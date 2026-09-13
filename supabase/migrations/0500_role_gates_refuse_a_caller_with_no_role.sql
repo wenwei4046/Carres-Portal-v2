@@ -19,7 +19,8 @@
 --      function(s) 0482 does not list (created or re-signed after 0482's list
 --      was taken, 0483-0498 included). Supabase grants anon EXECUTE on every
 --      new function by default; none has an unauthenticated caller.
---      authenticated is not touched.
+--      authenticated is not touched: its access is recorded before the
+--      revokes and the final block proves it did not change.
 --   B. FUNCTION BODIES. For 107 SECURITY DEFINER functions, the role gate
 --      is rewritten and nothing else:
 --          A not in (...)   ->   (A is null or A not in (...))
@@ -31,10 +32,20 @@
 --      the live definition after the dynamic renames of 0121/0123/0126/0167/
 --      0266/0272/0349 (which change bodies without a new `create function`, so
 --      replaying repo text would revert them). A function whose live body
---      matches neither is left untouched with a NOTICE, and production_check
---      lists it. The generator proves each rewrite: undoing the gate edits
---      returns the source byte for byte. create or replace keeps owner, grants
---      and comment.
+--      matches neither is left untouched, and the final block raises a
+--      WARNING naming it. The generator proves each rewrite: undoing the gate
+--      edits returns the source byte for byte. create or replace keeps owner,
+--      grants and comment.
+--      The seven hr_* functions whose gates 0266 already made fail closed are
+--      recognised by their live-body hash and reported as 'already'.
+--      SETTINGS: create or replace resets a function's SET clauses to those in
+--      the statement. Each rewrite checks that every setting the live function
+--      had is still there afterwards; if one would be lost, the rewrite is
+--      rolled back for that function alone and a WARNING names it.
+--      invoice_issue, order_create, order_dispatch and po_receive had no
+--      search_path at all; their rewrite pins `set search_path = public,
+--      pg_temp` (and names them public.<fn>), so a definer function cannot be
+--      steered by a caller's own search_path.
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO
 --   - No RLS or policy change. No table grant change.
@@ -50,6 +61,10 @@
 begin;
 
 -- Part A: guarded revokes (a signature absent in this database is skipped).
+-- Remember which of these authenticated can run, so the final block can prove
+-- this migration did not change that.
+create temp table _auth_before_0500 (fn regprocedure primary key) on commit drop;
+
 do $revoke$
 declare s text; p regprocedure;
 begin
@@ -128,7 +143,9 @@ begin
     'public.warehouse_set_working_hours(uuid, jsonb)'
   ]::text[]) loop
     p := to_regprocedure(s);
-    if p is not null then execute format('revoke all on function %s from public, anon', p); end if;
+    if p is null then continue; end if;
+    if has_function_privilege('authenticated', p, 'execute') then insert into _auth_before_0500 values (p); end if;
+    execute format('revoke all on function %s from public, anon', p);
   end loop;
 end
 $revoke$;
@@ -139,12 +156,13 @@ create temp table _g0500 (fn text primary key, result text) on commit drop;
 -- _add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)
 --   source: repo 0257_change_request_replace_and_service_addons.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public._add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '7cf649a7f2e83d3e9d263187a2a06339' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public._add_order_lines_0391_locked_impl(
   p_order_id uuid,
   p_lines jsonb,
@@ -442,10 +460,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('b74f971984b7077e2a2b7a1d53872182') then insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'already');
   else insert into _g0500 values ('_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_add_order_lines_0391_locked_impl(uuid, jsonb, text, uuid, jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -453,12 +475,13 @@ $g0500$;
 -- _import_autocount_order(jsonb)
 --   source: repo 0214_autocount_import_create_only.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._import_autocount_order(jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public._import_autocount_order(jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_import_autocount_order(jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b58bca1abf24119e16f6a8d2f85a38fb' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public._import_autocount_order(payload jsonb)
 returns jsonb
 language plpgsql
@@ -577,10 +600,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('_import_autocount_order(jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_import_autocount_order(jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_import_autocount_order(jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f391fc5a99044db06ecab073d8b8530b') then insert into _g0500 values ('_import_autocount_order(jsonb)', 'already');
   else insert into _g0500 values ('_import_autocount_order(jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_import_autocount_order(jsonb)';
   end if;
 end
 $g0500$;
@@ -588,12 +615,13 @@ $g0500$;
 -- _set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)
 --   source: repo 0230_orders_structured_address.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public._set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '4ca765124f05883a2375649acc5d5fd6' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public._set_order_address_0391_locked_impl(
   p_order_id uuid,
   p_address text,
@@ -663,10 +691,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('52c6a6f19929844f8693b95928b766a3') then insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'already');
   else insert into _g0500 values ('_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_set_order_address_0391_locked_impl(uuid, text, text, boolean, jsonb)';
   end if;
 end
 $g0500$;
@@ -674,12 +706,13 @@ $g0500$;
 -- _set_order_date_0391_locked_impl(uuid, date, date)
 --   source: repo 0165_add_proceed_date.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._set_order_date_0391_locked_impl(uuid, date, date)'); h text;
+declare p regprocedure := to_regprocedure('public._set_order_date_0391_locked_impl(uuid, date, date)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b4cea55bad34461397a1c01bb561b6c8' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public._set_order_date_0391_locked_impl(p_order_id uuid, p_date date, p_proceed_date date)
  returns jsonb
  language plpgsql
@@ -737,10 +770,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a39b4757b5ced79b8914970cc6541ccf') then insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'already');
   else insert into _g0500 values ('_set_order_date_0391_locked_impl(uuid, date, date)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_set_order_date_0391_locked_impl(uuid, date, date)';
   end if;
 end
 $g0500$;
@@ -748,12 +785,13 @@ $g0500$;
 -- _unproceed_order_0391_locked_impl(uuid)
 --   source: repo 0222_pos_proceed_lane_edits.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._unproceed_order_0391_locked_impl(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public._unproceed_order_0391_locked_impl(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '494e83ae14cd7a817556bcc073b0db37' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public._unproceed_order_0391_locked_impl(p_order_id uuid)
  returns jsonb
  language plpgsql
@@ -832,10 +870,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('1c69a46d3b153abb3d7fca549d6360f2') then insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'already');
   else insert into _g0500 values ('_unproceed_order_0391_locked_impl(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_unproceed_order_0391_locked_impl(uuid)';
   end if;
 end
 $g0500$;
@@ -843,12 +885,13 @@ $g0500$;
 -- _update_order_0391_locked_impl(uuid, jsonb)
 --   source: repo 0230_orders_structured_address.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public._update_order_0391_locked_impl(uuid, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public._update_order_0391_locked_impl(uuid, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'f3b891f392ab714003bef713d00d946c' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public._update_order_0391_locked_impl(p_order_id uuid, p_payload jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1036,10 +1079,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('1765cd3e121540760923ae3359efeb05') then insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'already');
   else insert into _g0500 values ('_update_order_0391_locked_impl(uuid, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', '_update_order_0391_locked_impl(uuid, jsonb)';
   end if;
 end
 $g0500$;
@@ -1047,12 +1094,13 @@ $g0500$;
 -- bd_convert_inquiry(uuid)
 --   source: repo 0072_bd_convert_inquiry.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.bd_convert_inquiry(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.bd_convert_inquiry(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('bd_convert_inquiry(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1d55945c044fff700af2f757117d9b4e' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.bd_convert_inquiry(p_inquiry_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -1117,10 +1165,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('bd_convert_inquiry(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('bd_convert_inquiry(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('bd_convert_inquiry(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a899b6ae207a9e9b68993c733bd0ee63') then insert into _g0500 values ('bd_convert_inquiry(uuid)', 'already');
   else insert into _g0500 values ('bd_convert_inquiry(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'bd_convert_inquiry(uuid)';
   end if;
 end
 $g0500$;
@@ -1128,12 +1180,13 @@ $g0500$;
 -- cancel_order(uuid, text)
 --   source: repo 0357_a_cancelled_order_voids_its_delivery_orders.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.cancel_order(uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.cancel_order(uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('cancel_order(uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'ce95ee6db7dae106353731c1a6990ad9' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.cancel_order(
   p_order_id uuid,
   p_reason   text
@@ -1227,10 +1280,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('cancel_order(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('cancel_order(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('cancel_order(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c759a9f1c5cf9823dbb228b12a5bcbad') then insert into _g0500 values ('cancel_order(uuid, text)', 'already');
   else insert into _g0500 values ('cancel_order(uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'cancel_order(uuid, text)';
   end if;
 end
 $g0500$;
@@ -1238,12 +1295,13 @@ $g0500$;
 -- cancel_order_change_request(uuid)
 --   source: repo 0233_order_change_requests_flow.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.cancel_order_change_request(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.cancel_order_change_request(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('cancel_order_change_request(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e46aab94515bf624572b428084cfe332' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.cancel_order_change_request(p_request_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1288,10 +1346,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('cancel_order_change_request(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('cancel_order_change_request(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('cancel_order_change_request(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c917daff7340e4de769c253a719b596d') then insert into _g0500 values ('cancel_order_change_request(uuid)', 'already');
   else insert into _g0500 values ('cancel_order_change_request(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'cancel_order_change_request(uuid)';
   end if;
 end
 $g0500$;
@@ -1299,12 +1361,13 @@ $g0500$;
 -- correction_work_close(uuid, text)
 --   source: repo 0332_a_consequence_becomes_work_that_outlives_the_tab.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.correction_work_close(uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.correction_work_close(uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('correction_work_close(uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '4338a6d9cd8298821c2955e2fbd94a37' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.correction_work_close(p_id uuid, p_note text default null)
 returns jsonb
 language plpgsql
@@ -1347,10 +1410,14 @@ begin
   return jsonb_build_object('id', p_id, 'state', 'closed');
 end $$
 $s0500a$;
-    insert into _g0500 values ('correction_work_close(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('correction_work_close(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('correction_work_close(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('1e785da6cc7587c8976e1383c3e6202b') then insert into _g0500 values ('correction_work_close(uuid, text)', 'already');
   else insert into _g0500 values ('correction_work_close(uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'correction_work_close(uuid, text)';
   end if;
 end
 $g0500$;
@@ -1358,12 +1425,13 @@ $g0500$;
 -- create_order(jsonb)
 --   source: repo 0230_orders_structured_address.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.create_order(jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.create_order(jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('create_order(jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e4be47a58a35d74d3c66112b36e8e597' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.create_order(payload jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1551,10 +1619,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('create_order(jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('create_order(jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('create_order(jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f9a841d5f0728cddb445dc1991cf3736') then insert into _g0500 values ('create_order(jsonb)', 'already');
   else insert into _g0500 values ('create_order(jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'create_order(jsonb)';
   end if;
 end
 $g0500$;
@@ -1562,12 +1634,13 @@ $g0500$;
 -- delivery_payment_approver_gate()
 --   source: repo 0362_money_in_full_before_delivery_or_the_owner_signs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.delivery_payment_approver_gate()'); h text;
+declare p regprocedure := to_regprocedure('public.delivery_payment_approver_gate()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('delivery_payment_approver_gate()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5c8731337789286ebdd05be4a351723e' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.delivery_payment_approver_gate()
 returns text
 language plpgsql
@@ -1602,10 +1675,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('delivery_payment_approver_gate()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('delivery_payment_approver_gate()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('delivery_payment_approver_gate()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('651e1fae05e0cc34db635d0f2820268e') then insert into _g0500 values ('delivery_payment_approver_gate()', 'already');
   else insert into _g0500 values ('delivery_payment_approver_gate()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'delivery_payment_approver_gate()';
   end if;
 end
 $g0500$;
@@ -1613,12 +1690,13 @@ $g0500$;
 -- delivery_settings_gate()
 --   source: repo 0488_delivery_settings_hold_the_partners_rules_and_templates.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.delivery_settings_gate()'); h text;
+declare p regprocedure := to_regprocedure('public.delivery_settings_gate()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('delivery_settings_gate()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b903f91d3902c4a7f8dece5861ba4674' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.delivery_settings_gate()
 returns void
 language plpgsql security definer
@@ -1645,10 +1723,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('delivery_settings_gate()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('delivery_settings_gate()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('delivery_settings_gate()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('180ce0d45b7bc18c2ad10587b2a963bd') then insert into _g0500 values ('delivery_settings_gate()', 'already');
   else insert into _g0500 values ('delivery_settings_gate()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'delivery_settings_gate()';
   end if;
 end
 $g0500$;
@@ -1656,12 +1738,13 @@ $g0500$;
 -- edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)
 --   source: repo 0258_edit_order_addon.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'd26f575881b56a440bf985764afccb33' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.edit_order_addon_unchecked_0258(
   p_order_id uuid,
   p_addon_id uuid,
@@ -1833,10 +1916,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('0186c95e65d71c70d9dc52d34592c114') then insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'already');
   else insert into _g0500 values ('edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'edit_order_addon_unchecked_0258(uuid, uuid, integer, jsonb, text, uuid)';
   end if;
 end
 $g0500$;
@@ -1844,12 +1931,13 @@ $g0500$;
 -- enforce_sku_price_cost_principal_only()
 --   source: repo 0226_operation_costing.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.enforce_sku_price_cost_principal_only()'); h text;
+declare p regprocedure := to_regprocedure('public.enforce_sku_price_cost_principal_only()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '4ed11e24cd061e53252193d5aad90734' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.enforce_sku_price_cost_principal_only()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1900,10 +1988,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('ca55b838ad67a1cf97f9677c9f71099f') then insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'already');
   else insert into _g0500 values ('enforce_sku_price_cost_principal_only()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'enforce_sku_price_cost_principal_only()';
   end if;
 end
 $g0500$;
@@ -1911,12 +2003,13 @@ $g0500$;
 -- finance_po_pay(text, numeric, payment_method, text)
 --   source: repo 0063_finance_ap_aging.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.finance_po_pay(text, numeric, payment_method, text)'); h text;
+declare p regprocedure := to_regprocedure('public.finance_po_pay(text, numeric, payment_method, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '3f21ee701ae21332a10b7fac9af2918a' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.finance_po_pay(
   p_po_id     text,
   p_amount    numeric,
@@ -1969,10 +2062,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('345f68dde1c5cb65a3e40a373b86c02a') then insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'already');
   else insert into _g0500 values ('finance_po_pay(text, numeric, payment_method, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'finance_po_pay(text, numeric, payment_method, text)';
   end if;
 end
 $g0500$;
@@ -1980,12 +2077,13 @@ $g0500$;
 -- finance_po_schedule(text, date)
 --   source: repo 0063_finance_ap_aging.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.finance_po_schedule(text, date)'); h text;
+declare p regprocedure := to_regprocedure('public.finance_po_schedule(text, date)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('finance_po_schedule(text, date)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '8d7334f8a1972797844e5e1d3868fee1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.finance_po_schedule(
   p_po_id          text,
   p_scheduled_for  date
@@ -2028,10 +2126,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('finance_po_schedule(text, date)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('finance_po_schedule(text, date)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('finance_po_schedule(text, date)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c27712a8d2c0c612ddb216e1c42632dc') then insert into _g0500 values ('finance_po_schedule(text, date)', 'already');
   else insert into _g0500 values ('finance_po_schedule(text, date)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'finance_po_schedule(text, date)';
   end if;
 end
 $g0500$;
@@ -2039,12 +2141,13 @@ $g0500$;
 -- finance_record_receipt(uuid, numeric, text, text, text)
 --   source: repo 0476_every_invoice_door_posts_and_a_method_is_a_setting.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.finance_record_receipt(uuid, numeric, text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.finance_record_receipt(uuid, numeric, text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '4f8ac5d7a99cacaac218efb6e342c083' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.finance_record_receipt(
   p_order_id uuid, p_amount numeric, p_method text, p_reference text,
   p_idempotency_key text default null
@@ -2058,10 +2161,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('9e4713c160f38668c81c1cb0170b8b0f') then insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'already');
   else insert into _g0500 values ('finance_record_receipt(uuid, numeric, text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'finance_record_receipt(uuid, numeric, text, text, text)';
   end if;
 end
 $g0500$;
@@ -2069,12 +2176,13 @@ $g0500$;
 -- hr_assign_dealer_bd(uuid, uuid)
 --   source: repo 0250_bd_commission.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_assign_dealer_bd(uuid, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_assign_dealer_bd(uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '26673ce2d33713d917ed70a85519b740' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_assign_dealer_bd(p_dealer_id uuid, p_user_id uuid)
 returns void
 language plpgsql
@@ -2117,10 +2225,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'rewritten');
-  elsif h in ('5baa1aeff44a5e296194cf61e839ba4a') then insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('5baa1aeff44a5e296194cf61e839ba4a', '0d6142c745718bbfcbf487dec571a0f2') then insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'already');
   else insert into _g0500 values ('hr_assign_dealer_bd(uuid, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_assign_dealer_bd(uuid, uuid)';
   end if;
 end
 $g0500$;
@@ -2128,12 +2240,13 @@ $g0500$;
 -- hr_commission_source(integer, integer)
 --   source: repo 0265_hr_source_exclude_imported_archive.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_commission_source(integer, integer)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_commission_source(integer, integer)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_commission_source(integer, integer)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '8fb2f228acb9f55eba54b269405636a5' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.hr_commission_source(p_year integer, p_month integer)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2284,10 +2397,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('hr_commission_source(integer, integer)', 'rewritten');
-  elsif h in ('138af038ef41df810885e2c641173361') then insert into _g0500 values ('hr_commission_source(integer, integer)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_commission_source(integer, integer)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_commission_source(integer, integer)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('138af038ef41df810885e2c641173361', 'e7d8143dbd3c39e26199a5fc9a737160') then insert into _g0500 values ('hr_commission_source(integer, integer)', 'already');
   else insert into _g0500 values ('hr_commission_source(integer, integer)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_commission_source(integer, integer)';
   end if;
 end
 $g0500$;
@@ -2295,12 +2412,13 @@ $g0500$;
 -- hr_set_position(uuid, uuid)
 --   source: repo 0254_hr_team_hierarchy.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_set_position(uuid, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_set_position(uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_set_position(uuid, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '69a384d68124b6f1aefb9da99138b188' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_set_position(p_user_id uuid, p_position_id uuid)
 returns void
 language plpgsql
@@ -2343,10 +2461,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('hr_set_position(uuid, uuid)', 'rewritten');
-  elsif h in ('f4a6ad88f4038d95c8e58cde707b8a1e') then insert into _g0500 values ('hr_set_position(uuid, uuid)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_set_position(uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_set_position(uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('f4a6ad88f4038d95c8e58cde707b8a1e', '12059cc837f89aea0c35f538dcdb4d3a') then insert into _g0500 values ('hr_set_position(uuid, uuid)', 'already');
   else insert into _g0500 values ('hr_set_position(uuid, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_set_position(uuid, uuid)';
   end if;
 end
 $g0500$;
@@ -2354,12 +2476,13 @@ $g0500$;
 -- hr_set_position_duty(uuid, text, boolean)
 --   source: repo 0260_hr_duty_keys.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_set_position_duty(uuid, text, boolean)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_set_position_duty(uuid, text, boolean)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1980d0a20b08e2f3dd5600696f2b7b3c' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_set_position_duty(
   p_position_id uuid,
   p_duty_key    text,
@@ -2403,10 +2526,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'rewritten');
-  elsif h in ('176830cc84208251f13b8cfdbbc41809') then insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('176830cc84208251f13b8cfdbbc41809', '43a57a774c333b4a3c9705926c5f5b94') then insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'already');
   else insert into _g0500 values ('hr_set_position_duty(uuid, text, boolean)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_set_position_duty(uuid, text, boolean)';
   end if;
 end
 $g0500$;
@@ -2414,12 +2541,13 @@ $g0500$;
 -- hr_set_reports_to(uuid, uuid)
 --   source: repo 0260_hr_duty_keys.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_set_reports_to(uuid, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_set_reports_to(uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'f7f0ae2c08672e6207a63d6018f734fa' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_set_reports_to(p_user_id uuid, p_manager_id uuid)
 returns void
 language plpgsql
@@ -2474,10 +2602,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'rewritten');
-  elsif h in ('f2ad90160080b7348706d150907c904f') then insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('f2ad90160080b7348706d150907c904f', 'e32c964705bf2db0871511e988af578f') then insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'already');
   else insert into _g0500 values ('hr_set_reports_to(uuid, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_set_reports_to(uuid, uuid)';
   end if;
 end
 $g0500$;
@@ -2485,12 +2617,13 @@ $g0500$;
 -- hr_set_staff_code(text, uuid, text)
 --   source: repo 0254_hr_team_hierarchy.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_set_staff_code(text, uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.hr_set_staff_code(text, uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'be0ca6f81b35c435b9d93b6860fee6d7' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_set_staff_code(
   p_kind text, p_id uuid, p_code text)
 returns void
@@ -2535,10 +2668,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'rewritten');
-  elsif h in ('417e26127d58dc627feaee2e4343e4bf') then insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('417e26127d58dc627feaee2e4343e4bf', '69263443bec64134769519a7a8ec8296') then insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'already');
   else insert into _g0500 values ('hr_set_staff_code(text, uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_set_staff_code(text, uuid, text)';
   end if;
 end
 $g0500$;
@@ -2546,12 +2683,13 @@ $g0500$;
 -- hr_team_source()
 --   source: repo 0259_org_departments.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.hr_team_source()'); h text;
+declare p regprocedure := to_regprocedure('public.hr_team_source()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('hr_team_source()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '6caa5fb4e7654c94a3a0118264995a5a' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.hr_team_source()
 returns jsonb
 language plpgsql
@@ -2627,10 +2765,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('hr_team_source()', 'rewritten');
-  elsif h in ('6abf27ce2c1de49bf1aeaa5bc5759a9b') then insert into _g0500 values ('hr_team_source()', 'already');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('hr_team_source()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('hr_team_source()', 'live settings would be lost - left untouched');
+    end;
+  elsif h in ('6abf27ce2c1de49bf1aeaa5bc5759a9b', '05fb9c94b6bc44162802fd97c6c704a4') then insert into _g0500 values ('hr_team_source()', 'already');
   else insert into _g0500 values ('hr_team_source()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'hr_team_source()';
   end if;
 end
 $g0500$;
@@ -2638,12 +2780,13 @@ $g0500$;
 -- import_autocount_orders(jsonb)
 --   source: repo 0143_autocount_import_batch.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.import_autocount_orders(jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.import_autocount_orders(jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('import_autocount_orders(jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '57afe89616c5f2cd9491a25ec1b23652' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.import_autocount_orders(payloads jsonb)
 returns jsonb
 language plpgsql
@@ -2686,10 +2829,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('import_autocount_orders(jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('import_autocount_orders(jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('import_autocount_orders(jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('762b510d7f4e6e4804072cc789a2da1a') then insert into _g0500 values ('import_autocount_orders(jsonb)', 'already');
   else insert into _g0500 values ('import_autocount_orders(jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'import_autocount_orders(jsonb)';
   end if;
 end
 $g0500$;
@@ -2698,18 +2845,21 @@ $g0500$;
 --   source: repo 0003_rpcs.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.invoice_issue(uuid, numeric, numeric)'); h text;
+declare p regprocedure := to_regprocedure('public.invoice_issue(uuid, numeric, numeric)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'cfcc247882ed4d327cca02856a7d4a70' then
-    execute $s0500a$
-create or replace function invoice_issue(
+    begin
+      execute $s0500a$
+create or replace function public.invoice_issue(
   p_order_id   uuid,
   p_amount     numeric,
   p_tax_amount numeric
 ) returns invoices
-language plpgsql security definer as $$
+language plpgsql security definer
+ set search_path = public, pg_temp
+as $$
 declare
   v_inv invoices;
   v_no  text;
@@ -2734,14 +2884,21 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '2ce2bb3cec81405bf4a8be3a17c27eae' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.invoice_issue(p_order_id uuid, p_amount numeric, p_tax_amount numeric)
  RETURNS invoices
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+ set search_path = public, pg_temp
+as $function$
 declare
   v_inv invoices;
   v_no  text;
@@ -2766,10 +2923,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('0a98b89a97d90e9c423dc9035c29f109', '8c6aa19e98db334701dfe6b8d4ede67a') then insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'already');
   else insert into _g0500 values ('invoice_issue(uuid, numeric, numeric)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'invoice_issue(uuid, numeric, numeric)';
   end if;
 end
 $g0500$;
@@ -2777,12 +2938,13 @@ $g0500$;
 -- issue_record_action_result(uuid, uuid, text, text, jsonb)
 --   source: repo 0454_an_issue_action_has_one_identity_and_one_result.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.issue_record_action_result(uuid, uuid, text, text, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.issue_record_action_result(uuid, uuid, text, text, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '82490e148a2fb4e3c99d9f99797efc3f' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.issue_record_action_result(
   p_issue_id uuid,
   p_action_id uuid,
@@ -2853,10 +3015,14 @@ begin
 end
 $fn$
 $s0500a$;
-    insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('0d4568d2046d92f1e959d9a4422b337e') then insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'already');
   else insert into _g0500 values ('issue_record_action_result(uuid, uuid, text, text, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'issue_record_action_result(uuid, uuid, text, text, jsonb)';
   end if;
 end
 $g0500$;
@@ -2864,12 +3030,13 @@ $g0500$;
 -- logistics_confirm_proceed_request(uuid, uuid)
 --   source: repo 0038b_logistics_v2_residual_rpc_sweep.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_confirm_proceed_request(uuid, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_confirm_proceed_request(uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1c2d50843656010d366029af205d9afa' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_confirm_proceed_request(
   p_order_id     uuid,
   p_warehouse_id uuid default null
@@ -3013,10 +3180,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('be37dfcc39a7b5f369cef0db0e5b5f16') then insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'already');
   else insert into _g0500 values ('logistics_confirm_proceed_request(uuid, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_confirm_proceed_request(uuid, uuid)';
   end if;
 end
 $g0500$;
@@ -3024,12 +3195,13 @@ $g0500$;
 -- logistics_dispatch_customer_leg(uuid, uuid, date, boolean)
 --   source: repo 0051_logistics_rpcs_chunk2.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_dispatch_customer_leg(uuid, uuid, date, boolean)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_dispatch_customer_leg(uuid, uuid, date, boolean)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b3182d0c9676ac4f7e1669e0b2bb5075' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.logistics_dispatch_customer_leg(
   p_thread_id            uuid,
   p_partner_id           uuid,
@@ -3142,10 +3314,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('58f549f6866cf26461c0c10fe0bb07de') then insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'already');
   else insert into _g0500 values ('logistics_dispatch_customer_leg(uuid, uuid, date, boolean)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_dispatch_customer_leg(uuid, uuid, date, boolean)';
   end if;
 end
 $g0500$;
@@ -3153,12 +3329,13 @@ $g0500$;
 -- logistics_receive_po_with_do(text, text, text, jsonb)
 --   source: repo 0120_receive_po_partial_thread_gate.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_receive_po_with_do(text, text, text, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_receive_po_with_do(text, text, text, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '9c4e783ff427404d103868b3dd4f5a9f' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_receive_po_with_do(
   p_po_id        text,
   p_do_file_path text,
@@ -3399,10 +3576,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('89dc3155ac4ac0dab33c7d206186ea7a') then insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'already');
   else insert into _g0500 values ('logistics_receive_po_with_do(text, text, text, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_receive_po_with_do(text, text, text, jsonb)';
   end if;
 end
 $g0500$;
@@ -3410,12 +3591,13 @@ $g0500$;
 -- logistics_receive_threads(text, uuid[], text, text, text)
 --   source: repo 0108_supplier_thread_pickup_fixes.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_receive_threads(text, uuid[], text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_receive_threads(text, uuid[], text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '067e1c69414a26730813ceee0d31cc29' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.logistics_receive_threads(
   p_po_id        text,
   p_thread_ids   uuid[],
@@ -3511,10 +3693,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('b4d1c3b742c8785d77733175f89a3fc8') then insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'already');
   else insert into _g0500 values ('logistics_receive_threads(text, uuid[], text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_receive_threads(text, uuid[], text, text, text)';
   end if;
 end
 $g0500$;
@@ -3522,12 +3708,13 @@ $g0500$;
 -- logistics_relocate_warehouse(text, uuid)
 --   source: repo 0053_logistics_rpcs_chunk2_part2.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_relocate_warehouse(text, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_relocate_warehouse(text, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '940e23f97da12ace31fea0c841d9fdf9' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.logistics_relocate_warehouse(
   p_po_id            text,
   p_new_warehouse_id uuid
@@ -3601,10 +3788,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('426dc6064dd91cdda8d3ea7a7632d10f') then insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'already');
   else insert into _g0500 values ('logistics_relocate_warehouse(text, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_relocate_warehouse(text, uuid)';
   end if;
 end
 $g0500$;
@@ -3612,12 +3803,13 @@ $g0500$;
 -- logistics_resume_dispatch_from_waiting(uuid)
 --   source: repo 0051_logistics_rpcs_chunk2.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_resume_dispatch_from_waiting(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_resume_dispatch_from_waiting(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'a400085098493f8f6fd2627714081623' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.logistics_resume_dispatch_from_waiting(p_thread_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -3711,10 +3903,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('66986cae729fd4bf04e257cecb9291a5') then insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'already');
   else insert into _g0500 values ('logistics_resume_dispatch_from_waiting(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_resume_dispatch_from_waiting(uuid)';
   end if;
 end
 $g0500$;
@@ -3722,12 +3918,13 @@ $g0500$;
 -- logistics_revert_order_dispatched_to_ready(uuid)
 --   source: repo 0095_revert_state_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_revert_order_dispatched_to_ready(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_revert_order_dispatched_to_ready(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5c6660a4f7bdeb1fd633418aa1bcfad1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_revert_order_dispatched_to_ready(
   p_order_id uuid
 ) returns jsonb
@@ -3794,10 +3991,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f84a3a55b6ed1509fcce493f7492b48d') then insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'already');
   else insert into _g0500 values ('logistics_revert_order_dispatched_to_ready(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_revert_order_dispatched_to_ready(uuid)';
   end if;
 end
 $g0500$;
@@ -3805,12 +4006,13 @@ $g0500$;
 -- logistics_revert_order_proceed_to_placed(uuid)
 --   source: repo 0095_revert_state_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_revert_order_proceed_to_placed(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_revert_order_proceed_to_placed(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '0c8178ed1c54552eccb1cef762beb577' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_revert_order_proceed_to_placed(
   p_order_id uuid
 ) returns jsonb
@@ -3870,10 +4072,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('3e9f3f11ca6c712037b7283ef6ffea78') then insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'already');
   else insert into _g0500 values ('logistics_revert_order_proceed_to_placed(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_revert_order_proceed_to_placed(uuid)';
   end if;
 end
 $g0500$;
@@ -3881,12 +4087,13 @@ $g0500$;
 -- logistics_stock_alerts()
 --   source: repo 0054_stock_balances_thresholds.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_stock_alerts()'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_stock_alerts()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_stock_alerts()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '852e80c2c3b7db08d85aff8396677679' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_stock_alerts()
 returns table (
   sku           text,
@@ -3927,10 +4134,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_stock_alerts()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_stock_alerts()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_stock_alerts()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('8535795d289f1dd73692d108ef85f82d') then insert into _g0500 values ('logistics_stock_alerts()', 'already');
   else insert into _g0500 values ('logistics_stock_alerts()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_stock_alerts()';
   end if;
 end
 $g0500$;
@@ -3938,12 +4149,13 @@ $g0500$;
 -- logistics_supplier_ready_confirm(text)
 --   source: repo 0034_logistics_rpcs_v3.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.logistics_supplier_ready_confirm(text)'); h text;
+declare p regprocedure := to_regprocedure('public.logistics_supplier_ready_confirm(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5f95f7490ed2e26da28bbdf28f591717' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.logistics_supplier_ready_confirm(p_po_id text)
 returns jsonb
 language plpgsql
@@ -4022,10 +4234,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c3794b9de8e3c4830977a53f8bfd38ef') then insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'already');
   else insert into _g0500 values ('logistics_supplier_ready_confirm(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'logistics_supplier_ready_confirm(text)';
   end if;
 end
 $g0500$;
@@ -4034,12 +4250,13 @@ $g0500$;
 --   source: repo 0053_logistics_rpcs_chunk2_part2.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.lp_accept_inbound_delivery(text)'); h text;
+declare p regprocedure := to_regprocedure('public.lp_accept_inbound_delivery(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'a36b48ff1ec3cbaf2ee70b90b72b2c64' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.lp_accept_inbound_delivery(p_po_id text)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -4099,9 +4316,15 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '953e6917bb3d23714a3287904ce81d52' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.lp_accept_inbound_delivery(p_po_id text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4163,10 +4386,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f3623a484acf7c28433baf301f274bd0', 'ef92efaa63d0d9c3117480fea2ba8d06') then insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'already');
   else insert into _g0500 values ('lp_accept_inbound_delivery(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'lp_accept_inbound_delivery(text)';
   end if;
 end
 $g0500$;
@@ -4174,12 +4401,13 @@ $g0500$;
 -- lp_accept_order(uuid)
 --   source: repo 0147_lp_request_accept_reject.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.lp_accept_order(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.lp_accept_order(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('lp_accept_order(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c2f5d9d396d7f457004b68815a737588' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.lp_accept_order(p_order_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4251,10 +4479,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('lp_accept_order(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('lp_accept_order(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('lp_accept_order(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a229687bd4d28259e5a1179eee94ae94') then insert into _g0500 values ('lp_accept_order(uuid)', 'already');
   else insert into _g0500 values ('lp_accept_order(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'lp_accept_order(uuid)';
   end if;
 end
 $g0500$;
@@ -4262,12 +4494,13 @@ $g0500$;
 -- lp_reject_order(uuid, text)
 --   source: repo 0152_auto_dispatch_and_reject_branch.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.lp_reject_order(uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.lp_reject_order(uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('lp_reject_order(uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'a2c08b06a9c66692496c1ae98ce176b1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.lp_reject_order(
   p_order_id uuid,
   p_reason   text
@@ -4390,10 +4623,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('lp_reject_order(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('lp_reject_order(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('lp_reject_order(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('ee2f093c01f66d53ef058c98fec334f0') then insert into _g0500 values ('lp_reject_order(uuid, text)', 'already');
   else insert into _g0500 values ('lp_reject_order(uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'lp_reject_order(uuid, text)';
   end if;
 end
 $g0500$;
@@ -4401,12 +4638,13 @@ $g0500$;
 -- operation_add_annotation(uuid, text, text)
 --   source: repo 0138_order_annotations.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_add_annotation(uuid, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.operation_add_annotation(uuid, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c7e6f2ed3e7f3803626a300984cdfbc5' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.operation_add_annotation(
   p_order_id uuid,
   p_content  text,
@@ -4455,10 +4693,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('4834a26f4d337805150e2a0bfc152f5b') then insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'already');
   else insert into _g0500 values ('operation_add_annotation(uuid, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_add_annotation(uuid, text, text)';
   end if;
 end
 $g0500$;
@@ -4466,12 +4708,13 @@ $g0500$;
 -- operation_get_timeline(uuid)
 --   source: repo 0138_order_annotations.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_get_timeline(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.operation_get_timeline(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_get_timeline(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '0c8ac7ca85cbaf10c233db1b495e56c1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.operation_get_timeline(
   p_order_id uuid
 )
@@ -4525,10 +4768,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('operation_get_timeline(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_get_timeline(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_get_timeline(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('6ab2cedacbf94a3031526133af3f249a') then insert into _g0500 values ('operation_get_timeline(uuid)', 'already');
   else insert into _g0500 values ('operation_get_timeline(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_get_timeline(uuid)';
   end if;
 end
 $g0500$;
@@ -4536,12 +4783,13 @@ $g0500$;
 -- operation_receive_po_with_do(text, text, text, jsonb, uuid)
 --   source: repo 0453_a_quantity_row_is_keyed_not_identified.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_receive_po_with_do(text, text, text, jsonb, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.operation_receive_po_with_do(text, text, text, jsonb, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1aaea6b0e8c19253c88f23558a31a9cc' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.operation_receive_po_with_do(
   p_po_id text,
   p_do_file_path text,
@@ -5094,10 +5342,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('353847b4eae361993e6972b77c9c8417') then insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'already');
   else insert into _g0500 values ('operation_receive_po_with_do(text, text, text, jsonb, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_receive_po_with_do(text, text, text, jsonb, uuid)';
   end if;
 end
 $g0500$;
@@ -5105,12 +5357,13 @@ $g0500$;
 -- operation_receive_threads(text, uuid[], text, text, text)
 --   source: repo 0152_auto_dispatch_and_reject_branch.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_receive_threads(text, uuid[], text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.operation_receive_threads(text, uuid[], text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'ec45d1a3881d25b50ed8ca09df079009' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.operation_receive_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5212,10 +5465,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a3a2071490f803a6a1a53e4269207953') then insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'already');
   else insert into _g0500 values ('operation_receive_threads(text, uuid[], text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_receive_threads(text, uuid[], text, text, text)';
   end if;
 end
 $g0500$;
@@ -5223,12 +5480,13 @@ $g0500$;
 -- operation_request_order_change(uuid, text, jsonb)
 --   source: repo 0326_a_promise_is_never_moved_silently.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_request_order_change(uuid, text, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.operation_request_order_change(uuid, text, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1eb85cdfd293c0770fb7ed230847ca7d' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.operation_request_order_change(
   p_order_id uuid,
   p_kind     text,
@@ -5352,10 +5610,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('77e7b633acfcc2ccc1bc40cdf0d26154') then insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'already');
   else insert into _g0500 values ('operation_request_order_change(uuid, text, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_request_order_change(uuid, text, jsonb)';
   end if;
 end
 $g0500$;
@@ -5364,12 +5626,13 @@ $g0500$;
 --   source: repo 0368_one_question_one_number_and_bulk_is_not_bindable.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.operation_stock_alerts()'); h text;
+declare p regprocedure := to_regprocedure('public.operation_stock_alerts()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('operation_stock_alerts()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '3bfdfd33a235f9e825a81f0e4e680246' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.operation_stock_alerts()
 returns table(sku text, warehouse_id uuid, qty integer, reserved integer,
               effective integer, low_threshold integer, shortage integer)
@@ -5405,9 +5668,15 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('operation_stock_alerts()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_stock_alerts()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_stock_alerts()', 'live settings would be lost - left untouched');
+    end;
   elsif h = 'f57890a742efa03a712adbc947af43d9' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.operation_stock_alerts()
  RETURNS TABLE(sku text, warehouse_id uuid, qty integer, reserved integer, effective integer, low_threshold integer, shortage integer)
  LANGUAGE plpgsql
@@ -5440,10 +5709,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('operation_stock_alerts()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('operation_stock_alerts()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('operation_stock_alerts()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('d8c57805be5ff615b2f2b30110533fc9', '6285c565858dbc2090c8a09548e82bb3') then insert into _g0500 values ('operation_stock_alerts()', 'already');
   else insert into _g0500 values ('operation_stock_alerts()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'operation_stock_alerts()';
   end if;
 end
 $g0500$;
@@ -5451,12 +5724,13 @@ $g0500$;
 -- ops_set_reorder_point(text, integer, integer, text)
 --   source: repo 0286_stock_reorder_points.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.ops_set_reorder_point(text, integer, integer, text)'); h text;
+declare p regprocedure := to_regprocedure('public.ops_set_reorder_point(text, integer, integer, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '521d2cfc2e5c508766d31b9737a46414' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.ops_set_reorder_point(
   p_sku       text,
   p_point     int,
@@ -5527,10 +5801,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c4bc7d2dc47119a972afee9e91ba17c6') then insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'already');
   else insert into _g0500 values ('ops_set_reorder_point(text, integer, integer, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'ops_set_reorder_point(text, integer, integer, text)';
   end if;
 end
 $g0500$;
@@ -5538,12 +5816,13 @@ $g0500$;
 -- ops_stock_flag_repair(uuid, boolean)
 --   source: repo 0139_wire_activity_log.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.ops_stock_flag_repair(uuid, boolean)'); h text;
+declare p regprocedure := to_regprocedure('public.ops_stock_flag_repair(uuid, boolean)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1ab83a166e8c8f999b436870587d3f7b' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.ops_stock_flag_repair(p_item_id uuid, p_flag boolean)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -5593,10 +5872,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a4cc507f6991fac81c10eaab0ac11586') then insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'already');
   else insert into _g0500 values ('ops_stock_flag_repair(uuid, boolean)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'ops_stock_flag_repair(uuid, boolean)';
   end if;
 end
 $g0500$;
@@ -5605,12 +5888,13 @@ $g0500$;
 --   source: repo 0471_a_reserved_unit_names_the_sales_order_line.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.ops_stock_reassign(uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.ops_stock_reassign(uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '40babb6b94908030229b95cc51dbdfe7' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.ops_stock_reassign(p_item_id uuid, p_new_ref text)
 returns uuid
 language plpgsql
@@ -5659,9 +5943,15 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h = 'e1e00647c4ac724a1e2b1b29f439e15d' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.ops_stock_reassign(p_item_id uuid, p_new_ref text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5706,10 +5996,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('41f0b18659be8de3f601d8409f78c29b', '41dc5d15cad52605f30ea9731c9f611b') then insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'already');
   else insert into _g0500 values ('ops_stock_reassign(uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'ops_stock_reassign(uuid, text)';
   end if;
 end
 $g0500$;
@@ -5718,12 +6012,13 @@ $g0500$;
 --   source: repo 0471_a_reserved_unit_names_the_sales_order_line.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.ops_stock_release(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.ops_stock_release(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('ops_stock_release(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'd6274a0d0c756621142cae991ad4be44' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.ops_stock_release(p_item_id uuid)
 returns uuid
 language plpgsql
@@ -5772,9 +6067,15 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('ops_stock_release(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_release(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_release(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '985ec1f2af1af22c8ae2eda785542da8' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.ops_stock_release(p_item_id uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5821,10 +6122,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('ops_stock_release(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_release(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_release(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('9f24c7da608bbe3ea7c35017d45cd619', '613865564afff56c9024f8bed4bef818') then insert into _g0500 values ('ops_stock_release(uuid)', 'already');
   else insert into _g0500 values ('ops_stock_release(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'ops_stock_release(uuid)';
   end if;
 end
 $g0500$;
@@ -5833,12 +6138,13 @@ $g0500$;
 --   source: repo 0322_the_pool_can_say_it_was_used_instead_of_ordering.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.ops_stock_takeout(uuid, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.ops_stock_takeout(uuid, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '862710c2dc0860910397fe5e825d7cbd' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.ops_stock_takeout(
   p_item_id uuid,
   p_reason  text default null,
@@ -5919,9 +6225,15 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h = 'aab0e3f3daadbae5fe4aa490f83a8fb4' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.ops_stock_takeout(p_item_id uuid, p_reason text DEFAULT NULL::text, p_note text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5996,10 +6308,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('cb0fc8be63859bbf8fc2b177a3990e73', '95af52919f86c6b7e9813aae362985e0') then insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'already');
   else insert into _g0500 values ('ops_stock_takeout(uuid, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'ops_stock_takeout(uuid, text, text)';
   end if;
 end
 $g0500$;
@@ -6008,15 +6324,18 @@ $g0500$;
 --   source: repo 0003_rpcs.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.order_create(jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.order_create(jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('order_create(jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '840b62589d146b8bef3832b4ff7ce143' then
-    execute $s0500a$
-create or replace function order_create(p_payload jsonb)
+    begin
+      execute $s0500a$
+create or replace function public.order_create(p_payload jsonb)
 returns orders
-language plpgsql security definer as $$
+language plpgsql security definer
+ set search_path = public, pg_temp
+as $$
 declare
   v_order  orders;
   v_dl     int;
@@ -6096,14 +6415,21 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('order_create(jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('order_create(jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('order_create(jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h = 'eda006b431e304870efb2ee36bf67746' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.order_create(p_payload jsonb)
  RETURNS orders
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+ set search_path = public, pg_temp
+as $function$
 declare
   v_order  orders;
   v_so     int;
@@ -6183,10 +6509,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('order_create(jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('order_create(jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('order_create(jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('9b6c2df2750a9c967e58697144b606e9', 'e9c70f482bc6c77c5457ad0e96314739') then insert into _g0500 values ('order_create(jsonb)', 'already');
   else insert into _g0500 values ('order_create(jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'order_create(jsonb)';
   end if;
 end
 $g0500$;
@@ -6195,18 +6525,21 @@ $g0500$;
 --   source: repo 0003_rpcs.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.order_dispatch(uuid, uuid, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.order_dispatch(uuid, uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'bfd3466928e7a062f054d7d07c78957e' then
-    execute $s0500a$
-create or replace function order_dispatch(
+    begin
+      execute $s0500a$
+create or replace function public.order_dispatch(
   p_order_id      uuid,
   p_partner_id    uuid,
   p_warehouse_id  uuid
 ) returns orders
-language plpgsql security definer as $$
+language plpgsql security definer
+ set search_path = public, pg_temp
+as $$
 declare v_order orders;
 begin
   if (public.app_role() is null or public.app_role() not in ('logistics','principal')) then
@@ -6241,14 +6574,21 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h = 'a1d2161841995a561e31cf99269b9cc5' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.order_dispatch(p_order_id uuid, p_partner_id uuid, p_warehouse_id uuid)
  RETURNS orders
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+ set search_path = public, pg_temp
+as $function$
 declare v_order orders;
 begin
   if (public.app_role() is null or public.app_role() not in ('operation','principal')) then
@@ -6283,10 +6623,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('69540cbe96bb1862d56c8a90c98708c1', '5971f4e125e520165f247eefd6685699') then insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'already');
   else insert into _g0500 values ('order_dispatch(uuid, uuid, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'order_dispatch(uuid, uuid, uuid)';
   end if;
 end
 $g0500$;
@@ -6294,12 +6638,13 @@ $g0500$;
 -- partner_accept_pickup(text)
 --   source: repo 0080_partner_pickup_state_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_accept_pickup(text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_accept_pickup(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_accept_pickup(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '7f325ea96d1b0e624f178bdbfde59f02' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.partner_accept_pickup(p_po_id text)
 returns jsonb
 language plpgsql
@@ -6361,10 +6706,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('partner_accept_pickup(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_accept_pickup(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_accept_pickup(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('341dc79056a662bfedffd4ba44872baa') then insert into _g0500 values ('partner_accept_pickup(text)', 'already');
   else insert into _g0500 values ('partner_accept_pickup(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_accept_pickup(text)';
   end if;
 end
 $g0500$;
@@ -6372,12 +6721,13 @@ $g0500$;
 -- partner_arrived_at_warehouse(text)
 --   source: repo 0082_partner_arrived_at_warehouse_rpc.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_arrived_at_warehouse(text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_arrived_at_warehouse(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '6dd0dd1897e9420fc2a362a8efdf7a60' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.partner_arrived_at_warehouse(p_po_id text)
 returns jsonb
 language plpgsql
@@ -6434,10 +6784,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('6c595982659db52d8666ccc8f4c0b459') then insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'already');
   else insert into _g0500 values ('partner_arrived_at_warehouse(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_arrived_at_warehouse(text)';
   end if;
 end
 $g0500$;
@@ -6445,12 +6799,13 @@ $g0500$;
 -- partner_attach_pod(uuid, text, text, text, boolean, text, text)
 --   source: repo 0151_delivery_esign.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_attach_pod(uuid, text, text, text, boolean, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_attach_pod(uuid, text, text, text, boolean, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c20a0879a8ca995811a295ae21c9a672' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.partner_attach_pod(
   p_thread_id     uuid,
   p_pod_path      text,
@@ -6547,10 +6902,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('7aa72ba22983221bc173bb4626f12d47') then insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'already');
   else insert into _g0500 values ('partner_attach_pod(uuid, text, text, text, boolean, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_attach_pod(uuid, text, text, text, boolean, text, text)';
   end if;
 end
 $g0500$;
@@ -6558,12 +6917,13 @@ $g0500$;
 -- partner_mark_picked_up(text)
 --   source: repo 0080_partner_pickup_state_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_mark_picked_up(text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_mark_picked_up(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_mark_picked_up(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1cb0cef70b6500332cbb5031214840f3' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.partner_mark_picked_up(p_po_id text)
 returns jsonb
 language plpgsql
@@ -6621,10 +6981,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('partner_mark_picked_up(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_mark_picked_up(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_mark_picked_up(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('8277c76f9d35b7065b5ef4afba29ea96') then insert into _g0500 values ('partner_mark_picked_up(text)', 'already');
   else insert into _g0500 values ('partner_mark_picked_up(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_mark_picked_up(text)';
   end if;
 end
 $g0500$;
@@ -6632,12 +6996,13 @@ $g0500$;
 -- partner_mark_pickup_collected(uuid)
 --   source: repo 0119_partner_mark_pickup_collected.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_mark_pickup_collected(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_mark_pickup_collected(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5e3422e5a18a6453c660c8539efc22ca' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.partner_mark_pickup_collected(
   p_event_id uuid
 ) RETURNS jsonb
@@ -6695,10 +7060,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('7af2fd54d931655d8a6f6256362d23fe') then insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'already');
   else insert into _g0500 values ('partner_mark_pickup_collected(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_mark_pickup_collected(uuid)';
   end if;
 end
 $g0500$;
@@ -6706,12 +7075,13 @@ $g0500$;
 -- partner_orders_for_threads(uuid[])
 --   source: repo 0130_cancelled_order_filter_audit.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_orders_for_threads(uuid[])'); h text;
+declare p regprocedure := to_regprocedure('public.partner_orders_for_threads(uuid[])'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c60a93cf8f1c1b445d9ecea803d42775' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.partner_orders_for_threads(p_order_ids uuid[])
  RETURNS TABLE(id uuid, so integer, customer_name text, delivery_date date)
  LANGUAGE plpgsql
@@ -6745,10 +7115,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('090c028764705ca44e5677a93d8febaa') then insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'already');
   else insert into _g0500 values ('partner_orders_for_threads(uuid[])', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_orders_for_threads(uuid[])';
   end if;
 end
 $g0500$;
@@ -6756,12 +7130,13 @@ $g0500$;
 -- partner_pickup_threads(text, uuid[], text, text, text)
 --   source: repo 0152_auto_dispatch_and_reject_branch.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_pickup_threads(text, uuid[], text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_pickup_threads(text, uuid[], text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'f4846ff9fa7b4c3515333d8049a80161' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.partner_pickup_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6880,10 +7255,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('862bc00a056b1e00960a7772c2e73e3a') then insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'already');
   else insert into _g0500 values ('partner_pickup_threads(text, uuid[], text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_pickup_threads(text, uuid[], text, text, text)';
   end if;
 end
 $g0500$;
@@ -6892,12 +7271,13 @@ $g0500$;
 --   source: repo 0090_partner_receive_sofa_flow.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_reject_customer(text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.partner_reject_customer(text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_reject_customer(text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b69daf80b514e311d9c8f26e45298b93' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.partner_reject_customer(
   p_po_id  text,
   p_reason text DEFAULT ''
@@ -6980,9 +7360,15 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('partner_reject_customer(text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_reject_customer(text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_reject_customer(text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '91ced0897d03520214076f5ce490f3ce' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.partner_reject_customer(p_po_id text, p_reason text DEFAULT ''::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7064,10 +7450,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('partner_reject_customer(text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_reject_customer(text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_reject_customer(text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('a7e2f13268109f9dfb49307a1a273d77', 'bb3e24d0204b309d177f42e1d70dd72d') then insert into _g0500 values ('partner_reject_customer(text, text)', 'already');
   else insert into _g0500 values ('partner_reject_customer(text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_reject_customer(text, text)';
   end if;
 end
 $g0500$;
@@ -7075,12 +7465,13 @@ $g0500$;
 -- partner_threads_to_deliver()
 --   source: repo 0129_deep_audit_cascade_fixes.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.partner_threads_to_deliver()'); h text;
+declare p regprocedure := to_regprocedure('public.partner_threads_to_deliver()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('partner_threads_to_deliver()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5320d002f568e644344fe3ee9db09f18' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.partner_threads_to_deliver()
  RETURNS TABLE(thread_id uuid, order_id uuid, po_id text, customer_name text, customer_address text, customer_phone text, dispatched_at timestamp with time zone, confirm_delivery_date date, do_number text, operation_stage text, delivered_at timestamp with time zone)
  LANGUAGE plpgsql
@@ -7135,10 +7526,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('partner_threads_to_deliver()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('partner_threads_to_deliver()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('partner_threads_to_deliver()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('3866808d636901d7725c8c110f82bb09') then insert into _g0500 values ('partner_threads_to_deliver()', 'already');
   else insert into _g0500 values ('partner_threads_to_deliver()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'partner_threads_to_deliver()';
   end if;
 end
 $g0500$;
@@ -7146,12 +7541,13 @@ $g0500$;
 -- patch_delivery_stop(uuid, integer, jsonb)
 --   source: repo 0156_delivery_stops.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.patch_delivery_stop(uuid, integer, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.patch_delivery_stop(uuid, integer, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '542f705ab64330d5ba2cd2af388bf8f1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.patch_delivery_stop(
   p_order_id uuid,
   p_leg      int,
@@ -7213,10 +7609,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('21c71c2fd7a5f9068f397026a28a5fd2') then insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'already');
   else insert into _g0500 values ('patch_delivery_stop(uuid, integer, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'patch_delivery_stop(uuid, integer, jsonb)';
   end if;
 end
 $g0500$;
@@ -7224,12 +7624,13 @@ $g0500$;
 -- payment_invoice_issue(uuid, jsonb)
 --   source: repo 0476_every_invoice_door_posts_and_a_method_is_a_setting.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.payment_invoice_issue(uuid, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.payment_invoice_issue(uuid, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e8c7351745eeaefc8a5e58960188bf68' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.payment_invoice_issue(
   p_invoice_id uuid,
   p_snapshot jsonb
@@ -7296,10 +7697,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('2c95fdf98bad5cd42e0d3baa4134295f') then insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'already');
   else insert into _g0500 values ('payment_invoice_issue(uuid, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'payment_invoice_issue(uuid, jsonb)';
   end if;
 end
 $g0500$;
@@ -7307,12 +7712,13 @@ $g0500$;
 -- payment_invoice_prepare(uuid, numeric, numeric)
 --   source: repo 0429_an_invoice_asks_for_money_and_keeps_its_lineage.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.payment_invoice_prepare(uuid, numeric, numeric)'); h text;
+declare p regprocedure := to_regprocedure('public.payment_invoice_prepare(uuid, numeric, numeric)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '89e385b5ce2222dd8d9a465d9937d41d' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.payment_invoice_prepare(
   p_order_id uuid,
   p_amount numeric,
@@ -7367,10 +7773,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('28d2280c7f87e9323e92de378eec756f') then insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'already');
   else insert into _g0500 values ('payment_invoice_prepare(uuid, numeric, numeric)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'payment_invoice_prepare(uuid, numeric, numeric)';
   end if;
 end
 $g0500$;
@@ -7378,12 +7788,13 @@ $g0500$;
 -- payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)
 --   source: repo 0448_a_likely_duplicate_is_inspected_by_the_approver.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)'); h text;
+declare p regprocedure := to_regprocedure('public.payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '104291280818166b28233f49fbf59e49' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.payment_record(
   p_order_id uuid, p_amount numeric, p_paid_on date, p_method text, p_kind text,
   p_reference text default null, p_note text default null, p_receipt_url text default null,
@@ -7475,10 +7886,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('17d9c1303d2f1f8ef2a36b2b13eb36fe') then insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'already');
   else insert into _g0500 values ('payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'payment_record(uuid, numeric, date, text, text, text, text, text, text, boolean, text, boolean)';
   end if;
 end
 $g0500$;
@@ -7486,12 +7901,13 @@ $g0500$;
 -- payment_record_message_sent(uuid, uuid, text, text, text, text)
 --   source: repo 0434_a_sent_message_is_recorded_with_its_proof.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.payment_record_message_sent(uuid, uuid, text, text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.payment_record_message_sent(uuid, uuid, text, text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '7ac52b3194a251b4be9dcfc4ffbd769b' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.payment_record_message_sent(
   p_order_id uuid,
   p_invoice_id uuid,
@@ -7557,10 +7973,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('bce1bf23e62334ec92152ce1ed78dd34') then insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'already');
   else insert into _g0500 values ('payment_record_message_sent(uuid, uuid, text, text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'payment_record_message_sent(uuid, uuid, text, text, text, text)';
   end if;
 end
 $g0500$;
@@ -7568,12 +7988,13 @@ $g0500$;
 -- payment_settings_gate()
 --   source: repo 0431_payment_settings_hold_the_banks_methods_and_storage_rules.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.payment_settings_gate()'); h text;
+declare p regprocedure := to_regprocedure('public.payment_settings_gate()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('payment_settings_gate()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'dde87ac1490dc9180963423cc4314b77' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.payment_settings_gate()
 returns void
 language plpgsql security definer
@@ -7600,10 +8021,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('payment_settings_gate()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('payment_settings_gate()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('payment_settings_gate()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('192d2dde0c2990e86dd30a958421435a') then insert into _g0500 values ('payment_settings_gate()', 'already');
   else insert into _g0500 values ('payment_settings_gate()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'payment_settings_gate()';
   end if;
 end
 $g0500$;
@@ -7612,12 +8037,13 @@ $g0500$;
 --   source: repo 0107_supplier_thread_pickup.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.pickup_event_render_payload(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.pickup_event_render_payload(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('pickup_event_render_payload(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '711199d49cc186a4ed05f104e915415a' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.pickup_event_render_payload(p_event_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
@@ -7685,9 +8111,15 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('pickup_event_render_payload(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('pickup_event_render_payload(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('pickup_event_render_payload(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '8f282563dfd5c27c1a09374c54e5e68c' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.pickup_event_render_payload(p_event_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7757,10 +8189,14 @@ BEGIN
 END;
 $function$
 $s0500b$;
-    insert into _g0500 values ('pickup_event_render_payload(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('pickup_event_render_payload(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('pickup_event_render_payload(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('9251627f7c89d57e6560109d0571cbd7', '79bb0c2ebf4a3ead3efff9a95b9fce85') then insert into _g0500 values ('pickup_event_render_payload(uuid)', 'already');
   else insert into _g0500 values ('pickup_event_render_payload(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'pickup_event_render_payload(uuid)';
   end if;
 end
 $g0500$;
@@ -7769,20 +8205,23 @@ $g0500$;
 --   source: repo 0003_rpcs.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.po_receive(text, text, text, integer, text)'); h text;
+declare p regprocedure := to_regprocedure('public.po_receive(text, text, text, integer, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e771307e78ea7f67e98dd7286c9549e1' then
-    execute $s0500a$
-create or replace function po_receive(
+    begin
+      execute $s0500a$
+create or replace function public.po_receive(
   p_po_id        text,
   p_do_number    text,
   p_do_note      text,
   p_received_qty int,
   p_do_photo_url text
 ) returns po_receipts
-language plpgsql security definer as $$
+language plpgsql security definer
+ set search_path = public, pg_temp
+as $$
 declare
   v_po purchase_orders;
   v_receipt po_receipts;
@@ -7818,14 +8257,21 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h = '4e701495a392ec5c7cfb781a16477aaf' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.po_receive(p_po_id text, p_do_number text, p_do_note text, p_received_qty integer, p_do_photo_url text)
  RETURNS po_receipts
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+ set search_path = public, pg_temp
+as $function$
 declare
   v_po purchase_orders;
   v_receipt po_receipts;
@@ -7861,10 +8307,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('62a0740c38ec870690667e287b3966ee', '46118a28c99ee4f957d55843743c5360') then insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'already');
   else insert into _g0500 values ('po_receive(text, text, text, integer, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'po_receive(text, text, text, integer, text)';
   end if;
 end
 $g0500$;
@@ -7872,12 +8322,13 @@ $g0500$;
 -- purchasing_settings_gate()
 --   source: repo 0303_purchasing_settings.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.purchasing_settings_gate()'); h text;
+declare p regprocedure := to_regprocedure('public.purchasing_settings_gate()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('purchasing_settings_gate()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '0bf5a0fe1bbbd3e3c5ea4c5e777b9058' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.purchasing_settings_gate()
 returns text
 language plpgsql
@@ -7912,10 +8363,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('purchasing_settings_gate()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('purchasing_settings_gate()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('purchasing_settings_gate()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('bd59673754d43ded52975d67a3da4041') then insert into _g0500 values ('purchasing_settings_gate()', 'already');
   else insert into _g0500 values ('purchasing_settings_gate()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'purchasing_settings_gate()';
   end if;
 end
 $g0500$;
@@ -7923,12 +8378,13 @@ $g0500$;
 -- replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)
 --   source: repo 0257_change_request_replace_and_service_addons.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1e7229e876d8fbd01c6a1169dd9fc551' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.replace_order_lines(
   p_order_id uuid,
   p_old_line_ids uuid[],
@@ -8271,10 +8727,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('6f8dd7b07cc184c9581ae1c9dce4373b') then insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'already');
   else insert into _g0500 values ('replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'replace_order_lines(uuid, uuid[], jsonb, jsonb, text, uuid)';
   end if;
 end
 $g0500$;
@@ -8282,12 +8742,13 @@ $g0500$;
 -- sales_order_amendment_impact(uuid)
 --   source: repo 0348_an_amendment_is_decided_once_and_preserves_every_owner.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_amendment_impact(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_amendment_impact(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1de2f95434c497b019be97646b1c485e' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_amendment_impact(p_amendment_id uuid)
 returns jsonb
 language plpgsql
@@ -8358,10 +8819,14 @@ begin
   );
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('aeb19a934145bb3c542d5ee526ec1f8e') then insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'already');
   else insert into _g0500 values ('sales_order_amendment_impact(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_amendment_impact(uuid)';
   end if;
 end
 $g0500$;
@@ -8369,12 +8834,13 @@ $g0500$;
 -- sales_order_amendment_live(uuid)
 --   source: repo 0354_the_object_page_edits_every_field_the_portal_asked.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_amendment_live(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_amendment_live(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_amendment_live(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '10ea04849101583ffbd488b9cb7c0727' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_amendment_live(p_order_id uuid)
 returns jsonb
 language plpgsql
@@ -8411,10 +8877,14 @@ begin
     'submitted_at', v_a.submitted_at));
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_amendment_live(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_amendment_live(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_amendment_live(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('497c0e6bf1e69a80cb0c54d4675c789a') then insert into _g0500 values ('sales_order_amendment_live(uuid)', 'already');
   else insert into _g0500 values ('sales_order_amendment_live(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_amendment_live(uuid)';
   end if;
 end
 $g0500$;
@@ -8422,12 +8892,13 @@ $g0500$;
 -- sales_order_apply_attribution(uuid)
 --   source: repo 0333_every_door_that_mints_a_revision_raises_the_work.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_apply_attribution(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_apply_attribution(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '8e356019d860eebc5b2525897b07178a' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_apply_attribution(p_request_id uuid)
 returns jsonb
 language plpgsql
@@ -8521,10 +8992,14 @@ begin
                             'correction_work_raised', v_work);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('4a6453d5727ec172f4c7f92c279ea8df') then insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'already');
   else insert into _g0500 values ('sales_order_apply_attribution(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_apply_attribution(uuid)';
   end if;
 end
 $g0500$;
@@ -8532,12 +9007,13 @@ $g0500$;
 -- sales_order_attribution_live(uuid)
 --   source: repo 0335_the_approver_read_names_a_column_that_exists.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_attribution_live(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_attribution_live(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_attribution_live(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1490738deeac240a5949c6c4c770425f' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_attribution_live(p_order_id uuid)
 returns jsonb
 language plpgsql
@@ -8621,10 +9097,14 @@ begin
   return jsonb_build_object('request', v_out);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_attribution_live(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_attribution_live(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_attribution_live(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('3e35f0fc0db1367419fcdeb8928fdf7c') then insert into _g0500 values ('sales_order_attribution_live(uuid)', 'already');
   else insert into _g0500 values ('sales_order_attribution_live(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_attribution_live(uuid)';
   end if;
 end
 $g0500$;
@@ -8632,12 +9112,13 @@ $g0500$;
 -- sales_order_cancel_impact(uuid)
 --   source: repo 0350_a_cancellation_names_its_reason_and_its_consequences.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_cancel_impact(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_cancel_impact(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '0c6e7b0121bd9f81a809165657108d6e' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_cancel_impact(p_order_id uuid)
 returns jsonb
 language plpgsql
@@ -8654,10 +9135,14 @@ begin
   return public.sales_order_cancel_impact_facts(p_order_id);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('8d9cd0d6c2f6bf782af8d0abadbf0654') then insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'already');
   else insert into _g0500 values ('sales_order_cancel_impact(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_cancel_impact(uuid)';
   end if;
 end
 $g0500$;
@@ -8665,12 +9150,13 @@ $g0500$;
 -- sales_order_commitment_bundle(uuid)
 --   source: repo 0340_a_change_names_who_asked_for_it.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_commitment_bundle(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_commitment_bundle(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '19440f24554dbe5c898fa76a47861a29' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_commitment_bundle(p_order_id uuid)
 returns jsonb
 language plpgsql
@@ -8720,10 +9206,14 @@ begin
   );
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('888cb5ddacf3309228586e5ed13d236f') then insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'already');
   else insert into _g0500 values ('sales_order_commitment_bundle(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_commitment_bundle(uuid)';
   end if;
 end
 $g0500$;
@@ -8731,12 +9221,13 @@ $g0500$;
 -- sales_order_create_unchecked_0374(jsonb, jsonb)
 --   source: repo 0374_a_line_born_in_the_office_may_carry_its_configuration.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_create_unchecked_0374(jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_create_unchecked_0374(jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'b5cd9824e9676909106b8694ecf4d7e0' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_create_unchecked_0374(
   p_header jsonb,
   p_lines  jsonb default '[]'::jsonb
@@ -8865,10 +9356,14 @@ begin
   return jsonb_build_object('id', v_order_id, 'so', v_so, 'revision', 1);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('8c70fd1ea067a3c4020956148ded19a5') then insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'already');
   else insert into _g0500 values ('sales_order_create_unchecked_0374(jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_create_unchecked_0374(jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -8876,12 +9371,13 @@ $g0500$;
 -- sales_order_decide_amendment(uuid, text, text)
 --   source: repo 0420_the_amendment_lane_may_move_what_it_names.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_decide_amendment(uuid, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_decide_amendment(uuid, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'efcb621d614be93d75f6b6948924e38f' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_decide_amendment(
   p_amendment_id uuid,
   p_decision text,
@@ -9013,10 +9509,14 @@ begin
                             'changed',v_result->'changed');
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('61585b1dc438b95a6c71a60f32c4e2b8') then insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'already');
   else insert into _g0500 values ('sales_order_decide_amendment(uuid, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_decide_amendment(uuid, text, text)';
   end if;
 end
 $g0500$;
@@ -9024,12 +9524,13 @@ $g0500$;
 -- sales_order_decide_attribution(uuid, text, text)
 --   source: repo 0329_attribution_moves_by_request_and_the_side_doors_close.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_decide_attribution(uuid, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_decide_attribution(uuid, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e9f0cf2c3fc8909a6fdfa60b8e90bfb3' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_decide_attribution(
   p_request_id uuid,
   p_decision   text,
@@ -9086,10 +9587,14 @@ begin
   return jsonb_build_object('id', p_request_id, 'status', p_decision);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('b1149351be5fd0549ad0da2287af44be') then insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'already');
   else insert into _g0500 values ('sales_order_decide_attribution(uuid, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_decide_attribution(uuid, text, text)';
   end if;
 end
 $g0500$;
@@ -9097,12 +9602,13 @@ $g0500$;
 -- sales_order_floors_unchecked_0328(uuid, text[], jsonb)
 --   source: repo 0328_the_floors_speak_before_any_write.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_floors_unchecked_0328(uuid, text[], jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_floors_unchecked_0328(uuid, text[], jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '63c95afb51777048d6e94656a9a67e55' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_floors_unchecked_0328(
   p_order_id       uuid,
   p_changed        text[],
@@ -9302,10 +9808,14 @@ begin
   return jsonb_build_object('order_id', p_order_id, 'so', v_order.so, 'findings', v_findings);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('e5a58b6602c6b7a0cd3e4685f6b069cb') then insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'already');
   else insert into _g0500 values ('sales_order_floors_unchecked_0328(uuid, text[], jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_floors_unchecked_0328(uuid, text[], jsonb)';
   end if;
 end
 $g0500$;
@@ -9313,12 +9823,13 @@ $g0500$;
 -- sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)
 --   source: repo 0354_the_object_page_edits_every_field_the_portal_asked.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5bf566769466c310c637b6dbed1cd1de' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_save_revision_unchecked_0354(
   p_order_id uuid,
   p_header   jsonb default '{}'::jsonb,
@@ -9591,10 +10102,14 @@ begin
                             'correction_work_raised', v_work);
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('55da0828db9151265298d0cdcce76c95') then insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'already');
   else insert into _g0500 values ('sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_save_revision_unchecked_0354(uuid, jsonb, jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -9602,12 +10117,13 @@ $g0500$;
 -- sales_order_submit_amendment(uuid, jsonb, text, date)
 --   source: repo 0354_the_object_page_edits_every_field_the_portal_asked.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_submit_amendment(uuid, jsonb, text, date)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_submit_amendment(uuid, jsonb, text, date)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'f56aff0c2fbc7ee170fa37289015c6e8' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_submit_amendment(
   p_order_id         uuid,
   p_proposed         jsonb,
@@ -9673,10 +10189,14 @@ begin
                             'base_contractual_hash', v_hash, 'status', 'submitted');
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('1bfdbd5cefb97b9478dd205db4ec1205') then insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'already');
   else insert into _g0500 values ('sales_order_submit_amendment(uuid, jsonb, text, date)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_submit_amendment(uuid, jsonb, text, date)';
   end if;
 end
 $g0500$;
@@ -9684,12 +10204,13 @@ $g0500$;
 -- sales_order_submit_attribution(uuid, jsonb, text)
 --   source: repo 0329_attribution_moves_by_request_and_the_side_doors_close.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_submit_attribution(uuid, jsonb, text)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_submit_attribution(uuid, jsonb, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '9e841a769a5250f576f38824ec883870' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_submit_attribution(
   p_order_id uuid,
   p_changes  jsonb,
@@ -9751,10 +10272,14 @@ begin
   return jsonb_build_object('id', v_id, 'fields', to_jsonb(v_fields));
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('e0c96fef6a14de4a2789f8dc0bb9bfb2') then insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'already');
   else insert into _g0500 values ('sales_order_submit_attribution(uuid, jsonb, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_submit_attribution(uuid, jsonb, text)';
   end if;
 end
 $g0500$;
@@ -9762,12 +10287,13 @@ $g0500$;
 -- sales_order_withdraw_attribution(uuid, text)
 --   source: repo 0336_an_approved_request_can_be_taken_back.sql; 2 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.sales_order_withdraw_attribution(uuid, text)'); h text;
+declare p regprocedure := to_regprocedure('public.sales_order_withdraw_attribution(uuid, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '6c952a129b1d08ab355a220ad4bf0932' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.sales_order_withdraw_attribution(
   p_request_id uuid,
   p_reason     text
@@ -9832,10 +10358,14 @@ begin
   return jsonb_build_object('id', p_request_id, 'status', 'cancelled');
 end $$
 $s0500a$;
-    insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('1e0b2f2e1afde08d69332c0e7669e2e9') then insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'already');
   else insert into _g0500 values ('sales_order_withdraw_attribution(uuid, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'sales_order_withdraw_attribution(uuid, text)';
   end if;
 end
 $g0500$;
@@ -9843,12 +10373,13 @@ $g0500$;
 -- set_delivery_chain(uuid, jsonb)
 --   source: repo 0156_delivery_stops.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.set_delivery_chain(uuid, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.set_delivery_chain(uuid, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '3f7955db33f406524b0d64223053aa68' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.set_delivery_chain(
   p_order_id uuid,
   p_stops    jsonb
@@ -9908,10 +10439,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('fec7dcb53bacc793becc5abc466bdf2d') then insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'already');
   else insert into _g0500 values ('set_delivery_chain(uuid, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'set_delivery_chain(uuid, jsonb)';
   end if;
 end
 $g0500$;
@@ -9919,12 +10454,13 @@ $g0500$;
 -- set_sales_order_grid_config(jsonb, jsonb)
 --   source: repo 0174_sales_order_grid_config.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.set_sales_order_grid_config(jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.set_sales_order_grid_config(jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'e0a7a2b8fa995caf30ffd6dcda0d28ee' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.set_sales_order_grid_config(
   p_columns jsonb,
   p_options jsonb
@@ -9962,10 +10498,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('25d1047fd3a77bde4f6c9ef039a4d9ea') then insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'already');
   else insert into _g0500 values ('set_sales_order_grid_config(jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'set_sales_order_grid_config(jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -9973,12 +10513,13 @@ $g0500$;
 -- submit_order_change_request_unchecked_0258(uuid, jsonb, text)
 --   source: repo 0258_edit_order_addon.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.submit_order_change_request_unchecked_0258(uuid, jsonb, text)'); h text;
+declare p regprocedure := to_regprocedure('public.submit_order_change_request_unchecked_0258(uuid, jsonb, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '60c9eb41f06f5b6952037d972ed3a52d' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.submit_order_change_request_unchecked_0258(
   p_order_id uuid,
   p_payload jsonb,
@@ -10173,10 +10714,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('8b4dbb96fbf5a459199fdc7fec432b98') then insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'already');
   else insert into _g0500 values ('submit_order_change_request_unchecked_0258(uuid, jsonb, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'submit_order_change_request_unchecked_0258(uuid, jsonb, text)';
   end if;
 end
 $g0500$;
@@ -10184,12 +10729,13 @@ $g0500$;
 -- supplier_acknowledge(text)
 --   source: repo 0066_supplier_phase6_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_acknowledge(text)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_acknowledge(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_acknowledge(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '2cba2cad3486860d82efbc185b6a530b' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.supplier_acknowledge(p_po_id text)
 returns jsonb
 language plpgsql
@@ -10252,10 +10798,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('supplier_acknowledge(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_acknowledge(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_acknowledge(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f0b5b5e16f0aa49eb051049548c456f7') then insert into _g0500 values ('supplier_acknowledge(text)', 'already');
   else insert into _g0500 values ('supplier_acknowledge(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_acknowledge(text)';
   end if;
 end
 $g0500$;
@@ -10263,12 +10813,13 @@ $g0500$;
 -- supplier_committed_demand()
 --   source: repo 0148_supplier_forecast_category.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_committed_demand()'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_committed_demand()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_committed_demand()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5443410c9d69edeb7d6999252298dceb' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.supplier_committed_demand()
 returns table(sku text, category text, committed_qty int, po_count int)
 language plpgsql
@@ -10304,10 +10855,14 @@ begin
 end;
 $func$
 $s0500a$;
-    insert into _g0500 values ('supplier_committed_demand()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_committed_demand()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_committed_demand()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c5f6d3d269322920c70cadf2df39edf1') then insert into _g0500 values ('supplier_committed_demand()', 'already');
   else insert into _g0500 values ('supplier_committed_demand()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_committed_demand()';
   end if;
 end
 $g0500$;
@@ -10315,12 +10870,13 @@ $g0500$;
 -- supplier_mark_delivered(text, text, text, text)
 --   source: repo 0094_supplier_mark_delivered_require_do_file.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_mark_delivered(text, text, text, text)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_mark_delivered(text, text, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '6bcb1e96987a1db41050038f4d61f077' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.supplier_mark_delivered(
   p_po_id        text,
   p_do_number    text,
@@ -10418,10 +10974,14 @@ BEGIN
 END;
 $$
 $s0500a$;
-    insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('f2f183303b4673c1f9f8525e0524c123') then insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'already');
   else insert into _g0500 values ('supplier_mark_delivered(text, text, text, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_mark_delivered(text, text, text, text)';
   end if;
 end
 $g0500$;
@@ -10429,12 +10989,13 @@ $g0500$;
 -- supplier_mark_thread_ready(uuid)
 --   source: repo 0131_supplier_mark_ready_po_rollup.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_mark_thread_ready(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_mark_thread_ready(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'fe39e5a049eb69983126fa8b4fd703ab' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.supplier_mark_thread_ready(p_thread_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -10550,10 +11111,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('d90e820b28f60e495f4b6be520e842df') then insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'already');
   else insert into _g0500 values ('supplier_mark_thread_ready(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_mark_thread_ready(uuid)';
   end if;
 end
 $g0500$;
@@ -10561,12 +11126,13 @@ $g0500$;
 -- supplier_orders_for_threads(uuid[])
 --   source: repo 0130_cancelled_order_filter_audit.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_orders_for_threads(uuid[])'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_orders_for_threads(uuid[])'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c6ad30da8d72c2670c2a0bbd75814bf3' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.supplier_orders_for_threads(p_order_ids uuid[])
  RETURNS TABLE(id uuid, so integer, customer_name text, delivery_date date)
  LANGUAGE plpgsql
@@ -10598,10 +11164,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('83335fe86d4c1a812e3bbf9b8351e23a') then insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'already');
   else insert into _g0500 values ('supplier_orders_for_threads(uuid[])', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_orders_for_threads(uuid[])';
   end if;
 end
 $g0500$;
@@ -10609,12 +11179,13 @@ $g0500$;
 -- supplier_pending_demand()
 --   source: repo 0148_supplier_forecast_category.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_pending_demand()'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_pending_demand()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_pending_demand()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '19b2cf6f638531ee729183622006bdb1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.supplier_pending_demand()
 returns table(sku text, category text, pending_qty int, order_count int)
 language plpgsql
@@ -10661,10 +11232,14 @@ begin
 end;
 $func$
 $s0500a$;
-    insert into _g0500 values ('supplier_pending_demand()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_pending_demand()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_pending_demand()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('cfb97f546522a105067fe78fb5c70ce0') then insert into _g0500 values ('supplier_pending_demand()', 'already');
   else insert into _g0500 values ('supplier_pending_demand()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_pending_demand()';
   end if;
 end
 $g0500$;
@@ -10672,12 +11247,13 @@ $g0500$;
 -- supplier_start_production(text)
 --   source: repo 0066_supplier_phase6_rpcs.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_start_production(text)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_start_production(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_start_production(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '91a492c04399bae3102354574be5daa1' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.supplier_start_production(p_po_id text)
 returns jsonb
 language plpgsql
@@ -10744,10 +11320,14 @@ begin
 end;
 $$
 $s0500a$;
-    insert into _g0500 values ('supplier_start_production(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_start_production(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_start_production(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('9f6c5828437f234f0416c22f79b20ed2') then insert into _g0500 values ('supplier_start_production(text)', 'already');
   else insert into _g0500 values ('supplier_start_production(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_start_production(text)';
   end if;
 end
 $g0500$;
@@ -10755,12 +11335,13 @@ $g0500$;
 -- supplier_threads_for_po(text)
 --   source: repo 0130_cancelled_order_filter_audit.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_threads_for_po(text)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_threads_for_po(text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_threads_for_po(text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '154c1f41361c2ebf1f06d6ab8ef201de' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.supplier_threads_for_po(p_po_id text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -10820,10 +11401,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('supplier_threads_for_po(text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_threads_for_po(text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_threads_for_po(text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('c1b8155111211e53c7424f4c574b1998') then insert into _g0500 values ('supplier_threads_for_po(text)', 'already');
   else insert into _g0500 values ('supplier_threads_for_po(text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_threads_for_po(text)';
   end if;
 end
 $g0500$;
@@ -10831,12 +11416,13 @@ $g0500$;
 -- supplier_unmark_thread_ready(uuid)
 --   source: repo 0131_supplier_mark_ready_po_rollup.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.supplier_unmark_thread_ready(uuid)'); h text;
+declare p regprocedure := to_regprocedure('public.supplier_unmark_thread_ready(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1e47498370067b8f15f653c05954b0f2' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.supplier_unmark_thread_ready(p_thread_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -10925,10 +11511,14 @@ BEGIN
 END;
 $function$
 $s0500a$;
-    insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('37d6e54776c4740b7de6abe3f01a5516') then insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'already');
   else insert into _g0500 values ('supplier_unmark_thread_ready(uuid)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'supplier_unmark_thread_ready(uuid)';
   end if;
 end
 $g0500$;
@@ -10936,12 +11526,13 @@ $g0500$;
 -- top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)
 --   source: repo 0351_customer_payment_posting_convergence.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)'); h text;
+declare p regprocedure := to_regprocedure('public.top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'be07fe46491aebd8326467a8fb197892' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.top_up_order(
   p_order_id uuid, p_amount numeric, p_method text, p_method_label text,
   p_reference text, p_note text, p_date date, p_photo_paths jsonb,
@@ -10993,10 +11584,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('2bb0645e8ca685ffa93504e9f2791311') then insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'already');
   else insert into _g0500 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)';
   end if;
 end
 $g0500$;
@@ -11004,12 +11599,13 @@ $g0500$;
 -- update_order_change_request(uuid, jsonb)
 --   source: repo 0258_edit_order_addon.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.update_order_change_request(uuid, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.update_order_change_request(uuid, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '652890754f42e5a36a88ec3b66efdea2' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 CREATE OR REPLACE FUNCTION public.update_order_change_request(
   p_request_id uuid,
   p_payload jsonb
@@ -11144,10 +11740,14 @@ begin
 end;
 $function$
 $s0500a$;
-    insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('01d11129ae7872e723b02206564183a6') then insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'already');
   else insert into _g0500 values ('update_order_change_request(uuid, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'update_order_change_request(uuid, jsonb)';
   end if;
 end
 $g0500$;
@@ -11156,12 +11756,13 @@ $g0500$;
 --   source: repo 0444_receiving_verifies_the_units_purchasing_issued.sql; 1 gate edit(s)
 --   source: live definition (dynamic renames applied); 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.warehouse_incoming_pos()'); h text;
+declare p regprocedure := to_regprocedure('public.warehouse_incoming_pos()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('warehouse_incoming_pos()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '2a30e5fce74bf1d70c3bfdd86a291413' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.warehouse_incoming_pos()
 returns jsonb
 language plpgsql
@@ -11237,9 +11838,15 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('warehouse_incoming_pos()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('warehouse_incoming_pos()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('warehouse_incoming_pos()', 'live settings would be lost - left untouched');
+    end;
   elsif h = '0b0fc18afe8db4b3d276d475dd1457bd' then
-    execute $s0500b$
+    begin
+      execute $s0500b$
 CREATE OR REPLACE FUNCTION public.warehouse_incoming_pos()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -11301,10 +11908,14 @@ begin
 end;
 $function$
 $s0500b$;
-    insert into _g0500 values ('warehouse_incoming_pos()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('warehouse_incoming_pos()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('warehouse_incoming_pos()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('e82021e3ea64a84ed6a975139c284d6f', 'c119d48bf263634a1b9eaa5494d06051') then insert into _g0500 values ('warehouse_incoming_pos()', 'already');
   else insert into _g0500 values ('warehouse_incoming_pos()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'warehouse_incoming_pos()';
   end if;
 end
 $g0500$;
@@ -11312,12 +11923,13 @@ $g0500$;
 -- warehouse_my_receipts()
 --   source: repo 0302_warehouse_files_its_own_receiving.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.warehouse_my_receipts()'); h text;
+declare p regprocedure := to_regprocedure('public.warehouse_my_receipts()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('warehouse_my_receipts()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '6d88cd951f1ea6c0346e58ca05d661ae' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.warehouse_my_receipts()
 returns jsonb
 language plpgsql
@@ -11377,10 +11989,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('warehouse_my_receipts()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('warehouse_my_receipts()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('warehouse_my_receipts()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('e4d2627fbcf0743f8ce6a044cf861d7e') then insert into _g0500 values ('warehouse_my_receipts()', 'already');
   else insert into _g0500 values ('warehouse_my_receipts()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'warehouse_my_receipts()';
   end if;
 end
 $g0500$;
@@ -11388,12 +12004,13 @@ $g0500$;
 -- warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)
 --   source: repo 0426_a_posted_receiving_wears_its_grn_number.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'fb0df0a86215e03537f5fa64bc18bb0b' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.warehouse_resubmit_receipt(
   p_receipt_id        uuid,
   p_do_number         text,
@@ -11491,10 +12108,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('78c9a7d160a1e638cb1a0a4a0560a048') then insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'already');
   else insert into _g0500 values ('warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -11502,12 +12123,13 @@ $g0500$;
 -- warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)
 --   source: repo 0426_a_posted_receiving_wears_its_grn_number.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)'); h text;
+declare p regprocedure := to_regprocedure('public.warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'd0effe7e85b2c4ab84d42b5536e1d9b2' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.warehouse_submit_receipt(
   p_po_id             text,
   p_do_number         text,
@@ -11607,10 +12229,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('0068d7e762113379970c561ce01699d9') then insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'already');
   else insert into _g0500 values ('warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb)';
   end if;
 end
 $g0500$;
@@ -11618,12 +12244,13 @@ $g0500$;
 -- workspace_assign_duty(text, uuid, date, date, text)
 --   source: repo 0425_one_shared_duty_resolver_and_the_grn_gate.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.workspace_assign_duty(text, uuid, date, date, text)'); h text;
+declare p regprocedure := to_regprocedure('public.workspace_assign_duty(text, uuid, date, date, text)'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '558727e3f8e5af6f3dccfea264d1e4a7' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.workspace_assign_duty(
   p_duty_key text,
   p_holder_id uuid,
@@ -11678,10 +12305,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('80433017b4eed001ac7f928a1d691fef') then insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'already');
   else insert into _g0500 values ('workspace_assign_duty(text, uuid, date, date, text)', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'workspace_assign_duty(text, uuid, date, date, text)';
   end if;
 end
 $g0500$;
@@ -11689,12 +12320,13 @@ $g0500$;
 -- workspace_duty_settings_gate()
 --   source: repo 0425_one_shared_duty_resolver_and_the_grn_gate.sql; 1 gate edit(s)
 do $g0500$
-declare p regprocedure := to_regprocedure('public.workspace_duty_settings_gate()'); h text;
+declare p regprocedure := to_regprocedure('public.workspace_duty_settings_gate()'); h text; cfg text[]; cfg_new text[];
 begin
   if p is null then insert into _g0500 values ('workspace_duty_settings_gate()', 'absent'); return; end if;
-  select md5(replace(prosrc, E'\r', '')) into h from pg_proc where oid = p and prosecdef;
+  select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'c2b118270f4f8d77834e06d844bb69f5' then
-    execute $s0500a$
+    begin
+      execute $s0500a$
 create or replace function public.workspace_duty_settings_gate()
 returns text
 language plpgsql
@@ -11725,10 +12357,14 @@ begin
 end;
 $fn$
 $s0500a$;
-    insert into _g0500 values ('workspace_duty_settings_gate()', 'rewritten');
+      select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
+      if not (cfg <@ cfg_new) then raise exception using errcode = 'P0500'; end if;
+      insert into _g0500 values ('workspace_duty_settings_gate()', 'rewritten');
+    exception when sqlstate 'P0500' then   -- rolls back this function's rewrite only
+      insert into _g0500 values ('workspace_duty_settings_gate()', 'live settings would be lost - left untouched');
+    end;
   elsif h in ('e3d85b2b0710a846171ce94418ec8bc0') then insert into _g0500 values ('workspace_duty_settings_gate()', 'already');
   else insert into _g0500 values ('workspace_duty_settings_gate()', 'live body differs - left untouched');
-    raise notice '0500: % left untouched: live body matches no known source', 'workspace_duty_settings_gate()';
   end if;
 end
 $g0500$;
@@ -11813,9 +12449,16 @@ begin
     p := to_regprocedure(s);
     if p is not null and has_function_privilege('anon', p, 'execute') then
       raise exception '0500: anon still executes %', p; end if;
+    if p is not null and has_function_privilege('authenticated', p, 'execute')
+         <> exists (select 1 from _auth_before_0500 b where b.fn = p) then
+      raise exception '0500: authenticated execute changed on %', p; end if;
   end loop;
-  for r in select result, count(*) n from _g0500 group by result loop
+  for r in select result, count(*) n from _g0500 group by result order by result loop
     raise notice '0500 part B: % %', r.n, r.result;
+  end loop;
+  -- Every function left untouched is named here, so it shows in the SQL editor.
+  for r in select fn, result from _g0500 where result like '%left untouched' order by fn loop
+    raise warning '0500: gate NOT fixed on public.% (%) -- fix it by hand', r.fn, r.result;
   end loop;
 end
 $sanity$;
