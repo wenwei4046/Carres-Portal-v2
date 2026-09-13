@@ -33,6 +33,7 @@
 
 import {
   deliveryOrderStatusOf,
+  signedDeliveryDocumentOf,
   deliveryStepDueIso,
   deliveryWorkStatusLabelOf,
   deliveryWorkStatusOf,
@@ -568,6 +569,9 @@ export function buildDeliveryScopeRows({
   /* The proof a delivered trip still lacks is the Delivery Orders register's
      arithmetic over the SAME document row (Law D): the latest recorded result,
      the driver's photos scoped to THIS document, the signed file. */
+  const signedDocumentOf = (doc: DeliveryOrderRow | null) => doc
+    ? signedDeliveryDocumentOf({ documentNumber: doc.do_number, order: doc.orders, evidence: attemptEvidence })
+    : null;
   const proofOf = (
     doc: DeliveryOrderRow | null,
     o: operationOrderListRow,
@@ -586,7 +590,7 @@ export function buildDeliveryScopeRows({
     return missingDeliveryProofOf({
       latestResult: latest?.result ?? null,
       photosPresent: submission.known ? submission.photos > 0 : null,
-      signedDoPresent: Boolean(doc?.orders.do_file_path),
+      signedDoPresent: Boolean(signedDocumentOf(doc)),
       intermediateLeg,
     });
   };
@@ -615,7 +619,7 @@ export function buildDeliveryScopeRows({
     return proofReviewOf({
       doNumber: doc.do_number,
       ledger: control?.delivery_photos,
-      signedDoUploadedAt: doc.orders.do_file_path ? doc.orders.do_uploaded_at ?? null : null,
+      signedDoUploadedAt: signedDocumentOf(doc)?.uploadedAt ?? null,
       reviews: proofRecords.reviewsByDo.get(doc.do_number) ?? [],
       attemptEvidence: proofRecords.evidenceByDo.get(doc.do_number) ?? [],
     });

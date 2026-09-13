@@ -53,6 +53,7 @@ function doRow(over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow {
       customer_address_state: "Selangor",
       delivery_date: "2026-08-25",
       delivery_date_tbd: false,
+      do_number: over.do_number ?? "DO-180826-3035",
       do_file_path: null,
       order_lines: [
         { id: "l-1", sku: "mattress:M1401F-K", qty: 1 },
@@ -431,6 +432,22 @@ describe("the footer", () => {
     expect(doRegisterFooter(4, 4)).toBe("4 delivery orders");
     expect(doRegisterFooter(1, 4)).toBe("1 of 4 delivery orders");
     expect(doRegisterFooter(1, 1)).toBe("1 delivery order");
+  });
+});
+
+
+describe("a signed file belongs to this DO, not its sibling", () => {
+  it("does not count the final signature on an intermediate DO", () => {
+    const raw = doRow();
+    const row = build({ orders: { ...raw.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } }, [DELIVERED]);
+    expect(row.signedDoPresent).toBe(false);
+    expect(row.proofReview.state).toBe("none");
+  });
+  it("counts a signed paper bound to the old DO even after the order mirror changes", () => {
+    const raw = doRow();
+    const evidence = { id: "e1", attempt_id: "a1", order_id: raw.orders.id, do_number: raw.do_number, kind: "document" as const, path: "order/own.pdf", recorded_at: "2026-09-13T10:00:00Z", recorded_by: null };
+    const row = buildDoRegisterRow({ ...raw, orders: { ...raw.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf" } }, new Map(), new Map(), groupProofRecords([], [evidence]));
+    expect(row.signedDoPresent).toBe(true);
   });
 });
 

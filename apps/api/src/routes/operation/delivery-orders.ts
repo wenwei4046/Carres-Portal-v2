@@ -8,6 +8,7 @@ import {
   recordOutboundPrepInput,
   signHandoverProofUploadInput,
   signedDoAttachInput,
+  signedDeliveryDocumentOf,
   unitIdOf,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
@@ -74,7 +75,7 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
  *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
  *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_number, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
 
 /**
  * §6.1 (0489) — the proof reviews and the attempt evidence of a set of
@@ -654,10 +655,9 @@ async function documentNumberOf(
 /**
  * GET /:id/signed-document — the signed Delivery Order on file, signed for
  * VIEWING (the 0280 pattern: private bucket, Worker signs after its own role
- * gate). The artefact is the ORDER's (`orders.do_file_path`, migration 0087),
- * which is a fact this route states rather than hides: one signed paper per
- * order today, reached through whichever of its documents the operator opened.
- * A document with no paper answers `{ url: null }` — an absence, never a 500.
+ * gate). Read this DO's bound document evidence, or the legacy order mirror
+ * only when its do_number matches. Missing paper answers `{ url: null }`;
+ * a failed evidence read remains an error rather than an invented absence.
  */
 deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -665,7 +665,7 @@ deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, as
 
   let query = sb
     .from("ops_delivery_orders")
-    .select("id, do_number, orders!inner(id, do_file_path, do_uploaded_at)");
+    .select("id, do_number, orders!inner(id, do_number, do_file_path, do_uploaded_at)");
   query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
   const { data: row, error } = await query.maybeSingle();
   if (error) {
@@ -679,21 +679,28 @@ deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, as
      carries the same guard. */
   const embedded = (row as unknown as {
     orders:
-      | { do_file_path: string | null; do_uploaded_at: string | null }
-      | Array<{ do_file_path: string | null; do_uploaded_at: string | null }>
+      | { do_number: string | null; do_file_path: string | null; do_uploaded_at: string | null }
+      | Array<{ do_number: string | null; do_file_path: string | null; do_uploaded_at: string | null }>
       | null;
   }).orders;
   const order = Array.isArray(embedded) ? embedded[0] ?? null : embedded;
-  if (!order?.do_file_path) return c.json({ url: null, uploadedAt: null });
+  const { data: evidence, error: evidenceError } = await sb
+    .from("delivery_attempt_evidence")
+    .select("do_number, kind, path, recorded_at")
+    .eq("do_number", row.do_number)
+    .eq("kind", "document");
+  if (evidenceError) return c.json({ error: "attempt_evidence_read_failed", message: evidenceError.message }, 500);
+  const document = signedDeliveryDocumentOf({ documentNumber: row.do_number, order, evidence: evidence ?? [] });
+  if (!document) return c.json({ url: null, uploadedAt: null });
 
   const admin = adminClient(c.env);
   const { data: signed, error: signErr } = await admin.storage
     .from("delivery-orders")
-    .createSignedUrl(order.do_file_path, 3600);
+    .createSignedUrl(document.path, 3600);
   if (signErr) {
     return c.json({ error: "sign_failed", message: signErr.message }, 500);
   }
-  return c.json({ url: signed?.signedUrl ?? null, uploadedAt: order.do_uploaded_at ?? null });
+  return c.json({ url: signed?.signedUrl ?? null, uploadedAt: document.uploadedAt });
 });
 
 /** THIS TRIP's goods, derived exactly as the DO page and the print path derive

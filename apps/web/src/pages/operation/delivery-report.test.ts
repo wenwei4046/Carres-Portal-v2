@@ -207,7 +207,7 @@ describe("Warehouse Performance — the handover chain against the delivery day"
 describe("Delivery Proof Control — the register's own state", () => {
   it("names each reached result's proof state and counts them", () => {
     const docs = [
-      doc({ id: "d1", do_number: "DO-1", orders: { id: "o1", so: 1301, customer_name: "a", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-10T09:00:00Z", ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-10T08:30:00Z", doNumber: "DO-1" }] } as never } }),
+      doc({ id: "d1", do_number: "DO-1", orders: { id: "o1", so: 1301, customer_name: "a", do_number: "DO-1", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-10T09:00:00Z", ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-10T08:30:00Z", doNumber: "DO-1" }] } as never } }),
       doc({ id: "d2", do_number: "DO-2", orders: { id: "o2", so: 1302, customer_name: "b", do_file_path: null, ops_order_control: { delivery_photos: [] } as never } }),
     ];
     const attempts = [

@@ -1118,11 +1118,7 @@ number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on to
   stops at the store's first-time staff PIN setup before the wizard; a dealer login whose PIN setup is complete
   is the minimum owner action.
 
-⚠️ **NOT PRODUCTION-WALKED, and named rather than implied:** the authenticated walks of Cards 19 and 20 on
-`a5646d2d` (and the 410 re-probe of Card 21's doors) are OWED. The operation@ browser session this chat held expired
-at 00:02 MYT during the deploy wait, a sign-in needs a password the chat may not type, and unauthenticated probes
-answer 401 before routing. Each Card file carries the exact URLs and the words to expect; the walk is minutes once
-someone signs in. No later chat may promote these three Cards to `PRODUCTION-VERIFIED` on the strength of CI.
+**Authenticated follow-up completed:** Operation verified Card 20 on all-five-converged `9dd3945b`: intermediate DO Arrived in header/history/Evidence, source warehouses Klang and JB respectively, customer delivery and partner reports exclude the intermediate leg. On all-five-converged `a5646d2d`, Card 19’s three number spellings resolve to the same UUID, the browser retains `?route=1` and renders Order Route by both number and UUID, and an unknown number shows the governed absence. Card 21’s two application doors return 410; allocation and order facts are unchanged before/after. Cards 19 and 21 carry the detailed observations. Card 22 separately owns the newly measured borrowed sibling signature and Register intermediate proof-absence correction; its production acceptance remains open.
 
 **2026-09-13 · Cards 08–15 and 18 production-verified; the two-leg Journey walked end to end.** Journey legs
 (0490/0491) landed on `d78b4e26` and were corrected on the authenticated walk of the governed fixture SO-1362 by
@@ -1480,3 +1476,11 @@ redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar
 ### Supplemental production acceptance · 2026-09-13 23:32 MYT
 
 Card 12’s representative manager save is now verified as principal on the existing E2E LP-X fixture, persisted after reload and restored to its original value with both audit entries retained. Card 18’s office form was walked as principal: Building type is required, the retired address-later control is absent, and missing address/building/date facts disable Create order with the governed message. These are authenticated observations on `f2fb3efeb89c395dd9f7ee96cdc49d60e6e103ff`; see the supplemental sections of Cards 12 and 18 for exact test facts. Dealer POS remains open: the working dealer-test login reaches first-time staff PIN setup, not the wizard. No identity/security setup was changed. Cards 19/20 are being handled in their existing Delivery workspaces; Card 21 owns only legacy warehouse-pick application retirement, with database retirement explicitly still outstanding.
+
+### Document ownership correction · Card 22 · build pending
+
+The SO-1362 acceptance read found that an intermediate DO borrowed its sibling final DO’s signed document from the order mirror. Card 22 binds signed-file presence, download and review timestamps to the exact DO, using document-bound evidence or an explicitly matching order mirror. Intermediate arrivals retain their own recorded photos and show no customer signed-paper demand. This is a read correction with no migration or Unit write; production closure remains pending.
+
+### Production convergence checkpoint · 2026-09-14
+
+All five production surfaces converged to `9dd3945b8d451e142d223752bbe91f243357bd0e`. Authenticated checks confirm the intermediate SO-1362 DO is Arrived, each DO uses its own source warehouse, and customer delivery/partner/proof reports exclude the intermediate trip while warehouse handovers retain it. Both legacy warehouse-pick application doors return 410 without changing the fixture order or allocation. Database 0501 is recorded, its three retired functions are absent, and the post-migration derived-total refusal probe rolled back with qty 4 / reserved 2 unchanged. Exact observations are appended to Card 21. Signed-file ownership and the Register’s remaining intermediate proof absence are Card 22 work; the dealer POS staff-PIN login remains outstanding; SO-number acceptance was subsequently completed on `a5646d2d` as recorded above.

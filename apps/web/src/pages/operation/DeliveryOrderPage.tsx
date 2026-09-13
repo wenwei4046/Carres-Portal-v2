@@ -7,6 +7,7 @@ import {
   deliveryGroupLabel,
   deliveryGroupOf,
   deliveryOrderStatusOf,
+  signedDeliveryDocumentOf,
   deliveryReasonLabel,
   deliveryScopeSentence,
   orderDeliveryGroups,
@@ -262,6 +263,7 @@ export default function DeliveryOrderPage() {
   /* §6.1 (0489) — the ONE review arithmetic the register and Monitor read.
      `Proof Accepted` is what turns the delivered pill green; every other
      delivered document is amber until Operation has judged its proof. */
+  const signedDocument = signedDeliveryDocumentOf({ documentNumber: d.do_number, order, evidence: data?.attemptEvidence });
   const latestAttempt = [...(data?.attempts ?? [])].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at)).at(-1);
   /* A warehouse arrival owes no delivery proof: the customer leg's document
      carries the proof and its review (Card 20). */
@@ -271,7 +273,7 @@ export default function DeliveryOrderPage() {
     ? proofReviewOf({
         doNumber: d.do_number,
         ledger: photos.data ? photoRows : null,
-        signedDoUploadedAt: order.do_file_path ? order.do_uploaded_at : null,
+        signedDoUploadedAt: signedDocument?.uploadedAt ?? null,
         reviews: data?.proofReviews ?? [],
         attemptEvidence: data?.attemptEvidence ?? [],
       })
@@ -576,7 +578,7 @@ export default function DeliveryOrderPage() {
             attemptEvidence={data?.attemptEvidence ?? []}
             proofReviews={data?.proofReviews ?? []}
             ledger={photos.data ? photoRows : null}
-            signedDo={{ present: Boolean(order.do_file_path), uploadedAt: order.do_uploaded_at }}
+            signedDo={{ present: Boolean(signedDocument), uploadedAt: signedDocument?.uploadedAt ?? null }}
             proofReview={proofReview}
           />
 

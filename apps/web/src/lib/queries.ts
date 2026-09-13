@@ -7020,6 +7020,7 @@ export interface DeliveryOrderRow {
     /** The signed DO on file (0087) — the `Upload signed Delivery Order`
      *  queue's canonical fact (register correction 2026-09-06) — and its
      *  clock, one of the §6.1 files that can reopen the review question. */
+    do_number?: string | null;
     do_file_path?: string | null;
     do_uploaded_at?: string | null;
     /** 0156 — the order's Journey legs, when it travels in legs. */

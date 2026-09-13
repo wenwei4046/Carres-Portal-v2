@@ -63,3 +63,7 @@ session this chat had expired at 00:02 MYT during the deploy wait and a sign-in 
 may not type. Minimum owner action: sign in once as operation@ (or any staff role) and open
 `/operation/orders/so/SO-1362?route=1` — it must land on `/operation/orders/so/db9c939a-…?route=1` with the
 Order Route drawn; `/operation/orders/so/SO-999999` must print `Sales Order not found.`.
+
+### Authenticated acceptance completed · 2026-09-14
+
+All five surfaces converged to `a5646d2d961dab852f44c2cd8dcfc19a5e0483a1`. As Operation, `SO-1362`, `so-1362` and `1362` resolved by API to the same UUID; unknown SO-999999 returned 404 and invalid text 400. Browser `/operation/orders/so/SO-1362?route=1` resolved to the canonical UUID with `?route=1` preserved and the route populated. Direct UUID entry also rendered Order Route; unknown SO-999999 showed `Sales Order not found.` with `Back to Sales Orders`. Initial blank loading cleared after resources loaded. This closes the previously owed number/UUID fan-in walk; no order or Unit fact was changed.

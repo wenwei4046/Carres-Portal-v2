@@ -441,10 +441,16 @@ describe("buildDeliveryMonitorCards", () => {
     it("the signed document on file (`orders.do_file_path`) clears that half", () => {
       const c = delivered(
         { ops_order_control: { delivery_photos: [] } },
-        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf" } },
       );
       expect(c.missingProof).toEqual({ photo: true, signedDo: false });
       expect(missingProofLabels(c)).toEqual(["Upload delivery photo"]);
+    });
+
+    it("another DO’s signature neither clears missing proof nor reopens this DO’s review", () => {
+      const c = delivered({}, { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-OTHER", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } });
+      expect(c.missingProof.signedDo).toBe(true);
+      expect(c.proofReview.state).toBe("none");
     });
 
     it("both on file — nothing owed, the row leaves the queue", () => {
@@ -456,7 +462,7 @@ describe("buildDeliveryMonitorCards", () => {
             ],
           },
         },
-        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf" } },
       );
       expect(needsProof(c)).toBe(false);
     });
@@ -469,7 +475,7 @@ describe("buildDeliveryMonitorCards", () => {
 
     /* ── §6.1 (0489) — the review, over the SAME document row ─────────── */
     const withFile = { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" as const }] } };
-    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
+    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
     const reviewed = (reviews: DeliveryProofReviewRow[]) =>
       cards([order({ id: "a", so: 1301, do_number: "DO-1", ...withFile })], {
         deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
