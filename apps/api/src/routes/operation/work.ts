@@ -478,6 +478,9 @@ export function projectStorageInvoiceWork(input: {
   invoices: readonly InvoiceRegisterRow[];
   today: string;
   timingRules?: readonly CollectionTimingRule[] | null;
+  /** The effective Delivery Duty resolution (Delivery MASTER §13.1). Absent
+   *  or unassigned ⇒ the duty word stands; never the PIC. */
+  deliveryDuty?: WorkspaceDutyResolution | null;
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
   const seen = new Set<string>();
@@ -491,6 +494,7 @@ export function projectStorageInvoiceWork(input: {
     const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
     const dueIso = clock.actionDueIso;
     const late = !!clock.dueIso && input.today > clock.dueIso;
+    const owner = input.deliveryDuty;
     const workItem: WorkItem = {
       ruleKey: "payment.send_storage_invoice",
       module: "payment",
@@ -498,14 +502,14 @@ export function projectStorageInvoiceWork(input: {
       orderId: invoice.id,
       action: "Send the invoice and collect payment",
       ownerRule: "delivery_duty",
-      ownerDutyKey: null,
-      normalOwner: null,
-      activeCover: null,
-      actingPerson: null,
-      ownerState: "not_assigned",
-      ownerName: null,
-      ownerUserId: null,
-      ownerDuty: "Delivery staff",
+      ownerDutyKey: "delivery_duty",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
       tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
@@ -1141,7 +1145,7 @@ export function projectStorageCheckWork(input: {
       action: "Check the stored furniture",
       ownerRule: "warehouse_duty",
       // No warehouse duty roster exists (§6 names none), so there is no duty
-      // KEY to resolve — the word stands, exactly as delivery_duty does.
+      // KEY to resolve — the word stands.
       ownerDutyKey: null,
       normalOwner: null,
       activeCover: null,
@@ -1235,9 +1239,13 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
   const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
+  // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): every routine Delivery
+  // action resolves through the same shared resolver as PO and Payment Duty.
+  const deliveryDuty = dutyResolution(duties, "delivery_duty", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
     ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
+    ...(deliveryDuty ? { delivery_duty: deliveryDuty } : {}),
   };
   // Gate convergence (2026-09-07): the same invoices read that feeds the
   // collection work also answers the §2 storage obligation per order.
@@ -1294,7 +1302,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
   });
   const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes, timingRules });
-  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, deliveryDuty });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });

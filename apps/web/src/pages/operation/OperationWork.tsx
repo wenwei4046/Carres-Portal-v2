@@ -22,9 +22,9 @@
  * There is no Done button anywhere, structurally.
  */
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { groupWorkItemsByDay } from "@carres/shared";
+import { groupWorkItemsByDay, workspaceDutyLabelOf } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
@@ -168,11 +168,18 @@ export default function OperationWork() {
         : key.startsWith("person:")
           ? key.slice(7)
           : (items[0]?.ownerName ?? null);
-      const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
+      // A duty group carries the duty KEY from the feed; the governed word
+      // comes from the shared catalogue (`PO Duty` · `Delivery Duty`), and a
+      // keyed duty with no holder prints the Staff & Duties door below.
+      const dutyKey = key.startsWith("duty:") && items[0]?.ownerDutyKey ? items[0].ownerDutyKey : null;
+      const dutyWord = key.startsWith("duty:")
+        ? dutyKey ? workspaceDutyLabelOf(dutyKey) : key.slice(5)
+        : null;
       return {
         key,
         person: personName !== null,
         userId: staffMember ? key : null,
+        dutyKey,
         name: personName ?? dutyWord ?? "No owner yet",
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
@@ -317,6 +324,17 @@ export default function OperationWork() {
                   </span>
                 )}
               </h2>
+              {g.dutyKey && (
+                // The governed configuration failure with its ONE door
+                // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
+                // fallback person, never a Work-local assignment control.
+                <p className="mb-1.5 text-label text-base-500" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
+                  Nobody holds {g.name}.{" "}
+                  <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
+                    Set the holder in Workspace → Staff &amp; Duties
+                  </Link>
+                </p>
+              )}
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (
                   <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} />
