@@ -655,10 +655,9 @@ async function documentNumberOf(
 /**
  * GET /:id/signed-document — the signed Delivery Order on file, signed for
  * VIEWING (the 0280 pattern: private bucket, Worker signs after its own role
- * gate). The artefact is the ORDER's (`orders.do_file_path`, migration 0087),
- * which is a fact this route states rather than hides: one signed paper per
- * order today, reached through whichever of its documents the operator opened.
- * A document with no paper answers `{ url: null }` — an absence, never a 500.
+ * gate). Read this DO's bound document evidence, or the legacy order mirror
+ * only when its do_number matches. Missing paper answers `{ url: null }`;
+ * a failed evidence read remains an error rather than an invented absence.
  */
 deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
