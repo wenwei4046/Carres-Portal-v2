@@ -251,6 +251,8 @@ falling back only to that PO's recorded destination. A current default destinati
 order fact. Missing line provenance renders `Not recorded`. Loading, failed reads and verified
 absence are distinct; failed reads offer Retry and never render `Not allocated`.
 The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
+Server search recognises the displayed `SO-1319` number as well as bare `1319`;
+customer names and imported references are not parsed as partial SO numbers.
 Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
 The footer explicitly labels category values as Qty and includes Other goods when counted.
 Default column widths fit the eight-column sample at 1180px without shrinking typography;

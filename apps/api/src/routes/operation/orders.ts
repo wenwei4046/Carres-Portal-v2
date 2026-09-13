@@ -321,7 +321,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   if (channel === "dealers") q = q.is("outlet_id", null);
   if (channel === "showrooms") q = q.not("outlet_id", "is", null);
   if (search) {
-    // Match customer name (ILIKE), the SO number (exact, when numeric), AND
+    // Match customer name (ILIKE), the SO number (digits or displayed SO- prefix), AND
     // each imported invoice number. A combined Ref is tokenised into
     // source_ref[] (normalizeRefs), so an exact contains-match makes searching
     // any single invoice — e.g. "CR0854" — find the combined order too (alias).
@@ -330,8 +330,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     const clauses = [`customer_name.ilike.%${search}%`];
     const refTerm = search.toUpperCase().replace(/[^A-Z0-9/-]/g, "");
     if (refTerm) clauses.push(`source_ref.cs.{${refTerm}}`);
-    const asInt = Number.parseInt(search, 10);
-    if (Number.isFinite(asInt)) clauses.push(`so.eq.${asInt}`);
+    const soTerm = /^(?:SO[-\s]?)?(\d+)$/i.exec(search.trim());
+    const asInt = soTerm ? Number(soTerm[1]) : NaN;
+    if (Number.isSafeInteger(asInt)) clauses.push(`so.eq.${asInt}`);
     q = q.or(clauses.join(","));
   }
 
