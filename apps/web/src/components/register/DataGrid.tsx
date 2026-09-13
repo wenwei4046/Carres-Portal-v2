@@ -208,6 +208,8 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Keep frequent controls labelled while the container has room. */
+  labelledToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -276,6 +278,14 @@ export type DataGridProps<T> = {
    * first-data-column behaviour byte-identical for every existing caller.
    */
   stickyIdentity?: boolean | { columnKey: string | readonly string[] };
+  /**
+   * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
+   * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
+   * every cell carries one primary fact and one supporting line. Omitted =
+   * the Register baseline (38px), byte-identical for every other caller. A
+   * page passes the governed number; the engine never invents a third.
+   */
+  rowHeight?: 38 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -507,6 +517,7 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  labelledToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -520,6 +531,7 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -1766,10 +1778,13 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        labelledToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
+      style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
+      data-row-height={rowHeight}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
@@ -1780,7 +1795,7 @@ function DataGridInner<T>({
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          isReference && !searchOpen && !search ? (
+          isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
               aria-label="Search"
@@ -1798,6 +1813,7 @@ function DataGridInner<T>({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="search"
+                aria-label="Search"
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -1850,7 +1866,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1864,7 +1880,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && (
+            {(!isReference || labelledToolbar) && (
               <>
                 <span>Export</span>
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
@@ -1926,7 +1942,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Columns"
             title="Columns"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1940,7 +1956,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Columns</span>}
+            {(!isReference || labelledToolbar) && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>
@@ -2188,7 +2204,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
+        <table className={`${styles.table}${typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey) ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}

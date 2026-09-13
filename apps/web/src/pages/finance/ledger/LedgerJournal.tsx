@@ -7,6 +7,10 @@
  * narrow the rows in hand through the column filters. A row expands to its
  * lines; `?entry=JE-202609-0003` opens one entry on its own page, which is
  * the link every other ledger page uses.
+ *
+ * The principal alone also sees `New journal entry` (ruling M), which opens
+ * the manual journal form at `?entry=new`; for anyone else `new` is just a
+ * number nobody has.
  */
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -18,8 +22,10 @@ import {
   ledgerSourceWord,
 } from "@carres/shared/finance-ledger";
 import ListPageShell from "@/components/ListPageShell";
+import Button from "@/components/kit/Button";
 import Select from "@/components/kit/Select";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
@@ -33,8 +39,10 @@ import {
   useLedgerEntry,
   type JournalScope,
 } from "./ledger-queries";
+import ManualJournalForm from "./ManualJournalForm";
 
 const ALL_ACCOUNTS = "all";
+const NEW_ENTRY = "new";
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const isoOrNull = (v: string | null) => (v && ISO_DAY.test(v) ? v : null);
 
@@ -57,17 +65,30 @@ export default function LedgerJournal() {
   });
   const showAll = () => edit((n) => { n.delete("account"); n.delete("from"); n.delete("to"); });
 
+  // The manual journal door (ruling M): the principal only. The API and the
+  // database refuse everyone else as well; hiding the door is the courtesy.
+  const mayRecord = useAuth((s) => s.role) === "principal";
+  const startEntry = () => edit((n) => n.set("entry", NEW_ENTRY));
+  // Replace, not push: the browser's Back from the new entry is the Journal,
+  // never an emptied form that could record the same entry a second time.
+  const recorded = (ref: string) => setParams((before) => {
+    const next = new URLSearchParams(before); next.set("entry", ref); return next;
+  }, { replace: true });
+
+  if (entryRef === NEW_ENTRY && mayRecord) return <ManualJournalForm onBack={close} onRecorded={recorded} />;
   if (entryRef) return <EntryPage entryRef={entryRef} search={params} onClose={close} />;
   return <JournalRegister scope={scope} search={params} onOpen={open}
-    onPickAccount={pickAccount} onShowAll={showAll} />;
+    onPickAccount={pickAccount} onShowAll={showAll} onNew={mayRecord ? startEntry : undefined} />;
 }
 
-function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll }: {
+function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll, onNew }: {
   scope: JournalScope;
   search: URLSearchParams;
   onOpen: (entryNo: string) => void;
   onPickAccount: (code: string) => void;
   onShowAll: () => void;
+  /** Present only for the principal. */
+  onNew?: () => void;
 }) {
   const query = useLedgerEntries(scope);
   const chart = useLedgerChart();
@@ -125,6 +146,9 @@ function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll }: {
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">
+            {onNew && <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
+              New journal entry
+            </Button>}
             <span className="w-64" data-testid="journal-account-picker">
               <Select id="journal-account" value={scope.account ?? ALL_ACCOUNTS}
                 onValueChange={onPickAccount} placeholder="All accounts" options={accountOptions} />

@@ -102,6 +102,9 @@ export const BANNED: readonly [RegExp, string][] = [
   [/\blogistic\b/i, "logistic → Logistics (with the s)"],
   // Moods and gaps instead of work.
   [/\bat risk\b/i, "At Risk → say what is late and by how much"],
+  // `Needs attention` is banned as a STATE word. The Payment Monitor's rail
+  // filter of that name is an owner-ruled FILTER word (2026-09-12) and lives
+  // in `@carres/shared/payment-monitor`, outside this scan of page files.
   [/\bneeds attention\b/i, "Attention → Due soon / Overdue"],
   [/\bpending\b/i, "Pending → the state it actually selects"],
 ];

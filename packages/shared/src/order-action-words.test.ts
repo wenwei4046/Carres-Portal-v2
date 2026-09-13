@@ -17,6 +17,7 @@ import {
   tomorrowDeliveryAnswerLabel,
   type OrderActionKey,
   type PurchasingActionKey,
+  orderActionLines,
 } from "./order-action-words";
 
 const EVERY_KEY: OrderActionKey[] = [
@@ -29,6 +30,7 @@ const EVERY_KEY: OrderActionKey[] = [
   "issue_delivery_order",
   "deliver_today",
   "upload_delivery_photo",
+  "check_delivery_proof",
   "delivering",
   "collect",
   // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — the missing
@@ -72,12 +74,67 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("confirm_ready_date", { supplier: "Ohana" })).toBe(
       "Call Ohana — confirm ready date",
     );
-    expect(orderActionLine("confirm_delivery_date", { logistics: "NETS" })).toBe(
-      "Call NETS — confirm delivery date",
+    /* ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+       2026-09-13): the act with its recipient, then the required result —
+       never joined with `—`. */
+    expect(orderActionLine("confirm_delivery_date", { logistics: "NETS" })).toBe("Call NETS");
+    expect(orderActionLines("confirm_delivery_date", { logistics: "NETS" })).toEqual({
+      act: "Call NETS",
+      result: "Confirm the delivery date",
+    });
+    /* The DAY is agreed and only the window is missing (owner ruling
+       2026-09-12): line two asks for the time, never re-asks the date. */
+    expect(orderActionLines("confirm_delivery_date", { logistics: "NETS", dayAgreed: true })).toEqual({
+      act: "Call NETS",
+      result: "Confirm the delivery time",
+    });
+    expect(orderActionLines("arrange_new_delivery_date", { logistics: "NETS" })).toEqual({
+      act: "Call NETS",
+      result: "Arrange a new delivery date",
+    });
+  });
+
+  it("every Delivery line is two lines with no `—`, and the non-Delivery lines keep one", () => {
+    expect(orderActionLines("assign_logistics")).toEqual({
+      act: "Assign logistics",
+      result: "Choose the company that carries this delivery",
+    });
+    expect(orderActionLines("deliver_today", { deliveryDate: "Thu, 22 Oct" })).toEqual({
+      act: "Deliver on Thu, 22 Oct",
+      result: "Record the delivery result",
+    });
+    expect(orderActionLines("upload_delivery_photo", { logistics: "NETS" })).toEqual({
+      act: "Upload the delivery photo",
+      result: "Attach the photo from NETS",
+    });
+    expect(orderActionLines("collect_loan_item", { loanUnit: "U1-000-045" })).toEqual({
+      act: "Collect the loan item",
+      result: "Bring back U1-000-045 on the delivery day",
+    });
+    expect(orderActionLines("collect_loan_item").result).toBe(
+      "Bring back the loan item on the delivery day",
     );
-    expect(
-      orderActionLine("arrange_new_delivery_date", { logistics: "NETS" }),
-    ).toBe("Call NETS — arrange new delivery date");
+    expect(orderActionLines("resolve_payment_exception")).toEqual({
+      act: "Resolve the payment exception",
+      result: "Finance clears it with evidence",
+    });
+    for (const key of [
+      "assign_logistics",
+      "confirm_delivery_date",
+      "arrange_new_delivery_date",
+      "deliver_today",
+      "upload_delivery_photo",
+      "collect_loan_item",
+      "resolve_payment_exception",
+    ] as const) {
+      const lines = orderActionLines(key, { logistics: "NETS", deliveryDate: "Thu, 22 Oct" });
+      expect(lines.act).not.toContain("—");
+      expect(lines.result).not.toContain("—");
+    }
+    expect(orderActionLines("issue_po", { supplier: "Ohana" })).toEqual({
+      act: "Issue PO to Ohana",
+      result: null,
+    });
   });
 
   // C3 — the FACT that replaced `Confirm delivery with {customer}`. Two forms
@@ -109,11 +166,10 @@ describe("order action words — the row line", () => {
     expect(orderActionLine("confirm_ready_date")).toBe(
       "Call supplier — confirm ready date",
     );
-    expect(orderActionLine("confirm_delivery_date", { logistics: "   " })).toBe(
-      "Call logistics — confirm delivery date",
-    );
-    expect(orderActionLine("arrange_new_delivery_date", { logistics: null })).toBe(
-      "Call logistics — arrange new delivery date",
+    expect(orderActionLine("confirm_delivery_date", { logistics: "   " })).toBe("Call logistics");
+    expect(orderActionLine("arrange_new_delivery_date", { logistics: null })).toBe("Call logistics");
+    expect(orderActionLines("upload_delivery_photo", { logistics: null }).result).toBe(
+      "Attach the photo from logistics",
     );
     // No label may ever contain a double space or a dangling dash.
     for (const key of EVERY_KEY) {
@@ -138,18 +194,13 @@ describe("order action words — the row line", () => {
     expect(collectPillLabel(2455)).not.toMatch(/from/);
   });
 
-  it("the party-less four read the same as their queue word", () => {
+  it("the party-less lines read the same as their queue word", () => {
     // C7 adds `issue_delivery_order`: the SYSTEM produces the document, so
     // there is no outside party to name (COPY-STANDARD's action naming law
-    // lists it beside `Assign logistics` and `Upload delivery photo`).
-    // C8 adds `delay_planning`: an internal decision, nobody outside involved.
-    for (const key of [
-      "assign_logistics",
-      "issue_delivery_order",
-      "deliver_today",
-      "upload_delivery_photo",
-      "delay_planning",
-    ] as const)
+    // lists it beside `Assign logistics`). C8 adds `delay_planning`: an
+    // internal decision, nobody outside involved. `Deliver today` keeps the
+    // queue word only until the caller hands in the actual day.
+    for (const key of ["assign_logistics", "issue_delivery_order", "deliver_today", "delay_planning"] as const)
       expect(orderActionLine(key, { logistics: "NETS" })).toBe(orderActionQueue(key));
   });
 });
@@ -166,8 +217,8 @@ describe("C8 · the delay words — the dictionary won, and rung 2 lost the cust
       "Arrange new delivery date",
     );
     expect(
-      orderActionLine("arrange_new_delivery_date", { logistics: "NETS Logistics" }),
-    ).toBe("Call NETS Logistics — arrange new delivery date");
+      orderActionLines("arrange_new_delivery_date", { logistics: "NETS Logistics" }),
+    ).toEqual({ act: "Call NETS Logistics", result: "Arrange a new delivery date" });
     expect(orderActionButton("arrange_new_delivery_date")).toBe("Record new date");
   });
 

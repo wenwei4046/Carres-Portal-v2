@@ -154,6 +154,35 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ session: { sessionId: "cs_test_walk", status: "open" } });
   if (url.includes("/api/finance/payment-settings/templates"))
     return json({ templates: [] });
+  // 0486 — the Monitor's clock reads the effective timing rules.
+  if (url.includes("/api/finance/payment-settings"))
+    return json({
+      bank_accounts: [], manual_methods: [], storage_rules: [],
+      collection_timing: [{ id: "t-1", ask_days_before: 3, deadline_days_before: 2,
+        effective_from: "2026-08-19", reason: "Owner ruling 2026-08-19", created_at: "2026-09-12T00:00:00Z" }],
+      setting_changes: [], online_provider: { name: "Stripe", configured: false },
+    });
+  // The Monitor's pending-free-request read — none on the walk.
+  if (url.includes("/later-delivery-requests"))
+    return json({ requests: [] });
+  // The shared Work feed — the ONE owner calculation the Monitor reads.
+  if (url.includes("/api/operation/work"))
+    return json({ items: [{
+      id: "payment:i-1:payment.collect_customer_balance", module: "payment",
+      ruleKey: "payment.collect_customer_balance",
+      object: { kind: "invoice", id: "i-1", label: "INV-060926-4101" },
+      problem: "Customer balance due", action: "Ask customer to pay",
+      recipient: ORDER.customer_name, requiredResult: "Outstanding balance reduced to RM 0",
+      completionFact: "outstanding = RM 0",
+      owner: { rule: "collection_owner", dutyKey: "delivery_duty",
+        normal: { userId: "u-sha", name: "Shasha Tan" }, activeCover: null,
+        acting: { userId: "u-sha", name: "Shasha Tan" }, state: "primary" },
+      timing: { dueOn: soon(8), workingDaysLate: 0, bucket: "later" },
+      destination: "/finance/monitor?invoice=i-1", tone: "warning", locked: false, broken: false,
+    }], staff: [], generatedOn: soon(0) });
+  if (url.includes("/api/catalog"))
+    return json({ models: [{ id: "m-1", name: "King Mattress" }],
+      skus: [{ id: "s-1", sku: "MS01-K", modelId: "m-1" }], sofaFabrics: [], addons: [], floorConfig: {} });
   // The §6 storage walk: one mattress case on day 21 (one period commenced).
   if (url.includes("/api/finance/payment-storage") && (!init || init.method !== "POST"))
     return json({ cases: [{
@@ -174,7 +203,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-window.history.replaceState(null, "", "/finance/payments");
+// `?page=records` walks Payment Records; the default is the Monitor — the
+// collection desk the everyday row opens (owner ruling 2026-09-12).
+window.history.replaceState(null, "",
+  new URLSearchParams(window.location.search).get("page") === "records"
+    ? "/finance/payments" : "/finance/monitor");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

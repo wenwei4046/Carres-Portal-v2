@@ -448,6 +448,8 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   // 1 · broken commitment or today's run
   deliver_today: 10,
   upload_delivery_photo: 11,
+  // §6.1 — the review follows the upload it judges; same rung, after the loan.
+  check_delivery_proof: 13,
   // 2 · the customer must be told something — and C8 puts the DECISION that
   // gates it immediately above the call it gates. Law 4 does not name
   // `Delay planning` at all (reported, not invented): it is not "the customer

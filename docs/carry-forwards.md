@@ -644,3 +644,5 @@ select public.workspace_resolve_duty('purchasing_approver');
 ```
 `source = 'assignment'` with a non-null `actor_user_id` = closed. `not_assigned` = the
 `ops_manager` fallback is still carrying the approval.
+
+- `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.

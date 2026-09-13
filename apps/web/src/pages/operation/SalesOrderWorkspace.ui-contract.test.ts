@@ -928,7 +928,7 @@ describe("Sales Order object page — one form grammar", () => {
        registered answer is the count and then what is being waited on, and it
        is written ONCE in shared so the Goods table, the Order Route STOCK node
        and the register expansion cannot drift into three spellings. */
-    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    expect(workspace).toContain("unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty)");
     /* The rendered STRING is gone; the governance comment recording WHY it
        went stays, which is why this pins the quoted literal. */
     expect(workspace).not.toContain('"Not allocated"');
@@ -1070,11 +1070,11 @@ describe("Sales Order object page — one form grammar", () => {
       workspace.indexOf('data-testid="goods-total"'),
     );
     for (const label of ["Unit price", "Line total"]) {
-      expect(goods).toContain(`>${label}</th>`);
+      expect(goods).toContain(`>${label}</div>`);
     }
     /* Numerals right-aligned and tabular, so a column of money reads as one. */
-    expect(goods).toContain('text-right font-medium">Unit price</th>');
-    expect(goods).toContain('text-right font-medium">Line total</th>');
+    expect(goods).toContain('text-right font-medium');
+    expect(goods).toContain('text-right tabular-nums whitespace-nowrap');
     expect(goods).toContain("{fmtMoney(r.unitPrice)}");
     expect(goods).toContain("{fmtMoney(r.total)}");
     /* A SERVICE row carries the same two columns off `order_addons`, so the
@@ -1158,12 +1158,13 @@ describe("Sales Order object page — one form grammar", () => {
   });
 
   it("states a recorded instalment plan, and invents nothing when there is none", () => {
+    const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
     /* `orders.installment_months` + `orders.payment_method` are the at-sale
        capture — an ORDER fact, so it is stated above the ledger, never as a
        column on rows that do not carry it. */
-    expect(workspace).toContain('data-testid="money-instalment"');
+    expect(ledger).toContain('data-testid="money-instalment"');
     expect(workspace).toContain("installment_months");
-    expect(workspace).toContain("{!isNew && instalmentWord && (");
+    expect(ledger).toContain("atSalePaymentWord(saved.method, saved.months)");
     /* ⛔ NO DERIVED MONTHLY FIGURE. A number this screen computed would be
        read as one Carres agreed to, and a month count plus a total does not
        say what the customer's bank actually charges. */

@@ -44,7 +44,7 @@ afterAll(() => _setJwksForTesting(null));
 describe("GET /api/finance/payment-settings", () => {
   function tables(fail = false) {
     const table = (rows: unknown[]) => {
-      const chain = { select: vi.fn(), order: vi.fn() };
+      const chain = { select: vi.fn(), order: vi.fn(), limit: vi.fn() };
       chain.select.mockReturnValue(chain);
       // Two chained .order calls resolve on await — a thenable chain.
       const result = fail
@@ -54,6 +54,7 @@ describe("GET /api/finance/payment-settings", () => {
         then: (resolve: (v: unknown) => void) => resolve(result),
       });
       chain.order.mockReturnValue(thenable);
+      chain.limit.mockReturnValue(thenable);
       return thenable;
     };
     const sb = { from: vi.fn().mockImplementation((name: string) =>
@@ -253,10 +254,113 @@ describe("POST /api/finance/payment-settings/*", () => {
     const res = await post("storage-rule", "principal", {
       productGroup: "sofa", freeDays: 14, chargeAmount: 200, cycleDays: 14,
       extraFreeAllowed: false, inspectionDays: 30, effectiveFrom: "2026-10-01",
+      reason: "Owner ruling",
     });
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("payment_set_storage_rule", expect.objectContaining({
       p_product_group: "sofa", p_charge_amount: 200, p_extra_free_allowed: false,
+      p_reason: "Owner ruling",
     }));
+  });
+  it("a storage rule change without its reason is refused before SQL (0486)", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("storage-rule", "principal", {
+      productGroup: "sofa", freeDays: 14, chargeAmount: 200, cycleDays: 14,
+      extraFreeAllowed: false, inspectionDays: 30, effectiveFrom: "2026-10-01",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("free days > Operation limit is refused before SQL — free ≤ Operation ≤ Approver", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("storage-rule", "principal", {
+      productGroup: "mattress_bedframe", freeDays: 25, chargeAmount: 150, cycleDays: 30,
+      operationLimitDay: 21, waiverLimitDay: 30, extraFreeAllowed: true, inspectionDays: 30,
+      effectiveFrom: "2026-10-01", reason: "typo",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Collection timing (0486)", () => {
+  async function post(path: string, role: string, body: unknown) {
+    return app.fetch(new Request(`http://t/api/finance/payment-settings/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("GET carries the effective-dated rules, the change log and the provider fact", async () => {
+    const table = (rows: unknown[]) => {
+      const chain = { select: vi.fn(), order: vi.fn(), limit: vi.fn() };
+      const thenable = Object.assign(chain, {
+        then: (resolve: (v: unknown) => void) => resolve({ data: rows, error: null }),
+      });
+      chain.select.mockReturnValue(chain); chain.order.mockReturnValue(thenable); chain.limit.mockReturnValue(thenable);
+      return thenable;
+    };
+    const sb = { from: vi.fn().mockImplementation((name: string) =>
+      table(name === "payment_collection_timing_rules"
+        ? [{ ask_days_before: 3, deadline_days_before: 2, effective_from: "2026-08-19" }]
+        : name === "payment_setting_changes"
+          ? [{ what: "collection_timing", reason: "ruling", effective_from: "2026-08-19" }]
+          : [])) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings", {
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      collection_timing: unknown[]; setting_changes: unknown[]; online_provider: { name: string; configured: boolean };
+    };
+    expect(body.collection_timing).toEqual([{ ask_days_before: 3, deadline_days_before: 2, effective_from: "2026-08-19" }]);
+    expect(body.setting_changes).toHaveLength(1);
+    // No STRIPE_SECRET_KEY in the test env → the provider is honestly not configured.
+    expect(body.online_provider).toEqual({ name: "Stripe", configured: false });
+  });
+  it("a change reaches the manager-gated SQL door with its reason and effective date", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { id: "t1" }, error: null }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "principal", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "  Give staff a day more  ",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_set_collection_timing", {
+      p_ask_days_before: 4, p_deadline_days_before: 3, p_effective_from: "2026-10-01",
+      p_reason: "Give staff a day more",
+    });
+  });
+  it("asking must start EARLIER than the deadline — refused before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    for (const body of [
+      { askDaysBefore: 2, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
+      { askDaysBefore: 1, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
+    ]) {
+      expect((await post("collection-timing", "principal", body)).status).toBe(422);
+    }
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("a reason is required", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "principal", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: " ",
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("the SQL manager refusal maps to 403", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({
+      data: null, error: { code: "42501", message: "forbidden", details: "payment settings are set by the manager" },
+    }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await post("collection-timing", "operation", {
+      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "x",
+    });
+    expect(res.status).toBe(403);
   });
 });

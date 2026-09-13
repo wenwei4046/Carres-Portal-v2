@@ -222,3 +222,116 @@ export async function attemptDeliveryOrderIssue(
 
   return { outcome: "issued", doNumber };
 }
+
+/**
+ * 0491 · A JOURNEY LEG'S OWN DOCUMENT — the SAME issuing discipline, a
+ * different scope (Delivery MASTER §3.1, §14.1). Leg 1 `Klang WH → JB
+ * partner` and leg 2 `JB partner → Singapore customer` each carry their own
+ * partner, agreed day, document, handover and result; the number is seeded on
+ * the order AND the leg so a reprint returns the same paper.
+ *
+ * The gate is the order's gate — money in full or an approved Delivery
+ * Payment Approval, no OPEN Finance exception, goods reserved — read through
+ * the ONE booking context; the leg's own readiness is its arrangement (0386):
+ * a partner and an agreed day. The mint is the governed door
+ * (`delivery_leg_document_mint`), never a direct insert; it also mirrors the
+ * customer leg's number onto the order for the legacy readers.
+ *
+ * FAIL-SOFT AT EVERY HOOK, exactly as the whole-order path: the arrangement
+ * save that called this keeps its record whatever happens here.
+ */
+export async function attemptLegDocumentIssue(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  leg: number,
+): Promise<DeliveryOrderAttempt> {
+  if (!Number.isInteger(leg) || leg < 1) {
+    return { outcome: "blocked", reasons: ["A leg document names its leg"] };
+  }
+  const [orderRes, arrangementRes, existingRes] = await Promise.all([
+    sb.from("orders").select("id, delivery_stops").eq("id", orderId).maybeSingle(),
+    sb
+      .from("ops_delivery_arrangements")
+      .select("partner_id, partner_name:delivery_partners(name), confirmed_date, confirmed_time")
+      .eq("order_id", orderId)
+      .eq("leg", leg)
+      .maybeSingle(),
+    sb
+      .from("ops_delivery_orders")
+      .select("id, do_number, leg, voided_at")
+      .eq("order_id", orderId),
+  ]);
+  if (orderRes.error) return { outcome: "error", body: { message: orderRes.error.message }, status: 500 };
+  if (arrangementRes.error) return { outcome: "error", body: { message: arrangementRes.error.message }, status: 500 };
+  if (existingRes.error) return { outcome: "error", body: { message: existingRes.error.message }, status: 500 };
+  if (!orderRes.data) return { outcome: "error", body: { message: "Order not found" }, status: 404 };
+
+  const stops = (orderRes.data.delivery_stops as Array<{ leg: number }> | null) ?? [];
+  if (!stops.some((s) => Number(s.leg) === leg)) {
+    return { outcome: "blocked", reasons: ["This leg is not on the order's Delivery Journey"] };
+  }
+  const live = ((existingRes.data ?? []) as Array<{ do_number: string; leg: number | null; voided_at: string | null }>)
+    .find((d) => (d.leg ?? 0) === leg && !d.voided_at);
+  if (live) return { outcome: "already", doNumber: live.do_number };
+
+  const arrangement = arrangementRes.data as
+    | { partner_id: string | null; confirmed_date: string | null; confirmed_time: string | null }
+    | null;
+  const reasons: string[] = [];
+  if (!arrangement?.partner_id) reasons.push("Assign logistics for this leg");
+  if (!arrangement?.confirmed_date) reasons.push("Confirm the delivery date for this leg");
+  if (reasons.length > 0) return { outcome: "blocked", reasons };
+
+  // The order's money and goods gate — ONE booking context, ONE gate (Law D).
+  const loaded = await loadBookingContext(sb, orderId, null);
+  if (!loaded.ok) return { outcome: "error", body: loaded.body, status: loaded.status };
+  const [feRes, paRes] = await Promise.all([
+    sb.from("order_finance_exceptions").select("id, status, reason, opened_at, cleared_at, clear_evidence").eq("order_id", orderId),
+    sb.from("order_delivery_payment_approvals").select("id, status, request_reason, requested_at, decided_at, decision_reason").eq("order_id", orderId),
+  ]);
+  if (feRes.error) return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
+  if (paRes.error) return { outcome: "error", body: { message: paRes.error.message }, status: 500 };
+  const issue = deliveryOrderIssueGate({
+    bookingConfirmed: true,
+    confirmedDateIso: arrangement!.confirmed_date,
+    confirmedTimeSlot: arrangement!.confirmed_time ?? "Anytime",
+    gate: loaded.ctx.gate,
+    financeExceptions: (feRes.data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      status: row.status as "open" | "cleared",
+      reason: row.reason as string,
+      openedAt: (row.opened_at as string | null) ?? null,
+      clearedAt: (row.cleared_at as string | null) ?? null,
+      clearEvidence: (row.clear_evidence as string | null) ?? null,
+    })),
+    paymentApprovals: (paRes.data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      status: row.status as "pending" | "approved" | "refused",
+      requestReason: row.request_reason as string,
+      requestedAt: (row.requested_at as string | null) ?? null,
+      decidedAt: (row.decided_at as string | null) ?? null,
+      decisionReason: (row.decision_reason as string | null) ?? null,
+    })),
+    holidays: myHolidaySet(),
+    waitBookingConfirm: false,
+  });
+  if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
+
+  // The locked scheme, seeded on the order AND the leg; a same-day re-issue of
+  // the same leg takes the repeat letter, exactly as the whole-order path.
+  const base = docNumber({ prefix: "DO", date: todayIsoMYT(), seed: `${orderId}#leg${leg}`, digits: 4 });
+  const taken = new Set(((existingRes.data ?? []) as Array<{ do_number: string }>).map((d) => d.do_number));
+  let doNumber = base;
+  for (let rev = 1; taken.has(doNumber) && rev <= 25; rev++) doNumber = `${base}${amendmentSuffix(rev)}`;
+
+  const { data, error } = await sb.rpc("delivery_leg_document_mint", {
+    p_order_id: orderId,
+    p_leg: leg,
+    p_do_number: doNumber,
+  });
+  if (error) return { outcome: "error", body: { message: error.message }, status: 500 };
+  const minted = (data as { do_number?: string } | null)?.do_number ?? doNumber;
+  return minted === doNumber ? { outcome: "issued", doNumber } : { outcome: "already", doNumber: minted };
+}
+

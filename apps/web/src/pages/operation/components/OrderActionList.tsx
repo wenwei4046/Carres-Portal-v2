@@ -48,6 +48,9 @@ export interface OrderActionRow {
   /** The row LINE, party named (`Call NETS — confirm delivery date`), built by
    *  the same shared helper the Orders list row uses. */
   line: string;
+  /** Line two of a Delivery Work sentence — the required result (owner
+   *  ruling 2026-09-13). Absent or null for an action spoken on one line. */
+  result?: string | null;
   tone: "danger" | "warning" | "info" | "success" | "neutral";
   /** Delivery is held on money — the 🔒 the ladder already shows. */
   locked?: boolean;
@@ -106,7 +109,12 @@ export default function OrderActionList({
                       aria-hidden="true"
                     />
                   )}
-                  <span className="truncate min-w-0">{a.line}</span>
+                  <span className="min-w-0 flex flex-col">
+                    <span className="truncate">{a.line}</span>
+                    {a.result ? (
+                      <span className="truncate text-meta text-base-500">{a.result}</span>
+                    ) : null}
+                  </span>
                 </>
               );
               return (

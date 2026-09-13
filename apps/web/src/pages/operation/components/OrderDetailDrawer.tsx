@@ -101,7 +101,6 @@ import {
   useSaveOrderControl,
   useConfirmBooking,
   usePartnerBookingCheck,
-  useSetPartnerDeliveryRules,
   useDeliveryPhotos,
   useOrderServiceCases,
   useOrderGuarantees,
@@ -5020,7 +5019,6 @@ function BookingBlock({
   // Confirm button never reads it, because a partner's working pattern is the
   // partner's fact, not one of our obligations — the operator may have already
   // phoned them.
-  const [rulesOpen, setRulesOpen] = useState(false);
   const partnerCheck = usePartnerBookingCheck(orderId, open ? date : "");
   const partnerWarnings = partnerCheck.data?.warnings ?? [];
   const checkedPartner = partnerCheck.data?.partner ?? null;
@@ -5051,7 +5049,6 @@ function BookingBlock({
       // last step.
       for (const w of res.gateWarnings ?? []) toast.warning(w);
       setOpen(false);
-      setRulesOpen(false);
       setTripGroups(null);
     },
     onError: (e) =>
@@ -5285,26 +5282,18 @@ function BookingBlock({
             </div>
           )}
           {checkedPartner && (
+            /* D5 relocated (owner ruling 2026-09-13): a partner's delivery
+               rules are maintained in Delivery Settings, never in this drawer.
+               The drawer keeps the DOOR and loses the editor. */
             <div className="text-right py-0.5">
-              <Btn
-                variant="ghost"
-                size="sm"
-                onClick={() => setRulesOpen((v) => !v)}
+              <Link
+                className="text-meta font-semibold text-kit-blue-11"
+                to={`/operation/settings/delivery/partners/${encodeURIComponent(checkedPartner.id)}/schedule`}
+                data-testid="drawer-partner-rules-door"
               >
-                {rulesOpen ? "Close" : `${checkedPartner.name} delivery rules`}
-              </Btn>
+                {checkedPartner.name} delivery rules
+              </Link>
             </div>
-          )}
-          {rulesOpen && checkedPartner && (
-            <PartnerRulesEditor
-              partnerId={checkedPartner.id}
-              partnerName={checkedPartner.name}
-              rules={partnerCheck.data?.rules ?? null}
-              onSaved={() => {
-                setRulesOpen(false);
-                void partnerCheck.refetch();
-              }}
-            />
           )}
           {gateHints.length > 0 && (
             <div className="text-right text-meta text-warning py-0.5">
@@ -5330,184 +5319,6 @@ function BookingBlock({
   );
 }
 
-/** T9 (0283) — the logistics company's own delivery rules, edited where FIRST
- *  read (L6: "build the fields WITH the first consumer, not as an admin page up
- *  front"). Four facts, plain words: which days it runs, days it is not running
- *  at all, how many drops it takes, and how much notice it needs.
- *
- *  Sunday is not offered: nobody delivers on Sunday, and the booking gate
- *  refuses it for every company — showing a switch for it would suggest the
- *  rule is negotiable per partner.
- *
- *  The rules belong to the CARRIER, not this order: saving here changes what
- *  the portal warns about on every order that uses it, which is why the panel
- *  says so out loud and why the write is audited server-side. */
-function PartnerRulesEditor({
-  partnerId,
-  partnerName,
-  rules,
-  onSaved,
-}: {
-  partnerId: string;
-  partnerName: string;
-  rules: {
-    offDays: number[];
-    blackoutDates: string[];
-    dailyCapacity: number | null;
-    bookingLeadDays: number;
-  } | null;
-  onSaved: () => void;
-}) {
-  const [offDays, setOffDays] = useState<number[]>(rules?.offDays ?? [0]);
-  const [blackouts, setBlackouts] = useState<string[]>(rules?.blackoutDates ?? []);
-  const [capacity, setCapacity] = useState<string>(
-    rules?.dailyCapacity != null ? String(rules.dailyCapacity) : "",
-  );
-  const [lead, setLead] = useState<string>(String(rules?.bookingLeadDays ?? 0));
-  const [newBlackout, setNewBlackout] = useState("");
-  const save = useSetPartnerDeliveryRules(partnerId, {
-    onSuccess: () => {
-      toast.success(`${partnerName} delivery rules saved`);
-      onSaved();
-    },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't save the delivery rules",
-      ),
-  });
-  const FIELD =
-    "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
-  const WEEK = [
-    { n: 1, label: "Mon" },
-    { n: 2, label: "Tue" },
-    { n: 3, label: "Wed" },
-    { n: 4, label: "Thu" },
-    { n: 5, label: "Fri" },
-    { n: 6, label: "Sat" },
-  ];
-  const runsOn = (n: number) => !offDays.includes(n);
-  const toggleDay = (n: number) =>
-    setOffDays((cur) =>
-      cur.includes(n) ? cur.filter((d) => d !== n) : [...cur, n],
-    );
-  // Sunday is always off; the API validates the same thing, this keeps the
-  // operator from saving a company that runs no day at all.
-  const runsSomeDay = WEEK.some((d) => runsOn(d.n));
-  const capacityNum = capacity.trim() === "" ? null : Number(capacity);
-  const leadNum = Number(lead || 0);
-  const valid =
-    runsSomeDay &&
-    Number.isInteger(leadNum) &&
-    leadNum >= 0 &&
-    leadNum <= 30 &&
-    (capacityNum === null ||
-      (Number.isInteger(capacityNum) && capacityNum >= 1 && capacityNum <= 999));
-  return (
-    <DRow k={`${partnerName} rules`} block>
-      <div className="py-1 space-y-1.5 text-right">
-        <div className="text-label text-base-500">
-          These are {partnerName}&apos;s own rules — they apply to every order
-          this logistics company delivers, and they warn, never block.
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Delivers on</span>
-          {WEEK.map((d) => (
-            <Btn
-              key={d.n}
-              variant={runsOn(d.n) ? "box" : "ghost"}
-              size="sm"
-              onClick={() => toggleDay(d.n)}
-              title={
-                runsOn(d.n)
-                  ? `${partnerName} runs on ${d.label}`
-                  : `${partnerName} does not run on ${d.label}`
-              }
-            >
-              {d.label}
-            </Btn>
-          ))}
-        </div>
-        {!runsSomeDay && (
-          <div className="text-meta text-danger">
-            A logistics company must run on at least one day of the week
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Needs</span>
-          <input
-            type="number"
-            min={0}
-            max={30}
-            value={lead}
-            onChange={(e) => setLead(e.target.value)}
-            aria-label={`${partnerName} booking notice in working days`}
-            className={`${FIELD} w-[70px]`}
-          />
-          <span className="text-meta text-base-600">
-            working days notice · takes at most
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={999}
-            value={capacity}
-            placeholder="not set"
-            onChange={(e) => setCapacity(e.target.value)}
-            aria-label={`${partnerName} deliveries a day`}
-            className={`${FIELD} w-[90px]`}
-          />
-          <span className="text-meta text-base-600">deliveries a day</span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Not running on</span>
-          {blackouts.length === 0 && (
-            <span className="text-meta text-base-400">no dates</span>
-          )}
-          {blackouts.map((b) => (
-            <Btn
-              key={b}
-              variant="ghost"
-              size="sm"
-              onClick={() => setBlackouts((cur) => cur.filter((x) => x !== b))}
-              title="Remove this date"
-            >
-              {fmtDate(b).split(",")[0]} ×
-            </Btn>
-          ))}
-          <input
-            type="date"
-            value={newBlackout}
-            onChange={(e) => {
-              const v = e.target.value;
-              setNewBlackout("");
-              if (v && !blackouts.includes(v))
-                setBlackouts((cur) => [...cur, v].sort());
-            }}
-            aria-label={`Add a date ${partnerName} is not running`}
-            className={`${FIELD} w-[150px]`}
-          />
-        </div>
-        <div className="flex items-center gap-1.5 justify-end">
-          <Btn
-            variant="box"
-            size="sm"
-            disabled={!valid || save.isPending}
-            onClick={() =>
-              save.mutate({
-                offDays: [0, ...WEEK.filter((d) => !runsOn(d.n)).map((d) => d.n)],
-                blackoutDates: blackouts,
-                dailyCapacity: capacityNum,
-                bookingLeadDays: leadNum,
-              })
-            }
-          >
-            {save.isPending ? "Saving…" : "Save rules"}
-          </Btn>
-        </div>
-      </div>
-    </DRow>
-  );
-}
 
 /**
  * T6 (0280) — the delivery-photo row inside the delivery card, shown only once
