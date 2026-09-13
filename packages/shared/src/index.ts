@@ -2090,6 +2090,14 @@ export {
   type DeliveryWorkStatusTone,
   type DeliveryStatusSpell,
 } from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
 // nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.

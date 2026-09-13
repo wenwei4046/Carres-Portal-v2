@@ -482,6 +482,9 @@ export const qk = {
      * modules. The cache key stays under the order so every existing order
      * invalidation refreshes the projection without creating a new owner. */
     orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
+    /** 【DELIVERY】 CARD 19 — the document word resolved to the id, keyed by
+     *  the number the URL carried. */
+    orderByNumber: (so: number) => ["operation", "orders", "by-number", so] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -5659,6 +5662,24 @@ export function useOperationOrders(
 }
 
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
+/**
+ * 【DELIVERY】 CARD 19 — the operator's document word (`SO-1362`) resolved to
+ * the order's id through the one by-number door. The object page calls this
+ * ONCE for a number URL and then re-enters by the id, so every other read
+ * still happens by the id (Law C — one door, never a second fan-in).
+ */
+export function useSalesOrderIdByNumber(so: number | null) {
+  return useQuery({
+    queryKey: so ? qk.operation.orderByNumber(so) : (["operation", "orders", "by-number", "null"] as const),
+    queryFn: () =>
+      apiFetch<{ id: string; so: number }>(`/api/operation/orders/by-number/${so}`),
+    enabled: so !== null,
+    /* A miss is a fact about the number, not a flake — no retry. */
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
 export function useOperationOrder(
   id: string | null,
   opts?: Partial<UseQueryOptions<operationOrderDetailResponse>>,
