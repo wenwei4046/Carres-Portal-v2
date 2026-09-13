@@ -166,7 +166,6 @@ import DOAttachModal from "./DOAttachModal";
 import { DeliveryProofUploadButton } from "./DriverSubmission";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
-import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import AnnotationTimeline from "./AnnotationTimeline";
@@ -324,7 +323,6 @@ export default function OrderDetailDrawer({
   const [showDO, setShowDO] = useState(false);
   const [showAbandon, setShowAbandon] = useState(false);
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
-  const [showTransferReady, setShowTransferReady] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [showServiceNote, setShowServiceNote] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
@@ -338,7 +336,6 @@ export default function OrderDetailDrawer({
       showDO ||
       showAbandon ||
       showConfirmProceed ||
-      showTransferReady ||
       showTopUp ||
       showServiceNote;
     if (anyModalOpen) return;
@@ -356,7 +353,6 @@ export default function OrderDetailDrawer({
     showDO,
     showAbandon,
     showConfirmProceed,
-    showTransferReady,
     showTopUp,
     showServiceNote,
   ]);
@@ -400,7 +396,6 @@ export default function OrderDetailDrawer({
               onDOClick={() => setShowDO(true)}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
-              onTransferReadyClick={() => setShowTransferReady(true)}
               onTopUpClick={() => setShowTopUp(true)}
               onServiceNoteClick={() => setShowServiceNote(true)}
               onFollowUpClick={() => setShowFollowUp(true)}
@@ -431,13 +426,6 @@ export default function OrderDetailDrawer({
                 order={data.order}
                 lines={data.lines}
                 onClose={() => setShowConfirmProceed(false)}
-              />
-            )}
-            {showTransferReady && (
-              <TransferReadyDialog
-                order={data.order}
-                lines={data.lines}
-                onClose={() => setShowTransferReady(false)}
               />
             )}
             {showTopUp && (
@@ -554,7 +542,6 @@ interface DrawerBodyProps {
   onDOClick: () => void;
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
-  onTransferReadyClick: () => void;
   onTopUpClick: () => void;
   onFollowUpClick: () => void;
 }
@@ -1292,7 +1279,6 @@ function DrawerBody({
   onDOClick,
   onAbandonClick,
   onConfirmProceedClick,
-  onTransferReadyClick,
   onTopUpClick,
   onServiceNoteClick,
   onFollowUpClick,
@@ -2678,7 +2664,6 @@ function DrawerBody({
           orderId={order.id}
           pipelineStatus={pipelineStatus}
           onServiceNoteClick={onServiceNoteClick}
-          onTransferReadyClick={onTransferReadyClick}
           onConfirmProceedClick={onConfirmProceedClick}
           onTopUpClick={onTopUpClick}
           onAbandonClick={onAbandonClick}
@@ -6933,7 +6918,6 @@ function ActionsMenu({
   orderId,
   pipelineStatus,
   onServiceNoteClick,
-  onTransferReadyClick,
   onConfirmProceedClick,
   onTopUpClick,
   onAbandonClick,
@@ -6946,7 +6930,6 @@ function ActionsMenu({
   orderId: string;
   pipelineStatus: PipelineStatus;
   onServiceNoteClick: () => void;
-  onTransferReadyClick: () => void;
   onConfirmProceedClick: () => void;
   onTopUpClick: () => void;
   onAbandonClick: () => void;
@@ -7050,15 +7033,6 @@ function ActionsMenu({
                     }}
                   />
                 )}
-                <MenuItem
-                  icon={<PackagePlus className="w-4 h-4" />}
-                  label="Transfer to ready"
-                  title="Mark stock on-hand → ready (manual bridge)"
-                  onClick={() => {
-                    close();
-                    onTransferReadyClick();
-                  }}
-                />
                 <MenuItem
                   icon={<Pencil className="w-4 h-4" />}
                   label="Record top-up"

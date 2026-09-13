@@ -270,7 +270,13 @@ Address` · `Confirm Site Access` · `Confirm Receiver` · `Obtain Missing Infor
 New Delivery Date after Failed Delivery` · `Confirm Cancellation`.
 
 Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
-reply evidence, recorder, proxy provenance and explicit next action. Results: `Confirmed` · `No
+reply evidence, recorder, proxy provenance and explicit next action. **Four identities, separately
+(0499, owner ruling 2026-09-13):** `contact_owner_user_id` is the order's NORMAL responsible
+Operation person, filled by the writer from the one responsibility read
+(`delivery_responsible_operation`) — never the recorder as such, never a shared login, never the
+cover; `acting_user_id` is today's acting person (the buddy cover, else the normal person);
+`recorded_by` is the actual signed-in recorder, evidence only; `on_behalf_of_partner_id` is
+partner provenance when a partner's reply is recorded. Results: `Confirmed` · `No
 Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details Incorrect` ·
 `Customer Refused Delivery` · `Waiting for Customer Reply`.
 
@@ -892,13 +898,16 @@ system.
 2026-09-13; Payment MASTER §10, migrations 0489 · 0495).** When a Sales Order's collection first
 becomes actionable, the order's recorded **contact owner** (§5.1 — the Operation person named on
 its earliest customer contact, else its partner arrangement) becomes that order's stable
-collection owner — provided the record names an individual staff identity (a People record) who
-was not acting as Delivery Duty buddy cover that day: the same person who has been contacting the
-customer about delivery asks for the money. Otherwise the Delivery Duty NORMAL holder on that day
-stands in (§13.1), never the cover. **Measured gap (2026-09-13):** the one contact writer stores
-`contact_owner_user_id = recorded_by` (the signed-in subject) and resolves no cover; a proxy record
-names only the partner. A recorder cannot yet name a different responsible owner — Payment guards
-the seam (0498) until this writer separates the two. The owner stays until the balance is RM 0; later duty rotation or a
+collection owner: the same person who has been contacting the customer about delivery asks for
+the money. Delivery and Payment read ONE authority, `delivery_responsible_operation(order, day)`
+(0499): the order's collection-owner ledger row (establishment or formal handover) · else the
+normal responsible person on its earliest customer contact (an individual with a staff_code, not
+covering that day) · else the configured NORMAL Delivery Duty holder on the day · else nobody;
+today's acting person is that person's buddy cover, else the person. The contact writer fills the
+record's four identities from that read (§5.1); the recorder — including the shared `Operations`
+login — is evidence, never responsibility. The one remaining fact for automatic ownership on real
+orders is the initial Delivery Duty holder, a one-time staffing configuration in Workspace →
+Staff & Duties. The owner stays until the balance is RM 0; later duty rotation or a
 later contact by someone else never moves it; only buddy cover (acting today) or a formal handover
 changes who acts. Delivery configures nothing extra for this: the Payment module reads the contact
 record and the resolver on the first actionable day and keeps its own append-only owner record.
@@ -1424,3 +1433,8 @@ window · plain REGION rows) were fixed before merge. Named follow-ups, not acci
 `Assign logistics` surface (the retired listing's door), the Delivery Orders register's own
 redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar` ·
 `NEEDS CHECKING` · `Search deliveries…`).
+
+
+### Supplemental production acceptance · 2026-09-13 23:32 MYT
+
+Card 12’s representative manager save is now verified as principal on the existing E2E LP-X fixture, persisted after reload and restored to its original value with both audit entries retained. Card 18’s office form was walked as principal: Building type is required, the retired address-later control is absent, and missing address/building/date facts disable Create order with the governed message. These are authenticated observations on `f2fb3efeb89c395dd9f7ee96cdc49d60e6e103ff`; see the supplemental sections of Cards 12 and 18 for exact test facts. Dealer POS remains open: the working dealer-test login reaches first-time staff PIN setup, not the wizard. No identity/security setup was changed. Cards 19/20 are being handled in their existing Delivery workspaces; Card 21 owns only legacy warehouse-pick application retirement, with database retirement explicitly still outstanding.
