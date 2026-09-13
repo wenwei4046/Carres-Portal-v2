@@ -700,8 +700,8 @@ describe("DeliveryOrderPage", () => {
    `from_loc`, and owes no delivery proof on its document. */
 describe("a Journey leg's document — Arrived, its own Warehouse, no proof owed (Card 20)", () => {
   const stops = [
-    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" },
-    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" },
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" as const },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" as const },
   ];
   const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
   const legDoc = (leg: number) =>
