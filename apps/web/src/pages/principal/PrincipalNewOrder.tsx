@@ -8,6 +8,8 @@ import type {
   RawCreateOrderInput,
 } from "@carres/shared";
 import {
+  BUILDING_TYPE_OPTIONS,
+  DELIVERY_FACT_REFUSALS,
   ORDER_ENTRY_TABS,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
@@ -245,12 +247,26 @@ export default function PrincipalNewOrder() {
   const subtotal = activeLines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const paidPct = subtotal > 0 ? Math.round((draft.paid / subtotal) * 100) : 0;
 
-  const canCreate =
+  const rawFloors =
     !!dealerId &&
     c.name.trim().length > 0 &&
     activeLines.length > 0 &&
-    activeLines.every((l) => l.qty > 0 && l.unitPrice >= 0) &&
-    !createRaw.isPending;
+    activeLines.every((l) => l.qty > 0 && l.unitPrice >= 0);
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13,
+     Delivery Card 18) — the office door refuses the same facts with the same
+     words as the POS schema, and says which one is missing HERE, not after
+     the round trip. Floor and lift always carry a value on this form. */
+  const factIssue =
+    c.addressLine1.trim().length < 5 || !c.addressCity || !c.addressPostcode
+      ? DELIVERY_FACT_REFUSALS.address
+      : !c.addressState
+        ? DELIVERY_FACT_REFUSALS.state
+        : !c.buildingType
+          ? DELIVERY_FACT_REFUSALS.buildingType
+          : !draft.delivery.date
+            ? DELIVERY_FACT_REFUSALS.date
+            : null;
+  const canCreate = rawFloors && !factIssue && !createRaw.isPending;
 
   // ── Submit — the extended raw door ────────────────────────────────────────
   async function handleCreate() {
@@ -277,6 +293,9 @@ export default function PrincipalNewOrder() {
       const fields = Object.fromEntries(
         Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
       );
+      // Building type rides entry_data.fields (no orders column) — the same
+      // slot the POS submit writes, so Monitor reads ONE fact (Card 18).
+      if (c.buildingType.trim()) fields.building_type = c.buildingType.trim();
       // 0219 — the picked method's follow-up answers (e.g. the Credit/Debit
       // Bank) ride entry_data.payment, same as the POS submit.
       const followUps = Object.fromEntries(
@@ -289,14 +308,14 @@ export default function PrincipalNewOrder() {
         customer: {
           name: c.name.trim(),
           phone: c.phone.trim() || null,
-          address: c.addressUnknown ? null : composedAddress || c.address.trim() || null,
-          addressUnknown: c.addressUnknown,
+          address: composedAddress || c.address.trim() || null,
+          addressUnknown: false,
           // 0230 — structured parts ride alongside the composed string.
-          addressLine1: c.addressUnknown ? null : c.addressLine1.trim() || null,
-          addressLine2: c.addressUnknown ? null : c.addressLine2.trim() || null,
-          addressState: c.addressUnknown ? null : c.addressState || null,
-          addressCity: c.addressUnknown ? null : c.addressCity || null,
-          addressPostcode: c.addressUnknown ? null : c.addressPostcode || null,
+          addressLine1: c.addressLine1.trim() || null,
+          addressLine2: c.addressLine2.trim() || null,
+          addressState: c.addressState || null,
+          addressCity: c.addressCity || null,
+          addressPostcode: c.addressPostcode || null,
           billing: c.billingSame ? null : composedBilling || c.billing.trim() || null,
           billingSame: c.billingSame,
           emergency: composeEmergency(c) || null,
@@ -647,7 +666,7 @@ export default function PrincipalNewOrder() {
       {/* ── Order info ── */}
       <Section title="Order info">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Delivery date" hint="Any date — leave empty = TBD. No lead-time floor.">
+          <Field label="Delivery date *" hint="Ask the customer for the date before you save the order. No lead-time floor.">
             <input
               type="date"
               value={draft.delivery.date}
@@ -799,45 +818,35 @@ export default function PrincipalNewOrder() {
 
       {/* ── Delivery address ── */}
       <Section title="Delivery address">
-        <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={c.addressUnknown}
-            onChange={(e) =>
-              setC({
-                addressUnknown: e.target.checked,
-                ...(e.target.checked
-                  ? {
-                      addressLine1: "",
-                      addressLine2: "",
-                      addressState: "",
-                      addressCity: "",
-                      addressPostcode: "",
-                    }
-                  : {}),
-              })
-            }
-            className="mt-0.5 w-4 h-4"
-          />
-          <span>
-            <span className="text-body font-semibold block">Fill in address later</span>
-            <span className="text-meta text-base-500">
-              Customer hasn't confirmed the delivery address yet.
-            </span>
-          </span>
-        </label>
-        {!c.addressUnknown && (
-          <MYAddressFields
-            data={{
-              addressLine1: c.addressLine1,
-              addressLine2: c.addressLine2,
-              addressState: c.addressState,
-              addressCity: c.addressCity,
-              addressPostcode: c.addressPostcode,
-            }}
-            onChange={(patch) => setC(patch)}
-          />
-        )}
+        {/* The "Fill in address later" tick is RETIRED (owner ruling 2026-09-13,
+            Delivery Card 18): a valid new order carries its delivery address. */}
+        <MYAddressFields
+          data={{
+            addressLine1: c.addressLine1,
+            addressLine2: c.addressLine2,
+            addressState: c.addressState,
+            addressCity: c.addressCity,
+            addressPostcode: c.addressPostcode,
+          }}
+          onChange={(patch) => setC(patch)}
+        />
+        {/* Building type (Card 18) — the delivery-access fact Monitor plans
+            from; rides entry_data.fields.building_type like the POS. */}
+        <Field label="Building type *">
+          <select
+            value={c.buildingType}
+            onChange={(e) => setC({ buildingType: e.target.value })}
+            data-testid="raw-building-type"
+            className={INPUT_CLASS}
+          >
+            <option value="">— select —</option>
+            {BUILDING_TYPE_OPTIONS.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </Field>
         <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
           <input
             type="checkbox"
@@ -1154,6 +1163,11 @@ export default function PrincipalNewOrder() {
       </Section>
 
       {/* ── Footer ── */}
+      {rawFloors && factIssue && (
+        <p className="text-meta text-base-700" data-testid="raw-first-issue">
+          {factIssue}
+        </p>
+      )}
       {submitError && (
         <p
           className="text-meta text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2"

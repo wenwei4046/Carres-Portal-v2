@@ -378,10 +378,14 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 
 **ONE SALES ORDER, ONE COLLECTION OWNER (owner ruling 2026-09-13; migration 0489).** One Sales
 Order's ordinary payment follow-up keeps one normal owner until the balance is fully paid. The
-system resolves that normal owner from the authoritative Responsible Delivery Operation: when
+system resolves that normal owner from the authoritative Responsible Delivery Operation when
 collection first becomes actionable (balance in the window, a missed promise, or a live Storage
-Invoice), the Delivery Duty NORMAL holder on that day is written as the order's collection owner
-(`payment_collection_owners`, append-only). The owner does not rotate every day — a changed
+Invoice): **the order's own recorded customer-contact owner** — the Operation person named on the
+earliest Delivery contact record for that order (0487 `ops_delivery_contacts`, a contact with the
+customer first, else the arrangement with the partner; Delivery MASTER §5.1) — and only when nobody
+has contacted this customer yet, the Delivery Duty NORMAL holder on that day (Delivery MASTER
+§13.1, the routine customer-contact rule). The result is written once to
+`payment_collection_owners` (append-only) with its basis in the row's reason (0489 · 0495). The owner does not rotate every day — a changed
 date, a duty rotation, a filter or a page reload never changes it, and a split delivery has one
 owner because the owner is keyed by the Sales Order. Only two things change who acts: governed
 buddy cover (a `delivery_duty` cover on the owner's person makes the cover today's acting person;
@@ -1879,6 +1883,27 @@ built. What keeps the module short of DELIVERED is not engineering:
 
 Until 1–3 are closed, several slices carry deployment and DB-layer evidence but no visual or
 authenticated-interaction acceptance — stated per slice in §14 rather than averaged away.
+
+### OWNER CORRECTION — the collection owner is the order's own customer-contact owner, 2026-09-13
+
+Ownership seam checked after the 0489 delivery: the approved rule says the responsible Delivery
+Operation *for this customer/SO* continues the follow-up, while 0489 took the Delivery Duty holder
+on the first actionable day — the person on duty, not necessarily the person handling this
+customer. The authoritative Delivery model already records the latter: each customer contact
+(0487 `ops_delivery_contacts`) names its **contact owner**, set by the one contact writer to the
+Operation person who made or proxy-recorded the contact. **Migration 0495 (APPLIED after a
+rolled-back production probe)** redefines `payment_collection_owner_establish`: (1) the order's
+earliest contact record's owner (customer contact first, else partner arrangement; active
+Operation staff) · (2) else the Delivery Duty holder on the day · (3) else unresolved. No new
+owner field; the basis is the row's reason. Probe: `SO-1358` (contact by *Operations*, a later
+contact by Shasha added) with Shasha holding Delivery Duty → owner **Operations** (the first
+contact owner, never the later one, never the duty holder); `SO-1321` (no contact) → Shasha (duty);
+a later day with Yu Jun holding → `kept 2`. **The precise gap:** when an order has no contact
+record yet, no established customer-contact responsibility exists in Delivery's model; the person
+who *will* contact the customer is the Delivery Duty holder (§13.1), so that holder stands in —
+today Delivery Duty has no holder and the two unpaid orders have no contact record, so every
+current order would print `Nobody holds Delivery Duty.` until either a contact is recorded or a
+holder is assigned. The Payment UI is unchanged.
 
 ### OWNER CORRECTION — one Sales Order keeps one collection owner, 2026-09-13
 

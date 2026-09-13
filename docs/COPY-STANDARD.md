@@ -1949,6 +1949,12 @@ new Sales Order always carries a real `Requested Delivery Date`.
 | The create door refuses a dateless order | **`Delivery date is required. Ask the customer for the date before you save the order.`** | `delivery date is required unless marked TBD` |
 | The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
 | The create door refuses a service-only order | **`A Sales Order must contain a product. Add the product this service belongs to, or open a Service Case instead.`** | Bad request · Service not allowed |
+| **Any door** refuses an order without a delivery address (owner ruling 2026-09-13, Delivery Card 18 — the `Fill in address later` tick is RETIRED at every create door) | **`Delivery address — ask the customer for the address before you save the order`** | Fill in address later · Address unknown · `Address — Line 1 (≥5 chars), or tick 'Unknown'` |
+| **Any door** refuses a missing State | **`Delivery address — pick the State`** | `Address — State, or tick 'Unknown'` |
+| **Any door** refuses a missing building type | **`Building type — pick the building the goods go to`** | `Address — Building type, or tick 'Unknown'` · Building type required |
+| The office door refuses a missing floor or lift answer (the POS shape carries both) | **`Floor — enter the floor the goods go to`** · **`Lift — say whether the building has a lift`** | Floor required · Lift required |
+| The wizard's address sub-step names the empty field | **`Address — Line 1 (≥5 chars)`** · **`Address — State`** · **`Address — City`** · **`Address — Postcode`** · **`Address — Building type`** | any of them followed by `, or tick 'Unknown'` |
+| The office door's date field hint | **`Ask the customer for the date before you save the order. No lead-time floor.`** | `Any date — leave empty = TBD. No lead-time floor.` |
 
 ### The Sales Order object page words (owner ruling 2026-08-15)
 

@@ -188,6 +188,20 @@ Need Preparation → Picking → Checking → Packing → ready for handover
 Readiness is not handover. Handover is not Logistics receipt. Logistics receipt is not delivery.
 On return, a Logistics report never substitutes for the Warehouse's actual receipt.
 
+**Built (0494, 2026-09-13):** a Journey leg's document hands over to the LEG's partner — the
+handover door resolves the goods-holder from the arrangement keyed `(order, leg)` of the document's
+own scope; a whole-order document (leg 0) resolves exactly as before.
+
+**Built (0497, 2026-09-13):** a later leg (2..n) hands over FROM the previous leg's partner at its
+named warehouse — every Unit must be held by that partner's operating party (`unit_not_with_previous_leg`
+otherwise), and that partner is the handing-over company; leg 0 and leg 1 still leave the Warehouse.
+The customer leg's result and proof walk the ONE deliver door (`operation_attach_do_and_deliver`),
+re-created for Stock's derived-total law and the Journey: the goods must be OUT WITH LOGISTICS (the live
+document's `received_by_logistics`, or the legacy `dispatched` stage); the delivered document's exact
+Units (0424 snapshot) become `sold`; no stock total is written; a Journey delivers on its LAST leg's own
+document only after every earlier leg has arrived (`journey_document_required` · `journey_incomplete`),
+and completes that last stop (`delivered`).
+
 Handover records the exact required Unit IDs, each scanned Unit result, both parties, actual
 receiver, time, vehicle when known and signature, photo or reply proof. The derived Outbound
 control is:
@@ -875,12 +889,15 @@ cover are configured only in `Workspace → Staff & Duties`. This is not a Deliv
 system.
 
 **The Responsible Delivery Operation owns the customer's money follow-up (owner ruling
-2026-09-13; Payment MASTER §10, migration 0489).** When a Sales Order's collection first becomes
-actionable, the Delivery Duty NORMAL holder on that day becomes that order's stable collection
-owner — the same person who contacts the customer about delivery asks for the money — and stays
-so until the balance is RM 0. Later duty rotation never moves it; only buddy cover (acting today)
-or a formal handover changes who acts. Delivery configures nothing extra for this: the Payment
-module reads the resolver on the first actionable day and keeps its own append-only owner record.
+2026-09-13; Payment MASTER §10, migrations 0489 · 0495).** When a Sales Order's collection first
+becomes actionable, the order's recorded **contact owner** (§5.1 — the Operation person named on
+its earliest customer contact, else its partner arrangement) becomes that order's stable
+collection owner: the same person who has been contacting the customer about delivery asks for
+the money. Only when nobody has contacted that customer yet does the Delivery Duty NORMAL holder
+on that day stand in (§13.1). The owner stays until the balance is RM 0; later duty rotation or a
+later contact by someone else never moves it; only buddy cover (acting today) or a formal handover
+changes who acts. Delivery configures nothing extra for this: the Payment module reads the contact
+record and the resolver on the first actionable day and keeps its own append-only owner record.
 
 When the resolver returns no active holder and no cover, the action stays visible in Team Work
 under its duty word and the surface prints the governed configuration failure with its door:
@@ -1025,7 +1042,7 @@ their absence as a design blind spot:
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
 | central Delivery reports | the Reports destination |
-| the POS required-facts gate for address, state, building type, floor, lift and access | Sales Orders' build, a dependency |
+| the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
 ### 15.2 · Whole-domain closure
 
