@@ -2117,6 +2117,8 @@ export {
   type DeliveryArrangementRow,
   type DeliveryArrangementEventRow,
   type ChangeLogisticsReasonKey,
+  operationCannotDeliverInput,
+  type OperationCannotDeliverInput,
 } from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
@@ -3094,6 +3096,7 @@ export * from "./work-engine";
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
 export * from "./workspace-duties-catalogue";
+export * from "./delivery-contact";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";

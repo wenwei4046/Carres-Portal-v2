@@ -1,10 +1,16 @@
 import { Hono } from "hono";
 import {
   assignLogisticsInputSchema,
+  deliveryContactInputSchema,
   deliveryWarehouseScheduleEvents,
+  isSundayIso,
+  laterThanRequested,
+  myHolidaySet,
+  operationCannotDeliverInput,
   saveDeliveryArrangementInputSchema,
   signHandoverProofUploadInput,
   isLogisticsChange,
+  type DeliveryContactInput,
   type DeliveryScopeRef,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
@@ -95,15 +101,69 @@ const shape = (r: ArrangementRecord) => ({
   updated_by: r.updated_by,
 });
 
-/** Every arrangement — the workspace reads them all in one round trip. */
+const CONTACT_SELECT =
+  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, contacted_at, " +
+  "result_key, reply_evidence_path, next_action, note, on_behalf_of_partner_id, recorded_by, recorded_at";
+
+/**
+ * THE ONE CONTACT WRITER (0487, Delivery MASTER §5.1). Both the standalone
+ * contact door and the arrangement save that carries a contact land here, so
+ * a record can never be written two ways.
+ */
+async function recordContact(
+  sb: ReturnType<typeof adminClient>,
+  scope: { orderId: string; leg: number },
+  input: DeliveryContactInput,
+  userId: string | null,
+) {
+  return sb
+    .from("ops_delivery_contacts")
+    .insert({
+      order_id: scope.orderId,
+      leg: scope.leg,
+      purpose_key: input.purpose,
+      channel: input.channel,
+      contacted_person: input.contactedPerson,
+      contact_owner_user_id: userId,
+      contacted_at: new Date().toISOString(),
+      result_key: input.result,
+      reply_evidence_path: input.replyEvidencePath ?? null,
+      next_action: input.nextAction ?? null,
+      note: input.note ?? null,
+      on_behalf_of_partner_id: input.onBehalfOfPartnerId ?? null,
+      recorded_by: userId,
+    })
+    .select(CONTACT_SELECT)
+    .single();
+}
+
+/** A delivery day is never a Sunday or a Malaysian public holiday (§8.6). */
+function refusedDeliveryDay(dateIso: string): string | null {
+  if (isSundayIso(dateIso)) return "Sunday is not a delivery day";
+  if (myHolidaySet().has(dateIso)) return "A Malaysian public holiday is not a delivery day";
+  return null;
+}
+
+/** Every arrangement — and every contact record — the workspace reads them
+ *  all in one round trip; the status ladder reads the latest contact. */
 deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT);
+  const [{ data, error }, contactsRes] = await Promise.all([
+    sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT),
+    sb.from("ops_delivery_contacts").select(CONTACT_SELECT).order("contacted_at", { ascending: false }),
+  ]);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape) });
+  if (contactsRes.error) {
+    const m = mapPgError(contactsRes.error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({
+    arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape),
+    contacts: contactsRes.data ?? [],
+  });
 });
 
 /**
@@ -496,7 +556,23 @@ deliveryArrangementsRouter.get("/:orderId", requireOperationOrPrincipal, async (
     });
   }
 
-  return c.json({ order, arrangement: arrangement ? shape(arrangement) : null, history });
+  const { data: contacts, error: contactsErr } = await sb
+    .from("ops_delivery_contacts")
+    .select(CONTACT_SELECT)
+    .eq("order_id", orderId)
+    .eq("leg", leg)
+    .order("contacted_at", { ascending: false });
+  if (contactsErr) {
+    const m = mapPgError(contactsErr);
+    return c.json(m.body, m.status);
+  }
+
+  return c.json({
+    order,
+    arrangement: arrangement ? shape(arrangement) : null,
+    history,
+    contacts: contacts ?? [],
+  });
 });
 
 /** The current partner on each named scope — arrangement first, order as fallback. */
@@ -659,7 +735,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   const { data: order, error: orderErr } = await sb
     .from("orders")
-    .select("id")
+    .select("id, delivery_date, delivery_date_tbd")
     .eq("id", orderId)
     .maybeSingle();
   if (orderErr) {
@@ -667,6 +743,28 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     return c.json(m.body, m.status);
   }
   if (!order) return c.json({ error: "Order not found" }, 404);
+
+  /* ⭐ A DELIVERY DAY IS NEVER A SUNDAY OR A PUBLIC HOLIDAY (§8.6). */
+  if (input.confirmedDate) {
+    const refused = refusedDeliveryDay(input.confirmedDate);
+    if (refused) return c.json({ error: refused, code: "not_a_delivery_day" }, 400);
+  }
+
+  /* ⭐ A LATER DATE IS NEVER A SILENT EDIT (§8.6). When the new day is later
+     than the customer's Requested Delivery Date, Operation must have
+     contacted the customer and the save must carry the WhatsApp reply. The
+     Sales promise itself is never touched here. */
+  const requestedDate = order.delivery_date_tbd ? null : (order.delivery_date as string | null);
+  const later = laterThanRequested(input.confirmedDate, requestedDate);
+  if (later && !input.replyProofPath) {
+    return c.json(
+      {
+        error: "Save confirmed delivery — upload the WhatsApp reply",
+        code: "later_date_needs_reply_proof",
+      },
+      409,
+    );
+  }
 
   const current = await currentPartners(sb, [{ orderId, leg }]);
   const before = current.get(`${orderId}#${leg}`) ?? { arrangementId: null, partnerId: null };
@@ -730,7 +828,135 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     }
   }
 
-  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord) });
+  /* THE CONTACT THAT PRODUCED THIS SAVE (0487): `Information received from`
+     names who was contacted and whether Operation stood proxy; a later day
+     records the purpose `Confirm New Delivery Date` with the customer's reply
+     as its evidence. Recorded in the same request as the arrangement. */
+  let contact: unknown = null;
+  if (input.informationReceivedFrom && (input.confirmedDate || input.confirmedTime)) {
+    const from = input.informationReceivedFrom;
+    const contactInput: DeliveryContactInput = {
+      purpose: later
+        ? "confirm_new_delivery_date"
+        : input.confirmedTime && !input.confirmedDate
+          ? "confirm_delivery_time"
+          : "confirm_delivery_date",
+      channel: input.replyProofPath ? "whatsapp" : "call",
+      contactedPerson: from === "partner" ? "partner" : "customer",
+      result: input.confirmedDate && input.confirmedTime ? "confirmed" : "requested_another_date",
+      replyEvidencePath: input.replyProofPath ?? null,
+      onBehalfOfPartnerId: from === "customer" ? null : nextPartner,
+      nextAction: null,
+      note: null,
+    };
+    const { data: contactRow, error: contactErr } = await recordContact(
+      sb,
+      { orderId, leg },
+      contactInput,
+      userId ?? null,
+    );
+    if (contactErr) {
+      const m = mapPgError(contactErr);
+      return c.json(m.body, m.status);
+    }
+    contact = contactRow;
+  }
+
+  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord), contact });
+});
+
+/**
+ * POST /:orderId/contacts?leg= — the ONE customer-contact door (0487, §5.1).
+ * A contact that changes nothing on the arrangement (a call with no answer,
+ * a reply still awaited) is recorded here with its purpose and result.
+ */
+deliveryArrangementsRouter.post("/:orderId/contacts", requireOperationOrPrincipal, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    return c.json({ error: "not_found", message: "Order not found" }, 404);
+  }
+  const leg = Number(c.req.query("leg") ?? "0") || 0;
+  const parsed = deliveryContactInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const { data: order, error: orderErr } = await sb.from("orders").select("id").eq("id", orderId).maybeSingle();
+  if (orderErr) {
+    const m = mapPgError(orderErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) return c.json({ error: "not_found", message: "Order not found" }, 404);
+  const { data, error } = await recordContact(sb, { orderId, leg }, parsed.data, c.var.auth.id ?? null);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ contact: data });
+});
+
+/**
+ * POST /:orderId/cannot-deliver?leg= — Operation records the partner's
+ * Cannot Deliver ON ITS BEHALF (§8.6): the same 0417 event and the same
+ * governed reason list as the partner's own door, the partner named as the
+ * reporter and the proxy recorded on the history line.
+ */
+deliveryArrangementsRouter.post("/:orderId/cannot-deliver", requireOperationOrPrincipal, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    return c.json({ error: "not_found", message: "Order not found" }, 404);
+  }
+  const leg = Number(c.req.query("leg") ?? "0") || 0;
+  const parsed = operationCannotDeliverInput.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const sb = adminClient(c.env);
+  const [{ data: order, error: orderErr }, { data: partner, error: partnerErr }] = await Promise.all([
+    sb.from("orders").select("id").eq("id", orderId).maybeSingle(),
+    sb.from("delivery_partners").select("id, name").eq("id", parsed.data.partnerId).maybeSingle(),
+  ]);
+  const firstErr = orderErr ?? partnerErr;
+  if (firstErr) {
+    const m = mapPgError(firstErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) return c.json({ error: "not_found", message: "Order not found" }, 404);
+  if (!partner) return c.json({ error: "not_found", message: "Logistics partner not found" }, 404);
+
+  const { error } = await sb.from("ops_delivery_arrangement_events").insert({
+    order_id: orderId,
+    leg,
+    event: "cannot_deliver",
+    from_partner_id: parsed.data.partnerId,
+    reason_key: parsed.data.reason,
+    note: [parsed.data.note, parsed.data.evidencePath ? `evidence: ${parsed.data.evidencePath}` : null]
+      .filter(Boolean)
+      .join(" · ") || null,
+    recorded_by: c.var.auth.id ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const { error: histErr } = await sb.from("order_history").insert({
+    order_id: orderId,
+    text: `${partner.name} cannot deliver — ${parsed.data.reason}${
+      parsed.data.note ? `: ${parsed.data.note}` : ""
+    } (recorded by Operation on behalf of ${partner.name})`,
+    by_role: "operation",
+  });
+  if (histErr) {
+    const m = mapPgError(histErr);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ reported: true });
 });
 
 /**

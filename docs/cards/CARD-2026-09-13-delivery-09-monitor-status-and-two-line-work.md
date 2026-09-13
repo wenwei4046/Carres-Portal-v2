@@ -30,4 +30,6 @@
 - [x] Render two lines on Work rows, the Orders list Actions cell and the DO page for Delivery keys
 - [x] Wire the `DELIVERY STATUS` dropdown and the calendar card to the new words
 - [x] Tests: status arithmetic per state, word bans, two-line rendering; typecheck; design guard
-- [ ] PR → merge → deploy → authenticated production verification on real rows
+- [x] PR → merge → deploy → authenticated production verification on real rows
+
+**Evidence (2026-09-13):** PR #1262 squash-merged as `11952e86`; Pages `/__carres_deploy.json` and Worker `/health` both report `11952e86`. Authenticated as operation@carres.com: Monitor `Work to do` lists 89 rows and prints none of the retired words (`Waiting for customer date` · `Delivery confirmed` · `Waiting for warehouse` · `Ready for handover` · `Out for delivery`); `Work → Team Work` prints 99 Delivery rows as two lines (`Call NETS` ×46 over `Confirm the delivery date`, `Assign logistics` over `Choose the company that carries this delivery`) with a result line on every row and no `Call … —` Delivery line; the only remaining `Call … —` sentences on the page are Purchasing's `Call Ohana — confirm tomorrow's delivery`, outside this ruling. The `Delivery Status` column becomes a default column in Card 10.

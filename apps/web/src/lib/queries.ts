@@ -308,6 +308,9 @@ import {
   type SupplierCreateInput,
   type PurchasingSupplierCollectionSetting,
   type OperationWorkResponse,
+  type DeliveryContactRow,
+  type DeliveryContactInput,
+  type OperationCannotDeliverInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -7056,6 +7059,9 @@ export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carre
 
 export interface DeliveryArrangementsPayload {
   arrangements: DeliveryArrangementRow[];
+  /** Every customer-contact record (0487) — the status ladder reads the
+   *  latest per scope. Optional: an older Worker carries none. */
+  contacts?: DeliveryContactRow[];
 }
 
 export function useDeliveryArrangements() {
@@ -7093,6 +7099,8 @@ export interface DeliveryArrangementDetail {
   };
   arrangement: DeliveryArrangementRow | null;
   history: DeliveryArrangementEventRow[];
+  /** This scope's contact records, newest first (0487). */
+  contacts?: DeliveryContactRow[];
 }
 
 export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
@@ -7104,6 +7112,39 @@ export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
       ),
     enabled: Boolean(orderId),
     staleTime: 10_000,
+  });
+}
+
+/** The ONE customer-contact door (0487, Delivery MASTER §5.1). */
+export function useRecordDeliveryContact(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeliveryContactInput) =>
+      apiFetch<{ contact: DeliveryContactRow }>(
+        `/api/operation/delivery-arrangements/${orderId}/contacts?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+    },
+  });
+}
+
+/** Operation records the partner's Cannot Deliver on its behalf (§8.6). */
+export function useRecordCannotDeliver(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OperationCannotDeliverInput) =>
+      apiFetch<{ reported: boolean }>(
+        `/api/operation/delivery-arrangements/${orderId}/cannot-deliver?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
   });
 }
 

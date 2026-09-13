@@ -39,7 +39,9 @@ import {
   DELIVERY_WORK_STATUS_TONE,
   lineKind,
   myHolidaySet,
+  latestDeliveryContactOf,
   type DeliveryArrangementRow,
+  type DeliveryContactRow,
   type DeliveryQueueLeads,
   type DeliveryStatusSpell,
   type DeliveryWorkStatus,
@@ -228,6 +230,8 @@ export interface DeliveryScopeRow {
   doIssuedAt: string | null;
   /** Required Sales facts this row lacks, in the operator's words (§8.3). */
   missingFacts: string[];
+  /** This scope's contact records, newest first (0487, §5.1). */
+  contacts: DeliveryContactRow[];
   /** True once Delivery has recorded its own arrangement for this scope. */
   hasArrangement: boolean;
   /** The order behind the row — for the expansion's own reads. */
@@ -483,6 +487,9 @@ export interface ScopeInputs {
   /** The `Confirm delivery date` lead in working days (Purchasing → Settings,
    *  `logistics_call_working_days`). Absent leaves the seed. */
   queueLeads?: DeliveryQueueLeads;
+  /** Every customer-contact record (0487); the status ladder reads the
+   *  latest per scope. Absent = no contact recorded anywhere. */
+  contacts?: readonly DeliveryContactRow[];
 }
 
 /** PostgREST may embed a to-one overlay as an object or a one-row array. */
@@ -509,8 +516,26 @@ export function buildDeliveryScopeRows({
   todayIso,
   holidays,
   queueLeads,
+  contacts,
 }: ScopeInputs): DeliveryScopeRow[] {
   const holidaySet = holidays ?? myHolidaySet();
+  const contactsByScope = new Map<string, DeliveryContactRow[]>();
+  for (const contact of contacts ?? []) {
+    const key = `${contact.order_id}#${contact.leg}`;
+    contactsByScope.set(key, [...(contactsByScope.get(key) ?? []), contact]);
+  }
+  /** The latest contact's answer for the status ladder — `waiting_customer_reply`
+   *  is the one result that changes the actor-first word (§8.4). */
+  const latestContactOf = (key: string) => {
+    const latest = latestDeliveryContactOf(contactsByScope.get(key) ?? []);
+    if (!latest) return null;
+    return {
+      result: (latest.result_key === "waiting_for_customer_reply"
+        ? "waiting_customer_reply"
+        : "answered") as "waiting_customer_reply" | "answered",
+      recordedOn: latest.contacted_at.slice(0, 10),
+    };
+  };
   const attemptsByDo = new Map<string, DeliveryOrderAttemptRow[]>();
   for (const a of attempts) {
     if (!a.do_number) continue;
@@ -619,6 +644,7 @@ export function buildDeliveryScopeRows({
       const missingProof = proofOf(doc, o);
       const logisticsName = arrangement?.partner_name ?? fallbackPartner.name;
       const liveDoc = Boolean(doc) && docStatusOf(doc!).kind !== "cancelled";
+      const scopeContacts = contactsByScope.get(`${o.id}#0`) ?? [];
       rows.push({
         ...base,
         key: o.id,
@@ -636,9 +662,11 @@ export function buildDeliveryScopeRows({
         receivedAt: handoverClockOf(doc, "received_by_logistics"),
         deliveryOrderId: liveDoc ? doc!.id : null,
         doIssuedAt: liveDoc ? doc!.issued_at : null,
+        contacts: scopeContacts,
         status: deliveryWorkStatusOf(
           {
             partnerName: logisticsName,
+            latestContact: latestContactOf(`${o.id}#0`),
             callByDate: contactDueIso,
             confirmedDate: confirmed.iso,
             confirmedTime: confirmed.time,
@@ -692,6 +720,7 @@ export function buildDeliveryScopeRows({
         receivedAt: null,
         deliveryOrderId: null,
         doIssuedAt: null,
+        contacts: contactsByScope.get(`${o.id}#${stop.leg}`) ?? [],
         status: legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
       });
     }

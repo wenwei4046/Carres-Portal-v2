@@ -578,6 +578,171 @@ describe("PUT /:orderId — Save Delivery", () => {
   });
 });
 
+describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)", () => {
+  const save = (body: unknown, path = `/${ORDER_A}`) =>
+    call(path, "operation", { method: "PUT", body: JSON.stringify(body) });
+  const savedArrangement = {
+    id: "arr-1",
+    order_id: ORDER_A,
+    leg: 0,
+    partner_id: NETS,
+    confirmed_date: "2026-09-29",
+    confirmed_time: "Afternoon (12pm–3pm)",
+    expected_arrival: null,
+    logistics_note: null,
+    reply_proof_path: "proof/a.jpg",
+    driver_name: null,
+    vehicle: null,
+    updated_at: "2026-09-13T00:00:00Z",
+    updated_by: null,
+    delivery_partners: { id: NETS, name: "NETS" },
+  };
+
+  it("⭐ a day LATER than the requested day is refused without the WhatsApp reply", async () => {
+    const { upserts } = mockSb([{ data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-29", confirmedTime: "Afternoon (12pm–3pm)" });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("later_date_needs_reply_proof");
+    expect(body.error).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("a day later than the requested day saves WITH the reply, and records the contact", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: savedArrangement },
+      { data: { id: "c-1" } },
+    ]);
+    const res = await save({
+      partnerId: NETS,
+      confirmedDate: "2026-09-29",
+      confirmedTime: "Afternoon (12pm–3pm)",
+      replyProofPath: "proof/a.jpg",
+      informationReceivedFrom: "operation_on_behalf",
+    });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact).toBeTruthy();
+    expect(contact.purpose_key).toBe("confirm_new_delivery_date");
+    expect(contact.contacted_person).toBe("customer");
+    expect(contact.on_behalf_of_partner_id).toBe(NETS);
+    expect(contact.reply_evidence_path).toBe("proof/a.jpg");
+    expect(contact.result_key).toBe("confirmed");
+  });
+
+  it("a day that is NOT later needs no reply, and the partner's own answer is recorded as the partner's", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: { ...savedArrangement, confirmed_date: "2026-09-24", reply_proof_path: null } },
+      { data: { id: "c-2" } },
+    ]);
+    const res = await save({
+      partnerId: NETS,
+      confirmedDate: "2026-09-24",
+      confirmedTime: "Morning (9am–12pm)",
+      informationReceivedFrom: "partner",
+    });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact.purpose_key).toBe("confirm_delivery_date");
+    expect(contact.contacted_person).toBe("partner");
+    expect(contact.channel).toBe("call");
+  });
+
+  it("no `Information received from` — no contact is invented", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: true } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: savedArrangement },
+    ]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-29" });
+    expect(res.status).toBe(200);
+    expect(inserts.some((i) => i.table === "ops_delivery_contacts")).toBe(false);
+  });
+
+  it("⭐ a Sunday is not a delivery day", async () => {
+    mockSb([{ data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-06" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("not_a_delivery_day");
+  });
+});
+
+describe("POST /:orderId/contacts — the one customer-contact door (0487)", () => {
+  it("records a contact with its purpose and result — silence is never a result", async () => {
+    const { inserts } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        purpose: "confirm_delivery_time",
+        channel: "whatsapp",
+        contactedPerson: "customer",
+        result: "waiting_for_customer_reply",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const row = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(row.result_key).toBe("waiting_for_customer_reply");
+    expect(row.purpose_key).toBe("confirm_delivery_time");
+  });
+
+  it("refuses a purpose outside the governed list", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/contacts`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "follow_up", channel: "call", contactedPerson: "customer", result: "no_answer" }),
+    });
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("POST /:orderId/cannot-deliver — Operation on behalf of the partner (§8.6)", () => {
+  it("records the 0417 event in the partner's name and a history line naming the proxy", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A } },
+      { data: { id: NETS, name: "NETS" } },
+      { data: null },
+      { data: null },
+    ]);
+    const res = await call(`/${ORDER_A}/cannot-deliver?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "no_capacity", note: "Lorry full that day" }),
+    });
+    expect(res.status).toBe(200);
+    const event = inserts.find((i) => i.table === "ops_delivery_arrangement_events")?.rows as Record<string, unknown>;
+    expect(event.event).toBe("cannot_deliver");
+    expect(event.from_partner_id).toBe(NETS);
+    expect(event.reason_key).toBe("no_capacity");
+    const history = inserts.find((i) => i.table === "order_history")?.rows as Record<string, unknown>;
+    expect(history.by_role).toBe("operation");
+    expect(history.text).toContain("on behalf of NETS");
+  });
+
+  it("`Another reason` needs the note, exactly as the partner's own door demands", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/cannot-deliver`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "other" }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("refuses a dealer", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/cannot-deliver`, "dealer", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "no_capacity" }),
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("POST /:orderId/reply-proof/sign-upload — the reply evidence door (Card 05)", () => {
   const sign = (
     body: unknown,

@@ -25,9 +25,9 @@
 
 ## Tasks
 
-- [ ] Contact record migration and its one door; probe in a rolled-back production transaction
-- [ ] Delivery Dates edit state on the panel right slot; Save names its gap; the later-date rule
-- [ ] Logistics Details edit state: partner, reason, fleet templates, condo registration, chase message, reply proof, `Cannot Deliver` on behalf
-- [ ] Retire `EditDelivery.tsx` and redirect its route; keep the DO preview on the DO object
+- [x] Contact record migration and its one door; probe in a rolled-back production transaction
+- [x] Delivery Dates edit state on the panel right slot; Save names its gap; the later-date rule
+- [x] Logistics Details edit state: partner, reason, fleet templates, condo registration, chase message, reply proof, `Cannot Deliver` on behalf
+- [x] Retire `EditDelivery.tsx` and redirect its route; keep the DO preview on the DO object
 - [ ] Tests: edit states, refusals, permissions, proxy provenance, keyboard and focus; typecheck; design guard
 - [ ] PR → merge → apply migration → deploy → authenticated production verification with a safe representative write and database re-read
