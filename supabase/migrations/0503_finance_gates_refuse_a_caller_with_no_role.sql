@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0502_finance_gates_refuse_a_caller_with_no_role.sql
+-- 0503_finance_gates_refuse_a_caller_with_no_role.sql
 -- =============================================================================
 -- WHAT WAS WRONG, MEASURED
 --   1. app_role() is NULL for a caller who is not signed in, for a signed-in
@@ -65,7 +65,7 @@ begin;
 
 -- Who can run these today, recorded so the final block can prove this
 -- migration changed no EXECUTE privilege (create or replace keeps grants).
-create temp table _auth_before_0502 (fn regprocedure, who text, primary key (fn, who)) on commit drop;
+create temp table _auth_before_0503 (fn regprocedure, who text, primary key (fn, who)) on commit drop;
 do $snap$
 declare s text; p regprocedure; w text;
 begin
@@ -85,25 +85,25 @@ begin
     p := to_regprocedure(s);
     if p is null then continue; end if;
     foreach w in array array['anon', 'authenticated'] loop
-      if has_function_privilege(w, p, 'execute') then insert into _auth_before_0502 values (p, w); end if;
+      if has_function_privilege(w, p, 'execute') then insert into _auth_before_0503 values (p, w); end if;
     end loop;
   end loop;
 end
 $snap$;
 
-create temp table _g0502 (fn text primary key, result text) on commit drop;
+create temp table _g0503 (fn text primary key, result text) on commit drop;
 
 -- finance_ar_aging()
 --   source: repo 0125_fix_alias_dl_after_0123_rename.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_ar_aging()'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_ar_aging()', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_ar_aging()', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '2d02c9ede191c1bd1654830d222007dd' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 CREATE OR REPLACE FUNCTION public.finance_ar_aging()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -184,33 +184,33 @@ begin
   return v_result;
 end;
 $function$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_ar_aging()', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_ar_aging()', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_ar_aging()', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_ar_aging()', 'live settings would be lost - left untouched');
     end;
-  elsif h = '47526e38b4b75f9a0998bd579eba32fc' then insert into _g0502 values ('finance_ar_aging()', 'already');
-  else insert into _g0502 values ('finance_ar_aging()', 'live body differs - left untouched');
+  elsif h = '47526e38b4b75f9a0998bd579eba32fc' then insert into _g0503 values ('finance_ar_aging()', 'already');
+  else insert into _g0503 values ('finance_ar_aging()', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_cashflow_series(integer)
 --   source: repo 0064_finance_chunk_b_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_cashflow_series(integer)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_cashflow_series(integer)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_cashflow_series(integer)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '18eafe230ec6a8c17f423f9f7394bbec' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_cashflow_series(
   p_weeks int default 12
 )
@@ -267,33 +267,33 @@ begin
   return v_result;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_cashflow_series(integer)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_cashflow_series(integer)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_cashflow_series(integer)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_cashflow_series(integer)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '97a61d10dd1d9a7a91f3a03de93d48cb' then insert into _g0502 values ('finance_cashflow_series(integer)', 'already');
-  else insert into _g0502 values ('finance_cashflow_series(integer)', 'live body differs - left untouched');
+  elsif h = '97a61d10dd1d9a7a91f3a03de93d48cb' then insert into _g0503 values ('finance_cashflow_series(integer)', 'already');
+  else insert into _g0503 values ('finance_cashflow_series(integer)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_dashboard_summary()
 --   source: repo 0062_finance_chunk_a_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_dashboard_summary()'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_dashboard_summary()', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_dashboard_summary()', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '63358a34a48fd467fb0c1130f7be05a8' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_dashboard_summary()
 returns jsonb
 language plpgsql
@@ -366,33 +366,33 @@ begin
   );
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_dashboard_summary()', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_dashboard_summary()', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_dashboard_summary()', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_dashboard_summary()', 'live settings would be lost - left untouched');
     end;
-  elsif h = '69e62716a1aecabbad04103037ccc857' then insert into _g0502 values ('finance_dashboard_summary()', 'already');
-  else insert into _g0502 values ('finance_dashboard_summary()', 'live body differs - left untouched');
+  elsif h = '69e62716a1aecabbad04103037ccc857' then insert into _g0503 values ('finance_dashboard_summary()', 'already');
+  else insert into _g0503 values ('finance_dashboard_summary()', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_monthly_pl(integer)
 --   source: repo 0064_finance_chunk_b_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_monthly_pl(integer)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_monthly_pl(integer)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_monthly_pl(integer)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '060040ac09033ccfb2b4013c30f99cab' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_monthly_pl(
   p_months int default 6
 )
@@ -466,33 +466,33 @@ begin
   return v_result;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_monthly_pl(integer)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_monthly_pl(integer)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_monthly_pl(integer)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_monthly_pl(integer)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '6ce3327314401a3b9041487e72e4ab52' then insert into _g0502 values ('finance_monthly_pl(integer)', 'already');
-  else insert into _g0502 values ('finance_monthly_pl(integer)', 'live body differs - left untouched');
+  elsif h = '6ce3327314401a3b9041487e72e4ab52' then insert into _g0503 values ('finance_monthly_pl(integer)', 'already');
+  else insert into _g0503 values ('finance_monthly_pl(integer)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_recon_suggest_matches(uuid)
 --   source: repo 0064_finance_chunk_b_rpcs.sql after 0123/0125's dl -> so rename (replayed on the repo text)
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_recon_suggest_matches(uuid)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_recon_suggest_matches(uuid)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_recon_suggest_matches(uuid)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'a38814f9647cba969c4da347491bbe07' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_recon_suggest_matches(
   p_bank_statement_id uuid
 )
@@ -565,33 +565,33 @@ begin
   return v_result;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_recon_suggest_matches(uuid)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_recon_suggest_matches(uuid)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_recon_suggest_matches(uuid)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_recon_suggest_matches(uuid)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '8aadf65672898752f1a569c66269fe1e' then insert into _g0502 values ('finance_recon_suggest_matches(uuid)', 'already');
-  else insert into _g0502 values ('finance_recon_suggest_matches(uuid)', 'live body differs - left untouched');
+  elsif h = '8aadf65672898752f1a569c66269fe1e' then insert into _g0503 values ('finance_recon_suggest_matches(uuid)', 'already');
+  else insert into _g0503 values ('finance_recon_suggest_matches(uuid)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_top_skus(integer)
 --   source: repo 0064_finance_chunk_b_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_top_skus(integer)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_top_skus(integer)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_top_skus(integer)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '27365821f2e853f6574c7ee9af6aecec' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_top_skus(
   p_limit int default 8
 )
@@ -637,33 +637,33 @@ begin
   return v_result;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_top_skus(integer)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_top_skus(integer)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_top_skus(integer)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_top_skus(integer)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '83e0c8bd85c066901c19f67da98aca00' then insert into _g0502 values ('finance_top_skus(integer)', 'already');
-  else insert into _g0502 values ('finance_top_skus(integer)', 'live body differs - left untouched');
+  elsif h = '83e0c8bd85c066901c19f67da98aca00' then insert into _g0503 values ('finance_top_skus(integer)', 'already');
+  else insert into _g0503 values ('finance_top_skus(integer)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_topup_approve(uuid, payment_method, text, text)
 --   source: repo 0062_finance_chunk_a_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_topup_approve(uuid, payment_method, text, text)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_topup_approve(uuid, payment_method, text, text)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_topup_approve(uuid, payment_method, text, text)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '5bfc751948beb0262d2ead5ecd1e6ab8' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_topup_approve(
   p_approval_id uuid,
   p_method      payment_method,
@@ -735,33 +735,33 @@ begin
   return v_pay;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_topup_approve(uuid, payment_method, text, text)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_topup_approve(uuid, payment_method, text, text)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_topup_approve(uuid, payment_method, text, text)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_topup_approve(uuid, payment_method, text, text)', 'live settings would be lost - left untouched');
     end;
-  elsif h = 'd46c9c520eb93e205470d202e46b850d' then insert into _g0502 values ('finance_topup_approve(uuid, payment_method, text, text)', 'already');
-  else insert into _g0502 values ('finance_topup_approve(uuid, payment_method, text, text)', 'live body differs - left untouched');
+  elsif h = 'd46c9c520eb93e205470d202e46b850d' then insert into _g0503 values ('finance_topup_approve(uuid, payment_method, text, text)', 'already');
+  else insert into _g0503 values ('finance_topup_approve(uuid, payment_method, text, text)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- finance_apply_credit_note(uuid, uuid)
 --   source: repo 0065_finance_chunk_c.sql after 0126's dl -> so rename (replayed on the repo text)
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.finance_apply_credit_note(uuid, uuid)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('finance_apply_credit_note(uuid, uuid)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('finance_apply_credit_note(uuid, uuid)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = 'eb44aa6f97eb0002909df3d6ac4efbb3' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.finance_apply_credit_note(
   p_refund_id        uuid,
   p_target_order_id  uuid
@@ -816,33 +816,33 @@ begin
   return v_refund;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('finance_apply_credit_note(uuid, uuid)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('finance_apply_credit_note(uuid, uuid)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('finance_apply_credit_note(uuid, uuid)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('finance_apply_credit_note(uuid, uuid)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '969b5fb89876daa1e246cd39ade21138' then insert into _g0502 values ('finance_apply_credit_note(uuid, uuid)', 'already');
-  else insert into _g0502 values ('finance_apply_credit_note(uuid, uuid)', 'live body differs - left untouched');
+  elsif h = '969b5fb89876daa1e246cd39ade21138' then insert into _g0503 values ('finance_apply_credit_note(uuid, uuid)', 'already');
+  else insert into _g0503 values ('finance_apply_credit_note(uuid, uuid)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- refund_pay(uuid, payment_method, text)
 --   source: repo 0062_finance_chunk_a_rpcs.sql
 --   edits: gate: A not in (...) -> (A is null or A not in (...)); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.refund_pay(uuid, payment_method, text)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('refund_pay(uuid, payment_method, text)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('refund_pay(uuid, payment_method, text)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '44f45c55012ecf29be243964980caeda' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.refund_pay(
   p_refund_id uuid,
   p_method    payment_method,
@@ -890,33 +890,33 @@ begin
   return v_ref;
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('refund_pay(uuid, payment_method, text)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('refund_pay(uuid, payment_method, text)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('refund_pay(uuid, payment_method, text)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('refund_pay(uuid, payment_method, text)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '114acce6aef3c4488b7ee578d0ab9e1f' then insert into _g0502 values ('refund_pay(uuid, payment_method, text)', 'already');
-  else insert into _g0502 values ('refund_pay(uuid, payment_method, text)', 'live body differs - left untouched');
+  elsif h = '114acce6aef3c4488b7ee578d0ab9e1f' then insert into _g0503 values ('refund_pay(uuid, payment_method, text)', 'already');
+  else insert into _g0503 values ('refund_pay(uuid, payment_method, text)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- next_credit_note_no()
 --   source: repo 0065_finance_chunk_c.sql
 --   edits: language sql -> plpgsql; gate added (finance, principal); search_path += pg_temp
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.next_credit_note_no()'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('next_credit_note_no()', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('next_credit_note_no()', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '1d3d44eb9e720194c057d0e895d1e32e' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.next_credit_note_no()
 returns text
 language plpgsql
@@ -930,33 +930,33 @@ begin
   return 'CN-' || lpad(nextval('refund_credit_note_seq')::text, 4, '0');
 end;
 $$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('next_credit_note_no()', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('next_credit_note_no()', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('next_credit_note_no()', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('next_credit_note_no()', 'live settings would be lost - left untouched');
     end;
-  elsif h = '1574b36c8ce7d907680e564468c5ed46' then insert into _g0502 values ('next_credit_note_no()', 'already');
-  else insert into _g0502 values ('next_credit_note_no()', 'live body differs - left untouched');
+  elsif h = '1574b36c8ce7d907680e564468c5ed46' then insert into _g0503 values ('next_credit_note_no()', 'already');
+  else insert into _g0503 values ('next_credit_note_no()', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 -- top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)
 --   source: repo 0500_role_gates_refuse_a_caller_with_no_role.sql
 --   edits: 'logistics' -> 'operation' in the cross-dealer gate
-do $g0502$
+do $g0503$
 declare p regprocedure := to_regprocedure('public.top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)'); h text; cfg text[]; cfg_new text[];
 begin
-  if p is null then insert into _g0502 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'absent'); return; end if;
+  if p is null then insert into _g0503 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'absent'); return; end if;
   select md5(replace(prosrc, E'\r', '')), coalesce(proconfig, '{}') into h, cfg from pg_proc where oid = p and prosecdef;
   if h = '2bb0645e8ca685ffa93504e9f2791311' then
     begin
-      execute $s0502a$
+      execute $s0503a$
 create or replace function public.top_up_order(
   p_order_id uuid, p_amount numeric, p_method text, p_method_label text,
   p_reference text, p_note text, p_date date, p_photo_paths jsonb,
@@ -1007,21 +1007,21 @@ begin
   return jsonb_build_object('id',p_order_id,'amount',v_amount,'paid',v_post->'orders_paid','payment_id',v_post->'payment_id');
 end;
 $fn$;
-$s0502a$;
+$s0503a$;
       select coalesce(proconfig, '{}') into cfg_new from pg_proc where oid = p;
       -- every live setting except search_path survives; search_path is now public, pg_temp
       if not (array(select c from unnest(cfg) c where c not like 'search_path=%') <@ cfg_new)
          or not ('search_path=public, pg_temp' = any(cfg_new)) then
-        raise exception using errcode = 'P0502'; end if;
-      insert into _g0502 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'rewritten');
-    exception when sqlstate 'P0502' then   -- rolls back this function's rewrite only
-      insert into _g0502 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live settings would be lost - left untouched');
+        raise exception using errcode = 'P0503'; end if;
+      insert into _g0503 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'rewritten');
+    exception when sqlstate 'P0503' then   -- rolls back this function's rewrite only
+      insert into _g0503 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live settings would be lost - left untouched');
     end;
-  elsif h = '62742f252c83488d93581fdfb625ef1f' then insert into _g0502 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'already');
-  else insert into _g0502 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live body differs - left untouched');
+  elsif h = '62742f252c83488d93581fdfb625ef1f' then insert into _g0503 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'already');
+  else insert into _g0503 values ('top_up_order(uuid, numeric, text, text, text, text, date, jsonb, text)', 'live body differs - left untouched');
   end if;
 end
-$g0502$;
+$g0503$;
 
 do $sanity$
 declare s text; p regprocedure; w text; r record;
@@ -1043,16 +1043,16 @@ begin
     if p is null then continue; end if;
     foreach w in array array['anon', 'authenticated'] loop
       if has_function_privilege(w, p, 'execute')
-           <> exists (select 1 from _auth_before_0502 b where b.fn = p and b.who = w) then
-        raise exception '0502: % execute changed on %', w, p; end if;
+           <> exists (select 1 from _auth_before_0503 b where b.fn = p and b.who = w) then
+        raise exception '0503: % execute changed on %', w, p; end if;
     end loop;
   end loop;
-  for r in select result, count(*) n from _g0502 group by result order by result loop
-    raise notice '0502: % %', r.n, r.result;
+  for r in select result, count(*) n from _g0503 group by result order by result loop
+    raise notice '0503: % %', r.n, r.result;
   end loop;
   -- Every function left untouched is named here, so it shows in the SQL editor.
-  for r in select fn, result from _g0502 where result like '%left untouched' order by fn loop
-    raise warning '0502: gate NOT fixed on public.% (%) -- fix it by hand', r.fn, r.result;
+  for r in select fn, result from _g0503 where result like '%left untouched' order by fn loop
+    raise warning '0503: gate NOT fixed on public.% (%) -- fix it by hand', r.fn, r.result;
   end loop;
 end
 $sanity$;
