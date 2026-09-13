@@ -757,6 +757,18 @@ History               the append-only audit of every object change and proxy rec
 Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs
 ```
 
+**BUILT 2026-09-13 (Card 16):** `DeliveryOrderPage.tsx` is the seven sections above in order on
+kit `Panel`s — section one prints the customer, address, Warehouse, partner, arrangement (day,
+window, ETA, driver, vehicle from `ops_delivery_arrangements`), route, trip scope, site
+requirements (building, floor, lift, stairs, access, customer request, instruction for
+logistics), the goods and the live document rendered inline by the governed DO renderer;
+Delivery history lists `Delivery on {day} · {result}`; Exceptions lists failed and partial
+visits, the open Finance exception, the pending payment approval, a cancellation and the Work
+action lines with their owner (`No open problems` otherwise); History merges the issue, the
+handover chain, the attempts and the order's own History lines in time order; Related records
+doors to the Sales Order, the Order Route, Payments, every exact Unit, every Service Case and
+every sibling document. The Object Header keeps `Print` and the one primary operational act.
+
 Reference views a person opens rarely join the header's governed view mechanism only where the
 Object Detail Template already admits one. Delivery history is actual delivery execution; History
 is the audit trail; they are not the same section. Cross-module doors open the owner and never a
@@ -1041,6 +1053,15 @@ scopes from.
 
 
 ## 16 · Production closure
+
+**2026-09-13 · Cards 08–15 and 18 production-verified; the two-leg Journey walked end to end.** Journey legs
+(0490/0491) landed on `d78b4e26` and were corrected on the authenticated walk of the governed fixture SO-1362 by
+**0494** (`45238b71`), **0496** (`1984a7ba`) and **0497** (`9ee6db65`): leg 1 NETS `Carres Klang Warehouse → JB
+transit warehouse` (DO-130926-0842: handover, receipt, arrival), leg 2 AL `JB transit warehouse → Customer
+(Singapore)` (DO-130926-3223: handover from NETS, receipt, customer delivery with the signed DO and signature);
+each leg on its own document with its own facts; the Journey completed only on the last leg after the earlier leg
+arrived; the exact Unit `id-dtd627907` went reserved → with NETS → with AL → sold. Card 15 (0492, `0dc51c6b`) and
+Card 18 (`4e944e51`) walked the same day. Evidence: the Card files.
 
 **DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
 appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA
