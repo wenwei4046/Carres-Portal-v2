@@ -689,7 +689,9 @@ assigned separately. The write lands on the arrangement, never on the Sales Orde
 
 **Driver and vehicle come from fleet templates.** The arrangement binds the partner's saved
 driver and vehicle templates (§11) rather than free text; a template chosen once is the fact the
-DO prints and the Warehouse handover shows. **APPROVED TARGET / NOT BUILT** (§15.1).
+DO prints and the Warehouse handover shows. The templates exist since 2026-09-13 (CARD 12, 0488
+`partner_drivers` · `partner_fleet.active`); the arrangement's binding is the remaining gap
+(§15.1).
 
 ## 9 · Delivery Order object
 
@@ -954,7 +956,7 @@ their absence as a design blind spot:
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
-| fleet-template binding on the arrangement, partner coverage and schedule facts, the Delivery Settings surface | `ops_delivery_arrangements`, `delivery_partners`, `partner_fleet`, the Settings Workspace |
+| fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | per-leg DO issuance and results, returned-goods receipt after a failed trip, the signed-DO attach door on a delivered order | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
 | central Delivery reports | the Reports destination |
 | the POS required-facts gate for address, state, building type, floor, lift and access | Sales Orders' build, a dependency |

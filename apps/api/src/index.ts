@@ -27,6 +27,7 @@ import operationMovementsRouter from "./routes/operation/movements";
 import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
+import deliverySettingsRouter from "./routes/operation/delivery-settings";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
@@ -236,6 +237,7 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
+api.route("/operation/delivery-settings", deliverySettingsRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
 api.route("/operation/pos", dispatchCustomerLegRouter);

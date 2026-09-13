@@ -7,6 +7,7 @@ vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales settings</div
 vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing settings</div> }));
 vi.mock("./IssueTrackerSettings", () => ({ default: () => <div>Issue settings</div> }));
 vi.mock("./PaymentSettings", () => ({ default: () => <div>Payment settings</div> }));
+vi.mock("./DeliverySettings", () => ({ default: () => <div>Delivery settings</div> }));
 vi.mock("./WarehouseSettings", async () => {
   const actual = await vi.importActual<typeof import("./WarehouseSettings")>("./WarehouseSettings");
   return { ...actual, default: () => <div>Warehouse settings</div> };
@@ -142,17 +143,22 @@ describe("SettingsWorkspace — the Warehouse group", () => {
       ["Special Dates", "special-dates"],
       ["Access", "access"],
     ] as const) {
-      expect(screen.getByRole("link", { name: label })).toHaveAttribute(
-        "href",
-        `/operation/settings/warehouse/${slug}`,
-      );
+      /* `Access` is also a Delivery row (owner ruling 2026-09-13) — the
+         Warehouse link is the one under the Warehouse path. */
+      const link = screen
+        .getAllByRole("link", { name: label })
+        .find((l) => l.getAttribute("href")?.includes("/warehouse/"));
+      expect(link).toHaveAttribute("href", `/operation/settings/warehouse/${slug}`);
     }
   });
 
   it("renders the page at a Warehouse section — never an empty placeholder", () => {
     renderAt("/operation/settings/warehouse/access");
     expect(screen.getByText("Warehouse settings")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Access" })).toHaveAttribute("aria-current", "page");
+    const access = screen
+      .getAllByRole("link", { name: "Access" })
+      .find((l) => l.getAttribute("href")?.includes("/warehouse/"));
+    expect(access).toHaveAttribute("aria-current", "page");
   });
 
   it("lands `/warehouse` on Warehouse Details rather than nothing", () => {
@@ -173,5 +179,41 @@ describe("SettingsWorkspace — the Warehouse group", () => {
     ]) {
       expect(screen.getAllByRole("link", { name })).toHaveLength(1);
     }
+  });
+});
+
+/* 【DELIVERY】 CARD 12 — one `Delivery` group of four rows (Delivery MASTER §11). */
+describe("SettingsWorkspace — the Delivery group", () => {
+  const renderAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("lists the four rows under ONE `Delivery` group heading, in the MASTER's order", () => {
+    renderAt("/operation/settings/delivery/partners");
+    expect(screen.getByText("Delivery", { selector: "[data-settings-group]" })).toBeInTheDocument();
+    for (const [label, slug] of [
+      ["Logistics Partners", "partners"],
+      ["Delivery Rules", "rules"],
+      ["Message Templates", "templates"],
+      ["Access", "access"],
+    ] as const) {
+      const link = screen
+        .getAllByRole("link", { name: label })
+        .find((l) => l.getAttribute("href")?.includes("/delivery/"));
+      expect(link).toHaveAttribute("href", `/operation/settings/delivery/${slug}`);
+    }
+    expect(screen.getByText("Delivery settings")).toBeInTheDocument();
+  });
+
+  it("lands `/delivery` on Logistics Partners, and a partner object route mounts the page", () => {
+    renderAt("/operation/settings/delivery");
+    expect(screen.getByText("Delivery settings")).toBeInTheDocument();
+    renderAt("/operation/settings/delivery/partners/p-nets/schedule");
+    expect(screen.getAllByText("Delivery settings").length).toBeGreaterThan(0);
   });
 });

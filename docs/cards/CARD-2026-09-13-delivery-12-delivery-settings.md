@@ -25,9 +25,9 @@
 
 ## Tasks
 
-- [ ] Settings group, rail rows and one `Save changes` per page on the Warehouse Settings grammar
-- [ ] Partner object sections and their doors; fleet templates; coverage informs, never hides
-- [ ] Delivery Rules and Message Templates on the Payment library grammar; Access links to Staff & Duties
-- [ ] Retire `PartnerRulesEditor` in the Orders drawer
-- [ ] Tests, typecheck, design guard; migration probe
+- [x] Settings group, rail rows and one `Save changes` per page on the Warehouse Settings grammar
+- [x] Partner object sections and their doors; fleet templates; coverage informs, never hides
+- [x] Delivery Rules and Message Templates on the Payment library grammar; Access links to Staff & Duties
+- [x] Retire `PartnerRulesEditor` in the Orders drawer
+- [x] Tests, typecheck, design guard; migration probe
 - [ ] PR → merge → apply migrations → deploy → authenticated production verification
