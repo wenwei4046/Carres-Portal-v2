@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
   /** Deliberate opt-in to point a DEV build at a remote API. See lib/api-base.ts. */
   readonly VITE_ALLOW_REMOTE_API?: string;
+  /** The commit a portable review package was built from (portal-shell preview only). */
+  readonly VITE_PREVIEW_SHA?: string;
 }
 
 interface ImportMeta {

@@ -37,6 +37,7 @@ createRoot(document.getElementById("root")!).render(
           className="pointer-events-none fixed bottom-2 right-2 z-50 rounded-card border border-kit-amber-11 bg-kit-amber-3 px-2 py-1 text-label text-kit-amber-11"
         >
           FIXTURE DATA · dev preview · no production record is read or written
+          {import.meta.env.VITE_PREVIEW_SHA ? ` · built from ${import.meta.env.VITE_PREVIEW_SHA}` : ""}
         </div>
       </MemoryRouter>
     </QueryClientProvider>
