@@ -58,7 +58,7 @@ Cards 19–21 — every canonical surface reports that SHA (deploy probe). Tests
 4 and every other `SalesOrderWorkspace.*` suite · tsc ×3 · design guard. **Measured before:** on
 `36c98830`, authenticated as operation@carres.com, `/operation/orders/so/SO-1362?route=1` printed `No route
 facts were found for this sales order` and `GET /api/operation/orders/SO-1362` → 500 `invalid input syntax for
-type uuid` (the same for `/1362`). **Production walk after deploy: OWED, not done** — the operation@ browser
+type uuid` (the same for `/1362`). **Earlier deployment-wait checkpoint (subsequently closed by authenticated acceptance below)** — the operation@ browser
 session this chat had expired at 00:02 MYT during the deploy wait and a sign-in needs a password the chat
 may not type. Minimum owner action: sign in once as operation@ (or any staff role) and open
 `/operation/orders/so/SO-1362?route=1` — it must land on `/operation/orders/so/db9c939a-…?route=1` with the
