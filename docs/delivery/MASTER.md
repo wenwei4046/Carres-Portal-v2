@@ -192,6 +192,16 @@ On return, a Logistics report never substitutes for the Warehouse's actual recei
 handover door resolves the goods-holder from the arrangement keyed `(order, leg)` of the document's
 own scope; a whole-order document (leg 0) resolves exactly as before.
 
+**Built (0497, 2026-09-13):** a later leg (2..n) hands over FROM the previous leg's partner at its
+named warehouse — every Unit must be held by that partner's operating party (`unit_not_with_previous_leg`
+otherwise), and that partner is the handing-over company; leg 0 and leg 1 still leave the Warehouse.
+The customer leg's result and proof walk the ONE deliver door (`operation_attach_do_and_deliver`),
+re-created for Stock's derived-total law and the Journey: the goods must be OUT WITH LOGISTICS (the live
+document's `received_by_logistics`, or the legacy `dispatched` stage); the delivered document's exact
+Units (0424 snapshot) become `sold`; no stock total is written; a Journey delivers on its LAST leg's own
+document only after every earlier leg has arrived (`journey_document_required` · `journey_incomplete`),
+and completes that last stop (`delivered`).
+
 Handover records the exact required Unit IDs, each scanned Unit result, both parties, actual
 receiver, time, vehicle when known and signature, photo or reply proof. The derived Outbound
 control is:
