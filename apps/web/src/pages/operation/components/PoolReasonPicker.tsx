@@ -15,7 +15,7 @@ import { useStockUsage } from "@/lib/queries";
  * Ready Stock card K4 (migration 0292).
  *
  * BOTH doors that draw from the free pool mount this: the order drawer's
- * picker (ReserveStockDialog / StockPickerGrid) and the On-hand box. One
+ * picker (StockPickerGrid) and the On-hand box. One
  * component, so the question, the words and the disabled-button rule cannot
  * drift between two screens that do the same thing.
  *
