@@ -26,7 +26,7 @@ import {
 } from "@/lib/queries";
 import { lineCategory, resolvedCategory } from "@/lib/line-category";
 import { fmtDateShort } from "@/lib/fmt-date";
-import type { ReserveFreeUnit } from "./ReserveStockDialog";
+import type { ReserveFreeUnit } from "./StockPickerGrid";
 
 /**
  * LoanPanel — "ON MISSION" card language (Jess 2026-07-19, approved from her
