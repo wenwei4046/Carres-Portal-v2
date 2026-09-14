@@ -9,6 +9,7 @@ import {
 } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * /api/operation/suppliers-overview — Phase 10 read-only oversight of the
@@ -63,11 +64,6 @@ const PO_SCAN_LIMIT = 2000;
 /** `?po_id=in.(…)` travels in the URL, so the id list is chunked rather than
  *  sent as one request a proxy would refuse. */
 const IN_CHUNK = 150;
-
-/** Today in MYT — see note 2 above. */
-function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 /** A timestamptz → the MYT calendar day it fell on. NULL stays NULL: a missing
  *  stamp must never become a date (the engine's gate D depends on it). */

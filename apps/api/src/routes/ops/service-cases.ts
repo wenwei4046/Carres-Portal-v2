@@ -35,6 +35,7 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Service Cases (SC) — migration 0210. The case / 病历 parent layer above
@@ -871,13 +872,6 @@ scRouter.post("/:id/sla", requireOperationOrPrincipal, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
- *  is already tomorrow in Klang, and a deadline must not turn late a day early
- *  (or a day late) because of it. */
-function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 /** Rows come back snake_case from the database; the clock reads camelCase. */
 function shapeSlaEvents(raw: unknown): CaseSlaEvent[] {

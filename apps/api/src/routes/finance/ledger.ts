@@ -34,6 +34,7 @@ import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * FINANCE LEDGER — the read-only Journal, Trial Balance and Self-check.
@@ -65,9 +66,6 @@ type Json = Record<string, unknown>;
 
 /** PostgREST caps a single read at 1000 rows in this project. */
 const PAGE = 1000;
-
-/** Today in Malaysia (UTC+8), the business day every ledger date is. */
-const todayMyt = () => new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -349,7 +347,7 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
 financeLedgerRouter.get("/trial-balance", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
-  const asOf = parsed.data.asOf ?? todayMyt();
+  const asOf = parsed.data.asOf ?? todayIsoMYT();
   const sb = userClient(c.env, c.var.auth.jwt);
 
   const [tb, chart] = await Promise.all([sb.rpc("gl_trial_balance", { p_as_of: asOf }), readChart(sb)]);
@@ -733,7 +731,7 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayMyt() });
+  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayIsoMYT() });
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });
