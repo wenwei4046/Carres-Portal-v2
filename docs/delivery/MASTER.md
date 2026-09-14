@@ -789,9 +789,9 @@ row-level evidence recorded below, not by the rail.
 **The Delivery Orders register reads the same interpretation (§3.1), and that is its ENTIRE
 scope.** It printed `Delivery Location` from the same two structured columns on the same order row,
 so a document issued for one of those 46 orders would have read `Not recorded` beside a Monitor row
-reading `Puchong, Selangor`. No issued document differs today — all 4 in production carry the
-structured state — and converging it is what stops the first one that does not from splitting two
-Delivery surfaces (Architecture Law D). The change is exactly three edits and nothing else:
+reading `Puchong, Selangor`. No issued document differs today, and converging it is what stops the
+first one that does not from splitting two Delivery surfaces (Architecture Law D). The change is
+exactly three edits and nothing else:
 
 ```
 apps/web  delivery-orders-register.ts   the `location` field swaps
@@ -895,6 +895,20 @@ address:
 Both routes match `orders.delivery_stops` exactly. Line 1 is the customer's locality on both rows
 because that is what it means; the leg's own destination governs the `State` bucket, per the
 Journey rule above.
+
+**THE DELIVERY ORDERS REGISTER, WALKED ON THE SAME SESSION.** All 4 issued documents render, and
+`Not recorded` appears exactly where it is TRUE:
+
+| document | `Delivery Location` | the record behind it |
+|---|---|---|
+| DO-130926-3223 · SO-1362 | `Singapore` | city and state both `Singapore`, collapsed to one word |
+| DO-130926-0842 · SO-1362 | `Singapore` | the same order, its other document |
+| DO-180826-3035 · SO-1322 | `Not recorded` | **every address column NULL** — a genuine absence |
+| DO-170826-5050 · SO-1321 | `Not recorded` | **every address column NULL** — a genuine absence |
+
+An earlier draft of this section said "all 4 carry the structured state". That was wrong: two of
+them carry no address at all. The convergence is still correct — `Not recorded` on those two is the
+honest answer, which is precisely the distinction the correction exists to keep.
 
 **The written address survives in full.** Panel 1 of the brief prints, byte-for-byte and unedited,
 `31,JALAN BK8/2B,ANGGUN, RESIDENCE,BANDAR KINRARA,, 43300 PUCHONG,SELANGOR, Puchong, Selangor`
