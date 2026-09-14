@@ -468,7 +468,7 @@ intermediate Journey leg's success is **`Arrived`** on line one and the partner 
 reached on line two (`JB transit warehouse`) — on Monitor, the Delivery Orders register, the DO
 object header, Delivery history and every report — through the same two arithmetics. A warehouse
 arrival owes no delivery photo, signed paper or proof review; the customer leg's document carries
-them. `Logistics Partner Performance` counts customer-leg results only.
+them. `Logistics Performance` counts customer-leg results only.
 
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
@@ -536,7 +536,7 @@ line inside the expansion reads `Loan {Unit ID} · collect back on delivery day`
 
 **Monitor rail and calendar words — owner correction 2026-09-07.** `Calendar` is a view, never a
 `WORK TO DO` row. The page toolbar uses exactly **`Day · Week · Month`**. The rail's four group
-headings are **`WORK TO DO` · `STATE` · `LOGISTICS PARTNER` · `DELIVERY STATUS`** (`REGION` and
+headings are **`WORK TO DO` · `STATE` · `LOGISTICS` · `DELIVERY STATUS`** (`REGION` and
 `LOGISTICS` are retired as Monitor headings; the groups carry no `All …` row — picking again
 unpicks and `Clear filters` clears). `scope` and `leg` are not employee-facing words anywhere on
 Monitor or its assignment door: the footer counts `{n} deliveries`, a Journey row prints its route. The rail's proof job is
@@ -628,7 +628,7 @@ coverage** — the exclusion is always stated, never silent:
 | `Delivery Commitment Performance` | `Kept the requested date` · `After the requested date` · `No requested date` · `{n} deliveries · Kept the requested date {rate}` |
 | `First Delivery Success` | `Delivered on the first visit` · `Partly delivered on the first visit` · `Failed on the first visit` |
 | `Failed Delivery Analysis` | the reason library's own words with the category in brackets, e.g. `Customer unreachable (Customer)` |
-| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named`; customer-leg results only — `Journey legs before the last are warehouse trips and are excluded.` (Card 20) |
+| `Logistics Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named`; customer-leg results only — `Journey legs before the last are warehouse trips and are excluded.` (Card 20) |
 | `Warehouse Performance` | `Ready {date} · Handed over {date} · Received by logistics {date}` · `Handed over by the delivery day` · `Handed over after the delivery day` |
 | `Delivery Proof Control` | `No proof yet` · `Not reviewed yet` · `Proof Accepted` · `More Proof Required` · `Proof Rejected` · `Delivery photo missing` · `Signed Delivery Order missing` |
 | `Schedule and Capacity` | `{n} deliveries confirmed across {n} days · busiest {day} with {n}` · `{n} deliveries · {n} booked` |
@@ -1851,7 +1851,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Working out what to do about a delay, before anyone calls the customer | **`Delay planning`** | Recovery · Recovery plan · Exception handling · Escalation |
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics}` over `Arrange a new delivery date`** (two lines, owner ruling 2026-09-13) | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **`Call {customer}` over `Book the delivery date`** (two lines) | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
-| The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
+| The company responsible for customer contact/transport in Delivery | **Logistics** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
@@ -1868,7 +1868,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The document-name words the `Document` cell may print | **`PO No` · `DO No` · `Transfer No` · `Repair Order No` · `Claim No` · `Case No`** — each names the record whose number follows it; the numbers are minted records (`TR-…`, `RO-…`, the Claim's or Case's own number), never invented for a screen | Ref · Reference No · a made-up document name |
 | Outbound valid empty date | **`No pickups on {date}. Choose another date.`** | No outbound handovers (retired 2026-09-06) · Empty · Nothing |
 | The exact goods a pickup takes, as the work heading | **`Goods scheduled for pickup`** — listing exact Unit IDs and products | Units to give · Items · Load list |
-| The transport company and the person, ALWAYS separate fields | **`Logistics Partner` · `Assigned Driver` · `Vehicle`**; unassigned reads **`Waiting for {partner} to assign a driver`** | NETS driver (merged identity) · Driver (as the company) · an invented driver name |
+| The transport company and the person, ALWAYS separate fields | **`Logistics` · `Assigned Driver` · `Vehicle`**; unassigned reads **`Waiting for {partner} to assign a driver`** | NETS driver (merged identity) · Driver (as the company) · an invented driver name |
 | The Outbound §3.5.1 tally (extended 2026-09-07) | **`Required {n} · Loaded {n} · Not loaded {n} · Driver confirmed {n}`** — required, warehouse-loaded and driver-confirmed are THREE separate facts and never one number | Handed over (retired 2026-09-06) · Progress · Completed · Pending · Done |
 | The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status — `loaded` is the ACT sentence and evidence line below, never a stored status word) |
 | A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting to be loaded`** | Pending · In progress · Blocked · Waiting for handover (retired 2026-09-06) |
@@ -2233,7 +2233,7 @@ inside the object already open, so it has no circular `Open SO-{n} →` action.
 **`goods`** · **`(same line)`** · **`delivery`** · **`money`** · **`loan`** ·
 **`{item} · Qty {n}`** · **`{n} to buy from factory`** · **`collect back`**.
 
-**`Logistics Partner`, never `Carrier`** — already this dictionary's word for the delivery module,
+**`Logistics`, never `Carrier`** — already this dictionary's word for the delivery module,
 restated here because the Route names the party on the delivery side and a second spelling on a new
 surface is how a dictionary splits.
 
@@ -2296,7 +2296,7 @@ There is no `Acknowledged` state. Once Carres sends the PDF, the order is `Issue
 silence changes nothing. Model/fabric unavailable, delay, quantity change and price change are
 later concrete exceptions.
 
-**Supplier Status is a SEPARATE axis** — what the factory and the logistics partner report.
+**Supplier Status is a SEPARATE axis** — what the factory and the logistics company report.
 It is never merged into the five above, and it is not Purchasing's to redefine: two external
 roles run their whole lifecycle on it.
 
@@ -2671,7 +2671,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
 | `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **RULED 2026-09-07** |
 | `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
-| `STATE` · `LOGISTICS PARTNER` | Monitor's second and third rail groups — direct state names, governed partners genuinely carrying rows; no `All …` row in either | **RULED 2026-09-07** (`All regions` · `All logistics` · the `REGION` / `LOGISTICS` headings RETIRED on Monitor) |
+| `STATE` · `LOGISTICS` | Monitor's second and third rail groups — direct state names, governed partners genuinely carrying rows; no `All …` row in either | **RULED 2026-09-07** (`All regions` · `All logistics` · the `REGION` heading RETIRED on Monitor; `LOGISTICS` is the owner-approved heading, 2026-09-14) |
 | `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
 | `{n} deliveries` / `{n} of {m} deliveries` · `No deliveries` · `No matching deliveries.` | Monitor's work-list footer and empty states; `1 delivery` / `{n} deliveries` on the Assign logistics door | **RULED 2026-09-07** (`delivery scope(s)` RETIRED from every employee surface) |
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
@@ -2716,7 +2716,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `An uploaded file records what the driver sent. It is not proof accepted and not a successful delivery.` | the one sentence at the top of every attachment viewer. An upload is evidence of an upload — the portal never lets a count read as a verdict | **RULED 2026-09-11** |
 | `Not recorded` | `Driver submission` when the ledger never reached the screen. An UNKNOWN is printed as an unknown, never as a reassuring `0` | **REUSED 2026-09-11** |
 | `Showing only:` | the label opening the register's active-condition strip above the table; each live condition is a removable chip and `Clear filters` removes them all | **RULED 2026-09-11** |
-| `Logistics` | the Delivery Orders register's COLUMN HEADING for the partner named on the document. The role word stays `Logistics Partner` everywhere the role itself is named; the heading spends its width on the fact | **RULED 2026-09-11** |
+| `Logistics` | the Delivery Orders register's COLUMN HEADING for the partner named on the document. The role word stays `Logistics` everywhere the role itself is named; the heading spends its width on the fact | **RULED 2026-09-11** |
 | A CANCELLED document's `Driver submission` | **nothing at all** when no file was ever sent. The pill already says `Cancelled`; two absences beside it read as two outstanding jobs on a trip that will never happen. Files sent before the void are still shown — a void never erases a recorded fact | **RULED 2026-09-11** |
 
 **ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
@@ -2748,9 +2748,9 @@ about the next second. Sunday never appears in a logistics company's rules: it i
 for everyone, and a per-partner Sunday line would read as though a phone call
 could buy one.
 
-**The Logistics word law (re-ruled by the Delivery Blueprint, owner 2026-08-14).** Use
-**`Logistics Partner`** for the role/category and the actual company name, such as **`NETS
-Logistics`**, for an assignment. `Logistics` always keeps the s. `Logistic`, `Carrier` and
+**The Logistics word law (owner correction 2026-09-14).** Use
+**`Logistics`** for the role/category and the actual company name, such as **`NETS
+Logistics`**, for an assignment. `Logistics` always keeps the s. `Logistics Partner`, `Logistic`, `Carrier` and
 `Delivery partner` are banned UI words; the standalone generic `Partner` is too ambiguous on a
 Delivery surface. DB/schema names may retain their technical spelling.
 

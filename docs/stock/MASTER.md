@@ -628,7 +628,7 @@ must physically be checked, packed and handed over on each actual date.
 DO scope today), in the SAME grammar as Inbound. The Register defaults are:
 
 ```
-Scheduled handover · Document · Product · From · To · Logistics Partner · Assigned Driver ·
+Scheduled handover · Document · Product · From · To · Logistics · Assigned Driver ·
 Units (Required · Loaded · Not loaded · Driver confirmed) · Status · Exceptions
 ```
 
@@ -658,7 +658,7 @@ The NETS operator journey is:
 6. Only the completed physical handover changes `Who has it`; a scheduled plan alone never moves
    authority from NETS Warehouse to NETS Delivery, showroom, supplier or repair partner.
 
-Delivery owns customer DO, journey, Logistics Partner and customer-delivery proof. Stock owns the
+Delivery owns customer DO, journey, Logistics and customer-delivery proof. Stock owns the
 Unit's current holder and physical history. Purchasing owns Supplier Return and supplier decision.
 Service Case owns the repair need and resolution. Outbound stores no duplicate business status.
 
@@ -1271,7 +1271,7 @@ signs in and scans acceptance; both identities/evidence are retained. NETS Deliv
 journey arrivals through Delivery, not Outbound.
 
 **UI / PAGE / OBJECT PLACEMENT →** Outbound Register defaults are `Scheduled handover · Document
-· Product · From · To · Logistics Partner · Assigned Driver · Required · Loaded · Not loaded ·
+· Product · From · To · Logistics · Assigned Driver · Required · Loaded · Not loaded ·
 Driver confirmed · Status · Exceptions` (unified card 2026-09-07; `SO No · SO date · Vehicle ·
 Loaded at · Driver collected at` optional; no Work column, no duty avatars on rows). The expanded
 detail shows exact Unit, product, reservation, check, pack, both sides' scans, evidence and
