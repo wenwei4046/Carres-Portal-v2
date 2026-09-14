@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import WarehouseWork from "./WarehouseWork";
@@ -38,10 +38,12 @@ describe("WarehouseWork", () => {
     expect(await screen.findByTestId("warehouse-work-11111111-1111-1111-1111-111111111111")).toBeInTheDocument();
     expect(screen.getByTestId("warehouse-work-site")).toHaveTextContent("Site · Klang");
     fireEvent.click(screen.getByRole("button", { name: "Accept work" }));
-    expect(apiFetchMock).toHaveBeenCalledWith(
-      "/api/warehouse/work/11111111-1111-1111-1111-111111111111/accept",
-      expect.objectContaining({ method: "POST" }),
-    );
+    await waitFor(() => {
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        "/api/warehouse/work/11111111-1111-1111-1111-111111111111/accept",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
   });
 
   it("keeps an empty Site queue explicit", async () => {
