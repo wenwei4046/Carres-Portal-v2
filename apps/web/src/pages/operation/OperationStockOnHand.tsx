@@ -7,6 +7,7 @@ import {
   type OpsStockItem,
   type OpsStockListResponse,
   unitIdOf,
+  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
@@ -75,13 +76,6 @@ const STATUS_FILTERS: { key: Status; label: string }[] = [
   { key: "defective", label: "Defective" },
 ];
 
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 const CONDITION_ORDER = ["new", "exhibition", "old", "refurbished", "damaged"];
 
 /**
@@ -489,7 +483,7 @@ export default function OperationStockOnHand() {
                 (c) => (
                   <FilterPill
                     key={c}
-                    label={CONDITION_LABEL[c] ?? c}
+                    label={READY_STOCK_CONDITION_WORDS[c] ?? c}
                     n={counts.byCondition.get(c) ?? 0}
                     active={condition === c}
                     onClick={() =>

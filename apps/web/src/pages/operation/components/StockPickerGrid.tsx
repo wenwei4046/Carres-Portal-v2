@@ -5,6 +5,7 @@ import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { READY_STOCK_CONDITION_WORDS } from "@carres/shared";
 import { resolvedCategory, stockMatchKey } from "@/lib/line-category";
 import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
 
@@ -50,14 +51,6 @@ export interface ReserveFreeUnit {
  * project-catalog-empty-sku-naming); within the loan view, a token-overlap score
  * surfaces the closest sofas first.
  */
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 type Category = "Mattress" | "Bedframe" | "Sofa" | "Other";
 type Size = "King" | "Queen" | "Other";
@@ -184,7 +177,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           ...u,
           cat: unitCategory(u.sku),
           size: unitSize(u.sku),
-          cond: CONDITION_LABEL[u.condition] ?? u.condition,
+          cond: READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
           dateLabel: u.dateIn ? fmtDate(u.dateIn) : "",
           ageDays,
           score,
