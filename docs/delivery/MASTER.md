@@ -573,8 +573,21 @@ stock records. Same-SKU pooling cannot light two product lines green. Missing, i
 excess bindings remain `Receipt not verified`; intermediate-leg receipt remains unknown,
 because an initial receipt is not arrival at the next site. This read does not prove current
 custody, loading, driver confirmation or customer delivery. The ordinary not-yet-received
-case still needs explicit receipt evidence; absence is not that evidence. The two status facts
-above and production verification remain open. Local fixtures and passing tests do not close them.
+case still needs explicit receipt evidence; absence is not that evidence. Whole-workspace
+conformance and production verification remain open. Local fixtures and passing tests do not close them.
+
+Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
+overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
+or `Collected by {partner}` without losing that fact when Sales details are missing. Transfer
+progress uses its own words and actual destination; a missing destination never creates a stop.
+Before collection, its supporting line names the payment, stock, Logistics or DO blocker.
+Unpriced and incomplete Sales facts cannot produce `Ready`. Once collection/result is recorded,
+the supporting line keeps the recorded ETA, failure reason or proof owed instead of re-testing
+pre-departure stock against goods that have moved. This display never authorises issue or dispatch.
+The Monitor Payment cell reads `No price yet` for unknown valuation, never `Paid`.
+Validation for this correction: 4,765 web tests, 30 shared status tests and workspace typecheck
+pass. Local Chrome at 1440px, 949px and 390px preserves product detail focus/viewport bounds and
+shows progress separately from the missing-fact or proof line. This is local evidence only.
 
 The local schedule now classifies each intermediate leg as `TRANSFER`, and only the final leg
 as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or

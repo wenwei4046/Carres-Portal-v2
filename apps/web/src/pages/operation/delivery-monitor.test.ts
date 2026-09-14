@@ -53,6 +53,7 @@ import {
   scheduleSplitSentence,
   missingProofLabels,
   monitorRowAction,
+  monitorScheduleStatusOf,
   monitorRowActionText,
   sortByRequestedDeliveryDate,
   needsProof,
@@ -80,6 +81,40 @@ import {
 
 /* The card's one consistent example: Friday, 4 September 2026. */
 const TODAY = "2026-09-04";
+
+describe("schedule progress and departure blockers", () => {
+  function subject(over: Partial<operationOrderListRow> = {}, arranged: Partial<DeliveryArrangementRow> = {}) {
+    return buildDeliveryMonitorCards({
+      orders: [order({ id: "status", so: 1400, paid: 100,
+        order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1, unit_price: 100 }],
+        allocated_units: [{ sku: "mattress:M1401F-K", qty: 1, status: "reserved" }], ...over })],
+      deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map(), todayIso: TODAY,
+      arrangements: new Map([["status#0", arrangement({ order_id: "status", partner_id: "nets", partner_name: "NETS",
+        confirmed_date: "2026-09-04", confirmed_time: "Morning", driver_name: "Driver", vehicle: "ABC123",
+        expected_arrival: "11:00", ...arranged })]]),
+    })[0]!;
+  }
+  it("preserves Confirmed while naming payment, stock and Logistics blockers in priority order", () => {
+    const unpaid = monitorScheduleStatusOf(subject({ paid: 0, allocated_units: [] }, { driver_name: null }));
+    expect(unpaid.progress.label).toBe("Confirmed");
+    expect(unpaid.supporting).toBe("Payment blocked");
+    expect(monitorScheduleStatusOf(subject({ allocated_units: [] }, { driver_name: null })).supporting).toBe("Stock risk");
+    expect(monitorScheduleStatusOf(subject({}, { driver_name: null })).supporting).toBe("Logistics details incomplete");
+    expect(monitorScheduleStatusOf(subject()).supporting).toBe("DO not released");
+  });
+  it("does not let missing Sales facts replace the confirmed journey", () => {
+    const card = subject({ building_type: null });
+    expect(card.statusKey).toBe("details_incomplete");
+    const status = monitorScheduleStatusOf(card);
+    expect(status.progress.label).toBe("Confirmed");
+    expect(status.supporting).toBe("Order details incomplete");
+  });
+  it("does not claim Paid or Ready from an unpriced order", () => {
+    const card = subject({ order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1 }] });
+    expect(monitorScheduleStatusOf(card).supporting).toBe("Order details incomplete");
+    expect(card.payment.line1).toBe("No price yet");
+  });
+});
 const WINDOW = [
   "2026-09-03",
   "2026-09-04",

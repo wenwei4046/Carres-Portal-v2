@@ -2078,6 +2078,8 @@ export {
 // `Created` belongs to the Register and may never appear on the workspace.
 export {
   deliveryWorkStatusOf,
+  deliveryJourneyProgressOf,
+  deliveryJourneyProgressFromStatus,
   deliveryWorkStatusLabelOf,
   DELIVERY_WORK_STATUS_KINDS,
   DELIVERY_WORK_STATUS_TONE,

@@ -134,6 +134,11 @@ export const MONITOR_COPY = {
   checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
   noDeliveryOrderShort: "DO",
+  paymentBlocked: "Payment blocked",
+  stockRisk: "Stock risk",
+  logisticsIncomplete: "Logistics details incomplete",
+  doNotReleased: "DO not released",
+  noPrice: "No price yet",
   openDo: "Open DO",
   receivedQty: "Received Qty",
   receiptUnknown: "Receipt not verified",
@@ -689,6 +694,7 @@ export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
   if (financeHolds) {
     return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
   }
+  if (!money.known) return { line1: MONITOR_COPY.noPrice, line2: null, tone: "none" };
   if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
   const approvals = (o.order_delivery_payment_approvals ?? []).map((a) => ({
     status: a.status as "pending" | "approved" | "refused",
@@ -1520,6 +1526,30 @@ export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | und
   }
   if (counts.noLogistics > 0) parts.push(`${counts.noLogistics} ${MONITOR_COPY.noLogistics}`);
   return `${dateLabel} — ${parts.join(" · ")}`;
+}
+
+/** Presentation of the existing stock/payment facts, not a permission to
+ * issue or dispatch. Once goods moved, show the recorded ETA/result/proof
+ * instead of diagnosing a pre-departure shortage against consumed stock. */
+export function monitorScheduleStatusOf(card: DeliveryMonitorCard): {
+  progress: DeliveryScopeRow["progress"];
+  supporting: string | null;
+  tone: DeliveryWorkStatusTone;
+} {
+  const progress = card.scope.progress;
+  if (["collected", "delivering", "arrived", "delivered", "failed"].includes(progress.kind)) {
+    return { progress, supporting: progress.second, tone: progress.secondTone ?? "none" };
+  }
+  if (card.payment.tone === "red") return { progress, supporting: MONITOR_COPY.paymentBlocked, tone: "orange" as const };
+  if (!moneyOfOrder(card.scope.o).known) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
+  if (!card.readiness.ready) return { progress, supporting: MONITOR_COPY.stockRisk, tone: "orange" as const };
+  const arrangement = card.scope.arrangement;
+  if (!card.logisticsPartnerId || !card.confirmedTime || !arrangement?.driver_name?.trim() || !arrangement.vehicle?.trim() || !arrangement.expected_arrival?.trim()) {
+    return { progress, supporting: MONITOR_COPY.logisticsIncomplete, tone: "orange" as const };
+  }
+  if (card.scope.missingFacts.length) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
+  if (!card.deliveryOrderId) return { progress, supporting: MONITOR_COPY.doNotReleased, tone: "orange" as const };
+  return { progress, supporting: "Ready", tone: "green" as const };
 }
 
 /** The selected schedule scope, not the all-dates work population. */

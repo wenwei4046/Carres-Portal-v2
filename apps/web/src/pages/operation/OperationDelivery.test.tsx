@@ -652,7 +652,8 @@ describe("one card", () => {
     docsState.data!.attempts.push({ do_number: "DO-D", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" });
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-d");
-    expect(within(card).getByText("Delivered")).toBeTruthy();
+    expect(within(card).getByText("Delivered to customer")).toBeTruthy();
+    expect(within(card).getByText("Delivery photo not uploaded")).toBeTruthy();
     expect(document.body.textContent).not.toContain("Proof Required");
   });
 

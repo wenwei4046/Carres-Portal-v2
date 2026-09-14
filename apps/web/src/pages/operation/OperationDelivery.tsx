@@ -135,6 +135,7 @@ import {
   missingProofLabels,
   monitorCardHref,
   monitorRowAction,
+  monitorScheduleStatusOf,
   monthDayCounts,
   monthDaysOf,
   monthStepStart,
@@ -454,6 +455,7 @@ function RailPicker({
 }
 
 function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
+  const scheduleStatus = monitorScheduleStatusOf(card);
   const stop = card.leg == null ? null : card.scope.o.delivery_stops?.find(s => s.leg === card.leg);
   const physical = [...card.items, ...card.extras.filter(line => line.kind === "accessory")];
   const services = card.extras.filter(line => line.kind === "service");
@@ -514,11 +516,10 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
       {card.logisticsPartnerId && card.logisticsPartnerName ? <div className="inline-flex items-center gap-1 text-label text-kit-slate-12" aria-label={`${MONITOR_COPY.partner}: ${card.logisticsPartnerName}`}>
         <Icon name="delivery" size={14} />{card.logisticsPartnerName}
       </div> : null}
-      {card.settled || (card.statusKey !== "confirmed" && card.booked) ?
-        <div className="min-w-0 break-words text-label" data-testid="schedule-status">
-          <div className={STATUS_TONE_TEXT[card.statusTone]}>{card.statusLabel}</div>
-          {card.statusSecond ? <div className={card.statusSecondTone ? STATUS_TONE_TEXT[card.statusSecondTone] : "text-kit-slate-11"}>{card.statusSecond}</div> : null}
-        </div> : null}
+      <div className="min-w-0 break-words text-label" data-testid="schedule-status">
+        <div className={STATUS_TONE_TEXT[scheduleStatus.progress.tone]}>{scheduleStatus.progress.label}</div>
+        {scheduleStatus.supporting ? <div className={STATUS_TONE_TEXT[scheduleStatus.tone]}>{scheduleStatus.supporting}</div> : null}
+      </div>
     </ScheduleCard>
   );
 }
