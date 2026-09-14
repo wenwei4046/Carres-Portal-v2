@@ -2185,6 +2185,10 @@ export {
   type WarehouseOutboundCard,
 } from "./warehouse-outbound";
 export {
+  projectWarehouseOutboundWork,
+  type WarehouseOutboundAssignment,
+} from "./warehouse-work";
+export {
   driverCollectedLine,
   WAREHOUSE_MONITOR_EVENT_LABEL,
   WAREHOUSE_MONITOR_GROUP_LABEL,

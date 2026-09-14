@@ -77,6 +77,7 @@ export type WorkOwnerRule =
   | "payment_approver_duty"
   | "delivery_duty"
   | "warehouse_duty"
+  | "warehouse_site_queue_then_operator"
   | "finance_duty"
   | "system"
   /* The cross-module rules' own precise keys — recorded now so the later
@@ -88,7 +89,7 @@ export type WorkOwnerRule =
 
 export interface WorkRule {
   key: string;
-  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery" | "payment";
+  module: "orders" | "purchasing" | "receiving" | "claims" | "stock" | "delivery" | "payment";
   /** ① when the item exists — the owning engine's trigger, in words. */
   trigger: string;
   /** ② who — the rule in words, never a stored owner field (§2.2). */
@@ -291,6 +292,16 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRule[] = [
   {
+    key: "warehouse.outbound_handover",
+    module: "stock",
+    trigger: "a dated Warehouse pickup has required Units without an accepted Warehouse handover",
+    owner: "the authorised Warehouse Site queue until a personally signed-in Site operator accepts or begins the work",
+    ownerRule: "warehouse_site_queue_then_operator",
+    action: "Check, pack and hand over the exact Units",
+    dueRule: "the scheduled Warehouse handover date on the Site calendar",
+    completionFact: "every required Unit has an accepted Warehouse handover event with receiver and proof",
+  },
+  {
     key: "manual_purchase.approve",
     module: "purchasing",
     trigger: "a Manual Purchase request requires a decision and has none",
@@ -491,7 +502,7 @@ export interface WorkItem {
   normalOwner: WorkOwnerPerson | null;
   activeCover: WorkOwnerPerson | null;
   actingPerson: WorkOwnerPerson | null;
-  ownerState: WorkspaceDutyResolution["state"];
+  ownerState: WorkspaceDutyResolution["state"] | "site_queue";
   /** WHO — resolved from the rule's `ownerRule` (§0.1 Action Owner Engine):
    *  the PO-duty holder, the salesperson, or the PIC — else the honest gap. */
   ownerName: string | null;

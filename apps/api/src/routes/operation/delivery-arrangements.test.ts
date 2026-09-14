@@ -337,7 +337,7 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
     const LEG_DO = { ...DO_ROW, id: "do-2", do_number: "DO-010926-0002", leg: 1 };
     mockSb([
       { data: [LEG_ARRANGEMENT, { ...ARRANGEMENT_ROW, id: "arr-3", leg: 2 }] },
-      { data: [ORDER_ROW] },
+      { data: [{ ...ORDER_ROW, delivery_stops: [{ leg: 1, partner_id: NETS, partner_name: "NETS", from_loc: "Carres Klang", to_loc: "Customer" }] }] },
       { data: [LEG_DO] },
       { data: [{ delivery_order_id: "do-2", item_id: "item-1" }] },
       { data: [{ id: "item-1", unit_code: "CAR-000123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
@@ -355,6 +355,43 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
     expect(events.length).toBe(2);
     expect(new Set(events.map((e) => `${e.leg}:${e.doNumber}`))).toEqual(new Set(["1:DO-010926-0002"]));
     expect(events[0]!.deliveryHref).toContain("open=");
+  });
+
+  it.each(["operation", "warehouse"])("keeps the actual two-leg route and limits %s to its physical Site", async (role) => {
+    mockSb([
+      { data: [1, 2].map((leg) => ({ ...ARRANGEMENT_ROW, leg })) },
+      { data: [{ ...ORDER_ROW, delivery_stops: [
+        { leg: 1, partner_id: NETS, partner_name: "NETS", from_loc: "Klang", to_loc: "JB" },
+        { leg: 2, partner_id: AL, partner_name: "AL", from_loc: "JB", to_loc: "Singapore customer" },
+      ] }] },
+      { data: [1, 2].map((leg) => ({ ...DO_ROW, id: `do-${leg}`, leg })) },
+      { data: [1, 2].map((leg) => ({ delivery_order_id: `do-${leg}`, item_id: "item-1" })) },
+      { data: [{ id: "item-1", unit_code: "U1-000-123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
+      { data: [] }, { data: [] }, { data: [] },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [{ sku: "SOFA-X", variant: "Sofa" }] },
+    ]);
+    const res = await call("/warehouse-schedule", role, undefined, role === "warehouse" ? "wh-1" : undefined);
+    expect(res.status).toBe(200);
+    const { events } = await res.json() as { events: Array<Record<string, unknown>> };
+    expect(events.filter((e) => e.leg === 1)).toHaveLength(1);
+    expect(events[0]).toMatchObject({ fromLocation: "Klang", toCustomer: "JB", warehouseSiteId: "wh-1" });
+    const later = events.filter((e) => e.leg === 2);
+    if (role === "warehouse") expect(later).toEqual([]);
+    else {
+      expect(later).toHaveLength(2);
+      expect(later[0]).toMatchObject({ fromLocation: "JB", toCustomer: "Singapore customer", warehouseSiteId: null });
+    }
+  });
+
+  it("refuses an unreadable documented leg instead of inventing its original Warehouse route", async () => {
+    mockSb([
+      { data: [{ ...ARRANGEMENT_ROW, leg: 1 }] },
+      { data: [ORDER_ROW] },
+      { data: [{ ...DO_ROW, leg: 1 }] },
+    ]);
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(503);
   });
 
   it("projects the DO's recorded exact-Unit scope onto the real Saturday pickup with Friday readiness", async () => {

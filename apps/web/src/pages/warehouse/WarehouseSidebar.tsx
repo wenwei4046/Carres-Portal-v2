@@ -18,6 +18,7 @@ import { useWarehouseIncoming } from "@/lib/queries";
  */
 const NAV_ITEMS = [
   { to: "/warehouse/incoming", label: "Incoming", icon: "↘", badge: true },
+  { to: "/warehouse/work", label: "Work", icon: "◆", badge: false },
   { to: "/warehouse/receipts", label: "My receiving", icon: "▤", badge: false },
   { to: "/warehouse/outbound", label: "Outbound", icon: "↗", badge: false },
 ];
@@ -32,14 +33,14 @@ export default function WarehouseSidebar() {
   const warehouseName = data?.warehouse?.name ?? "Warehouse";
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-card border-r border-border flex flex-col py-[22px] z-10 overflow-auto">
-      <div className="px-[22px] pb-[18px] border-b border-border">
+    <aside className="fixed left-0 top-0 bottom-0 w-[72px] sm:w-[240px] bg-card border-r border-border flex flex-col py-[22px] z-10 overflow-auto">
+      <div className="px-3 sm:px-[22px] pb-[18px] border-b border-border">
         <Link to="/warehouse/incoming" className="block">
           <CarresLockup />
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 pt-5 pb-1 flex flex-col gap-px">
+      <nav className="flex-1 px-2 sm:px-3 pt-5 pb-1 flex flex-col gap-px">
         {NAV_ITEMS.map((it) => (
           <NavItem key={it.to} item={it} badge={it.badge ? toCount : 0} />
         ))}
@@ -48,12 +49,12 @@ export default function WarehouseSidebar() {
       <Link
         to="/me"
         title="Profile · Sign out"
-        className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
+        className="px-3 sm:px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
       >
         <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-semibold flex-shrink-0">
           {initials || "WH"}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 hidden sm:block">
           <div className="text-meta font-semibold truncate">
             {email || "Warehouse"}
           </div>
@@ -97,7 +98,7 @@ function NavItem({
           >
             {item.icon}
           </span>
-          <span className="flex-1">{item.label}</span>
+          <span className="flex-1 hidden sm:inline">{item.label}</span>
           {badge > 0 && (
             <span className="font-mono text-label font-semibold px-1.5 py-px rounded-full bg-primary text-primary-foreground">
               {badge}

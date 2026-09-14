@@ -56,7 +56,13 @@ function supportingLine(i: WorkRow): string {
  * required result — never joined with `—`. `Deliver on {weekday, date}` is
  * spelled here through the one date home, because the engine spells no dates.
  */
-function deliveryLines(item: WorkRow): { act: string; result: string | null } | null {
+function structuredLines(item: WorkRow): { act: string; result: string | null } | null {
+  if (item.ruleKey === "warehouse.outbound_handover") {
+    return {
+      act: item.recipient ? `${item.action} · ${item.recipient}` : item.action,
+      result: item.requiredResult || null,
+    };
+  }
   if (item.module !== "delivery") return null;
   const act =
     item.ruleKey === "deliver_today" && item.dueIso
@@ -72,7 +78,7 @@ function WorkRowButton({
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
 }) {
-  const delivery = deliveryLines(item);
+  const lines = structuredLines(item);
   return (
     <button
       type="button"
@@ -87,6 +93,7 @@ function WorkRowButton({
       <span className="flex-1 min-w-0">
         <span className="block truncate text-label font-semibold text-base-500">
           {item.soRef}
+          {item.ownerQueue && ` · ${item.ownerQueue.label}`}
         </span>
         <span className={`${cjkClassName(item.problem)} block truncate text-body font-semibold text-base-900`}>
           {item.problem}
@@ -95,14 +102,14 @@ function WorkRowButton({
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {delivery?.act ?? item.action}
+          {lines?.act ?? item.action}
         </span>
-        {delivery?.result ? (
+        {lines?.result ? (
           <span
             className="block truncate text-body text-base-700"
             data-testid="work-row-result"
           >
-            {delivery.result}
+            {lines.result}
           </span>
         ) : null}
         <span
@@ -174,15 +181,18 @@ export default function OperationWork() {
     for (const i of allItems) {
       const key =
         i.normalOwnerId ??
+        (i.ownerQueue
+          ? `queue:${i.ownerQueue.id}`
+          :
         (i.ownerName
           ? `person:${i.ownerName}`
-          : `duty:${i.ownerDuty ?? "No owner yet"}`);
+          : `duty:${i.ownerDuty ?? "No owner yet"}`));
       const list = byOwner.get(key) ?? [];
       list.push(i);
       byOwner.set(key, list);
     }
     const groups = [...byOwner.entries()].map(([key, items]) => {
-      const staffMember = key.startsWith("duty:") || key.startsWith("person:")
+      const staffMember = key.startsWith("duty:") || key.startsWith("person:") || key.startsWith("queue:")
         ? null
         : staffById.get(key) ?? null;
       // A resolved person without an ops account still has a NAME (the
@@ -192,6 +202,9 @@ export default function OperationWork() {
         : key.startsWith("person:")
           ? key.slice(7)
           : (items[0]?.ownerName ?? null);
+      const queueWord = key.startsWith("queue:")
+        ? `${items[0]?.ownerQueue?.label ?? "Warehouse Site"} queue`
+        : null;
       // A duty group carries the duty KEY from the feed; the governed word
       // comes from the shared catalogue (`PO Duty` · `Delivery Duty`), and a
       // keyed duty with no holder prints the Staff & Duties door below.
@@ -204,7 +217,7 @@ export default function OperationWork() {
         person: personName !== null,
         userId: staffMember ? key : null,
         dutyKey,
-        name: personName ?? dutyWord ?? "No owner yet",
+        name: personName ?? queueWord ?? dutyWord ?? "No owner yet",
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),
@@ -308,7 +321,7 @@ export default function OperationWork() {
                 </h2>
                 <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                   {g.items.map((i) => (
-                    <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i as WorkRow} onOpen={openRow} />
+                    <WorkRowButton key={(i as WorkRow).id} item={i as WorkRow} onOpen={openRow} />
                   ))}
                 </div>
               </section>
@@ -361,7 +374,7 @@ export default function OperationWork() {
               )}
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (
-                  <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} />
+                  <WorkRowButton key={i.id} item={i} onOpen={openRow} />
                 ))}
               </div>
             </section>

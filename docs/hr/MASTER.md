@@ -77,7 +77,7 @@ against a real session.
   among the remaining active staff, including two-person and one-person operation. Historical actor,
   avatar, receipt, handover, approval and cover evidence remain unchanged. HR/People does not store
   a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
-  `../purchasing/MASTER.md` §2.2 and its one edit door remains Team.
+  `../purchasing/MASTER.md` §2.2 and its one edit door remains Workspace → Staff & Duties.
 - **Checklists are a shared constant, not a config table.**
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff

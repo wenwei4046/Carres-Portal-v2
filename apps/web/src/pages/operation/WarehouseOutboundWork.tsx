@@ -784,9 +784,10 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           ))}
         </div>
       )}
-      <table className="w-full border-collapse text-[13px]">
-        <thead>
-          <tr className="text-left text-label uppercase tracking-wide text-base-400">
+      <div className="overflow-x-auto" data-testid={`wo-unit-scroll-${card.doNumber}`}>
+        <table className="w-full min-w-[900px] border-collapse text-[13px]">
+          <thead>
+            <tr className="text-left text-label uppercase tracking-wide text-base-400">
             <th className="py-1 pr-3 font-medium">Unit ID</th>
             <th className="py-1 pr-3 font-medium">Product</th>
             <th className="py-1 pr-3 font-medium">Reservation</th>
@@ -797,13 +798,14 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             <th className="py-1 pr-3 font-medium">Driver confirmed</th>
             <th className="py-1 font-medium">Still to do</th>
           </tr>
-        </thead>
-        <tbody>
-          {card.units.map((u) => (
-            <UnitRow key={u.unitId} unit={u} />
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {card.units.map((u) => (
+              <UnitRow key={u.unitId} unit={u} />
+            ))}
+          </tbody>
+        </table>
+      </div>
       {loadOpen && card.deliveryOrderId && (
         <RecordLoadedModal
           card={card}

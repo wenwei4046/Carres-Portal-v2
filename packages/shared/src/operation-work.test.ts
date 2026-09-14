@@ -102,4 +102,34 @@ describe("Operation Work wire contract", () => {
     expect(adapted.timing.bucket).toBe("overdue");
     expect(adapted.completionFact).toContain("posted Receiving Session");
   });
+
+  it("keeps an unaccepted Warehouse action in its authorised Site queue", () => {
+    const queued = operationWorkItemSchema.parse({
+      ...item,
+      id: "stock:do-1:warehouse.outbound_handover",
+      module: "stock",
+      ruleKey: "warehouse.outbound_handover",
+      object: { kind: "delivery_order", id: "do-1", label: "DO-2609-019" },
+      problem: "1 Unit has not been handed over",
+      action: "Check, pack and hand over the exact Unit to NETS Delivery",
+      recipient: "NETS Delivery",
+      requiredResult: "Every required Unit handed over with receiver and proof",
+      completionFact: "Every required Unit has an accepted Warehouse handover event",
+      owner: {
+        rule: "warehouse_site_queue_then_operator",
+        dutyKey: null,
+        normal: null,
+        activeCover: null,
+        acting: null,
+        state: "site_queue",
+        queue: { kind: "warehouse_site", id: "site-1", label: "Carres Klang Warehouse" },
+      },
+      timing: { dueOn: "2026-09-09", workingDaysLate: 0, bucket: "today" },
+      destination: "/warehouse/outbound?do=DO-2609-019",
+    });
+
+    expect(queued.owner.state).toBe("site_queue");
+    expect(queued.owner.queue?.label).toBe("Carres Klang Warehouse");
+    expect(queued.owner.acting).toBeNull();
+  });
 });

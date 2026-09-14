@@ -162,6 +162,61 @@ describe("Operation Work — one server feed", () => {
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
+  it("groups unaccepted Outbound work under its Warehouse Site queue", () => {
+    workState.data!.items = [item({
+      id: "stock:do-1:warehouse.outbound_handover",
+      module: "stock",
+      ruleKey: "warehouse.outbound_handover",
+      object: { kind: "delivery_order", id: "do-1", label: "DO-2609-019" },
+      problem: "1 Unit has not been handed over",
+      action: "Check, pack and hand over the exact Unit to Ahmad",
+      owner: {
+        rule: "warehouse_site_queue_then_operator", dutyKey: null,
+        normal: null, activeCover: null, acting: null, state: "site_queue",
+        queue: { kind: "warehouse_site", id: "site-1", label: "Carres Klang Warehouse" },
+      },
+      destination: "/warehouse/outbound?do=DO-2609-019",
+    })];
+    show("/operation?tab=work&scope=team");
+    expect(screen.getByText("Carres Klang Warehouse queue")).toBeInTheDocument();
+    expect(screen.queryByText("No owner yet")).not.toBeInTheDocument();
+  });
+
+  it("retains each DO Site after personal assignment, including recipient and result", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      workState.data!.items = ["Klang", "Johor"].map((site) => item({
+        id: `stock:do-1:${site}:warehouse.outbound_handover`,
+        module: "stock", ruleKey: "warehouse.outbound_handover",
+        object: { kind: "delivery_order", id: "do-1", label: "DO-1" },
+        problem: "1 Unit has not been handed over",
+        action: "Check, pack and hand over the exact Unit",
+        recipient: "Driver", requiredResult: "Every required Unit handed over with receiver and proof",
+        owner: {
+          rule: "warehouse_site_queue_then_operator", dutyKey: null,
+          normal: { userId: "operator-1", name: "Nadia" }, activeCover: null,
+          acting: { userId: "operator-1", name: "Nadia" }, state: "primary",
+          queue: { kind: "warehouse_site", id: site, label: site },
+        },
+        destination: `/operation?tab=warehouse-outbound&site=${site}&do=DO-1`,
+      }));
+      show("/operation?tab=work&scope=team");
+      expect(screen.getByText("DO-1 · Klang")).toBeInTheDocument();
+      expect(screen.getByText("DO-1 · Johor")).toBeInTheDocument();
+      const rows = screen.getAllByTestId("work-row-DO-1-warehouse.outbound_handover");
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row).toHaveTextContent("Check, pack and hand over the exact Unit · Driver");
+        expect(row).toHaveTextContent("Every required Unit handed over with receiver and proof");
+      }
+      fireEvent.click(rows[1]);
+      expect(navigate).toHaveBeenCalledWith("/operation?tab=warehouse-outbound&site=Johor&do=DO-1");
+      expect(error.mock.calls.filter((args) => args.some((arg) => String(arg).includes("same key")))).toEqual([]);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("keeps a Delivery item on its exact Delivery Order door", () => {
     workState.data!.items = [item({
       id: "delivery:DO-2041:deliver_today",

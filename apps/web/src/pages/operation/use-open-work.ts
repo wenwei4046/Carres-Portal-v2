@@ -25,6 +25,7 @@ export interface WorkRow extends WorkItem {
   ownerId: string | null;
   normalOwnerId: string | null;
   deliveryDoNumber: string | null;
+  ownerQueue: OperationWorkItem["owner"]["queue"];
 }
 
 export interface OwnerWorkload {
@@ -52,6 +53,7 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
         : item.module === "orders" ||
             item.module === "purchasing" ||
             item.module === "receiving" ||
+            item.module === "stock" ||
             item.module === "delivery" ||
             item.module === "payment"
           ? item.module
@@ -65,6 +67,7 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
     activeCover: item.owner.activeCover,
     actingPerson: item.owner.acting,
     ownerState: item.owner.state,
+    ownerQueue: item.owner.queue ?? null,
     ownerName: item.owner.acting?.name ?? item.owner.normal?.name ?? null,
     ownerUserId: item.owner.acting?.userId ?? null,
     ...(!item.owner.acting && item.owner.dutyKey

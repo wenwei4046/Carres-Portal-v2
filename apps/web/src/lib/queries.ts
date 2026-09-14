@@ -650,6 +650,7 @@ export const qk = {
   warehousePortal: {
     incoming: () => ["warehouse-portal", "incoming"] as const,
     receipts: () => ["warehouse-portal", "receipts"] as const,
+    work: () => ["warehouse-portal", "work"] as const,
   },
   // 2026-05-15 (Loo) — Supplier per-thread readiness + pickup event keys.
   // Top-level (not nested under `supplier`) because thread + pickup-event
@@ -4292,6 +4293,37 @@ export function useWarehouseMyReceipts(
   });
 }
 
+/** Site queue for the external Warehouse operator. The server owns scope and
+ * projection; this hook only reads the governed Work contract. */
+export function useWarehouseWork(
+  opts?: Partial<UseQueryOptions<OperationWorkResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.warehousePortal.work(),
+    queryFn: () => apiFetch<OperationWorkResponse>("/api/warehouse/work"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useAcceptWarehouseWorkMutation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deliveryOrderId) =>
+      apiFetch<unknown>(`/api/warehouse/work/${deliveryOrderId}/accept`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.warehousePortal.work() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
 /** File a count. Goods do NOT move — ops's check-in replays it through the
  *  receive engine, which is why both warehouse lists are refreshed and no
  *  stock cache is touched here. */
@@ -7573,6 +7605,7 @@ export function useRecordHandoverEvent(
       await qc.invalidateQueries({
         queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
       });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -7597,6 +7630,7 @@ export function useRecordOutboundPrep(doId: string) {
         queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
       });
       await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
     },
   });
 }

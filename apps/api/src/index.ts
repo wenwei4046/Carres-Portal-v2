@@ -100,6 +100,7 @@ import supplierProductsRouter from "./routes/supplier/products";
 import supplierThreadsRouter from "./routes/supplier/threads";
 // R6 — the warehouse login's whole surface: incoming · file a count · my counts
 import warehouseReceivingRouter from "./routes/warehouse/receiving";
+import warehouseWorkRouter from "./routes/warehouse/work";
 import salespersonsRouter from "./routes/salespersons";
 import hrRouter from "./routes/hr";
 import hrTeamRouter from "./routes/hr-team";
@@ -295,6 +296,7 @@ api.route("/supplier/products", supplierProductsRouter);
 api.route("/supplier/threads", supplierThreadsRouter);
 // R6 — the third external portal, beside supplier and partner.
 api.route("/warehouse", warehouseReceivingRouter);
+api.route("/warehouse/work", warehouseWorkRouter);
 api.route("/storage/dos", dosRouter);
 api.route("/ops/stock", opsStockRouter);
 // K2 (0287) — the monthly ready stock plan. Mounted BELOW /ops/stock so the

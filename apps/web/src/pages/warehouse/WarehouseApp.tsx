@@ -3,6 +3,7 @@ import WarehouseSidebar from "./WarehouseSidebar";
 import WarehouseIncoming from "./WarehouseIncoming";
 import WarehouseMyReceipts from "./WarehouseMyReceipts";
 import WarehouseOutboundDoor from "./WarehouseOutboundDoor";
+import WarehouseWork from "./WarehouseWork";
 
 /**
  * Warehouse portal shell — R6 of the receiving & claim queue (Jess 2026-07-27).
@@ -25,10 +26,11 @@ export default function WarehouseApp() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <WarehouseSidebar />
-      <main className="ml-[240px] flex-1 min-w-0">
+      <main className="ml-[72px] sm:ml-[240px] flex-1 min-w-0">
         <Routes>
           <Route index element={<Navigate to="incoming" replace />} />
           <Route path="incoming" element={<WarehouseIncoming />} />
+          <Route path="work" element={<WarehouseWork />} />
           <Route path="receipts" element={<WarehouseMyReceipts />} />
           <Route path="outbound" element={<WarehouseOutboundDoor />} />
           <Route path="*" element={<Navigate to="incoming" replace />} />

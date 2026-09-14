@@ -340,6 +340,7 @@ describe("Warehouse Outbound — the unified Register", () => {
       expect(screen.getByTestId("wo-units-DO-2609-019")).toBeInTheDocument(),
     );
     const units = screen.getByTestId("wo-units-DO-2609-019");
+    expect(within(units).getByTestId("wo-unit-scroll-DO-2609-019")).toHaveClass("overflow-x-auto");
     expect(within(units).getByText("Goods scheduled for pickup")).toBeInTheDocument();
     expect(within(units).getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent(
       "Not scanned yet",
