@@ -46,6 +46,6 @@ describe("WarehouseWork", () => {
   it("keeps an empty Site queue explicit", async () => {
     apiFetchMock.mockResolvedValue({ items: [], staff: [], generatedOn: "2026-09-14" });
     renderPage();
-    expect(await screen.findByTestId("warehouse-work-empty")).toHaveTextContent("No open work");
+    expect(await screen.findByTestId("warehouse-work-empty")).toHaveTextContent("No open work — every track is clear.");
   });
 });

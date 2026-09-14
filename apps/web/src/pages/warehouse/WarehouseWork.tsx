@@ -28,7 +28,7 @@ export default function WarehouseWork() {
       <PageHeader kicker="Warehouse" title="Work" className="mb-3" />
       <p className="text-body text-base-600 mb-[18px]">The Site queue for this warehouse. Accept one delivery order, then complete it at Outbound.</p>
       {items.length === 0 ? (
-        <p className="text-body text-base-500" data-testid="warehouse-work-empty">No open work for this warehouse.</p>
+        <p className="text-body text-base-500" data-testid="warehouse-work-empty">No open work — every track is clear.</p>
       ) : (
         <div className="space-y-3">
           {items.map((item) => {
