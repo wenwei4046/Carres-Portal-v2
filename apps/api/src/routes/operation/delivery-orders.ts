@@ -73,9 +73,16 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
 /** The order fields the register's columns print — nothing more. The 2026-09-06
  *  register correction added the proof facts its WORK TO DO rail counts
  *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
- *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
+ *  read-only ▸ expansion. All are existing canonical columns, read as-is.
+ *
+ *  `customer_address` joined 2026-09-14 with the one address reading: without
+ *  it `Delivery Location` can only see the two structured columns, and a
+ *  document issued for one of the 46 written-address orders would print
+ *  `Not recorded` beside a Monitor row printing `Puchong, Selangor`. It is the
+ *  same canonical column the single-document read below already selects, on the
+ *  same route and the same role — no new permission and no new table. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_number, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+  "orders!inner(id, so, customer_name, customer_address, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_number, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
 
 /**
  * §6.1 (0489) — the proof reviews and the attempt evidence of a set of
