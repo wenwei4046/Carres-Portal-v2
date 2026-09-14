@@ -7,11 +7,11 @@
  *
  *  1. **The shape** — one 50px Destination Header saying Monitor, the page
  *     toolbar's `Day · Week · Month` (Week the desktop default), one
- *     page-owned 240px FilterRail (WORK TO DO · STATE · LOGISTICS PARTNER ·
+ *     page-owned 240px FilterRail (WORK TO DO · STATE · LOGISTICS ·
  *     DELIVERY STATUS) with the complete month calendar fixed on top, and
  *     never a `Calendar` rail row.
  *  2. **One card, the approved fields** — confirmed time · DO No · Customer ·
- *     City and State · Goods · Logistics Partner · Delivery Status; no phone,
+ *     City and State · Goods · Logistics · Delivery Status; no phone,
  *     money, owner, driver, vehicle, arrival or upload timestamp; NO checkbox.
  *  3. **Every card is ONE link** — an issued DO opens the Delivery Order, a
  *     row without one opens Edit Delivery.
@@ -291,7 +291,7 @@ function seedUnassigned() {
 describe("the shape", () => {
   beforeEach(seedTwoScopes);
 
-  it("the DEFAULT landing is the Week calendar — six Mon–Sat columns, Week lit in the toolbar", () => {
+  it("the DEFAULT calendar has six Mon–Sat columns and is labelled Work week", () => {
     wrap(<OperationDelivery />);
     for (const day of ["2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05"]) {
       expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
@@ -299,7 +299,7 @@ describe("the shape", () => {
     expect(screen.queryByTestId("delivery-monitor-day-2026-09-06")).toBeNull();
     expect(screen.queryByTestId("delivery-monitor-work-list")).toBeNull();
     const control = screen.getByTestId("delivery-monitor-calendar-view");
-    expect(within(control).getByRole("tab", { name: "Week" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(control).getByRole("tab", { name: "Work week" }).getAttribute("aria-selected")).toBe("true");
     expect(within(control).getByRole("tab", { name: "Day" })).toBeTruthy();
     expect(within(control).getByRole("tab", { name: "Month" })).toBeTruthy();
     // The toolbar states the range in the governed date spelling.
@@ -324,12 +324,12 @@ describe("the shape", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     const rail = screen.getByTestId("delivery-monitor-rail");
     expect(rail.className).toContain("w-[240px]");
-    for (const heading of ["WORK TO DO", "STATE", "LOGISTICS PARTNER", "DELIVERY STATUS"]) {
+    for (const heading of ["WORK TO DO", "STATE", "LOGISTICS", "DELIVERY STATUS"]) {
       expect(within(rail).getByText(heading)).toBeTruthy();
     }
     for (const gone of [
       "REGION",
-      "LOGISTICS",
+      "LOGISTICS PARTNER",
       "DELIVERY SCHEDULE",
       "NEEDS CHECKING",
       "Calendar",
@@ -353,7 +353,7 @@ describe("the shape", () => {
     ]) {
       expect(within(rail).getByText(row)).toBeTruthy();
     }
-    /* ⭐ STATE · LOGISTICS PARTNER · DELIVERY STATUS ARE DROPDOWNS (owner
+    /* ⭐ STATE · LOGISTICS · DELIVERY STATUS ARE DROPDOWNS (owner
        ruling 2026-09-12). The group titles and the values are unchanged; the
        control is the kit's, so the values are read from the listbox. */
     for (const group of ["region", "logistics", "status"] as const) {
@@ -417,7 +417,7 @@ describe("the shape", () => {
     }
   });
 
-  it("LOGISTICS PARTNER lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
+  it("LOGISTICS lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
     wrap(<OperationDelivery />);
     fireEvent.click(
       within(screen.getByTestId("delivery-monitor-logistics-select")).getByRole("combobox"),
@@ -590,29 +590,59 @@ describe("the spanning empty range", () => {
 });
 
 describe("one card", () => {
+  it("shows a gray pending mark only from explicit incoming line evidence", () => {
+    const orders = ordersState.data!.orders;
+    const first = orders.find(o => o.id === "b")!;
+    first.allocated_units = [];
+    first.incoming_units = [{ unitCode: "U-INCOMING", orderLineId: first.order_lines![0]!.id!, qty: 1 }];
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-b");
+    expect(within(card).getByText("Received Qty 0/1")).toBeTruthy();
+    expect(card.querySelector('[data-icon="ready"]')).toBeNull();
+    fireEvent.click(within(card).getByRole("button", { name: /Qty 1/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Received Qty 0/1");
+  });
   beforeEach(seedTwoScopes);
+
+  it("keeps repeated product lines separate and reveals complete names on tap", () => {
+    const first = ordersState.data!.orders.find(o => o.id === "a")!;
+    first.order_lines = [
+      { id: "one", sku: "mattress:one", qty: 1, label: "First mattress full name" },
+      { id: "two", sku: "mattress:one", qty: 2, label: "Second mattress full name" },
+      { id: "three", sku: "Mattress Protector Queen", qty: 1, label: "Protector Queen full name" },
+    ];
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(within(card).getAllByTestId("schedule-product-line")).toHaveLength(3);
+    expect(within(card).getAllByRole("link")).toHaveLength(1);
+    expect(card.querySelectorAll('[data-icon="mattress"]')).toHaveLength(2);
+    fireEvent.click(within(card).getAllByRole("button")[1]!);
+    expect(screen.getByRole("dialog").textContent).toContain("Second mattress full name");
+    expect(card.textContent).not.toContain("+1 more");
+    expect(card.textContent).not.toContain("Kong Chai Yin");
+  });
 
   it("a card with an issued DO shows the DO number and opens the Delivery Order", () => {
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-a");
     expect(within(card).getByText("DO-040926-0001")).toBeTruthy();
-    expect(within(card).getByText("Kong Chai Yin")).toBeTruthy();
+    expect(within(card).queryByText("Kong Chai Yin")).toBeNull();
     expect(within(card).getByText("Klang, Selangor")).toBeTruthy();
     expect(within(card).getByText("11:00–13:00")).toBeTruthy();
-    expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
+    expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
   it("a card without a DO says so and opens its Monitor row, brief unfolded", () => {
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-b");
-    expect(within(card).getByText("No delivery order yet")).toBeTruthy();
-    expect(within(card).getByText("Aida Rahim")).toBeTruthy();
+    expect(within(card).queryByText("No delivery order yet")).toBeNull();
+    expect(within(card).queryByText("Aida Rahim")).toBeNull();
     expect(within(card).getByText("NETS")).toBeTruthy();
     /* A day AND a window: the pill names the day (§8.4), never the retired
        `Delivery confirmed`. */
-    expect(within(card).getByText("Confirmed for Sat, 5 Sep")).toBeTruthy();
+    expect(within(card).queryByText("Confirmed for Sat, 5 Sep")).toBeNull();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
-    expect(card.closest("a")?.getAttribute("href")).toBe("/operation?tab=delivery&view=all&open=b");
+    expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation?tab=delivery&view=all&open=b");
   });
 
   it("shows ONLY the approved fields — no expected arrival, phone, owner name or upload time", () => {
@@ -634,7 +664,8 @@ describe("one card", () => {
     docsState.data!.attempts.push({ do_number: "DO-D", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" });
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-d");
-    expect(within(card).getByText("Delivered")).toBeTruthy();
+    expect(within(card).getByText("Delivered to customer")).toBeTruthy();
+    expect(within(card).getByText("Delivery photo not uploaded")).toBeTruthy();
     expect(document.body.textContent).not.toContain("Proof Required");
   });
 
@@ -642,7 +673,7 @@ describe("one card", () => {
     wrap(<OperationDelivery />);
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     const card = screen.getByTestId("delivery-monitor-card-a");
-    expect(within(card).queryAllByRole("button")).toHaveLength(0);
+    expect(within(card).getAllByTestId("schedule-product-line")).toHaveLength(1);
     expect(document.querySelector("[draggable='true']")).toBeNull();
   });
 
@@ -663,6 +694,30 @@ describe("one card", () => {
 describe("the two top-level views (owner ruling 2026-09-10)", () => {
   beforeEach(seedTwoScopes);
 
+  it("keeps transfer-only weeks distinct and updates both schedule and rail counts when filtered", () => {
+    ordersState.data = { orders: [order({ id: "journey", so: 1501, delivery_stops: [
+      { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Klang WH", to_loc: "Ipoh WH", scheduled_at: "2026-09-04T02:00:00Z", status: "picked_up" },
+      { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "Ipoh WH", to_loc: "Penang WH", scheduled_at: "2026-09-04T04:00:00Z", status: "pending" },
+      { leg: 3, partner_id: "p-al", partner_name: "AL", from_loc: "Penang WH", to_loc: "Customer", scheduled_at: "2026-09-07T04:00:00Z", status: "pending" },
+    ] as never })] };
+    docsState.data = { deliveryOrders: [], attempts: [], handoverEvents: [] };
+    arrangementsState.data = { arrangements: [] };
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("0 customer deliveries · 2 transfers");
+    expect(screen.getByTestId("delivery-monitor-tab-calendar")).toHaveTextContent("Delivery schedule2");
+    expect(screen.getAllByText("TRANSFER")).toHaveLength(2);
+    expect(within(screen.getByTestId("delivery-monitor-card-journey#leg1")).getByText("To Ipoh WH")).toBeTruthy();
+    const rail = screen.getByTestId("delivery-monitor-month-calendar");
+    expect(within(rail).getByRole("button", { name: /Fri, 4 Sep, 0 customer deliveries · 2 transfers/ })).toBeTruthy();
+    pickRail("logistics", /^NETS/);
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("0 customer deliveries · 1 transfer");
+    expect(within(rail).getByRole("button", { name: /Fri, 4 Sep, 0 customer deliveries · 1 transfer/ })).toBeTruthy();
+    fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
+    fireEvent.click(screen.getByTestId("delivery-monitor-next"));
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("1 customer delivery · 0 transfers");
+    expect(screen.getByTestId("delivery-monitor-tab-calendar")).toHaveTextContent("Delivery schedule1");
+  });
+
   it("⭐ the DEFAULT LANDING is Work to do — the selectable work list, not a calendar", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     const tabs = screen.getByTestId("delivery-monitor-tabs");
@@ -677,7 +732,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     /* Both tabs are NAMED — the operator never has to discover the other view
        by clearing a filter. */
     expect(within(tabs).getByText("Work to do")).toBeTruthy();
-    expect(within(tabs).getByText("Confirmed deliveries")).toBeTruthy();
+    expect(within(tabs).getByText("Delivery schedule")).toBeTruthy();
   });
 
   it("the landing offers nothing to CLEAR — its queue narrows nothing", () => {
@@ -698,11 +753,11 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));
     expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
     expect(screen.getByTestId("location-probe").textContent).toContain("view=week");
-    expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toBe(
+    expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toContain(
       /* A day with no agreed window DOES enter the calendar — the operator
          must see the day — and its card says `No time agreed` rather than
          passing as a settled booking (owner ruling 2026-09-11). */
-      "Only deliveries with a confirmed date appear here.",
+      "Confirmed dates only",
     );
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-work"));
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
@@ -759,15 +814,10 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
     const card = screen.getByTestId("delivery-monitor-card-a");
-    expect(within(card).getByText("Fri, 4 Sep")).toBeTruthy();
+    expect(screen.getAllByText("Fri, 4 Sep").length).toBeGreaterThan(0);
     expect(within(card).getByText("No time agreed")).toBeTruthy();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
-    /* The footer carries the ACT as two structured lines (owner ruling
-       2026-09-13), and it is about the TIME. */
-    const act = within(card).getByTestId("delivery-monitor-card-act-a");
-    expect(within(act).getByText("Call NETS")).toBeTruthy();
-    expect(within(act).getByText("Confirm the delivery time")).toBeTruthy();
-    expect(act.textContent).not.toContain("—");
+    expect(within(card).getByRole("link").getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
   it("a fully booked card keeps its window and its confirmed pill", () => {
@@ -853,7 +903,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Johor");
   });
 
-  it("a LOGISTICS PARTNER pick renders the work list narrowed to that partner", () => {
+  it("a LOGISTICS pick renders the work list narrowed to that partner", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     pickRail("logistics", /^NETS/);
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
@@ -1176,6 +1226,46 @@ describe("a Journey row on the work list", () => {
     expect(within(list).getByText("2 deliveries")).toBeTruthy();
     expect(list.textContent).not.toMatch(/\bLeg\b/);
     expect(list.textContent).not.toMatch(/\bscopes?\b/i);
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    const route = screen.getByTestId("delivery-brief-route");
+    expect(within(route).getByText("Leg 1 of 2")).toBeTruthy();
+    expect(within(route).getByText("Leg 2 of 2")).toBeTruthy();
+    expect(within(route).getByText("Klang WH → JB transit")).toBeTruthy();
+    expect(within(route).getByText("JB transit → Singapore customer")).toBeTruthy();
+    expect(route.querySelector('[aria-current="step"]')?.textContent).toContain("Leg 1 of 2");
+  });
+});
+
+describe("the expanded brief names operational facts without stock placeholders for services", () => {
+  it("separates services, excludes delivery charges and splits the emergency contact", () => {
+    ordersState.data = { orders: [order({ id: "brief", so: 1600,
+      customer_emergency: "Alice · 0123456789 · Spouse",
+      delivery_stair_items: 2, delivery_floor: 3,
+      order_addons: [{ addon_key: "DELIVERY", qty: 1 }, { addon_key: "STAIR_CARRY", qty: 2 }],
+      order_lines: [{ id: "goods", sku: "mattress:M1401F-K", qty: 1 },
+        { id: "service", sku: "Disposal old mattress", qty: 1 }],
+    })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    const services = screen.getByTestId("delivery-brief-services");
+    expect(services.textContent).toContain("Disposal old mattress");
+    expect(services.textContent).toContain("floor 3");
+    expect(services.textContent).not.toContain("—");
+    expect(services.textContent).not.toContain("Delivery fee");
+    expect(screen.getByTestId("delivery-brief-items").textContent).not.toContain("Disposal");
+    const customer = screen.getByTestId("delivery-brief-customer");
+    for (const word of ["Alice", "0123456789", "Spouse", "Emergency phone", "Emergency relationship"]) {
+      expect(within(customer).getByText(word)).toBeTruthy();
+    }
+  });
+
+  it("calls out missing access and confirmed-trip logistics once", () => {
+    ordersState.data = { orders: [order({ id: "brief", so: 1601 })] };
+    arrangementsState.data = { arrangements: [arrangement({ order_id: "brief", confirmed_date: "2026-09-05" })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByText("Access not recorded").className).toContain("text-kit-amber-11");
+    expect(within(screen.getByTestId("delivery-brief-logistics")).getAllByText("Logistics details incomplete")).toHaveLength(1);
   });
 });
 
@@ -1222,7 +1312,7 @@ describe("mobile is only ever the Day list", () => {
 
   it("uses the identical card link arithmetic as desktop", () => {
     wrap(<OperationDelivery />);
-    expect(screen.getByTestId("delivery-monitor-card-a").closest("a")?.getAttribute("href")).toBe(
+    expect(within(screen.getByTestId("delivery-monitor-card-a")).getByRole("link").getAttribute("href")).toBe(
       "/operation/delivery-orders/do-row-1",
     );
   });
@@ -1251,6 +1341,8 @@ describe("tablet Week is a fixed three-day window", () => {
 
   it("shows the aligned half-week containing the date — never a horizontal scroll", () => {
     wrap(<OperationDelivery />);
+    expect(screen.getByRole("tab", { name: "3 days" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByRole("tab", { name: "Work week" })).toBeNull();
     for (const day of ["2026-09-03", "2026-09-04", "2026-09-05"]) {
       expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
     }
@@ -1356,7 +1448,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(seen).toEqual([...seen].sort((a, b) => a - b));
   });
 
-  it("a row with NO Logistics Partner offers `Assign logistics` inside its brief — the panel body is the edit surface (§8.6)", () => {
+  it("a row with NO Logistics offers `Assign logistics` inside its brief — the panel body is the edit surface (§8.6)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     /* The rows sort by requested day: early · mid · late · none. Expand `mid`. */
@@ -1374,7 +1466,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(screen.queryByTestId("delivery-brief-logistics-edit")).toBeNull();
   });
 
-  it("⭐ a row WITH a Logistics Partner names the ACT; the partner stays in its own column", () => {
+  it("⭐ a row WITH a Logistics names the ACT; the partner stays in its own column", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     /* Owner ruling 2026-09-14. The register carries no Actions column (owner
@@ -1475,7 +1567,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     cleanup();
     wrap(<OperationDelivery />, "/operation?tab=delivery&date=2026-09-04&view=day");
     const day = screen.getByTestId("delivery-monitor-daily");
-    expect(within(day).getByText("Kong Chai Yin")).toBeTruthy();
+    expect(within(day).getByTestId("delivery-monitor-card-early")).toBeTruthy();
   });
 
   it("never prints `scope` or `leg` while the chase is on screen", () => {
@@ -1533,7 +1625,7 @@ describe("the phone's chase list", () => {
     const card = screen.getByTestId("delivery-monitor-work-card-early");
     expect(within(card).getByText("Requested Delivery Date")).toBeTruthy();
     expect(within(card).getByText("Thu, 10 Sep")).toBeTruthy();
-    expect(within(card).getByText("Logistics Partner")).toBeTruthy();
+    expect(within(card).getByText("Logistics")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
     expect(within(card).getByText("Call NETS")).toBeTruthy();
     expect(within(card).getByText("Confirm the delivery date")).toBeTruthy();
@@ -1784,7 +1876,7 @@ describe("the row's goods, arrival and stock cells", () => {
     const items = screen.getByTestId("delivery-brief-items");
     expect(within(items).getByText("Serena · King")).toBeTruthy();
     expect(within(items).getByText(/Pillow/)).toBeTruthy();
-    expect(within(items).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
+    expect(within(screen.getByTestId("delivery-brief-services")).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
     /* The site the crew meets is panel 1's own facts — floor and lift, each
        its own line, never a joined sentence. */
     const customer = screen.getByTestId("delivery-brief-customer");

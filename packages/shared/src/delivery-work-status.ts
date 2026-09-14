@@ -381,3 +381,44 @@ export function deliveryWorkStatusOf(
   if (input.contactBy === "operation") return say("operation_must_call");
   return say("partner_must_contact");
 }
+
+/** The same recorded ladder, without data gaps or the clock replacing the
+ * journey fact. Work queues still use deliveryWorkStatusOf unchanged. */
+export function deliveryJourneyProgressOf(
+  input: DeliveryWorkStatusInput,
+  spell: DeliveryStatusSpell,
+): DeliveryWorkStatus {
+  return deliveryJourneyProgressFromStatus(
+    deliveryWorkStatusOf({ ...input, missingFacts: [], todayIso: null }, spell),
+    input,
+  );
+}
+
+/** Shared copy for a recorded journey rung, including legacy stop records.
+ * This translates a fact; it never infers movement from a planned date. */
+export function deliveryJourneyProgressFromStatus(
+  status: DeliveryWorkStatus,
+  context: Pick<DeliveryWorkStatusInput, "partnerName" | "intermediateLeg" | "legStop">,
+): DeliveryWorkStatus {
+  const transfer = Boolean(context.intermediateLeg);
+  const stop = context.legStop?.trim();
+  const partner = context.partnerName?.trim() || LOGISTICS_ROLE_WORD;
+  let label = status.label;
+  switch (status.kind) {
+    case "confirmed": label = transfer ? "Transfer confirmed" : "Confirmed"; break;
+    case "collected": label = transfer ? "Collected for transfer" : `Collected by ${partner}`; break;
+    // With no named stop, retain the recorded collection fact instead of
+    // inventing a destination. The recorded ETA remains in supporting detail.
+    case "delivering": label = transfer ? (stop ? `In transit to ${stop}` : "Collected for transfer") : "On the way to customer"; break;
+    case "arrived": label = stop ? `Arrived at ${stop}` : "Arrived"; break;
+    case "delivered": label = transfer ? (stop ? `Arrived at ${stop}` : "Arrived") : "Delivered to customer"; break;
+    case "failed": label = transfer ? "Transfer failed" : "Failed Delivery"; break;
+  }
+  return {
+    ...status,
+    label,
+    tone: transfer && status.kind === "confirmed" ? "none" : status.tone,
+    // The stop is already in the progress label and route; it is not a blocker.
+    second: status.kind === "arrived" ? null : status.second,
+  };
+}

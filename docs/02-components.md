@@ -296,6 +296,16 @@ must touch the edges — a table, an empty state.
 
 ---
 
+## ScheduleCard
+
+Below 768px, embedded button and link targets have a 40px minimum height; product buttons
+also have a 40px minimum width. The dense desktop controls retain their kit dimensions.
+
+Shared calendar-card composition for Delivery and Warehouse (owner direction 2026-09-14).
+Header, body and footer have fixed positions. Uses existing card border/radius, body/label text and spacing tokens, without shadow. The event owner supplies recorded facts; this component computes no status, quantity or route. Product lines may use kit Button + Popover for accessible details; the footer holds one link to the owning work. No nested interactive elements inside a card-wide link.
+
+Product category icons retain the existing mattress / bedframe / sofa mapping. Pillow uses RectangleHorizontal and Mattress protector uses Layers2, via the shared Icon registry. Other/unverified categories use the generic goods icon and expose the recorded product name through the same detail control. No category may be inferred by the glyph component. Every product line remains separate, including repeated categories; no hidden +N more.
+
 ## EmptyState
 
 **Purpose.** What a region says when it holds nothing — an ANSWER, not an

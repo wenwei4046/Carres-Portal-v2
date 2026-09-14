@@ -26,5 +26,5 @@ export function ViewportExpansion({ children }: {
       window.removeEventListener("resize", measure);
     };
   }, []);
-  return <div ref={ref} className="w-full min-w-0" style={{ maxWidth: width }}>{children}</div>;
+  return <div ref={ref} className="sticky left-0 w-full min-w-0" style={{ maxWidth: width }}>{children}</div>;
 }

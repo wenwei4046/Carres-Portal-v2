@@ -75,11 +75,20 @@ interface Tables {
   promises?: Record<string, unknown>[];
   reserved?: Record<string, unknown>[];
   sold?: Record<string, unknown>[];
+  incoming?: Record<string, unknown>[];
+  sources?: Record<string, unknown>[];
+  truncatedOwners?: boolean;
 }
 
 /** Every table the list read touches, each answering with its own rows. */
 function mockTables(t: Tables) {
   const from = vi.fn((table: string) => {
+    if (table === "po_line_sources") {
+      return { select: vi.fn(() => ({ in: vi.fn((column: string, values: string[]) => {
+        const data = (t.sources ?? []).filter(row => values.includes(String(row[column])));
+        return Promise.resolve({ data, count: data.length + (column === "po_line_id" && t.truncatedOwners ? 1 : 0), error: null });
+      }) })) };
+    }
     if (table === "purchase_orders") {
       const or = vi.fn().mockResolvedValue({ data: t.pos ?? [], error: null });
       return { select: vi.fn(() => ({ or })) };
@@ -98,13 +107,19 @@ function mockTables(t: Tables) {
       /* ONE table, two reads — reserved by `reserved_ref`, sold by
          `sold_order_id`. The mock answers each by the status it was asked for,
          exactly as the register would. */
-      const eq = vi.fn((_col: string, value: string) => ({
-        in: vi.fn().mockResolvedValue({
-          data: (value === "reserved" ? t.reserved : t.sold) ?? [],
-          error: null,
-        }),
-      }));
-      return { select: vi.fn(() => ({ eq })) };
+      const query = () => {
+        let status = "";
+        const chain = {
+          eq: vi.fn((column: string, value: string) => { if (column === "status") status = value; return chain; }),
+          in: vi.fn((_column: string, values: string[]) => {
+            const data = status === "incoming" ? (t.incoming ?? []).filter(row => values.includes(String(row.po_line_id)))
+              : (status === "reserved" ? t.reserved : t.sold) ?? [];
+            return Promise.resolve({ data, count: data.length, error: null });
+          }),
+        };
+        return chain;
+      };
+      return { select: vi.fn(query) };
     }
     const chain: Record<string, unknown> = {};
     for (const k of ["in", "eq", "ilike", "or", "not", "is", "order"]) chain[k] = vi.fn(() => chain);
@@ -147,9 +162,41 @@ async function get() {
       so: number;
       po_arrivals: ArrivalWire[];
       allocated_units: { sku: string; status: string; qty: number }[];
+      incoming_units: { unitCode: string; orderLineId: string; qty: number }[];
     }[];
   };
 }
+
+describe("incoming line evidence", () => {
+  it.each([false, true])("returns incoming Units only when every source names the same line (shared=%s)", async shared => {
+    const from = mockTables({
+      orders: [{ ...ORDER, order_lines: [{ id: "line-a", sku: "MAT-1", qty: 1 }] }],
+      pos: [{ id: "PO-1", so: 4001, status: "open" }],
+      poLines: [{ po_id: "PO-1", sku: "MAT-1", qty: 1, received_qty: 0 }],
+      sources: [{ po_id: "PO-1", po_line_id: "pl-1", order_id: ORDER.id, order_line_id: "line-a" },
+        ...(shared ? [{ po_id: "PO-1", po_line_id: "pl-1", order_id: "another", order_line_id: "line-b" }] : [])],
+      incoming: [{ unit_code: "U1", po_line_id: "pl-1", qty: 1 }],
+    });
+    expect((await get()).orders[0]!.incoming_units).toEqual(shared ? [] : [{ unitCode: "U1", orderLineId: "line-a", qty: 1 }]);
+    expect(from.mock.calls.filter(call => call[0] === "po_line_sources")).toHaveLength(2);
+  });
+  it("does not use incoming rows from a cancelled PO", async () => {
+    mockTables({ pos: [{ id: "PO-1", so: 4001, status: "cancelled" }],
+      sources: [{ po_id: "PO-1", po_line_id: "pl-1", order_id: ORDER.id, order_line_id: "line-a" }],
+      incoming: [{ unit_code: "U1", po_line_id: "pl-1", qty: 1 }],
+    });
+    expect((await get()).orders[0]!.incoming_units).toEqual([]);
+  });
+  it("does not call a truncated source read exclusive", async () => {
+    mockTables({
+      orders: [{ ...ORDER, order_lines: [{ id: "line-a", sku: "MAT-1", qty: 1 }] }],
+      pos: [{ id: "PO-1", so: 4001, status: "open" }],
+      sources: [{ po_id: "PO-1", po_line_id: "pl-1", order_id: ORDER.id, order_line_id: "line-a" }],
+      incoming: [{ unit_code: "U1", po_line_id: "pl-1", qty: 1 }], truncatedOwners: true,
+    });
+    expect((await get()).orders[0]!.incoming_units).toEqual([]);
+  });
+});
 
 describe("po_arrivals — recorded purchase-order dates, never a derived word", () => {
   it("carries the status, OUR prediction and the immutable original", async () => {
@@ -265,14 +312,14 @@ describe("allocated_units — what the register physically holds", () => {
       ],
     });
     expect((await get()).orders[0]!.allocated_units).toEqual([
-      { sku: "MAT-1", status: "reserved", qty: 1 },
+      { sku: "MAT-1", status: "reserved", qty: 1, orderLineId: null },
     ]);
   });
 
   it("sold rows reach the order they were sold to, by its id", async () => {
     mockTables({ sold: [{ sku: "MAT-1", qty: 2, sold_order_id: ORDER.id }] });
     expect((await get()).orders[0]!.allocated_units).toEqual([
-      { sku: "MAT-1", status: "sold", qty: 2 },
+      { sku: "MAT-1", status: "sold", qty: 2, orderLineId: null },
     ]);
   });
 

@@ -18,10 +18,10 @@
  *     pick holds (no queue, state, partner or status); any pick answers with
  *     the work list.
  *  6. The rail filters combine, every count is what clicking it produces,
- *     STATE is flat direct names, LOGISTICS PARTNER lists only partners
+ *     STATE is flat direct names, LOGISTICS lists only partners
  *     genuinely carrying matching rows, DELIVERY STATUS is the three fixed
  *     rungs, and `No logistics picked` is a WORK TO DO queue — never
- *     duplicated under LOGISTICS PARTNER.
+ *     duplicated under LOGISTICS.
  *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
  *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
  */
@@ -49,8 +49,11 @@ import {
   monthStepStart,
   monthDayCounts,
   monthDaySentence,
+  scheduleCountsOf,
+  scheduleSplitSentence,
   missingProofLabels,
   monitorRowAction,
+  monitorScheduleStatusOf,
   monitorRowActionText,
   sortByRequestedDeliveryDate,
   needsProof,
@@ -78,6 +81,40 @@ import {
 
 /* The card's one consistent example: Friday, 4 September 2026. */
 const TODAY = "2026-09-04";
+
+describe("schedule progress and departure blockers", () => {
+  function subject(over: Partial<operationOrderListRow> = {}, arranged: Partial<DeliveryArrangementRow> = {}) {
+    return buildDeliveryMonitorCards({
+      orders: [order({ id: "status", so: 1400, paid: 100,
+        order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1, unit_price: 100 }],
+        allocated_units: [{ sku: "mattress:M1401F-K", qty: 1, status: "reserved" }], ...over })],
+      deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map(), todayIso: TODAY,
+      arrangements: new Map([["status#0", arrangement({ order_id: "status", partner_id: "nets", partner_name: "NETS",
+        confirmed_date: "2026-09-04", confirmed_time: "Morning", driver_name: "Driver", vehicle: "ABC123",
+        expected_arrival: "11:00", ...arranged })]]),
+    })[0]!;
+  }
+  it("preserves Confirmed while naming payment, stock and Logistics blockers in priority order", () => {
+    const unpaid = monitorScheduleStatusOf(subject({ paid: 0, allocated_units: [] }, { driver_name: null }));
+    expect(unpaid.progress.label).toBe("Confirmed");
+    expect(unpaid.supporting).toBe("Payment blocked");
+    expect(monitorScheduleStatusOf(subject({ allocated_units: [] }, { driver_name: null })).supporting).toBe("Stock risk");
+    expect(monitorScheduleStatusOf(subject({}, { driver_name: null })).supporting).toBe("Logistics details incomplete");
+    expect(monitorScheduleStatusOf(subject()).supporting).toBe("DO not released");
+  });
+  it("does not let missing Sales facts replace the confirmed journey", () => {
+    const card = subject({ building_type: null });
+    expect(card.statusKey).toBe("details_incomplete");
+    const status = monitorScheduleStatusOf(card);
+    expect(status.progress.label).toBe("Confirmed");
+    expect(status.supporting).toBe("Order details incomplete");
+  });
+  it("does not claim Paid or Ready from an unpriced order", () => {
+    const card = subject({ order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1 }] });
+    expect(monitorScheduleStatusOf(card).supporting).toBe("Order details incomplete");
+    expect(card.payment.line1).toBe("No price yet");
+  });
+});
 const WINDOW = [
   "2026-09-03",
   "2026-09-04",
@@ -604,7 +641,7 @@ describe("the two top-level views", () => {
     expect(DEFAULT_TOP_TAB).toBe("work");
     expect(DEFAULT_WORK_VIEW).toBe("all");
     expect(MONITOR_TOP_TAB_LABEL.work).toBe("Work to do");
-    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Confirmed deliveries");
+    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Delivery schedule");
   });
 
   it("a STATE pick narrows the calendar instead of replacing it", () => {
@@ -646,7 +683,8 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     booked: true,
     /* Nothing has been delivered in a fixture unless it says so: `settled`
        is the trip having already RUN, not the arrangement being complete. */
-    settled: false,
+    settled: ["arrived", "delivered", "failed"].includes(over.statusKey ?? ""),
+    eventType: "delivery",
     customerName: "Kong Chai Yin",
     locality: "Klang, Selangor",
     goodsSummary: "Mattress ×1",
@@ -859,20 +897,46 @@ describe("monthDayCounts", () => {
       datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
     ];
     const counts = monthDayCounts(set, TODAY);
-    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, exceptions: 1, noLogistics: 2 });
-    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, exceptions: 2, noLogistics: 1 });
+    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 });
+    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, transfers: 0, exceptions: 2, noLogistics: 1 });
     // A dateless row sits on no day.
     expect(counts.size).toBe(2);
   });
 
   it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, exceptions: 1, noLogistics: 2 })).toBe(
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 })).toBe(
       "Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked",
     );
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, exceptions: 0, noLogistics: 0 })).toBe(
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, transfers: 0, exceptions: 0, noLogistics: 0 })).toBe(
       "Fri, 4 Sep — 1 delivery",
     );
     expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep — No deliveries");
+  });
+});
+
+describe("the schedule separates customer deliveries from transfers", () => {
+  const journey = () => cards([order({ id: "journey", so: 1401, delivery_stops: [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Klang WH", to_loc: "Ipoh WH", scheduled_at: "2026-09-04T02:00:00Z", status: "delivered" },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "Ipoh WH", to_loc: "Penang WH", scheduled_at: "2026-09-04T04:00:00Z", status: "pending" },
+    { leg: 3, partner_id: "p-al", partner_name: "AL", from_loc: "Penang WH", to_loc: "Customer", scheduled_at: "2026-09-05T04:00:00Z", status: "pending" },
+  ] as never })]);
+
+  it("keeps an intermediate completion as an arrival even without a DO", () => {
+    const set = journey();
+    expect(set.map(card => card.eventType)).toEqual(["transfer", "transfer", "delivery"]);
+    expect(set[0]).toMatchObject({ statusKey: "arrived", statusSecond: "Ipoh WH", settled: true, contactOverdue: false });
+    expect(set[0]!.missingProof).toEqual({ photo: false, signedDo: false });
+  });
+
+  it("counts the selected range and filters instead of retaining an all-dates total", () => {
+    const set = journey();
+    const friday = filterMonitorCalendarCards(set, noFilters, ["2026-09-04"]);
+    expect(scheduleSplitSentence(scheduleCountsOf(friday))).toBe("0 customer deliveries · 2 transfers");
+    expect(monthDayCounts(friday, TODAY).get("2026-09-04")).toMatchObject({ deliveries: 0, transfers: 2 });
+    const alOnly = filterMonitorCalendarCards(set, { ...noFilters, logisticsPartnerId: "p-al" }, ["2026-09-04"]);
+    expect(scheduleCountsOf(alOnly)).toEqual({ deliveries: 0, transfers: 1 });
+    expect(scheduleCountsOf(filterMonitorCalendarCards(set, noFilters, ["2026-09-05"]))).toEqual({ deliveries: 1, transfers: 0 });
+    expect(monthDaySentence("Fri, 4 Sep", monthDayCounts(friday, TODAY).get("2026-09-04"))).toBe("Fri, 4 Sep — 2 transfers");
   });
 });
 
@@ -901,11 +965,12 @@ describe("the work list's own words — never `scope` (owner correction 2026-09-
     expect(selectedSentence(3)).toBe("3 selected");
   });
 
-  it("no visible word says scope or leg", () => {
+  it("work-list copy excludes scope and leg; only the approved expanded route names legs", () => {
     /* Two entries are sentence BUILDERS (`Call by {date}` · `Late — was due
        {date}`); they are checked on a real date so the rule covers the words
        they produce, not just the plain strings beside them. */
-    const words = Object.values(MONITOR_COPY).map((w) =>
+    expect(MONITOR_COPY.legOf(1, 2)).toBe("Leg 1 of 2");
+    const words = Object.entries(MONITOR_COPY).filter(([key]) => key !== "legOf").map(([, w]) =>
       typeof w === "function"
         ? (w as (...args: never[]) => string)("Tue, 15 Sep" as never, "NETS" as never)
         : w,
@@ -1031,7 +1096,7 @@ describe("buildMonitorRails", () => {
     expect(rails.regions.find((r) => r.key === "Sabah")!.count).toBe(0);
   });
 
-  it("LOGISTICS PARTNER lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
+  it("LOGISTICS lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     const labels = rails.logistics.map((r) => r.label);
     // NETS carries one; AL and HOUZS carry nothing and are not listed.
@@ -1112,7 +1177,7 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   it("the group headings are the owner's words", () => {
     expect(MONITOR_COPY.railWork).toBe("WORK TO DO");
     expect(MONITOR_COPY.railState).toBe("STATE");
-    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS PARTNER");
+    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS");
     expect(MONITOR_COPY.railStatus).toBe("DELIVERY STATUS");
   });
 });

@@ -65,7 +65,7 @@ import {
   HelpCircle,
   PanelLeftOpen,
 } from "lucide-react";
-import type { DeliveryWorkStatusTone, OrderActionTone } from "@carres/shared";
+import type { DeliveryWorkStatusTone } from "@carres/shared";
 import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
 import {
   ARRIVAL_COPY,
@@ -96,7 +96,10 @@ import ModuleHeader from "./components/ModuleHeader";
 import DeliveryBrief, { STATUS_TONE_TEXT } from "./components/DeliveryBrief";
 /* The kit's own glyph registry — a business meaning, never a Lucide name
    (`components/kit/Icon`). The contact deadline draws `call` and `late`. */
-import Icon from "@/components/kit/Icon";
+import Icon, { type IconName } from "@/components/kit/Icon";
+import ScheduleCard from "@/components/kit/ScheduleCard";
+import Popover from "@/components/kit/Popover";
+import Button from "@/components/kit/Button";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
 import { requestedDeliveryText } from "./sales-order-columns";
@@ -110,6 +113,8 @@ import {
   MONITOR_CALENDAR_VIEW_LABEL,
   MONITOR_COLUMN,
   MONITOR_COPY,
+  scheduleCountsOf,
+  scheduleSplitSentence,
   MONITOR_DAYS,
   MONITOR_STATUS_FILTERS,
   MONITOR_STATUS_LABEL,
@@ -130,7 +135,7 @@ import {
   missingProofLabels,
   monitorCardHref,
   monitorRowAction,
-  monitorRowActionText,
+  monitorScheduleStatusOf,
   monthDayCounts,
   monthDaysOf,
   monthStepStart,
@@ -166,19 +171,6 @@ const NARROW_VIEWPORT_PX = 1100;
    outranks the default, so a key that kept its name would have shown the old
    sheet to every operator who had ever opened this page. */
 const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v5";
-
-/**
- * The status word's TEXT COLOUR (owner ruling 2026-09-13): green for a settled
- * good fact, orange for a fact that needs an act, red for `Overdue` and
- * `Failed Delivery`, none while the goods move normally. The colour comes
- * from the one arithmetic; this map only names the kit tone for it.
- */
-const PILL_TONE: Record<DeliveryWorkStatusTone, OrderActionTone> = {
-  green: "success",
-  orange: "warning",
-  red: "danger",
-  none: "neutral",
-};
 
 /**
  * THE THREE FIXED WINDOWS (owner correction 2026-09-06). The calendar never
@@ -463,87 +455,75 @@ function RailPicker({
 }
 
 function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
+  const scheduleStatus = monitorScheduleStatusOf(card);
+  const stop = card.leg == null ? null : card.scope.o.delivery_stops?.find(s => s.leg === card.leg);
+  const physical = [...card.items, ...card.extras.filter(line => line.kind === "accessory")];
+  const services = card.extras.filter(line => line.kind === "service");
+  const so = `SO-${card.scope.so}`;
+  const iconOf = (category: string): IconName => {
+    switch (category.toLowerCase()) {
+      case "mattress": return "mattress";
+      case "bedframe": return "bedframe";
+      case "sofa": return "sofa";
+      case "pillow": return "pillow";
+      case "mattress protector": return "protector";
+      default: return "goods";
+    }
+  };
   return (
-    <Link
-      to={monitorCardHref(card)}
-      data-testid={`delivery-monitor-card-${card.scopeId}`}
-      className="block min-h-11 rounded-control border border-kit-slate-5 bg-white shadow-sm hover:border-kit-slate-6 hover:bg-hovertint"
+    <ScheduleCard label={`${card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType} ${so}`} testId={`delivery-monitor-card-${card.scopeId}`} variant={card.eventType === "transfer" ? "secondary" : "standard"}
+      header={<>
+        <div className="w-full text-label font-medium text-kit-slate-11">{card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType}</div>
+        <div className="min-w-0 break-words font-mono font-medium text-blue-700">
+          {card.doNumber ? <div>{card.doNumber}</div> : null}
+          <div>{so}</div>
+        </div>
+        {card.confirmedTime ? <span className="inline-flex items-center gap-1 text-label text-kit-slate-12">
+          <Icon name="waiting" size={14} />{card.confirmedTime}
+        </span> : <span className="text-label text-kit-slate-11">{MONITOR_COPY.noTimeAgreed}</span>}
+      </>}
+      footer={<Link to={monitorCardHref(card)} aria-label={card.doNumber ? `Open ${card.doNumber}` : `${MONITOR_COPY.editDelivery} ${so}`} className="inline-flex min-h-6 items-center gap-1 text-label text-blue-700 hover:underline">
+        {card.doNumber ? MONITOR_COPY.openDo : MONITOR_COPY.editDelivery}<Icon name="open" size={14} />
+      </Link>}
     >
-      <div className="flex flex-col gap-0.5 px-2 py-1.5 text-body">
-        {card.confirmedTime ? (
-          <div className="font-medium text-kit-slate-12">{card.confirmedTime}</div>
-        ) : (
-          /* ⭐ A DAY WITH NO WINDOW IS VISIBLY INCOMPLETE, AND THE DAY IS KEPT
-             (owner ruling 2026-09-12, correcting the 2026-09-11 card which
-             replaced the day with the absence). The agreed day is a real
-             recorded fact — losing it to say the time is missing trades one
-             error for another — so the card states BOTH: the day it has, then
-             the half it does not. */
-          <>
-            {card.confirmedDate ? (
-              <div className="font-medium text-kit-slate-12">{fmtDate(card.confirmedDate)}</div>
-            ) : null}
-            <div className="text-kit-slate-9" data-absence="true">
-              {MONITOR_COPY.noTimeAgreed}
+      {stop ? <div className="text-label text-kit-slate-11">
+        <div className="break-words">From {stop.from_loc || "Not recorded"}</div>
+        <div className="break-words">To {stop.to_loc || "Not recorded"}</div>
+      </div> : card.locality ? <div className="break-words text-label text-kit-slate-11">{card.locality}</div> : null}
+      <div className="flex flex-col gap-1">
+        {physical.map(line => <div key={line.key} data-testid="schedule-product-line" className="flex items-center justify-between gap-1">
+          <Popover label={line.name} trigger={
+            <Button variant="ghost" size="sm" icon={iconOf(line.category)} aria-label={`${line.name}, ${MONITOR_COPY.qty} ${line.qty}`} title={line.name}>
+              ×{line.qty}
+            </Button>
+          }>
+            <div className="max-w-xs text-body">
+              <div className="break-words font-medium">{line.name}</div>
+              <div>{line.category}</div>
+              <div>{MONITOR_COPY.qty} {line.qty}</div>
+              <div>{line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}</div>
+              <div className="text-label text-kit-slate-11">{MONITOR_COPY.receiptMeaning}</div>
             </div>
-          </>
-        )}
-        {card.doNumber ? (
-          <div className="font-mono font-medium text-blue-700">{card.doNumber}</div>
-        ) : (
-          /* The absence is a stage, not a missing click — the governed gate
-             issues the document; this card only explains today's door. */
-          <div className="text-kit-slate-9">{MONITOR_COPY.noDeliveryOrder}</div>
-        )}
-        <div className="truncate font-medium" title={card.customerName}>
-          {card.customerName}
-        </div>
-        {card.locality ? (
-          <div className="truncate text-kit-slate-11" title={card.locality}>
-            {card.locality}
-          </div>
-        ) : null}
-        <div className="truncate text-kit-slate-11" title={card.goodsSummary}>
-          {card.goodsSummary}
-        </div>
-        {card.logisticsPartnerName ? (
-          <div className="text-kit-slate-12">{card.logisticsPartnerName}</div>
-        ) : null}
-      </div>
-      <div className="border-t border-kit-slate-4 px-2 py-1">
-        {/* ⭐ A HALF-ANSWERED BOOKING DOES NOT WEAR A CONFIRMED PILL (owner
-            ruling 2026-09-12). The ladder reaches `Delivery confirmed` on a
-            recorded day alone, so a card missing its window used to claim the
-            appointment was settled. While the window is open the footer
-            carries the ACT instead — about the TIME, never asking again for a
-            date the customer has already given. */}
-        {card.booked || card.settled ? (
-          <StatusPill tone={PILL_TONE[card.statusTone]}>{card.statusLabel}</StatusPill>
-        ) : (
-          <span
-            className="block text-label text-kit-slate-12"
-            data-testid={"delivery-monitor-card-act-" + card.scopeId}
-          >
-            {(() => {
-              const action = monitorRowAction(card);
-              /* Two structured lines, never joined with `—` (owner ruling
-                 2026-09-13): the act with its recipient, then the result. */
-              return action.kind === "confirm_date" ? (
-                <>
-                  <span className="block truncate">{action.call}</span>
-                  <span className="block truncate text-kit-slate-11">{action.result}</span>
-                </>
-              ) : (
-                <span className="block truncate">{monitorRowActionText(card)}</span>
-              );
-            })()}
+          </Popover>
+          <span title={line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}>
+            {line.receivedQty == null ? <StatusPill tone="neutral"><Icon name="help" size={14} title={MONITOR_COPY.receiptUnknown} /></StatusPill>
+              : line.receivedQty === 0 ? <StatusPill tone="neutral" icon="waiting"><span className="sr-only">{MONITOR_COPY.receivedQty} 0/{line.qty}</span></StatusPill>
+              : line.receivedQty >= line.qty ? <StatusPill tone="success" icon="ready"><span className="sr-only">{MONITOR_COPY.receivedQty} {line.receivedQty}/{line.qty}</span></StatusPill>
+              : <StatusPill tone="warning" icon="waiting">{line.receivedQty}/{line.qty}</StatusPill>}
           </span>
-        )}
+        </div>)}
       </div>
-    </Link>
+      {services.map(line => <div key={line.key} className="break-words text-label text-kit-slate-11">{line.name} ×{line.qty}</div>)}
+      {card.logisticsPartnerId && card.logisticsPartnerName ? <div className="inline-flex items-center gap-1 text-label text-kit-slate-12" aria-label={`${MONITOR_COPY.partner}: ${card.logisticsPartnerName}`}>
+        <Icon name="delivery" size={14} />{card.logisticsPartnerName}
+      </div> : null}
+      <div className="min-w-0 break-words text-label" data-testid="schedule-status">
+        <div className={STATUS_TONE_TEXT[scheduleStatus.progress.tone]}>{scheduleStatus.progress.label}</div>
+        {scheduleStatus.supporting ? <div className={STATUS_TONE_TEXT[scheduleStatus.tone]}>{scheduleStatus.supporting}</div> : null}
+      </div>
+    </ScheduleCard>
   );
 }
-
 /**
  * ⭐ THE PHONE'S WORK LIST — a readable list, never the desktop sheet squeezed.
  *
@@ -1129,10 +1109,11 @@ export default function OperationDelivery() {
   );
   /* The dot days for the rail's month calendar — every date genuinely
      holding a confirmed delivery, whatever month it sits in. */
-  const workDayIsos = useMemo(
-    () => [...new Set(cards.map((c) => c.confirmedDate).filter((d): d is string => d !== null))],
-    [cards],
+  const railCalendarCards = useMemo(
+    () => filterMonitorCalendarCards(cards, filters, cards.flatMap(card => card.confirmedDate ? [card.confirmedDate] : [])),
+    [cards, filters],
   );
+  const railCountsByDay = useMemo(() => monthDayCounts(railCalendarCards, today), [railCalendarCards, today]);
   const rails = useMemo(
     () => buildMonitorRails(cards, filters, partners),
     [cards, filters, partners],
@@ -1141,21 +1122,7 @@ export default function OperationDelivery() {
     () => filterMonitorCalendarCards(cards, filters, visibleDays),
     [cards, filters, visibleDays],
   );
-  /* Every AGREED appointment the current narrowings leave — the Confirmed
-     deliveries tab's own badge. It is deliberately not window-scoped: a tab
-     count that emptied when the operator paged to a quiet week would say the
-     work had gone away. */
-  const confirmedCount = useMemo(
-    () =>
-      cards.filter(
-        (c) =>
-          c.confirmedDate !== null &&
-          (region === null || c.region === region) &&
-          (logistics === null || c.logisticsPartnerId === logistics) &&
-          (status === null || c.statusKey === status),
-      ).length,
-    [cards, region, logistics, status],
-  );
+  const scheduleCounts = useMemo(() => scheduleCountsOf(calendarCards), [calendarCards]);
   /* The PHONE work list's own search box. It is deliberately LOCAL, not the
      URL's `?q=`: a carried-over URL search must never narrow a work list
      invisibly (the desktop sheet applies the same rule with the grid's own
@@ -1515,7 +1482,7 @@ export default function OperationDelivery() {
                 {r.doNumber}
               </button>
             ) : (
-              <Absent>{MONITOR_COPY.noDeliveryOrder}</Absent>
+              <span title={MONITOR_COPY.noDeliveryOrder} aria-label={MONITOR_COPY.noDeliveryOrder}><Absent>{MONITOR_COPY.noDeliveryOrderShort}</Absent></span>
             )}
             {r.scope.doIssuedAt ? (
               <span className="block truncate text-label text-kit-slate-11">
@@ -1699,7 +1666,7 @@ export default function OperationDelivery() {
       <Segmented<MonitorCalendarView>
         options={MONITOR_CALENDAR_VIEWS.map((v) => ({
           value: v,
-          label: MONITOR_CALENDAR_VIEW_LABEL[v],
+          label: v === "week" && viewport === "tablet" ? MONITOR_COPY.threeDays : MONITOR_CALENDAR_VIEW_LABEL[v],
         }))}
         value={calendarView}
         onChange={pickCalendarView}
@@ -1718,14 +1685,10 @@ export default function OperationDelivery() {
     >
       {MONITOR_TOP_TABS.map((tab) => {
         const active = topTab === tab;
-        /* ⭐ A TAB'S COUNT IS THE VIEW'S WHOLE POPULATION, not the pick inside
-           it. `Work to do` counts every open delivery and `Confirmed
-           deliveries` counts every agreed appointment — both narrowed by the
-           STATE / LOGISTICS PARTNER / DELIVERY STATUS picks that apply to
-           BOTH views, and by neither the queue nor the visible week. A badge
-           that changed with the queue would say what the footer already says
-           and stop answering *how much is there?* from the other tab. */
-        const count = tab === "work" ? rails.work.all : confirmedCount;
+        /* Work counts the open population. Schedule counts its visible date
+           window under the active filters; the adjacent split identifies
+           customer deliveries and transfers within that same population. */
+        const count = tab === "work" ? rails.work.all : calendarCards.length;
         return (
           <button
             key={tab}
@@ -1866,7 +1829,8 @@ export default function OperationDelivery() {
         <MonitorMonthCalendar
           selectedIso={selectedDate}
           onSelect={pickCalendarDate}
-          workDayIsos={workDayIsos}
+          countsByDay={railCountsByDay}
+          todayIso={today}
           testId="delivery-monitor-month-calendar"
         />
       }
@@ -2127,6 +2091,7 @@ export default function OperationDelivery() {
                 className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-label text-kit-slate-9"
                 data-testid="delivery-monitor-calendar-scope"
               >
+                <div className="text-kit-slate-11" data-testid="delivery-monitor-schedule-split">{scheduleSplitSentence(scheduleCounts)}</div>
                 {MONITOR_COPY.calendarScope}
               </div>
 
@@ -2277,6 +2242,7 @@ export default function OperationDelivery() {
                   rowHeight={72}
                   expandTitle={DW.showItems}
                   expandable={{
+                    fitExpansionToViewport: true,
                     renderExpansion: (r) => <DeliveryBrief card={r} onOpenOrder={openOrder} />,
                     /* A retired Edit Delivery link, or a calendar card without
                        a document, lands here with `?open=` naming the row —

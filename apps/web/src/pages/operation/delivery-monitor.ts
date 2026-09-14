@@ -48,7 +48,9 @@ import {
   deliveryStockReadinessOf,
   deliveryWorkStatusLabelOf,
   goodsCategoryWordOf,
+  receivedForBoundLine,
   lineKind,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
   lineShortagesOf,
   myHolidaySet,
   orderActionLines,
@@ -93,10 +95,10 @@ export const MONITOR_COPY = {
   /** The three dropdowns own clear-this-one-condition word (2026-09-12).
    *  `All` alone would read as all of everything; each says WHAT it clears. */
   allStates: "All states",
-  allPartners: "All partners",
+  allPartners: "All",
   allStatuses: "All",
   railState: "STATE",
-  railLogistics: "LOGISTICS PARTNER",
+  railLogistics: "LOGISTICS",
   railStatus: "DELIVERY STATUS",
   allDeliveryWork: "All delivery work",
   noLogistics: "No logistics picked",
@@ -132,6 +134,16 @@ export const MONITOR_COPY = {
    *  section. Joins the rail now that the proof-review record exists. */
   checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
+  noDeliveryOrderShort: "DO",
+  paymentBlocked: "Payment blocked",
+  stockRisk: "Stock risk",
+  logisticsIncomplete: "Logistics details incomplete",
+  doNotReleased: "DO not released",
+  noPrice: "No price yet",
+  openDo: "Open DO",
+  receivedQty: "Received Qty",
+  receiptUnknown: "Receipt not verified",
+  receiptMeaning: "Receipt for this product line. Delivery and current location are separate.",
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
   /* ── THE TWELVE-COLUMN REGISTER (owner ruling 2026-09-12, MASTER §8.3) ── */
@@ -156,6 +168,10 @@ export const MONITOR_COPY = {
   customer: "Customer",
   phone: "Phone",
   emergencyContact: "Emergency contact",
+  emergencyPhone: "Emergency phone",
+  emergencyRelationship: "Emergency relationship",
+  accessNotRecorded: "Access not recorded",
+  legOf: (n: number, total: number) => `Leg ${n} of ${total}`,
   address: "Address",
   buildingType: "Building type",
   lift: "Lift",
@@ -163,7 +179,7 @@ export const MONITOR_COPY = {
   customerRequested: "Customer requested",
   confirmedDate: "Confirmed delivery date",
   confirmedTime: "Confirmed delivery time",
-  partner: "Logistics Partner",
+  partner: "Logistics",
   driver: "Driver",
   driverPhone: "Driver phone",
   vehiclePlate: "Vehicle plate",
@@ -239,7 +255,8 @@ export const MONITOR_COPY = {
   openNoConfirmedDate: "Open Call customer",
   calendarViews: "Calendar view",
   day: "Day",
-  week: "Week",
+  week: "Work week",
+  threeDays: "3 days",
   month: "Month",
   /** The Month view's compact cell lines — the rail row grammar (label, then
    *  the count) so the operator reads what the rail already taught. */
@@ -253,7 +270,10 @@ export const MONITOR_COPY = {
   /** The landing: what an operator must DO today. */
   tabWork: "Work to do",
   /** The calendar: only deliveries a customer has actually agreed a day for. */
-  tabCalendar: "Confirmed deliveries",
+  tabCalendar: "Delivery schedule",
+  deliveryType: "DELIVERY",
+  transferType: "TRANSFER",
+  cellTransfers: "Transfers",
   tabs: "Monitor views",
   /** The calendar's own boundary, stated ON the calendar rather than learned
    *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
@@ -261,7 +281,7 @@ export const MONITOR_COPY = {
    *  because the operator must see the day — and its card says `No time
    *  agreed` rather than passing as a finished booking (owner ruling
    *  2026-09-11). */
-  calendarScope: "Only deliveries with a confirmed date appear here.",
+  calendarScope: "Confirmed dates only",
   /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
   /** The strip's own caption — these dates are CONTACT deadlines, and a reader
    *  who mistakes them for delivery appointments will call on the wrong day. */
@@ -314,7 +334,7 @@ export const MONITOR_COLUMN = {
   customer: "Customer",
   state: "State",
   requestedDelivery: "Requested Delivery Date",
-  logisticsPartner: "Logistics Partner",
+  logisticsPartner: "Logistics",
   /** The register's own heading for the partner column (§8.3 column 9). */
   logistics: "Logistics",
   confirmedDelivery: "Confirmed Delivery",
@@ -564,6 +584,7 @@ export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] =
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
+  eventType: "delivery" | "transfer";
   /** Stable identity — the row's own key (order id, or `id#legN`). */
   scopeId: string;
   orderId: string;
@@ -678,6 +699,7 @@ export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
   if (financeHolds) {
     return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
   }
+  if (!money.known) return { line1: MONITOR_COPY.noPrice, line2: null, tone: "none" };
   if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
   const approvals = (o.order_delivery_payment_approvals ?? []).map((a) => ({
     status: a.status as "pending" | "approved" | "refused",
@@ -746,6 +768,7 @@ export interface MonitorGoodsLine {
   qty: number;
   /** Pieces the register does not hold for this line — 0 when it is all in. */
   shortQty: number;
+  receivedQty?: number | null;
 }
 
 /** One accessory or service line. A service moves no Unit and can be short of
@@ -855,6 +878,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     const items: MonitorGoodsLine[] = [];
     const extras: MonitorExtraLine[] = [];
     lines.forEach((line, index) => {
+      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(line.sku.trim().toUpperCase())) return;
       const kind = lineKind(line.sku);
       const entry: MonitorGoodsLine = {
         key: line.id ?? `${line.sku}-${index}`,
@@ -864,6 +888,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         category: goodsCategoryWordOf(line),
         qty: line.qty,
         shortQty: shortByLineIndex.get(index) ?? 0,
+        receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units, row.o.incoming_units),
       };
       /* `unknown` is a physical thing nobody recognised — it travels on the
          truck, so it belongs with the MAIN goods, never buried under the
@@ -874,6 +899,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     });
     for (const [index, addon] of (row.o.order_addons ?? []).entries()) {
       const key = addon.addon_key ?? "";
+      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(key.toUpperCase())) continue;
       extras.push({
         key: `addon-${index}-${key}`,
         lineId: null,
@@ -885,6 +911,11 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         kind: "service",
       });
     }
+    if ((row.o.delivery_stair_items ?? 0) > 0) extras.push({
+      key: "stair-carry", lineId: null, sku: "STAIR_CARRY", category: "Service", kind: "service",
+      name: MONITOR_COPY.stairCarry(row.o.delivery_stair_items!, row.o.delivery_floor ?? null),
+      qty: row.o.delivery_stair_items!, shortQty: 0,
+    });
     const contactDueIso = row.contactDueIso;
     /* The arrangement is COMPLETE only with a day AND a window on it. */
     const booked = row.confirmedIso !== null && row.confirmedTime !== null;
@@ -898,7 +929,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        delivered trip sitting in `Call customer` because nobody recorded a
        time window sends an operator to phone a customer whose furniture is
        already in the house. */
-    const settled = row.status.kind === "delivered" || row.status.kind === "failed";
+    const settled = row.status.kind === "delivered" || row.status.kind === "arrived" || row.status.kind === "failed";
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -909,6 +940,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       confirmedTime: row.confirmedTime,
       booked,
       settled,
+      eventType: row.intermediateLeg ? "transfer" : "delivery",
       customerName: row.customer,
       locality: row.location || null,
       goodsSummary: row.goods,
@@ -1346,7 +1378,7 @@ export function isOverdueDelivery(card: DeliveryMonitorCard, todayIso: string): 
   return (
     card.confirmedDate !== null &&
     card.confirmedDate < todayIso &&
-    card.statusKey !== "delivered"
+    !card.settled
   );
 }
 
@@ -1468,6 +1500,7 @@ export function groupCardsByDay(
 
 export interface MonthDayCounts {
   deliveries: number;
+  transfers: number;
   exceptions: number;
   noLogistics: number;
 }
@@ -1484,8 +1517,9 @@ export function monthDayCounts(
   const out = new Map<string, MonthDayCounts>();
   for (const c of cards) {
     if (!c.confirmedDate) continue;
-    const cell = out.get(c.confirmedDate) ?? { deliveries: 0, exceptions: 0, noLogistics: 0 };
-    cell.deliveries += 1;
+    const cell = out.get(c.confirmedDate) ?? { deliveries: 0, transfers: 0, exceptions: 0, noLogistics: 0 };
+    if (c.eventType === "transfer") cell.transfers += 1;
+    else cell.deliveries += 1;
     if (isExceptionCard(c, todayIso)) cell.exceptions += 1;
     if (c.logisticsPartnerId === null) cell.noLogistics += 1;
     out.set(c.confirmedDate, cell);
@@ -1495,15 +1529,52 @@ export function monthDayCounts(
 
 /** The month cell's aria sentence — the same three facts, in words. */
 export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | undefined): string {
-  if (!counts || counts.deliveries === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
-  const parts = [
-    `${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`,
-  ];
+  if (!counts || counts.deliveries + counts.transfers === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
+  const parts = [];
+  if (counts.deliveries > 0) parts.push(`${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`);
+  if (counts.transfers > 0) parts.push(`${counts.transfers} ${counts.transfers === 1 ? "transfer" : "transfers"}`);
   if (counts.exceptions > 0) {
     parts.push(`${counts.exceptions} ${counts.exceptions === 1 ? "exception" : "exceptions"}`);
   }
   if (counts.noLogistics > 0) parts.push(`${counts.noLogistics} ${MONITOR_COPY.noLogistics}`);
   return `${dateLabel} — ${parts.join(" · ")}`;
+}
+
+/** Presentation of the existing stock/payment facts, not a permission to
+ * issue or dispatch. Once goods moved, show the recorded ETA/result/proof
+ * instead of diagnosing a pre-departure shortage against consumed stock. */
+export function monitorScheduleStatusOf(card: DeliveryMonitorCard): {
+  progress: DeliveryScopeRow["progress"];
+  supporting: string | null;
+  tone: DeliveryWorkStatusTone;
+} {
+  const progress = card.scope.progress;
+  if (["collected", "delivering", "arrived", "delivered", "failed"].includes(progress.kind)) {
+    return { progress, supporting: progress.second, tone: progress.secondTone ?? "none" };
+  }
+  if (card.payment.tone === "red") return { progress, supporting: MONITOR_COPY.paymentBlocked, tone: "orange" as const };
+  if (!moneyOfOrder(card.scope.o).known) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
+  if (!card.readiness.ready) return { progress, supporting: MONITOR_COPY.stockRisk, tone: "orange" as const };
+  const arrangement = card.scope.arrangement;
+  if (!card.logisticsPartnerId || !card.confirmedTime || !arrangement?.driver_name?.trim() || !arrangement.vehicle?.trim() || !arrangement.expected_arrival?.trim()) {
+    return { progress, supporting: MONITOR_COPY.logisticsIncomplete, tone: "orange" as const };
+  }
+  if (card.scope.missingFacts.length) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
+  if (!card.deliveryOrderId) return { progress, supporting: MONITOR_COPY.doNotReleased, tone: "orange" as const };
+  return { progress, supporting: "Ready", tone: "green" as const };
+}
+
+/** The selected schedule scope, not the all-dates work population. */
+export function scheduleCountsOf(cards: readonly DeliveryMonitorCard[]): { deliveries: number; transfers: number } {
+  return cards.reduce((count, card) => {
+    if (card.eventType === "transfer") count.transfers += 1;
+    else count.deliveries += 1;
+    return count;
+  }, { deliveries: 0, transfers: 0 });
+}
+
+export function scheduleSplitSentence(count: { deliveries: number; transfers: number }): string {
+  return `${count.deliveries} customer ${count.deliveries === 1 ? "delivery" : "deliveries"} · ${count.transfers} ${count.transfers === 1 ? "transfer" : "transfers"}`;
 }
 
 /* ── The calendar's empty range — ONE spanning sentence, never six copies ── */

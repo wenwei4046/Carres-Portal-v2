@@ -128,6 +128,48 @@ describe("GET /api/operation/orders", () => {
     expect(or).toHaveBeenCalledWith(expect.not.stringContaining("so.eq."));
   });
 
+  it("carries exact product-line bindings through both reserved and sold stock reads", async () => {
+    const stockSelects: string[] = [];
+    const from = vi.fn((table: string) => {
+      let status: unknown;
+      const chain: Record<string, unknown> = {};
+      for (const method of ["in", "ilike", "or", "not", "is", "order", "limit", "range"])
+        chain[method] = vi.fn(() => chain);
+      chain.select = vi.fn((columns: string) => {
+        if (table === "ops_stock_items") stockSelects.push(columns);
+        return chain;
+      });
+      chain.eq = vi.fn((column: string, value: unknown) => {
+        if (column === "status") status = value;
+        return chain;
+      });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ error: null, data:
+        table === "orders" ? [ORDER_ROW] : table === "ops_stock_items" ?
+          status === "reserved" ? [
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: "line-a" },
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: null },
+          ] : status === "sold" ? [
+            { sku: "same", qty: 2, sold_order_id: ORDER_ROW.id, reserved_order_line_id: "line-b" },
+          ] : [] : [],
+      });
+      return chain;
+    });
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { orders: { allocated_units: unknown[] }[] };
+    expect(body.orders[0]?.allocated_units).toEqual([
+      { sku: "same", qty: 1, status: "reserved", orderLineId: "line-a" },
+      { sku: "same", qty: 1, status: "reserved", orderLineId: null },
+      { sku: "same", qty: 2, status: "sold", orderLineId: "line-b" },
+    ]);
+    expect(stockSelects).toHaveLength(2);
+    expect(stockSelects.every(columns => columns.split(", ").includes("reserved_order_line_id"))).toBe(true);
+  });
+
   // ── D1 · the list carries the SKUs a real purchase order covers ───────────
   //
   // Before D1 the only PO evidence on the wire was `order_lines.source_po`, a
@@ -2734,7 +2776,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(body.lines.every((line) => line.deliverTo.length === 0)).toBe(true);
   });
 
-  it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
+  it.each([[false, false], [true, false], [false, true]])("reads incoming IDs only from complete exclusive sources (shared=%s, truncated=%s)", async (shared, truncated) => {
     const orderId = "00000000-0000-0000-0000-000000000a01";
     const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
     const secondSource = { ...source, po_line_id: "pol-2" };
@@ -2756,7 +2798,9 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         const chain: Record<string, unknown> = {};
         for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
         chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
-        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null,
+          count: Array.isArray(data) ? data.length + (table === "po_line_sources" && columns.includes("order_id") && truncated ? 1 : 0) : null,
+        });
         return chain;
       }),
     }));
@@ -2772,8 +2816,8 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       unitCoverage: Record<string, string>;
       unitLines: Record<string, string | null>;
     };
-    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070", "U1-000-071"]);
-    expect(body.unitCoverage).toEqual(shared ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
+    expect(body.lines[0].unitIds).toEqual(shared || truncated ? [] : ["U1-000-070", "U1-000-071"]);
+    expect(body.unitCoverage).toEqual(shared || truncated ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
     expect(body.lines[1].unitIds).toEqual([]);
     /**
      * ⭐ THE INVARIANT A READER IS ALLOWED TO STAND ON (owner correction
@@ -2787,7 +2831,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
      * Without this, a gap in the data proved a fact about the goods.
      */
     expect(body.unitLines).toEqual(
-      shared ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
+      shared || truncated ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
     );
     // Incoming goods are not reported as physical allocated stock for Delivery.
     expect(body.place).toEqual([]);

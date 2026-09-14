@@ -78,10 +78,63 @@ export interface PoArrival {
 
 /** One physically allocated register row, as the list read carries it. */
 export interface AllocatedUnit {
+  /** Exact stock-to-order-line binding. Absent in older list responses. */
+  orderLineId?: string | null;
   sku: string;
   status: "reserved" | "sold";
   /** A bulk register row counts its own `qty` (0218); a unit row counts 1. */
   qty: number;
+}
+
+export interface IncomingLineUnit {
+  unitCode: string;
+  orderLineId: string;
+  qty: number;
+}
+
+/** A shared PO line cannot identify one SO's physical pieces. Every source
+ * must name the same order and item line before incoming Units can be bound. */
+export function exclusivePoSourceBindings(sources: readonly {
+  po_line_id: string | null;
+  order_id: string | null;
+  order_line_id: string | null;
+}[]): Map<string, { orderId: string; lineId: string }> {
+  const grouped = new Map<string, typeof sources[number][]>();
+  for (const source of sources) {
+    if (source.po_line_id) grouped.set(source.po_line_id, [...(grouped.get(source.po_line_id) ?? []), source]);
+  }
+  const result = new Map<string, { orderId: string; lineId: string }>();
+  for (const [poLineId, owners] of grouped) {
+    const first = owners[0]!;
+    if (first.order_id && first.order_line_id && owners.every(o => o.order_id === first.order_id && o.order_line_id === first.order_line_id)) {
+      result.set(poLineId, { orderId: first.order_id, lineId: first.order_line_id });
+    }
+  }
+  return result;
+}
+
+/** A reserved/sold stock record proves receipt only for its explicitly bound line.
+ * SKU pooling remains useful for shortages, but cannot prove which repeated line arrived.
+ * Missing binding is unknown, not zero received. This is not current-site custody or release.
+ */
+export function receivedForBoundLine(
+  lineId: string | null | undefined,
+  requiredQty: number,
+  units: readonly AllocatedUnit[] | undefined,
+  incoming: readonly IncomingLineUnit[] = [],
+): number | null {
+  if (!lineId || !units || !Number.isFinite(requiredQty) || requiredQty <= 0) return null;
+  const bound = units.filter(unit => unit.orderLineId === lineId);
+  const pending = incoming.filter(unit => unit.orderLineId === lineId);
+  if (pending.some(unit => !unit.unitCode || !Number.isFinite(unit.qty) || unit.qty <= 0)) return null;
+  if (new Set(pending.map(unit => unit.unitCode)).size !== pending.length) return null;
+  const pendingQty = pending.reduce((total, unit) => total + unit.qty, 0);
+  // Zero is proved only when the entire line has explicitly incoming pieces.
+  if (!bound.length) return pendingQty === requiredQty ? 0 : null;
+  if (bound.some(unit => !Number.isFinite(unit.qty) || unit.qty <= 0)) return null;
+  const qty = bound.reduce((total, unit) => total + unit.qty, 0);
+  // Excess bindings are not a reassuring full receipt.
+  return qty + pendingQty > requiredQty ? null : qty;
 }
 
 /** One committed goods line of the sales order. */

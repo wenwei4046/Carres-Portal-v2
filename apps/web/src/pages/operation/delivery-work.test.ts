@@ -127,8 +127,18 @@ describe("delivery scopes and journey legs", () => {
     expect(rows.map((r) => r.logisticsName)).toEqual(["TEOW", "SSY"]);
     expect(rows.map((r) => r.confirmedIso)).toEqual(["2026-08-25", "2026-08-27"]);
     expect(rows[0]!.legRoute).toBe("Klang WH → JB transit");
+    expect(rows.map((r) => r.location)).toEqual(["JB transit", "Singapore customer"]);
     // Two rows of one order must never read as a duplicate.
     expect(rows[0]!.key).not.toBe(rows[1]!.key);
+  });
+
+  it("does not substitute the customer address for an unnamed transfer destination", () => {
+    const rows = build([order({ id: "missing-stop", so: 1303, delivery_stops: [
+      { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "", status: "pending" },
+      { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "", to_loc: "Customer", status: "pending" },
+    ] })]);
+    expect(rows[0]!.location).toBe("");
+    expect(rows[1]!.location).toBe("Customer");
   });
 
   it("0491 — a leg with its OWN document takes the document's number, id and the shared ladder", () => {

@@ -14,7 +14,7 @@ Delivery turns Sales Order goods that may be delivered into a controlled Deliver
 Warehouse-to-Logistics handover, a factual delivery history, accepted proof and either completion
 or an explicit next action.
 
-Delivery owns Logistics Partner identity, rules and assignment; the delivery arrangement
+Delivery owns Logistics identity, rules and assignment; the delivery arrangement
 (confirmed operational date and time, ETA, driver and vehicle, condo registration, the partner's
 actual reply proof); the customer contact record for a delivery; the Delivery Order document and
 its lifecycle; each actual delivery event and item result; delivery proof and its review; delivery
@@ -46,7 +46,7 @@ facts`:
 Receiving  proves what physically arrived
 Stock      owns where each Unit is and who has it now
 Delivery   owns which exact Units must reach the customer
-Outbound   proves which exact Units were handed to the Logistics Partner
+Outbound   proves which exact Units were handed to the Logistics
 ```
 
 The event is recorded once by its owner and read by every connected surface. A module may display
@@ -79,7 +79,7 @@ customer/item match.
 
 ## 2 · Current Carres operating model
 
-- **NETS Logistics is Klang Valley's current default and main Logistics Partner.** Default
+- **NETS Logistics is Klang Valley's current default and main Logistics.** Default
   coverage is configurable and audited, never hard-coded; other partners remain selectable, and
   partner coverage informs the operator but never hides or disables a partner.
 - Assigning a Klang Valley delivery pre-selects NETS. NETS is responsible immediately and does not
@@ -92,7 +92,7 @@ customer/item match.
 - AL, TT, TEOW, EU, SSY, HOUZS and other partners without Portal access are assigned manually. The
   Portal prepares WhatsApp, email or copy-message content; Operation uploads the partner's actual
   reply before recording a confirmation. Prepared, copied, opened or sent never means confirmed.
-- One active Delivery Order has one active Logistics Partner. A permitted split uses separate
+- One active Delivery Order has one active Logistics. A permitted split uses separate
   Delivery Orders and may use different partners. A Journey leg is its own assignment.
 - NETS Warehouse and NETS Logistics are separate roles and permissions even inside one company.
 
@@ -100,7 +100,7 @@ Current flow:
 
 ```
 goods may be arranged
-→ Operation assigns the Logistics Partner (Klang Valley pre-selects NETS)
+→ Operation assigns the Logistics (Klang Valley pre-selects NETS)
 → the partner, or Operation on its behalf, contacts the customer
 → the confirmed day and time window are recorded on the Monitor row
 → the SYSTEM issues the Delivery Order when the governed gate is met
@@ -113,11 +113,11 @@ goods may be arranged
 ## 3 · Delivery Order and goods scope
 
 A Delivery Order is Carres' formal authority for a Warehouse to hand specified goods to a named
-Logistics Partner for delivery to a customer. It is not proof of Warehouse handover and is never
+Logistics for delivery to a customer. It is not proof of Warehouse handover and is never
 proof of delivery.
 
 Each DO stores a stable number, source Sales Order, customer, contact and address, Warehouse,
-Logistics Partner, customer-contact owner, planned and confirmed date, time window, ETA, goods
+Logistics, customer-contact owner, planned and confirmed date, time window, ETA, goods
 and quantities, site and handling requirements, release restrictions, Warehouse status, latest
 result, proof, problems and history.
 
@@ -395,7 +395,7 @@ The record also states whether goods remain with Logistics, returned to Warehous
 customer or are unknown. The next action is concrete, in the two-line Work grammar of §10:
 `Confirm New Delivery Date` · `Confirm Delivery Address` · `Confirm Customer Availability` ·
 `Obtain Correct Contact Details` · `Confirm Site Access` · `Return Goods to Warehouse` · `Inspect
-Returned Goods` · `Arrange Replacement Goods` · `Assign Another Logistics Partner` · `Keep NETS and
+Returned Goods` · `Arrange Replacement Goods` · `Assign Another Logistics` · `Keep NETS and
 Change Date` · `Correct Delivery Information` · `Obtain Missing Delivery Proof` · `Confirm Delivery
 Cancellation` · `Management Review`.
 
@@ -482,7 +482,7 @@ preserved.** A range holding no customer delivery and two transfers reads exactl
 `0 customer deliveries · 2 transfers` — never `2 customer deliveries` because four rows somewhere
 else carry a confirmed date. **A transfer is never counted as a customer delivery, never enters
 customer-delivery performance, and never produces a `Delivered to customer` result** — in the tab
-count, the day and month counts, the rail marks, Logistics Partner Performance, Commitment, First
+count, the day and month counts, the rail marks, Logistics Performance, Commitment, First
 Delivery or any report. A transfer's completion is `Arrived at {stop}` and nothing else.
 
 **The rail's two-month calendar.** The rail's first, fixed region is the complete current month
@@ -493,7 +493,7 @@ current work week carries a subtle grey band.** Sundays stay visible, muted and 
 date carries **two separate marks — customer delivery and transfer — never one mark for both**, by
 shape and position so colour is never the only carrier, and the same split rides its accessible
 sentence. **Marks and counts follow the picked scope and every active filter.** Clicking a date
-opens that date's Day view on `Delivery schedule` and keeps every STATE, LOGISTICS PARTNER and
+opens that date's Day view on `Delivery schedule` and keeps every STATE, LOGISTICS and
 DELIVERY STATUS narrowing.
 
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
@@ -511,7 +511,7 @@ counts computed over the rows the other groups already narrowed (Law D):
 - **`STATE`**: a kit dropdown of the direct state names the data genuinely carries, ordered by
   count; leg 1 of a Singapore journey counts under Johor and leg 2 under Singapore; `All` clears
   only this group.
-- **`LOGISTICS PARTNER`**: a kit dropdown of the partners genuinely carrying a row, governed roster
+- **`LOGISTICS`**: a kit dropdown of the partners genuinely carrying a row, governed roster
   order first; `No logistics picked` is never duplicated here.
 - **`DELIVERY STATUS`**: a kit dropdown offering `All` plus the §8.4 status words, each with its
   live count, zero included.
@@ -547,10 +547,13 @@ because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfer
 transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
 selection; arrows replace the whole window and never scroll it.
 
-**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** In order: the
-type label (`DELIVERY` · `TRANSFER`) with the Logistics Partner · the confirmed window · who and
-where · the goods summary · the identity (`DO No`, or `SO No · Leg {n} of {m}` on a transfer, or
-`DO not released`) · **line 1 the journey progress · line 2 the readiness or blocker** (§8.4).
+**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** The compact
+card shows its type (`DELIVERY` · `TRANSFER`), the DO number when present, the SO on its own
+line and the confirmed window. It carries the actual route or delivery locality, each physical
+product line's icon and quantity, written service details and the assigned Logistics name.
+Customer names and legacy references stay off the card face. Below those facts are
+**line 1 the journey progress · line 2 the readiness or blocker** (§8.4), then the existing
+DO or arrangement door. No missing DO placeholder is added to the calendar card.
 Progress and readiness never merge into one line. The status never repeats the date of the column
 it already sits in, and it is a text line, never a pill that can truncate. A transfer card is
 visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
@@ -558,6 +561,62 @@ never the customer's town**. Never a phone, money detail, employee name, driver,
 expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
 range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
 `{n} deliveries need a confirmed date.` count and its door.
+
+**Compact calendar correction — implementation evidence, not release completion (2026-09-14).**
+The owner-approved compact composition is being implemented in the shared `ScheduleCard`:
+DO number when present, SO number on its own line, no legacy reference or customer name on
+the face; every physical product line has its own category icon and quantity, with its full
+name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
+appears only for an explicit assignment. A real journey uses its actual From and To; no fixed
+transit stop is inferred. The one footer is `Open DO` or the existing `Edit Delivery` door.
+An unissued DO is omitted from the calendar card; the register's absence is the owner's `DO`.
+
+Receipt marks currently require exact `reserved_order_line_id` bindings in reserved/sold
+stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
+excess bindings remain `Receipt not verified`; intermediate-leg receipt remains unknown,
+because an initial receipt is not arrival at the next site. This read does not prove current
+custody, loading, driver confirmation or customer delivery. Explicit incoming Units can now
+prove zero received when they cover the entire product line. They must belong to an open PO
+whose complete `po_line_sources` read names only that SO and item line. Shared sources,
+truncated reads, duplicate Units and excess quantities never establish this fact. The same
+exclusive-source rule, including the complete-owner-read check, is used by the order expansion.
+Incoming evidence is read in page-wide
+batches and never counted as reserved stock or permission to dispatch. The zero-received mark
+is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
+Whole-workspace conformance and production verification remain open. Local fixtures and passing
+tests do not close them.
+
+Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
+overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
+or `Collected by {partner}` without losing that fact when Sales details are missing. Transfer
+progress uses its own words and actual destination; a missing destination never creates a stop.
+Before collection, its supporting line names the payment, stock, Logistics or DO blocker.
+Unpriced and incomplete Sales facts cannot produce `Ready`. Once collection/result is recorded,
+the supporting line keeps the recorded ETA, failure reason or proof owed instead of re-testing
+pre-departure stock against goods that have moved. This display never authorises issue or dispatch.
+The Monitor Payment cell reads `No price yet` for unknown valuation, never `Paid`.
+Validation for this correction: 4,765 web tests, 30 shared status tests and workspace typecheck
+pass. Local Chrome at 1440px, 949px and 390px preserves product detail focus/viewport bounds and
+shows progress separately from the missing-fact or proof line. This is local evidence only.
+
+The local schedule now classifies each intermediate leg as `TRANSFER`, and only the final leg
+as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or
+remain overdue. The tab total and customer/transfer split use the same visible date window and
+active filters. Month summaries and the two-month rail keep the two event counts separate;
+the rail uses a circle/square legend, a blue today ring and a subtle current-work-week ground.
+Evidence: 254 targeted Delivery tests and workspace typecheck pass. Dedicated local Chrome
+checks at 1440px, 949px and 390px show the transfer's actual Klang WH → JB transit route and
+TEOW assignment, with no customer locality substituted; all card bounds fit their viewport.
+These checks use illustrative fixtures, not production records or deployed screenshots.
+Local Chrome verification covers 1440px, 949px and 390px: all three product lines remain
+separate, the correct line's details stay inside the viewport, Escape returns focus to its
+trigger, and mobile product/footer targets measure 40px high. The calendar control reads
+`Work week`, `3 days` and `Day` for the corresponding windows. These are fixture checks,
+not production screenshots or proof of the missing receipt states.
+The incoming correction adds local coverage for the gray zero-received case beside green,
+partial and unknown marks. Validation: 224 targeted web tests, 33 shared receipt tests,
+3,275 API tests pass (14 optional integration tests skipped); typecheck and the production-mode
+web build pass. No migration, RLS change or new writer is introduced.
 
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 
@@ -577,7 +636,7 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 9 | `Logistics` | partner name · `No logistics picked` | driver name once assigned |
 | 10 | `Items & Stock` | `Ready` · `Not ready` | `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` |
 | 11 | `Payment` | `Paid` · `Do not deliver` · `Collect RM {amount}` | `RM {amount} still to collect` · `Finance is holding this delivery` · `Cash on delivery` |
-| 12 | `DO No` | the number, opens the DO · `No delivery order yet` | `DO date` |
+| 12 | `DO No` | the number opens the DO; when absent, muted `DO` with `No delivery order yet` tooltip and accessible name (owner correction 2026-09-14), no action | `DO date` |
 
 **Row law.** The parent row is **72px** and carries exactly one primary fact and one supporting
 line. This is the approved Delivery Monitor page-specific exception to the Register density law
@@ -585,7 +644,7 @@ line. This is the approved Delivery Monitor page-specific exception to the Regis
 scrolling; the sheet scrolls, never squeezes. The layout storage key moves to `workList.v5`.
 
 **Cell law.** The first line states the exact operational result; the second line supports it.
-No cell joins facts with an em dash. The SO, customer, Logistics Partner and object identity are
+No cell joins facts with an em dash. The SO, customer, Logistics and object identity are
 named once on the row. Dates print `Tue, 18 Aug`, the year only when not current. Every absence
 is a governed word, never a dash. `Requested Delivery Date` opens no editor here.
 
@@ -606,7 +665,9 @@ retired its own inline route from this same cell (2026-09-06). Search still reac
 either value and sorting stays on the number.
 
 **THE JOURNEY LEG'S ROUTE — owner ruling 2026-09-14, APPROVED / LOCKED.** `Klang WH → JB transit`
-is column 6's supporting line on that row, in place of the building facts. An intermediate leg
+is column 6's supporting line on that row, in place of the building facts. Its primary line
+reads the recorded destination. An unnamed intermediate destination stays unrecorded; it
+never falls back to the customer's town. An intermediate leg
 never reaches the customer's door, so `Condominium · Floor 12` against a warehouse-to-transit run
 describes a building those goods are not going to; the CUSTOMER leg keeps its building facts
 because it does arrive there. This is the reading the shared region arithmetic already uses —
@@ -1062,7 +1123,7 @@ shared connector:
    the panel's one control     `Update date and time`  →  the panel's own edit state (§8.6)
 
 3  LOGISTICS DETAILS   (Delivery; pickup facts read from Warehouse)
-   Logistics Partner · driver · driver phone · vehicle plate · pickup fact · ETA
+   Logistics · driver · driver phone · vehicle plate · pickup fact · ETA
    pickup fact prints the recorded handover, `Handed over Thu, 22 Oct 12:53 · 2 of 2 Units`
    then `Received by NETS 13:10`; before any event, `Pickup not recorded`
    the panel's one control     `Assign logistics` or `Change logistics`; driver and vehicle are
@@ -1109,6 +1170,17 @@ The four panels and their inline doors are unchanged. Six corrections bind:
    facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
+
+**Implementation evidence, not production closure.** The Monitor enables the Register's
+viewport-fitted expansion; its shared wrapper stays visible during horizontal scrolling.
+At 949px physical items use wrapped labelled facts; at 1440px they retain the five-column
+table. Services carry only their description and quantity, server-generated delivery fees
+are excluded, and stair carry is derived once from the recorded Sales facts. Journey strips
+show every recorded leg with the selected leg marked. Access gaps, the single Logistics
+completeness alert and the three emergency-contact facts are rendered in the four panels.
+Local browser inspection at 949px and 1440px verified the brief and its item facts after
+horizontal scrolling. The 227 focused Monitor/model/viewport tests pass. These are fixture
+and test results; deployment and production verification remain outstanding.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 
@@ -1357,7 +1429,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 
 | Section | Rows |
 |---|---|
-| `Logistics Partners` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Warehouses & handover points` (the partner's own warehouse and the two-leg handover locations) · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
+| `Logistics` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Warehouses & handover points` (the partner's own warehouse and the two-leg handover locations) · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
 | `Delivery Rules` | who contacts the customer, per partner · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Workspace → Staff & Duties`, never a copy |
@@ -1381,7 +1453,7 @@ Delivery Settings stores only the duty keys its actions require, `delivery_duty`
 ## 12 · Reports
 
 Central Reports owns Delivery Commitment Performance, First Delivery Success, Failed Delivery
-Analysis, Logistics Partner Performance, Warehouse Performance, Delivery Proof Control, Schedule
+Analysis, Logistics Performance, Warehouse Performance, Delivery Proof Control, Schedule
 and Capacity, Customer Contact Performance, Return-to-Warehouse Control and Exception Ageing.
 
 Every measure declares source fact, date basis, coverage and drill-through. First-delivery success
@@ -1402,7 +1474,7 @@ five records reads `Rate withheld · fewer than 5 records`; an unreadable read p
 available`; Excel export writes one sheet per listing. The Cannot Deliver records (0417) reach the
 report through the arrangements read (`cannotDeliver`, absent when unreadable). The words are in
 `docs/COPY-STANDARD.md` (Reports → Delivery words). A Journey leg before the last is a warehouse
-trip: Commitment, First Delivery, Proof Control and `Logistics Partner Performance` count
+trip: Commitment, First Delivery, Proof Control and `Logistics Performance` count
 customer-leg results only and say so in their coverage sentence (Card 20, 2026-09-13).
 
 ## 13 · Owners, permissions and the external boundary
@@ -1489,14 +1561,14 @@ or proof. The stable read contract is one row per assigned exact Unit and Delive
 `(order_id, leg)`, carrying only the permanent Carres Unit ID; the exact collection appointment as
 **Customer delivery pickup** on its real Warehouse event date; **Operations ready by**, derived one
 Office working day before pickup; actual collection and actual customer arrival from their
-append-only event timestamps; the assigned Logistics Partner, DO number and source Sales Order; and
+append-only event timestamps; the assigned Logistics, DO number and source Sales Order; and
 admitted evidence with doors to the exact scope, DO and source order. The read feed is
 `/api/operation/delivery-arrangements/warehouse-schedule`. A Journey leg joins the feed once it
 carries its own document (0491), whose 0424 scope names the exact Units; a leg with no document
 is absence, never an invented row.
 
 The same feed admits a Warehouse login only when its token is bound to a Warehouse and keeps only
-that Warehouse's Units. The Logistics Partner boundary is the same projection narrowed by
+that Warehouse's Units. The Logistics boundary is the same projection narrowed by
 authenticated assignment: a Partner sees only its assigned rows and only the admitted fields.
 Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence
 and before confirmed arrival; Stock owns the custody word and Delivery never writes it. **DO No**
@@ -1508,7 +1580,7 @@ means an outbound customer Delivery Order; inbound receiving stays under its PO/
 
 **Singapore.** A Singapore address creates two arrangement rows from the day the order arrives:
 leg 1 `Klang WH → JB partner` and leg 2 `JB partner → Singapore customer`, each with its own
-Logistics Partner, dates, DO, handover, `Who has it` fact and result. Leg 1 completion means the
+Logistics, dates, DO, handover, `Who has it` fact and result. Leg 1 completion means the
 goods reached the named JB warehouse, never that the customer received them. The route prints
 without a `Leg` word; the leg number rides the URL only.
 
@@ -1556,7 +1628,7 @@ only when a real vehicle-level fact exists.
 | Attempt · Create Delivery Visit | `Record Delivery Result` · `Delivery History` |
 | Not Delivered | `Failed Delivery` |
 | Contact Customer · Follow Up | the exact contact purpose |
-| Carrier · Logistic · Delivery partner | `Logistics Partner`, and the actual company name |
+| Carrier · Logistic · Delivery partner | `Logistics`, and the actual company name |
 | Accept for the default assignment | `Assigned to NETS` |
 | Reject button | `Cannot Deliver` |
 | POD | `Delivery Proof` or the concrete proof name |
@@ -1621,7 +1693,7 @@ number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on to
   intermediate Journey leg's `delivered` result reads `Arrived` over the partner warehouse on Monitor, the Delivery
   Orders register (a sixth `DOCUMENT STATUS` word), the DO header, Delivery history, History and the Evidence section
   (which states that a warehouse arrival owes no delivery proof); a leg document's `Warehouse` fact is its own
-  `from_loc`; `Logistics Partner Performance` counts customer legs only; the Work Engine's Delivery deep-link is the
+  `from_loc`; `Logistics Performance` counts customer legs only; the Work Engine's Delivery deep-link is the
   Monitor row, not the retired Edit Delivery address. Notes (1) and (2) closed in law (§3.1 · §8.4 · §9 · §12) and in
   code. The deploy of `9dd3945b` converged on all three surfaces at 00:2x MYT.
 - **Card 19 (`334c3720`, PR #1291) — a number and an id open the same page.** `salesOrderParamOf` classifies the URL
@@ -1665,7 +1737,7 @@ appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at
 `operation`) against **89 real delivery rows**.
 
 - **1440×900.** The rail carries both months in the fixed 429px band, the six `WORK TO DO` rows,
-  then `STATE` `All states (89)` · `LOGISTICS PARTNER` `All partners (89)` · `DELIVERY STATUS`
+  then `STATE` `All states (89)` · `LOGISTICS` `All partners (89)` · `DELIVERY STATUS`
   `All (89)` as kit dropdowns. The filter box holds **506px in 421px and scrolls 85px** — the
   measured result, against 1152px in 421px (731px) before.
 - **949×800.** The rail starts collapsed behind a 44px strip carrying a visible `Show filters`
@@ -1743,7 +1815,7 @@ in production and has been verified through an authenticated Operations session:
   facts;
 - the date rail uses **No confirmed date** and **Overdue**;
 - the listing keeps Requested Delivery Date separate from Confirmed Delivery and Confirmed Time, shows
-  Logistics Partner and Goods, and adds DO No and Delivery Status to the same row;
+  Logistics and Goods, and adds DO No and Delivery Status to the same row;
 - expanding a row shows its product lines and the shared Stock facts Where, Who has it and Stock
   ETA without leaving Delivery;
 - clicking an issued DO opens the formal DO object; its back door returns to **Delivery**;
@@ -1791,7 +1863,7 @@ bucket under `arrangement/{order}/{leg}/…`.
 production Worker report that exact SHA).** §8's chase ruling is LIVE and walked on real data.
 
 `Monitor → No confirmed date` prints the ruled twelve columns in order — `SO No · Customer ·
-State · Requested Delivery Date · Logistics Partner · Confirmed Delivery · Confirmed Time ·
+State · Requested Delivery Date · Logistics · Confirmed Delivery · Confirmed Time ·
 DO No · Delivery Location · Goods · Delivery Status · Actions` — over 86 real deliveries,
 ordered `Mon, 20 Jul` → `Tue, 21 Jul` → … → `Sat, 31 Oct`, with the one row carrying no
 requested date printing `No delivery date` LAST. 81 rows read `Call {partner} — confirm delivery
@@ -1804,7 +1876,7 @@ screen is a furniture line (`Leg 4"`), not a Journey word.
 `/operation/delivery/edit/{order}?from=%2Foperation%3Ftab%3Ddelivery%26view%3Dno_confirmed_date%26region%3DSelangor`
 and its back door returned to exactly that list, queue still active and the narrowing intact.
 `/operation/delivery-orders` prints `DO No · SO No · Customer · Requested Delivery Date ·
-Confirmed Delivery · Confirmed Time · Logistics Partner · Delivery Location · Delivery Result ·
+Confirmed Delivery · Confirmed Time · Logistics · Delivery Location · Delivery Result ·
 Proof Status · Status · DO date`, and one live document proves the three dates are three facts:
 requested `No delivery date` · confirmed `Thu, 20 Aug` · `DO date` `Tue, 18 Aug`.
 
@@ -1895,7 +1967,7 @@ start recording confirmed dates.
 **DEPLOYED 2026-09-07 — Monitor Day · Week · Month and rail correction, PR #1157, main SHA
 `4f35842c87acea49cd0fcc0716d6acc0a3e31ce6`, all four canonical surfaces converged (erp ·
 pos · pages.dev `/__carres_deploy.json` and the Worker `/health` each report that exact SHA;
-the served entry bundle carries `Upload delivery proof` · `LOGISTICS PARTNER` · `DELIVERY
+the served entry bundle carries `Upload delivery proof` · `LOGISTICS` · `DELIVERY
 STATUS` and no `Delivered — Proof Required` or `delivery scopes selected`).** The §8 owner
 correction is live and was verified through an authenticated Operations session on production:
 `/operation?tab=delivery` lands on the **Week** calendar (Mon 7 – Sat 12 Sep) with `Day · Week ·
@@ -1903,7 +1975,7 @@ Month` in the page toolbar, the honest spanning state and the REAL `86 deliverie
 confirmed date.` door; the rail reads the four ruled groups with real counts — WORK TO DO
 (All delivery work 87 · No logistics picked 33 · No confirmed date 86 · Overdue 1 · Failed
 Delivery 0 · Upload delivery proof 0), STATE as 13 direct names (Kuala Lumpur 37 · Selangor 23
-· Pahang 6 · …), LOGISTICS PARTNER (NETS 46 · AL 7 · HOUZS 1) and DELIVERY STATUS (0 · 0 · 0)
+· Pahang 6 · …), LOGISTICS (NETS 46 · AL 7 · HOUZS 1) and DELIVERY STATUS (0 · 0 · 0)
 — with no `Calendar` row, no `All …` rows and no proof-required status; `Month` on an empty
 September showed the one spanning state, the toolbar's `Previous month` opened AUGUST 2026
 printing `27 · Deliveries 1 · Exceptions 1`, and clicking 27 opened that date's `Day` with the

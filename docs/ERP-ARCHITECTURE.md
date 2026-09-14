@@ -489,7 +489,7 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 > with the order, because **both are promises to the customer, and the customer's promise is
 > what this module owns.** A booking is *"we told them Tuesday"*; the gate is *"we do not send
 > goods that are not paid for"*. Neither is a fact about a truck or a ledger. **The operational
-> ARRANGEMENT — which Logistics Partner carries a scope, the confirmed operational date and
+> ARRANGEMENT — which Logistics carries a scope, the confirmed operational date and
 > time, ETA, note, reply proof, driver/vehicle — is Delivery's own record**
 > (`ops_delivery_arrangements`, owner ruling 2026-08-24): the promise and the arrangement are
 > two facts with two owners, and neither module writes the other's.
@@ -948,7 +948,7 @@ WhatsApp manifest sent to the carrier = generated from the view. Multi-leg journ
 trip RECORD either, but the legs are **Delivery Journey legs, not stock movements** (owner
 ruling 2026-09-01, overwriting the 2026-08-06 "a warehouse-to-warehouse leg is a stock
 movement" half): a Singapore SO's KL → JB-partner-warehouse leg and its JB → customer leg each
-carry their own Logistics Partner, DO/scope, dates, handover and exact-Unit reconciliation
+carry their own Logistics, DO/scope, dates, handover and exact-Unit reconciliation
 (`../delivery/MASTER.md` §1.1, §8; `../stock/MASTER.md` §5). Stock still owns each Unit's
 current `Where`/`Who has it` along the way; an internal reposition that serves no customer
 Journey remains Stock's Transfer.

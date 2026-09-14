@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   deliveryWorkStatusOf,
+  deliveryJourneyProgressOf,
   deliveryWorkStatusLabelOf,
   DELIVERY_WORK_STATUS_KINDS,
   DELIVERY_WORK_STATUS_TONE,
@@ -32,6 +33,31 @@ const attempt = (
 ) => ({ result, reasonKey, recordedAt });
 const status = (over: Partial<DeliveryWorkStatusInput>) =>
   deliveryWorkStatusOf({ ...base, ...over }, SPELL);
+
+describe("journey progress is independent of work urgency", () => {
+  it("keeps collection visible when Sales details are missing and the day has passed", () => {
+    const input = { ...base, confirmedDate: "2026-09-01", todayIso: "2026-09-14", missingFacts: ["Floor not recorded"], handoverEvents: at("received_by_logistics") };
+    expect(deliveryWorkStatusOf(input, SPELL).kind).toBe("details_incomplete");
+    expect(deliveryJourneyProgressOf(input, SPELL).label).toBe("Collected by NETS");
+  });
+  it("does not infer transit from a planned day or a warehouse-only handover", () => {
+    const input = { ...base, hasDeliveryOrder: true, handoverEvents: at("handed_over"), expectedArrival: "14:00" };
+    expect(deliveryJourneyProgressOf(input, SPELL).kind).toBe("waiting_pickup");
+  });
+  it("uses transfer progress and the recorded stop, never customer delivery words", () => {
+    const input = { ...base, intermediateLeg: true, legStop: "Ipoh WH", handoverEvents: at("received_by_logistics") };
+    expect(deliveryJourneyProgressOf(input, SPELL).label).toBe("Collected for transfer");
+    expect(deliveryJourneyProgressOf({ ...input, expectedArrival: "14:00" }, SPELL).label).toBe("In transit to Ipoh WH");
+    expect(deliveryJourneyProgressOf({ ...input, attempts: [attempt("delivered")] }, SPELL).label).toBe("Arrived at Ipoh WH");
+    expect(deliveryJourneyProgressOf({ ...input, attempts: [attempt("failed")] }, SPELL).label).toBe("Transfer failed");
+  });
+  it("keeps customer delivery proof work and does not repeat the confirmed date", () => {
+    expect(deliveryJourneyProgressOf({ ...base, confirmedDate: "2026-09-15", confirmedTime: "Morning" }, SPELL).label).toBe("Confirmed");
+    const result = deliveryJourneyProgressOf({ ...base, attempts: [attempt("delivered")], proof: { photoUploaded: false, signedDoUploaded: false, acceptedOn: null } }, SPELL);
+    expect(result.label).toBe("Delivered to customer");
+    expect(result.second).toBe("Delivery photo not uploaded");
+  });
+});
 
 describe("deliveryWorkStatusOf — the actor and the fact, never the document (§8.4)", () => {
   it("no partner on the scope → Operation must assign logistics, orange", () => {

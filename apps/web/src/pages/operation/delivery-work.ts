@@ -37,6 +37,8 @@ import {
   deliveryStepDueIso,
   deliveryWorkStatusLabelOf,
   deliveryWorkStatusOf,
+  deliveryJourneyProgressOf,
+  deliveryJourneyProgressFromStatus,
   DELIVERY_WORK_STATUS_TONE,
   lineKind,
   myHolidaySet,
@@ -46,6 +48,7 @@ import {
   type DeliveryQueueLeads,
   type DeliveryStatusSpell,
   type DeliveryWorkStatus,
+  type DeliveryWorkStatusInput,
   type DeliveryWorkStatusKind,
   type DeliveryHandoverKind,
   type DeliveryOrderStatus,
@@ -197,6 +200,8 @@ export interface DeliveryScopeRow {
   refs: string[];
   /** 1-based leg number on a multi-leg Journey; null on a whole-order scope. */
   leg: number | null;
+  /** A Journey leg before the final customer leg; computed once with the scope. */
+  intermediateLeg: boolean;
   /** `Klang WH → JB transit` — the leg's own two places, never invented. */
   legRoute: string | null;
   customer: string;
@@ -226,6 +231,8 @@ export interface DeliveryScopeRow {
    * and it always has an answer — even before any document exists.
    */
   status: DeliveryWorkStatus;
+  /** Recorded journey progress, independent of work urgency and data gaps. */
+  progress: DeliveryWorkStatus;
   /** The contact deadline — the shared `chase` step's own due day, counted
    *  once here so the status line, the rail and the calendar agree. */
   contactDueIso: string | null;
@@ -269,11 +276,16 @@ export interface DeliveryScopeRow {
  * ruling 2026-08-24) — one vocabulary across the workspace, so two rows of one
  * order cannot be read on two different scales.
  */
+function statusAndProgressOf(input: DeliveryWorkStatusInput, spell: DeliveryStatusSpell) {
+  return { status: deliveryWorkStatusOf(input, spell), progress: deliveryJourneyProgressOf(input, spell) };
+}
+
 export function legWorkStatusOf(
   stop: Pick<DeliveryStop, "status"> & Partial<Pick<DeliveryStop, "to_loc">>,
   confirmedIso: string | null,
   partnerName: string | null = null,
   confirmedTime: string | null = null,
+  intermediateLeg = false,
 ): DeliveryWorkStatus {
   const say = (kind: DeliveryWorkStatusKind, second: string | null = null): DeliveryWorkStatus => ({
     kind,
@@ -289,7 +301,7 @@ export function legWorkStatusOf(
   });
   switch (stop.status) {
     case "delivered":
-      return say("delivered");
+      return intermediateLeg ? say("arrived", stop.to_loc?.trim() || null) : say("delivered");
     case "handed_off":
       /* A leg handed off at the named partner warehouse has ARRIVED there —
          the goods reached the stop, never the customer (Delivery MASTER
@@ -738,6 +750,7 @@ export function buildDeliveryScopeRows({
         ...base,
         key: o.id,
         leg: null,
+        intermediateLeg: false,
         legRoute: null,
         logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
         logisticsName,
@@ -753,7 +766,7 @@ export function buildDeliveryScopeRows({
         deliveryOrderId: liveDoc ? doc!.id : null,
         doIssuedAt: liveDoc ? doc!.issued_at : null,
         contacts: scopeContacts,
-        status: deliveryWorkStatusOf(
+        ...statusAndProgressOf(
           {
             partnerName: logisticsName,
             latestContact: latestContactOf(`${o.id}#0`),
@@ -805,11 +818,16 @@ export function buildDeliveryScopeRows({
       const legFacts = factsOf(legDoc);
       const legMissingProof = proofOf(legDoc, o, intermediateLeg);
       const legReview = reviewOf(legDoc, o, intermediateLeg);
+      const stopStatus = legWorkStatusOf(stop, confirmedIso, legPartner, legTime, intermediateLeg);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
         leg: stop.leg,
+        intermediateLeg,
         legRoute: legRouteOf(stop),
+        // A transfer goes to its recorded stop, never to the customer's town.
+        // Only a final customer leg may use the order address when no stop is named.
+        location: stop.to_loc?.trim() || (intermediateLeg ? "" : base.location),
         logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
         logisticsName: legPartner,
         confirmedIso,
@@ -824,8 +842,8 @@ export function buildDeliveryScopeRows({
         deliveryOrderId: legDoc?.id ?? null,
         doIssuedAt: legDoc?.issued_at ?? null,
         contacts: contactsByScope.get(`${o.id}#${stop.leg}`) ?? [],
-        status: legDoc
-          ? deliveryWorkStatusOf(
+        ...(legDoc
+          ? statusAndProgressOf(
               {
                 partnerName: legPartner,
                 latestContact: latestContactOf(`${o.id}#${stop.leg}`),
@@ -847,7 +865,9 @@ export function buildDeliveryScopeRows({
               },
               DELIVERY_STATUS_SPELL,
             )
-          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
+          : { status: stopStatus, progress: deliveryJourneyProgressFromStatus(stopStatus, {
+              partnerName: legPartner, intermediateLeg, legStop: stop.to_loc,
+            }) }),
       });
     }
   }
