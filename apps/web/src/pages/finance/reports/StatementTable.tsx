@@ -30,14 +30,17 @@ export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[se
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
 export const nothingOnDay = (section: string): string => NOTHING_ON_DAY[section] ?? NOTHING_ON_DAY.ASSET!;
 
-/** Balance Sheet, under Customer deposits held: the part that is customers'
- *  money paid before their invoice, which the ledger books on receivables
- *  (0506). The database moved it; this only says so. Null for any other line,
- *  and before 0506 is applied. */
-export const paidBeforeInvoiceNote = (line: { reclassified: number | null }): string | null =>
-  line.reclassified !== null && line.reclassified > 0 && !isZeroMoney(line.reclassified)
+/** Balance Sheet: customers' money paid before their invoice, which the ledger
+ *  books on receivables (0506). Under Customer deposits held it says what was
+ *  added; under receivables it says what was left out, so the line still
+ *  reconciles to the Trial Balance. The database moved it; this only says so.
+ *  Null for any other line, and before 0506 is applied. */
+export const paidBeforeInvoiceNote = (line: { reclassified: number | null }): string | null => {
+  if (line.reclassified === null || isZeroMoney(line.reclassified)) return null;
+  return line.reclassified > 0
     ? `Includes ${rm(line.reclassified)} from customers who paid before their invoice.`
-    : null;
+    : `Leaves out ${rm(-line.reclassified)} that customers paid before their invoice.`;
+};
 
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number }

@@ -120,6 +120,15 @@ begin
     group by p.acct
   ) c;
 
+  -- The moved money needs a liability line to land on. Without 2210 the totals
+  -- below would still agree while the printed rows did not, so refuse instead.
+  if v_moved <> 0 and not exists (
+    select 1 from public.gl_accounts where code = c_deposits and kind = 'LIABILITY'
+  ) then
+    raise exception 'gl_balance_sheet: account % (LIABILITY) is missing', c_deposits
+      using errcode = 'P0002';
+  end if;
+
   -- The three section totals and the undistributed result, computed once so the
   -- equation row is arithmetic on the same numbers the rows below print.
   --

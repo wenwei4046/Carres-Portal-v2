@@ -220,7 +220,7 @@ describe("Reports — the statements read the ledger", () => {
       "Cash and bank | RM 6,000.00",
       "1120 Bank — current account | RM 6,000.00",
       "Receivables | RM 2,000.00",
-      "1210 Trade receivables — customers | RM 2,000.00",
+      "1210 Trade receivables — customersLeaves out RM 2,815.00 that customers paid before their invoice. | RM 2,000.00",
       "Liability | RM 2,815.00",
       "2210 Customer deposits heldIncludes RM 2,815.00 from customers who paid before their invoice. | RM 2,815.00",
       "Equity | RM 5,185.00",
