@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
+import { APP_ROLES } from "@carres/shared";
 import type { Role } from "@carres/shared/domain";
 import type { AppEnv, AuthContext } from "../types";
 
@@ -28,17 +29,11 @@ export function _setJwksForTesting(jwks: JWTVerifyGetKey | null): void {
   jwksInjectedForTest = jwks !== null;
 }
 
-const VALID_ROLES: ReadonlyArray<Role> = [
-  "principal", "dealer", "salesperson", "showroom",
-  "operation", "supplier", "partner", "finance", "bd", "hr",
-  // R6 (0301) — the third external role. A token minted before 0302 carries no
-  // `warehouse_id`, and every warehouse RPC scopes on `app_warehouse_id()`
-  // server-side anyway, so an unscoped token reaches nothing.
-  "warehouse",
-];
-
+// Any `app_role` value is accepted, `warehouse` included: a warehouse token
+// minted before 0302 carries no `warehouse_id`, and every warehouse RPC scopes
+// on `app_warehouse_id()` server-side anyway, so an unscoped token reaches nothing.
 function isRole(v: unknown): v is Role {
-  return typeof v === "string" && (VALID_ROLES as readonly string[]).includes(v);
+  return typeof v === "string" && (APP_ROLES as readonly string[]).includes(v);
 }
 
 function asNullableUuid(v: unknown): string | null {
