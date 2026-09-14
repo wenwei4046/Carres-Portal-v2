@@ -1,7 +1,7 @@
 # SALES ORDERS — CARD 11 · Table spacing and six-column expanded goods
 
 Module: Sales Orders · Sequence: 11 · Lane: BUILD / DELIVERY
-Status: OWNER APPROVED — implementation in progress, not delivered.
+Status: IMPLEMENTED — current release and production status: [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695).
 Owner: 2026-09-14 “agreed. open card to start code at new chat”.
 Authority: Orders MASTER §0.1; UI MASTER Register; COPY-STANDARD; shared components/tokens.
 
@@ -43,9 +43,9 @@ Targeted regression tests with a negative control, purchasing/shared consumer ch
 repository CI gate: migrations validation, lint, typecheck, tests, production build, secret-name
 bundle guard. Screenshots and measurements recorded here with honest fixture/live boundaries.
 PR → successful CI → merge → successful exact-SHA deployment → authenticated read-only production
-walk → Card/MASTER closure. Delivery proof is pending.
+walk → Card/MASTER closure. Delivery proof and exact-SHA status are maintained in the [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695).
 
-## Implementation checks (delivery still pending)
+## Implementation checks (local evidence)
 
 - Sales Orders regression suite: 50 tests pass. Shared grid sticky checks: 6 pass.
 - Purchasing SO Batch plus shared GoodsMiniTable: 121 tests pass.
@@ -59,7 +59,7 @@ walk → Card/MASTER closure. Delivery proof is pending.
   12px top/bottom. Child x=130 equals SO No x=130; child right=1246 equals parent right=1246.
 - Fixture preview uses the actual page and shared engine with isolated sample responses, not
   production business data. Production baseline is before-847.png; post-change production proof
-  remains pending. Do not infer delivery from these measurements.
+  is recorded in the [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695). Do not infer delivery from these measurements.
 
 
 ## Rendered acceptance before merge
@@ -85,3 +85,10 @@ and is not committed. A local typecheck/build was stopped under heavy machine co
 complete authoritative gate runs in GitHub CI. Initial CI found unsupported `exact` options in
 six new test queries; those were removed (role names already match exactly). The corrected
 six-column negative-control restoration passes. PR: https://github.com/wenwei4046/Carres-Portal-v2/pull/1305.
+
+
+The release receipt is updated after CI/merge/deployment/read-only verification, following the
+Orders MASTER's existing PR-based delivery-proof convention. It carries the exact live SHA and
+states any unresolved limits. This avoids treating a fixture screenshot or a merge as live proof.
+At 847px, opening the off-screen DO No filter moved only the grid to scrollLeft=374;
+body remained 847px (grid client 727 / scroll 1181). All main columns remain reachable.

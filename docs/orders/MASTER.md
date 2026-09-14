@@ -234,9 +234,12 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
-**Table spacing — owner approved 2026-09-14; BUILD / delivery pending.**
+**Table spacing — owner approved 2026-09-14; implementation in [PR #1305](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305).**
 [Sales Orders Card 11](../cards/CARD-2026-09-14-sales-orders-11-table-spacing.md) owns this
-presentation correction. Expanded goods has exactly the six columns above: SKU stays separate;
+presentation correction. The [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695)
+records CI, the exact merged/deployed SHA and authenticated read-only production closure; the
+implementation and fixture measurements alone do not claim deployment.
+Expanded goods has exactly the six columns above: SKU stays separate;
 Item is always last and takes remaining space. All other child tracks have consistent fixed,
 content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
