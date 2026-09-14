@@ -117,6 +117,20 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
 
+  it("Finance opens Dashboard, AP · Payables, AR · Receivables — in that order (owner ruling 2026-09-14)", () => {
+    mockRole = "finance";
+    renderAt("/finance/dashboard");
+    const dashboard = child("dashboard");
+    const ap = child("ap");
+    const ar = child("ar");
+    expect(ap).toHaveTextContent("AP · Payables");
+    expect(ap).toHaveAttribute("href", "/finance/ap-outstanding");
+    expect(screen.queryByText("Unpaid by Supplier")).not.toBeInTheDocument();
+    expect(dashboard.compareDocumentPosition(ap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ap.compareDocumentPosition(ar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ar.compareDocumentPosition(child("bills")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("principal on the Finance base expands the Finance area", () => {
     mockRole = "principal";
     renderAt("/finance/ar");

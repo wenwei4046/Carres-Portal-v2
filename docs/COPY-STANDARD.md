@@ -3059,7 +3059,7 @@ Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP dra
 
 | Where | Word on screen | Stored value it replaces | Note |
 |---|---|---|---|
-| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch |
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch; the Finance sidebar names the third **AP · Payables** (RULING below) |
 | Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
 | Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
 | Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
@@ -3185,17 +3185,23 @@ with where it appears.
 
 ### Finance Dashboard · AR · Receivables (build/finance-old-reads)
 
-**PROPOSAL / NOT LAW.** Pages: Finance → `Dashboard` and `AR · Receivables`, and the AR drawer.
-Both figures add up the same per-row numbers as the page they open (`money-owed.ts`). The words
-may appear only on these pages until the owner rules.
+**RULING — YH, 2026-09-14.** The Finance sidebar row that opens `/finance/ap-outstanding` is
+**`AP · Payables`** again (PR #1248 had renamed it `Unpaid by Supplier`), and it sits above
+`AR · Receivables`: `Dashboard` · `AP · Payables` · `AR · Receivables`, then the rest. The page
+it opens is unchanged; its header and the Bills toolbar switch keep `Unpaid by Supplier`. The
+Dashboard keeps its pre-#1248 layout (figure tiles, then the Payables card) with every number
+read through `money-owed.ts`.
+
+**PROPOSAL / NOT LAW** for the rest of this block. Pages: Finance → `Dashboard` and
+`AR · Receivables`, and the AR drawer. Both figures add up the same per-row numbers as the page
+they open (`money-owed.ts`). The words may appear only on these pages until the owner rules.
 
 | Word on screen | Meaning | Falsifier |
 |---|---|---|
+| `AP · Payables` | RULING: the Finance sidebar row and the Dashboard card for what Carres still owes suppliers and other creditors on confirmed bills. | — (owner ruling) |
 | `AR · Receivables` | Destination: every order a customer still owes money on, where Finance records a receipt. | The owner rules one global Dashboard with no Finance AR page (COPY 1690), or recording moves to the Invoices register. |
-| `Material exposure` | Dashboard section heading over the money-owed figures (Workspace MASTER §8). | A finance user cannot say what the section holds. |
-| `Open AR · Receivables` · `Open Unpaid by Supplier` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
-| `What customers still owe HQ, storage included. Orders with no price yet are left out.` | Meaning line under the Dashboard's Outstanding figure. | The figure includes an unpriced order, or leaves out storage owed. |
-| `What Carres still owes suppliers and other creditors on confirmed bills.` | Meaning line under the Dashboard's Unpaid figure. | The figure counts a draft bill, or differs from the Unpaid by Supplier footer. |
+| `Outstanding` · `Unpaid` · `{n} orders` · `{n} suppliers` | Dashboard figure tiles: what customers still owe HQ (storage included, unpriced orders left out), and what Carres still owes on confirmed bills; the count under each. | A tile differs from the footer of the page its door opens. |
+| `Open AR · Receivables` · `Open AP · Payables` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
 | `includes storage {RM}` | Second line under Outstanding: the storage part of what the customer owes (Payment MASTER). | Storage owed shows as a separate total that the Outstanding figure leaves out. |
 | `Could not load {source}` · `Last available {date and time} · {RM}` · `Try again` | A figure whose read failed: said in words, never RM 0.00, with the last figure it had. | A failed read shows a zero or a blank. |
 | `Invoices could not be loaded. Try again.` | The AR register's failed read (Error pattern). | The page shows an empty list when the read failed. |

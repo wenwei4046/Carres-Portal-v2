@@ -515,13 +515,23 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/dashboard",
       },
       {
+        // Owner ruling 2026-09-14: the sidebar word is `AP · Payables` again,
+        // above AR. It opens what is still unpaid per supplier (0477); the old
+        // PO-cost page is gone and /finance/ap redirects here.
+        key: "ap",
+        label: "AP · Payables",
+        icon: ArrowUpRight,
+        financePath: "/finance/ap-outstanding",
+      },
+      {
         key: "ar",
         label: "AR · Receivables",
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
       },
-      // 0477 — a supplier's bill, the voucher that pays it, and what is still
-      // unpaid per supplier (also the third listing of the Bills toolbar switch).
+      // 0477 — a supplier's bill and the voucher that pays it. What is still
+      // unpaid per supplier is the `ap` row above (and the third listing of the
+      // Bills toolbar switch).
       {
         key: "bills",
         label: "Bills",
@@ -533,14 +543,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Payment Vouchers",
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
-      },
-      {
-        // The old `AP · Payables` row. Its page read PO cost and pay states
-        // nothing writes since 0477; /finance/ap now redirects here.
-        key: "ap",
-        label: "Unpaid by Supplier",
-        icon: ArrowUpRight,
-        financePath: "/finance/ap-outstanding",
       },
       /* The finance role sees the SAME two Payments destinations, as the same
        * module — never a second Payment information architecture (owner
