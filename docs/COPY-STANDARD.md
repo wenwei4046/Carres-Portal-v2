@@ -443,12 +443,25 @@ Delivery Order document — the DOCUMENT's own life
    named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
-  Operation must assign logistics · {partner} must contact the customer ·
-  Operation must call the customer · Waiting for customer reply ·
-  Confirmed for {weekday, date} · Waiting for {partner} pickup ·
-  Goods collected by {partner} · {partner} is delivering to the customer ·
-  Overdue · Arrived · Delivered · Failed Delivery · Order details incomplete
+  before the arrangement is agreed — the ACTOR rungs, unchanged:
+    Operation must assign logistics · {partner} must contact the customer ·
+    Operation must call the customer · Waiting for customer reply
+  once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
+    customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
+                   On the way to customer · Delivered to customer · Failed Delivery
+    transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
+                   Arrived at {stop} · Transfer failed
+  across both      Overdue · Order details incomplete
 ```
+
+**Re-ruled 2026-09-14, replacing the 2026-09-13 spellings one-for-one** (one fact, one word — the
+column, the `DELIVERY STATUS` dropdown, the schedule card and every report read the SAME
+arithmetic): `Confirmed for {weekday, date}` → **`Confirmed`** (the day and window are column 8's
+job, and on a card the date column already names the day) · `Goods collected by {partner}` →
+**`Collected by {partner}`** · `{partner} is delivering to the customer` → **`On the way to
+customer`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
+`Waiting for {partner} pickup` is KEPT: it is a recorded fact (the document exists, the partner
+has not collected) that the new ladder does not otherwise express.
 
 **`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
 intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
@@ -460,6 +473,42 @@ them. `Logistics Partner Performance` counts customer-leg results only.
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
 
+**THE DELIVERY SCHEDULE CARD — TWO FACTS, TWO LINES (owner ruling 2026-09-14).** The Monitor tab
+is **`Delivery schedule`**; `Confirmed deliveries` is retired and survives only in dated historical
+walk records. The schedule carries both kinds of logistics work under a type label that is never
+mixed and never summed:
+
+```
+DELIVERY   the final customer leg          TRANSFER   an intermediate warehouse leg
+
+tab count and split, following the SELECTED RANGE and every active filter:
+  Delivery schedule {n}
+  {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
+
+LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
+  customer leg        transfer leg           Ready · Stock risk · Payment blocked ·
+  Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
+  Collected by {p}    Collected for transfer
+  On the way to       In transit to {stop}
+    customer
+  Delivered to        Arrived at {stop}
+    customer
+  Failed Delivery     Transfer failed
+```
+
+Progress and readiness never merge into one status. The two ladders share no word. A transfer is
+never counted as a customer delivery and never produces a `Delivered to customer` result. A
+transfer card prints its own `{from} → {to}` route, never the customer's town.
+
+**`Arrived at customer` is not a Carres word** — no arrival-at-customer fact is recorded, and it
+may never be inferred from a time, an ETA or a location.
+
+**Schedule view words:** `Day` · **`3 days`** (768–1279px) · **`Work week`** (≥1280px, Mon–Sat) ·
+`Month`. **A three-day layout is never labelled `Week`.**
+
+**Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
+**`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
+
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
 `Waiting for warehouse` · `Ready for handover` · `Out for delivery` · `Created` · any bare
 `Waiting` that does not name who must act. `Ready for handover` and `Received by logistics`
@@ -468,6 +517,10 @@ may not appear in the Delivery Orders register, which describes documents.
 
 Banned as status words on either surface, because each names a mood rather than a fact:
 `Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
+**This ban was tested and upheld on 2026-09-14:** a proposed schedule ladder opened with
+`Scheduled` / `Transfer scheduled`, and the owner ruled the governed **`Confirmed`** /
+**`Transfer confirmed`** instead. `Delivery failed` is likewise not a second spelling of
+**`Failed Delivery`**.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
