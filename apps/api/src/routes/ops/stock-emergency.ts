@@ -15,6 +15,7 @@ import { hasDuty, myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
@@ -113,7 +114,7 @@ opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
   }
   const raw = [...byId.values()];
 
-  const names = await nameMap(
+  const names = await resolveActorNames(
     sb,
     [
       ...new Set(
@@ -161,19 +162,6 @@ opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
     meId: c.var.auth.id ?? null,
   });
 });
-
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
-}
 
 // =====================================================================
 // POST actions — thin wrappers over the DEFINER RPCs

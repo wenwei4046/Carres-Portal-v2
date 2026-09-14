@@ -50,6 +50,7 @@ import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
 
 /**
  * Per-unit stock register (migration 0137) — Carres Klang scope.
@@ -462,7 +463,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
     taken_at: string;
   }[];
 
-  const names = await nameMap(sb, [...new Set(raw.map((r) => r.taken_by))]);
+  const names = await resolveActorNames(sb, [...new Set(raw.map((r) => r.taken_by))]);
   const entries: PoolUsageEntry[] = raw.map((r) => ({
     id: r.id,
     sku: r.sku,
@@ -1252,19 +1253,6 @@ function nextMonth(period: string): string {
   return m === 12
     ? `${y + 1}-01`
     : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
 }
 
 function mapErr(error: { code?: string; message?: string }): HTTPException {

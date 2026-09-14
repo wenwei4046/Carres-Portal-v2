@@ -21,6 +21,7 @@ import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
@@ -136,7 +137,7 @@ opsStockPlanRouter.get("/", requireOperationOrPrincipal, async (c) => {
       proposed_by: string;
       note: string | null;
     }[];
-    const names = await nameMap(
+    const names = await resolveActorNames(
       sb,
       unique([
         ...raw.map((p) => p.proposed_by),
@@ -287,19 +288,6 @@ async function respond(args: {
 
 function unique(ids: (string | null)[]): string[] {
   return [...new Set(ids.filter((v): v is string => !!v))];
-}
-
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
 }
 
 // =====================================================================
