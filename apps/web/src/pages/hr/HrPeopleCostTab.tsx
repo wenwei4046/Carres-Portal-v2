@@ -13,6 +13,7 @@ import { fieldCls } from "@/components/Field";
 import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
 import { useHrComp, useHrDeleteStaffComp, useHrSetStaffComp } from "@/lib/queries";
+import { StatTile } from "./HrOverviewTab";
 
 /**
  * People cost (HR-P7, migration 0278) — what the team costs, per month.
@@ -40,32 +41,6 @@ const PILL: Record<string, string> = {
   waiting: "pill pill-warning",
   neutral: "pill pill-neutral",
 };
-
-function Tile({
-  label,
-  value,
-  sub,
-  muted,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex-1 min-w-[170px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
-      <div
-        className={`t-num text-page leading-8 font-semibold ${
-          muted ? "text-base-400" : "text-base-900"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="text-meta text-base-500">{sub}</div>
-    </div>
-  );
-}
 
 interface EditState {
   employeeId: string;
@@ -291,21 +266,21 @@ export default function HrPeopleCostTab({
     <div className="flex flex-col gap-4">
       {/* Four tiles, none of which needs revenue to mean something. */}
       <div className="flex gap-3 flex-wrap">
-        <Tile
+        <StatTile
           label="Monthly cost"
           value={rm(cost.fixedCost)}
           sub={`loaded · ${cost.recorded} of ${cost.headcount} recorded`}
           muted={cost.fixedCost === 0}
         />
         {/* Its own tile on purpose — never folded into the figure above. */}
-        <Tile
+        <StatTile
           label="Commission"
           value={rm(cost.commissionCost)}
           sub={cost.commissionCost === 0 ? "no rates set up yet" : "this month, variable"}
           muted={cost.commissionCost === 0}
         />
-        <Tile label="Headcount" value={String(cost.headcount)} sub="people on file" />
-        <Tile
+        <StatTile label="Headcount" value={String(cost.headcount)} sub="people on file" />
+        <StatTile
           label="Average per person"
           value={rm(cost.avgFixedPerPerson)}
           sub="fixed only, excludes commission"
