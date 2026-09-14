@@ -14,7 +14,13 @@ import {
 import Segmented from "@/components/Segmented";
 import Btn from "@/components/Btn";
 import { toast } from "sonner";
-import { docNumber, loanOfferEventLabel, loanOfferStateOf, type SofaLoanDto } from "@carres/shared";
+import {
+  docNumber,
+  loanOfferEventLabel,
+  loanOfferStateOf,
+  READY_STOCK_CONDITION_WORDS,
+  type SofaLoanDto,
+} from "@carres/shared";
 import {
   useBorrowLoan,
   useLoanOffers,
@@ -49,15 +55,6 @@ import type { ReserveFreeUnit } from "./StockPickerGrid";
  *    "checked it can enter" confirm gates the lend.
  * migration 0217 (no schema change here).
  */
-
-/** Same labels as the rev20 stock picker — one vocabulary across the drawer. */
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 /** Lend order — display/used stock first, sellable NEW last (protect stock). */
 const COND_RANK: Record<string, number> = {
@@ -263,7 +260,7 @@ function LoanCard({
         {!isSupplier && loan.item_condition && (
           <Row k="Condition">
             <span className={`${TAG} ${condTone(loan.item_condition)}`}>
-              {CONDITION_LABEL[loan.item_condition] ?? loan.item_condition}
+              {READY_STOCK_CONDITION_WORDS[loan.item_condition] ?? loan.item_condition}
             </span>
           </Row>
         )}
@@ -599,7 +596,7 @@ function WarehousePick({
             </div>
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <span className={`${TAG} ${condTone(g.condition)}`}>
-                {CONDITION_LABEL[g.condition] ?? g.condition}
+                {READY_STOCK_CONDITION_WORDS[g.condition] ?? g.condition}
                 {g.condition === "new" ? " · sellable" : ""}
               </span>
               <span className="text-label text-base-500">{g.count} free</span>
@@ -899,7 +896,7 @@ export default function LoanPanel({
           "—",
         condition: isSup
           ? "Borrowed piece"
-          : (CONDITION_LABEL[loan.item_condition ?? ""] ??
+          : (READY_STOCK_CONDITION_WORDS[loan.item_condition ?? ""] ??
             loan.item_condition ??
             "—"),
         source: isSup

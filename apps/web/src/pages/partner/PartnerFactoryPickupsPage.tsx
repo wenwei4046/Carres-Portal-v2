@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { qk, usePartnerMarkPickupCollected } from "@/lib/queries";
 import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 import PickupBatchDialog from "./components/PickupBatchDialog";
+import { lineSummary } from "./PartnerDashboard";
 
 /**
  * Partner · Factory pickups — supplier → warehouse pipeline.
@@ -200,23 +201,6 @@ function stagesOf(p: PickupRow): Stage[] {
   if (scheduled) out.push("scheduled");
   if (inTransit) out.push("in_transit");
   return out;
-}
-
-function lineSummary(lines: PickupLine[]): { head: string; rest: number; totalQty: number } {
-  const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0);
-  const head = lines[0];
-  if (!head) return { head: "—", rest: 0, totalQty };
-  const a = head.attrs as { color?: string; gap?: string; fabric_name?: string } | null;
-  let label = head.sku;
-  if (a?.color || a?.gap) {
-    const bits: string[] = [];
-    if (a.color) bits.push(a.color);
-    if (a.gap) bits.push(`gap ${a.gap}`);
-    label = `${head.sku} · ${bits.join(" · ")}`;
-  } else if (a?.fabric_name) {
-    label = `${head.sku} · ${a.fabric_name}`;
-  }
-  return { head: label, rest: lines.length - 1, totalQty };
 }
 
 export default function PartnerFactoryPickupsPage() {

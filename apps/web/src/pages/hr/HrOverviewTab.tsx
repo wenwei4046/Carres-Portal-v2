@@ -20,7 +20,7 @@ import { useHrReport } from "@/lib/queries";
  * is the answer HR wants most mornings, not a sign the page is broken.
  */
 
-function StatTile({
+export function StatTile({
   label,
   value,
   sub,

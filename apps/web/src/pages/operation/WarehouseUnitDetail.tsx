@@ -5,6 +5,7 @@ import {
   UNIT_OWNERSHIP_LABEL,
   type UnitAvailability,
   type UnitLifecycleOutcome,
+  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockUnit } from "@/lib/queries";
@@ -31,14 +32,6 @@ import ModuleHeader from "./components/ModuleHeader";
  * Wiring them half-way would put five buttons on screen whose refusals nobody
  * had designed. They are recorded as the next Warehouse scope.
  */
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
   available: "bg-kit-green-11",
@@ -120,7 +113,7 @@ export default function WarehouseUnitDetail() {
                   {UNIT_OWNERSHIP_LABEL[unit.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? unit.ownership}
                 </Fact>
                 <Fact label="Condition">
-                  {CONDITION_LABEL[unit.condition] ?? unit.condition}
+                  {READY_STOCK_CONDITION_WORDS[unit.condition] ?? unit.condition}
                   {unit.needsRepair ? " · in repair" : ""}
                 </Fact>
                 <Fact label="Last verified">

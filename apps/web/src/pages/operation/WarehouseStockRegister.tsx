@@ -23,6 +23,7 @@ import {
   type UnitAvailability,
   displayUnitId,
   unitIdOf,
+  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
@@ -61,14 +62,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   guarantee: "Guarantee",
 };
 const CATEGORY_ORDER = ["mattress", "bedframe", "sofa", "accessory", "service", "guarantee"];
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 /** Availability decides the dot's colour. The ARITHMETIC is 0366's; this only
  *  paints the answer it was handed. */
@@ -304,11 +297,11 @@ export default function WarehouseStockRegister() {
         width: 130,
         sortable: true,
         filterType: "enum",
-        filterValue: (u) => CONDITION_LABEL[u.condition] ?? u.condition,
-        exportValue: (u) => CONDITION_LABEL[u.condition] ?? u.condition,
+        filterValue: (u) => READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
+        exportValue: (u) => READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
         chooserGroup: "Unit",
         accessor: (u) => (
-          <span className="text-meta text-base-800">{CONDITION_LABEL[u.condition] ?? u.condition}</span>
+          <span className="text-meta text-base-800">{READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition}</span>
         ),
       },
       {
