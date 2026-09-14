@@ -30,7 +30,7 @@ import { controlClass } from "./field-recipe";
 import { fmtDate } from "@/lib/fmt-date";
 
 /** `YYYY-MM-DD` → a Date at LOCAL midnight. Anything else → undefined. */
-function fromIso(iso: string | null | undefined): Date | undefined {
+export function fromIso(iso: string | null | undefined): Date | undefined {
   if (!iso || iso.length < 10) return undefined;
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return undefined;
@@ -39,7 +39,7 @@ function fromIso(iso: string | null | undefined): Date | undefined {
 }
 
 /** A Date → `YYYY-MM-DD`, read in LOCAL time so the day never shifts. */
-function toIso(date: Date): string {
+export function toIso(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${mm}-${dd}`;
