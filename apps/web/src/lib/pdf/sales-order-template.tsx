@@ -30,7 +30,7 @@ import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/render
 import { displayCustomerName } from "@/lib/customer-name";
 import { lineConfigBits } from "../../pages/dealer/new-order/special-addons-picker";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { CARRES_COMPANY } from "./letterhead";
+import { CARRES_COMPANY, formatMoney, moneyDigits } from "./letterhead";
 import type { SalesOrderTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -75,23 +75,6 @@ function niceDate(iso: string | null | undefined, withDow = false): string | nul
     .toLowerCase()
     .replace(/\b([a-z])/g, (c) => c.toUpperCase());
   return withDow ? pretty : pretty.replace(/^[A-Za-z]{3}, /, "");
-}
-
-/** Table cells print DIGITS only — the column header carries `(RM)` once
- *  (owner round 7: a dozen repeated "RM" was noise; Stripe/IKEA print the
- *  currency once). The money zone keeps the full `RM x` form. */
-function moneyDigits(value: number): string {
-  return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/** Customer-facing money: `RM 1,495.00` (MYR prints as RM — the word the
- *  customer reads on every Malaysian receipt). */
-function formatMoney(value: number, currency: string): string {
-  const unit = currency === "MYR" ? "RM" : currency;
-  return `${unit} ${value.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 const styles = StyleSheet.create({
