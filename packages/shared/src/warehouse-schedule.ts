@@ -235,6 +235,41 @@ export function warehouseArrivalSourceFacts(
 
 const NO_SKU_KEY = " no-sku";
 
+/**
+ * SKU → the CATALOG's own category (`product_models.category`), or `null`
+ * where the catalog holds no row for that SKU. A SKU absent from the map was
+ * never asked about at all — a different thing again, and the ladder's
+ * `undefined` branch handles it.
+ *
+ * MEASURED ON PRODUCTION 2026-09-14. `goodsCategoryWordOf` is the governed
+ * ladder — recorded category, then the CATALOG, then a keyword classifier —
+ * and it was being called with the SKU alone, so the top two rungs were empty
+ * and only the classifier ever ran. 15 of the 37 distinct SKUs on the live
+ * purchasing surface rendered `Other goods` while the catalog knew exactly
+ * what they were: every `5539-*` and `LYYAR-*` sofa among them.
+ *
+ * Those are precisely the families `line-category.ts` names in its own D9
+ * note — *"adding 5539 and lyyar would clear today's twelve orders and
+ * rebuild the same trap for the next model Ohana names"*. So the fix is not a
+ * keyword. It is asking the authority that already knows.
+ */
+export type WarehouseSkuCategories = ReadonlyMap<string, string | null>;
+
+/** The governed ladder, asked properly. Passing `category: undefined` is NOT
+ *  the same as passing `null`: undefined means nobody asked (version skew),
+ *  null means the catalog was asked and holds no row. `goodsCategoryWordOf`
+ *  distinguishes them and this preserves that distinction rather than
+ *  flattening it. */
+function categoryKeyOf(
+  sku: string | null | undefined,
+  categories: WarehouseSkuCategories | undefined,
+): GoodsCategoryWord | null {
+  if (!sku) return null;
+  return categories?.has(sku)
+    ? goodsCategoryWordOf({ sku, category: categories.get(sku) ?? null })
+    : goodsCategoryWordOf({ sku });
+}
+
 /** The Units of one arrangement, counted at one line's SKU scope. */
 function unitCountsForSku(
   units: InboundArrival["units"],
@@ -263,6 +298,7 @@ function modelLabelOf(arrival: InboundArrival, sku: string | null): string | nul
 function arrivalLines(
   arrival: InboundArrival,
   facts: WarehouseArrivalSourceFacts | undefined,
+  categories: WarehouseSkuCategories | undefined,
 ): WarehouseScheduleLine[] {
   const sourceLines = facts?.lines ?? [];
   if (sourceLines.length > 0) {
@@ -279,7 +315,7 @@ function arrivalLines(
       const counts = unique ? unitCountsForSku(arrival.units, line.sku) : null;
       return {
         id: line.id,
-        categoryKey: line.sku ? goodsCategoryWordOf({ sku: line.sku }) : null,
+        categoryKey: categoryKeyOf(line.sku, categories),
         modelLabel: modelLabelOf(arrival, line.sku),
         plannedQty: line.qty,
         receivedQty: counts ? counts.received : null,
@@ -299,7 +335,7 @@ function arrivalLines(
       unit.outcome === "received" || unit.outcome === "received_with_issue";
     return {
       id: unit.id,
-      categoryKey: unit.sku ? goodsCategoryWordOf({ sku: unit.sku }) : null,
+      categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.product ?? unit.sku ?? null,
       plannedQty: 1,
       receivedQty: unmapped ? null : received ? 1 : 0,
@@ -339,6 +375,7 @@ export function warehouseArrivalScheduleCards(
   arrivals: readonly InboundArrival[],
   facts: readonly WarehouseArrivalSourceFacts[],
   todayIso: IsoDate,
+  categories?: WarehouseSkuCategories,
 ): WarehouseScheduleCard[] {
   const factsById = new Map(facts.map((f) => [f.sourceId, f]));
   return arrivals.map((arrival) => {
@@ -373,7 +410,7 @@ export function warehouseArrivalScheduleCards(
                of any kind — an estimate is all that exists to report. */
             ("expected" as const)
         : null,
-      lines: arrivalLines(arrival, fact),
+      lines: arrivalLines(arrival, fact, categories),
       driverConfirmedQty: null,
       logisticsName: null,
       relatedRecords: related,
@@ -429,6 +466,7 @@ export function warehousePickupScheduleCards(
   cards: readonly WarehouseOutboundCard[],
   todayIso: IsoDate,
   proofs?: WarehousePickupAgreementProofs,
+  categories?: WarehouseSkuCategories,
 ): WarehouseScheduleCard[] {
   return cards.map((card) => ({
     id: `pickup:${card.deliveryOrderId ?? card.doNumber}@${
@@ -452,7 +490,7 @@ export function warehousePickupScheduleCards(
        own line and two Units of one model stay two lines. */
     lines: card.units.map((unit) => ({
       id: unit.unitId,
-      categoryKey: unit.sku ? goodsCategoryWordOf({ sku: unit.sku }) : null,
+      categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.productName ?? unit.sku ?? null,
       plannedQty: 1,
       receivedQty: null,

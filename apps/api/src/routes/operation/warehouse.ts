@@ -101,7 +101,7 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       optional("stock_operating_parties", "id,name"),
       optional("arrival_source_events", "id,source_id,kind,unit_ids"),
       read("product_skus", "id,sku,variant,model_id"),
-      read("product_models", "id,name"),
+      read("product_models", "id,name,category"),
     ]);
     /* PRODUCT IDENTITY IS MODEL + VARIANT, NEVER THE VARIANT ALONE.
        Measured on production 2026-09-14: a ten-line PO rendered as ten rows
@@ -118,13 +118,25 @@ operationWarehouseRouter.get("/inbound", async (c) => {
         row.name,
       ]),
     );
-    const skuNames = (
-      productSkus as Array<{
-        sku: string;
-        variant: string | null;
-        model_id: string | null;
-      }>
-    ).map((row) => {
+    /* THE CATALOG'S OWN CATEGORY, read beside the name from the same rows.
+       `goodsCategoryWordOf` is the governed ladder — recorded category, then
+       the CATALOG, then a keyword classifier — and without this field the
+       Schedule could only ever reach its bottom rung. Measured on production
+       2026-09-14: 15 of the 37 distinct SKUs on the live purchasing surface
+       rendered `Other goods` while the catalog knew exactly what they were,
+       every `5539-*` and `LYYAR-*` sofa among them. A SKU the catalog has no
+       row for stays `null` — asked and silent, never guessed. */
+    const modelCategory = new Map(
+      (productModels as Array<{ id: string; category?: string | null }>).map(
+        (row) => [row.id, row.category ?? null],
+      ),
+    );
+    const productRows = productSkus as Array<{
+      sku: string;
+      variant: string | null;
+      model_id: string | null;
+    }>;
+    const skuNames = productRows.map((row) => {
       const model = row.model_id ? modelName.get(row.model_id) ?? null : null;
       const name = [model, row.variant].filter(Boolean).join(" ").trim();
       return { sku: row.sku, name: name || null };
@@ -148,10 +160,26 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       lines: lines as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["lines"],
       promises: promises as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["promises"],
     }).filter((fact) => pagedSourceIds.has(fact.sourceId));
+    /* Scoped to the SKUs the returned arrangements actually mention, so the
+       field never describes goods the rows beside it do not contain. */
+    const pagedSkus = new Set<string>();
+    for (const row of view.rows) {
+      for (const unit of row.units) if (unit.sku) pagedSkus.add(unit.sku);
+      for (const product of row.products) if (product.sku) pagedSkus.add(product.sku);
+    }
+    for (const fact of sourceFacts)
+      for (const line of fact.lines) if (line.sku) pagedSkus.add(line.sku);
+    const skuCategories = productRows
+      .filter((row) => pagedSkus.has(row.sku))
+      .map((row) => ({
+        sku: row.sku,
+        category: row.model_id ? modelCategory.get(row.model_id) ?? null : null,
+      }));
     return c.json({
       arrivals: view.rows,
       sites,
       sourceFacts,
+      skuCategories,
       unresolvedSources: inboundUnresolvedSources(input),
       page: { offset, limit, total: view.total },
       facets: view.facets,

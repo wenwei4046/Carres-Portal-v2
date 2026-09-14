@@ -73,6 +73,7 @@ const PO_ARRIVAL = {
       lines: [{ id: "l1", sku: "sofa:Muro-K", qty: 1 }],
     },
   ],
+  skuCategories: [{ sku: "sofa:Muro-K", category: "sofa" }],
   page: { offset: 0, limit: 200, total: 1 },
 };
 
@@ -287,5 +288,36 @@ describe("the Site filter narrows the RESULT, not the permission", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cards).toEqual([]);
     expect(result.current.errors).toEqual([]);
+  });
+});
+
+describe("the CATALOG reaches categoryKey", () => {
+  it("labels a line from the catalog, not from the SKU text", async () => {
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards[0].lines[0].categoryKey).toBe("Sofa");
+  });
+
+  it("reports when the server cannot supply the catalog", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound")) {
+        const { skuCategories: _drop, ...rest } = PO_ARRIVAL;
+        return Promise.resolve(rest);
+      }
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
+    expect(
+      result.current.errors.some((e) => e.message.includes("catalog")),
+    ).toBe(true);
+    // It still renders — the classifier rung is a degradation, not an outage.
+    expect(result.current.cards).toHaveLength(1);
   });
 });

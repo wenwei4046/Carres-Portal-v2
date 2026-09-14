@@ -87,6 +87,7 @@ describe("GET warehouse/inbound", () => {
       arrivals: [],
       sites: [],
       sourceFacts: [],
+      skuCategories: [],
       unresolvedSources: [],
       page: { offset: 0, limit: 50, total: 0 },
       facets: {
@@ -162,6 +163,20 @@ function dbWithOnePo(promises: unknown[] = []) {
     purchase_order_lines: [
       { id: "line-1", po_id: "PO-1", qty: 1, destination_id: null, sku: "sofa:Muro-K" },
       { id: "line-2", po_id: "PO-1", qty: 2, destination_id: null, sku: "bedframe:Jager-Q" },
+      { id: "line-3", po_id: "PO-1", qty: 1, destination_id: null, sku: "sofa:NoModel-K" },
+    ],
+    product_skus: [
+      { id: "ps1", sku: "sofa:Muro-K", variant: "King", model_id: "m-sofa" },
+      { id: "ps2", sku: "bedframe:Jager-Q", variant: "Queen", model_id: "m-bed" },
+      // A SKU the catalog holds no model for — asked, and silent.
+      { id: "ps3", sku: "sofa:NoModel-K", variant: "King", model_id: null },
+      // Present in the catalog but on no arrangement of this page.
+      { id: "ps4", sku: "mattress:Unrelated-Q", variant: "Queen", model_id: "m-mat" },
+    ],
+    product_models: [
+      { id: "m-sofa", name: "Muro", category: "sofa" },
+      { id: "m-bed", name: "Jager", category: "bedframe" },
+      { id: "m-mat", name: "Breeze", category: "mattress" },
     ],
     po_supplier_promises: promises,
     ops_stock_items: [
@@ -199,6 +214,7 @@ describe("GET warehouse/inbound — arrival source facts", () => {
     expect(fact.lines).toEqual([
       { id: "line-1", sku: "sofa:Muro-K", qty: 1 },
       { id: "line-2", sku: "bedframe:Jager-Q", qty: 2 },
+      { id: "line-3", sku: "sofa:NoModel-K", qty: 1 },
     ]);
   });
 
@@ -339,5 +355,31 @@ describe("GET warehouse/inbound — product identity", () => {
       ),
     );
     expect(named.get("NO-MODEL-K")).toBe("King");
+  });
+});
+
+describe("GET warehouse/inbound — the catalog's own category", () => {
+  it("carries product_models.category per SKU, scoped to the page", async () => {
+    dbWithOnePo();
+    const body = (await (await app().request("/inbound")).json()) as {
+      skuCategories: Array<{ sku: string; category: string | null }>;
+    };
+    const bySku = new Map(body.skuCategories.map((r) => [r.sku, r.category]));
+    /* The ladder can only reach the catalog rung if this field exists. Without
+       it every `5539-*` sofa on the live surface reads `Other goods`. */
+    expect(bySku.get("sofa:Muro-K")).toBe("sofa");
+    expect(bySku.get("bedframe:Jager-Q")).toBe("bedframe");
+    // A SKU no arrangement on this page mentions is not described.
+    expect(bySku.has("mattress:Unrelated-Q")).toBe(false);
+  });
+
+  it("reports a catalog SILENCE as null, never as a guess", async () => {
+    dbWithOnePo();
+    const body = (await (await app().request("/inbound")).json()) as {
+      skuCategories: Array<{ sku: string; category: string | null }>;
+    };
+    const row = body.skuCategories.find((r) => r.sku === "sofa:NoModel-K");
+    expect(row).toBeDefined();
+    expect(row!.category).toBeNull();
   });
 });

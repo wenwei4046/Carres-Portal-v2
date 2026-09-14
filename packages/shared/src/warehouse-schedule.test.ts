@@ -795,3 +795,106 @@ describe("undated work is REACHABLE, not merely counted", () => {
     expect(undated[0].dateStatus).toBeNull();
   });
 });
+
+
+describe("categoryKey asks the CATALOG, not the SKU text", () => {
+  /* MEASURED ON PRODUCTION 2026-09-14. The governed ladder
+     (`goodsCategoryWordOf`) asks a recorded category, then the catalog, then
+     a keyword classifier. I was calling it with the SKU alone, so the top two
+     rungs were empty and only the classifier ever ran. 15 of the 37 distinct
+     SKUs on the live purchasing surface rendered `Other goods` while the
+     catalog knew exactly what they were — every `5539-*` and `LYYAR-*` sofa
+     among them, which are the very families `line-category.ts` names as the
+     trap that adding keywords rebuilds. */
+  const input = () =>
+    inboundInput({
+      pos: [po("PO-A")],
+      lines: [
+        { po_id: "PO-A", qty: 1, destination_id: null, sku: "5539-CNR" },
+        { po_id: "PO-A", qty: 1, destination_id: null, sku: "N1001S-Q" },
+      ],
+      units: [unit("u1", "PO-A", "5539-CNR"), unit("u2", "PO-A", "N1001S-Q")],
+    });
+
+  it("reads the catalog category when it is supplied", () => {
+    const i = input();
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([
+        ["5539-CNR", "sofa"],
+        ["N1001S-Q", "mattress"],
+      ]),
+    );
+    expect(card.lines.map((l) => l.categoryKey)).toEqual(["Sofa", "Mattress"]);
+  });
+
+  it("falls through to the classifier only where the catalog is SILENT", () => {
+    const i = input();
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([["5539-CNR", null]]),
+    );
+    // Catalog asked and silent, and no keyword recognises it — it says so
+    // rather than claiming a category nobody recorded.
+    expect(card.lines[0].categoryKey).toBe("Other goods");
+  });
+
+  it("lets the CATALOG outrank a keyword the classifier would have matched", () => {
+    const i = inboundInput({
+      pos: [po("PO-A")],
+      lines: [{ po_id: "PO-A", qty: 1, destination_id: null, sku: "CODY-K" }],
+      units: [unit("u1", "PO-A", "CODY-K")],
+    });
+    // `cody` is a bedframe keyword; the catalog is still the authority.
+    expect(
+      warehouseArrivalScheduleCards(
+        inboundArrivals(i),
+        warehouseArrivalSourceFacts(i),
+        TODAY,
+        new Map([["CODY-K", "sofa"]]),
+      )[0].lines[0].categoryKey,
+    ).toBe("Sofa");
+  });
+
+  it("applies the catalog to UNIT-derived lines too", () => {
+    const i = inboundInput({
+      arrivalSources: [
+        {
+          id: "src-1",
+          source_no: "TR-001",
+          kind: "transfer",
+          from_site_id: null,
+          to_site_id: "site-1",
+          party_id: null,
+          expected_date: "2026-09-20",
+          cancelled_at: null,
+        },
+      ] as unknown as InboundInput["arrivalSources"],
+      sourceUnits: [
+        { source_id: "src-1", stock_item_id: "u1" },
+      ] as unknown as InboundInput["sourceUnits"],
+      units: [unit("u1", "", "5539-CNR")],
+    });
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([["5539-CNR", "sofa"]]),
+    );
+    expect(card.lines[0].categoryKey).toBe("Sofa");
+  });
+
+  it("applies the catalog to PICKUP lines when one is supplied", () => {
+    const [card] = warehousePickupScheduleCards(
+      warehouseOutboundCards(pickupEvents([{ unitId: "U-1", sku: "5539-CNR" }])),
+      TODAY,
+      undefined,
+      new Map([["5539-CNR", "sofa"]]),
+    );
+    expect(card.lines[0].categoryKey).toBe("Sofa");
+  });
+});

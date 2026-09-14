@@ -60,6 +60,9 @@ interface InboundPayload {
   sites: Array<{ id: string; name: string }>;
   /** Additive, read-only (this card). Absent on a Worker built before it. */
   sourceFacts?: WarehouseArrivalSourceFacts[];
+  /** Additive, read-only: the CATALOG's own answer per SKU. Absent on a
+   *  Worker built before it, which drops the ladder to its classifier rung. */
+  skuCategories?: Array<{ sku: string; category: string | null }>;
   page: { offset: number; limit: number; total: number };
 }
 
@@ -198,10 +201,19 @@ export function useWarehouseSchedule(
             direction,
             message: `Showing ${payload.arrivals.length} of ${payload.page.total} arrival arrangements. The rest are not on this page.`,
           });
+        if (!payload.skuCategories)
+          errors.push({
+            direction,
+            message:
+              "The product catalog is not available from this server. Categories fall back to the shared classifier.",
+          });
         cards = warehouseArrivalScheduleCards(
           payload.arrivals,
           payload.sourceFacts ?? [],
           today,
+          payload.skuCategories
+            ? new Map(payload.skuCategories.map((r) => [r.sku, r.category]))
+            : undefined,
         );
       }
     } else {
