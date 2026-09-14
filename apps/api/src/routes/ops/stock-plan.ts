@@ -20,6 +20,7 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
 
 /**
  * Ready stock plan — card K2 (migration 0287).
@@ -373,25 +374,6 @@ opsStockPlanRouter.post("/:planId/decide", requireOperationOrPrincipal, async (c
 // =====================================================================
 // Helpers
 // =====================================================================
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
-}
 
 /** A permission answer must read as 403, never as an outage. */
 function mapErr(error: { code?: string; message?: string }): HTTPException {

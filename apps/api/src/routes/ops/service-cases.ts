@@ -34,6 +34,7 @@ import {
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
 
 /**
  * Service Cases (SC) — migration 0210. The case / 病历 parent layer above
@@ -1041,20 +1042,6 @@ function embeddedSo(o: RawCase["orders"]): number | null {
   if (!o) return null;
   const row = Array.isArray(o) ? o[0] : o;
   return row?.so ?? null;
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try { body = await c.req.json(); }
-  catch { throw new HTTPException(400, { message: "Body must be valid JSON" }); }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, { message: "Invalid input: " + parsed.error.issues[0]?.message });
-  }
-  return parsed.data;
 }
 
 export default scRouter;
