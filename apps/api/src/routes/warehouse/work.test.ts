@@ -38,4 +38,20 @@ describe("Warehouse Site Work", () => {
     })));
     expect((await app.request("/api/warehouse/work")).status).toBe(403);
   });
+
+  it("refuses an internal account at the acceptance door too", async () => {
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("auth", {
+        id: "ops-1", email: "ops@carres.test", role: "operation",
+        dealerId: null, supplierId: null, partnerId: null, outletId: null,
+        warehouseId: null, jwt: "jwt",
+      });
+      await next();
+    });
+    app.route("/api/warehouse/work", createWarehouseWorkRouter(async () => ({
+      items: [], staff: [], generatedOn: "2026-09-09",
+    })));
+    expect((await app.request("/api/warehouse/work/11111111-1111-4111-8111-111111111111/accept", { method: "POST", body: "{}" })).status).toBe(403);
+  });
 });
