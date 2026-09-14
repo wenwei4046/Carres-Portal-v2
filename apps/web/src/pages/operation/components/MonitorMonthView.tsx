@@ -108,7 +108,7 @@ export default function MonitorMonthView({
             const iso = toIso(day.date);
             const counts = countsByDay.get(iso);
             const sentence = monthDaySentence(fmtDate(iso), counts);
-            const quiet = !counts || counts.deliveries === 0;
+            const quiet = !counts || counts.deliveries + counts.transfers === 0;
             return (
               <button
                 {...button}
@@ -128,9 +128,10 @@ export default function MonitorMonthView({
                 <span className={`text-body leading-5 ${quiet ? "text-kit-slate-9" : ""}`}>
                   {day.date.getDate()}
                 </span>
-                {counts && counts.deliveries > 0 ? (
+                {counts && counts.deliveries + counts.transfers > 0 ? (
                   <>
-                    <Line label={MONITOR_COPY.cellDeliveries} count={counts.deliveries} />
+                    {counts.deliveries > 0 ? <Line label={MONITOR_COPY.cellDeliveries} count={counts.deliveries} /> : null}
+                    {counts.transfers > 0 ? <Line label={MONITOR_COPY.cellTransfers} count={counts.transfers} /> : null}
                     {counts.exceptions > 0 ? (
                       <Line label={MONITOR_COPY.cellExceptions} count={counts.exceptions} warning />
                     ) : null}

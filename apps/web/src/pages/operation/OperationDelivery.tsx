@@ -113,6 +113,8 @@ import {
   MONITOR_CALENDAR_VIEW_LABEL,
   MONITOR_COLUMN,
   MONITOR_COPY,
+  scheduleCountsOf,
+  scheduleSplitSentence,
   MONITOR_DAYS,
   MONITOR_STATUS_FILTERS,
   MONITOR_STATUS_LABEL,
@@ -467,8 +469,9 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
     }
   };
   return (
-    <ScheduleCard label={so} testId={`delivery-monitor-card-${card.scopeId}`}
+    <ScheduleCard label={`${card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType} ${so}`} testId={`delivery-monitor-card-${card.scopeId}`} variant={card.eventType === "transfer" ? "secondary" : "standard"}
       header={<>
+        <div className="w-full text-label font-medium text-kit-slate-11">{card.eventType === "transfer" ? MONITOR_COPY.transferType : MONITOR_COPY.deliveryType}</div>
         <div className="min-w-0 break-words font-mono font-medium text-blue-700">
           {card.doNumber ? <div>{card.doNumber}</div> : null}
           <div>{so}</div>
@@ -1104,10 +1107,11 @@ export default function OperationDelivery() {
   );
   /* The dot days for the rail's month calendar — every date genuinely
      holding a confirmed delivery, whatever month it sits in. */
-  const workDayIsos = useMemo(
-    () => [...new Set(cards.map((c) => c.confirmedDate).filter((d): d is string => d !== null))],
-    [cards],
+  const railCalendarCards = useMemo(
+    () => filterMonitorCalendarCards(cards, filters, cards.flatMap(card => card.confirmedDate ? [card.confirmedDate] : [])),
+    [cards, filters],
   );
+  const railCountsByDay = useMemo(() => monthDayCounts(railCalendarCards, today), [railCalendarCards, today]);
   const rails = useMemo(
     () => buildMonitorRails(cards, filters, partners),
     [cards, filters, partners],
@@ -1116,21 +1120,7 @@ export default function OperationDelivery() {
     () => filterMonitorCalendarCards(cards, filters, visibleDays),
     [cards, filters, visibleDays],
   );
-  /* Every AGREED appointment the current narrowings leave — the Confirmed
-     deliveries tab's own badge. It is deliberately not window-scoped: a tab
-     count that emptied when the operator paged to a quiet week would say the
-     work had gone away. */
-  const confirmedCount = useMemo(
-    () =>
-      cards.filter(
-        (c) =>
-          c.confirmedDate !== null &&
-          (region === null || c.region === region) &&
-          (logistics === null || c.logisticsPartnerId === logistics) &&
-          (status === null || c.statusKey === status),
-      ).length,
-    [cards, region, logistics, status],
-  );
+  const scheduleCounts = useMemo(() => scheduleCountsOf(calendarCards), [calendarCards]);
   /* The PHONE work list's own search box. It is deliberately LOCAL, not the
      URL's `?q=`: a carried-over URL search must never narrow a work list
      invisibly (the desktop sheet applies the same rule with the grid's own
@@ -1693,14 +1683,10 @@ export default function OperationDelivery() {
     >
       {MONITOR_TOP_TABS.map((tab) => {
         const active = topTab === tab;
-        /* ⭐ A TAB'S COUNT IS THE VIEW'S WHOLE POPULATION, not the pick inside
-           it. `Work to do` counts every open delivery and `Confirmed
-           deliveries` counts every agreed appointment — both narrowed by the
-           STATE / LOGISTICS PARTNER / DELIVERY STATUS picks that apply to
-           BOTH views, and by neither the queue nor the visible week. A badge
-           that changed with the queue would say what the footer already says
-           and stop answering *how much is there?* from the other tab. */
-        const count = tab === "work" ? rails.work.all : confirmedCount;
+        /* Work counts the open population. Schedule counts its visible date
+           window under the active filters; the adjacent split identifies
+           customer deliveries and transfers within that same population. */
+        const count = tab === "work" ? rails.work.all : calendarCards.length;
         return (
           <button
             key={tab}
@@ -1841,7 +1827,8 @@ export default function OperationDelivery() {
         <MonitorMonthCalendar
           selectedIso={selectedDate}
           onSelect={pickCalendarDate}
-          workDayIsos={workDayIsos}
+          countsByDay={railCountsByDay}
+          todayIso={today}
           testId="delivery-monitor-month-calendar"
         />
       }
@@ -2102,6 +2089,7 @@ export default function OperationDelivery() {
                 className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-label text-kit-slate-9"
                 data-testid="delivery-monitor-calendar-scope"
               >
+                <div className="text-kit-slate-11" data-testid="delivery-monitor-schedule-split">{scheduleSplitSentence(scheduleCounts)}</div>
                 {MONITOR_COPY.calendarScope}
               </div>
 

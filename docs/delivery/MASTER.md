@@ -573,9 +573,18 @@ stock records. Same-SKU pooling cannot light two product lines green. Missing, i
 excess bindings remain `Receipt not verified`; intermediate-leg receipt remains unknown,
 because an initial receipt is not arrival at the next site. This read does not prove current
 custody, loading, driver confirmation or customer delivery. The ordinary not-yet-received
-case still needs explicit receipt evidence; absence is not that evidence. Whole-schedule
-conformance (including separate transfer counts and the two status facts above) and production
-verification remain open. Local fixtures and passing tests do not close them.
+case still needs explicit receipt evidence; absence is not that evidence. The two status facts
+above and production verification remain open. Local fixtures and passing tests do not close them.
+
+The local schedule now classifies each intermediate leg as `TRANSFER`, and only the final leg
+as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or
+remain overdue. The tab total and customer/transfer split use the same visible date window and
+active filters. Month summaries and the two-month rail keep the two event counts separate;
+the rail uses a circle/square legend, a blue today ring and a subtle current-work-week ground.
+Evidence: 254 targeted Delivery tests and workspace typecheck pass. Dedicated local Chrome
+checks at 1440px, 949px and 390px show the transfer's actual Klang WH → JB transit route and
+TEOW assignment, with no customer locality substituted; all card bounds fit their viewport.
+These checks use illustrative fixtures, not production records or deployed screenshots.
 Local Chrome verification covers 1440px, 949px and 390px: all three product lines remain
 separate, the correct line's details stay inside the viewport, Escape returns focus to its
 trigger, and mobile product/footer targets measure 40px high. The calendar control reads

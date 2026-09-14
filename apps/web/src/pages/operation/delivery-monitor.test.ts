@@ -49,6 +49,8 @@ import {
   monthStepStart,
   monthDayCounts,
   monthDaySentence,
+  scheduleCountsOf,
+  scheduleSplitSentence,
   missingProofLabels,
   monitorRowAction,
   monitorRowActionText,
@@ -604,7 +606,7 @@ describe("the two top-level views", () => {
     expect(DEFAULT_TOP_TAB).toBe("work");
     expect(DEFAULT_WORK_VIEW).toBe("all");
     expect(MONITOR_TOP_TAB_LABEL.work).toBe("Work to do");
-    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Confirmed deliveries");
+    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Delivery schedule");
   });
 
   it("a STATE pick narrows the calendar instead of replacing it", () => {
@@ -646,7 +648,8 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     booked: true,
     /* Nothing has been delivered in a fixture unless it says so: `settled`
        is the trip having already RUN, not the arrangement being complete. */
-    settled: false,
+    settled: ["arrived", "delivered", "failed"].includes(over.statusKey ?? ""),
+    eventType: "delivery",
     customerName: "Kong Chai Yin",
     locality: "Klang, Selangor",
     goodsSummary: "Mattress ×1",
@@ -859,20 +862,46 @@ describe("monthDayCounts", () => {
       datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
     ];
     const counts = monthDayCounts(set, TODAY);
-    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, exceptions: 1, noLogistics: 2 });
-    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, exceptions: 2, noLogistics: 1 });
+    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 });
+    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, transfers: 0, exceptions: 2, noLogistics: 1 });
     // A dateless row sits on no day.
     expect(counts.size).toBe(2);
   });
 
   it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, exceptions: 1, noLogistics: 2 })).toBe(
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 })).toBe(
       "Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked",
     );
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, exceptions: 0, noLogistics: 0 })).toBe(
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, transfers: 0, exceptions: 0, noLogistics: 0 })).toBe(
       "Fri, 4 Sep — 1 delivery",
     );
     expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep — No deliveries");
+  });
+});
+
+describe("the schedule separates customer deliveries from transfers", () => {
+  const journey = () => cards([order({ id: "journey", so: 1401, delivery_stops: [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Klang WH", to_loc: "Ipoh WH", scheduled_at: "2026-09-04T02:00:00Z", status: "delivered" },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "Ipoh WH", to_loc: "Penang WH", scheduled_at: "2026-09-04T04:00:00Z", status: "pending" },
+    { leg: 3, partner_id: "p-al", partner_name: "AL", from_loc: "Penang WH", to_loc: "Customer", scheduled_at: "2026-09-05T04:00:00Z", status: "pending" },
+  ] as never })]);
+
+  it("keeps an intermediate completion as an arrival even without a DO", () => {
+    const set = journey();
+    expect(set.map(card => card.eventType)).toEqual(["transfer", "transfer", "delivery"]);
+    expect(set[0]).toMatchObject({ statusKey: "arrived", statusSecond: "Ipoh WH", settled: true, contactOverdue: false });
+    expect(set[0]!.missingProof).toEqual({ photo: false, signedDo: false });
+  });
+
+  it("counts the selected range and filters instead of retaining an all-dates total", () => {
+    const set = journey();
+    const friday = filterMonitorCalendarCards(set, noFilters, ["2026-09-04"]);
+    expect(scheduleSplitSentence(scheduleCountsOf(friday))).toBe("0 customer deliveries · 2 transfers");
+    expect(monthDayCounts(friday, TODAY).get("2026-09-04")).toMatchObject({ deliveries: 0, transfers: 2 });
+    const alOnly = filterMonitorCalendarCards(set, { ...noFilters, logisticsPartnerId: "p-al" }, ["2026-09-04"]);
+    expect(scheduleCountsOf(alOnly)).toEqual({ deliveries: 0, transfers: 1 });
+    expect(scheduleCountsOf(filterMonitorCalendarCards(set, noFilters, ["2026-09-05"]))).toEqual({ deliveries: 1, transfers: 0 });
+    expect(monthDaySentence("Fri, 4 Sep", monthDayCounts(friday, TODAY).get("2026-09-04"))).toBe("Fri, 4 Sep — 2 transfers");
   });
 });
 

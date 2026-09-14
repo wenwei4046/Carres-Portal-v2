@@ -197,6 +197,8 @@ export interface DeliveryScopeRow {
   refs: string[];
   /** 1-based leg number on a multi-leg Journey; null on a whole-order scope. */
   leg: number | null;
+  /** A Journey leg before the final customer leg; computed once with the scope. */
+  intermediateLeg: boolean;
   /** `Klang WH → JB transit` — the leg's own two places, never invented. */
   legRoute: string | null;
   customer: string;
@@ -274,6 +276,7 @@ export function legWorkStatusOf(
   confirmedIso: string | null,
   partnerName: string | null = null,
   confirmedTime: string | null = null,
+  intermediateLeg = false,
 ): DeliveryWorkStatus {
   const say = (kind: DeliveryWorkStatusKind, second: string | null = null): DeliveryWorkStatus => ({
     kind,
@@ -289,7 +292,7 @@ export function legWorkStatusOf(
   });
   switch (stop.status) {
     case "delivered":
-      return say("delivered");
+      return intermediateLeg ? say("arrived", stop.to_loc?.trim() || null) : say("delivered");
     case "handed_off":
       /* A leg handed off at the named partner warehouse has ARRIVED there —
          the goods reached the stop, never the customer (Delivery MASTER
@@ -738,6 +741,7 @@ export function buildDeliveryScopeRows({
         ...base,
         key: o.id,
         leg: null,
+        intermediateLeg: false,
         legRoute: null,
         logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
         logisticsName,
@@ -809,6 +813,7 @@ export function buildDeliveryScopeRows({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
         leg: stop.leg,
+        intermediateLeg,
         legRoute: legRouteOf(stop),
         logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
         logisticsName: legPartner,
@@ -847,7 +852,7 @@ export function buildDeliveryScopeRows({
               },
               DELIVERY_STATUS_SPELL,
             )
-          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
+          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime, intermediateLeg),
       });
     }
   }

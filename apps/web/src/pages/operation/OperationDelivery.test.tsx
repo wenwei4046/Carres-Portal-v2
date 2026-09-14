@@ -681,6 +681,30 @@ describe("one card", () => {
 describe("the two top-level views (owner ruling 2026-09-10)", () => {
   beforeEach(seedTwoScopes);
 
+  it("keeps transfer-only weeks distinct and updates both schedule and rail counts when filtered", () => {
+    ordersState.data = { orders: [order({ id: "journey", so: 1501, delivery_stops: [
+      { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Klang WH", to_loc: "Ipoh WH", scheduled_at: "2026-09-04T02:00:00Z", status: "picked_up" },
+      { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "Ipoh WH", to_loc: "Penang WH", scheduled_at: "2026-09-04T04:00:00Z", status: "pending" },
+      { leg: 3, partner_id: "p-al", partner_name: "AL", from_loc: "Penang WH", to_loc: "Customer", scheduled_at: "2026-09-07T04:00:00Z", status: "pending" },
+    ] as never })] };
+    docsState.data = { deliveryOrders: [], attempts: [], handoverEvents: [] };
+    arrangementsState.data = { arrangements: [] };
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("0 customer deliveries · 2 transfers");
+    expect(screen.getByTestId("delivery-monitor-tab-calendar")).toHaveTextContent("Delivery schedule2");
+    expect(screen.getAllByText("TRANSFER")).toHaveLength(2);
+    expect(within(screen.getByTestId("delivery-monitor-card-journey#leg1")).getByText("To Ipoh WH")).toBeTruthy();
+    const rail = screen.getByTestId("delivery-monitor-month-calendar");
+    expect(within(rail).getByRole("button", { name: /Fri, 4 Sep, 0 customer deliveries · 2 transfers/ })).toBeTruthy();
+    pickRail("logistics", /^NETS/);
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("0 customer deliveries · 1 transfer");
+    expect(within(rail).getByRole("button", { name: /Fri, 4 Sep, 0 customer deliveries · 1 transfer/ })).toBeTruthy();
+    fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
+    fireEvent.click(screen.getByTestId("delivery-monitor-next"));
+    expect(screen.getByTestId("delivery-monitor-schedule-split")).toHaveTextContent("1 customer delivery · 0 transfers");
+    expect(screen.getByTestId("delivery-monitor-tab-calendar")).toHaveTextContent("Delivery schedule1");
+  });
+
   it("⭐ the DEFAULT LANDING is Work to do — the selectable work list, not a calendar", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     const tabs = screen.getByTestId("delivery-monitor-tabs");
@@ -695,7 +719,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     /* Both tabs are NAMED — the operator never has to discover the other view
        by clearing a filter. */
     expect(within(tabs).getByText("Work to do")).toBeTruthy();
-    expect(within(tabs).getByText("Confirmed deliveries")).toBeTruthy();
+    expect(within(tabs).getByText("Delivery schedule")).toBeTruthy();
   });
 
   it("the landing offers nothing to CLEAR — its queue narrows nothing", () => {
@@ -716,11 +740,11 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));
     expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
     expect(screen.getByTestId("location-probe").textContent).toContain("view=week");
-    expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toBe(
+    expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toContain(
       /* A day with no agreed window DOES enter the calendar — the operator
          must see the day — and its card says `No time agreed` rather than
          passing as a settled booking (owner ruling 2026-09-11). */
-      "Only deliveries with a confirmed date appear here.",
+      "Confirmed dates only",
     );
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-work"));
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();

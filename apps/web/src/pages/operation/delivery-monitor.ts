@@ -260,7 +260,10 @@ export const MONITOR_COPY = {
   /** The landing: what an operator must DO today. */
   tabWork: "Work to do",
   /** The calendar: only deliveries a customer has actually agreed a day for. */
-  tabCalendar: "Confirmed deliveries",
+  tabCalendar: "Delivery schedule",
+  deliveryType: "DELIVERY",
+  transferType: "TRANSFER",
+  cellTransfers: "Transfers",
   tabs: "Monitor views",
   /** The calendar's own boundary, stated ON the calendar rather than learned
    *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
@@ -268,7 +271,7 @@ export const MONITOR_COPY = {
    *  because the operator must see the day — and its card says `No time
    *  agreed` rather than passing as a finished booking (owner ruling
    *  2026-09-11). */
-  calendarScope: "Only deliveries with a confirmed date appear here.",
+  calendarScope: "Confirmed dates only",
   /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
   /** The strip's own caption — these dates are CONTACT deadlines, and a reader
    *  who mistakes them for delivery appointments will call on the wrong day. */
@@ -571,6 +574,7 @@ export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] =
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
+  eventType: "delivery" | "transfer";
   /** Stable identity — the row's own key (order id, or `id#legN`). */
   scopeId: string;
   orderId: string;
@@ -907,7 +911,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        delivered trip sitting in `Call customer` because nobody recorded a
        time window sends an operator to phone a customer whose furniture is
        already in the house. */
-    const settled = row.status.kind === "delivered" || row.status.kind === "failed";
+    const settled = row.status.kind === "delivered" || row.status.kind === "arrived" || row.status.kind === "failed";
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -918,6 +922,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       confirmedTime: row.confirmedTime,
       booked,
       settled,
+      eventType: row.intermediateLeg ? "transfer" : "delivery",
       customerName: row.customer,
       locality: row.location || null,
       goodsSummary: row.goods,
@@ -1355,7 +1360,7 @@ export function isOverdueDelivery(card: DeliveryMonitorCard, todayIso: string): 
   return (
     card.confirmedDate !== null &&
     card.confirmedDate < todayIso &&
-    card.statusKey !== "delivered"
+    !card.settled
   );
 }
 
@@ -1477,6 +1482,7 @@ export function groupCardsByDay(
 
 export interface MonthDayCounts {
   deliveries: number;
+  transfers: number;
   exceptions: number;
   noLogistics: number;
 }
@@ -1493,8 +1499,9 @@ export function monthDayCounts(
   const out = new Map<string, MonthDayCounts>();
   for (const c of cards) {
     if (!c.confirmedDate) continue;
-    const cell = out.get(c.confirmedDate) ?? { deliveries: 0, exceptions: 0, noLogistics: 0 };
-    cell.deliveries += 1;
+    const cell = out.get(c.confirmedDate) ?? { deliveries: 0, transfers: 0, exceptions: 0, noLogistics: 0 };
+    if (c.eventType === "transfer") cell.transfers += 1;
+    else cell.deliveries += 1;
     if (isExceptionCard(c, todayIso)) cell.exceptions += 1;
     if (c.logisticsPartnerId === null) cell.noLogistics += 1;
     out.set(c.confirmedDate, cell);
@@ -1504,15 +1511,28 @@ export function monthDayCounts(
 
 /** The month cell's aria sentence — the same three facts, in words. */
 export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | undefined): string {
-  if (!counts || counts.deliveries === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
-  const parts = [
-    `${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`,
-  ];
+  if (!counts || counts.deliveries + counts.transfers === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
+  const parts = [];
+  if (counts.deliveries > 0) parts.push(`${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`);
+  if (counts.transfers > 0) parts.push(`${counts.transfers} ${counts.transfers === 1 ? "transfer" : "transfers"}`);
   if (counts.exceptions > 0) {
     parts.push(`${counts.exceptions} ${counts.exceptions === 1 ? "exception" : "exceptions"}`);
   }
   if (counts.noLogistics > 0) parts.push(`${counts.noLogistics} ${MONITOR_COPY.noLogistics}`);
   return `${dateLabel} — ${parts.join(" · ")}`;
+}
+
+/** The selected schedule scope, not the all-dates work population. */
+export function scheduleCountsOf(cards: readonly DeliveryMonitorCard[]): { deliveries: number; transfers: number } {
+  return cards.reduce((count, card) => {
+    if (card.eventType === "transfer") count.transfers += 1;
+    else count.deliveries += 1;
+    return count;
+  }, { deliveries: 0, transfers: 0 });
+}
+
+export function scheduleSplitSentence(count: { deliveries: number; transfers: number }): string {
+  return `${count.deliveries} customer ${count.deliveries === 1 ? "delivery" : "deliveries"} · ${count.transfers} ${count.transfers === 1 ? "transfer" : "transfers"}`;
 }
 
 /* ── The calendar's empty range — ONE spanning sentence, never six copies ── */

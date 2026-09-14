@@ -505,6 +505,8 @@ may never be inferred from a time, an ETA or a location.
 
 **Schedule view words:** `Day` · **`3 days`** (768–1279px) · **`Work week`** (≥1280px, Mon–Sat) ·
 `Month`. **A three-day layout is never labelled `Week`.**
+The schedule boundary is **`Confirmed dates only`**: a date can be confirmed while its time
+still needs agreeing. It applies equally to customer deliveries and transfers.
 
 **Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
 **`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
