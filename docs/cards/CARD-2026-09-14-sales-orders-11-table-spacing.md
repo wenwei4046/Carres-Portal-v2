@@ -60,3 +60,28 @@ walk → Card/MASTER closure. Delivery proof is pending.
 - Fixture preview uses the actual page and shared engine with isolated sample responses, not
   production business data. Production baseline is before-847.png; post-change production proof
   remains pending. Do not infer delivery from these measurements.
+
+
+## Rendered acceptance before merge
+
+The actual page fixture passed 847×704 and 1440×900, with two expanded rows at desktop:
+the five fixed child widths stay 132/140/200/152/64px in both, while Item grows from 426 to
+560.539px. Body width equals viewport width in both. Saved layout moves Customer before SO No,
+keeps Customer=288px and Requested Delivery Date=240px, adds Phone and survives reload.
+The child then begins at x=418, exactly the reordered SO No edge, and reaches the parent right edge.
+The normal and selected toolbars remain accessible at 847px; sort and the date filter open correctly.
+The sorted two-line date button is 87.531×28px within its 128×36px header.
+
+Content measurements at the real 13px font: Mattress protector=113.406px; ordinary SKU
+5539-1A(LHF)=94.586px; AL Sungai Buloh ×10=129.039px; Unit ID (14) trigger=86.516px.
+The retained fixed tracks cover these plus 16px padding and normal longer codes/destinations;
+Qty retains its shared 64px header/numeral track. The 321px stress SKU and 311px stress Unit ID
+stay one line in keyboard-scrollable code spans (ArrowRight produces scrollLeft=40), retaining
+full-text titles. No code spills into a neighbour. The multi-ID Popover exposes all 14 IDs.
+
+Evidence: `docs/evidence/sales-orders-11/` fixture screenshots and JSON measurements.
+These are isolated samples, not live transactions. The fixture entry is excluded from production
+and is not committed. A local typecheck/build was stopped under heavy machine contention; the
+complete authoritative gate runs in GitHub CI. Initial CI found unsupported `exact` options in
+six new test queries; those were removed (role names already match exactly). The corrected
+six-column negative-control restoration passes. PR: https://github.com/wenwei4046/Carres-Portal-v2/pull/1305.
