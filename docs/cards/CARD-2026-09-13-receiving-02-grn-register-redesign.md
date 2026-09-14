@@ -446,3 +446,40 @@ nothing here touched it, but it is a live security gap somebody owns.
 5. **Close `docs/purchasing/MASTER.md`** with what production actually showed.
 
 **Steps 2–4 are the owner's to authorise. Nothing in this pass performed any of them.**
+
+### CI on the reconciled head — GREEN
+
+`verify` **success** on `02c3edb7`, 2026-09-14 08:11→08:30 UTC (run `34821393067`). That is the
+full gate against current `main`: `ci:migrations` · `lint` · `typecheck` · `test` · `build` · the
+web-bundle secret probe — including the **full migration-chain replay this machine could not run**,
+which is the check that `0493` still applies cleanly with eleven files now sorting after it.
+The one-in-two local flake (`OperationPurchaseOrders.test.tsx`) did not reproduce in CI.
+
+**PR #1274 is `mergeable: true` and still a DRAFT.** Everything that can be verified without owner
+authorisation is now verified. What remains is not engineering work:
+
+| Remaining step | Who | Why it is not this lane's to take |
+|---|---|---|
+| Apply `0493` to production | owner-authorised governed path | a production migration apply is the Constitution's named manual-intervention exception |
+| Mark #1274 ready and merge | owner | the PR is a DRAFT held open FOR owner review of the design; merging deploys both Pages projects and the Worker |
+| Authorised walk of the deployed page | this lane, after the merge | the closure evidence |
+
+**Pre-apply baseline measured for the backfill (2026-09-14, read-only):** production holds **7**
+`warehouse_receipts`, all projectable, **7** lines between them, and exactly **two** carry exception
+evidence — `smoke/dmg-b.jpg` on `GRN-20260904-1064` and `receiving/p5/damaged-1.jpg` on the PO-2054
+receipt `eab42aec`. So `0493`'s backfill must insert **exactly 2 rows** into
+`receiving_line_evidence` — a number to check after the apply rather than trust. Neither file is
+in `storage.objects` (the PO-2054 one was measured absent in the third pass), so the viewer will
+name both `Recorded file is not in storage`. That is the truth about the data, not a defect.
+
+**Migration safety audit before any apply:** the only destructive statements in `0493` are three
+`drop … if exists` — a policy on the table it creates, a function signature it replaces on the next
+line, and a trigger it recreates on the next line. No `drop table`, no `truncate`, no `delete from`,
+and no migration-time row-count assertion (red line 8). The backfill is a `select` calling the
+projection function; it never updates `warehouse_receipts` and never moves `updated_at`.
+
+**Ordering, confirmed by measurement:** apply `0493` BEFORE the merge. Not because a deploy-first
+would crash — the evidence route detects the missing relation and answers `verified: false`. The
+reason is the write path: the Session ships damaged/wrong-item video pickers and extra-line
+evidence pickers that the pre-`0493` validator refuses, so a deploy-first window would hand
+operators controls their database rejects.
