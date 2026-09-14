@@ -559,6 +559,29 @@ expected arrival or upload time. An unconfirmed delivery never enters a date cel
 range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
 `{n} deliveries need a confirmed date.` count and its door.
 
+**Compact calendar correction — implementation evidence, not release completion (2026-09-14).**
+The owner-approved compact composition is being implemented in the shared `ScheduleCard`:
+DO number when present, SO number on its own line, no legacy reference or customer name on
+the face; every physical product line has its own category icon and quantity, with its full
+name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
+appears only for an explicit assignment. A real journey uses its actual From and To; no fixed
+transit stop is inferred. The one footer is `Open DO` or the existing `Edit Delivery` door.
+An unissued DO is omitted from the calendar card; the register's absence is the owner's `DO`.
+
+Receipt marks currently require exact `reserved_order_line_id` bindings in reserved/sold
+stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
+excess bindings remain `Receipt not verified`; intermediate-leg receipt remains unknown,
+because an initial receipt is not arrival at the next site. This read does not prove current
+custody, loading, driver confirmation or customer delivery. The ordinary not-yet-received
+case still needs explicit receipt evidence; absence is not that evidence. Whole-schedule
+conformance (including separate transfer counts and the two status facts above) and production
+verification remain open. Local fixtures and passing tests do not close them.
+Local Chrome verification covers 1440px, 949px and 390px: all three product lines remain
+separate, the correct line's details stay inside the viewport, Escape returns focus to its
+trigger, and mobile product/footer targets measure 40px high. The calendar control reads
+`Work week`, `3 days` and `Day` for the corresponding windows. These are fixture checks,
+not production screenshots or proof of the missing receipt states.
+
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 
 The work list is the shared `register/DataGrid` with the Register Template's toolbar, footer,
@@ -577,7 +600,7 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 9 | `Logistics` | partner name · `No logistics picked` | driver name once assigned |
 | 10 | `Items & Stock` | `Ready` · `Not ready` | `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` |
 | 11 | `Payment` | `Paid` · `Do not deliver` · `Collect RM {amount}` | `RM {amount} still to collect` · `Finance is holding this delivery` · `Cash on delivery` |
-| 12 | `DO No` | the number, opens the DO · `No delivery order yet` | `DO date` |
+| 12 | `DO No` | the number opens the DO; when absent, muted `DO` with `No delivery order yet` tooltip and accessible name (owner correction 2026-09-14), no action | `DO date` |
 
 **Row law.** The parent row is **72px** and carries exactly one primary fact and one supporting
 line. This is the approved Delivery Monitor page-specific exception to the Register density law

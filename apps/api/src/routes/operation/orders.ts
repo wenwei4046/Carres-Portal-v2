@@ -595,7 +595,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       if (batch.length === 0) continue;
       const { data: reserved, error: e_reserved } = await sb
         .from("ops_stock_items")
-        .select("sku, qty, reserved_ref")
+        .select("sku, qty, reserved_ref, reserved_order_line_id")
         .eq("status", "reserved")
         .in("reserved_ref", batch);
       if (e_reserved) {
@@ -603,10 +603,10 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         return c.json(m.body, m.status);
       }
       for (const u of reserved ?? []) {
-        const row = u as { sku: string | null; qty: number | null; reserved_ref: string | null };
+        const row = u as { sku: string | null; qty: number | null; reserved_ref: string | null; reserved_order_line_id?: string | null };
         const orderId = row.reserved_ref ? soRefByNumber.get(row.reserved_ref) : undefined;
         if (!orderId || !row.sku) continue;
-        push(orderId, { sku: row.sku, status: "reserved", qty: row.qty ?? 1 });
+        push(orderId, { sku: row.sku, status: "reserved", qty: row.qty ?? 1, orderLineId: row.reserved_order_line_id ?? null });
       }
     }
     /* An order id is a 36-character UUID; 100 of them is a 4KB URL. */
@@ -614,7 +614,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       if (batch.length === 0) continue;
       const { data: sold, error: e_sold } = await sb
         .from("ops_stock_items")
-        .select("sku, qty, sold_order_id")
+        .select("sku, qty, sold_order_id, reserved_order_line_id")
         .eq("status", "sold")
         .in("sold_order_id", batch);
       if (e_sold) {
@@ -622,9 +622,9 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         return c.json(m.body, m.status);
       }
       for (const u of sold ?? []) {
-        const row = u as { sku: string | null; qty: number | null; sold_order_id: string | null };
+        const row = u as { sku: string | null; qty: number | null; sold_order_id: string | null; reserved_order_line_id?: string | null };
         if (!row.sold_order_id || !row.sku) continue;
-        push(row.sold_order_id, { sku: row.sku, status: "sold", qty: row.qty ?? 1 });
+        push(row.sold_order_id, { sku: row.sku, status: "sold", qty: row.qty ?? 1, orderLineId: row.reserved_order_line_id ?? null });
       }
     }
   }

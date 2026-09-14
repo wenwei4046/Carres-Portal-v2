@@ -114,7 +114,20 @@ function arrival(over: Record<string, unknown> = {}) {
 }
 
 const ORDERS = [
-  order({ id: "a", so: 1322, do_number: "DO-030926-0001", customer_name: "kong chai yin" }),
+  order({
+    id: "a", so: 1322, do_number: "DO-030926-0001", customer_name: "kong chai yin",
+    // Visual fixture: repeat a category without merging the product lines.
+    // Each receipt belongs to its line; an unbound accessory stays unknown.
+    order_lines: [
+      { id: "a-m1", sku: "mattress:M1401F-K", qty: 1, label: "Serena · King" },
+      { id: "a-m2", sku: "mattress:M1401F-Q", qty: 2, label: "Serena · Queen" },
+      { id: "a-p1", sku: "Pillow soft", qty: 2, label: "Pillow soft" },
+    ],
+    allocated_units: [
+      { sku: "mattress:M1401F-K", status: "reserved", qty: 1, orderLineId: "a-m1" },
+      { sku: "mattress:M1401F-Q", status: "reserved", qty: 1, orderLineId: "a-m2" },
+    ],
+  }),
   order({
     id: "b",
     so: 1323,

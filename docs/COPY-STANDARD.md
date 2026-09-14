@@ -2653,7 +2653,9 @@ door.
 | The register page and its sidebar child | **Delivery Orders** | DO list · Documents |
 | No confirmed operational date | **No confirmed date** | Unscheduled · Pending · No ETA |
 | Confirmed date is behind today with no result | **Overdue** | Date passed · Late delivery |
-| No formal DO exists yet | **No delivery order yet** | Not issued · Create DO · Issue DO |
+| Calendar product receipt evidence (2026-09-14) | **Received Qty**; unknown **Receipt not verified**. Details: **Receipt for this product line. Delivery and current location are separate.** These refer to explicitly bound stock records, not SKU-pooled availability or payment release. | assuming an unbound or missing row means not received |
+| No formal DO exists yet | **DO** in the Monitor DO No cell (owner correction 2026-09-14), muted and non-interactive; tooltip and accessible name **No delivery order yet**. Detail explanations keep the full absence wording. | Not issued · Create DO · Issue DO |
+| Compact calendar card's existing-DO door | **Open DO**. The accessible name includes the actual DO number; the full number remains at the top of the card. Without a DO, keep **Edit Delivery** and the existing arrangement route. | repeating the entire DO number in the visible footer |
 | Open the formal document | the actual **DO number** | View DO · Details |
 
 A Monitor card carries the arrangement facts, DO number and Delivery Status in one place. This
@@ -2671,7 +2673,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
 | `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **RULED 2026-09-07** |
 | `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
-| `STATE` · `LOGISTICS` | Monitor's second and third rail groups — direct state names, governed partners genuinely carrying rows; no `All …` row in either | **RULED 2026-09-07** (`All regions` · `All logistics` · the `REGION` heading RETIRED on Monitor; `LOGISTICS` is the owner-approved heading, 2026-09-14) |
+| `STATE` · `LOGISTICS` | Monitor's second and third rail groups. The State dropdown offers **All states**; the Logistics dropdown offers **All** under its visible **LOGISTICS** heading. Each clears only that filter. | `REGION` · `LOGISTICS PARTNER` · `All partners` |
 | `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
 | `{n} deliveries` / `{n} of {m} deliveries` · `No deliveries` · `No matching deliveries.` | Monitor's work-list footer and empty states; `1 delivery` / `{n} deliveries` on the Assign logistics door | **RULED 2026-09-07** (`delivery scope(s)` RETIRED from every employee surface) |
 | `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |

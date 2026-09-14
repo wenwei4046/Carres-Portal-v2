@@ -48,6 +48,7 @@ import {
   deliveryStockReadinessOf,
   deliveryWorkStatusLabelOf,
   goodsCategoryWordOf,
+  receivedForBoundLine,
   lineKind,
   lineShortagesOf,
   myHolidaySet,
@@ -93,10 +94,10 @@ export const MONITOR_COPY = {
   /** The three dropdowns own clear-this-one-condition word (2026-09-12).
    *  `All` alone would read as all of everything; each says WHAT it clears. */
   allStates: "All states",
-  allPartners: "All partners",
+  allPartners: "All",
   allStatuses: "All",
   railState: "STATE",
-  railLogistics: "LOGISTICS PARTNER",
+  railLogistics: "LOGISTICS",
   railStatus: "DELIVERY STATUS",
   allDeliveryWork: "All delivery work",
   noLogistics: "No logistics picked",
@@ -132,6 +133,11 @@ export const MONITOR_COPY = {
    *  section. Joins the rail now that the proof-review record exists. */
   checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
+  noDeliveryOrderShort: "DO",
+  openDo: "Open DO",
+  receivedQty: "Received Qty",
+  receiptUnknown: "Receipt not verified",
+  receiptMeaning: "Receipt for this product line. Delivery and current location are separate.",
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
   /* ── THE TWELVE-COLUMN REGISTER (owner ruling 2026-09-12, MASTER §8.3) ── */
@@ -163,7 +169,7 @@ export const MONITOR_COPY = {
   customerRequested: "Customer requested",
   confirmedDate: "Confirmed delivery date",
   confirmedTime: "Confirmed delivery time",
-  partner: "Logistics Partner",
+  partner: "Logistics",
   driver: "Driver",
   driverPhone: "Driver phone",
   vehiclePlate: "Vehicle plate",
@@ -239,7 +245,8 @@ export const MONITOR_COPY = {
   openNoConfirmedDate: "Open Call customer",
   calendarViews: "Calendar view",
   day: "Day",
-  week: "Week",
+  week: "Work week",
+  threeDays: "3 days",
   month: "Month",
   /** The Month view's compact cell lines — the rail row grammar (label, then
    *  the count) so the operator reads what the rail already taught. */
@@ -314,7 +321,7 @@ export const MONITOR_COLUMN = {
   customer: "Customer",
   state: "State",
   requestedDelivery: "Requested Delivery Date",
-  logisticsPartner: "Logistics Partner",
+  logisticsPartner: "Logistics",
   /** The register's own heading for the partner column (§8.3 column 9). */
   logistics: "Logistics",
   confirmedDelivery: "Confirmed Delivery",
@@ -746,6 +753,7 @@ export interface MonitorGoodsLine {
   qty: number;
   /** Pieces the register does not hold for this line — 0 when it is all in. */
   shortQty: number;
+  receivedQty?: number | null;
 }
 
 /** One accessory or service line. A service moves no Unit and can be short of
@@ -864,6 +872,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         category: goodsCategoryWordOf(line),
         qty: line.qty,
         shortQty: shortByLineIndex.get(index) ?? 0,
+        receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units),
       };
       /* `unknown` is a physical thing nobody recognised — it travels on the
          truck, so it belongs with the MAIN goods, never buried under the

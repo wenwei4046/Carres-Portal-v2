@@ -128,6 +128,48 @@ describe("GET /api/operation/orders", () => {
     expect(or).toHaveBeenCalledWith(expect.not.stringContaining("so.eq."));
   });
 
+  it("carries exact product-line bindings through both reserved and sold stock reads", async () => {
+    const stockSelects: string[] = [];
+    const from = vi.fn((table: string) => {
+      let status: unknown;
+      const chain: Record<string, unknown> = {};
+      for (const method of ["in", "ilike", "or", "not", "is", "order", "limit", "range"])
+        chain[method] = vi.fn(() => chain);
+      chain.select = vi.fn((columns: string) => {
+        if (table === "ops_stock_items") stockSelects.push(columns);
+        return chain;
+      });
+      chain.eq = vi.fn((column: string, value: unknown) => {
+        if (column === "status") status = value;
+        return chain;
+      });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ error: null, data:
+        table === "orders" ? [ORDER_ROW] : table === "ops_stock_items" ?
+          status === "reserved" ? [
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: "line-a" },
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: null },
+          ] : status === "sold" ? [
+            { sku: "same", qty: 2, sold_order_id: ORDER_ROW.id, reserved_order_line_id: "line-b" },
+          ] : [] : [],
+      });
+      return chain;
+    });
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { orders: { allocated_units: unknown[] }[] };
+    expect(body.orders[0]?.allocated_units).toEqual([
+      { sku: "same", qty: 1, status: "reserved", orderLineId: "line-a" },
+      { sku: "same", qty: 1, status: "reserved", orderLineId: null },
+      { sku: "same", qty: 2, status: "sold", orderLineId: "line-b" },
+    ]);
+    expect(stockSelects).toHaveLength(2);
+    expect(stockSelects.every(columns => columns.split(", ").includes("reserved_order_line_id"))).toBe(true);
+  });
+
   // ── D1 · the list carries the SKUs a real purchase order covers ───────────
   //
   // Before D1 the only PO evidence on the wire was `order_lines.source_po`, a

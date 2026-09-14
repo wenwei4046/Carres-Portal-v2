@@ -253,8 +253,10 @@ line drawn in it would change colour at the header and read as two lines.
 
 **Three sizes: 14 · 16 · 18.**
 
-**One meaning, one glyph.** The 40 permitted meanings are the `IconName` union
+**One meaning, one glyph.** The 46 registered meanings are the `IconName` union
 in `apps/web/src/components/kit/Icon.tsx`; a name outside it does not compile.
+These include the original 40, mattress/bedframe/sofa, columnFilter, and the
+compact product-line card's pillow/protector. Stroke and size tokens are unchanged.
 Validated 2026-07-31: the kebab is `overflow`, and `more` does not exist.
 
 ---

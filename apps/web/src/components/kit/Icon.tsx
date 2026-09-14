@@ -44,6 +44,8 @@ import {
   MessageCircle,
   MoreVertical,
   Package,
+  RectangleHorizontal,
+  Layers2,
   Paperclip,
   Pencil,
   Phone,
@@ -125,6 +127,8 @@ const GLYPH = {
   mattress: BedDouble,
   bedframe: Bed,
   sofa: Sofa,
+  pillow: RectangleHorizontal,
+  protector: Layers2,
 } as const;
 
 /** Every meaning the portal has. Not a Lucide name — a business meaning. */

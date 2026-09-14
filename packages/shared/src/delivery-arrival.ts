@@ -78,10 +78,30 @@ export interface PoArrival {
 
 /** One physically allocated register row, as the list read carries it. */
 export interface AllocatedUnit {
+  /** Exact stock-to-order-line binding. Absent in older list responses. */
+  orderLineId?: string | null;
   sku: string;
   status: "reserved" | "sold";
   /** A bulk register row counts its own `qty` (0218); a unit row counts 1. */
   qty: number;
+}
+
+/** A reserved/sold stock record proves receipt only for its explicitly bound line.
+ * SKU pooling remains useful for shortages, but cannot prove which repeated line arrived.
+ * Missing binding is unknown, not zero received. This is not current-site custody or release.
+ */
+export function receivedForBoundLine(
+  lineId: string | null | undefined,
+  requiredQty: number,
+  units: readonly AllocatedUnit[] | undefined,
+): number | null {
+  if (!lineId || !units || !Number.isFinite(requiredQty) || requiredQty <= 0) return null;
+  const bound = units.filter(unit => unit.orderLineId === lineId);
+  if (!bound.length) return null;
+  if (bound.some(unit => !Number.isFinite(unit.qty) || unit.qty <= 0)) return null;
+  const qty = bound.reduce((total, unit) => total + unit.qty, 0);
+  // Excess bindings are not a reassuring full receipt.
+  return qty > requiredQty ? null : qty;
 }
 
 /** One committed goods line of the sales order. */

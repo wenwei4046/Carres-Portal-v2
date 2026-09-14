@@ -18,10 +18,10 @@
  *     pick holds (no queue, state, partner or status); any pick answers with
  *     the work list.
  *  6. The rail filters combine, every count is what clicking it produces,
- *     STATE is flat direct names, LOGISTICS PARTNER lists only partners
+ *     STATE is flat direct names, LOGISTICS lists only partners
  *     genuinely carrying matching rows, DELIVERY STATUS is the three fixed
  *     rungs, and `No logistics picked` is a WORK TO DO queue — never
- *     duplicated under LOGISTICS PARTNER.
+ *     duplicated under LOGISTICS.
  *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
  *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
  */
@@ -1031,7 +1031,7 @@ describe("buildMonitorRails", () => {
     expect(rails.regions.find((r) => r.key === "Sabah")!.count).toBe(0);
   });
 
-  it("LOGISTICS PARTNER lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
+  it("LOGISTICS lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     const labels = rails.logistics.map((r) => r.label);
     // NETS carries one; AL and HOUZS carry nothing and are not listed.
@@ -1112,7 +1112,7 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   it("the group headings are the owner's words", () => {
     expect(MONITOR_COPY.railWork).toBe("WORK TO DO");
     expect(MONITOR_COPY.railState).toBe("STATE");
-    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS PARTNER");
+    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS");
     expect(MONITOR_COPY.railStatus).toBe("DELIVERY STATUS");
   });
 });
