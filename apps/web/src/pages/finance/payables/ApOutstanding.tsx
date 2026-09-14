@@ -109,7 +109,7 @@ function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
             ? <p>No unpaid bill.</p>
             : open.map((b) => (
               <p key={b.bill_id}>
-                <Link to={`/finance/bills/${b.bill_id}`}>{b.bill_no}</Link>
+                <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${b.bill_id}`}>{b.bill_no}</Link>
                 {" · "}{b.supplier_invoice_no} · {fmtDate(b.bill_date)}
                 {" · "}{b.due_date ? `due ${fmtDate(b.due_date)}` : "no due date"}
                 {" · "}{money(b.balance_owing)} unpaid

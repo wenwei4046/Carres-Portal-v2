@@ -78,7 +78,7 @@ function VoucherRegister() {
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
     { key: "voucher", label: "Voucher No", width: 170,
-      accessor: (r) => <Link to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
+      accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.voucher_no ?? "", exportValue: (r) => r.voucher_no ?? "Draft, no number yet" },
     { key: "date", label: "Voucher Date", width: 130, accessor: (r) => fmtDate(r.voucher_date),
       dateValue: (r) => r.voucher_date, filterType: "date", exportValue: (r) => fmtDate(r.voucher_date) },
@@ -351,7 +351,7 @@ function VoucherBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
               <tbody>
                 {doc.allocations.map((a) => (
                   <tr key={a.bill_id} className="border-t border-base-100">
-                    <td className="py-1 pr-3"><Link to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
+                    <td className="py-1 pr-3"><Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
                     <td className="py-1 pr-3">{a.supplier_invoice_no}</td>
                     <td className="py-1 pr-3">{fmtDate(a.bill_date)}</td>
                     <td className="py-1 pr-3">{a.due_date ? fmtDate(a.due_date) : "No due date"}</td>
@@ -525,7 +525,7 @@ function VoucherForm() {
   if (id && existing.data && !existing.data.can.edit) {
     return (
       <div className="p-6 text-body">
-        Only a draft voucher can be changed. <Link to={`/finance/payment-vouchers/${id}`}>Back to the voucher</Link>
+        Only a draft voucher can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${id}`}>Back to the voucher</Link>
       </div>
     );
   }

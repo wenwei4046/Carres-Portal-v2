@@ -78,7 +78,7 @@ function BillRegister() {
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierBillRegisterRow>[]>(() => [
     { key: "bill", label: "Bill No", width: 170,
-      accessor: (r) => <Link to={`/finance/bills/${r.id}`}>{r.bill_no ?? "Draft, no number yet"}</Link>,
+      accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${r.id}`}>{r.bill_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
@@ -249,7 +249,7 @@ function BillDetail() {
                 ? (
                   <p key={p.application_id ?? `${p.voucher_id}-advance`}>
                     Advance from{" "}
-                    <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
                     {" · "}{word(ADVANCE_APPLICATION_STATUS_WORD, p.status)}
                     {" · "}{fmtDate(p.applied_on ?? p.voucher_date)} · {money(p.amount_applied)}
                     {doc.can.take_advance_off && p.status === "applied" && p.application_id && (
@@ -264,7 +264,7 @@ function BillDetail() {
                 )
                 : (
                   <p key={p.voucher_id}>
-                    <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
                     {" · "}{word(VOUCHER_STATUS_WORD, p.status)} · {fmtDate(p.voucher_date)} · {money(p.amount_applied)}
                   </p>
                 ))}
@@ -553,7 +553,7 @@ function BillForm() {
   if (id && existing.isError) return <ReadFailed what="This bill" onRetry={() => void existing.refetch()} />;
   if (id && !loaded) return <div className="p-6 text-body">Loading bill…</div>;
   if (id && existing.data && !existing.data.can.edit) {
-    return <div className="p-6 text-body">Only a draft bill can be changed. <Link to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
+    return <div className="p-6 text-body">Only a draft bill can be changed. <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${id}`}>Back to the bill</Link></div>;
   }
 
   const ready = supplierId !== "" && invoiceNo.trim() !== "" && /^\d{4}-\d{2}-\d{2}$/.test(billDate)
