@@ -1062,7 +1062,7 @@ describe("buildMonitorRails", () => {
 });
 
 describe("the ruled rail groups (owner correction 2026-09-07)", () => {
-  it("WORK TO DO is the seven queues in the ruled order — `Check delivery proof` joined with the §6.1 record (0489)", () => {
+  it("WORK TO DO is the eight queues in the ruled order — `Order details incomplete` joined 2026-09-14 (Card 23)", () => {
     expect(MONITOR_WORK_VIEWS).toEqual([
       "all",
       "no_logistics",
@@ -1071,7 +1071,9 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
       "failed",
       "upload_proof",
       "check_proof",
+      "details_incomplete",
     ]);
+    expect(MONITOR_VIEW_LABEL.details_incomplete).toBe("Order details incomplete");
     expect(MONITOR_VIEW_LABEL.check_proof).toBe("Check delivery proof");
     expect(MONITOR_VIEW_LABEL.all).toBe(MONITOR_COPY.allDeliveryWork);
     expect(MONITOR_VIEW_LABEL.no_logistics).toBe(MONITOR_COPY.noLogistics);
@@ -1137,11 +1139,27 @@ describe("the No confirmed date chase", () => {
     expect(rows.slice(3).map((r) => r.scope.so).sort()).toEqual([1504, 1505]);
   });
 
-  it("the chase order is applied to `No confirmed date` and to nothing else", () => {
-    /* `All delivery work` keeps the canonical row order — re-sorting every
-       queue by a Sales date would quietly re-rank work that is not a chase. */
-    const all = filterMonitorListRows(cards(chaseOrders), { ...noFilters, view: "all" });
-    expect(all.map((r) => r.scope.so)).toEqual([1503, 1504, 1501, 1502]);
+  it("the chase order belongs to `No confirmed date`; `All delivery work` leads with what is LATE", () => {
+    /* ⭐ Re-ruled 2026-09-14 (Card 23). This test used to assert that
+       `All delivery work` applied NO sort at all. Measured on production that
+       day, that is exactly what buried the one overdue delivery in ninth
+       place under eight rows that were not yet due. The chase's
+       requested-date order still belongs to the chase alone; every other
+       queue now answers the morning question and leads with late work. */
+    const late = datedCard({
+      scopeId: "late-trip",
+      confirmedDate: "2026-08-20",
+      statusKey: "overdue",
+      statusLabel: "Overdue",
+      statusTone: "red",
+    });
+    const soon = datedCard({ scopeId: "soon", confirmedDate: "2026-09-30" });
+    const all = filterMonitorListRows([soon, late], { ...noFilters, view: "all" });
+    expect(all.map((c) => c.scopeId)).toEqual(["late-trip", "soon"]);
+
+    /* And the chase is still ordered by the customer's requested date. */
+    const chase = filterMonitorListRows(cards(chaseOrders), chaseFilters);
+    expect(chase.map((r) => r.scope.so)).toEqual([1501, 1502, 1503, 1504]);
   });
 
   it("sorting is stable and never mutates its input", () => {
@@ -1656,5 +1674,77 @@ describe("the three rail dropdowns' All counts", () => {
     /* And each group's rows never add up to more than its own total. */
     const regionSum = rails.regions.reduce((n, r) => n + r.count, 0);
     expect(regionSum).toBeLessThanOrEqual(rails.regionTotal);
+  });
+});
+
+/* ── CARD 23 · THE POPULATION AND THE WORK ORDER (owner ruling 2026-09-14) ── */
+
+describe("Card 23 · the work order — overdue first, incomplete last", () => {
+  const late = () =>
+    datedCard({
+      scopeId: "late",
+      confirmedDate: "2026-08-20",
+      statusKey: "overdue",
+      statusLabel: "Overdue",
+      statusTone: "red",
+    });
+  const today = () => datedCard({ scopeId: "today", confirmedDate: TODAY });
+  const future = () => datedCard({ scopeId: "future", confirmedDate: "2026-09-30" });
+  const incomplete = () =>
+    datedCard({
+      scopeId: "incomplete",
+      /* Overdue AND incomplete: the hardest case, because the status ladder
+         makes this row SAY `Order details incomplete` while its trip is also
+         late. It still sinks — a missing postcode never outranks live work. */
+      confirmedDate: "2026-08-01",
+      statusKey: "details_incomplete",
+      statusLabel: "Order details incomplete",
+      statusTone: "orange",
+    });
+
+  it("leads with the overdue trip, then today, then the nearest deadline", () => {
+    const rows = filterMonitorListRows([future(), today(), late()], {
+      ...noFilters,
+      view: "all",
+    });
+    expect(rows.map((c) => c.scopeId)).toEqual(["late", "today", "future"]);
+  });
+
+  it("`Order details incomplete` sinks beneath live work and never hides Overdue", () => {
+    const rows = filterMonitorListRows([incomplete(), future(), late()], {
+      ...noFilters,
+      view: "all",
+    });
+    expect(rows.map((c) => c.scopeId)).toEqual(["late", "future", "incomplete"]);
+    expect(rows[rows.length - 1]!.statusKey).toBe("details_incomplete");
+  });
+
+  it("a missed CONTACT deadline is late work too", () => {
+    const chased = datedCard({
+      scopeId: "missed-call",
+      confirmedDate: null,
+      booked: false,
+      contactDueIso: "2026-08-28",
+      contactOverdue: true,
+      statusKey: "operation_must_call",
+      statusLabel: "Operation must call the customer",
+      statusTone: "orange",
+    });
+    const rows = filterMonitorListRows([future(), chased], { ...noFilters, view: "all" });
+    expect(rows[0]!.scopeId).toBe("missed-call");
+  });
+
+  it("the eighth rail queue counts exactly the rows whose status says so", () => {
+    const rails = buildMonitorRails([incomplete(), future(), late()], noFilters, []);
+    expect(rails.work.details_incomplete).toBe(1);
+    expect(rails.work.all).toBe(3);
+  });
+
+  it("the queue lists only those rows", () => {
+    const rows = filterMonitorListRows([incomplete(), future(), late()], {
+      ...noFilters,
+      view: "details_incomplete",
+    });
+    expect(rows.map((c) => c.scopeId)).toEqual(["incomplete"]);
   });
 });

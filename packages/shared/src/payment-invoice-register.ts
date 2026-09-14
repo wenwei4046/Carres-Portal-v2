@@ -144,8 +144,15 @@ export function invoiceGoodsFacts(row: InvoiceRegisterRow): {
   return { completed, goodsReady, arrivalIso };
 }
 
+/* ⭐ ONE DATE SPELLING — COPY-STANDARD's own date law (`Wed, 12 Aug`), which
+   `fmtDate` spells everywhere else in the portal. These names used to be the
+   FULL weekday (`Monday`), so the same day read `Sunday, 4 Oct` on the Payment
+   Monitor and `Sun, 4 Oct` in the collection workspace the row opens — and
+   COPY-STANDARD is explicit that a second date spelling is itself the defect.
+   The Payment MASTER's own examples carried the long form; they are corrected
+   in the same change, because the date law outranks a module's example. */
 const WEEKDAYS = [
-  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
 ] as const;
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -237,9 +244,21 @@ export function soRemaining(
 
 /** The Customer Delivery cell fact: the customer-confirmed day, else the
  *  requested day, else the honest absence. */
+export type CustomerDeliveryStatus = "confirmed" | "requested" | "customer_not_sure" | "no_date";
+
+/**
+ * ⭐ THE ONE CUSTOMER-DELIVERY READ (ERP-ARCHITECTURE Law D).
+ *
+ * The Monitor row and the collection workspace the row opens used to derive
+ * this fact SEPARATELY, and they disagreed: an order whose customer is not sure
+ * read `No delivery date` on the row and `Customer not sure` inside. Worse, the
+ * workspace computed the status and then printed the bare date, so a date the
+ * customer had NOT confirmed looked exactly like one they had. Both surfaces
+ * now read this function and print `deliveryWords` below it.
+ */
 export function invoiceCustomerDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;
-  word: "confirmed" | "requested" | "customer_not_sure" | "no_date";
+  word: CustomerDeliveryStatus;
 } {
   const confirmed = ctrlOf(row)?.confirmed_date ?? null;
   if (confirmed && ISO_DATE.test(confirmed)) return { dateIso: confirmed, word: "confirmed" };
@@ -248,6 +267,23 @@ export function invoiceCustomerDelivery(row: InvoiceRegisterRow): {
   const requested = order?.delivery_date ?? null;
   if (requested && ISO_DATE.test(requested)) return { dateIso: requested, word: "requested" };
   return { dateIso: null, word: "no_date" };
+}
+
+/**
+ * The governed words for that status — the SAME line on the row and in the
+ * workspace. `Not confirmed yet` is a second line, never a replacement for the
+ * date: the operator still needs the day they are working towards.
+ */
+export function deliveryWords(d: { dateIso: string | null; word: CustomerDeliveryStatus }): {
+  word: string;
+  note: string | null;
+} {
+  switch (d.word) {
+    case "confirmed": return { word: invoiceArrivalDayWord(d.dateIso!), note: null };
+    case "requested": return { word: invoiceArrivalDayWord(d.dateIso!), note: "Not confirmed yet" };
+    case "customer_not_sure": return { word: "Customer not sure", note: null };
+    case "no_date": return { word: "No delivery date", note: null };
+  }
 }
 
 export type InvoiceTiming =

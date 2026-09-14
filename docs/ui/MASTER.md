@@ -1283,6 +1283,13 @@ breathing gap
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
   may not squeeze the default set.
+- **Sales Orders spacing correction — owner approved 2026-09-14.** The owning Orders MASTER
+  §0.1 / Sales Orders Card 11 governs six separate child columns, fixed content widths with Item
+  last, 8px side padding, its own four-sided border and 12px vertical gaps. The child follows the
+  actual SO No column after saved reordering and ends at the parent table edge. Requested Delivery
+  Date may use the deliberate two-line header `Requested` / `Delivery Date`; the exact accessible,
+  filter and export label stays unchanged. Narrow grids scroll internally. These are Sales Orders
+  opt-ins; Purchasing's approved goods composition and other consumers retain their layouts.
 - Expansion is goods-only: a small clean, non-filterable table beneath the parent row with the
   locked columns `Category | Unit ID | Deliver To | SKU | Qty | Item` (owner ruling 2026-08-15,
   moving `Deliver To` next to `Unit ID`: both answer *where is this piece*, and separating them by

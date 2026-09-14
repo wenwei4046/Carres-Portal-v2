@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
+  deliveryWords,
   invoiceCustomerDelivery,
   invoiceGoodsFacts,
   invoiceGoodsWord,
@@ -62,11 +63,11 @@ export function collectionFactsOf(
   const timingRule = collectionTimingFor(timingRules, row.issued_at?.slice(0, 10) ?? today);
   const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule);
   const neededWord = money.known ? rm(money.outstanding) : "Value not recorded";
-  const deliveryWord =
-    delivery.word === "customer_not_sure" ? "Customer not sure"
-    : delivery.word === "no_date" ? "No delivery date"
-    : fmtDate(delivery.dateIso!);
-  return { money, goodsMoney, goods, delivery, timing, neededWord, deliveryWord };
+  /* The SAME words the Monitor row prints (Law D). This used to throw the
+     status away and print a bare date, so a day the customer had NOT confirmed
+     was indistinguishable from one they had. */
+  const { word: deliveryWord, note: deliveryNote } = deliveryWords(delivery);
+  return { money, goodsMoney, goods, delivery, timing, neededWord, deliveryWord, deliveryNote };
 }
 
 export function invoiceIdentityOf(row: InvoiceRegisterRow): string {
@@ -191,7 +192,8 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
       </Facts>
       <Facts title="Goods and Delivery">
         <p>{invoiceGoodsWord(invoice)}</p>
-        <p>Customer Delivery: {f.deliveryWord}</p>
+        <p>Customer Delivery: {f.deliveryWord}
+          {f.deliveryNote && <span className="text-kit-amber-11"> · {f.deliveryNote}</span>}</p>
         <p>{partner ? `Logistics Partner: ${partner}${contact ? ` · ${contact}` : " · No customer contact on file yet."}` : "No Logistics Partner assigned yet."}</p>
       </Facts>
       {/* §6/§7 — the storage case lives between the goods facts and the

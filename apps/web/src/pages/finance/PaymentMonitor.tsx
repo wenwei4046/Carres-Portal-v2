@@ -333,6 +333,16 @@ export default function PaymentMonitor() {
   const isError = invoicesQ.isError || casesQ.isError || requestsQ.isError || settingsQ.isError;
   const loaded = invoicesQ.isSuccess && casesQ.isSuccess && requestsQ.isSuccess && settingsQ.isSuccess;
 
+  /* ⭐ THE SUMMARY SURVIVES THE COLLAPSE (2026-09-14).
+     Payment MASTER §3 places the clear summaries above the rail's filters, and
+     that placement stays. What the MASTER does not contemplate is the rail
+     being collapsible: below 1100px it collapses on its own, the collapse is
+     REMEMBERED, and the governed summary simply disappeared — measured on
+     production at 1024px, where the whole node was absent from the page. So the
+     summary is not moved out of its governed home; it is repeated in the sheet
+     header for exactly the state where its home is not on screen. */
+  const summaryLines = loaded ? summaries : ["Reading the collection desk…"];
+
   const showFiltersButton = (
     <button type="button" aria-label="Show filters" title="Show filters"
       data-testid="payment-monitor-show-filters"
@@ -349,9 +359,7 @@ export default function PaymentMonitor() {
          prints nothing; an empty desk says so in one sentence. */
       header={<div data-testid="payment-monitor-summaries" className="space-y-1 pr-8">
         <p className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Today</p>
-        {loaded
-          ? summaries.map((s) => <p key={s} className="text-body text-kit-slate-12">{s}</p>)
-          : <p className="text-body text-kit-slate-11">Reading the collection desk…</p>}
+        {summaryLines.map((line) => <p key={line} className="text-body text-kit-slate-12">{line}</p>)}
       </div>}>
       <FilterRailGroup title="Show">
         {MONITOR_FILTERS.map((f) => <FilterRailRow key={f.key} label={f.label}
@@ -403,12 +411,24 @@ export default function PaymentMonitor() {
                 </aside>
               : null}
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+            {!railVisible && <div data-testid="payment-monitor-summaries-collapsed"
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-kit-slate-5 bg-white px-3 py-1.5">
+              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Today</span>
+              {summaryLines.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
+            </div>}
             <ListPageShell register>
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
                 storageKey="carres.payment.monitor.v1" appearance="reference" exportName="Payment Monitor"
                 /* No confirmed answer is not an empty list: skeleton until every
                    source has actually answered. */
-                groupBanner={false} stickyIdentity isLoading={!loaded} searchPlaceholder="Search by SO, customer or phone…"
+                /* ⭐ THE ROW KEEPS ITS NAME (owner ruling 2026-09-12, Delivery
+                   Monitor; applied here 2026-09-14). Seven columns need 1295px
+                   and the sheet has ~950px, so it ALWAYS scrolls; with only
+                   `SO No` pinned, the right-hand end showed `Ask customer to
+                   pay` with no customer attached to it. Identity is the SO
+                   number AND whose row it is. */
+                groupBanner={false} stickyIdentity={{ columnKey: ["so", "customer"] }}
+                isLoading={!loaded} searchPlaceholder="Search by SO, customer or phone…"
                 toolbarStart={<span className="flex items-center gap-3 text-body">
                   {isPhone && !railVisible && showFiltersButton}
                   {orderScope !== null && <span className="flex items-center gap-2" data-testid="payment-monitor-order-scope">
