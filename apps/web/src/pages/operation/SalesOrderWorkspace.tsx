@@ -1,45 +1,10 @@
 /**
- * SalesOrderWorkspace — the Sales Order object page. Commercial changes leave
- * through Amendment, never this form.
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * ⭐ ONE PAGE, ONE STATE — owner ruling 2026-08-15
- *
- * ```
- * ┌───────────────── 50% ─────────────────┬────────────── 50% ──────────────┐
- * │ CUSTOMER                              │                                 │
- * │ ORDER INFO                            │      the REAL Sales Order       │
- * │ AMEND DELIVERY DATE                   │      document — the SAME        │
- * │ EMERGENCY CONTACT                     │      template Print renders,    │
- * │ DELIVERY ADDRESS                      │      never a lookalike          │
- * │ MONEY · SALES OWNERSHIP · GOODS       │                                 │
- * ├───────────────────────────────────────┤                                 │
- * │ ⚠ 3 changes            Discard  Save  │  (only when something changed)  │
- * └───────────────────────────────────────┴─────────────────────────────────┘
- * ```
- *
- * **The `?edit=1` page is retired.** There was no reading state and no editing
- * state — there was one document with fields in it, and a mode switch in front
- * of it that made the operator ask permission to fix a phone number. Fields are
- * always editable in place; the dark bar appears only when something changed.
- *
- * **THE PREVIEW IS THE DOCUMENT.** Whatever the left side holds — the saved
- * order, the 300ms-debounced draft, or an old revision's snapshot — becomes ONE
- * `SalesOrderTemplateData`, ONE `renderSalesOrderPdf` blob. pdf.js paints those
- * bytes (VIEWER ONLY — never a second renderer) and Print opens the SAME blob.
- * The previous blob URL is revoked on every render.
- *
- * **A PROPOSAL IS NOT A DOCUMENT.** A submitted, not-yet-approved amendment
- * never enters the paper: the preview always renders the current effective
- * Revision and the proposal shows as a banner strip above it. A customer must
- * not be handed a document stating something nobody has agreed to.
- *
- * **THE FORM IS THE SALES PORTAL'S FORM.** Every question the portal asks is
- * here, rendered from the SAME `order_entry_config` contract the POS renders
- * from (0219) and the same shared choice lists — so the two surfaces cannot
- * drift into two different forms for one record. Goods, price and
- * `Requested Delivery Date` are the exception, and they are the whole point: those
- * are what the customer agreed to, so they leave through the amendment lane.
+ * Sales Order detail keeps the approved document beside the order fields.
+ * Saved orders start read-only. Edit opens the existing local field controls;
+ * Submit Amendment only informs the user until business confirms the workflow.
+ * Cancel discards the draft. Creation retains its existing form and save path.
+ * Commercial, payment and cross-module facts retain their existing ownership.
+ * The saved order preview and print never use an unapproved amendment draft.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
@@ -87,6 +52,7 @@ import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
+import { amendmentValidation, type AmendmentField } from "./sales-order-amendment-validation";
 import { payMethodWord } from "@/lib/payment-display";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
@@ -116,7 +82,6 @@ import {
   useSalesOrderExpansion,
   useSalesOrderRouteFacts,
   useSalespersons,
-  useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
   type AmendmentProposal,
@@ -899,10 +864,10 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
  * announced grammar matches the drawn one. `aria-label` carries the name
  * because `<label for>` binds only to real form controls.
  */
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+function Fact({ label, value, required = false, error }: { label: string; value: React.ReactNode; required?: boolean; error?: string }) {
   const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
-    <FieldFrame id={id} label={label}>
+    <FieldFrame id={id} label={label} required={required} error={error}>
       <div
         id={id}
         role="textbox"
@@ -922,10 +887,14 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
  *  renders from. An operator who adds a field in Settings gets it on both
  *  surfaces or on neither. */
 function CustomFields({
+  readOnly = false,
+  errors,
   fields,
   values,
   onChange,
 }: {
+  readOnly?: boolean;
+  errors?: Record<string, string>;
   fields: CustomField[];
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
@@ -935,6 +904,7 @@ function CustomFields({
       {fields.map((f) => {
         const id = `so-custom-${f.key}`;
         const value = values[f.key] ?? "";
+        if (readOnly) return <Fact key={f.key} label={f.label} value={f.type === "date" ? fmtDate(value || null) : value || "Not recorded"} />;
         if (f.type === "select") {
           return (
             <Select
@@ -942,6 +912,7 @@ function CustomFields({
               id={id}
               label={f.label}
               required={f.required}
+              error={errors?.[f.key]}
               value={value || undefined}
               onValueChange={(v) => onChange(f.key, v)}
               options={f.options.map((o) => ({ value: o, label: o }))}
@@ -955,6 +926,7 @@ function CustomFields({
               id={id}
               label={f.label}
               required={f.required}
+              error={errors?.[f.key]}
               value={value || null}
               onChange={(iso) => onChange(f.key, iso ?? "")}
             />
@@ -966,6 +938,7 @@ function CustomFields({
             id={id}
             label={f.label}
             required={f.required}
+              error={errors?.[f.key]}
             type={f.type === "number" ? "number" : "text"}
             value={value}
             onChange={(e) => onChange(f.key, e.target.value)}
@@ -987,6 +960,8 @@ export default function SalesOrderWorkspace() {
   const [params, setParams] = useSearchParams();
   const isNew = location.pathname.endsWith("/so/new");
   const showRoute = params.get("route") === "1" && !isNew;
+  const [isAmending, setIsAmending] = useState(false);
+  const [amendmentAttempted, setAmendmentAttempted] = useState(false);
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -1220,6 +1195,7 @@ export default function SalesOrderWorkspace() {
   ]);
 
   const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : "object";
+  const fieldsEditable = mode === "create" || (mode === "object" && isAmending);
 
   /* ── WHAT CHANGED — the save bar counts fields, never keystrokes. ─────── */
   const changedFields = useMemo(() => {
@@ -1244,8 +1220,6 @@ export default function SalesOrderWorkspace() {
   /* Read by the seeding effect without becoming one of its dependencies. */
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
 
   const liveAmendment = amendmentQ.data?.amendment ?? null;
   /* THE PROPOSAL NEVER ENTERS THE PAPER — it shows as a banner above it. */
@@ -1394,7 +1368,7 @@ export default function SalesOrderWorkspace() {
       return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
         addonNameByKey.get(key) ?? key,
       );
-    return debouncedDraftData;
+    return mode === "object" ? base : debouncedDraftData;
   }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
   const { setPane } = usePdfCanvases(templateData);
@@ -1433,19 +1407,6 @@ export default function SalesOrderWorkspace() {
   );
 
   /* ── Writes — ONE page-level Save; every write mints a revision. ── */
-  const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
-    onSuccess: (r) => {
-      toast.success(`Saved · Rev ${r.revision}`);
-      /* The saved values ARE the new baseline, so the bar clears immediately
-         rather than after the round trip. The refetch that follows lands on a
-         clean form and reseeds it from what the database actually stored. */
-      setBaseline(draftRef.current);
-      void revisionsQ.refetch();
-      void baseQ.refetch();
-      void detailQ.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
   const createMut = useCreateSalesOrder({
     onSuccess: (r) => {
       toast.success(`SO-${r.so} created · Rev 1`);
@@ -1518,19 +1479,23 @@ export default function SalesOrderWorkspace() {
         ...(l.attrs ? { attrs: l.attrs } : {}),
       }));
 
-  const validateDraft = (needDealer: boolean): string | null => {
-    if (!draft.customer_name.trim()) return "Customer name is required";
-    if (needDealer && !draft.dealer_id) return "A dealer is required";
+  const validateDraft = (needDealer: boolean, onInvalid?: (field: keyof Draft, message: string) => void): string | null => {
+    const invalid = (field: keyof Draft, message: string) => {
+      onInvalid?.(field, message);
+      return message;
+    };
+    if (!draft.customer_name.trim()) return invalid("customer_name", "Customer name is required");
+    if (needDealer && !draft.dealer_id) return invalid("dealer_id", "A dealer is required");
     /* orders_salesperson_required (0296): every portal-born order names who
      * sold it. */
-    if (needDealer && !draft.salesperson_id) return "A salesperson is required";
-    if (needDealer && draftLinesPayload().length === 0) return "An order needs at least one item";
+    if (needDealer && !draft.salesperson_id) return invalid("salesperson_id", "A salesperson is required");
+    if (needDealer && draftLinesPayload().length === 0) return invalid("lines", "An order needs at least one item");
     /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
      * DATES). A date inside the production lead is a promise the factory
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
      * now refuses it too, with the same arithmetic rather than a second one. */
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
-      return `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+      return invalid("delivery_date", `Delivery is too soon — the earliest this cart can be promised is ${fmtDate(earliestPromise)}`);
     }
     /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
        The POS has refused an order without one since Phase 11.1; this door did
@@ -1538,24 +1503,45 @@ export default function SalesOrderWorkspace() {
        whose Proceed date renders read-only as `Not recorded` forever.
        `createOrderInput` and `sales_order_create` (0391) refuse it again. */
     if (needDealer && !draft.proceed_date) {
-      return "Proceed date — pick the day production should start";
+      return invalid("proceed_date", "Proceed date — pick the day production should start");
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
-      return "The proceed date is after the delivery date";
+      return invalid("proceed_date", "The proceed date is after the delivery date");
     }
     /* Building type is DELIVERY's fact — stairs, lift access, van parking all
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
      * An unknown address cannot demand one; a known address must say. */
     if (!draft.customer_address_unknown && !draft.building_type) {
-      return "Fill in the building type first — a condominium can only take a half-day delivery.";
+      return invalid("building_type", "Fill in the building type first — a condominium can only take a half-day delivery.");
     }
     return null;
   };
 
-  const onSave = () => {
-    const err = validateDraft(false);
-    if (err) return void toast.error(err);
-    saveMut.mutate({ header: safeCorrectionPayload() });
+  const amendmentChecks = amendmentValidation(draft, formFields);
+  const amendmentRuleErrors: Partial<Record<keyof Draft, string>> = {};
+  if (isAmending && amendmentAttempted) {
+    validateDraft(false, (field, message) => { amendmentRuleErrors[field] = message; });
+  }
+  const amendmentFieldProps = (field: AmendmentField) => isAmending ? {
+    required: amendmentChecks.required[field],
+    error: amendmentAttempted ? amendmentRuleErrors[field] ?? amendmentChecks.errors[field] : undefined,
+  } : {};
+
+  const cancelAmendment = () => {
+    setDraft(baseline);
+    setIsAmending(false);
+    setAmendmentAttempted(false);
+  };
+  const submitAmendment = () => {
+    setAmendmentAttempted(true);
+    if (validateDraft(false) || Object.keys(amendmentChecks.errors).length > 0
+      || Object.keys(amendmentChecks.customErrors).length > 0) return;
+    // TODO: Approval owner and amendment routing must be confirmed by the business owner.
+    // Future workflow must retain the current approved order and approved commercial
+    // versions under Revisions, with an append-only History event recording requester,
+    // date/time, reason, changed fields, and approval or rejection information.
+    console.log('Amendment Submitted');
+    toast.info("Amendment approval workflow is not configured yet.");
   };
   const onCreate = () => {
     const err = validateDraft(true);
@@ -1602,6 +1588,10 @@ export default function SalesOrderWorkspace() {
   const openObjectView = (view: ObjectView) => {
     if (view !== "Order" && !confirmDiscard()) return;
     if (view !== "Order" && dirty) setDraft(baseline);
+    if (view !== "Order") {
+      setIsAmending(false);
+      setAmendmentAttempted(false);
+    }
     setObjectView(view);
     setParams(
       (prev) => {
@@ -1887,6 +1877,16 @@ export default function SalesOrderWorkspace() {
 
   const headerRight = (
     <span className="flex items-center gap-2">
+      {mode === "object" && objectView === "Order" && !showRoute && order && (
+        isAmending ? (
+          <>
+            <Button size="sm" variant="ghost" onClick={cancelAmendment}>Cancel</Button>
+            <Button size="sm" variant="primary" onClick={submitAmendment}>Submit Amendment</Button>
+          </>
+        ) : (
+          <Button size="sm" variant="neutral" onClick={() => setIsAmending(true)}>Edit</Button>
+        )
+      )}
       {mode === "object" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
         <details className="relative">
           <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
@@ -2038,44 +2038,44 @@ export default function SalesOrderWorkspace() {
             then who they are demographically. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div data-pos-field="name">
-            <Input id="so-name" label="Full name" required value={draft.customer_name}
-              onChange={(e) => setField("customer_name", e.target.value)} />
+            {fieldsEditable ? (<Input id="so-name" label="Full name" required {...amendmentFieldProps("customer_name")} value={draft.customer_name}
+              onChange={(e) => setField("customer_name", e.target.value)} />) : (<Fact label={"Full name"} value={(draft.customer_name) || "Not recorded"} />)}
           </div>
           <div data-pos-field="phone">
-            <Input id="so-phone" label="Phone" value={draft.customer_phone}
-              onChange={(e) => setField("customer_phone", e.target.value)} />
+            {fieldsEditable ? (<Input id="so-phone" label="Phone" {...amendmentFieldProps("customer_phone")} value={draft.customer_phone}
+              onChange={(e) => setField("customer_phone", e.target.value)} />) : (<Fact label={"Phone"} value={(draft.customer_phone) || "Not recorded"} />)}
           </div>
           {customerBuiltins["email"]?.enabled !== false && (
             <div data-pos-field="email">
-              <Input id="so-email" label="Email" required={customerBuiltins["email"]?.required}
+              {fieldsEditable ? (<Input id="so-email" label="Email" required={customerBuiltins["email"]?.required} {...amendmentFieldProps("customer_email")}
                 value={draft.customer_email}
-                onChange={(e) => setField("customer_email", e.target.value)} />
+                onChange={(e) => setField("customer_email", e.target.value)} />) : (<Fact label={"Email"} value={(draft.customer_email) || "Not recorded"} />)}
             </div>
           )}
           {customerBuiltins["race"]?.enabled !== false && (
             <div data-pos-field="race">
-              <Select id="so-race" label="Race" required={customerBuiltins["race"]?.required}
+              {fieldsEditable ? (<Select id="so-race" label="Race" required={customerBuiltins["race"]?.required} {...amendmentFieldProps("customer_race")}
                 value={draft.customer_race || undefined}
                 onValueChange={(v) => setField("customer_race", v)}
-                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />
+                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />) : (<Fact label={"Race"} value={(draft.customer_race || undefined) || "Not recorded"} />)}
             </div>
           )}
           {customerBuiltins["gender"]?.enabled !== false && (
             <div data-pos-field="gender">
-              <Select id="so-gender" label="Gender" required={customerBuiltins["gender"]?.required}
+              {fieldsEditable ? (<Select id="so-gender" label="Gender" required={customerBuiltins["gender"]?.required} {...amendmentFieldProps("customer_gender")}
                 value={draft.customer_gender || undefined}
                 onValueChange={(v) => setField("customer_gender", v)}
-                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />
+                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />) : (<Fact label={"Gender"} value={(draft.customer_gender || undefined) || "Not recorded"} />)}
             </div>
           )}
           {customerBuiltins["birthday"]?.enabled !== false && (
             <div data-pos-field="birthday">
-              <DatePicker id="so-birthday" label="Birthday" required={customerBuiltins["birthday"]?.required}
+              {fieldsEditable ? (<DatePicker id="so-birthday" label="Birthday" required={customerBuiltins["birthday"]?.required} {...amendmentFieldProps("customer_birthday")}
                 value={draft.customer_birthday}
-                onChange={(iso) => setField("customer_birthday", iso)} />
+                onChange={(iso) => setField("customer_birthday", iso)} />) : (<Fact label={"Birthday"} value={fmtDate(draft.customer_birthday)} />)}
             </div>
           )}
-          <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} />
+          <CustomFields readOnly={!fieldsEditable} errors={isAmending && amendmentAttempted ? amendmentChecks.customErrors : undefined} fields={tab("customer").custom} values={draft.custom} onChange={setCustom} />
         </div>
         {/* ⭐ WHO SOLD IT IS PART OF WHO BOUGHT IT (approved Sales Order
             detail organisation, 2026-09-11). `Sales ownership` was its own
@@ -2090,21 +2090,21 @@ export default function SalesOrderWorkspace() {
         </div>
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Select id="so-dealer" label="Dealer"
+            {fieldsEditable ? (<Select id="so-dealer" label="Dealer"
               value={draft.dealer_id ?? ""}
               onValueChange={(v) => setField("dealer_id", v || null)}
-              options={dealerOptions} placeholder="Pick a dealer" />
+              options={dealerOptions} placeholder="Pick a dealer" />) : (<Fact label={"Dealer"} value={(draft.dealer_id ?? "") || "Not recorded"} />)}
             <div data-pos-field="outlet">
-              <Select id="so-outlet" label="Showroom"
+              {fieldsEditable ? (<Select id="so-outlet" label="Showroom"
                 value={draft.outlet_id ?? "none"}
                 onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
-                options={outletOptions} />
+                options={outletOptions} />) : (<Fact label={"Showroom"} value={(draft.outlet_id ?? "none") || "Not recorded"} />)}
             </div>
             <div data-pos-field="salesperson">
-              <Select id="so-salesperson" label="Salesperson"
+              {fieldsEditable ? (<Select id="so-salesperson" label="Salesperson"
                 value={draft.salesperson_id ?? "none"}
                 onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
-                options={spOptions} />
+                options={spOptions} />) : (<Fact label={"Salesperson"} value={(draft.salesperson_id ?? "none") || "Not recorded"} />)}
             </div>
           </div>
         ) : (
@@ -2112,7 +2112,7 @@ export default function SalesOrderWorkspace() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
               <div data-pos-field="outlet">
-                <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+                <Fact label="Showroom" required={isAmending && tab("customer").builtins["outlet"]?.required} value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
               </div>
               {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
                   `Change salesperson` had a rule and a right-aligned row of its
@@ -2126,7 +2126,7 @@ export default function SalesOrderWorkspace() {
                   salesperson already has their eye. `useCanChangeSalesOwnership`
                   is GATE 3's rule, imported rather than re-typed. */}
               <div data-pos-field="salesperson">
-                <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                <Fact label="Salesperson" required={isAmending && tab("customer").builtins["salesperson"]?.required} value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
                 {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
                   <button
                     type="button"
@@ -2176,23 +2176,23 @@ export default function SalesOrderWorkspace() {
               <SubHead>Emergency contact</SubHead>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
-              <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
-                onChange={(e) => setField("emergency_name", e.target.value)} />
-              <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
-                onChange={(e) => setField("emergency_phone", e.target.value)} />
+              {fieldsEditable ? (<Input id="so-emergency-name" label="Name" {...amendmentFieldProps("emergency_name")} value={draft.emergency_name}
+                onChange={(e) => setField("emergency_name", e.target.value)} />) : (<Fact label={"Name"} value={(draft.emergency_name) || "Not recorded"} />)}
+              {fieldsEditable ? (<Input id="so-emergency-phone" label="Phone" {...amendmentFieldProps("emergency_phone")} value={draft.emergency_phone}
+                onChange={(e) => setField("emergency_phone", e.target.value)} />) : (<Fact label={"Phone"} value={(draft.emergency_phone) || "Not recorded"} />)}
               {/* The relationship is a picker with a free-text escape: an
                   imported or hand-typed word that is not on the list must survive
                   being looked at, so it stays in the text box. */}
-              <Input id="so-emergency-relationship" label="Relationship"
+              {fieldsEditable ? (<Input id="so-emergency-relationship" label="Relationship" {...amendmentFieldProps("emergency_relationship")}
                 list="so-emergency-relationships"
                 value={draft.emergency_relationship}
-                onChange={(e) => setField("emergency_relationship", e.target.value)} />
+                onChange={(e) => setField("emergency_relationship", e.target.value)} />) : (<Fact label={"Relationship"} value={(draft.emergency_relationship) || "Not recorded"} />)}
               <datalist id="so-emergency-relationships">
                 {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
               </datalist>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
+              <CustomFields readOnly={!fieldsEditable} errors={isAmending && amendmentAttempted ? amendmentChecks.customErrors : undefined} fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
             </div>
           </>
         )}
@@ -2210,18 +2210,19 @@ export default function SalesOrderWorkspace() {
           <Fact label="SO Date" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
-              <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
+              {fieldsEditable ? (<DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
                 hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
                 error={
                   draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
                     ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
                     : undefined
                 }
-                onChange={(iso) => setField("delivery_date", iso)} />
+                onChange={(iso) => setField("delivery_date", iso)} />) : (<Fact label={"Requested Delivery Date"} value={fmtDate(draft.delivery_date)} />)}
             </div>
           ) : (
             <div data-pos-field="deliveryDate">
-              <Fact label="Requested Delivery Date" value={
+              <Fact label="Requested Delivery Date" required={isAmending && tab("target").builtins["deliveryDate"]?.required}
+                error={isAmending && amendmentAttempted ? amendmentRuleErrors.delivery_date : undefined} value={
                 promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
                   <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
                 ) : promisedWord(mode, viewedRevision, order)
@@ -2283,22 +2284,22 @@ export default function SalesOrderWorkspace() {
               blank may be filled, a recorded date may not be moved or cleared.
               This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
-            {mode === "create" || (mode === "object" && !baseline.proceed_date) ? (
-              <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
+            {fieldsEditable && (mode === "create" || !baseline.proceed_date) ? (
+              <DatePicker id="so-proceed" label="Proceed date" {...amendmentFieldProps("proceed_date")} value={draft.proceed_date}
                 hint={
                   mode === "object"
                     ? "Never recorded — fill it in once, then it locks"
                     : undefined
                 }
-                error={
+                error={amendmentFieldProps("proceed_date").error ?? (
                   draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
                     ? "After the delivery date"
-                    : undefined
+                    : undefined)
                 }
                 onChange={(iso) => setField("proceed_date", iso)} />
             ) : (
               <span id="so-proceed">
-                <Fact label="Proceed date" value={fmtDate(draft.proceed_date) || "Not recorded"} />
+                <Fact label="Proceed date" required={isAmending && tab("target").builtins["proceedDate"]?.required} value={fmtDate(draft.proceed_date) || "Not recorded"} />
               </span>
             )}
           </div>
@@ -2314,7 +2315,7 @@ export default function SalesOrderWorkspace() {
           )}
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
+          <CustomFields readOnly={!fieldsEditable} errors={isAmending && amendmentAttempted ? amendmentChecks.customErrors : undefined} fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
         </div>
         {/* THE ONE DOOR for goods, price and the promised date — opened from
             `More actions` since 2026-08-26. The component still MOUNTS here
@@ -2375,20 +2376,20 @@ export default function SalesOrderWorkspace() {
                 round-trips, and the POS still asks the same question. */}
             {(addressIsBlank || draft.customer_address_unknown) && (
               <div className="sm:col-span-4">
-                <Checkbox id="so-address-unknown" label="Address not given yet"
+                {fieldsEditable ? (<Checkbox id="so-address-unknown" label="Address not given yet"
                   checked={draft.customer_address_unknown}
-                  onCheckedChange={(v) => setField("customer_address_unknown", v)} />
+                  onCheckedChange={(v) => setField("customer_address_unknown", v)} />) : (<Fact label={"Address not given yet"} value={(draft.customer_address_unknown) ? "Yes" : "No"} />)}
               </div>
             )}
             <div className="sm:col-span-2">
-              <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
+              {fieldsEditable ? (<Input id="so-line1" label="Address line 1" {...amendmentFieldProps("customer_address_line1")} value={draft.customer_address_line1}
                 disabled={draft.customer_address_unknown}
-                onChange={(e) => setField("customer_address_line1", e.target.value)} />
+                onChange={(e) => setField("customer_address_line1", e.target.value)} />) : (<Fact label={"Address line 1"} value={(draft.customer_address_line1) || "Not recorded"} />)}
             </div>
             <div className="sm:col-span-2">
-              <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
+              {fieldsEditable ? (<Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
                 disabled={draft.customer_address_unknown}
-                onChange={(e) => setField("customer_address_line2", e.target.value)} />
+                onChange={(e) => setField("customer_address_line2", e.target.value)} />) : (<Fact label={"Address line 2"} value={(draft.customer_address_line2) || "Not recorded"} />)}
             </div>
             {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
                 three questions in the same order the POS asks them.
@@ -2407,22 +2408,22 @@ export default function SalesOrderWorkspace() {
                 column to preserve. An address the list cannot express still has
                 two homes — the free-text lines above, and `Address not given
                 yet` for the genuinely unknown. */}
-            <Select id="so-state" label="State"
+            {fieldsEditable ? (<Select id="so-state" label="State" {...amendmentFieldProps("customer_address_state")}
               value={draft.customer_address_state || undefined}
               disabled={draft.customer_address_unknown}
               onValueChange={(v) =>
                 setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
               }
-              options={MY_STATES.map((st) => ({ value: st, label: st }))} />
-            <Select id="so-city" label="City"
+              options={MY_STATES.map((st) => ({ value: st, label: st }))} />) : (<Fact label={"State"} value={(draft.customer_address_state || undefined) || "Not recorded"} />)}
+            {fieldsEditable ? (<Select id="so-city" label="City" {...amendmentFieldProps("customer_address_city")}
               value={draft.customer_address_city || undefined}
               disabled={draft.customer_address_unknown || !draft.customer_address_state}
               hint={!draft.customer_address_state ? "Pick a state first" : undefined}
               onValueChange={(v) =>
                 setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
               }
-              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
-            <Select id="so-postcode" label="Postcode"
+              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />) : (<Fact label={"City"} value={(draft.customer_address_city || undefined) || "Not recorded"} />)}
+            {fieldsEditable ? (<Select id="so-postcode" label="Postcode" {...amendmentFieldProps("customer_address_postcode")}
               value={draft.customer_address_postcode || undefined}
               disabled={draft.customer_address_unknown || !draft.customer_address_city}
               hint={!draft.customer_address_city ? "Pick a city first" : undefined}
@@ -2430,8 +2431,8 @@ export default function SalesOrderWorkspace() {
               options={getPostcodes(
                 draft.customer_address_state || null,
                 draft.customer_address_city || null,
-              ).map((pc) => ({ value: pc, label: pc }))} />
-            <Select id="so-building-type" label="Building type" required
+              ).map((pc) => ({ value: pc, label: pc }))} />) : (<Fact label={"Postcode"} value={(draft.customer_address_postcode || undefined) || "Not recorded"} />)}
+            {fieldsEditable ? (<Select id="so-building-type" label="Building type" required {...amendmentFieldProps("building_type")}
               error={
                 !draft.customer_address_unknown && !draft.building_type
                   ? "Fill in the building type first — a condominium can only take a half-day delivery."
@@ -2439,7 +2440,7 @@ export default function SalesOrderWorkspace() {
               }
               value={draft.building_type || undefined}
               onValueChange={(v) => setField("building_type", v)}
-              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
+              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />) : (<Fact label={"Building type"} value={(draft.building_type || undefined) || "Not recorded"} />)}
           </div>
           {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
               (approved Sales Order detail composition, 2026-09-10). Floor,
@@ -2484,7 +2485,7 @@ export default function SalesOrderWorkspace() {
                     under the box, which reads as advice rather than as the limit
                     the input actually enforces. One statement, in the field's own
                     name, and the separate hint line goes with it. */}
-                <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+                {fieldsEditable ? (<Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} {...amendmentFieldProps("delivery_floor")}
                   type="number" min={1} max={MAX_DELIVERY_FLOOR}
                   value={String(draft.delivery_floor)}
                   onChange={(e) =>
@@ -2497,7 +2498,7 @@ export default function SalesOrderWorkspace() {
                          only this box could type and nothing could mean. */
                       Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
                     )
-                  } />
+                  } />) : (<Fact label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} value={(String(draft.delivery_floor)) || "Not recorded"} />)}
               {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
                   then put a default value, rather than leaving it blank". The
                   STORED value stays null until somebody types; this shows the
@@ -2532,7 +2533,7 @@ export default function SalesOrderWorkspace() {
                   simply not applied and the floor at zero still is. A guess at the
                   ceiling would be worse than no ceiling: it would silently cut a
                   number the operator typed correctly. Degrade, never abort. */}
-              <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+              {fieldsEditable ? (<Input id="so-stair-items" label="Items needing stair carry" type="number" min={0} {...amendmentFieldProps("delivery_stair_items")}
                 max={stair?.itemsTotal}
                 hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
                 value={String(draft.delivery_stair_items ?? 0)}
@@ -2545,7 +2546,7 @@ export default function SalesOrderWorkspace() {
                         ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
                         : Math.max(0, Number(e.target.value) || 0),
                   )
-                } />
+                } />) : (<Fact label={"Items needing stair carry"} value={(String(draft.delivery_stair_items ?? 0)) || "Not recorded"} />)}
               {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
                   2026-08-26). The POS asks `Lift available?` and offers two named
                   answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
@@ -2553,10 +2554,10 @@ export default function SalesOrderWorkspace() {
                   box meant BOTH "no lift" and "nobody said", and the two surfaces
                   did not tally. Two named options, the POS's exact words, and a
                   blank that still reads as a blank. */}
-              <Select id="so-lift" label="Lift available?"
+              {fieldsEditable ? (<Select id="so-lift" label="Lift available?" {...amendmentFieldProps("delivery_has_lift")}
                 value={draft.delivery_has_lift ? "Has lift" : "No lift"}
                 onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
-                options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+                options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />) : (<Fact label={"Lift available?"} value={draft.delivery_has_lift ? "Has lift" : "No lift"} />)}
               </div>
           </div>
           {/* The three fields above, added up out loud — the POS's own sentence
@@ -2590,17 +2591,17 @@ export default function SalesOrderWorkspace() {
           )}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
             <div className="sm:col-span-4">
-              <Checkbox id="so-billing-same" label="Billing address same as delivery"
+              {fieldsEditable ? (<Checkbox id="so-billing-same" label="Billing address same as delivery"
                 checked={draft.customer_billing_same}
-                onCheckedChange={(v) => setField("customer_billing_same", v)} />
+                onCheckedChange={(v) => setField("customer_billing_same", v)} />) : (<Fact label={"Billing address same as delivery"} value={(draft.customer_billing_same) ? "Yes" : "No"} />)}
             </div>
             {!draft.customer_billing_same && (
               <div className="sm:col-span-4">
-                <Input id="so-billing" label="Billing address" value={draft.customer_billing}
-                  onChange={(e) => setField("customer_billing", e.target.value)} />
+                {fieldsEditable ? (<Input id="so-billing" label="Billing address" {...amendmentFieldProps("customer_billing")} value={draft.customer_billing}
+                  onChange={(e) => setField("customer_billing", e.target.value)} />) : (<Fact label={"Billing address"} value={(draft.customer_billing) || "Not recorded"} />)}
               </div>
             )}
-            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
+            <CustomFields readOnly={!fieldsEditable} errors={isAmending && amendmentAttempted ? amendmentChecks.customErrors : undefined} fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
           </div>
       </Block>
 
@@ -2693,12 +2694,12 @@ export default function SalesOrderWorkspace() {
             <table className="w-full text-body" data-testid="document-goods">
               <thead>
                 <tr className="text-label text-base-500">
-                  <th className="py-1 pr-3 text-left font-medium">Category</th>
-                  <th className="py-1 pr-3 text-left font-medium">Unit ID</th>
-                  <th className="py-1 pr-3 text-left font-medium">SKU</th>
-                  <th className="py-1 pr-3 text-right font-medium">Qty</th>
-                  <th className="py-1 pr-3 text-left font-medium">Item</th>
-                  <th className="py-1 pr-3 text-left font-medium">Deliver To</th>
+                  <th className="align-middle py-1 pr-3 text-left font-medium">Category</th>
+                  <th className="align-middle py-1 pr-3 text-left font-medium">Unit ID</th>
+                  <th className="align-middle py-1 pr-3 text-left font-medium">SKU</th>
+                  <th className="align-middle py-1 pr-3 text-center font-medium">Qty</th>
+                  <th className="align-middle py-1 pr-3 text-left font-medium">Item</th>
+                  <th className="align-middle py-1 pr-3 text-left font-medium">Deliver To</th>
                   {/* ⭐ THE MONEY COLUMNS RIDE THE RIGHT EDGE (approved Sales
                       Order detail composition, 2026-09-10). The six ruled
                       columns keep their ruled order and alignment; what the
@@ -2706,8 +2707,8 @@ export default function SalesOrderWorkspace() {
                       read the commitment without opening the PDF beside it.
                       A free gift is a line at RM 0.00: visible as goods,
                       charged nothing, counted nowhere twice. */}
-                  <th className="py-1 pr-3 text-right font-medium">Unit price</th>
-                  <th className="py-1 text-right font-medium">Line total</th>
+                  <th className="align-middle py-1 pr-3 text-right font-medium">Unit price</th>
+                  <th className="align-middle py-1 text-right font-medium">Line total</th>
                 </tr>
               </thead>
               <tbody>
@@ -2717,7 +2718,7 @@ export default function SalesOrderWorkspace() {
                   const destinations = truth?.deliverTo ?? [];
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
-                    <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
+                    <td className="align-middle py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
                     {/* ⭐ THE SHORT-LINE WORDS ARE RULED, AND `Not allocated`
                         IS NOT ONE OF THEM (YH, 2026-09-01).
                         `COPY-STANDARD.md`:1755 lists `Not allocated` in its
@@ -2732,7 +2733,7 @@ export default function SalesOrderWorkspace() {
                         is in flight; this one did not, so a slow read printed
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
-                    <td className="py-1.5 pr-3">
+                    <td className="align-middle py-1.5 pr-3">
                       {goodsTruthQ.isLoading && !truth ? (
                         <span className="font-mono text-meta">Loading…</span>
                       ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
@@ -2758,17 +2759,17 @@ export default function SalesOrderWorkspace() {
                         })()
                       )}
                     </td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
-                    <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
+                    <td className="align-middle py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
+                    <td className="align-middle py-1.5 pr-3 text-center tabular-nums">{r.qty}</td>
+                    <td className={`align-middle py-1.5 pr-3 ${cjkClassName(r.name)}`}>
                       <div>{r.name}</div>
                       {liveLine && operationalConfig(liveLine).length > 0 && (
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
+                    <td className="align-middle py-1.5 pr-3">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="align-middle py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
+                    <td className="align-middle py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
                   </tr>
                   );
                 })}
@@ -2799,10 +2800,10 @@ export default function SalesOrderWorkspace() {
                   const size = a.attrs?.size ?? null;
                   return (
                   <tr key={`a-${i}`} className="border-t border-kit-slate-5">
-                    <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">Not recorded</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
+                    <td className="align-middle py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
+                    <td className="align-middle py-1.5 pr-3 font-mono text-meta">Not recorded</td>
+                    <td className="align-middle py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
+                    <td className="align-middle py-1.5 pr-3 text-center tabular-nums">{a.qty}</td>
                     {/* ⭐ THE ROW CARRIES ITS OWN DOORS (YH, 2026-09-01). A
                         service was printed twice — here, and again in a
                         `Services` list below that repeated its name, size,
@@ -2816,7 +2817,7 @@ export default function SalesOrderWorkspace() {
                         quiet line under the name — which is where a goods row
                         already puts its own configuration, so both row kinds
                         keep one shape. */}
-                    <td className={`py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
+                    <td className={`align-middle py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
                       <div>{serviceName}</div>
                       {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
                       {mode === "object" && orderId && (
@@ -2828,9 +2829,9 @@ export default function SalesOrderWorkspace() {
                         />
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">Not recorded</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
+                    <td className="align-middle py-1.5 pr-3">Not recorded</td>
+                    <td className="align-middle py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
+                    <td className="align-middle py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
                   </tr>
                   );
                 })}
@@ -2884,7 +2885,7 @@ export default function SalesOrderWorkspace() {
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
       <Block
-        title="Money"
+        title="Payments"
         headerSlot={
           !isNew && order ? (
             <button
@@ -2939,7 +2940,8 @@ export default function SalesOrderWorkspace() {
             {instalmentWord}
           </p>
         )}
-        <PaymentLedger orderId={isNew ? null : (orderId ?? null)} />
+        <PaymentLedger orderId={isNew ? null : (orderId ?? null)}
+          savedPayments={base?.payments} summaryLoading={baseQ.isLoading} summaryError={baseQ.isError} />
         {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
             RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
             2026-09-10). `Total` is NOT repeated here — it is stated once,
@@ -3182,31 +3184,7 @@ export default function SalesOrderWorkspace() {
             <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="object-two-panes">
               <div className="flex min-h-0 min-w-0 flex-col lg:w-1/2 lg:overflow-hidden">
                 <div className="min-h-0 flex-1 px-4 py-4 lg:overflow-auto">{form}</div>
-                {/* THE SAVE BAR EXISTS ONLY WHEN SOMETHING CHANGED (§6.4 ⑥). */}
-                {mode === "object" && dirty && (
-                  <div
-                    className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-base-900 bg-base-900 px-4 py-2.5"
-                    data-testid="save-bar"
-                  >
-                    <span className="text-body font-medium text-white">
-                      ⚠ {changedFields.length} {changedFields.length === 1 ? "change" : "changes"}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Button size="sm" variant="ghost" onClick={discard} data-testid="workspace-cancel">
-                        <X size={14} /> Discard
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        loading={saveMut.isPending}
-                        onClick={onSave}
-                        data-testid="workspace-save"
-                      >
-                        Save
-                      </Button>
-                    </span>
-                  </div>
-                )}
+
               </div>
 
               <aside
