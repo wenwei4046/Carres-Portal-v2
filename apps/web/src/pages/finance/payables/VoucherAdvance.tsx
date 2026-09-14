@@ -100,7 +100,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
               <tbody>
                 {adv.applications.map((a) => (
                   <tr key={a.id} className="border-t border-base-100">
-                    <td className="py-1 pr-3"><Link to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
+                    <td className="py-1 pr-3"><Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${a.bill_id}`}>{a.bill_no ?? "Draft bill"}</Link></td>
                     <td className="py-1 pr-3">{a.supplier_invoice_no}</td>
                     <td className="py-1 pr-3">{fmtDate(a.created_at, { time: true })} · {a.created_by_name ?? "Name not available"}</td>
                     <td className="py-1 pr-3">
