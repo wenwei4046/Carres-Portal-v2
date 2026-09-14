@@ -661,7 +661,9 @@ retired its own inline route from this same cell (2026-09-06). Search still reac
 either value and sorting stays on the number.
 
 **THE JOURNEY LEG'S ROUTE — owner ruling 2026-09-14, APPROVED / LOCKED.** `Klang WH → JB transit`
-is column 6's supporting line on that row, in place of the building facts. An intermediate leg
+is column 6's supporting line on that row, in place of the building facts. Its primary line
+reads the recorded destination. An unnamed intermediate destination stays unrecorded; it
+never falls back to the customer's town. An intermediate leg
 never reaches the customer's door, so `Condominium · Floor 12` against a warehouse-to-transit run
 describes a building those goods are not going to; the CUSTOMER leg keeps its building facts
 because it does arrive there. This is the reading the shared region arithmetic already uses —
@@ -1412,7 +1414,7 @@ effective date on every change. It contains no roster, no owner list and no duty
 
 | Section | Rows |
 |---|---|
-| `Logisticss` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Warehouses & handover points` (the partner's own warehouse and the two-leg handover locations) · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
+| `Logistics` | one row per partner opening its object: `Partner details` (name, `Active` · `Inactive`, customer-facing number, office contact, address, WhatsApp group) · `Coverage` (states, cities and postcodes covered; excluded locations; the `Klang Valley default` flag and its fallback rule) · `Schedule` (pickup weekdays, delivery weekdays per region, transit days, cut-off time, capacity per day, closed dates) · `Warehouses & handover points` (the partner's own warehouse and the two-leg handover locations) · `Drivers` and `Vehicles` (templates: driver name and phone; plate, vehicle type, capacity) · `Services & charges` (stair carry, dismantling, disposal, surcharge areas, partner charges) · `Portal access` (Warehouse role, Logistics role, data visibility, API scope) |
 | `Delivery Rules` | who contacts the customer, per partner · the record-on-behalf policy · the contact lead days (reads the shared `chase` setting, one home) · the payment-clearance read rule and DO availability, both read-only mirrors of Payment's clock and the DO gate · proof required by result and goods type · the supported delivery services |
 | `Message Templates` | WhatsApp, email and copy-message templates per purpose, versioned, one Default per purpose, the Payment template-library grammar |
 | `Access` | which People hold Delivery capabilities; a link to `Workspace → Staff & Duties`, never a copy |

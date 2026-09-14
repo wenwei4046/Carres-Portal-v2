@@ -825,6 +825,9 @@ export function buildDeliveryScopeRows({
         leg: stop.leg,
         intermediateLeg,
         legRoute: legRouteOf(stop),
+        // A transfer goes to its recorded stop, never to the customer's town.
+        // Only a final customer leg may use the order address when no stop is named.
+        location: stop.to_loc?.trim() || (intermediateLeg ? "" : base.location),
         logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
         logisticsName: legPartner,
         confirmedIso,
