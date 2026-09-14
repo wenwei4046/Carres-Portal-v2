@@ -2159,6 +2159,22 @@ observation; §14.4 names the remaining identity, stored Site and production gat
 not Warehouse substitutes. Real-person acceptance, concurrency, cross-Site refusal and closure
 must be proven; passing branch CI is not personal Warehouse go-live.
 
+### 13.12 · BUILD / VERIFIED IN BRANCH — Journey-leg source correction (2026-09-14)
+
+The Warehouse Schedule feed now reads the order's governed `delivery_stops` for documented
+journey legs. A leg carries its actual `from_loc` and `to_loc`; its evidence uses the leg's own
+arrival and proof fields. A Warehouse login receives only leg 0/1 work at its bound physical Site;
+later carrier legs remain visible to authorised internal Delivery/Operations readers with
+`warehouseSiteId = null`, so they cannot enter a Warehouse Site queue. A documented leg with a
+missing or ambiguous route source returns a source-read failure instead of inventing the original
+Warehouse route. Intermediate legs no longer print a customer-handover event as though the
+customer were the next physical recipient.
+
+The route suite covers a two-leg Klang → JB → Singapore example for internal and Warehouse roles,
+the missing-route failure, and existing exact-Unit scope/readiness cases: 49 tests passed. This
+fixes the known reader boundary in code; it does not prove the production schema has the same route
+data, apply migrations, or complete the personal operator and handover gates in §14.4.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
