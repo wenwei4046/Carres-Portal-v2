@@ -333,10 +333,12 @@ honest Work for admitted modules.
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
   Delivery Operation, read through the one shared authority `delivery_responsible_operation`
-  (the order's ledger row, else the normal responsible person on its earliest customer contact,
-  else the configured NORMAL Delivery Duty holder — an individual staff identity, with the buddy
-  cover as today's acting person) when collection first became actionable, and kept until the
-  balance is RM 0 (0489 · 0495 · 0498 · 0499, owner ruling 2026-09-13) — owns the action
+  (the order's responsibility ledger row, else the INDIVIDUAL the Sales Order was dealt to when it
+  entered Operations — `ops_order_control.assigned_staff`; contact history and the Delivery Duty
+  holder are no longer owner sources, and an account with no `staff_code` may record evidence but
+  never own), with today's acting person being the governed buddy cover, else an away person's
+  least-loaded stand-in for the day, and kept until the
+  balance is RM 0 (0489 · 0504, owner rulings 2026-09-13) — owns the action
   with the shared buddy-cover law and a formal handover door; `Payment Duty` is retired; the exact Invoice
   is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
   Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes

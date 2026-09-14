@@ -905,27 +905,40 @@ Engine; the approved architecture correction is only that it gains its assignmen
 cover are configured only in `Workspace → Staff & Duties`. This is not a Delivery-local duty
 system.
 
-**The Responsible Delivery Operation owns the customer's money follow-up (owner ruling
-2026-09-13; Payment MASTER §10, migrations 0489 · 0495).** When a Sales Order's collection first
-becomes actionable, the order's recorded **contact owner** (§5.1 — the Operation person named on
-its earliest customer contact, else its partner arrangement) becomes that order's stable
-collection owner: the same person who has been contacting the customer about delivery asks for
-the money. Delivery and Payment read ONE authority, `delivery_responsible_operation(order, day)`
-(0499): the order's collection-owner ledger row (establishment or formal handover) · else the
-normal responsible person on its earliest customer contact (an individual with a staff_code, not
-covering that day) · else the configured NORMAL Delivery Duty holder on the day · else nobody;
-today's acting person is that person's buddy cover, else the person. The contact writer fills the
-record's four identities from that read (§5.1); the recorder — including the shared `Operations`
-login — is evidence, never responsibility. The one remaining fact for automatic ownership on real
-orders is the initial Delivery Duty holder, a one-time staffing configuration in Workspace →
-Staff & Duties. The owner stays until the balance is RM 0; later duty rotation or a
-later contact by someone else never moves it; only buddy cover (acting today) or a formal handover
-changes who acts. Delivery configures nothing extra for this: the Payment module reads the contact
-record and the resolver on the first actionable day and keeps its own append-only owner record.
+**The Responsible Delivery Operation owns the customer's money follow-up, and it is the person
+the Sales Order was DEALT to (owner ruling 2026-09-13; Payment MASTER §10, Orders MASTER
+§"How the PIC is decided", migrations 0489 · 0504).** A Sales Order is dealt to one individual
+Operation person when it enters Operations (`ops_order_control.assigned_staff`, 0232/0235). That
+person continues the customer follow-up — the delivery contact, the ordinary balance and the
+storage collection. Delivery and Payment read ONE authority,
+`delivery_responsible_operation(order, day)` (0504): the order's responsibility ledger row
+(an establishment or a formal handover) · else the individual the order was dealt to · else
+nobody. Today's acting person is that person's governed buddy cover, else — when they are away
+today and no cover was named — the least-loaded individual who is in, else the person.
 
-When the resolver returns no active holder and no cover, the action stays visible in Team Work
-under its duty word and the surface prints the governed configuration failure with its door:
-`Nobody holds Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`. The protected
+**Contact history and the Delivery Duty holder are NOT owner sources.** 0495/0498 inferred the
+owner from the earliest customer contact and 0489/0499 from the Delivery Duty holder; the owner
+rejected both, and 0504 removed them. Delivery Duty keeps its own work and remains the key the
+buddy-cover law is written against; it no longer decides who chases a customer's money. **Nobody
+needs to be asked for an initial Delivery Duty holder** — that request was the workaround the
+owner refused, and automatic ownership no longer waits on it.
+
+The contact writer still fills the record's four identities from that read (§5.1); the
+recorder — including the shared `Operations` login — is evidence, never responsibility, and an
+account with no `staff_code` may record but never own. The owner stays until the balance is
+RM 0; a later contact by someone else, a duty rotation, a changed date, a filter or a reload
+never moves it. Only two things change who acts: buddy cover (today only) and a formal handover,
+which moves the assignment and appends the ledger row together. Delivery configures nothing extra
+for this.
+
+When the resolver returns nobody, the action stays visible in Team Work under its duty word and
+the surface prints the governed configuration failure with its door: `Nobody holds Delivery Duty.`
+and `Set the holder in Workspace → Staff & Duties`. 🔴 **Those words are now WRONG and wait on the
+owner** — after 0504 an unresolved owner means no individual is in the Operation assignment pool,
+and Staff & Duties cannot fix it. Approved copy is the owner's to change; the recommended
+replacement is `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`. The state is unreachable while the pool holds an individual,
+which is why this is recorded rather than shipped. The protected
 act refuses with the same sentence. No action is routed to an Operations Superuser by default and
 no fallback identity is invented; an authorised superuser who does act is recorded as the actual
 actor with the normal owner and cover kept separate. Governed delivery-charge exceptions route to
