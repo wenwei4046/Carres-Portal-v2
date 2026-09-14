@@ -186,8 +186,10 @@ describe("Reports — the statements read the ledger", () => {
     ]);
     expect(within(table).queryByText("Difference")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
-    // Rows without 0506's `reclassified` column print as before, with no note.
+    // Rows without 0506's `reclassified` column print as before: no note, and no mark.
     expect(within(table).queryByText(/paid before their invoice/)).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: /paid before their invoice/ })).not.toBeInTheDocument();
+    expect(table.querySelectorAll('tr[data-kit="data-row"] button')).toHaveLength(0);
   });
 
   // 0506: customer A paid RM 5,000 before a RM 2,185 invoice (balance -2,815);
@@ -210,23 +212,49 @@ describe("Reports — the statements read the ledger", () => {
     { section: "CHECK", row_kind: "EQUATION", amount: 0 },
   ];
 
+  const INCLUDES = "Includes RM 2,815.00 from customers who paid before their invoice.";
+  const LEAVES_OUT = "Leaves out RM 2,815.00 that customers paid before their invoice.";
+
   it("shows customers who paid before their invoice under Customer deposits held, as the ledger served it", async () => {
     serve({ bs: (a) => bs(a, reclassedBody()) });
     show();
     const table = screen.getByTestId("balance-sheet");
     await within(table).findByRole("link", { name: "2210 Customer deposits held" });
+    // Each account stays one line: the note is not printed in the row.
     expect(lines(table)).toEqual([
       "Asset | RM 8,000.00",
       "Cash and bank | RM 6,000.00",
       "1120 Bank — current account | RM 6,000.00",
       "Receivables | RM 2,000.00",
-      "1210 Trade receivables — customersLeaves out RM 2,815.00 that customers paid before their invoice. | RM 2,000.00",
+      "1210 Trade receivables — customers | RM 2,000.00",
       "Liability | RM 2,815.00",
-      "2210 Customer deposits heldIncludes RM 2,815.00 from customers who paid before their invoice. | RM 2,815.00",
+      "2210 Customer deposits held | RM 2,815.00",
       "Equity | RM 5,185.00",
       "Net result not yet closed | RM 5,185.00",
     ]);
+    // The note is on a mark in the same row as its account, named by the sentence.
+    const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
+    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES }))
+      .toHaveAttribute("type", "button");
+    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT }))
+      .toHaveAttribute("type", "button");
+    expect(within(table).getAllByRole("button", { name: /paid before their invoice/ })).toHaveLength(2);
+    expect(within(rowOf("1120 Bank — current account")).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
+  });
+
+  it("the mark shows its note on keyboard focus and on hover", async () => {
+    serve({ bs: (a) => bs(a, reclassedBody()) });
+    show();
+    const table = screen.getByTestId("balance-sheet");
+    const includes = await within(table).findByRole("button", { name: INCLUDES });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.focus(includes);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(INCLUDES);
+    fireEvent.blur(includes);
+    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+    fireEvent.pointerMove(within(table).getByRole("button", { name: LEAVES_OUT }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(LEAVES_OUT);
   });
 
   it("a reclassified amount that is not a number is refused as a whole", async () => {
