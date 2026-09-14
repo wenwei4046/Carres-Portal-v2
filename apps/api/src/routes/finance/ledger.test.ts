@@ -659,4 +659,13 @@ describe("statements, passed through", () => {
     expect((await get("/balance-sheet?asOf=2026-09-30")).status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30" });
   });
+
+  it("balance sheet rows reach the page whole, with whatever columns the database returns (0506, 0507)", async () => {
+    const rows = [
+      { report_status: "OK", row_kind: "ACCOUNT", account_code: "1230", amount: 100, reclassified: 100, reclassified_for: "SUPPLIER" },
+      { report_status: "OK", row_kind: "ACCOUNT", account_code: "2210", amount: 50, reclassified: 50 },
+    ];
+    fakeClient(() => ok(rows));
+    expect(await json(await get("/balance-sheet?asOf=2026-09-30"))).toEqual({ rows });
+  });
 });

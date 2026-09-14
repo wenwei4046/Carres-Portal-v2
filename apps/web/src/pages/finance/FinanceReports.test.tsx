@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { itSaysNoBannedWord } from "@/test/banned-words";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import FinanceReports from "./FinanceReports";
+import { paidBeforeInvoiceNote } from "./reports/StatementTable";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
@@ -194,6 +195,7 @@ describe("Reports — the statements read the ledger", () => {
 
   // 0506: customer A paid RM 5,000 before a RM 2,185 invoice (balance -2,815);
   // customer B owes RM 2,000. The database moves A's RM 2,815 onto 2210.
+  // 0506's shape: no `reclassified_for` column, and the notes are the customer ones.
   const reclassedBody = (): Row[] => [
     account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 6000),
     subtotal("ASSET", "1100", "Cash and bank", 6000),
@@ -262,6 +264,76 @@ describe("Reports — the statements read the ledger", () => {
     show();
     expect(await screen.findByTestId("balance-sheet-failed"))
       .toHaveTextContent("The balance sheet could not be loaded. Try again.");
+  });
+
+  // 0507: supplier A was paid RM 100 before any bill; supplier B billed RM 500.
+  // The database moves A's RM 100 onto 1230 and leaves 2110 at B's RM 500. A
+  // customer who paid before the invoice is in the same report. 0507 rows say
+  // whose money was moved in `reclassified_for`.
+  const advancedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5900),
+    subtotal("ASSET", "1100", "Cash and bank", 5900),
+    { ...account("ASSET", "1200", "Receivables", "1210", "Trade receivables — customers", 2000), reclassified: -2815, reclassified_for: "CUSTOMER" },
+    { ...account("ASSET", "1200", "Receivables", "1230", "Advances to suppliers", 100), reclassified: 100, reclassified_for: "SUPPLIER" },
+    subtotal("ASSET", "1200", "Receivables", 2100),
+    total("ASSET", 8000),
+    { ...account("LIABILITY", "2100", "Payables", "2110", "Trade payables — suppliers", 500), reclassified: -100, reclassified_for: "SUPPLIER" },
+    subtotal("LIABILITY", "2100", "Payables", 500),
+    { ...account("LIABILITY", "2200", "Customer money held", "2210", "Customer deposits held", 2815), reclassified: 2815, reclassified_for: "CUSTOMER" },
+    subtotal("LIABILITY", "2200", "Customer money held", 2815),
+    total("LIABILITY", 3315),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 4685 },
+    total("EQUITY", 4685),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+
+  const ADVANCES = "Includes RM 100.00 paid to suppliers before their bill.";
+  const PAYABLES = "Leaves out RM 100.00 paid to suppliers before their bill.";
+
+  it("shows suppliers paid before their bill under Advances to suppliers, beside the customer notes", async () => {
+    serve({ bs: (a) => bs(a, advancedBody()) });
+    show();
+    const table = screen.getByTestId("balance-sheet");
+    await within(table).findByRole("link", { name: "1230 Advances to suppliers" });
+    expect(lines(table)).toEqual([
+      "Asset | RM 8,000.00",
+      "Cash and bank | RM 5,900.00",
+      "1120 Bank — current account | RM 5,900.00",
+      "Receivables | RM 2,100.00",
+      "1210 Trade receivables — customers | RM 2,000.00",
+      "1230 Advances to suppliers | RM 100.00",
+      "Liability | RM 3,315.00",
+      "Payables | RM 500.00",
+      "2110 Trade payables — suppliers | RM 500.00",
+      "Customer money held | RM 2,815.00",
+      "2210 Customer deposits held | RM 2,815.00",
+      "Equity | RM 4,685.00",
+      "Net result not yet closed | RM 4,685.00",
+    ]);
+    const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
+    expect(within(rowOf("1230 Advances to suppliers")).getByRole("button", { name: ADVANCES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2110 Trade payables — suppliers")).getByRole("button", { name: PAYABLES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES })).toBeInTheDocument();
+    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT })).toBeInTheDocument();
+    expect(table.querySelectorAll('tr[data-kit="data-row"] button')).toHaveLength(4);
+    fireEvent.focus(within(table).getByRole("button", { name: ADVANCES }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(ADVANCES);
+  });
+
+  it("a moved amount that names nobody it belongs to is refused as a whole", async () => {
+    serve({ bs: (a) => bs(a, advancedBody().map((r) => r.account_code === "1230" ? { ...r, reclassified_for: "BANK" } : r)) });
+    show();
+    expect(await screen.findByTestId("balance-sheet-failed"))
+      .toHaveTextContent("The balance sheet could not be loaded. Try again.");
+  });
+
+  it("the note follows whose money the database says it was, never the line's side", () => {
+    expect(paidBeforeInvoiceNote({ reclassified: 40, reclassifiedFor: "SUPPLIER" })).toBe("Includes RM 40.00 paid to suppliers before their bill.");
+    expect(paidBeforeInvoiceNote({ reclassified: 40, reclassifiedFor: "CUSTOMER" })).toBe("Includes RM 40.00 from customers who paid before their invoice.");
+    expect(paidBeforeInvoiceNote({ reclassified: -40, reclassifiedFor: "SUPPLIER" })).toBe("Leaves out RM 40.00 paid to suppliers before their bill.");
+    expect(paidBeforeInvoiceNote({ reclassified: 0, reclassifiedFor: "SUPPLIER" })).toBeNull();
   });
 
   it("opens each account in the Journal, narrowed to that account and the statement's dates", async () => {

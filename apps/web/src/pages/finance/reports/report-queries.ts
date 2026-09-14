@@ -2,8 +2,9 @@
  * The Profit and Loss and the Balance Sheet, read from the ledger's own
  * statement functions (gl_profit_and_loss and gl_balance_sheet, migration
  * 0469) through the ledger API. Since 0506 the Balance Sheet shows customers
- * who paid before their invoice under 2210 instead of as negative receivables;
- * the database does that move too.
+ * who paid before their invoice under 2210 instead of as negative receivables,
+ * and since 0507 suppliers paid before their bill under 1230 instead of as
+ * negative payables; the database does both moves too.
  *
  * The database does every sum. This file only checks that the rows arrived
  * whole and files each one where the page prints it. If anything is missing
@@ -18,13 +19,15 @@ export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
 
 /** One account and the amount the ledger summed for it. `reclassified` is
  *  what the Balance Sheet moved onto (plus) or off (minus) this line from
- *  customers who paid before their invoice (0506); the move is already inside
- *  `amount`. Null when nothing was moved, or before 0506 is applied. */
+ *  money paid before its document (0506, 0507); the move is already inside
+ *  `amount`. `reclassifiedFor` is whose money that was, as the database says.
+ *  Both null when nothing was moved, or before 0506 is applied. */
 export interface StatementLine {
   code: string;
   name: string | null;
   amount: number;
   reclassified: number | null;
+  reclassifiedFor: "CUSTOMER" | "SUPPLIER" | null;
 }
 
 /** The accounts under one chart header, and the subtotal the ledger served. */
@@ -117,6 +120,15 @@ function nameOf(v: unknown, bad: Fail): string | null {
   return v;
 }
 
+/** Whose money a moved amount is: 0507's `reclassified_for`. Rows from 0506
+ *  have no such column, and 0506 moved only customers' money. */
+function movedFor(r: Raw, moved: number | null, bad: Fail): StatementLine["reclassifiedFor"] {
+  if (moved === null) return null;
+  const v = r.reclassified_for === undefined ? "CUSTOMER" : r.reclassified_for;
+  if (v !== "CUSTOMER" && v !== "SUPPLIER") throw bad();
+  return v;
+}
+
 /** In the database's own order. `ordinal` is its row number. */
 function inOrder(rows: Raw[], bad: Fail): Raw[] {
   if (!rows.every((r) => Number.isInteger(r.ordinal))) throw bad();
@@ -174,12 +186,14 @@ function readBody(
     switch (r.row_kind) {
       case "ACCOUNT": {
         const g = group(section(r.section), r);
+        // Absent before 0506, and on the Profit and Loss.
+        const reclassified = r.reclassified === undefined || r.reclassified === null ? null : money(r.reclassified, bad);
         g.lines.push({
           code: code(r.account_code, bad),
           name: nameOf(r.account_name, bad),
           amount: money(r.amount, bad),
-          // Absent before 0506, and on the Profit and Loss.
-          reclassified: r.reclassified === undefined || r.reclassified === null ? null : money(r.reclassified, bad),
+          reclassified,
+          reclassifiedFor: movedFor(r, reclassified, bad),
         });
         break;
       }
