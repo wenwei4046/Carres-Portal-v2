@@ -144,12 +144,12 @@ function buildSb(opts: SbOpts = {}) {
       if (table === "ops_stock_emergency_requests")
         return chainFor(opts.requests ?? []);
       if (table === "ops_stock_items") return chainFor(opts.stock ?? []);
-      if (table === "app_users") return chainFor([{ id: ME, name: "Khor Yee" }]);
       return chainFor([]);
     }),
     rpc: vi.fn(async (name: string, args: unknown) => {
       rpcCalls.push([name, args]);
       if (name === "my_org_duties") return { data: opts.duties ?? [], error: null };
+      if (name === "actor_display_names") return { data: [{ id: ME, name: "Khor Yee" }], error: null };
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return { data: opts.rpcData ?? null, error: null };
     }),

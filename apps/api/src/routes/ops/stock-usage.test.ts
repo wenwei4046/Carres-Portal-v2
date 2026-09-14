@@ -129,13 +129,12 @@ function buildSb(opts: SbOpts = {}) {
       tables.push(table);
       if (table === "ops_stock_pool_usage") return chainFor(opts.usage ?? []);
       if (table === "ops_stock_reserve_levels") return chainFor(opts.levels ?? []);
-      if (table === "app_users")
-        return chainFor([{ id: "u-1", name: "Shasha" }]);
       return chainFor(opts.stock ?? STOCK_ROWS);
     }),
     rpc: vi.fn(async (name: string, args: unknown) => {
       rpcCalls.push([name, args]);
       if (name === "my_org_duties") return { data: opts.duties ?? [], error: null };
+      if (name === "actor_display_names") return { data: [{ id: "u-1", name: "Shasha" }], error: null };
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return { data: opts.rpcResult ?? null, error: null };
     }),
