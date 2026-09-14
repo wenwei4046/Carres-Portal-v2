@@ -84,9 +84,6 @@
    Manual Purchase · Warehouse Stock · SO Batch · Supplier Items) — the
    2026-08-14 "exactly one screen" note is history. A change here is a change
    to the Register template on all of them, which is the point: one grammar.
-   The frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
-   Claim) still render components/data-grid/DataGrid.tsx and never load this
-   file.
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */

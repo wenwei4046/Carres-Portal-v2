@@ -38,7 +38,6 @@ const LANE = [
   "pages/operation/OperationToOrder.tsx",
   "pages/operation/OperationReceiving.tsx",
   "pages/operation/OperationSupplierClaims.tsx",
-  "pages/operation/components/WarehouseReceiptsPanel.tsx",
   "pages/operation/procurement/ProcurementTabContent.tsx",
   "pages/warehouse/WarehouseCountModal.tsx",
   // Added AFTER the first deploy, by the deploy grep itself: the ops right-rail
@@ -77,7 +76,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(9);
+    expect(LANE.length).toBe(8);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 

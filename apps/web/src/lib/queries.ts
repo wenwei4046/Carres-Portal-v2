@@ -190,7 +190,6 @@ import {
   type SubmitEmailChangeInput,
   // 2026-07-19 — the BD dealer-account create door (principal-parity schema).
   type CreateAccountInput,
-  type SetOrderAddressInput,
   type SetOrderDateInput,
   type TopUpOrderInput,
   type CreateStripeCheckoutInput,
@@ -366,8 +365,6 @@ export const qk = {
     units: () => ["rental", "units"] as const,
     // 0255 — the POS sell lane's stripped offer list + checkout polling.
     posPlans: () => ["rental", "pos-plans"] as const,
-    checkoutSession: (agreementId: string, sessionId: string) =>
-      ["rental", "checkout", agreementId, sessionId] as const,
     // 0268 — the finance approver's credit queue.
     approvals: () => ["rental", "approvals"] as const,
     // 0279 — the wording in force, read by the POS before a customer signs.
@@ -1466,77 +1463,6 @@ export function useStripeCheckoutStatus(
     enabled: !!sessionId && (opts?.enabled ?? true),
     refetchInterval: opts?.refetchInterval ?? 4000,
     refetchIntervalInBackground: false,
-  });
-}
-
-/** useSetOrderAddress — POST /api/orders/:id/address. Resolves the
- *  addressUnknown blocker by writing customer_address. */
-export function useSetOrderAddress(
-  orderId: string,
-  opts?: Partial<UseMutationOptions<Order, ApiError, SetOrderAddressInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<Order, ApiError, SetOrderAddressInput>({
-    mutationFn: (input) =>
-      apiFetch<Order>(`/api/orders/${orderId}/address`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      const [order] = args;
-      // Prime the detail cache with the freshly-mutated row so the page
-      // updates instantly. We key on the orderId we already have rather
-      // than the response's order.id — they should always match but the
-      // closure-captured value is the safer choice when callers are
-      // reading the same query.
-      qc.setQueryData(qk.order(orderId), order);
-      // Force a refetch on the order detail too, so the cache stays
-      // authoritative even if the response shape ever drifts from the
-      // GET /:id shape (defense-in-depth — no observable cost when the
-      // response was correct, fixes the "Windows screen out of sync"
-      // bug Loo flagged on 2026-05-03).
-      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
-      // List views (kanban / orders tabs) — invalidate so paid pct,
-      // status badge, and counts refresh when reopened.
-      void qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/** useSetOrderDate — POST /api/orders/:id/date. Resolves the dateTbd blocker. */
-export function useSetOrderDate(
-  orderId: string,
-  opts?: Partial<UseMutationOptions<Order, ApiError, SetOrderDateInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<Order, ApiError, SetOrderDateInput>({
-    mutationFn: (input) =>
-      apiFetch<Order>(`/api/orders/${orderId}/date`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      const [order] = args;
-      // Prime the detail cache with the freshly-mutated row so the page
-      // updates instantly. We key on the orderId we already have rather
-      // than the response's order.id — they should always match but the
-      // closure-captured value is the safer choice when callers are
-      // reading the same query.
-      qc.setQueryData(qk.order(orderId), order);
-      // Force a refetch on the order detail too, so the cache stays
-      // authoritative even if the response shape ever drifts from the
-      // GET /:id shape (defense-in-depth — no observable cost when the
-      // response was correct, fixes the "Windows screen out of sync"
-      // bug Loo flagged on 2026-05-03).
-      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
-      // List views (kanban / orders tabs) — invalidate so paid pct,
-      // status badge, and counts refresh when reopened.
-      void qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
   });
 }
 
@@ -8040,10 +7966,8 @@ export function useSetOpsAssignedLogistic(
 }
 
 /** P2 — set the delivery date (set_order_date RPC, status='place' only,
- *  lead-time floor enforced server-side) from the order drawer. Operation
- *  variant of useSetOrderDate: invalidates the operation order detail + list
- *  (the dealer-facing hook keys on qk.order, which the operation surfaces
- *  don't read). */
+ *  lead-time floor enforced server-side) from the order drawer. Invalidates
+ *  the operation order detail + list. */
 export function useOperationSetDeliveryDate(
   orderId: string,
   opts?: Partial<UseMutationOptions<unknown, ApiError, SetOrderDateInput>>,
@@ -11816,38 +11740,6 @@ export function useCreateRentalAgreement() {
         body: JSON.stringify(input),
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["rental"] }),
-  });
-}
-
-/** Mint the Stripe SUBSCRIPTION checkout link for an agreement (amount = the
- *  monthly fee; card saved for auto-debit). 422 codes: plan_not_synced /
- *  plan_repriced / fee_missing / wrong_status; 409 already_subscribed. */
-export function useCreateRentalCheckout(agreementId: string) {
-  return useMutation<{ session: StripeCheckoutSessionInfo }, ApiError, void>({
-    mutationFn: () =>
-      apiFetch<{ session: StripeCheckoutSessionInfo }>(
-        `/api/rental/agreements/${agreementId}/stripe/checkout`,
-        { method: "POST" },
-      ),
-  });
-}
-
-/** Poll one rental checkout link; while open the SERVER live-reconciles, so a
- *  counter payment wraps the schedule + links the ids within one poll. */
-export function useRentalCheckoutStatus(
-  agreementId: string,
-  sessionId: string | null,
-  opts?: { enabled?: boolean },
-) {
-  return useQuery<{ session: StripeCheckoutSessionInfo }, ApiError>({
-    queryKey: qk.rental.checkoutSession(agreementId, sessionId ?? ""),
-    queryFn: () =>
-      apiFetch<{ session: StripeCheckoutSessionInfo }>(
-        `/api/rental/agreements/${agreementId}/stripe/checkout/${sessionId}`,
-      ),
-    enabled: !!sessionId && (opts?.enabled ?? true),
-    refetchInterval: 4000,
-    refetchIntervalInBackground: false,
   });
 }
 
