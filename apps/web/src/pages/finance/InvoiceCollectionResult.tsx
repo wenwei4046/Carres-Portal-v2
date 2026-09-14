@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import { toast } from "sonner";
+import { appTodayIso } from "@/lib/fmt-date";
 
 /**
  * Record the result — the §3 structured collection outcome (0446).
@@ -23,10 +24,6 @@ import { toast } from "sonner";
  * open until the payment is recorded through the posting door. That is §3's
  * "`Done` never replaces authoritative completion" on screen.
  */
-function todayIso(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
-
 export default function InvoiceCollectionResult({ invoice, onClose }: {
   invoice: InvoiceRegisterRow;
   onClose: () => void;
@@ -55,7 +52,7 @@ export default function InvoiceCollectionResult({ invoice, onClose }: {
   });
 
   const needsDate = outcome === "will_pay_on_date";
-  const ready = outcome != null && (!needsDate || promisedDate >= todayIso());
+  const ready = outcome != null && (!needsDate || promisedDate >= appTodayIso());
 
   return <div className="flex-1 overflow-auto p-4" data-testid="invoice-collection-result">
     <SectionCard><div className="p-4">
@@ -76,7 +73,7 @@ export default function InvoiceCollectionResult({ invoice, onClose }: {
 
         {needsDate && <label className="block">
           <span className="text-label">The day the customer promised</span>
-          <input type="date" value={promisedDate} min={todayIso()}
+          <input type="date" value={promisedDate} min={appTodayIso()}
             onChange={(e) => setPromisedDate(e.target.value)}
             aria-label="The day the customer promised"
             className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />

@@ -16,7 +16,7 @@ import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   fetchGrnLines,
   useApAccounts,
@@ -40,7 +40,6 @@ import {
   num,
   priceDiffWord,
   refusal,
-  todayIso,
   word,
   VOUCHER_STATUS_WORD,
 } from "./payables-words";
@@ -487,7 +486,7 @@ function BillForm() {
 
   const [supplierId, setSupplierId] = useState(params.get("supplier") ?? "");
   const [invoiceNo, setInvoiceNo] = useState("");
-  const [billDate, setBillDate] = useState(todayIso());
+  const [billDate, setBillDate] = useState(appTodayIso());
   const [dueDate, setDueDate] = useState("");
   const [apAccount, setApAccount] = useState("");
   const [narration, setNarration] = useState("");

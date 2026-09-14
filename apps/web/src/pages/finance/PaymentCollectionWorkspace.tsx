@@ -27,7 +27,7 @@ import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { toast } from "sonner";
 import { SectionCard } from "@/components/SectionPanel";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 
@@ -43,10 +43,6 @@ import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
  * the customer's answer. The Invoice document belongs to the Sales Order —
  * this workspace displays and opens it; it never lists invoices.
  */
-
-function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
 
 /** The cells derived once per row through the shared arithmetic (Law D). */
 export function collectionFactsOf(
@@ -88,7 +84,7 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   backLabel: string;
   onClose: () => void;
 }) {
-  const today = todayIso();
+  const today = appTodayIso();
   const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const role = useAuth((s) => s.role);
   const [recording, setRecording] = useState(false);

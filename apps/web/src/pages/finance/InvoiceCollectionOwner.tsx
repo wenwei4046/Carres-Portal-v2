@@ -8,7 +8,7 @@ import {
 } from "@carres/shared/payment-collection-owner";
 import { SectionCard } from "@/components/SectionPanel";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { qk, useCollectionOwner, useOperationWork, useWorkspaceDuties } from "@/lib/queries";
 import { toast } from "sonner";
 
@@ -22,10 +22,6 @@ import { toast } from "sonner";
  * itself is the individual the Sales Order was dealt to (0504), so the
  * unresolved case points at the assignment, not at a duty holder.
  */
-function todayIso(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
-
 export default function InvoiceCollectionOwner({ orderId, canRead }: {
   orderId: string;
   /** Operation / principal read the owner; Finance reads the facts only. */
@@ -104,7 +100,7 @@ function HandoverForm({ orderId, current, onClose }: {
   const staff = (staffQ.data?.staff ?? []).filter((s) => s.userId !== current?.normal_user_id);
   const [newOwner, setNewOwner] = useState("");
   const [reason, setReason] = useState("");
-  const [effectiveFrom, setEffectiveFrom] = useState(todayIso());
+  const [effectiveFrom, setEffectiveFrom] = useState(appTodayIso());
   const qc = useQueryClient();
   const handover = useMutation({
     mutationFn: () => apiFetch("/api/finance/collection-owner/handover", {
@@ -121,7 +117,7 @@ function HandoverForm({ orderId, current, onClose }: {
     },
     onError: (e: Error) => toast.error(`The handover was not recorded — ${e.message}`),
   });
-  const ready = newOwner !== "" && reason.trim().length >= 3 && effectiveFrom >= todayIso();
+  const ready = newOwner !== "" && reason.trim().length >= 3 && effectiveFrom >= appTodayIso();
   return <div className="mt-2 space-y-2" data-testid="collection-owner-handover">
     {current && <p className="text-label font-normal">Previous owner: {current.normal_user_name ?? "Name not recorded"}</p>}
     <label className="block text-label">New owner
@@ -134,7 +130,7 @@ function HandoverForm({ orderId, current, onClose }: {
       <input className="input mt-1 w-full" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why the collection changes hands" data-testid="collection-owner-reason" />
     </label>
     <label className="block text-label">Effective from
-      <input type="date" className="input mt-1" value={effectiveFrom} min={todayIso()} onChange={(e) => setEffectiveFrom(e.target.value)} data-testid="collection-owner-from" />
+      <input type="date" className="input mt-1" value={effectiveFrom} min={appTodayIso()} onChange={(e) => setEffectiveFrom(e.target.value)} data-testid="collection-owner-from" />
     </label>
     <span className="flex gap-2">
       <button type="button" className="btn-primary" disabled={!ready || handover.isPending} onClick={() => handover.mutate()} data-testid="collection-owner-handover-save">
