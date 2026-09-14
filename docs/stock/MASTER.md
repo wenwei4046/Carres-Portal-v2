@@ -2102,6 +2102,9 @@ UI, later-leg physical origin and mobile execution still require completion and 
 
 PR #1198 implements the §8 DO + Site identity in `warehouse-work.ts`, excludes cards outside the
 queue Site, and forwards Worker bindings in `warehouse/work.ts` while rejecting failed sources.
+Work uses that same stable identity for rendered rows, retains Site beside the DO after personal
+assignment, and displays the separate recipient and required-result fields without repeating them
+inside the stored action sentence. `OperationWork.test.tsx` exercises two Sites under one person.
 Acceptance remains separate from exact-Unit handover completion. Monitor creates no Work.
 
 Committed 0459 checks active role/Site but does not enforce personal identity or implement

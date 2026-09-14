@@ -26,7 +26,8 @@ describe("Warehouse Outbound Work projection", () => {
 
     expect(item.owner.state).toBe("site_queue");
     expect(item.owner.queue?.id).toBe("site-1");
-    expect(item.action).toBe("Check, pack and hand over the exact Units to Ahmad");
+    expect(item.action).toBe("Check, pack and hand over the exact Units");
+    expect(item.recipient).toBe("Ahmad");
     expect(item.destination).toBe("/warehouse/outbound?site=site-1&do=DO-2609-019");
   });
 

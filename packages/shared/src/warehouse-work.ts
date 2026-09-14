@@ -35,7 +35,7 @@ export function projectWarehouseOutboundWork(input: {
       ruleKey: "warehouse.outbound_handover",
       object: { kind: "delivery_order", id: card.deliveryOrderId, label: card.doNumber },
       problem: `${card.notHandedOver} ${card.notHandedOver === 1 ? "Unit has" : "Units have"} not been handed over`,
-      action: `Check, pack and hand over the exact ${card.notHandedOver === 1 ? "Unit" : "Units"} to ${recipient}`,
+      action: `Check, pack and hand over the exact ${card.notHandedOver === 1 ? "Unit" : "Units"}`,
       recipient,
       requiredResult: "Every required Unit handed over with receiver and proof",
       completionFact: "Every required Unit has an accepted Warehouse handover event",
