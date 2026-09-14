@@ -34,3 +34,32 @@ quantities and separate Photos / Videos doors · the Damaged Photos viewer · th
 viewer (an unsigned record, named as not verified) · GRN detail and its lower sections · 831 with
 the rail closed · 831 with the rail open and the row expanded. Fixture data throughout.
 
+
+## Defect-fix captures — 2026-09-14, package rebuilt at `b824aee8`
+
+The owner inspected the hosted candidate (built from `26e68c2a`) and reported two defects. These
+three shots come from the REBUILT package, served over http at 1440×900 and driven by Playwright;
+the footer label in each reads `built from b824aee8`. Fixture data throughout — no production
+record is read or written.
+
+| File | Entry · viewport · data | What it proves |
+|---|---|---|
+| `fix-01-expansion-name-only-1440.png` | `portal-shell-preview.html` · 1440×900 · fixture | GRN-20260903-1184 expanded: `Quinn · King` with only `name from the current catalog` beneath it. The PO-line configuration (`BF-03`) no longer joins or shadows the goods' name |
+| `fix-02-viewer-one-line-1440.png` | same · 1440×900 · fixture | The Wrong Item Photos viewer: `For: Quinn · King (1 wrong item)` once, and the tile captioned `Thu, 3 Sep · Shasha` — the goods' name is not repeated under a tile when the viewer covers ONE line |
+| `fix-03-grn-paper-drawn-1440.png` | same · 1440×900 · fixture | The GRN object with its paper DRAWN (the defect was a blank pane reading `Failed to fetch`): letterhead, AMENDED banner, receiving details, goods table, unit results, extra goods, recorded-by |
+
+Measured in the same walk: **1** canvas page (`846×1196`), **0** occurrences of
+`could not be drawn`, and **0** requests to `jsdelivr`/`fontsource` — the document font is embedded
+in the bundle as `data:` URIs, so the paper needs no network at all. Print and Download PDF each
+produced a real `application/pdf` blob of 18,306 bytes (`%PDF-1.3`, 1 page, embedding
+`NotoSansSC…-Regular/-SemiBold/-Bold` subsets); the download's anchor was named
+`GRN-20260903-1184.pdf`.
+
+The hosted artifact was confirmed to load and render at the same commit, and its published bundle
+is byte-identical to the walked file (sha256
+`79e1d35d43a5a1d8ccf7cbd8afd2bce32c54417744c68a73926d28aa6b1a2467`). It could not be CLICKED
+through from here: the viewer runs the package in a cross-origin sandboxed iframe
+(`allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups`) that does not
+accept synthetic input. A real mouse in that page is unaffected; but because that sandbox grants
+no `allow-downloads`, expect the browser to refuse **Download PDF** there while Print opens the
+document — the host's sandbox, not the code.

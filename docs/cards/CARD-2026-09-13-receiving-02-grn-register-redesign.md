@@ -26,7 +26,7 @@
 | # | Requirement | Current gap (measured on `origin/main` b8dab48d) | Governing decision | Target component / file | Acceptance check |
 |---|---|---|---|---|---|
 | R1 | Default columns exactly `Expand · GRN No · GRN Date · Supplier DO No · Supplier · PO No · Items · Received Qty · Exceptions · GRN Status` | 14 default columns (`OperationReceiving.tsx:211-495`); no GRN Date, Items, Exceptions; `Product` prints `product_skus.variant` alone (`Super Single`) | Instruction §3; UI MASTER §6.5 density; Law D one arithmetic | `OperationReceiving.tsx` columns + `storageKey` bump; API `?scope=grn` gains `grn_date`, `items`, totals, labels | Page test asserts the exact default order and that secondary facts are `defaultHidden`; API test asserts the new fields |
-| R2 | Expanded columns `Item · Received · Damaged · Wrong Item · Extra`; full real name (`Model · Variant` + PO-line configuration); no SKU column; only this GRN's counted lines; Received excludes damaged/wrong/extra | No expansion exists; name resolution is variant-only | §3; ui MASTER §6.8 (the ONE child table); `resolveSkuLabels` grammar (`Model · Variant`) already used by Orders/Stock/Claims | `GoodsMiniTable.tsx` gains `receivingLayout`; API resolves `item_label` (snapshot first, catalog fallback flagged); validator snapshots `item_label` at posting | Page test: expansion renders the five heads, the full name, no SKU head, only counted lines; shared test for the label ladder |
+| R2 | Expanded columns `Item · Received · Damaged · Wrong Item · Extra`; the goods' resolved name (`Model · Variant`) as the WHOLE identity, with only the provenance caveat beneath it (**owner correction 2026-09-14** — the PO-line configuration no longer joins the name); no SKU column; only this GRN's counted lines; Received excludes damaged/wrong/extra | No expansion exists; name resolution is variant-only | §3; ui MASTER §6.8 (the ONE child table); `resolveSkuLabels` grammar (`Model · Variant`) already used by Orders/Stock/Claims | `GoodsMiniTable.tsx` gains `receivingLayout`; API resolves `item_label` (snapshot first, catalog fallback flagged); validator snapshots `item_label` at posting | Page test: expansion renders the five heads, the full name, no SKU head, only counted lines; shared test for the label ladder |
 | R3 | GRN Status `Confirmed` / `Cancelled` mapped to `posted` / `voided` | Prints `Valid` / `Cancelled` | §3 later decision overrides the 2026-09-06 `Valid` word; internal states unchanged | `@carres/shared warehouse-receipt.ts` status label; COPY-STANDARD; MASTER §9.4 | Shared test; source scan finds no `Valid` on Receiving surfaces |
 | R4 | CO flows preserved and identified; never relabel a CO as a PO | Column head `PO/CO No`; `is_consignment` not exposed on register rows | §3; MASTER §9.4 CO paragraph | API row `source_kind`; column head `PO No` per instruction with a `CO` marker on consignment rows; GRN paper unchanged | API test on an `is_consignment` PO; page test prints the CO marker |
 | R5 | GRN Date from schema semantics, never from the number | No such column; `receivingRecordNo` derives a display number from dates for pre-0426 rows | MASTER §7.3/§9.4: the GRN exists FROM the posted session → `posted_at` (MYT date) is the GRN Date; `goods_received_at` stays the physical-arrival fact (optional column) | API `grn_date`; page column | API test: `grn_date` = MYT date of `posted_at`, never parsed from `grn_no` |
@@ -66,7 +66,7 @@ the build that is not an owner decision.
 | # | Requirement | Fix | Actual verification | Remaining blocker |
 |---|---|---|---|---|
 | R1 | Default columns, exact order | `OperationReceiving.tsx` columns rewritten; secondary facts `defaultHidden` under Columns groups; `storageKey` bumped to `.v3` | VERIFIED — page test `prints the DEFAULT columns exactly…`; Playwright read the rendered heads `GRN No · GRN Date · Supplier DO No · Supplier · PO No · Items · Received Qty · Exceptions · GRN Status`; screenshot `01-register-1440.png` | At 1440 the default sheet is wider than the column because the `Exceptions` cell carries the summary and six doors on one 38px line (owner rule); the sheet scrolls with the identity pinned. NOT VERIFIED inside the real portal shell (the preview draws no sidebar). |
-| R2 | Expansion `Item · Received · Damaged · Wrong Item · Extra`, full name, no SKU, only this GRN's lines | `GoodsMiniTable` `receivingLayout`; `grnLineName` ladder (snapshot → catalog-with-model → SKU, source printed); PO-line configuration words (`poLineConfigBits`); validator snapshots `item_label` at posting (0493) | VERIFIED — child-table tests; page test `▸ expands to THIS receipt's own lines…`; PGlite `snapshots the goods' full name at posting`; API test `line_labels` (fixture without a model resolves to the SKU, labelled); screenshot `02-expanded-exceptions-1440.png` | Every GRN posted before 0493 has no snapshot and prints the CURRENT catalog name with `name from the current catalog` — the historical name of those receipts is unknowable and is said so. |
+| R2 | Expansion `Item · Received · Damaged · Wrong Item · Extra`, resolved name alone, no SKU, only this GRN's lines | `GoodsMiniTable` `receivingLayout`; `grnLineName` ladder (snapshot → catalog-with-model → SKU, source printed); validator snapshots `item_label` at posting (0493). **Owner correction 2026-09-14:** `grnLineItemWords` and the PO-configuration second line are GONE from Receiving's screens | VERIFIED — child-table tests; page test `▸ expands to THIS receipt's own lines…`; PGlite `snapshots the goods' full name at posting`; API test `line_labels` (fixture without a model resolves to the SKU, labelled); screenshot `02-expanded-exceptions-1440.png` | Every GRN posted before 0493 has no snapshot and prints the CURRENT catalog name with `name from the current catalog` — the historical name of those receipts is unknowable and is said so. |
 | R3 | `Confirmed` / `Cancelled` | `WAREHOUSE_RECEIPT_STATUS_LABEL.posted = "Confirmed"`; COPY-STANDARD row replaced; MASTER §9.4 | VERIFIED — shared, page and template tests; source scan finds no `Valid` on Receiving surfaces | — |
 | R4 | CO identified, never relabelled | `source_kind` on the row; `CO` marker in the cell and export; object header `· CO` | VERIFIED — API test (`source_kind`), page test `identifies a consignment source as a CO` | — |
 | R5 | GRN Date from schema semantics | `grnDateOf(posted_at)` in MYT (`purchasing/MASTER.md` §7.3: the GRN exists FROM the posted session); `Goods received on` stays optional | VERIFIED — shared test (`17:30Z on 4 Sep` → `2026-09-05`), API detail test (`2026-09-06`), page test (`Sun, 30 Aug` on a GRN whose number says 30 Aug because the fixture posted then) | PO-2054's two receipts posted on 5 Aug 2026 print GRN Date 5 Aug = Goods received on (same day) — measured on production rows, not invented. |
@@ -220,3 +220,99 @@ Sales Orders and Delivery Orders registers already have).
 items in R11; plus one observation from the shell walk — at 831 with the rail open the expansion's
 child table scrolls sideways WITH the sheet (the standalone preview showed the same); whether the
 child table should stay pinned under the identity column is a presentation question for the owner.
+
+
+## Third pass — 2026-09-14, the owner's inspection of the hosted candidate
+
+The owner inspected the hosted review package (built from `26e68c2a`) independently and reported
+two defects. Both are fixed in `b824aee8`; the package was rebuilt and republished to the SAME
+artifact URL, and the review remains open — **no acceptance is asked for in this pass.**
+
+### 🔴 D1 · `Quinn · King` printed a redundant `BF-03` beneath its resolved name and in its evidence viewer
+
+**What it was.** The PO line's configuration words were joined to the goods' name for the evidence
+doors and the viewer (`Quinn · King · BF-03`), printed AGAIN on the line beneath the name in the
+expansion and the record (`BF-03 · name from the current catalog`), and repeated under EVERY tile
+of a viewer that was already scoped to that one line. One fact, up to four prints on one screen.
+
+**The fix.** The resolved NAME is the whole identity on every Receiving screen; beneath it sits
+only the provenance caveat. A tile names its line only when the viewer spans more than one line —
+where the name is the only thing saying which goods a photo belongs to. `grnLineItemWords` had no
+caller left and is removed with its test.
+Files: `OperationReceiving.tsx` · `ReceivingRecord.tsx` · `ExceptionEvidence.tsx` ·
+`packages/shared/src/warehouse-receipt.ts` · `index.ts`.
+
+**Measured before deciding** (production, read-only, 2026-09-14): **0 of 106**
+`purchase_order_lines` carry any `attrs`, so `poLineConfigBits` printed nothing for any real
+receipt — the `BF-03` in the package is fixture-only. Where configuration DOES exist today (71 of
+216 `order_lines`), `fabric_name` already reads `CG-012 Maroon` — code and colour in one fact, so
+a separate code line would duplicate it there too. The configuration still belongs to the Purchase
+Order and still prints on the PO paper, which is the document that ordered that fabric.
+**Falsifier:** an operator who cannot tell two receipts of the same model apart without the fabric
+code on the Receiving screen — then it returns as ONE bit on the identity line, never as a second
+line and never repeated per tile.
+
+### 🔴 D2 · the hosted GRN pane read `The GRN preview could not be drawn — Failed to fetch`
+
+**Cause (not transient, which is why `Try again` never recovered).** `lib/pdf/fonts/noto.ts`
+registers the document font by CDN URL, and `@react-pdf/font` resolves a URL source with `fetch()`
+(`index.browser.js` → `fetchFont`). A hosted review page may load scripts from a CDN but may not
+open a connection to one, so the font never arrived, no PDF was ever built, and the pane had
+nothing to paint. Every retry re-ran the same blocked request.
+
+**The fix, scoped to the package alone.** `@react-pdf/font` decodes a `data:…;base64,` source with
+`atob` and makes NO request, so `vite.portal-preview.config.ts` now swaps one module for
+`noto.preview.ts`, which embeds the same family at the same four weights (Fontsource **latin**
+subset, 4 × ~35 kB, committed under `src/lib/pdf/fonts/offline/`). Two build details, both
+measured rather than assumed:
+
+1. the swap is matched by RESOLVED PATH, not by specifier — nine templates and `render.ts` import
+   the module as `./fonts/noto`, so the first cut of this fix (an alias on `@/lib/pdf/fonts/noto`)
+   silently missed every one of them and the built bundle still carried the jsdelivr URL;
+2. Vite 5 emits a `?inline` font as a FILE and returns its URL — the second cut produced
+   `assets/noto-sans-sc-latin-400-*.ttf` and a bundle that still called `fetch()`, merely at a new
+   address. A same-origin request is not the same as no request, and the `file://` variant has no
+   origin to ask, so the config now reads each font at build time and returns the real `data:` URI.
+
+**The portal's own build is untouched** and still fetches the full `chinese-simplified` subset, so
+production paper — including Chinese customer names — is unchanged. What the PACKAGE shows is the
+same typeface at the same metrics for latin text (every word the fixture holds); CJK text would
+render blank in the package and correctly in production. The fixture contains none.
+
+### What was verified, and exactly where
+
+| Check | Result | Surface |
+|---|---|---|
+| `tsc --noEmit` web · api · shared | 0 errors each | local |
+| `pnpm lint` | exit 0 (warn-only stage) | local |
+| `ci:migrations` | 496 filenames, 0 changes | local |
+| web suite | **4590 passed / 330 files** | local |
+| shared suite | **3294 passed / 154 files** | local |
+| D1 in the built package — expansion, record, viewer `For:` line, tile caption | no `BF-03` anywhere; tile reads `Thu, 3 Sep · Shasha` | package served over http, walked in a real browser |
+| D2 — GRN paper | 1 canvas page drawn, `846×1196`, no error text, **0 requests to jsdelivr/fontsource** (Playwright request log) | same |
+| Print | real `application/pdf` blob, 18,306 bytes, opened | same |
+| Download PDF | same blob, anchor named `GRN-20260903-1184.pdf` | same |
+| The PDF itself | `%PDF-1.3`, 1 page, embeds `NotoSansSC…-Regular/-SemiBold/-Bold` subsets — the embedded fonts really were used | same |
+| The HOSTED artifact | loads and renders, footer reads `built from b824aee8`; its `assets/portal-shell-preview-C6tXiiNG.js` is **byte-identical** to the walked file (sha256 `79e1d35d43a5a1d8ccf7cbd8afd2bce32c54417744c68a73926d28aa6b1a2467`), with 0 jsdelivr references and 4 embedded TTFs | hosted |
+
+**Honest limit on the hosted walk.** The artifact viewer runs the package in a cross-origin
+sandboxed iframe (`allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups` —
+measured), which does not accept synthetic input, so the hosted page could not be CLICKED through
+from here: its load and its bytes are proven, its interactions were proven on the identical bytes
+served over http. A real mouse in that page is unaffected. One consequence to expect: the sandbox
+grants no `allow-downloads`, so **Download PDF may be refused by the browser in the hosted viewer**
+while Print (popups are allowed) opens the document — that is the host's sandbox, not the code,
+and it is why the package also ships as a folder that can be served or opened locally.
+
+**Unchanged and still NOT VERIFIED:** real Storage round-trips (no non-production Supabase; the
+runnable test and its prerequisites stand as written above), and the migration replay remains
+PARTIAL with auth and Storage stubbed. Neither is a fixture check, and neither may be read as
+production readiness. **Nothing here authorises a merge or a deploy.**
+
+### Screenshots added this pass — all FIXTURE data, all from the rebuilt package
+
+| File | What it proves |
+|---|---|
+| `fix-01-expansion-name-only-1440.png` | the expansion: `Quinn · King` with `name from the current catalog` beneath it, no `BF-03` |
+| `fix-02-viewer-one-line-1440.png` | the viewer: `For: Quinn · King (1 wrong item)`, the tile captioned `Thu, 3 Sep · Shasha` |
+| `fix-03-grn-paper-drawn-1440.png` | the GRN object with its paper drawn — letterhead, AMENDED banner, goods table, unit results, recorded-by |
