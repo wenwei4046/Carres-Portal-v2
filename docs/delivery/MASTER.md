@@ -694,6 +694,29 @@ Location`, `City`, `State`, `Address line 1` and `Postcode` columns read the str
 raw and print `Not recorded` for the same 46 orders. That is the same false absence on a
 Sales-owned surface, reported and left to its owner rather than folded into this correction.
 
+**DELIVERED — PR #1311, main `d6abf2ac4bab3993a61b3dc75bd7e3963e2ed710`, deployed 2026-09-14.**
+CI passed on the full gate; all five canonical surfaces report that exact SHA (both Pages
+projects, both canonical domains, the API Worker), and the deployed ERP bundle carries the
+resolver.
+
+**What is proven, and what is not — stated exactly.**
+
+```
+PROVEN  the shipped SHA on all five surfaces
+PROVEN  the fix renders: the REAL Monitor page over the two production records
+        (delivery-monitor-preview), SO-1217 reading `Puchong, Selangor` over
+        `Floor 1 · No lift` with `Order details incomplete / Building type not
+        recorded`, its brief showing the whole written address, and the STATE
+        dropdown keeping it under `Selangor` while SO-1246 stays out
+PROVEN  nothing was written back — SO-1217, SO-1225 and SO-1246 re-read from
+        production after the deploy, every address field byte-identical
+NOT YET the authenticated row-level walk on LIVE rows. The Browser pane's
+        Operation session had expired and no password may be typed, so the
+        rendering evidence above is the real page over real records, not the
+        live database. Anyone with a session should confirm SO-1217 on
+        `/operation/delivery` and record it here.
+```
+
 **THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
 not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
 address, goods that require delivering and a valid scope or Journey leg. Cancelled orders, orders
