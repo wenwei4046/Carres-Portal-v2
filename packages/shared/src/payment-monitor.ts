@@ -20,8 +20,11 @@
  * Primary School English, verbatim from the ruling.
  */
 import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "./collection-clock";
+import type { CustomerDeliveryStatus } from "./payment-invoice-register";
 import {
+  deliveryWords,
   invoiceArrivalDayWord,
+  invoiceCustomerDelivery,
   invoicePaymentTiming,
   soRemaining,
   type InvoiceRegisterRow,
@@ -225,23 +228,24 @@ export function monitorStorageWord(s: MonitorStorage, money: (n: number) => stri
 export interface MonitorDelivery {
   dateIso: string | null;
   confirmed: boolean;
+  /** The full governed status, so no surface has to infer it from `confirmed`. */
+  status: CustomerDeliveryStatus;
   /** `Friday, 18 Sep` · `No delivery date` */
   word: string;
   /** The second line when the date is the customer's REQUEST, not yet agreed. */
   note: string | null;
 }
 
+/**
+ * The Monitor's Customer delivery cell — now the SHARED read (Law D), not a
+ * second derivation. It used to flatten `delivery_date_tbd` into
+ * `No delivery date` while the workspace called the same order
+ * `Customer not sure`; one order, two answers.
+ */
 export function monitorDelivery(row: InvoiceRegisterRow): MonitorDelivery {
-  const confirmed = ctrlOf(row)?.confirmed_date ?? null;
-  if (confirmed && ISO_DATE.test(confirmed)) {
-    return { dateIso: confirmed, confirmed: true, word: monitorDayWord(confirmed), note: null };
-  }
-  const order = row.orders;
-  const requested = order?.delivery_date_tbd ? null : (order?.delivery_date ?? null);
-  if (requested && ISO_DATE.test(requested)) {
-    return { dateIso: requested, confirmed: false, word: monitorDayWord(requested), note: "Not confirmed yet" };
-  }
-  return { dateIso: null, confirmed: false, word: "No delivery date", note: null };
+  const d = invoiceCustomerDelivery(row);
+  const { word, note } = deliveryWords(d);
+  return { dateIso: d.dateIso, confirmed: d.word === "confirmed", status: d.word, word, note };
 }
 
 // ─── Payment timing ──────────────────────────────────────────────────────────

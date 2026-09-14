@@ -267,7 +267,7 @@ describe("Payment Monitor — the listing", () => {
       row({ id: "b", order_id: "o2", so: 1301, control: READY }),
     ];
     show();
-    expect(screen.getByRole("button", { name: /Open Calendar · Customer delivery Friday, 18 Sep/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open Calendar · Customer delivery Fri, 18 Sep/ })).toBeInTheDocument();
     expect(screen.getAllByText("No delivery date").length).toBeGreaterThan(0);
   });
 
@@ -276,12 +276,12 @@ describe("Payment Monitor — the listing", () => {
       lines: [{ sku: "A", qty: 2, unit_price: 500 }, { sku: "B", qty: 1, unit_price: 100 }],
       control: { line_stock_status: { A: "ready", B: "waiting" }, line_etas: { B: "2026-09-21" }, confirmed_date: iso(20) } })];
     show();
-    expect(screen.getByText("1 of 2 items ready · Last item arriving Monday, 21 Sep")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 items ready · Last item arriving Mon, 21 Sep")).toBeInTheDocument();
     fireEvent.click(screen.getAllByTitle("Show items")[0]);
     const items = screen.getByTestId("payment-monitor-items");
     expect(within(items).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Item", "Qty", "Goods"]);
     expect(items).toHaveTextContent("King Mattress");
-    expect(items).toHaveTextContent("Arriving Monday, 21 Sep");
+    expect(items).toHaveTextContent("Arriving Mon, 21 Sep");
     expect(within(items).queryAllByRole("button")).toHaveLength(0);
     expect(within(items).queryAllByRole("textbox")).toHaveLength(0);
   });
@@ -325,6 +325,36 @@ describe("Payment Monitor — the rail: filters are facts, summaries name the wo
     expect(localStorage.getItem("carres.paymentMonitor.filterRail")).toBe("0");
     fireEvent.click(screen.getByTestId("payment-monitor-show-filters"));
     expect(screen.getByTestId("payment-monitor-rail")).toBeInTheDocument();
+  });
+
+  /* ⭐ 2026-09-14 — measured on production at 1024px: the rail collapses on its
+     own below 1100px, the collapse is REMEMBERED, and the governed Today
+     summary went with it; the node was simply absent from the page. §3 places
+     the summary above the rail's filters, so it stays there — and it is
+     repeated in the sheet header for exactly the state where its home is off
+     screen. */
+  it("the Today summary survives the rail being collapsed", () => {
+    show();
+    expect(screen.getByTestId("payment-monitor-summaries")).toBeInTheDocument();
+    expect(screen.queryByTestId("payment-monitor-summaries-collapsed")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
+    const collapsed = screen.getByTestId("payment-monitor-summaries-collapsed");
+    expect(collapsed).toHaveTextContent("Today");
+    expect(collapsed).toHaveTextContent(/needs? collection|should have been received|Nothing needs collection/);
+    expect(collapsed.textContent).not.toMatch(/\d+ open/);
+  });
+
+  /* ⭐ 2026-09-14 — seven columns need 1295px and the sheet has ~950px, so the
+     Monitor ALWAYS scrolls sideways. With only `SO No` pinned the right-hand
+     end showed the action with no customer attached to it — the same defect the
+     owner ruled on for Delivery Monitor on 2026-09-12. */
+  it("the row keeps its NAME when the sheet is scrolled: SO No and Customer both pin", () => {
+    show();
+    const pinned = [...document.querySelectorAll("th")]
+      .filter((th) => th.style.left !== "")
+      .map((th) => th.textContent?.replace(/\s+/g, " ").trim());
+    expect(pinned.some((t) => t?.includes("SO No"))).toBe(true);
+    expect(pinned.some((t) => t?.includes("Customer"))).toBe(true);
   });
 });
 

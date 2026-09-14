@@ -67,7 +67,7 @@ describe("invoiceGoodsFacts / invoiceGoodsWord", () => {
       line_stock_status: { A: "ready", B: "awaiting" },
       line_etas: { B: "2026-09-07" },
     } });
-    expect(invoiceGoodsWord(r)).toBe("Arriving Monday, 7 Sep");
+    expect(invoiceGoodsWord(r)).toBe("Arriving Mon, 7 Sep");
   });
   it("no readiness evidence reads Arrival not confirmed", () => {
     expect(invoiceGoodsWord(row())).toBe("Arrival not confirmed");

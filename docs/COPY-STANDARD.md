@@ -1895,7 +1895,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 |---|---|---|
 | The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
 | Monitor columns, in order | **`SO No · Customer · Amount needed · Goods · Storage · Customer delivery · Payment timing`** | Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
-| Goods cell | **`Goods ready`** · **`2 of 3 items ready · Last item arriving Monday, 21 Sep`** · **`Arriving Monday, 21 Sep`** · **`Arrival not confirmed`** | Stock received Yes/No · ETA · In stock |
+| Goods cell | **`Goods ready`** · **`2 of 3 items ready · Last item arriving Mon, 21 Sep`** · **`Arriving Mon, 21 Sep`** · **`Arrival not confirmed`** | Stock received Yes/No · ETA · In stock |
 | The item disclosure and its heads | **`Show items`** · **`Item · Qty · Goods`** — a line says `Ready` · `Arriving {day}` · `Arrival not confirmed` | Expand · Details · SKU (as a head) |
 | Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** | Storage fee · Accrued · Pending waiver |
 | Customer delivery cell | **`{Weekday}, {d} {Mon}`** with the second line **`Not confirmed yet`** when only requested · **`No delivery date`** | Logistics ETA · TBD · Delivery date |

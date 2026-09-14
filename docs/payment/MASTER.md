@@ -88,7 +88,10 @@ Workspace          duties, cover, working calendars
 
 Payment Monitor is a full-width control listing keyed on the Sales Order: one row per SO that
 still needs customer money. It is not a calendar, a document register, a KPI dashboard or a
-second My Work. Default columns, in this order, `SO No` sticky:
+second My Work. Default columns, in this order, with **`SO No` AND `Customer` sticky** (the shared
+identity rule, owner ruling 2026-09-12 for Delivery Monitor, applied here 2026-09-14 — the seven
+columns need 1295px against roughly 950px of sheet, so the Monitor always scrolls sideways and with
+`SO No` alone the right-hand end showed the action with no customer attached to it):
 
 ```text
 SO No | Customer | Amount needed | Goods | Storage | Customer delivery | Payment timing
@@ -99,21 +102,26 @@ SO No | Customer | Amount needed | Goods | Storage | Customer delivery | Payment
   `RM {amount} so far` and never silently enters Amount needed; after the final calculation and
   Storage Invoice issue it enters with the readable breakdown `includes storage RM {amount}`.
 - **Goods** — Primary School English only, no separate Arrival column, no technical words:
-  `Goods ready` · `2 of 3 items ready · Last item arriving Monday, 21 Sep` ·
-  `Arriving Monday, 21 Sep` · `Arrival not confirmed`. `Show items` (the row expansion) opens a
+  `Goods ready` · `2 of 3 items ready · Last item arriving Mon, 21 Sep` ·
+  `Arriving Mon, 21 Sep` · `Arrival not confirmed`. `Show items` (the row expansion) opens a
   read-only `Item | Qty | Goods` disclosure for the delivery scope's goods; Payment staff change
   no stock fact there.
-- **Storage** — every real state: `No storage charge` · `Free until Monday, 14 Sep` ·
+- **Storage** — every real state: `No storage charge` · `Free until Mon, 14 Sep` ·
   `Sofa · Day 15 · RM 200.00 so far` · `Free request waiting for approval · Estimated charge
-  RM 150.00` · `Free storage approved until Monday, 21 Sep` · `Storage Invoice issued ·
+  RM 150.00` · `Free storage approved until Mon, 21 Sep` · `Storage Invoice issued ·
   RM 200.00 not paid`.
-- **Customer delivery** — the customer-confirmed day (`Friday, 18 Sep`); a requested day carries
-  the second line `Not confirmed yet`; else `No delivery date`. Never a Logistics ETA under this
-  heading. The date cell opens the §17 Calendar at that week.
+- **Customer delivery** — the customer-confirmed day (`Fri, 18 Sep`); a requested day carries
+  the second line `Not confirmed yet`; `Customer not sure` when the customer has no date in mind;
+  else `No delivery date`. Never a Logistics ETA under this heading. The date cell opens the §17
+  Calendar at that week. **ONE READ (Law D, 2026-09-14):** the Monitor row and the collection
+  workspace both call `invoiceCustomerDelivery` + `deliveryWords`. They used to derive it
+  separately and disagree — the row flattened `Customer not sure` into `No delivery date`, and the
+  workspace printed the bare date, so a day the customer had NOT confirmed looked exactly like one
+  they had. The workspace now prints the same word and the same `Not confirmed yet` second line.
 - **Payment timing** — the two-line fact/action surface. Facts: `Payment due today` ·
   `Ask customer today` · `Customer promised to pay today` · `Payment should have been received` ·
   `Arrival not confirmed` · `Storage Invoice not paid` · `No delivery date` ·
-  `Payment due Friday, 18 Sep`. Actions: `Ask customer to pay` · `Wait` · `Send the invoice and
+  `Payment due Fri, 18 Sep`. Actions: `Ask customer to pay` · `Wait` · `Send the invoice and
   collect payment`. The owner is the shared Work feed's resolved person as an avatar (hover /
   accessible name = full name); a staff name never enters the action sentence; no Work item ⇒
   no invented owner. This is the ruled exception to the fact-only register cell (UI MASTER).
@@ -129,6 +137,13 @@ SO No | Customer | Amount needed | Goods | Storage | Customer delivery | Payment
 - Completed payment work leaves the Monitor; historical money remains in Payment Records. A
   scoped `?order=` for a paid SO says `SO-{n} needs no payment right now. Its money is in
   Payment Records.`
+
+**ONE DATE SPELLING (COPY-STANDARD's date law, corrected here 2026-09-14).** Every day on every
+Payment surface is spelled `Wed, 12 Aug` — the year only when it is not the current year. This
+MASTER's examples used to carry the full weekday (`Monday, 21 Sep`) while the rest of the portal
+spelled `Mon, 21 Sep` through `fmtDate`, so the Monitor said `Sunday, 4 Oct` and the workspace the
+row opens said `Sun, 4 Oct` for the same day. COPY-STANDARD is explicit that a second date spelling
+is itself the defect, and the date law outranks a module's examples.
 
 ### Monitor versus shared Work
 
@@ -171,7 +186,7 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
 ```
 
 Operation does not work on Saturday, so an Operation collection owner acts on Friday for a
-Saturday deadline while the Monitor still names the Saturday (`Payment due Saturday, 12 Sep`) and
+Saturday deadline while the Monitor still names the Saturday (`Payment due Sat, 12 Sep`) and
 the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
 day gives each owner its own governed previous working day. Logistics Partner DO lead time is
