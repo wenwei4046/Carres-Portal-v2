@@ -72,7 +72,7 @@ vi.mock("./procurement/TabbedProcurementShell", () => ({
 // The bare procurement path mounts the Purchase Execution Workspace (Jess's
 // 2026-08-01 architecture freeze); slugged paths keep the legacy shell so
 // `?po=` deep links survive. Stubbed — it self-fetches via react-query.
-vi.mock("./OperationPurchaseOrders", () => ({
+vi.mock("./purchase-orders/PurchaseOrdersPage", () => ({
   default: () => (
     <div data-testid="purchase-orders-workspace-stub">po-workspace</div>
   ),
