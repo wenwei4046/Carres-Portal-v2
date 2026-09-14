@@ -571,7 +571,7 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 3 | `Delivery Status` | one status word set (§8.4) | the failure reason, or the overdue act |
 | 4 | `SO No` | `SO-1358`, opens the Sales Order | |
 | 5 | `Customer` | customer name | phone |
-| 6 | `Delivery Location` | city and state | building type and floor when recorded |
+| 6 | `Delivery Location` | city and state, from the one address reading below | building type, floor and lift when recorded |
 | 7 | `Requested Delivery Date` | `Thu, 24 Sep` · `To be confirmed` · `No delivery date` | `Customer requested this date` only when a window, not a date, was given |
 | 8 | `Confirmed Delivery` | `Confirmed` · `Not confirmed` | `Thu, 22 Oct` then `2 PM to 5 PM`; `Mon, 14 Sep · No time agreed` for a half booking; `Call by Thu, 22 Oct` while unconfirmed |
 | 9 | `Logistics` | partner name · `No logistics picked` | driver name once assigned |
@@ -635,6 +635,54 @@ problem, never a normal empty delivery: its status reads `Order details incomple
 fact prints in orange inside panel 1 (`Building type not recorded`), and the row offers `Open
 Sales Order to change`. An order with no delivery address at all is not a delivery and stays
 Sales-owned Work under the entry rule below.
+
+**⭐ ONE ADDRESS, ONE READING — owner correction 2026-09-14, APPROVED / LOCKED.** Monitor read the
+customer's address three different ways on one screen. **Verified on production SO-1217 /
+TCF0541:** `Delivery Location` said `Not recorded`, the `State` column said `Selangor`, the status
+said `State not recorded`, and the expanded brief showed a full Puchong address the Operation
+account could read — four answers to one question, two of them false. **Measured the same day over
+the 99 open scopes:** 43 carry the structured state, 46 carry only a written address and no
+structured state (every AutoCount and rental order), 10 carry no address at all. So 46 of the 89
+addressed rows were warning about a state their own `State` column was printing.
+
+The location summary, the `State` column, the `STATE` dropdown and the `State not recorded` check
+now run **one reader** over **one address**, and it never writes anything back — correcting an
+address stays Sales work through `Open Sales Order to change`:
+
+```
+STATE   1  the recorded customer_address_state, exactly as recorded
+        2  the state NAMED in the written address, or its exact 5-digit postcode
+           in the national dataset
+        ✗  a coarse 2-digit postcode range — a guess, so nothing resolves and
+           `State not recorded` stays true
+
+TOWN    1  the recorded customer_address_city, exactly as recorded
+        2  the segment the written address puts immediately before its trailing
+           state, when that segment is an official post town OF that state
+        3  the post town of the address's exact 5-digit postcode, when that town
+           belongs to the resolved state
+        ✗  otherwise nothing — the label prints the state alone
+```
+
+**A recorded column always wins.** When the structured fields and the written address disagree, the
+explicit value is what a person chose and free text never overrules it. **The town the customer
+wrote outranks a postcode lookup** (rung 2 above rung 3): SO-1217 writes `Puchong` twice and
+carries `43300`, which the dataset files under Seri Kembangan. **A town is never paired with a
+state it is not in:** SO-1225 carries `43500` (Semenyih, Selangor) and ends `Sentul, Kuala Lumpur`,
+and resolves to `Kuala Lumpur` alone rather than `Semenyih, Kuala Lumpur`.
+
+**AN EXISTING ADDRESS IS NEVER CALLED ABSENT.** When no locality resolves but an address is
+recorded, `Delivery Location` prints that address; `Not recorded` is reserved for a record that
+genuinely holds nothing. The warning belongs to the STATE, not to the address — SO-1246
+(`Tuai Timur, Setia Alam`) prints its address and keeps `State not recorded`, because `Setia Alam`
+is a township and inventing a state from it would file the row under a state nobody recorded.
+
+**Reading the state does not complete the order.** Every other required fact keeps its own
+sentence: SO-1217 still reads `Order details incomplete` over `Building type not recorded`.
+
+**The STATE rail did not move.** Replaying the previous `customerRegionOf` against all 99 open
+scopes put no row in a different bucket; what changed is that the label, the filter and the
+warning can no longer disagree.
 
 **THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
 not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery

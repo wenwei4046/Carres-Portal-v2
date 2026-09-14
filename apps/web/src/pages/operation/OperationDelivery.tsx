@@ -676,11 +676,25 @@ function joinLines(a: string, b: string | null | undefined): string {
 }
 
 /** `Condominium · Floor 12` — the crew's building facts under the locality. */
+/**
+ * COLUMN 6's second line — what the crew is walking into, in the governed
+ * words. The LIFT joined it with the address correction (2026-09-14): a floor
+ * with no lift is the single fact that decides how many people and how long a
+ * delivery takes, it is already recorded on the order, and reading it off the
+ * row costs nothing. A fact nobody recorded prints nothing here; its own
+ * `Lift not recorded` warning lives in panel 1, where it can be fixed.
+ */
 function buildingLine(r: DeliveryMonitorCard): string | null {
   const building = r.scope.building !== DW.notGiven ? r.scope.building : null;
   const floor =
     r.scope.o.delivery_floor != null ? `${MONITOR_COPY.floor} ${r.scope.o.delivery_floor}` : null;
-  const parts = [building, floor].filter((p): p is string => Boolean(p));
+  const lift =
+    r.scope.o.delivery_has_lift == null
+      ? null
+      : r.scope.o.delivery_has_lift
+        ? MONITOR_COPY.hasLift
+        : MONITOR_COPY.noLift;
+  const parts = [building, floor, lift].filter((p): p is string => Boolean(p));
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 

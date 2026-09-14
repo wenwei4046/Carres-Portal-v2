@@ -508,6 +508,133 @@ describe("REGION classification — direct state names (owner correction 2026-09
 
 });
 
+/* ── ⭐ ONE ADDRESS, ONE READING — owner correction 2026-09-14 ──────────────
+ *
+ * THE VERIFIED DEFECT, on production SO-1217 / TCF0541: one row said its
+ * delivery location was `Not recorded`, said it was going to `Selangor`, said
+ * `State not recorded` as its status, and carried a full Puchong address that
+ * Operations could read in the brief below it. Four answers, one question,
+ * three readers of the same address.
+ *
+ * Measured the same day over the 99 open scopes: 43 carry the structured
+ * state, 46 carry only a written address (every AutoCount and rental order),
+ * 10 carry no address at all. So 46 of the 89 addressed rows were warning
+ * about a state their own `State` column was printing.
+ *
+ * All four now run `resolveDeliveryLocality`, and the STATE rail's population
+ * is unchanged: replaying the old `customerRegionOf` against every one of the
+ * 99 rows moved no row to a different bucket.
+ */
+describe("the location, the State and the warning read ONE address", () => {
+  /** SO-1217 / TCF0541 exactly as production holds it. */
+  const so1217 = () =>
+    order({
+      id: "tcf0541",
+      so: 1217,
+      source_ref: ["TCF0541"] as never,
+      source_system: "autocount",
+      customer_address:
+        "31,JALAN BK8/2B,ANGGUN, RESIDENCE,BANDAR KINRARA,, 43300 PUCHONG,SELANGOR, Puchong, Selangor",
+      customer_address_line1: null,
+      customer_address_city: null,
+      customer_address_state: null,
+      customer_address_postcode: null,
+      /* Building type is genuinely absent on this order; floor and lift are
+         recorded, which is why it is delivery work at all. */
+      building_type: null,
+      delivery_floor: 1,
+      delivery_has_lift: false,
+      delivery_date: "2026-07-20",
+      delivery_date_tbd: false,
+    });
+
+  it("⭐ SO-1217 no longer says Selangor and `State not recorded` at once", () => {
+    const o = so1217();
+    const row = build([o])[0]!;
+    expect(row.location).toBe("Puchong, Selangor");
+    expect(regionBucketOf(row)).toBe("Selangor");
+    expect(requiredSalesFactsMissing(o)).not.toContain(DW.stateNotRecorded);
+    expect(row.missingFacts).not.toContain(DW.stateNotRecorded);
+  });
+
+  it("⭐ SO-1217's genuinely missing Building type still warns", () => {
+    /* Reading the state must not mark the whole order complete. The row stays
+       `Order details incomplete`, now naming the fact that IS missing. */
+    const o = so1217();
+    const row = build([o])[0]!;
+    expect(requiredSalesFactsMissing(o)).toEqual([DW.buildingNotRecorded]);
+    expect(row.status.label).toBe("Order details incomplete");
+    expect(row.status.second).toBe(DW.buildingNotRecorded);
+  });
+
+  it("the written address stays reachable behind the row", () => {
+    /* The brief prints `row.o.customer_address` when no structured line
+       exists; resolving a locality never replaces or rewrites it. */
+    const o = so1217();
+    expect(build([o])[0]!.o.customer_address).toBe(o.customer_address);
+  });
+
+  it("an address nothing resolves out of still warns, and is not called absent", () => {
+    /* SO-1246 on production: `Tuai Timur, Setia Alam` names a township, not a
+       state. Nothing is guessed, the warning survives — and the cell prints
+       the address rather than the false word `Not recorded`. */
+    const o = order({
+      id: "ambiguous",
+      so: 1246,
+      customer_address: "Tuai Timur, Setia Alam",
+      customer_address_city: null,
+      customer_address_state: null,
+    });
+    const row = build([o])[0]!;
+    expect(requiredSalesFactsMissing(o)).toContain(DW.stateNotRecorded);
+    expect(regionBucketOf(row)).toBeNull();
+    expect(row.location).toBe("Tuai Timur, Setia Alam");
+    expect(row.location).not.toBe(DW.notRecorded);
+  });
+
+  it("a structured address is printed and bucketed from its own columns", () => {
+    const o = order({ id: "structured", so: 1209 }); // Klang, Selangor fixture
+    const row = build([o])[0]!;
+    expect(row.location).toBe("Klang, Selangor");
+    expect(regionBucketOf(row)).toBe("Selangor");
+    expect(requiredSalesFactsMissing(o)).not.toContain(DW.stateNotRecorded);
+  });
+
+  it("conflicting fields: the recorded column wins over the written address", () => {
+    /* SO-1319's shape — the written address still carries an older Selangor
+       address while the columns say Kuala Lumpur. Location, bucket and
+       warning all follow the explicit answer, so no two of them disagree. */
+    const o = order({
+      id: "conflict",
+      so: 1319,
+      customer_address:
+        "21 Laksjlkaet, ARA DAMANSARA 47301 PJ, Petaling Jaya, Selangor, Kuala Lumpur 50200, Kuala Lumpur",
+      customer_address_city: "Kuala Lumpur",
+      customer_address_state: "Kuala Lumpur",
+    });
+    const row = build([o])[0]!;
+    expect(row.location).toBe("Kuala Lumpur");
+    expect(regionBucketOf(row)).toBe("Kuala Lumpur");
+    expect(requiredSalesFactsMissing(o)).not.toContain(DW.stateNotRecorded);
+  });
+
+  it("an order with NO address at all is still Sales work, never a Monitor row", () => {
+    /* The entry rule is untouched: reading an address that exists never
+       admits an order that has none. */
+    const o = order({
+      id: "nothing",
+      so: 1255,
+      customer_address: null,
+      customer_address_line1: null,
+      customer_address_city: null,
+      customer_address_state: null,
+    });
+    expect(entersDeliveryWork(o)).toBe(false);
+    expect(deliveryEntryBlockers(o)).toContain(DW.blockerNoLocation);
+    expect(build([o])).toEqual([]);
+  });
+});
+
 /* ── 【DELIVERY】 CARD 20 — a Journey leg's arrival on Monitor ──────────────
    `Delivered` is the customer's word. Leg 1's `delivered` result on its own
    document is the goods reaching the JB warehouse: `Arrived` over the stop,
