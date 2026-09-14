@@ -271,8 +271,9 @@ function retryOnce(failures: number, error: unknown): boolean {
   return failures < 1;
 }
 
-export function useProfitAndLoss(from: string, to: string) {
-  return useQuery({
+/** The Profit and Loss read, as options — Reports and the Dashboard's month-end pack share it. */
+export function profitAndLossQuery(from: string, to: string) {
+  return {
     queryKey: reportKeys.profitAndLoss(from, to),
     queryFn: async () => parseProfitAndLoss(
       await apiFetch<unknown>(`/api/finance/ledger/profit-and-loss?${new URLSearchParams({ from, to }).toString()}`),
@@ -280,16 +281,25 @@ export function useProfitAndLoss(from: string, to: string) {
       to,
     ),
     retry: retryOnce,
-  });
+  };
 }
 
-export function useBalanceSheet(asOf: string) {
-  return useQuery({
+/** The Balance Sheet read, as options — Reports and the Dashboard's month-end pack share it. */
+export function balanceSheetQuery(asOf: string) {
+  return {
     queryKey: reportKeys.balanceSheet(asOf),
     queryFn: async () => parseBalanceSheet(
       await apiFetch<unknown>(`/api/finance/ledger/balance-sheet?${new URLSearchParams({ asOf }).toString()}`),
       asOf,
     ),
     retry: retryOnce,
-  });
+  };
+}
+
+export function useProfitAndLoss(from: string, to: string) {
+  return useQuery(profitAndLossQuery(from, to));
+}
+
+export function useBalanceSheet(asOf: string) {
+  return useQuery(balanceSheetQuery(asOf));
 }

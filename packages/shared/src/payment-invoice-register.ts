@@ -64,6 +64,9 @@ export interface InvoiceRegisterRow {
     delivery_date: string | null;
     delivery_date_tbd: boolean | null;
     delivered_at: string | null;
+    /** When the order was placed (timestamptz). The Finance Dashboard's A/R
+     *  Aging ages an order from this day, Malaysia time. */
+    placed_at?: string | null;
     ops_assigned_logistic?: string | null;
     delivery_partners?: { name: string; contact: string | null } | null;
     order_payments?: Array<{
