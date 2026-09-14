@@ -1,9 +1,7 @@
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import PurchasingTabs from "../PurchasingTabs";
-import OhanaBedFrameTab from "./OhanaBedFrameTab";
-import OhanaSofaTab from "./OhanaSofaTab";
-import NiceFutureMattressTab from "./NiceFutureMattressTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 
 /**
  * TabbedProcurementShell — Phase 4.5 Chunk 2 Sprint F Task 34.
@@ -35,12 +33,6 @@ const TAB_LABELS: Record<ProcurementTabSlug, string> = {
   "nice-future": "Nice Future Mattress",
   "hookka-sofa": "Ohana Sofa",
   "hookka-bedframe": "Ohana Bed Frame",
-};
-
-const TAB_COMPONENTS: Record<ProcurementTabSlug, () => JSX.Element> = {
-  "nice-future": NiceFutureMattressTab,
-  "hookka-sofa": OhanaSofaTab,
-  "hookka-bedframe": OhanaBedFrameTab,
 };
 
 const DEFAULT_SLUG: ProcurementTabSlug = "nice-future";
@@ -85,8 +77,6 @@ export default function TabbedProcurementShell() {
       />
     );
   }
-
-  const ActiveTab = TAB_COMPONENTS[rawSlug];
 
   return (
     /* h-full flex column: the two header rows stay put, only the tab body
@@ -134,10 +124,10 @@ export default function TabbedProcurementShell() {
         </div>
       </div>
 
-      {/* Active tab body — the ONLY scroll area. Child mounts on slug change
+      {/* Active tab body — the ONLY scroll area. `key` remounts it on slug change
           so each tab's TanStack query runs against its own slug-keyed cache. */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-14">
-        <ActiveTab />
+        <ProcurementTabContent key={rawSlug} slug={rawSlug} />
       </div>
     </div>
   );

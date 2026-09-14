@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import OhanaSofaTab from "./OhanaSofaTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 import { purchasingActionButton } from "@carres/shared";
 import type { CatalogResponse } from "@carres/shared";
 import type {
@@ -158,7 +158,7 @@ describe("OhanaSofaTab — slug + read view", () => {
     posListState = [
       makeSofaPo({ id: "PO-SOFA-001", sup_status: "ready_confirm_sent" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(useProcurementTabSpy).toHaveBeenCalledWith("hookka-sofa");
     expect(screen.getByTestId("po-row-PO-SOFA-001")).toBeInTheDocument();
     expect(screen.getByText("Nordic Sofa · 3 seater")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)"
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2060"));
     expect(
       screen.getByText(/Assign pickup partner · PO-2060/),
@@ -193,7 +193,7 @@ describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)"
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2061"));
     // Two buttons named "Assign partner": the row CTA and the modal's primary.
     // The modal-rendered one is inside [role=dialog]; pick that one.
@@ -264,7 +264,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3005", sup_status: "ready_for_pickup" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(screen.getByTestId("assign-pickup-PO-3005")).toBeInTheDocument();
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
@@ -274,7 +274,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3006", sup_status: "pickup_assigned" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3006");
@@ -285,7 +285,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3007", sup_status: "pickup_accepted" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3007");
@@ -296,7 +296,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3008", sup_status: "picked_up" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3008");
@@ -307,7 +307,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     // Without this, all four assertions above would still pass if the button
     // vanished from the page entirely, and the suite would be guarding nothing.
     posListState = [makeSofaPo({ id: "PO-3009", sup_status: "delivered" })];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeInTheDocument();
   });
 });
