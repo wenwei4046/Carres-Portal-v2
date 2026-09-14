@@ -426,9 +426,8 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
 // Helpers
 // -----------------------------------------------------------------------------
 
-/** Shared modal chrome — proto-style backdrop + 620px card with the full
- *  three-row layout (header + scrollable body + footer). All three action
- *  modals (TopUp / Date / Address) reuse this shell. */
+/** Modal chrome — proto-style backdrop + 620px card with the full
+ *  three-row layout (header + scrollable body + footer). */
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
@@ -451,5 +450,3 @@ function extensionFromMime(mime: string): string | null {
   if (mime === "image/heic" || mime === "image/heif") return "heic";
   return null;
 }
-
-export { ModalShell };
