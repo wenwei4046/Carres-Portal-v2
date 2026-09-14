@@ -16,6 +16,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderAttemptRow, DeliveryOrderRow } from "@/lib/queries";
+import { resolveDeliveryLocality } from "@/lib/locality";
 import {
   buildDoRegisterRails,
   buildDoRegisterRow,
@@ -494,5 +495,37 @@ describe("an intermediate Journey leg's document (Card 20)", () => {
     expect(rails.status.arrived).toBe(1);
     expect(rails.status.delivered).toBe(1);
     expect(DO_STATUS_KEYS).toContain("arrived");
+  });
+});
+/* ── ⭐ ONE ADDRESS, ONE READING — owner correction 2026-09-14 ──────────────
+   The register and Monitor read the SAME order row. A second interpretation
+   here is how one Delivery surface starts printing `Not recorded` over an
+   address the other prints as `Puchong, Selangor`. No issued document differs
+   today — all 4 in production carry the structured state — and this is what
+   stops the first one that does not from splitting the two registers. */
+describe("Delivery Location reads the one shared address interpretation", () => {
+  const written = (customer_address: string) =>
+    build({
+      orders: {
+        ...doRow().orders,
+        customer_address,
+        customer_address_city: null,
+        customer_address_state: null,
+      },
+    });
+
+  it("a written-only address prints its locality, exactly as Monitor prints it", () => {
+    const address =
+      "31,JALAN BK8/2B,ANGGUN, RESIDENCE,BANDAR KINRARA,, 43300 PUCHONG,SELANGOR, Puchong, Selangor";
+    expect(written(address).location).toBe("Puchong, Selangor");
+    expect(written(address).location).toBe(resolveDeliveryLocality({ customer_address: address }).label);
+  });
+
+  it("an address nothing resolves out of is still not called absent", () => {
+    expect(written("Tuai Timur, Setia Alam").location).toBe("Tuai Timur, Setia Alam");
+  });
+
+  it("the structured columns still win when a document's order carries them", () => {
+    expect(build().location).toBe("Klang, Selangor");
   });
 });

@@ -54,6 +54,7 @@ import {
 import { displayCustomerName } from "@/lib/customer-name";
 import { fmtDate } from "@/lib/fmt-date";
 import { orderBookingDay } from "@/lib/order-booking";
+import { resolveDeliveryLocality } from "@/lib/locality";
 import { detectState } from "@/lib/region";
 import type {
   DeliveryOrderAttemptRow,
@@ -63,7 +64,7 @@ import type {
   DeliveryHandoverKindRow,
   operationOrderListRow,
 } from "@/lib/queries";
-import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
+import { requestedDeliveryOf } from "./sales-order-columns";
 import { itemsSummary } from "./sales-order-facts";
 import {
   driverSubmissionOf,
@@ -203,6 +204,12 @@ export interface DeliveryScopeRow {
   customerDeliveryIso: string | null;
   /** The customer WAS asked and answered "not yet" — a different fact. */
   customerDateTbd: boolean;
+  /**
+   * The customer's locality as ONE reading of ONE address
+   * (`resolveDeliveryLocality`) — the same reading the `State` column, the
+   * STATE rail and the `State not recorded` warning run, so a row can no
+   * longer print the state it also says was never recorded.
+   */
   location: string;
   building: string;
   logisticsId: string | null;
@@ -456,10 +463,25 @@ export function entersDeliveryWork(o: operationOrderListRow): boolean {
   return f.isTravelling && f.hasLocation && f.hasGoods;
 }
 
-/** The required Sales facts this row lacks, in the operator's words. */
+/**
+ * The required Sales facts this row lacks, in the operator's words.
+ *
+ * ⭐ THE STATE IS READ THE WAY IT IS PRINTED (owner correction 2026-09-14).
+ * This check used to test the structured `customer_address_state` column
+ * alone, while the `State` column, the STATE rail and the `Delivery
+ * Location` cell each read the address their own way. On SO-1217 / TCF0541
+ * that made one row say `Selangor` and `State not recorded` at the same
+ * time, over an address Operations could read in the brief below it.
+ * Measured 2026-09-14: 46 of the 89 addressed open scopes were in exactly
+ * that state. All four now run `resolveDeliveryLocality`, so the warning
+ * fires when — and only when — nothing on the record names a state.
+ *
+ * It stays a WARNING, not a repair: a state read out of a written address is
+ * never written back, and every other missing fact keeps its own sentence.
+ */
 export function requiredSalesFactsMissing(o: operationOrderListRow): string[] {
   const out: string[] = [];
-  if (!o.customer_address_state?.trim()) out.push(DW.stateNotRecorded);
+  if (!resolveDeliveryLocality(o).state) out.push(DW.stateNotRecorded);
   if (!o.building_type?.trim()) out.push(DW.buildingNotRecorded);
   if (o.delivery_floor == null) out.push(DW.floorNotRecorded);
   if (o.delivery_has_lift == null) out.push(DW.liftNotRecorded);
@@ -686,7 +708,7 @@ export function buildDeliveryScopeRows({
       customerDateTbd: requestedDeliveryOf(o).tbd,
       contactDueIso,
       missingFacts: requiredSalesFactsMissing(o),
-      location: conciseLocality(o.customer_address_city, o.customer_address_state),
+      location: resolveDeliveryLocality(o).label,
       building: o.building_type?.trim() || DW.notGiven,
       goods: itemsSummary(o) || DW.noGoods,
       o,
@@ -843,23 +865,21 @@ export function buildDeliveryScopeRows({
  */
 export const SINGAPORE_KEY = "Singapore";
 
-/** The customer's own state — the STRUCTURED column first (a native order
- *  records it directly), then the free-text classifier over the address. */
+/**
+ * The customer's own state, for the rail row and the `State` filter — the
+ * SAME reading `Delivery Location` prints and the SAME one the `State not
+ * recorded` warning tests (`resolveDeliveryLocality`, owner correction
+ * 2026-09-14). One address, one answer: the structured column when a
+ * salesperson chose one, otherwise the state the written address names.
+ *
+ * `stateKey` rather than `state` because a rail row is a BUCKET — an alias
+ * (`KL`, `Malacca`) has to land on the one canonical spelling instead of
+ * minting a second row beside the real one.
+ */
 function customerRegionOf(o: DeliveryScopeRow["o"]): string | null {
-  const stated = o.customer_address_state?.trim();
-  if (stated) {
-    if (/singapore/i.test(stated)) return SINGAPORE_KEY;
-    /* Through the classifier so an alias (`KL`, `Malacca`) lands on the one
-       canonical spelling instead of minting a second rail row. */
-    const canon = detectState(stated);
-    if (canon) return canon;
-  }
-  const text =
-    o.customer_address ??
-    [o.customer_address_line1, o.customer_address_city, stated].filter(Boolean).join(", ");
-  if (!text) return null;
-  if (/singapore/i.test(text)) return SINGAPORE_KEY;
-  return detectState(text);
+  const key = resolveDeliveryLocality(o).stateKey;
+  if (!key) return null;
+  return /singapore/i.test(key) ? SINGAPORE_KEY : key;
 }
 
 /** The region row this scope counts under, or null when nothing resolves. */

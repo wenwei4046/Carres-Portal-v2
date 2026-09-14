@@ -7024,6 +7024,10 @@ export interface DeliveryOrderRow {
     id: string;
     so: number;
     customer_name: string | null;
+    /** The written address, and the two structured columns beside it — read
+     *  through the ONE shared interpretation (`resolveDeliveryLocality`), so
+     *  the register and Monitor cannot print two localities for one order. */
+    customer_address?: string | null;
     customer_address_city?: string | null;
     customer_address_state?: string | null;
     /** The SO's customer promise — the register's `Requested Delivery Date` column
