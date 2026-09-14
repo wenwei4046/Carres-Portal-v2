@@ -367,7 +367,7 @@ describe("the shape", () => {
     for (const value of [
       "Operation must assign logistics",
       "Waiting for logistics pickup",
-      "Logistics is delivering to the customer",
+      "On the way to customer",
       "Order details incomplete",
     ]) {
       expect(screen.getByRole("option", { name: new RegExp(`^${value}`) })).toBeTruthy();
@@ -610,7 +610,9 @@ describe("one card", () => {
     expect(within(card).getByText("NETS")).toBeTruthy();
     /* A day AND a window: the pill names the day (§8.4), never the retired
        `Delivery confirmed`. */
-    expect(within(card).getByText("Confirmed for Sat, 5 Sep")).toBeTruthy();
+    /* The card no longer repeats the date of the column it sits in
+       (owner ruling 2026-09-14). */
+    expect(within(card).getByText("Confirmed")).toBeTruthy();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
     expect(card.closest("a")?.getAttribute("href")).toBe("/operation?tab=delivery&view=all&open=b");
   });
@@ -634,7 +636,7 @@ describe("one card", () => {
     docsState.data!.attempts.push({ do_number: "DO-D", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" });
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-d");
-    expect(within(card).getByText("Delivered")).toBeTruthy();
+    expect(within(card).getByText("Delivered to customer")).toBeTruthy();
     expect(document.body.textContent).not.toContain("Proof Required");
   });
 
@@ -677,7 +679,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     /* Both tabs are NAMED — the operator never has to discover the other view
        by clearing a filter. */
     expect(within(tabs).getByText("Work to do")).toBeTruthy();
-    expect(within(tabs).getByText("Confirmed deliveries")).toBeTruthy();
+    expect(within(tabs).getByText("Delivery schedule")).toBeTruthy();
   });
 
   it("the landing offers nothing to CLEAR — its queue narrows nothing", () => {
@@ -693,7 +695,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     );
   });
 
-  it("switching to Confirmed deliveries opens the Mon–Sat week, and back again", () => {
+  it("switching to Delivery schedule opens the Mon–Sat work week, and back again", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));
     expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();

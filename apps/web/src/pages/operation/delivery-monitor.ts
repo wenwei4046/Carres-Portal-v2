@@ -244,6 +244,8 @@ export const MONITOR_COPY = {
   /** The Month view's compact cell lines — the rail row grammar (label, then
    *  the count) so the operator reads what the rail already taught. */
   cellDeliveries: "Deliveries",
+  /** Card 24 — the Month cell's own line, never summed into `Deliveries`. */
+  cellTransfers: "Transfers",
   cellExceptions: "Exceptions",
   /** The eighth WORK TO DO queue (owner ruling 2026-09-14) — the SAME words
    *  the status column already prints for these rows, so the rail and the row
@@ -253,7 +255,12 @@ export const MONITOR_COPY = {
   /** The landing: what an operator must DO today. */
   tabWork: "Work to do",
   /** The calendar: only deliveries a customer has actually agreed a day for. */
-  tabCalendar: "Confirmed deliveries",
+  /** ⭐ THE TAB NAMES A PLACE, NOT A STATE (owner ruling 2026-09-14).
+   *  `Confirmed deliveries` is RETIRED: confirmation is one condition of a row
+   *  inside the schedule, and naming the whole view after it is what let a
+   *  green pill stand in for readiness. The retired URL spelling still
+   *  resolves. */
+  tabCalendar: "Delivery schedule",
   tabs: "Monitor views",
   /** The calendar's own boundary, stated ON the calendar rather than learned
    *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
@@ -549,6 +556,24 @@ export interface DeliveryMonitorCard {
   /** The Journey leg this card is, when the order travels in legs. Rides the
    *  href only — never printed as a word. */
   leg: number | null;
+  /**
+   * ⭐ THIS ROW IS A WAREHOUSE TRANSFER, NOT A CUSTOMER DELIVERY (owner ruling
+   * 2026-09-14, Card 24).
+   *
+   * The fact existed in `delivery-work.ts` from the day Journeys shipped and
+   * never reached this card, so every Monitor count treated a Klang → JB
+   * transit run as a delivery to a customer. Card 20 taught the WORD and the
+   * reports; it never touched the scheduling arithmetic. Measured the day this
+   * shipped: the audited week showed two cards, BOTH transfers, and the tab
+   * claimed four confirmed deliveries.
+   */
+  isTransfer: boolean;
+  /** `Carres Klang Warehouse → JB transit warehouse` — the leg's own route. */
+  legRoute: string | null;
+  /** The place this leg is heading for, for the transfer ladder's line one. */
+  legStop: string | null;
+  /** How many legs the Journey has, so a row can say `Leg 1 of 2`. */
+  legCount: number | null;
   /** The issued DO row's id — the Delivery Order object's address. */
   deliveryOrderId: string | null;
   doNumber: string | null;
@@ -888,6 +913,10 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       confirmedTime: row.confirmedTime,
       booked,
       settled,
+      isTransfer: row.intermediateLeg,
+      legRoute: row.legRoute,
+      legStop: row.legStop,
+      legCount: row.legCount,
       customerName: row.customer,
       locality: row.location || null,
       goodsSummary: row.goods,
@@ -1442,7 +1471,10 @@ export function groupCardsByDay(
 /* ── THE MONTH'S COUNTS — compact, never cards (owner correction 2026-09-07) ── */
 
 export interface MonthDayCounts {
+  /** CUSTOMER deliveries only — a transfer is counted on its own line. */
   deliveries: number;
+  /** Warehouse transfers, never summed into `deliveries` (Card 24). */
+  transfers: number;
   exceptions: number;
   noLogistics: number;
 }
@@ -1459,8 +1491,14 @@ export function monthDayCounts(
   const out = new Map<string, MonthDayCounts>();
   for (const c of cards) {
     if (!c.confirmedDate) continue;
-    const cell = out.get(c.confirmedDate) ?? { deliveries: 0, exceptions: 0, noLogistics: 0 };
-    cell.deliveries += 1;
+    const cell = out.get(c.confirmedDate) ?? {
+      deliveries: 0,
+      transfers: 0,
+      exceptions: 0,
+      noLogistics: 0,
+    };
+    if (c.isTransfer) cell.transfers += 1;
+    else cell.deliveries += 1;
     if (isExceptionCard(c, todayIso)) cell.exceptions += 1;
     if (c.logisticsPartnerId === null) cell.noLogistics += 1;
     out.set(c.confirmedDate, cell);
@@ -1470,10 +1508,16 @@ export function monthDayCounts(
 
 /** The month cell's aria sentence — the same three facts, in words. */
 export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | undefined): string {
-  if (!counts || counts.deliveries === 0) return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
-  const parts = [
-    `${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`,
-  ];
+  if (!counts || counts.deliveries + counts.transfers === 0) {
+    return `${dateLabel} — ${MONITOR_COPY.emptyDay}`;
+  }
+  const parts: string[] = [];
+  if (counts.deliveries > 0) {
+    parts.push(`${counts.deliveries} ${counts.deliveries === 1 ? "delivery" : "deliveries"}`);
+  }
+  if (counts.transfers > 0) {
+    parts.push(`${counts.transfers} ${counts.transfers === 1 ? "transfer" : "transfers"}`);
+  }
   if (counts.exceptions > 0) {
     parts.push(`${counts.exceptions} ${counts.exceptions === 1 ? "exception" : "exceptions"}`);
   }
@@ -1496,6 +1540,40 @@ export function emptyRangeSentence(
   const last = visibleDays[visibleDays.length - 1];
   if (!first || !last) return "No deliveries are scheduled.";
   return `No deliveries are scheduled from ${fmt(first)} to ${fmt(last)}.`;
+}
+
+/**
+ * ⭐ THE SCHEDULE'S SPLIT (owner ruling 2026-09-14, Card 24).
+ *
+ * Operations watches all logistics work in one place, so the schedule carries
+ * BOTH the final customer delivery and the intermediate warehouse transfer —
+ * but their meaning and their totals never merge. **A transfer is never
+ * counted as a customer delivery**, here or in any report.
+ *
+ * The split is computed over the rows ACTUALLY IN SCOPE, so it follows the
+ * selected range and every active narrowing. An old total is never preserved:
+ * a week holding no customer delivery and two transfers reads exactly
+ * `0 customer deliveries · 2 transfers`, never `2 customer deliveries` because
+ * four rows somewhere else carry a confirmed date.
+ */
+export interface ScheduleSplit {
+  deliveries: number;
+  transfers: number;
+  total: number;
+}
+
+export function scheduleSplitOf(cards: readonly DeliveryMonitorCard[]): ScheduleSplit {
+  let transfers = 0;
+  for (const c of cards) if (c.isTransfer) transfers += 1;
+  return { deliveries: cards.length - transfers, transfers, total: cards.length };
+}
+
+/** `0 customer deliveries · 2 transfers` — the exact sentence, zero included,
+ *  because a zero the operator can read is the whole point of the split. */
+export function scheduleSplitSentence(split: ScheduleSplit): string {
+  const d = `${split.deliveries} ${split.deliveries === 1 ? "customer delivery" : "customer deliveries"}`;
+  const t = `${split.transfers} ${split.transfers === 1 ? "transfer" : "transfers"}`;
+  return `${d} \u00b7 ${t}`;
 }
 
 /** `86 deliveries need a confirmed date.` — printed only from the REAL count. */

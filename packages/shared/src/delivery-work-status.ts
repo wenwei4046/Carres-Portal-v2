@@ -81,7 +81,15 @@ export type DeliveryWorkStatusKind =
   | "arrived"
   | "delivered"
   | "failed"
-  | "details_incomplete";
+  | "details_incomplete"
+  /* ⭐ THE TRANSFER LADDER (owner ruling 2026-09-14, Card 24). An intermediate
+     Journey leg runs a DIFFERENT journey from a customer delivery, so it
+     climbs its own rungs. The two ladders share no word, which is what makes
+     `Delivered to customer` unreachable by a warehouse leg. */
+  | "transfer_confirmed"
+  | "collected_transfer"
+  | "in_transit"
+  | "transfer_failed";
 
 /** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is.
  *  `arrived` (【DELIVERY】 CARD 20): an intermediate Journey leg whose goods
@@ -100,6 +108,10 @@ export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
   "delivered",
   "failed",
   "details_incomplete",
+  "transfer_confirmed",
+  "collected_transfer",
+  "in_transit",
+  "transfer_failed",
 ];
 
 /**
@@ -123,6 +135,12 @@ export const DELIVERY_WORK_STATUS_TONE: Record<DeliveryWorkStatusKind, DeliveryW
   delivered: "green",
   failed: "red",
   details_incomplete: "orange",
+  /* A transfer's agreed day is not a customer promise, so it does not wear the
+     customer leg's green; the goods moving between warehouses are `none`. */
+  transfer_confirmed: "none",
+  collected_transfer: "none",
+  in_transit: "none",
+  transfer_failed: "red",
 };
 
 /** The role word where the data names no partner — the same fallback the
@@ -137,7 +155,11 @@ export const LOGISTICS_ROLE_WORD = "logistics";
 export function deliveryWorkStatusLabelOf(
   kind: DeliveryWorkStatusKind,
   partnerName: string | null | undefined,
-  confirmedDay?: string | null,
+  /** The rung's own detail where line one needs one — today only the STOP a
+   *  transfer is heading for or has reached. `confirmed` no longer takes a
+   *  day: the date lives in `Confirmed Delivery`, and on a schedule card the
+   *  column already names the day (owner ruling 2026-09-14). */
+  detail?: string | null,
 ): string {
   const partner = (partnerName ?? "").trim() || LOGISTICS_ROLE_WORD;
   const cap = partner === LOGISTICS_ROLE_WORD ? "Logistics" : partner;
@@ -151,23 +173,31 @@ export function deliveryWorkStatusLabelOf(
     case "waiting_customer_reply":
       return "Waiting for customer reply";
     case "confirmed":
-      return confirmedDay ? `Confirmed for ${confirmedDay}` : "Confirmed";
+      return "Confirmed";
     case "waiting_pickup":
       return `Waiting for ${partner} pickup`;
     case "collected":
-      return `Goods collected by ${partner}`;
+      return `Collected by ${partner}`;
     case "delivering":
-      return `${cap} is delivering to the customer`;
+      return "On the way to customer";
     case "overdue":
       return "Overdue";
     case "arrived":
-      return "Arrived";
+      return detail ? `Arrived at ${detail}` : "Arrived";
     case "delivered":
-      return "Delivered";
+      return "Delivered to customer";
     case "failed":
       return "Failed Delivery";
     case "details_incomplete":
       return "Order details incomplete";
+    case "transfer_confirmed":
+      return "Transfer confirmed";
+    case "collected_transfer":
+      return "Collected for transfer";
+    case "in_transit":
+      return detail ? `In transit to ${detail}` : "In transit";
+    case "transfer_failed":
+      return "Transfer failed";
   }
 }
 
@@ -262,17 +292,26 @@ export function deliveryWorkStatusOf(
     extra: {
       secondTone?: "orange" | "red" | null;
       reasonLabel?: string | null;
-      day?: string | null;
+      /** Line one's own detail — today only a transfer's stop. */
+      detail?: string | null;
       tone?: DeliveryWorkStatusTone;
     } = {},
   ): DeliveryWorkStatus => ({
     kind,
-    label: deliveryWorkStatusLabelOf(kind, partner, extra.day ?? null),
+    label: deliveryWorkStatusLabelOf(kind, partner, extra.detail ?? null),
     tone: extra.tone ?? DELIVERY_WORK_STATUS_TONE[kind],
     second,
     secondTone: extra.secondTone ?? null,
     reasonLabel: extra.reasonLabel ?? null,
   });
+
+  /* ⭐ WHICH JOURNEY IS THIS? (owner ruling 2026-09-14, Card 24.) An
+     intermediate Journey leg climbs the TRANSFER ladder; everything else is a
+     customer delivery. The two ladders share no word, so a warehouse leg can
+     never reach `Delivered to customer`, and a customer leg can never claim it
+     merely `Arrived`. */
+  const transfer = input.intermediateLeg === true;
+  const stop = input.legStop?.trim() || null;
 
   /* A RECORDED RESULT OUTRANKS EVERY DERIVATION — the DO model's own rule, and
      it holds here for the same reason: somebody was there. */
@@ -284,7 +323,7 @@ export function deliveryWorkStatusOf(
       /* An intermediate leg's success is the goods reaching the named partner
          warehouse — `Arrived` over the stop, green, no proof owed here; the
          customer leg carries `Delivered` and its proof (Card 20). */
-      if (input.intermediateLeg) return say("arrived", input.legStop?.trim() || null);
+      if (transfer) return say("arrived", null, { detail: stop });
       const proof = input.proof;
       const review = proof?.review ?? null;
       /* `Proof Accepted` is the fact that turns `Delivered` green everywhere
@@ -307,7 +346,7 @@ export function deliveryWorkStatusOf(
     /* `partial` and `failed` are both ONE Failed Delivery carrying ONE reason
        (§7's rule) — never a family of failure words. */
     const reason = deliveryReasonByKey(latest.reasonKey)?.label ?? null;
-    return say("failed", reason, { reasonLabel: reason });
+    return say(transfer ? "transfer_failed" : "failed", reason, { reasonLabel: reason });
   }
 
   /* A row Sales left incomplete is a DATA problem, and the row says so before
@@ -329,8 +368,15 @@ export function deliveryWorkStatusOf(
      1). Handed Over without a receipt is the warehouse's half of a handshake
      nobody has answered, so the scope is still waiting for the pickup. */
   if (receipt) {
-    if (input.expectedArrival) return say("delivering", `ETA ${time(input.expectedArrival)}`);
-    return say("collected", receipt.recordedAt ? `Collected ${spell.dateTime(receipt.recordedAt)}` : null);
+    if (input.expectedArrival) {
+      return transfer
+        ? say("in_transit", `ETA ${time(input.expectedArrival)}`, { detail: stop })
+        : say("delivering", `ETA ${time(input.expectedArrival)}`);
+    }
+    const collectedOn = receipt.recordedAt
+      ? `Collected ${spell.dateTime(receipt.recordedAt)}`
+      : null;
+    return say(transfer ? "collected_transfer" : "collected", collectedOn);
   }
 
   /* The document exists and the partner has not collected: the job is the
@@ -345,7 +391,7 @@ export function deliveryWorkStatusOf(
   /* A booking is a DAY and a WINDOW (owner ruling 2026-09-11). A day alone
      leaves the conversation open, and the row stays contact work below. */
   if (input.confirmedDate && input.confirmedTime) {
-    return say("confirmed", time(input.confirmedTime), { day: spell.date(input.confirmedDate) });
+    return say(transfer ? "transfer_confirmed" : "confirmed", time(input.confirmedTime));
   }
 
   if (!partner) return say("assign_logistics");
