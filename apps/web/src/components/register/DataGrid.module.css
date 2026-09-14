@@ -612,6 +612,21 @@ div:first-child > .columnsMenuGroup {
 .td:last-child {
   border-right: 0;
 }
+/* ⭐ THE ELLIPSIS BELONGS TO WHATEVER HOLDS THE TEXT (2026-09-14).
+   `.td` already declares overflow:hidden + text-overflow:ellipsis, but a cell's
+   text almost never sits in the td itself — it sits in the button or span the
+   column's accessor returns. text-overflow applies to a box's OWN inline
+   content, not to an overflowing child box, so the child was drawn at its full
+   width, the td clipped it, and the operator saw a word sliced mid-glyph with
+   no `…` to say anything was missing (`Stage Three Fixture — Invoi`).
+   Measured on production 2026-09-14: td 179px, inner button 193px, no ellipsis.
+   Giving the child the same three declarations puts the mark back. Wrap columns
+   are untouched — they are the opt-in that says height beats one line. */
+.td:not(.tdWrap) > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* WRAP COLUMN (Warehouse unified Inbound/Outbound card, 2026-09-07).
    Information completeness outranks row height: a column that carries every
    product of an arrangement declares `wrap: true` and its content wraps onto
