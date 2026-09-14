@@ -86,6 +86,7 @@ describe("GET warehouse/inbound", () => {
     expect(await r.json()).toEqual({
       arrivals: [],
       sites: [],
+      sourceFacts: [],
       unresolvedSources: [],
       page: { offset: 0, limit: 50, total: 0 },
       facets: {
@@ -134,5 +135,117 @@ describe("GET warehouse/inbound", () => {
     expect((await app().request("/inbound", { method: "POST" })).status).toBe(
       404,
     );
+  });
+});
+
+/** The ADDITIVE read-only facts the Warehouse Schedule needs: which ORIGINAL
+ *  lines an arrangement ordered, and whether its date rests on an AGREEMENT or
+ *  an estimate. Both come from rows this handler already reads. */
+function dbWithOnePo(promises: unknown[] = []) {
+  const rows: Record<string, unknown[]> = {
+    purchase_orders: [
+      {
+        id: "PO-1",
+        version: 1,
+        supplier_id: "sup-1",
+        warehouse_id: "site-1",
+        destination_id: null,
+        status: "open",
+        official_delivery_date: null,
+        eta_date: "2026-09-20",
+        placed_at: "2026-09-01",
+        so: 1362,
+      },
+    ],
+    warehouses: [{ id: "site-1", name: "Carres Klang" }],
+    suppliers: [{ id: "sup-1", name: "Ohana" }],
+    purchase_order_lines: [
+      { id: "line-1", po_id: "PO-1", qty: 1, destination_id: null, sku: "sofa:Muro-K" },
+      { id: "line-2", po_id: "PO-1", qty: 2, destination_id: null, sku: "bedframe:Jager-Q" },
+    ],
+    po_supplier_promises: promises,
+    ops_stock_items: [
+      { id: "u1", unit_code: "U-1", po_no: "PO-1", qty: 1, sku: "sofa:Muro-K" },
+    ],
+  };
+  vi.mocked(userClient).mockReturnValue({
+    from: (table: string) => {
+      const q: any = {
+        select: () => q,
+        order: () => q,
+        range: async (start: number) => ({
+          data: start === 0 ? rows[table] ?? [] : [],
+          error: null,
+        }),
+      };
+      return q;
+    },
+  } as never);
+}
+
+describe("GET warehouse/inbound — arrival source facts", () => {
+  it("returns each PO's OWN ordered lines, keeping two products apart", async () => {
+    dbWithOnePo();
+    const body = (await (await app().request("/inbound")).json()) as {
+      sourceFacts: Array<{
+        sourceId: string;
+        dateStatus: string | null;
+        lines: Array<{ id: string; sku: string | null; qty: number }>;
+      }>;
+    };
+    expect(body.sourceFacts).toHaveLength(1);
+    const [fact] = body.sourceFacts;
+    expect(fact.sourceId).toBe("PO-1");
+    expect(fact.lines).toEqual([
+      { id: "line-1", sku: "sofa:Muro-K", qty: 1 },
+      { id: "line-2", sku: "bedframe:Jager-Q", qty: 2 },
+    ]);
+  });
+
+  it("calls a bare eta_date EXPECTED — a date alone is not an agreement", async () => {
+    dbWithOnePo();
+    const body = (await (await app().request("/inbound")).json()) as {
+      sourceFacts: Array<{ dateStatus: string | null }>;
+    };
+    expect(body.sourceFacts[0].dateStatus).toBe("expected");
+  });
+
+  it("calls an EVIDENCED supplier reply SCHEDULED", async () => {
+    dbWithOnePo([
+      {
+        id: "p1",
+        po_id: "PO-1",
+        po_version: 1,
+        kind: "tomorrow_delivery",
+        answer: "confirmed",
+        new_date: "2026-09-22",
+        about_date: null,
+        previous_date: null,
+        reason: null,
+        channel: "whatsapp",
+        recipient: "Ohana group",
+        evidence: "shot.png",
+        reported_by: "Lim",
+        reported_at: "2026-09-11T02:00:00Z",
+        recorded_by: "user-1",
+        recorded_at: "2026-09-11T03:00:00Z",
+      },
+    ]);
+    const body = (await (await app().request("/inbound")).json()) as {
+      sourceFacts: Array<{ dateStatus: string | null }>;
+    };
+    expect(body.sourceFacts[0].dateStatus).toBe("scheduled");
+  });
+
+  it("keeps the facts scoped to the sources this page returned", async () => {
+    dbWithOnePo();
+    const body = (await (await app().request("/inbound?source=PO-MISSING")).json()) as {
+      arrivals: unknown[];
+      sourceFacts: unknown[];
+    };
+    /* No arrangement on this page means no facts about one — the field never
+       describes a scope the rows beside it do not contain. */
+    expect(body.arrivals).toEqual([]);
+    expect(body.sourceFacts).toEqual([]);
   });
 });
