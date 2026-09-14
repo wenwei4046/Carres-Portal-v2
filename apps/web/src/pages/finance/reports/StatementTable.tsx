@@ -14,7 +14,7 @@ import Button from "@/components/kit/Button";
 import DataTable, { type Column, type GroupRowCell } from "@/components/kit/DataTable";
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
-import type { StatementSection } from "./report-queries";
+import type { StatementLine, StatementSection } from "./report-queries";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -32,23 +32,37 @@ export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[se
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
 export const nothingOnDay = (section: string): string => NOTHING_ON_DAY[section] ?? NOTHING_ON_DAY.ASSET!;
 
-/** Balance Sheet: customers' money paid before their invoice, which the ledger
- *  books on receivables (0506). Under Customer deposits held it says what was
- *  added; under receivables it says what was left out, so the line still
- *  reconciles to the Trial Balance. The database moved it; this only says so.
- *  Null for any other line, and before 0506 is applied. */
-export const paidBeforeInvoiceNote = (line: { reclassified: number | null }): string | null => {
+/** Balance Sheet: money paid before its document, which the ledger books on
+ *  the party's own account. Customers who paid before their invoice sit on
+ *  receivables (0506); money paid to suppliers before their bill sits on
+ *  payables (0507). On the line the money was moved onto (Customer deposits
+ *  held, Advances to suppliers) it says what was added; on the line it was
+ *  moved off it says what was left out, so that line still reconciles to the
+ *  Trial Balance. The database moved it and says whose money it was; this
+ *  only says so. Null for any other line, and before 0506 is applied. */
+export const paidBeforeInvoiceNote = (line: Pick<StatementLine, "reclassified" | "reclassifiedFor">): string | null => {
   if (line.reclassified === null || isZeroMoney(line.reclassified)) return null;
-  return line.reclassified > 0
-    ? `Includes ${rm(line.reclassified)} from customers who paid before their invoice.`
-    : `Leaves out ${rm(-line.reclassified)} that customers paid before their invoice.`;
+  const added = line.reclassified > 0;
+  const money = rm(Math.abs(line.reclassified));
+  switch (line.reclassifiedFor) {
+    case "CUSTOMER":
+      return added
+        ? `Includes ${money} from customers who paid before their invoice.`
+        : `Leaves out ${money} that customers paid before their invoice.`;
+    case "SUPPLIER":
+      return added
+        ? `Includes ${money} paid to suppliers before their bill.`
+        : `Leaves out ${money} paid to suppliers before their bill.`;
+    default:
+      return null;
+  }
 };
 
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number }
   | {
       id: string; section: string; kind: "line"; code: string; name: string | null; amount: number;
-      nested: boolean; reclassified: number | null;
+      nested: boolean; reclassified: number | null; reclassifiedFor: StatementLine["reclassifiedFor"];
     }
   | { id: string; section: string; kind: "unclosed"; amount: number }
   | { id: string; section: string; kind: "nothing" };
@@ -76,7 +90,7 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
       for (const l of lines) {
         out.push({
           id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
-          amount: l.amount, nested: headed, reclassified: l.reclassified,
+          amount: l.amount, nested: headed, reclassified: l.reclassified, reclassifiedFor: l.reclassifiedFor,
         });
       }
     }
@@ -111,7 +125,7 @@ export default function StatementTable({
   accountHref: (code: string) => string;
   /** A note about an account, or null for none. It shows in the tooltip of a
    *  small mark after the account name, so the row stays one line. */
-  lineNote?: (line: { code: string; reclassified: number | null }) => string | null;
+  lineNote?: (line: Pick<StatementLine, "code" | "reclassified" | "reclassifiedFor">) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
 }) {

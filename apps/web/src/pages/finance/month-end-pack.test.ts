@@ -158,6 +158,36 @@ describe("Export month-end pack", () => {
     expect(bs.rows[at + 1]).toEqual(["Includes RM 2,815.00 from customers who paid before their invoice."]);
   });
 
+  it("the Balance Sheet sheet says what was paid to suppliers before their bill, under both lines (0507)", async () => {
+    const ok = api.fetch.getMockImplementation()!;
+    api.fetch.mockImplementation(async (url: string) => {
+      if (!url.includes("balance-sheet")) return ok(url);
+      const asOf = new URL(url, "http://portal.test").searchParams.get("asOf")!;
+      return {
+        rows: [
+          acc("ASSET", "1100", "1120", "Bank — current account", 1150), sub("ASSET", "1100", 1150),
+          { ...acc("ASSET", "1200", "1230", "Advances to suppliers", 100), reclassified: 100, reclassified_for: "SUPPLIER" },
+          sub("ASSET", "1200", 100), tot("ASSET", 1250),
+          { ...acc("LIABILITY", "2100", "2110", "Trade payables — suppliers", 500), reclassified: -100, reclassified_for: "SUPPLIER" },
+          sub("LIABILITY", "2100", 500), tot("LIABILITY", 500),
+          acc("EQUITY", "3000", "3100", "Share capital", 0), sub("EQUITY", "3000", 0),
+          { section: "EQUITY", row_kind: "DERIVED", amount: 750 }, tot("EQUITY", 750),
+          { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+        ].map((r, i) => ({ report_status: "OK", go_live_on: GO_LIVE, as_of: asOf, ordinal: i + 1, ...BLANK,
+          equation_balances: true, equation_difference: 0, ...r })),
+      };
+    });
+    await exportMonthEndPack(client(), "2026-10", "2026-11-03");
+    const bs = api.book[2]!;
+    const adv = bs.rows.findIndex((r) => r[0] === "1230 Advances to suppliers");
+    expect(bs.rows[adv]).toEqual(["1230 Advances to suppliers", 100]);
+    expect(bs.rows[adv + 1]).toEqual(["Includes RM 100.00 paid to suppliers before their bill."]);
+    const pay = bs.rows.findIndex((r) => r[0] === "2110 Trade payables — suppliers");
+    expect(bs.rows[pay]).toEqual(["2110 Trade payables — suppliers", 500]);
+    expect(bs.rows[pay + 1]).toEqual(["Leaves out RM 100.00 paid to suppliers before their bill."]);
+    expect(bs.rows.some((r) => /customers/.test(String(r[0])))).toBe(false);
+  });
+
   it("writes nothing when any of the three reads fails", async () => {
     const ok = api.fetch.getMockImplementation()!;
     api.fetch.mockImplementation(async (url: string) => {

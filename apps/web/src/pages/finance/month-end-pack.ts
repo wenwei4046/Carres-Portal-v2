@@ -22,6 +22,7 @@ import {
   profitAndLossQuery,
   type BalanceSheet,
   type ProfitAndLoss,
+  type StatementLine,
   type StatementSection,
 } from "./reports/report-queries";
 
@@ -113,7 +114,7 @@ export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
 function statementBody(
   sections: readonly StatementSection[],
   nothing: (section: string) => string,
-  lineNote: (line: { reclassified: number | null }) => string | null = () => null,
+  lineNote: (line: Pick<StatementLine, "reclassified" | "reclassifiedFor">) => string | null = () => null,
 ): Cell[][] {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const out: Cell[][] = [["Account", "Amount"]];
@@ -127,7 +128,7 @@ function statementBody(
       case "group": out.push([r.name, r.amount]); break;
       case "line": {
         out.push([`${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
-        // The page's second line, as a row of its own under the account.
+        // The note the page shows in the tooltip next to the account, as a row of its own under it.
         const note = lineNote(r);
         if (note) out.push([note]);
         break;
