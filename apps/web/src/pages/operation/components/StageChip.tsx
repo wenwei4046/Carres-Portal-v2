@@ -101,10 +101,6 @@ export function displayStageOf(o: {
   return stageOf(o);
 }
 
-export function stageLabel(stage: OperationStage): string {
-  return STAGE_LABEL[stage];
-}
-
 export default function StageChip({ stage }: Props) {
   return (
     <span className={`pill ${STAGE_PILL[stage]}`}>{STAGE_LABEL[stage]}</span>

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
-import { qk } from "@/lib/queries";
 
 /**
  * PartnerFleet — Phase 7 Sprint 3.
@@ -226,6 +225,3 @@ export default function PartnerFleet() {
     </div>
   );
 }
-
-// Re-use qk constant (kept for type narrowing if other code uses fleet key).
-export const PARTNER_FLEET_QK = qk.partner;
