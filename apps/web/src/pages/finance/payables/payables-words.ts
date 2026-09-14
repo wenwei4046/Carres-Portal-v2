@@ -93,10 +93,6 @@ export function cents(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export function todayIso(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
-
 /** The price on the supplier's invoice against the PO's price: a flag, never a block. */
 export function priceDiffWord(diff: number | null): string {
   if (diff === null) return "No PO price";

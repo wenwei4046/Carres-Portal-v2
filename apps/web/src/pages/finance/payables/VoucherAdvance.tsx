@@ -6,7 +6,7 @@ import type { PaymentVoucherDocument } from "@carres/shared/schemas/finance-ap";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useApAccounts,
   useApBillOutstanding,
@@ -22,7 +22,6 @@ import {
   money,
   num,
   refusal,
-  todayIso,
   word,
 } from "./payables-words";
 import { FactRow, Facts, ReasonModal } from "./PayablesParts";
@@ -268,7 +267,7 @@ function MoneyBackModal({ voucherId, voucherNo, open, onClose }: {
   const accounts = useApAccounts();
   const record = useRecordMoneyBack();
   const choices = (accounts.data ?? []).filter((a) => a.for_pay_from);
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(appTodayIso());
   const [account, setAccount] = useState("");
   const [amount, setAmount] = useState(String(open));
   const [reference, setReference] = useState("");

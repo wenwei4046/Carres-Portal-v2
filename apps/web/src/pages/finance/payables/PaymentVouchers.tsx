@@ -16,7 +16,7 @@ import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useApAccounts,
   useApBillOutstanding,
@@ -36,7 +36,6 @@ import {
   money,
   num,
   refusal,
-  todayIso,
   word,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
@@ -420,7 +419,7 @@ function VoucherForm() {
   const [purpose, setPurpose] = useState<Purpose>("SUPPLIER_BILLS");
   const [supplierId, setSupplierId] = useState(params.get("supplier") ?? "");
   const [payee, setPayee] = useState("");
-  const [voucherDate, setVoucherDate] = useState(todayIso());
+  const [voucherDate, setVoucherDate] = useState(appTodayIso());
   const [payFrom, setPayFrom] = useState("");
   const [method, setMethod] = useState<Method>("BANK_TRANSFER");
   const [reference, setReference] = useState("");

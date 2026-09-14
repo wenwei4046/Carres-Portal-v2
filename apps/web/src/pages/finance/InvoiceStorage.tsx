@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { toast } from "sonner";
 
@@ -50,10 +50,6 @@ const GROUP_WORD: Record<StorageCaseRow["product_group"], string> = {
   mattress_bedframe: "Mattress / Bedframe",
   sofa: "Sofa",
 };
-
-function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
 
 export default function InvoiceStorage({ orderId, canAct, correctionInFlight = false }: {
   orderId: string;
@@ -141,7 +137,7 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
     ruleChargeAmount: Number(c.rule_charge_amount),
     ruleCycleDays: c.rule_cycle_days,
     approvedFreeUntil: c.approved_free_until,
-  }, todayIso());
+  }, appTodayIso());
   const billed = c.billed_through_period ?? 0;
   const unbilled = Math.max(0, charge.commencedPeriods - billed);
   // 0438 — the charge door: commenced unbilled periods become the paper.
@@ -197,7 +193,7 @@ function StorageChecks({ storageCase: c, canAct }: {
 }) {
   const qc = useQueryClient();
   const [checking, setChecking] = useState(false);
-  const [on, setOn] = useState(todayIso());
+  const [on, setOn] = useState(appTodayIso());
   const [location, setLocation] = useState("");
   const [packaging, setPackaging] = useState("");
   const [note, setNote] = useState("");
@@ -213,7 +209,7 @@ function StorageChecks({ storageCase: c, canAct }: {
     storageStart: c.storage_start,
     lastCheckedOn: last,
     inspectionDays: c.rule_inspection_days ?? 30,
-  }, todayIso());
+  }, appTodayIso());
   const record = useMutation({
     mutationFn: (photoUrl: string) => apiFetch("/api/finance/payment-storage/inspection", {
       method: "POST",
@@ -253,7 +249,7 @@ function StorageChecks({ storageCase: c, canAct }: {
         onClick={() => setChecking(true)}>Check the stored furniture</button>}
     {checking && <div className="mt-2 space-y-2" data-testid="storage-check-form">
       <label className="block"><span className="text-label">Day it was checked</span>
-        <input type="date" value={on} max={todayIso()} onChange={(e) => setOn(e.target.value)}
+        <input type="date" value={on} max={appTodayIso()} onChange={(e) => setOn(e.target.value)}
           aria-label="Day it was checked"
           className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
       <label className="block"><span className="text-label">Where it is stored</span>
@@ -488,7 +484,7 @@ function LaterDateForm({ orderId, onDone, onBack }: {
     data-testid="storage-later-date-form">
     <p className="font-semibold">This records what the customer asked for. It does not change the delivery date.</p>
     <label className="block"><span className="text-label">The date the customer asked for</span>
-      <input type="date" value={date} min={todayIso()} onChange={(e) => setDate(e.target.value)}
+      <input type="date" value={date} min={appTodayIso()} onChange={(e) => setDate(e.target.value)}
         aria-label="The date the customer asked for"
         className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
     <label className="block"><span className="text-label">Reason</span>

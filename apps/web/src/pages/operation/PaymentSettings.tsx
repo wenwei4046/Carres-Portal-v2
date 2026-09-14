@@ -9,7 +9,7 @@ import Select from "@/components/kit/Select";
 import DatePicker from "@/components/kit/DatePicker";
 import PaymentTemplateLibrary from "./PaymentTemplateLibrary";
 import { rm } from "@/lib/format-currency";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { toast } from "sonner";
 import type { PaymentMethodRegistryRow } from "@carres/shared";
 import {
@@ -56,10 +56,6 @@ function nextNumberExample(prefix: string): string {
   const mm = String(kl.getMonth() + 1).padStart(2, "0");
   const yy = String(kl.getFullYear()).slice(-2);
   return `${prefix}-${dd}${mm}${yy}-0001`;
-}
-
-function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
 }
 
 function Section({ title, lead, children, testId }: {
@@ -212,7 +208,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
   const [step, setStep] = useState<"view" | "edit" | "review">("view");
   const [ask, setAsk] = useState(String(current?.ask_days_before ?? 3));
   const [deadline, setDeadline] = useState(String(current?.deadline_days_before ?? 2));
-  const [effectiveFrom, setEffectiveFrom] = useState(todayIso());
+  const [effectiveFrom, setEffectiveFrom] = useState(appTodayIso());
   const [reason, setReason] = useState("");
   const save = useMutation({
     mutationFn: () => apiFetch("/api/finance/payment-settings/collection-timing", {
@@ -252,7 +248,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
         value={ask} onChange={(e) => setAsk(e.target.value)} disabled={step === "review"} />
       <Input id="timing-deadline" label="Payment must be complete (working days before Confirmed Delivery)" type="number" min={0} max={60}
         value={deadline} onChange={(e) => setDeadline(e.target.value)} disabled={step === "review"} />
-      <DatePicker id="timing-effective" label="Effective from" value={effectiveFrom} minDate={todayIso()}
+      <DatePicker id="timing-effective" label="Effective from" value={effectiveFrom} minDate={appTodayIso()}
         onChange={(iso) => setEffectiveFrom(iso ?? "")} disabled={step === "review"} />
       <Input id="timing-reason" label="Reason" value={reason} maxLength={500}
         onChange={(e) => setReason(e.target.value)} disabled={step === "review"} />
@@ -287,7 +283,7 @@ function StorageRuleCard({ group, rule, onSaved }: {
     freeDays: String(rule?.free_days ?? ""), chargeAmount: String(rule?.charge_amount ?? ""),
     cycleDays: String(rule?.cycle_days ?? ""), operationLimitDay: String(rule?.operation_limit_day ?? ""),
     waiverLimitDay: String(rule?.waiver_limit_day ?? ""), extraFreeAllowed: rule?.extra_free_allowed ?? false,
-    inspectionDays: String(rule?.inspection_days ?? "30"), effectiveFrom: todayIso(), reason: "",
+    inspectionDays: String(rule?.inspection_days ?? "30"), effectiveFrom: appTodayIso(), reason: "",
   });
   const [draft, setDraft] = useState(fromRule);
   const set = (k: keyof typeof draft, v: string | boolean) => setDraft((d) => ({ ...d, [k]: v }));
@@ -351,7 +347,7 @@ function StorageRuleCard({ group, rule, onSaved }: {
         <Input id={`sr-waiver-${group}`} label="Approver may approve until Day" type="number" min={0}
           value={draft.waiverLimitDay} onChange={(e) => set("waiverLimitDay", e.target.value)} disabled={step === "review"} />
       </>}
-      <DatePicker id={`sr-eff-${group}`} label="Effective from" value={draft.effectiveFrom} minDate={todayIso()}
+      <DatePicker id={`sr-eff-${group}`} label="Effective from" value={draft.effectiveFrom} minDate={appTodayIso()}
         onChange={(iso) => set("effectiveFrom", iso ?? "")} disabled={step === "review"} />
       <Input id={`sr-reason-${group}`} label="Reason" value={draft.reason} maxLength={500}
         onChange={(e) => set("reason", e.target.value)} disabled={step === "review"} />

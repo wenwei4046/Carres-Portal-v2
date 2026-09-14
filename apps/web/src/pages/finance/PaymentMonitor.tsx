@@ -36,6 +36,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "@/pages/operation/components/workspace-rail";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
+import { appTodayIso } from "@/lib/fmt-date";
 
 /**
  * PAYMENT MONITOR — the full-width collection control listing (owner ruling
@@ -71,10 +72,6 @@ const COLUMN = {
 const FILTER_RAIL_STORAGE_KEY = "carres.paymentMonitor.filterRail";
 const NARROW_VIEWPORT_PX = 1100;
 const PHONE_BREAKPOINT = 768;
-
-function todayIso() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
-}
 
 function useIsPhone(): boolean {
   const query = `(max-width: ${PHONE_BREAKPOINT - 1}px)`;
@@ -167,7 +164,7 @@ export default function PaymentMonitor() {
   // The Work feed is Operation's; a finance reader sees the facts and no owner.
   const workQ = useOperationWork({ enabled: role === "operation" || role === "principal" });
   const [params, setParams] = useSearchParams();
-  const today = todayIso();
+  const today = appTodayIso();
   const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const isPhone = useIsPhone();
 
