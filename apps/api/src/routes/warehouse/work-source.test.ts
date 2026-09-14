@@ -41,6 +41,15 @@ describe("Warehouse Work source integration", () => {
     expect(await response.json()).toMatchObject({ items: [] });
     expect(source.rpc).toHaveBeenCalledWith("warehouse_my_outbound_assignments");
   });
+
+  it("accepts only through the personal Warehouse RPC door", async () => {
+    source.rpc.mockResolvedValueOnce({ data: { site: { id: siteId, label: "Site" }, assignments: [] }, error: null });
+    source.rpc.mockResolvedValueOnce({ data: { accepted: true }, error: null });
+    const doId = "22222222-2222-4222-8222-222222222222";
+    const response = await app().request(`/work/${doId}/accept`, { method: "POST", body: "{}" }, { SUPABASE_URL: "https://example.test" });
+    expect(response.status).toBe(200);
+    expect(source.rpc).toHaveBeenLastCalledWith("warehouse_accept_outbound_work", { p_do_id: doId });
+  });
   it.each(["schedule", "malformed", "owner"])("refuses %s failure instead of reporting zero Work", async (failure) => {
     if (failure === "schedule") source.status = 503;
     if (failure === "malformed") source.events = null;
