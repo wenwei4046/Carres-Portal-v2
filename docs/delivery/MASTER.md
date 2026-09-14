@@ -562,8 +562,8 @@ expected arrival or upload time. An unconfirmed delivery never enters a date cel
 range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
 `{n} deliveries need a confirmed date.` count and its door.
 
-**Compact calendar correction — implementation evidence, not release completion (2026-09-14).**
-The owner-approved compact composition is being implemented in the shared `ScheduleCard`:
+**Compact calendar — deployed and observed (2026-09-14).**
+The owner-approved compact composition is implemented in the shared `ScheduleCard`:
 DO number when present, SO number on its own line, no legacy reference or customer name on
 the face; every physical product line has its own category icon and quantity, with its full
 name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
@@ -583,8 +583,17 @@ exclusive-source rule, including the complete-owner-read check, is used by the o
 Incoming evidence is read in page-wide
 batches and never counted as reserved stock or permission to dispatch. The zero-received mark
 is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
-Whole-workspace conformance and production verification remain open. Local fixtures and passing
-tests do not close them.
+Production release PR #1316, `e8456cb8365503e5a73af9710d94d30bbadf4aea`, passed the
+required CI and deployment checks; all five public deployment probes matched that revision.
+An authenticated Principal browser walk measured 1440px and 949px. The September 14–19
+window showed zero customer deliveries and two transfers, with every physical line on
+SO-1209 separate and the actual Klang Warehouse → JB transit route. Its product Popover
+showed the full name, quantity and receipt uncertainty; Escape returned focus to the trigger.
+The 949px view used three days, retained both calendars and reopened its dropdown filters
+after collapse. These trial rows prove rendering, not business volume or carrier coverage.
+The walk did not exercise Operation-role RLS, every receipt state, or any production write.
+The card-to-row reveal defect found during that walk is corrected in §8.6; that follow-up
+still requires its own deployment and authenticated verification.
 
 Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
 overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
@@ -599,7 +608,7 @@ Validation for this correction: 4,765 web tests, 30 shared status tests and work
 pass. Local Chrome at 1440px, 949px and 390px preserves product detail focus/viewport bounds and
 shows progress separately from the missing-fact or proof line. This is local evidence only.
 
-The local schedule now classifies each intermediate leg as `TRANSFER`, and only the final leg
+The schedule classifies each intermediate leg as `TRANSFER`, and only the final leg
 as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or
 remain overdue. The tab total and customer/transfer split use the same visible date window and
 active filters. Month summaries and the two-month rail keep the two event counts separate;
@@ -813,15 +822,11 @@ never paired with a state it is not in:** SO-1225 carries `43500` (Semenyih, Sel
 `Sentul, Kuala Lumpur`; the two disagree, so the town resolves to nothing and the label is
 `Kuala Lumpur` alone rather than the false pair `Semenyih, Kuala Lumpur`.
 
-**⭐ THE ONE READING IS THE CUSTOMER'S ADDRESS — A JOURNEY LEG IS NOT AN EXCEPTION TO IT, IT IS A
-DIFFERENT QUESTION.** On a Journey-leg row the `State` column deliberately does NOT read the
-customer's address: a leg is classified by its own DESTINATION, so leg 1 of a Singapore journey is
-a Klang → JB run and counts under Johor (the rule below, unchanged since 2026-09-06 and untouched
-by this correction). `Delivery Location` on that row still prints the CUSTOMER's locality on line 1
-and the leg's own recorded route on line 2 — the route is never replaced by the customer address,
-and the customer address is never replaced by a transit destination. A leg row can therefore show
-`Sungai Buloh, Selangor` under `State` = `Johor` without contradiction: they answer *where the
-goods end up* and *where this leg goes*.
+**A JOURNEY LEG READS ITS OWN DESTINATION.** Its State filter is classified by that destination,
+and `Delivery Location` prints the same recorded destination on line 1 with the leg's full route
+on line 2. A Klang → JB transfer therefore shows the JB destination, not the customer's town.
+An unnamed intermediate destination stays unrecorded; it never falls back to the customer's
+address. The customer address remains unchanged in the read-only Customer panel of the brief.
 
 **AN EXISTING ADDRESS IS NEVER CALLED ABSENT.** When no locality resolves but an address is
 recorded, `Delivery Location` prints that address; `Not recorded` is reserved for a record that
@@ -944,18 +949,10 @@ SELANGOR — and its text ends `Sentul, Kuala Lumpur`. The row prints `Kuala Lum
 in the `Kuala Lumpur` bucket, NOT Selangor: the postcode did not win, and no false `Semenyih,
 Kuala Lumpur` pair was printed.
 
-**A MULTI-LEG DELIVERY PRINTS ITS OWN ROUTE — SO-1209, both legs, live.** The customer address is
-never substituted for a transit destination, and the route is never replaced by the customer
-address:
-
-| leg | `Delivery Location` line 1 | `Delivery Location` line 2 | `Logistics` |
-|---|---|---|---|
-| 1 | `Sungai Buloh, Selangor` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
-| 2 | `Sungai Buloh, Selangor` | `JB transit warehouse → Customer (Singapore)` | AL |
-
-Both routes match `orders.delivery_stops` exactly. Line 1 is the customer's locality on both rows
-because that is what it means; the leg's own destination governs the `State` bucket, per the
-Journey rule above.
+**A MULTI-LEG DELIVERY PRINTS ITS OWN ROUTE.** Each row reads its own recorded destination and
+route. For a recorded Klang → JB → Singapore journey, the transfer row names JB and the final
+row names Singapore. These are examples of the reading rule, not inferred stops or evidence
+that an operator has booked either leg. Production examples do not override the scope rule.
 
 **THE DELIVERY ORDERS REGISTER, WALKED ON THE SAME SESSION.** All 4 issued documents render, and
 `Not recorded` appears exactly where it is TRUE:
@@ -1171,7 +1168,7 @@ The four panels and their inline doors are unchanged. Six corrections bind:
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
 
-**Implementation evidence, not production closure.** The Monitor enables the Register's
+**Deployed brief; verified boundary.** The Monitor enables the Register's
 viewport-fitted expansion; its shared wrapper stays visible during horizontal scrolling.
 At 949px physical items use wrapped labelled facts; at 1440px they retain the five-column
 table. Services carry only their description and quantity, server-generated delivery fees
@@ -1180,12 +1177,24 @@ show every recorded leg with the selected leg marked. Access gaps, the single Lo
 completeness alert and the three emergency-contact facts are rendered in the four panels.
 Local browser inspection at 949px and 1440px verified the brief and its item facts after
 horizontal scrolling. The 227 focused Monitor/model/viewport tests pass. These are fixture
-and test results; deployment and production verification remain outstanding.
+and test results. On deployed `e8456cb8365503e5a73af9710d94d30bbadf4aea`, the
+authenticated Principal walk at 949px additionally verified SO-1209's expanded brief after
+horizontal scrolling: pinned SO/Customer identity, both recorded route legs, wrapped address,
+and separate emergency-contact facts remained readable. Its calendar link expanded the correct
+row but left it below the viewport; §8.6 owns the positioning correction. No production
+arrangement was saved during this read-only walk.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 
 The approved journey is: expand the row → act inside the panel → save → remain on the same
 Monitor row, in the same queue, with the same narrowings; the row moves queues by itself.
+
+A calendar card's arrangement link opens and reveals its exact scope row, including when the
+rows arrive asynchronously. The row sits below the sticky table header and its disclosure
+receives keyboard focus. A later data refresh must not undo the operator's subsequent scroll.
+Only a register that supplies an explicit reveal target performs this positioning; ordinary
+registers retain their existing behavior. Non-virtualized lists disable the unused virtualizer
+so it cannot reset this position on mount.
 
 **Delivery Dates edit state.** `Update date and time` is the panel's one right-slot control. It
 flips the panel body into a focused edit state showing exactly: `Confirmed date` (Sunday and

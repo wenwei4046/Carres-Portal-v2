@@ -2248,6 +2248,7 @@ export default function OperationDelivery() {
                        a document, lands here with `?open=` naming the row —
                        its brief already unfolded (§8.6). */
                     defaultExpandedKeys: openScopeId ? [openScopeId] : undefined,
+                    revealExpandedKey: openScopeId ?? undefined,
                   }}
                   selectable={{
                     selectedKeys: selected,

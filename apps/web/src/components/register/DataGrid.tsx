@@ -335,6 +335,8 @@ export type DataGridProps<T> = {
      * operator's own; changing this after mount changes nothing.
      */
     defaultExpandedKeys?: readonly string[];
+    /** Open and reveal a deep-linked row once it is present, including after async loading. */
+    revealExpandedKey?: string;
   };
   /**
    * First-class multi-select (Commander 2026-06-19). Prepends a synthetic
@@ -1519,10 +1521,32 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  const revealedKey = useRef<string | null>(null);
+  const revealKey = expandable?.revealExpandedKey;
+  useEffect(() => {
+    if (!revealKey) {
+      revealedKey.current = null;
+      return;
+    }
+    setExpandedRows(previous => previous.has(revealKey) ? previous : new Set([...previous, revealKey]));
+  }, [revealKey]);
+  useEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport || !revealKey || revealedKey.current === revealKey || !expandedRows.has(revealKey)) return;
+    const target = Array.from(viewport.querySelectorAll<HTMLTableRowElement>("tr[data-grid-expansion-key]"))
+      .find(row => row.dataset.gridExpansionKey === revealKey);
+    if (!target) return;
+    const headerHeight = viewport.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    viewport.scrollTop = Math.max(0, viewport.scrollTop + target.getBoundingClientRect().top
+      - viewport.getBoundingClientRect().top - headerHeight);
+    target.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus({ preventScroll: true });
+    revealedKey.current = revealKey;
+  }, [revealKey, expandedRows, renderList]);
   const VIRTUAL_THRESHOLD = 25;
   const canVirtualize =
     !isLoading && !embedded && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
   const rowVirtualizer = useVirtualizer({
+    enabled: canVirtualize,
     count: canVirtualize ? renderList.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 30,
@@ -1559,6 +1583,7 @@ function DataGridInner<T>({
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
+          data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
           className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
           style={{
