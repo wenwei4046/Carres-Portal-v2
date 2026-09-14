@@ -138,6 +138,31 @@ describe("ExceptionEvidenceViewer — the five states", () => {
     expect(screen.queryByTestId("exception-evidence-enlarged")).not.toBeInTheDocument();
   });
 
+  it("a viewer on ONE line does not repeat that line's name on every tile — the tile carries what differs (owner correction 2026-09-14)", () => {
+    h.response = {
+      receipt_id: "r-1",
+      verified: true,
+      files: [
+        { id: "e1", line_key: "l5", path: "PO-1/c.jpg", kind: "photo", url: "blob:c", status: "ok", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+        { id: "e2", line_key: "l5", path: "PO-1/d.jpg", kind: "photo", url: "blob:d", status: "ok", source: "amend", added_at: "2026-09-04T02:05:00Z", added_by_name: "Khor Yee" },
+      ],
+    };
+    renderViewer({ ...SCOPE, lines: [{ lineKey: "l5", name: "Quinn · King", qty: 1 }] });
+    /* The `For:` line says WHICH goods, once. */
+    expect(screen.getByTestId("exception-evidence-lines")).toHaveTextContent("Quinn · King (1 damaged)");
+    const tiles = screen.getAllByTestId("exception-evidence-photo");
+    expect(tiles).toHaveLength(2);
+    /* …and no tile says it again. */
+    for (const tile of tiles) expect(tile).not.toHaveTextContent("Quinn · King");
+    expect(tiles[0]!).toHaveTextContent("Thu, 3 Sep · Shasha");
+    expect(tiles[1]!).toHaveTextContent("Fri, 4 Sep · Khor Yee");
+    /* The enlarged picture follows the same rule. */
+    fireEvent.click(tiles[0]!);
+    const big = screen.getByTestId("exception-evidence-enlarged");
+    expect(big).toHaveTextContent("1 of 2 · Thu, 3 Sep");
+    expect(big).not.toHaveTextContent("Quinn · King");
+  });
+
   it("plays a video in a real player and names an unsigned file as not verified", () => {
     h.response = {
       receipt_id: "r-1",

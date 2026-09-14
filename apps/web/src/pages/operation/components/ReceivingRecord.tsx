@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Download, Printer } from "lucide-react";
 import {
   grnExceptionFacts,
-  grnLineItemWords,
   grnLineName,
   receivingDisplayNo,
   receivingExtraQty,
@@ -194,15 +193,27 @@ export default function ReceivingRecord({
   const facts = grnExceptionFacts(lines, extras);
   const hasIssue = totals.issue > 0;
   const lineInfo = detail.line_info ?? {};
-  const lineConfig = detail.line_config ?? {};
   const sourceWord = po?.is_consignment ? "CO" : "PO";
 
-  /** ONE name ladder for every surface of this record (`grnLineName`). */
-  const nameOfLine = (l: { id: string; sku: string; item_label?: string | null }, isExtra = false) => {
+  /**
+   * ONE name ladder for every surface of this record (`grnLineName`), and the
+   * name is the WHOLE identity.
+   *
+   * ⭐ OWNER CORRECTION 2026-09-14. The goods used to carry the PO line's
+   * configuration words joined to the resolved name — `Quinn · King · BF-03` in
+   * the evidence doors and viewer, and `BF-03 · name from the current catalog`
+   * on the line beneath the name. The reviewer read that code as a second
+   * identity for goods the name had already named, in two places at once.
+   * Receiving now prints the resolved NAME and, beneath it, only the
+   * PROVENANCE caveat — one fact per line, each said once. The configuration
+   * still belongs to the PURCHASE ORDER and still prints on the PO paper,
+   * which is the document that ordered that exact fabric.
+   */
+  const nameOfLine = (l: { id: string; sku: string; item_label?: string | null }) => {
     const named = grnLineName({ sku: l.sku, item_label: l.item_label, catalogLabel: lineInfo[l.sku]?.label ?? null });
     return {
       ...named,
-      words: grnLineItemWords(named.name, isExtra ? [] : lineConfig[l.id]),
+      words: named.name,
       note:
         named.source === "catalog" ? RECORD_WORDS.catalogName : named.source === "sku" ? RECORD_WORDS.itemsNotResolved : null,
     };
@@ -210,7 +221,7 @@ export default function ReceivingRecord({
   const nameOfKey = (key: string, sku: string) => {
     const line = lines.find((l) => l.id === key);
     if (line) return nameOfLine(line).words;
-    return nameOfLine({ id: key, sku }, true).words;
+    return nameOfLine({ id: key, sku }).words;
   };
   /** Verified counts by (type, line, kind) from the evidence rows; undefined
    *  while the rows are not verified. */
@@ -254,7 +265,7 @@ export default function ReceivingRecord({
         sku: l.sku,
         qty: l.received_now,
         item: named.name,
-        itemDetail: [...(lineConfig[l.id] ?? []), named.note].filter(Boolean).join(" · ") || undefined,
+        itemDetail: named.note ?? undefined,
         received: Math.max(0, l.received_now),
         damaged: Math.max(0, l.damaged_qty),
         wrongItem: Math.max(0, l.wrong_item_qty),
@@ -266,7 +277,7 @@ export default function ReceivingRecord({
     }),
     ...extras.map((x, i): GoodsMiniLine => {
       const key = (x.id ?? "").trim();
-      const named = nameOfLine({ id: key, sku: x.sku }, true);
+      const named = nameOfLine({ id: key, sku: x.sku });
       return {
         key: key || `extra-${i}`,
         testId: `record-extra-${key || i}`,

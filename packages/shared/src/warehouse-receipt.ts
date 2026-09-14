@@ -779,15 +779,6 @@ export function grnLineName(line: {
   return { name: line.sku, source: "sku" };
 }
 
-/** The Register's `Item` word with its configuration facts joined. */
-export function grnLineItemWords(
-  name: string,
-  configBits: readonly string[] | null | undefined,
-): string {
-  const bits = (configBits ?? []).map((b) => b.trim()).filter(Boolean);
-  return bits.length ? `${name} · ${bits.join(" · ")}` : name;
-}
-
 export type GrnExceptionType = "damaged" | "wrong_item" | "extra";
 export type GrnMediaKind = "photo" | "video";
 

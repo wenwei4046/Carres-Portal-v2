@@ -730,6 +730,10 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(within(box).getByText("Cloud Sofa · 3-seater")).toBeInTheDocument();
     // The catalog fallback says so; the SKU is never a column of its own.
     expect(within(box).getByText(/name from the current catalog/)).toBeInTheDocument();
+    /* …and the line beneath the name carries THAT caveat and nothing else —
+       no PO configuration code repeating an identity already given
+       (owner correction 2026-09-14). */
+    expect(box).not.toHaveTextContent("Fabric BF-01");
     expect(within(box).queryByText("SF99")).not.toBeInTheDocument();
     expect(within(box).queryByText("Receiving Result")).not.toBeInTheDocument();
     // A positive exception carries its Photos / Videos doors with VERIFIED counts.
@@ -743,7 +747,13 @@ describe("OperationReceiving — the formal GRN Register", () => {
     fireEvent.click(screen.getByTestId("row-evidence-r-voided-damaged-photo"));
     const viewer = await screen.findByTestId("exception-evidence-viewer");
     expect(screen.getByRole("dialog")).toHaveTextContent("Damaged Photos · GRN-20260830-7777");
-    expect(within(viewer).getByTestId("exception-evidence-lines")).toHaveTextContent("Cloud Sofa · 3-seater · Fabric BF-01 (1 damaged)");
+    /* ⭐ OWNER CORRECTION 2026-09-14 — the goods are named ONCE, by their
+       resolved name. The PO line's configuration words used to be joined to it
+       here and printed again beneath the name in the expansion; the reviewer
+       read that repeated code as a second identity. The configuration belongs
+       to the Purchase Order and prints on the PO paper. */
+    expect(within(viewer).getByTestId("exception-evidence-lines")).toHaveTextContent("Cloud Sofa · 3-seater (1 damaged)");
+    expect(within(viewer).getByTestId("exception-evidence-lines")).not.toHaveTextContent("Fabric BF-01");
   });
 
   it("a row whose evidence counts are not verified says so on the door — never a reassuring 0", () => {

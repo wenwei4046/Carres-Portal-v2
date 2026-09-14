@@ -5,7 +5,6 @@ import {
   expectedArrivalCounts,
   grnExceptionFacts,
   grnExceptionSummary,
-  grnLineItemWords,
   grnLineName,
   receivingDisplayNo,
   receivingExtraQty,
@@ -150,7 +149,7 @@ function miniLinesOf(r: WarehouseReceiptQueueRow, onOpen: (s: EvidenceScope) => 
     const named = lab
       ? { name: lab.name, source: lab.source }
       : grnLineName({ sku });
-    return grnLineItemWords(named.name, lab?.config);
+    return named.name;
   };
   const doors = (key: string, type: "damaged" | "wrong_item" | "extra") => (
     <ExceptionEvidenceDoors
@@ -180,7 +179,6 @@ function miniLinesOf(r: WarehouseReceiptQueueRow, onOpen: (s: EvidenceScope) => 
       item: named.name,
       itemDetail:
         [
-          ...(lab?.config ?? []),
           named.source === "catalog" ? RECEIVING_WORDS.catalogName : null,
           named.source === "sku" ? RECEIVING_WORDS.itemsNotResolved : null,
         ]
@@ -442,7 +440,7 @@ export default function OperationReceiving() {
           const labels = r.line_labels ?? {};
           const nameOf = (key: string, sku: string) => {
             const lab = labels[key];
-            return grnLineItemWords(lab ? lab.name : grnLineName({ sku }).name, lab?.config);
+            return lab ? lab.name : grnLineName({ sku }).name;
           };
           return (
             <span className="flex items-center gap-1.5 whitespace-nowrap" data-testid={`exceptions-${r.id}`}>

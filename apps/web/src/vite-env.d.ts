@@ -1,5 +1,12 @@
 /// <reference types="vite/client" />
 
+/* A font embedded as a `data:` URI at build time — the review package's paper
+   needs its bytes present, not fetchable (see `lib/pdf/fonts/noto.preview.ts`). */
+declare module "*.ttf?inline" {
+  const dataUri: string;
+  export default dataUri;
+}
+
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;

@@ -3,7 +3,6 @@ import {
   grnDateOf,
   grnExceptionFacts,
   grnExceptionSummary,
-  grnLineItemWords,
   grnLineName,
   warehouseReceiptStatusLabel,
 } from "./warehouse-receipt";
@@ -27,12 +26,6 @@ describe("grnLineName — the goods' full name ladder", () => {
     expect(grnLineName({ sku: "JAGER-SS" })).toEqual({ name: "JAGER-SS", source: "sku" });
     // Blank snapshots do not count as names.
     expect(grnLineName({ sku: "X", item_label: "   ", catalogLabel: "" })).toEqual({ name: "X", source: "sku" });
-  });
-
-  it("joins the configuration facts after the name, and nothing when there are none", () => {
-    expect(grnLineItemWords("Jager · Super Single", ["Gap 5\"", "Fabric BF-01"])).toBe("Jager · Super Single · Gap 5\" · Fabric BF-01");
-    expect(grnLineItemWords("Jager · Super Single", [])).toBe("Jager · Super Single");
-    expect(grnLineItemWords("Jager · Super Single", [" ", ""])).toBe("Jager · Super Single");
   });
 });
 

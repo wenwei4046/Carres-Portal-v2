@@ -1199,7 +1199,6 @@ export {
   // 2026-09-13 owner instruction — the GRN Register redesign: the goods' name
   // ladder, the exception facts and the GRN Date arithmetic, one copy each.
   grnLineName,
-  grnLineItemWords,
   grnExceptionFacts,
   grnExceptionSummary,
   grnDateOf,

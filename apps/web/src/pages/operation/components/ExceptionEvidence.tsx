@@ -199,6 +199,17 @@ export function ExceptionEvidenceViewer({
   }
 
   const nameByKey = new Map(scope.lines.map((l) => [l.lineKey, l]));
+  /**
+   * ⭐ OWNER CORRECTION 2026-09-14 — A NAME THE VIEWER HAS ALREADY SAID IS NOT
+   * SAID AGAIN ON EVERY TILE. The viewer opens for ONE exception on the lines
+   * named in its own `For:` line. While that is a single line, every tile
+   * beneath it belonged to the same goods, so printing the goods' name on each
+   * one repeated the same words as many times as there were photos and told
+   * the reader nothing new; the tile keeps what actually differs — the day and
+   * the person. The name returns the moment the viewer spans TWO lines, where
+   * it is the only thing saying which goods a photo belongs to.
+   */
+  const namesTiles = scope.lines.length > 1;
   const permissionDenied = query.isError && query.error instanceof ApiError && query.error.status === 403;
 
   return (
@@ -264,7 +275,8 @@ export function ExceptionEvidenceViewer({
                 <ChevronLeft size={16} aria-hidden />
               </button>
               <span className="text-label text-kit-slate-11">
-                {openable.indexOf(enlarged) + 1} of {openable.length} · {nameByKey.get(files[enlarged]!.line_key)?.name ?? files[enlarged]!.line_key}
+                {openable.indexOf(enlarged) + 1} of {openable.length}
+                {namesTiles ? ` · ${nameByKey.get(files[enlarged]!.line_key)?.name ?? files[enlarged]!.line_key}` : ""}
                 {" · "}
                 {fmtDate(files[enlarged]!.added_at.slice(0, 10))}
               </span>
@@ -296,7 +308,13 @@ export function ExceptionEvidenceViewer({
           <div className="flex flex-wrap gap-3">
             {files.map((file, index) => {
               const line = nameByKey.get(file.line_key);
-              const caption = `${line?.name ?? file.line_key} · ${fmtDate(file.added_at.slice(0, 10))}${file.added_by_name ? ` · ${file.added_by_name}` : ""}`;
+              const caption = [
+                namesTiles ? (line?.name ?? file.line_key) : null,
+                fmtDate(file.added_at.slice(0, 10)),
+                file.added_by_name,
+              ]
+                .filter(Boolean)
+                .join(" · ");
               if (file.status !== "ok" || !file.url) {
                 /* A recorded fact whose file cannot be shown is NAMED. */
                 return (
