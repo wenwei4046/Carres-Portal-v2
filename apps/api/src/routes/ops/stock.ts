@@ -44,7 +44,7 @@ import {
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { stockRegisterContext } from "../../lib/stock-register-context";
-import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
+import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
@@ -520,7 +520,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
  */
 opsStockRouter.get("/health", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
 
   // The plans decide how far back the sales window must reach: a month can only
   // be scored if its own sales were fetched. Read them first for that reason.
@@ -1233,11 +1233,6 @@ function shape(rows: RawRow[]) {
 /** This month in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
 function thisMonthMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
-}
-
-/** Today in the same calendar. K5 dates everything from here. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
 /** A malformed `?period=` reads as "this month" rather than 500-ing: the

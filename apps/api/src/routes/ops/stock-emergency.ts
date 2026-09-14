@@ -15,6 +15,7 @@ import { hasDuty, myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Urgent restock — card K3 (migration 0290).
@@ -39,11 +40,6 @@ import { parseBody } from "../../lib/route-helpers";
  */
 
 const opsStockEmergencyRouter = new Hono<AppEnv>();
-
-/** Today in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 /**
  * How far back the lane reads. An urgent ask is a THIS-WEEK object; a year of
@@ -84,7 +80,7 @@ const COLUMNS =
 
 opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
 
   const duties = await myDuties(c);
   const { role, email } = c.var.auth;

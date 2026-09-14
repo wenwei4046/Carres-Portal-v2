@@ -31,6 +31,7 @@ import {
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * MANUAL PURCHASE — the request lane's doors
@@ -77,13 +78,6 @@ function refuse(
   facts?: Parameters<typeof purchasingRefusal>[1],
 ) {
   return c.json(refusalBody(code, facts), status);
-}
-
-/** Today in Asia/Kuala_Lumpur (UTC+8, no DST) — the Malaysia calendar date
- *  the Proceed Date preview and the timing lens read (Card 06 §3.1). The
- *  browser never guesses a date; this server fact travels in the payload. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
 /** `iso` + n CALENDAR days — the same day arithmetic `earliest_sell_days`
@@ -717,7 +711,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     /* Card 06 — the Malaysia calendar date the timing lens compares against
        (the browser never reads its own clock for a business classification),
        and the honest date-plan availability fact. */
-    todayIso: todayMyt(),
+    todayIso: todayIsoMYT(),
     planUnavailable,
     /* 0422 — Purchasing Settings' `manual_purchase_min_delivery_days`
        (calendar days after the Proceed Date). The create form mirrors the
@@ -982,7 +976,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: approver,
-    todayIso: todayMyt(),
+    todayIso: todayIsoMYT(),
     planUnavailable,
   });
 });
@@ -1412,7 +1406,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
      (YH, 2026-09-04; owner ruling: a NUMBER, not a switch). Purchasing
      Settings holds `manual_purchase_min_delivery_days` — CALENDAR days, like
      `earliest_sell_days`. The floor is the Proceed Date (today in Malaysia,
-     the date this request is created on — the same `todayMyt()` the `/plan`
+     the date this request is created on — the same `todayIsoMYT()` the `/plan`
      preview shows as Proceed Date) + that many days. 0 means no floor.
      The lead-time plan's `deliveryDateDefault` stays a proposal only; the
      two are NOT combined.
@@ -1429,7 +1423,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
       console.error("manual purchase — purchasing settings unavailable", (e as Error).message);
     }
     if (minDeliveryDays > 0) {
-      const earliest = plusCalendarDays(todayMyt(), minDeliveryDays);
+      const earliest = plusCalendarDays(todayIsoMYT(), minDeliveryDays);
       if (requiredBy < earliest) {
         return refuse(c, 422, "delivery_date_before_earliest", { date: requiredBy, earliest });
       }
@@ -1591,7 +1585,7 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
   const skus = [...new Set(parsed.data.skus)];
-  const proceedDate = todayMyt();
+  const proceedDate = todayIsoMYT();
   if (skus.length === 0) {
     return c.json({
       proceedDate,

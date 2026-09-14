@@ -21,6 +21,7 @@ import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Ready stock plan — card K2 (migration 0287).
@@ -51,11 +52,6 @@ function monthAnchor(period: string): string {
   return `${period}-01`;
 }
 
-/** Today in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() + 8 * 3_600_000 - days * 86_400_000)
     .toISOString()
@@ -82,7 +78,7 @@ interface PlanRow {
 
 opsStockPlanRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
   const requested = c.req.query("period");
   const period =
     requested && /^\d{4}-(0[1-9]|1[0-2])$/.test(requested)
