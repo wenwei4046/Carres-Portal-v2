@@ -1895,6 +1895,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
 | A money cell on an order that is fully settled | **`Paid in full`** | Settled · Cleared · Fully paid · Nil outstanding — registered 2026-09-02 (D7): it has been on the SO register and the workspace MONEY card since they were written and was in no dictionary, so the rule it was breaking was this one. Registered rather than reverted, on the `SO Date` precedent (2026-09-01). ⚠️ **The DELIVERY GATE says `Money in full` for the same arithmetic** (outstanding = 0, ruled 2026-09-01, two tables below). Two words, one fact, two surfaces — left as it is deliberately, because unifying them is an owner's call and not a tidy-up. Do not swap one for the other without one. |
 | A money cell on an order nobody has priced | **`No price yet`** | RM 0 · Unpriced · — · Free. The DELIVERY GATE says the longer `No price yet — money does not hold this delivery` because a gate must name the consequence; a register column has no room for one and states only the fact |
+| Money Carres pays a SUPPLIER before its bill, later knocked off that bill (or sent back) | **`Advance`** — **APPROVED, owner ruling YH 11 Sep 2026**, for exactly three places: the payment voucher's advance box, the advance knocked off a bill (the bill's Payments), and the column on `Unpaid by Supplier` showing advance not yet used. Migrations 0484–0485 | Deposit · Prepayment · Down payment · Supplier credit · Refund (`Refund` still has no entry — see the Claims ruling). The phrases built on it (`Advance left`, `Apply advance`, `Money back` …) are PROPOSAL until ruled — § Finance ledger words, *Supplier advances* |
 | Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
 | Direct customer-order document identity | **SO No** | Doc. No. · Current |
@@ -3137,6 +3138,50 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
 | `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
 | `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
+
+### Supplier advances (migrations 0484–0485)
+
+`Advance` itself is **APPROVED** — YH ruled it on 11 Sep 2026 for money paid to a supplier before
+its bill: the voucher's advance box, the knock-off on the bill, and the unused-advance column on
+Unpaid by Supplier (see the Vocabulary row). The money back number's prefix `SMB` is **APPROVED**
+— YH ruled it on 14 Sep 2026. Every other word below is **PROPOSAL — PENDING APPROVAL**, listed
+with where it appears.
+
+| Word | Where · meaning |
+|---|---|
+| `Advance` (field) · `Money paid before the bill. It is applied to a bill later, or the supplier sends it back.` | Payment voucher form, the Advance card under Bills to pay. |
+| `Pays confirmed bills, or an advance before the bill.` | The Purpose help on the voucher form (replaces the 0477 sentence's first clause). |
+| `An advance cannot be less than RM 0.00` | Form and API refusal. |
+| `No advance` · `{RM} · {RM} left` | The Advance column of the Payment Vouchers register. |
+| `Advance on this voucher` · `Applied to bills` · `Money back` · `Advance left` | The voucher's Advance card and its facts. |
+| `Not paid yet — approving the payment pays it` | Advance left before the voucher is approved. |
+| `Apply advance` · `Apply advance to a bill?` · `Apply advance to this bill?` | Action on the voucher's Advance card and the bill's Payments card, and its modal. |
+| `Take advance off` · `Take this advance off the bill?` | Undo one knock-off; needs a reason. |
+| `Record money back` · `Cancel money back` · `Cancel this money back?` | The supplier sent part of an advance back (money back); the approver reverses it. |
+| `Advance applied` · `Advance taken off` · `Money back recorded` · `Money back cancelled` | History lines (event words) and toasts. |
+| `Applied` · `Taken off` | A knock-off's status (database `applied` / `cancelled`). |
+| `Recorded` · `Cancelled` | A money back's status (database `posted` / `voided`) — same pair as Other receipts. |
+| `Money back No` · `SMB-YYYYMMDD-NNNN` | The money back number. Prefix SMB = supplier money back, **APPROVED** (YH, 14 Sep 2026); it is one line, `supplier_money_back_prefix()` in 0485. |
+| `This money back was already recorded as {No} with different details. Open the form again to record another.` | Refusal (`idempotency_mismatch`) when a key is re-sent with a different voucher, amount, account or date. |
+| `Received into` | Reused from 0478: the bank or cash account the money back came into. |
+| `Advance from {PV No}` | A knock-off row on a bill's Payments card. |
+| `This supplier has no advance left.` · `Choose the advance` · `Choose the bill` · `Loading advances…` · `The advances could not be loaded. Try again.` | The Apply advance modal. |
+| `More than can be applied` · `More than the advance left` | Amount warnings in the modals. |
+| `Nothing is entered in the ledger: the advance is already on the supplier's account. The bill shows it as paid by this amount.` | Apply advance modal. |
+| `Nothing is entered in the ledger. The bill is unpaid again by this amount, and the advance is left to use.` | Take advance off modal. |
+| `The supplier sent part of the advance on {PV No} back. It is entered in the ledger on the date below.` | Record money back modal. |
+| `The ledger entry is reversed on its own date, and the amount is left on the advance again.` | Cancel money back modal. |
+| `An advance applied to a bill or sent back must be taken off or cancelled first.` | Added to the cancel-voucher sentence when the voucher carries an advance. |
+| `A bill already on a payment voucher, or with an advance applied, cannot be cancelled.` | Cancel bill sentence (extends 0477's). |
+| `Advance Left` · `Unpaid After Advance` | Columns on Unpaid by Supplier (`advance_open`, `net_owing`). |
+| `Supplier money back` · `Supplier money back reversal` | The Journal's Source for `SUPPLIER_MONEY_BACK` and its reversal (finance-ledger.ts). |
+| `{Bill No} · {Supplier invoice} · {RM} left to pay` | An option in the Bill picker of Apply advance (from the voucher). |
+| `{PV No} · {date} · {RM} left` | An option in the Advance picker of Apply advance (from the bill). |
+| `Taken off — {reason}` · `Cancelled — {reason}` | Status cell of a knock-off taken off, and of a money back cancelled, with the reason. |
+| `This voucher is cancelled, so its advance was never paid or has been reversed.` | The Advance card of a cancelled voucher, in place of Applied / Money back / Advance left. |
+| `Loading accounts…` · `The accounts could not be loaded. Try again.` | Record money back, in place of the Received into list while it loads or fails. |
+| `Advance` (picker label) · `Bill` · `Date` · `Amount` · `Reference` | Field labels in the Apply advance and Record money back modals. |
+| `Bill No` · `Supplier invoice` · `Draft bill` · `Loading bills…` · `The bills could not be loaded. Try again.` · `This supplier has no confirmed bill left to pay.` · `Choose the bank or cash account` · `Bank reference or cheque No` | Reused from 0477 — the Apply advance and Record money back modals and the knock-off table. |
 
 ### Finance Dashboard · AR · Receivables (build/finance-old-reads)
 

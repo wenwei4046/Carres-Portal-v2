@@ -46,6 +46,23 @@ export const EVENT_WORD: Record<string, string> = {
   rejected: "Returned to draft",
   cancelled: "Cancelled",
   file_added: "File added",
+  // Supplier advances (migration 0485).
+  advance_applied: "Advance applied",
+  advance_taken_off: "Advance taken off",
+  money_back: "Money back recorded",
+  money_back_cancelled: "Money back cancelled",
+};
+
+/** One knock-off of an advance against a bill (migration 0485). */
+export const ADVANCE_APPLICATION_STATUS_WORD: Record<string, string> = {
+  applied: "Applied",
+  cancelled: "Taken off",
+};
+
+/** Money a supplier sent back out of an advance (migration 0485). */
+export const MONEY_BACK_STATUS_WORD: Record<string, string> = {
+  posted: "Recorded",
+  voided: "Cancelled",
 };
 
 export function word(map: Record<string, string>, key: string | null | undefined): string {

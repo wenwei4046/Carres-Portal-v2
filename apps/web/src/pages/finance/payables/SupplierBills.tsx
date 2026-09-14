@@ -27,8 +27,12 @@ import {
   useSaveBill,
   useSupplierBill,
   useSupplierBills,
+  useApplyAdvance,
+  useSupplierAdvances,
+  useTakeAdvanceOff,
 } from "@/lib/payables-queries";
 import {
+  ADVANCE_APPLICATION_STATUS_WORD,
   BILL_STATUS_WORD,
   cents,
   creditorKindWord,
@@ -41,6 +45,7 @@ import {
   VOUCHER_STATUS_WORD,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { AdvanceModal, AmountField } from "./VoucherAdvance";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -160,6 +165,9 @@ function BillDetail() {
   const act = useBillAct();
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [takeOff, setTakeOff] = useState<string | null>(null);
+  const takeOffAct = useTakeAdvanceOff();
   const doc = query.data;
 
   if (query.isError) {
@@ -228,15 +236,38 @@ function BillDetail() {
             )}
           </Facts>
           <BillLinesCard doc={doc} />
-          <Facts title="Payments">
+          <Facts
+            title="Payments"
+            testId="bill-payments"
+            right={doc.can.apply_advance && (num(doc.advance_open) ?? 0) > 0
+              ? <Button variant="primary" onClick={() => setApplying(true)}>Apply advance</Button>
+              : undefined}
+          >
             {doc.payments.length === 0
               ? <p>No payment voucher pays this bill yet.</p>
-              : doc.payments.map((p) => (
-                <p key={p.voucher_id}>
-                  <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
-                  {" · "}{word(VOUCHER_STATUS_WORD, p.status)} · {fmtDate(p.voucher_date)} · {money(p.amount_applied)}
-                </p>
-              ))}
+              : doc.payments.map((p) => p.kind === "advance"
+                ? (
+                  <p key={p.application_id ?? `${p.voucher_id}-advance`}>
+                    Advance from{" "}
+                    <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    {" · "}{word(ADVANCE_APPLICATION_STATUS_WORD, p.status)}
+                    {" · "}{fmtDate(p.applied_on ?? p.voucher_date)} · {money(p.amount_applied)}
+                    {doc.can.take_advance_off && p.status === "applied" && p.application_id && (
+                      <>
+                        {" "}
+                        <Button size="sm" variant="ghost" onClick={() => setTakeOff(p.application_id)}>
+                          Take advance off
+                        </Button>
+                      </>
+                    )}
+                  </p>
+                )
+                : (
+                  <p key={p.voucher_id}>
+                    <Link to={`/finance/payment-vouchers/${p.voucher_id}`}>{p.voucher_no ?? "Draft voucher"}</Link>
+                    {" · "}{word(VOUCHER_STATUS_WORD, p.status)} · {fmtDate(p.voucher_date)} · {money(p.amount_applied)}
+                  </p>
+                ))}
           </Facts>
           <FilesCard kind="bills" id={id} files={doc.files} canAdd={doc.can.add_file} />
           <HistoryCard events={doc.events} />
@@ -260,14 +291,99 @@ function BillDetail() {
         open={cancelling}
         title="Cancel this bill?"
         description={b.status === "confirmed"
-          ? "The ledger entry is reversed on the bill date. A bill already on a payment voucher cannot be cancelled."
+          ? "The ledger entry is reversed on the bill date. A bill already on a payment voucher, or with an advance applied, cannot be cancelled."
           : "The draft is kept, marked cancelled."}
         action="Cancel bill"
         busy={act.isPending}
         onClose={() => setCancelling(false)}
         onSubmit={cancel}
       />
+      <ReasonModal
+        open={takeOff !== null}
+        title="Take this advance off the bill?"
+        description="Nothing is entered in the ledger. The bill is unpaid again by this amount, and the advance is left to use."
+        action="Take advance off"
+        busy={takeOffAct.isPending}
+        onClose={() => setTakeOff(null)}
+        onSubmit={(reason) => takeOff && takeOffAct.mutate({ applicationId: takeOff, reason }, {
+          onSuccess: () => { setTakeOff(null); toast.success("Advance taken off"); },
+          onError: (e) => toast.error(refusal(e)),
+        })}
+      />
+      {applying && (
+        <ApplyToBillModal
+          billId={id}
+          supplierId={b.supplier_id}
+          apAccountCode={b.ap_account_code}
+          leftToPay={num(doc.left_to_pay) ?? 0}
+          onClose={() => setApplying(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/** From the bill: choose one of the supplier's approved advances on the same
+ *  payables account, and how much of it to knock off this bill. Posts nothing. */
+function ApplyToBillModal({ billId, supplierId, apAccountCode, leftToPay, onClose }: {
+  billId: string;
+  supplierId: string;
+  apAccountCode: string;
+  leftToPay: number;
+  onClose: () => void;
+}) {
+  const advances = useSupplierAdvances(supplierId);
+  const apply = useApplyAdvance();
+  const rows = (advances.data ?? [])
+    .filter((a) => (num(a.advance_open) ?? 0) > 0 && a.ap_account_code === apAccountCode);
+  const [voucherId, setVoucherId] = useState("");
+  const [amount, setAmount] = useState("");
+  const row = rows.find((a) => a.voucher_id === voucherId) ?? null;
+  const cap = row ? cents(Math.min(num(row.advance_open) ?? 0, leftToPay)) : leftToPay;
+  const n = num(amount);
+  const ready = row !== null && n !== null && n > 0 && n <= cap;
+
+  return (
+    <AdvanceModal
+      title="Apply advance to this bill?"
+      description="Nothing is entered in the ledger: the advance is already on the supplier's account. The bill shows it as paid by this amount."
+      action="Apply advance"
+      ready={ready}
+      busy={apply.isPending}
+      onClose={onClose}
+      onSubmit={() => apply.mutate({ voucherId, input: { billId, amount: n ?? 0 } }, {
+        onSuccess: () => { toast.success("Advance applied"); onClose(); },
+        onError: (e) => toast.error(refusal(e)),
+      })}
+    >
+      {advances.isError
+        ? <p role="alert">The advances could not be loaded. Try again.</p>
+        : !advances.isSuccess
+          ? <p>Loading advances…</p>
+          : rows.length === 0
+            ? <p>This supplier has no advance left.</p>
+            : (
+              <div className="flex flex-col gap-3">
+                <label className="block">
+                  Advance
+                  <select aria-label="Advance" className={`${fieldCls} mt-1`} value={voucherId}
+                    onChange={(e) => {
+                      setVoucherId(e.target.value);
+                      const a = rows.find((r) => r.voucher_id === e.target.value);
+                      setAmount(a ? String(cents(Math.min(num(a.advance_open) ?? 0, leftToPay))) : "");
+                    }}>
+                    <option value="">Choose the advance</option>
+                    {rows.map((a) => (
+                      <option key={a.voucher_id} value={a.voucher_id}>
+                        {a.voucher_no} · {fmtDate(a.voucher_date)} · {money(a.advance_open)} left
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <AmountField amount={amount} onChange={setAmount} cap={cap} capWord="More than can be applied" />
+              </div>
+            )}
+    </AdvanceModal>
   );
 }
 
