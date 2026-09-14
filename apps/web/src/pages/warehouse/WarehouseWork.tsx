@@ -37,6 +37,11 @@ export default function WarehouseWork() {
               <article key={item.id} className="rounded border border-base-200 bg-white p-4" data-testid={`warehouse-work-${item.object.id}`}>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="font-mono font-semibold text-base-800">{item.object.label}</span>
+                  {item.owner.queue?.label && (
+                    <span className="text-meta text-base-600" data-testid="warehouse-work-site">
+                      Site · {item.owner.queue.label}
+                    </span>
+                  )}
                   <span className="text-meta text-base-600">{item.timing.bucket === "overdue" ? `${item.timing.workingDaysLate} working days late` : item.timing.dueOn ?? "No date"}</span>
                 </div>
                 <p className="mt-2 text-body text-base-700">{item.problem}</p>

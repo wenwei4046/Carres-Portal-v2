@@ -36,6 +36,7 @@ describe("WarehouseWork", () => {
     apiFetchMock.mockResolvedValue({ items: [item], staff: [], generatedOn: "2026-09-14" });
     renderPage();
     expect(await screen.findByTestId("warehouse-work-11111111-1111-1111-1111-111111111111")).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-work-site")).toHaveTextContent("Site · Klang");
     fireEvent.click(screen.getByRole("button", { name: "Accept work" }));
     expect(apiFetchMock).toHaveBeenCalledWith(
       "/api/warehouse/work/11111111-1111-1111-1111-111111111111/accept",
