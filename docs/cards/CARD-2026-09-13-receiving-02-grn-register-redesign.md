@@ -316,3 +316,128 @@ production readiness. **Nothing here authorises a merge or a deploy.**
 | `fix-01-expansion-name-only-1440.png` | the expansion: `Quinn · King` with `name from the current catalog` beneath it, no `BF-03` |
 | `fix-02-viewer-one-line-1440.png` | the viewer: `For: Quinn · King (1 wrong item)`, the tile captioned `Thu, 3 Sep · Shasha` |
 | `fix-03-grn-paper-drawn-1440.png` | the GRN object with its paper drawn — letterhead, AMENDED banner, goods table, unit results, recorded-by |
+
+## Fourth pass — 2026-09-14, release preparation against current `main`
+
+**Lane:** BUILD/DELIVERY, release preparation. **Still no merge, no deploy, no production
+migration apply** — those are the owner decision this pass exists to put in front of her.
+
+### What this pass changed
+
+`origin/main` had moved **36 commits** (`650abf39` → `c02cf891`) since the branch left it, so the
+third pass's green suites were green against a tree that no longer exists. `main` was merged IN
+(not rebased: the PR is shared and force-push is red line 4). Two conflicts, both resolved by
+**keeping both sides**, verified against the merge base so neither lane lost work:
+
+| File | Main's change | This branch's change | Resolution |
+|---|---|---|---|
+| `GoodsMiniTable.tsx` | Sales Orders lane re-ordered `salesOrderLayout` to `category · unit · deliverTo · sku · qty · item` | added the `receivingLayout` branch above it | main's order kept verbatim, receiving branch added |
+| `docs/ENGINEERING.md` | appended the applied-`0499` migration row | appended this branch's migration row | both rows kept, main's first |
+
+`pnpm-lock.yaml` merged without conflict and `pnpm install --frozen-lockfile` succeeds, which is
+the check that a merged lockfile is actually coherent rather than merely textually resolved.
+
+### The release candidate re-verified — every CI step, run locally on the MERGED tree
+
+| Gate | Result |
+|---|---|
+| `pnpm install --frozen-lockfile` | clean, 504 packages |
+| `pnpm ci:migrations` | **511 filenames, 15 changes, nothing applied** |
+| `apps/web lint` (design + governance guards) | exit 0 — stage 1, warn only |
+| `tsc --noEmit` — shared · api · web (`tsconfig.app.json`, the file CI uses) | **0 errors each** |
+| shared suite | **3319 passed / 158 files** |
+| api suite | **3294 passed / 156 files, 3 files + 30 tests skipped** (the Storage integration cases below) |
+| web suite | **4777 passed / 340 files** on the second run. ⚠️ The FIRST full run failed one test — `OperationPurchaseOrders.test.tsx:1563`, a `waitFor` on `po-working-header`. That file passes in isolation (126/126) and passed on the re-run, and it belongs to another lane's page, not this card. Reported as a **flake under full-suite load, not a merge regression** — 1 failure in 2 full runs. |
+| `apps/web build` | built in 23.7s, `index-kYPzLaDy.js` |
+| CI's secret probe over `apps/web/dist` | PASS — no server secret name in the bundle |
+
+### The agreed design and the two fixes, checked against the CANDIDATE — not the hosted package
+
+- **R1 columns.** The merged page's defaults are exactly `GRN No · GRN Date · Supplier DO No ·
+  Supplier · PO No · Items · Received Qty · Exceptions · GRN Status`, with `Goods received on ·
+  Supplier Delivery Date · Deliver To · Goods arrived at · Damaged Qty · Wrong Item Qty ·
+  Extra Qty · Category` carried as `defaultHidden` secondary facts. `storageKey` is `.v3`.
+- **D1 (the redundant `BF-03`).** `grnLineItemWords` has **0 references** anywhere in `apps` or
+  `packages`. No Receiving surface reads `line_config`: `OperationReceiving.tsx`,
+  `ReceivingRecord.tsx`, `ExceptionEvidence.tsx` and `GoodsMiniTable.tsx` all hold 0 references.
+  The only second line under a name is the provenance caveat `name from the current catalog`.
+  *Noted, not a defect:* the API still ships `line_config` on the detail payload with no consumer
+  — dead payload, left for the owner of that route.
+- **D2 (the GRN paper).** `vite.portal-preview.config.ts` still swaps `./fonts/noto` by RESOLVED
+  PATH for `noto.preview.ts`. **The fix is still package-only, as promised:** the production
+  bundle built in this pass still carries its jsdelivr/fontsource reference, so production paper
+  keeps the full `chinese-simplified` subset and Chinese customer names are unaffected.
+
+### Production, measured this pass (authenticated, read-only)
+
+**The live page is still the old design** — `https://erp.carresofficial.com/operation?tab=receiving`
+served: a ONE-month `SEPTEMBER 2026` calendar with filtering, and the columns
+`GRN No · Supplier Delivery Date · Goods received on · PO/CO No · Supplier · Product · Deliver To ·
+Goods arrived at · Received Qty · Status · Supplier DO No. · Damaged Qty · Wrong Item Qty ·
+Extra Qty`, with `Product` printing `Super Single` — the variant-alone defect R1 names. No GRN
+Date, no Items, no Exceptions column, no expansion. 7 GRNs, 4 of them the `PO-SMOKE-*` rows.
+**Nothing of this card is live, and the only thing standing between the candidate and that page is
+the owner's merge/deploy decision.**
+
+### The two prerequisites — re-tested this pass, not re-quoted
+
+**1 · Storage round-trips — STILL NOT VERIFIED. Prerequisite re-measured, and it has changed.**
+The third pass reported "the only Supabase project is production". That is now known to be wrong:
+the account holds **two further projects** — `carres-operations` (`uoaokqboeajmpsudsbql`, created
+2026-04-18) and `carres-ops` (`xchradclyhntcxwsjdvv`, created 2026-05-02). **Both are `INACTIVE`**
+(paused); a read-only probe of each returns `Connection terminated due to connection timeout`.
+Production's `list_branches` still returns the default branch only.
+
+So the blocker is now exact and smaller than it was: **a non-production project EXISTS but is
+paused, and resuming it is a state-changing, billable action on the owner's account that nothing
+in this lane authorises.** To run
+`apps/api/src/test/receiving-evidence-storage.integration.test.ts` (9 cases, currently SKIPPED)
+somebody with owner authorisation must: resume one of those two projects · apply the migration
+chain to it · create one operation login holding GRN duty and optionally one warehouse login ·
+post one receiving carrying a damaged unit, a wrong-item unit and an extra line · put the values
+in a GitHub Actions environment secret set or an untracked local `.env` as
+`CARRES_NONPROD_SUPABASE_URL` + keys. Never in a chat, never in the repository. The test refuses
+the production project ref by design.
+
+**2 · Full-chain migration replay — NOT RE-RUN, and the third pass's run is now stale.** That run
+replayed 496 files with `0493` at the tail; the chain now holds 511 with eleven files AFTER it.
+Real PostgreSQL could not be stood up here: no Docker, no Supabase CLI, no `psql`, and the
+`embedded-postgres` PostgreSQL 18 **Windows** binaries crash on launch — `initdb.exe` and even
+`postgres.exe --version` exit `0xC0000186`, a native DLL-init failure, so the harness the third
+pass used on macOS has no equivalent on this machine.
+
+What was done instead, and what it does and does not prove: every object `0493` creates, replaces
+or drops (11) was compared against all eleven later files. **The intersection is empty.** The two
+pre-existing functions `0493` replaces — `warehouse_receipt_validate_lines` and
+`receiving_validate_session_extras` — appear in neither `0500`'s 78-function null-role rewrite nor
+anywhere else, so `0493` reverts no later hardening and its position in the chain is immaterial.
+That is a static argument about names; it is **not** a replay, and it does not prove the SQL still
+executes cleanly on the current chain. The replay must be re-run by CI or by a machine with real
+PostgreSQL before the migration is applied.
+
+### Found this pass and reported, NOT touched — another lane's apply debt
+
+**`0500`, `0502` and `0503` are merged to `main` and ABSENT from
+`supabase_migrations.schema_migrations`** (measured 2026-09-14: the tracker runs `…0498`, `0499`,
+`0501`, `0504`). `0500_role_gates_refuse_a_caller_with_no_role` is the null-role fix for 107
+SECURITY DEFINER functions, and production carries the guard on only **32 of 568** — so that fix
+is not live. Same class as the known `0461`–`0469` carry-forward. It does not gate this card and
+nothing here touched it, but it is a live security gap somebody owns.
+
+### The release sequence, in order, for when the owner authorises it
+
+1. **CI green on PR #1274** at the reconciled head (this push is what makes CI run against current
+   `main`). The replay in CI is the re-run the machine here could not do.
+2. **Apply `0493` to production** through the governed MCP path, BEFORE the merge — the Worker
+   routes this card ships read `receiving_line_evidence`, and a deploy that lands first would call
+   a table that does not exist. `0493` creates a new table and two new doors, revokes execute from
+   `public`/`anon`, and replaces two validators nothing later touches; the backfill is
+   `INSERT…SELECT` and never bumps `updated_at`. Re-measure the number at the moment of apply.
+3. **Merge PR #1274 to `main`.** That merge deploys both Pages projects and the production Worker.
+4. **Verify on production:** `GET https://api.carresofficial.com/health` reports the merge SHA, all
+   canonical web surfaces report the same SHA, then an **authenticated** walk of
+   `https://erp.carresofficial.com/operation?tab=receiving` showing the nine agreed default columns,
+   the two-month calendar, an expansion, and the exception-evidence viewer on a real row.
+5. **Close `docs/purchasing/MASTER.md`** with what production actually showed.
+
+**Steps 2–4 are the owner's to authorise. Nothing in this pass performed any of them.**
