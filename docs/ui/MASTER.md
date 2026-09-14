@@ -365,6 +365,31 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Widths and radii that have no home in a standard live as named config keys**, never as
   numbers inside a component.
 
+**⭐ THE CENTRED SURFACE'S WIDTH TABLE — closed at three, and every value carries its
+measurement (2026-09-11, adding the third).**
+
+| `width` | Config key | Value | The measurement that produced it |
+|---|---|---|---|
+| *(omitted)* | `max-w-modal` | 512px | The default: a question, a short form, a confirmation |
+| `"wide"` | `max-w-modal-wide` | 600px | P19, 2026-08-05 — a surface carrying a LINE LIST rather than a question |
+| `"viewer"` | `max-w-modal-viewer` | 880px | 2026-09-11 — a surface whose binding constraint is a PICTURE's height, not a column of text. The dialog caps at `85vh`; its chrome (header, footer, the caption line) takes 136px, leaving 629px of image. A 4:3 delivery photo 629px tall is 839px wide, so 880px shows it whole with 9px of headroom either side. Below this the photo is letterboxed and the operator zooms to read a door number |
+
+**A FOURTH WIDTH IS A DECISION FOR THIS TABLE, NOT FOR A CALLER.** `width` stays a union of
+literals with no number and no `style`, so what a page can express is one of these three. A page
+that needs a surface this table does not describe brings the gap here — it does not draw its own
+overlay.
+
+**⭐ RETURNING FOCUS IS `DialogFrame`'s JOB, AND IT WAS NOT BEING DONE (defect found and fixed
+2026-09-11).** The kit documented *"focus returned to the trigger"* as Radix behaviour it
+inherited. It was not: Radix restores focus to `Dialog.Trigger`, and the kit deliberately has
+none, because `open` is CONTROLLED and what opens a surface is an ordinary page button, a row
+action or a keyboard shortcut. Radix's modal content therefore called `preventDefault()` on its
+own close-focus event and then focused a trigger that was `null` — so **every modal and drawer in
+the portal dropped a keyboard user onto `<body>`**, with no way back to the row they opened.
+`DialogFrame` now remembers the element that had focus when it opened and restores it on close,
+skipping an opener the close itself removed from the document. One fix, every surface — which is
+the whole reason the two components share a frame.
+
 # §4 · Shells and grids
 
 ### FROZEN RULES
@@ -441,6 +466,16 @@ EDIT      full screen          split           left composes · right shows what
 means staff must remember which one can do what, and that memory is the thing this portal exists
 to remove.**
 
+**THE ONE GOVERNED WRITE STATE INSIDE AN INSPECT SURFACE — owner ruling 2026-09-13, Delivery
+Monitor.** The Monitor row's expansion is the delivery brief: four kit `Panel`s (`Customer,
+Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock`). Where a
+panel owns a Delivery write, the `Panel`'s one right-slot control (`Update date and time`,
+`Assign logistics` / `Change logistics`) flips that panel's own body into a focused edit state
+with its named Save (`Save confirmed delivery`); the operator stays on the same row, queue and
+narrowings. No overflow menu and no separate dialog is invented for these acts, and no other
+register may copy this without its own owner ruling. Sales facts inside the brief stay read-only
+behind `Open Sales Order to change`. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
 Header       which record · what state · ‹ 4 of 69 ›
@@ -513,8 +548,10 @@ shipped code, and stated the opposite.)*
 PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
 multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
 elbows. A destination with only one page is a direct icon + name row; it does not hide that page
-behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
-2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+behind a chevron that reveals the same name again. **Payments is a module of two destinations
+(owner ruling 2026-09-12): `Monitor` — the named landing — and `Payment Records`; no
+`Payments · Invoices` tabs, no standalone Invoices or Receipts row, and the same two rows for the
+finance role, which is never a second Payment information architecture.** The existing `PortalSidebar` is the only left navigation surface: 232px
 expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
@@ -687,7 +724,23 @@ directory only and said so.*
   A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
   instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
   avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
-  My Work, Team Work, the PO detail and Order Route.
+  My Work, Team Work, the PO detail and Order Route. **THE ONE RULED EXCEPTION — the Payment
+  Monitor's `Payment timing` cell (owner ruling 2026-09-12, `docs/payment/MASTER.md` §3):** the
+  Monitor is a CONTROL LISTING, not a document register, and the owner ruled its last column a
+  two-line fact/action surface — line 1 the fact, line 2 the governed action with the shared
+  Work feed's resolved owner as an avatar (hover/accessible name = full name, never a name in the
+  sentence). It reads the Work feed's items; it resolves no owner and creates no second action.
+  No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
+  the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, `../delivery/MASTER.md`
+  §8.4):** its status word names the actor and the fact in primary-school English
+  (`Operation must call the customer` · `Waiting for {partner} pickup` · `Goods collected by
+  {partner}`), one arithmetic, no owner avatar and no second action. It is a status word, not an
+  action sentence.
+- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner ruling 2026-09-13.** For Delivery
+  Work, line 1 is the act with its recipient (`Call NETS`) and line 2 the required result
+  (`Confirm the delivery date`); the row's status word carries the fact. Owner, source object and
+  the actual working date are structured metadata beside the sentence, never joined into it, and
+  no `—` appears in either line. The 13 / 11 sizes below apply unchanged.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -1110,7 +1163,10 @@ card; new designs and mockups show the approved destination, not the legacy red 
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
 table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
-`text-body` (13px / 18px). The remaining height is balanced vertical breathing room, with the
+`text-body` (13px / 18px). **THE ONE PAGE-SPECIFIC EXCEPTION — the Delivery Monitor work list
+(owner ruling 2026-09-12): its parent row is 72px because it deliberately carries one primary
+fact and one supporting line in every cell (`../delivery/MASTER.md` §8.3). The 38 versus 72
+decision is not reopened, and no other register inherits 72px without its own owner ruling.** The remaining height is balanced vertical breathing room, with the
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing

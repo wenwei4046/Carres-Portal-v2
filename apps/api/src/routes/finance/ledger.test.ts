@@ -123,9 +123,13 @@ const ENTRY = {
   reversed_by: "aaaaaaaa-0000-4000-8000-000000000002",
   created_at: "2026-09-02T03:00:00Z",
   created_by: "11111111-1111-1111-1111-000000000001",
-  reverses_entry: null,
-  reversed_by_entry: { entry_no: "JE-202609-0004" },
 };
+
+/** The entry ENTRY.reversed_by points at, as the linked-number read returns it. */
+const LINKED = { id: "aaaaaaaa-0000-4000-8000-000000000002", entry_no: "JE-202609-0004" };
+
+/** The linked-number read is the `gl_entries` read filtered `in("id", …)`. */
+const isLinkedRead = (call: Call) => call.name === "gl_entries" && ops(call, "in").some((o) => o[1] === "id");
 
 // ── the guard ────────────────────────────────────────────────────────────────
 
@@ -162,7 +166,7 @@ describe("finance ledger — who may read", () => {
 
 describe("GET /entries", () => {
   it("reads posted entries newest first, with both reversal numbers", async () => {
-    const { calls } = fakeClient(() => ok([ENTRY], 1));
+    const { calls } = fakeClient((call) => (isLinkedRead(call) ? ok([LINKED]) : ok([ENTRY], 1)));
     const res = await get("/entries");
     expect(res.status).toBe(200);
     const body = await json(res);
@@ -177,12 +181,61 @@ describe("GET /entries", () => {
     const c = calls[0]!;
     expect(c.name).toBe("gl_entries");
     const select = ops(c, "select")[0]!;
-    expect(String(select[1])).toContain("gl_entries!gl_entries_reversed_by_fkey(entry_no)");
     expect(String(select[1])).not.toContain("!inner");
     expect(select[2]).toEqual({ count: "exact" });
     expect(ops(c, "eq")).toContainEqual(["eq", "posted", true]);
     expect(ops(c, "order").map((o) => o[1])).toEqual(["entry_date", "created_at", "id"]);
     expect(ops(c, "range")).toEqual([["range", 0, 499]]);
+    // The number comes from a second, plain read of the entry it points at.
+    const linked = calls[1]!;
+    expect(isLinkedRead(linked)).toBe(true);
+    expect(ops(linked, "select")).toEqual([["select", "id,entry_no"]]);
+    expect(ops(linked, "in")).toEqual([["in", "id", [LINKED.id]]]);
+    expect(calls).toHaveLength(2);
+  });
+
+  // PostgREST refuses to embed a table in itself through a foreign-key hint,
+  // and production answered every Journal read 500 while this select carried
+  // one. A recording fake accepts any string, so the select is pinned instead.
+  it("never embeds gl_entries in itself", async () => {
+    const { calls } = fakeClient((call) =>
+      isLinkedRead(call) ? ok([LINKED]) : ops(call, "maybeSingle").length ? ok(ENTRY) : ok([ENTRY], 1));
+    await get("/entries");
+    await get("/entries?account=1210");
+    await get("/entries/JE-202609-0003");
+    const selects = calls.flatMap((call) => ops(call, "select").map((o) => String(o[1])));
+    expect(selects.length).toBeGreaterThan(3);
+    for (const s of selects) expect(s).not.toMatch(/gl_entries[!(]/);
+  });
+
+  it("asks for no linked numbers when no entry on the page links", async () => {
+    const { calls } = fakeClient(() => ok([{ ...ENTRY, reversed: false, reversed_by: null }], 1));
+    const res = await get("/entries");
+    expect(res.status).toBe(200);
+    expect((await json(res)).rows[0]).toMatchObject({ reverses_entry_no: null, reversed_by_entry_no: null });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("reads the linked numbers of a full page in slices of 100", async () => {
+    const id = (n: number) => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    const page = Array.from({ length: 250 }, (_, n) => ({ ...ENTRY, id: `row-${n}`, reversed_by: id(n) }));
+    const { calls } = fakeClient((call) => {
+      if (!isLinkedRead(call)) return ok(page, 250);
+      const asked = ops(call, "in")[0]![2] as string[];
+      return ok(asked.map((i) => ({ id: i, entry_no: `JE-${i.slice(-4)}` })));
+    });
+    const res = await get("/entries?limit=1000");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.rows[249].reversed_by_entry_no).toBe("JE-0249");
+    expect(calls.filter(isLinkedRead).map((call) => (ops(call, "in")[0]![2] as string[]).length)).toEqual([100, 100, 50]);
+  });
+
+  it("answers an unreadable linked number with an error, never a reversal without its link", async () => {
+    fakeClient((call) => (isLinkedRead(call) ? fail("XX000") : ok([ENTRY], 1)));
+    const res = await get("/entries");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The journal could not be loaded. Try again.");
   });
 
   it("narrows by account through an inner join, and by date, source and search", async () => {
@@ -228,9 +281,10 @@ describe("GET /entries", () => {
 });
 
 describe("GET /entries/:ref", () => {
-  function entryAnswer(overrides: Partial<Record<"head" | "related" | "lines", Result>> = {}) {
+  function entryAnswer(overrides: Partial<Record<"head" | "linked" | "related" | "lines", Result>> = {}) {
     return (call: Call): Result => {
       if (call.name === "gl_entries" && ops(call, "maybeSingle").length) return overrides.head ?? ok(ENTRY);
+      if (isLinkedRead(call)) return overrides.linked ?? ok([LINKED]);
       if (call.name === "gl_entries") {
         return overrides.related ?? ok([
           {
@@ -279,7 +333,9 @@ describe("GET /entries/:ref", () => {
     // about everybody else; the entry does not ask.
     expect(body).not.toHaveProperty("posted_by_name");
     expect(calls.some((c) => c.name === "app_users")).toBe(false);
-    const related = calls.find((c) => c.name === "gl_entries" && !ops(c, "maybeSingle").length)!;
+    const linked = calls.find(isLinkedRead)!;
+    expect(ops(linked, "in")).toEqual([["in", "id", [LINKED.id]]]);
+    const related = calls.find((c) => c.name === "gl_entries" && ops(c, "eq").some((o) => o[1] === "source_doc_no"))!;
     expect(ops(related, "in")).toEqual([["in", "source_type", ["SALES_INVOICE", "SALES_INVOICE_REVERSAL"]]]);
     expect(ops(related, "neq")).toEqual([["neq", "id", ENTRY.id]]);
     // No supplier on the lines, so suppliers are never asked.
@@ -304,6 +360,11 @@ describe("GET /entries/:ref", () => {
 
   it("fails when the lines cannot be read, rather than showing an entry with none", async () => {
     fakeClient(entryAnswer({ lines: fail("XX000") }));
+    expect((await get("/entries/JE-202609-0003")).status).toBe(500);
+  });
+
+  it("fails when the linked number cannot be read, rather than showing a reversal without it", async () => {
+    fakeClient(entryAnswer({ linked: fail("XX000") }));
     expect((await get("/entries/JE-202609-0003")).status).toBe(500);
   });
 });

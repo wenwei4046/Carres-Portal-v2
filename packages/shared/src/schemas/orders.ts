@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DELIVERY_FACT_REFUSALS } from "../sales-order-form";
 import { MAX_DELIVERY_FLOOR } from "../constants";
 
 /**
@@ -337,6 +338,19 @@ export const createOrderInputSchema = z.object({
     .strict()
     .optional(),
 }).superRefine((data, ctx) => {
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13, Card 18).
+     The wizard's "Fill in address later" escape is gone; this is the server
+     half, so a stale tab or a curl cannot file an order Delivery cannot plan.
+     Floor and lift are already required by shape; the date by the rule below. */
+  if (data.customer.addressUnknown || !data.customer.address?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "address"], message: DELIVERY_FACT_REFUSALS.address });
+  }
+  if (!data.customer.addressState?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "addressState"], message: DELIVERY_FACT_REFUSALS.state });
+  }
+  if (!data.entryData?.fields?.building_type?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["entryData", "fields", "building_type"], message: DELIVERY_FACT_REFUSALS.buildingType });
+  }
   /* ⛔ OWNER RULING 2026-08-15 — CUSTOMER DELIVERY IS MANDATORY AT ORDER ENTRY.
      The wizard's "Confirm later" option is gone; this is the server half of the
      same rule, so a curl or a stale tab cannot file a dateless order either.
@@ -474,6 +488,29 @@ export const rawCreateOrderInputSchema = z.object({
     })
     .strict()
     .optional(),
+}).superRefine((data, ctx) => {
+  /* ⛔ OFFICE DOOR PARITY (owner ruling 2026-09-13, Card 18): the raw door
+     still gates no price, no lead time and no payment — but it is a create
+     door, and a valid new order carries the facts Delivery plans from. ONE
+     spelling with the POS schema and the wizard. */
+  if (data.customer.addressUnknown || !data.customer.address?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "address"], message: DELIVERY_FACT_REFUSALS.address });
+  }
+  if (!data.customer.addressState?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "addressState"], message: DELIVERY_FACT_REFUSALS.state });
+  }
+  if (!data.entryData?.fields?.building_type?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["entryData", "fields", "building_type"], message: DELIVERY_FACT_REFUSALS.buildingType });
+  }
+  if (data.deliveryFloor == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryFloor"], message: DELIVERY_FACT_REFUSALS.floor });
+  }
+  if (data.deliveryHasLift == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryHasLift"], message: DELIVERY_FACT_REFUSALS.lift });
+  }
+  if (!data.deliveryDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryDate"], message: DELIVERY_FACT_REFUSALS.date });
+  }
 });
 /** z.input — `paid` stays optional for the POSTing client. */
 export type RawCreateOrderInput = z.input<typeof rawCreateOrderInputSchema>;

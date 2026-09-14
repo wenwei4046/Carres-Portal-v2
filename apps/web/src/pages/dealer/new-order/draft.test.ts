@@ -17,8 +17,7 @@ import {
   step2Valid,
   step3DateFirstIssue,
   step3DateValid,
-  step3Valid,
-} from "./draft";
+  step3Valid, step1FirstIssue } from "./draft";
 
 afterEach(() => {
   sessionStorage.clear();
@@ -246,14 +245,15 @@ describe("step1Valid — Continue gate", () => {
     expect(step1Valid(d)).toBe(false);
   });
 
-  it("addressUnknown = true bypasses every address rule", () => {
+  it("addressUnknown no longer bypasses the address rules (owner ruling 2026-09-13)", () => {
     const d = validDraft();
     d.customer.addressLine1 = "";
     d.customer.addressState = "";
     d.customer.addressCity = "";
     d.customer.addressPostcode = "";
     d.customer.addressUnknown = true;
-    expect(step1Valid(d)).toBe(true);
+    expect(step1Valid(d)).toBe(false);
+    expect(step1FirstIssue(d)).toBe("Address — Line 1 (≥5 chars)");
   });
 
   it("rejects when billing empty and not billingSame", () => {

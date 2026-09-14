@@ -1,45 +1,30 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import {
-  cashflowSeriesQuery,
-  monthlyPlQuery,
-  topSkusQuery,
-} from "@carres/shared";
+import { monthlyPlQuery, topSkusQuery } from "@carres/shared";
 import { requireFinance } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * Phase 5 Chunk A — Finance · Reports router.
+ * Finance · Reports router, mounted at `/api/finance/reports`.
  *
- * Spec: docs/superpowers/specs/2026-05-08-phase-5-finance-spec.md §5.5.
+ * Each route forwards the caller's JWT through `userClient`, so the role gate
+ * inside the SQL function sees the real caller. `requireFinance` is the same
+ * gate at the HTTP layer.
  *
- * Mounted at `/api/finance/reports`. The two endpoints below cover the
- * Chunk A acceptance:
- *   - dashboard-summary feeds the FinanceDashboard 4 KPIs + 12-week
- *     cashflow card + AR aging card.
- *   - ar-aging feeds the AR page table + filter pills (rows include
- *     settled rows so the page's status filter doesn't need a second
- *     round-trip).
- *
- * Both wrap STABLE SECURITY DEFINER RPCs from migration 0062. Caller
- * forwards JWT via `userClient` so the SQL `app_role()` gate inside the
- * RPC sees the right session role; the per-route `requireFinance` guard
- * is the HTTP-layer mirror.
- *
- * ap-aging added in migration 0063. cashflow / monthly-pl / top-skus
- * added in migration 0064 (Chunk B).
+ * What is NOT here any more: `/dashboard-summary` and `/cashflow`. They read
+ * `finance_dashboard_summary` and `finance_cashflow_series` (migrations
+ * 0062/0064), which were written before the money convergence and count
+ * money owed their own way. The Finance Dashboard now reads the two
+ * canonical figures instead — customer Outstanding from the invoice register
+ * and supplier Unpaid from `/api/finance/payables/outstanding` — through
+ * `apps/web/src/pages/finance/money-owed.ts`. The SQL functions stay in the
+ * database as history; nothing calls them.
  */
 const financeReportsRouter = new Hono<AppEnv>();
 
-financeReportsRouter.get("/dashboard-summary", requireFinance, async (c) => {
-  const auth = c.var.auth;
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("finance_dashboard_summary");
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json(data);
-});
-
+// No route in the web app reaches this any more (the AR page reads the
+// invoice register); kept because FinancePayments/FinanceInvoices still import its hook.
 financeReportsRouter.get("/ar-aging", requireFinance, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
@@ -48,29 +33,12 @@ financeReportsRouter.get("/ar-aging", requireFinance, async (c) => {
   return c.json(data);
 });
 
+// No route in the web app reaches this any more (/finance/ap redirects to
+// /finance/ap-outstanding); kept because FinanceAP/APDrawer still import its hook.
 financeReportsRouter.get("/ap-aging", requireFinance, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("finance_ap_aging");
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json(data);
-});
-
-financeReportsRouter.get("/cashflow", requireFinance, async (c) => {
-  const auth = c.var.auth;
-  const parsed = cashflowSeriesQuery.safeParse(
-    Object.fromEntries(new URL(c.req.url).searchParams),
-  );
-  if (!parsed.success) {
-    return c.json(
-      { error: "invalid_query", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid query" },
-      422,
-    );
-  }
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("finance_cashflow_series", {
-    p_weeks: parsed.data.weeks ?? 12,
-  });
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json(data);
 });

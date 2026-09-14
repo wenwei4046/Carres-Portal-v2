@@ -128,8 +128,38 @@ financeInvoicesRouter.get("/register", async (c) => {
   }
   const rows = data as unknown as Array<Record<string, unknown>>;
   await attachLegacyStorage(sb, rows);
+  await attachLatestPromise(sb, rows);
   return c.json({ rows, total: count });
 });
+
+/**
+ * The customer's latest standing promise (0446 `will_pay_on_date`), one per
+ * order, attached as a source fact so the Payment Monitor's `Customer promised
+ * to pay today` reads the SAME ledger the Work feed's missed-promise rule
+ * reads — never a second store. Batched over the page's order ids; a read
+ * failure refuses the page rather than presenting promises as absent.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachLatestPromise(sb: any, rows: Array<Record<string, unknown>>) {
+  const orderIds = [...new Set(rows.map((r) => String(r.order_id)))];
+  if (orderIds.length === 0) return;
+  const { data, error } = await sb
+    .from("payment_collection_outcomes")
+    .select("order_id,promised_date,recorded_at")
+    .eq("outcome", "will_pay_on_date")
+    .in("order_id", orderIds)
+    .order("recorded_at", { ascending: false });
+  if (error) throw new HTTPException(500, { message: "Invoices could not be loaded. Try again." });
+  const latest = new Map<string, { promised_date: string; recorded_at: string }>();
+  for (const o of (data ?? []) as Array<{ order_id: string; promised_date: string | null; recorded_at: string }>) {
+    if (!o.promised_date || latest.has(o.order_id)) continue;
+    latest.set(o.order_id, { promised_date: o.promised_date, recorded_at: o.recorded_at });
+  }
+  for (const r of rows) {
+    const o = r.orders as { latest_promise?: unknown } | null;
+    if (o) o.latest_promise = latest.get(String(r.order_id)) ?? null;
+  }
+}
 
 /**
  * The legacy C9 storage figure, derived server-side through the SAME shared

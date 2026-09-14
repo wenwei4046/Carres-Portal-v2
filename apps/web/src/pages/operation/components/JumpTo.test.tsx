@@ -119,11 +119,12 @@ describe("the empty query", () => {
       "WorkOperations",
       "Sales OrdersOperations",
       "InventoryOperations",
-      "PaymentsOperations",
-      // `Monitor` since the four-page map made it the Delivery module's
-      // flagship child (CARD-2026-09-04-delivery-01) — same key, same route,
-      // the sidebar's own word.
-      "MonitorOperations",
+      // `operation:payments` is the Payments module's `Monitor` since the
+      // 2026-09-12 ruling — same key, same recent, the sidebar's own word.
+      // Three modules now own a `Monitor` (Delivery · Warehouse · Payments),
+      // so a shared label carries its module word.
+      "Payments · MonitorOperations",
+      "Delivery · MonitorOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
@@ -209,10 +210,10 @@ describe("the keyboard", () => {
     });
     renderJump();
     const input = openSurface();
-    /* `payments` matches exactly one destination, so the document is the row
-     * after it and one ↓ is what reaches it. (`delivery` stopped being unique
-     * when the Delivery Orders register joined the sidebar.) */
-    fireEvent.change(input, { target: { value: "payments" } });
+    /* `payment records` matches exactly one destination, so the document is
+     * the row after it and one ↓ is what reaches it. (`payments` stopped being
+     * unique when the module gained its two destinations, 2026-09-12.) */
+    fireEvent.change(input, { target: { value: "payment records" } });
     await screen.findByTestId("jump-to-document"); // the debounced lookup lands
     const before = screen.getAllByRole("option");
     expect(before[0]).toHaveAttribute("data-active", "true");
@@ -269,9 +270,9 @@ describe("the keyboard", () => {
 describe("navigate-only", () => {
   it("selecting a destination only opens it — and remembers it as recent", () => {
     renderJump();
-    fireEvent.change(openSurface(), { target: { value: "Payments" } });
+    fireEvent.change(openSurface(), { target: { value: "Payments · Monitor" } });
     fireEvent.click(screen.getByTestId("jump-to-destination"));
-    expect(screen.getByTestId("here")).toHaveTextContent("/finance/invoices");
+    expect(screen.getByTestId("here")).toHaveTextContent("/finance/monitor");
     expect(JSON.parse(localStorage.getItem("carres-jump-recent") ?? "[]")).toEqual([
       "operation:payments",
     ]);

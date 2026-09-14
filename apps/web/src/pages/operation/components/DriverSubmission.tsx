@@ -32,7 +32,7 @@ import { DELIVERY_PHOTO_MIMES, DELIVERY_VIDEO_MIMES } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { qk, useDeliveryPhotos, useUploadDeliveryPhoto } from "@/lib/queries";
-import { Modal } from "./Modal";
+import KitModal from "@/components/kit/Modal";
 import { DOR_COPY, submissionFilesOf } from "../delivery-orders-register";
 
 const ACCEPT = [...DELIVERY_PHOTO_MIMES, ...DELIVERY_VIDEO_MIMES].join(",");
@@ -123,8 +123,25 @@ export function DriverSubmissionViewer({
   const files = submissionFilesOf(query.data?.photos, doNumber, kind);
   const title = `${kind === "photo" ? DOR_COPY.photos : DOR_COPY.videos} · ${doNumber}`;
 
+  /* ⭐ THE KIT'S SURFACE, AT THE MEASURED VIEWER WIDTH (2026-09-11).
+     This opened on the four-year-old operation-local `Modal`, which is
+     hand-rolled: it never returns focus to the button that opened it, never
+     locks the background scroll, names itself with `aria-label` instead of
+     the title element, and paints its scrim from an inline `rgba`. An
+     operator who opens a photo with the keyboard and presses Escape used to
+     land at the top of the page rather than back on the row they were
+     reading. The kit owns all of that, and `viewer` is the width the kit's
+     own table measured for a surface carrying a PICTURE. Only the SURFACE
+     changed here — the files, the predicate and the words are untouched. */
   return (
-    <Modal title={title} onClose={onClose}>
+    <KitModal
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={title}
+      width="viewer"
+    >
       <div className="grid gap-3" data-testid="driver-submission-viewer">
         <p className="text-label text-kit-slate-11">{DOR_COPY.submissionMeaning}</p>
         {query.isLoading ? (
@@ -195,7 +212,7 @@ export function DriverSubmissionViewer({
           </div>
         )}
       </div>
-    </Modal>
+    </KitModal>
   );
 }
 

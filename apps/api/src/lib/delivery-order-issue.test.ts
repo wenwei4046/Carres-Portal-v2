@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { docNumber, orderActionDone } from "@carres/shared";
-import { attemptDeliveryOrderIssue, todayIsoMYT } from "./delivery-order-issue";
+import { attemptDeliveryOrderIssue, attemptLegDocumentIssue, todayIsoMYT } from "./delivery-order-issue";
 
 type Result = { data: unknown; error: unknown };
 
@@ -325,3 +325,69 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(attempt).toEqual({ outcome: "already", doNumber: "DO-170826-9999" });
   });
 });
+
+describe("attemptLegDocumentIssue — a Journey leg's own document (0491)", () => {
+  const STOPS = [
+    { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", status: "pending" },
+    { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", status: "pending" },
+  ];
+  const LEG_DO = docNumber({ prefix: "DO", date: todayIsoMYT(), seed: `${ORDER_ID}#leg1`, digits: 4 });
+  function legTables(over?: {
+    stops?: unknown[] | null;
+    arrangement?: Record<string, unknown> | null;
+    existing?: Array<{ do_number: string; leg: number; voided_at: string | null }>;
+    paid?: number;
+  }) {
+    const t: Record<string, ReturnType<typeof tableMock>> = tables({ paid: over?.paid });
+    t.orders = ordersMock(
+      { data: { id: ORDER_ID, so: 1234, paid: over?.paid ?? 2500, do_number: null, delivery_stops: over?.stops === undefined ? STOPS : over.stops }, error: null },
+      { data: { id: ORDER_ID, do_number: LEG_DO }, error: null },
+    );
+    t.ops_delivery_arrangements = tableMock({
+      data:
+        over?.arrangement === null
+          ? null
+          : { partner_id: "p-teow", partner_name: { name: "TEOW" }, confirmed_date: CONFIRMED_DATE, confirmed_time: "Morning (9am–12pm)", ...(over?.arrangement ?? {}) },
+      error: null,
+    });
+    t.ops_delivery_orders = tableMock({ data: over?.existing ?? [], error: null });
+    return t;
+  }
+
+  it("issues the leg's document through the governed mint, numbered on the order AND the leg", async () => {
+    const sb = makeSb(legTables());
+    sb.rpc = vi.fn().mockResolvedValue({ data: { do_number: LEG_DO, leg: 1 }, error: null });
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
+    expect(out).toEqual({ outcome: "issued", doNumber: LEG_DO });
+    expect(LEG_DO).not.toBe(DO_NUMBER);
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_leg_document_mint", { p_order_id: ORDER_ID, p_leg: 1, p_do_number: LEG_DO });
+  });
+
+  it("a leg that is not on the order's Journey issues nothing", async () => {
+    const sb = makeSb(legTables({ stops: null }));
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
+    expect(out.outcome).toBe("blocked");
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a leg without its partner or its agreed day is not ready — the reasons name what is open", async () => {
+    const sb = makeSb(legTables({ arrangement: { partner_id: null, confirmed_date: null } }));
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
+    expect(out).toEqual({ outcome: "blocked", reasons: ["Assign logistics for this leg", "Confirm the delivery date for this leg"] });
+  });
+
+  it("the order's money gate still holds for a leg — an owing order issues no leg paper", async () => {
+    const sb = makeSb(legTables({ paid: 0 }));
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
+    expect(out.outcome).toBe("blocked");
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a live document for the leg is returned, never re-minted", async () => {
+    const sb = makeSb(legTables({ existing: [{ do_number: "DO-010926-0001", leg: 1, voided_at: null }] }));
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
+    expect(out).toEqual({ outcome: "already", doNumber: "DO-010926-0001" });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+

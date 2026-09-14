@@ -52,9 +52,17 @@ describe("GET /api/finance/invoices/register", () => {
       amount: 1000, tax_amount: 0, issued_at: null, voided_at: null,
       orders: { id: ORDER_ID, so: 1300, customer_name: "Customer" },
     }];
-    const chain = { select: vi.fn(), order: vi.fn(), range: vi.fn() };
+    // The register makes two reads through one chain shape: the paged
+    // invoices read ends in `.range()`; the latest-promise read (0486) ends in
+    // `.order()` and is awaited — so the chain is a thenable answering empty.
+    const chain = {
+      select: vi.fn(), order: vi.fn(), range: vi.fn(), eq: vi.fn(), in: vi.fn(),
+      then: (resolve: (v: unknown) => void) => resolve({ data: [], error: null }),
+    };
     chain.select.mockReturnValue(chain);
     chain.order.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.in.mockReturnValue(chain);
     chain.range.mockResolvedValue({ data: error ? null : rows, error, count: 1 });
     const sb = { from: vi.fn().mockReturnValue(chain) };
     vi.mocked(userClient).mockReturnValue(sb as never);
@@ -70,7 +78,10 @@ describe("GET /api/finance/invoices/register", () => {
     const res = await request(role);
     expect(res.status).toBe(200);
     expect(sb.from).toHaveBeenCalledWith("invoices");
-    expect(await res.json()).toEqual({ rows, total: 1 });
+    expect(await res.json()).toEqual({
+      rows: rows.map((r) => ({ ...r, orders: { ...r.orders, legacy_storage_owing: 0, latest_promise: null } })),
+      total: 1,
+    });
   });
   it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading", async (role) => {
     const res = await request(role);

@@ -34,8 +34,9 @@ const LANE = [
   // Register. Its place in this lane belongs to the surface that prints those
   // figures now — reached from HERE by relative path, because the lane is a
   // list of files in this folder and the Register lives in `../finance`.
-  "../finance/PaymentRegister.tsx",
-  "../finance/InvoiceRegister.tsx",
+  "../finance/PaymentRecords.tsx",
+  "../finance/PaymentMonitor.tsx",
+  "../finance/PaymentCollectionWorkspace.tsx",
   "OperationDelivery.tsx",
 ] as const;
 

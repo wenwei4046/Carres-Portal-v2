@@ -76,6 +76,17 @@ const COLLISION_BASELINE = new Set([
      halves touch disjoint objects (Delivery Order units vs
      purchase_requests), so their relative order is immaterial. */
   "0424",
+  /* 0489 · two lanes merged seventeen minutes apart on 2026-09-13 (#1266, then
+     #1267) and both carried an 0489. Both halves are committed, so the rename
+     path is closed (immutability, red line 6) and the pair is baselined the
+     way 0417 and 0424 were. Measured state at baselining: BOTH halves are
+     APPLIED and the tracker defines their order —
+     `one_sales_order_keeps_one_collection_owner` at 07:30 UTC (Payment, a
+     rolled-back probe first) · `proof_is_reviewed_and_every_attempt_keeps_its_evidence`
+     at 08:24 UTC (Delivery). The two halves touch disjoint objects
+     (payment_collection_owners and its three doors vs Delivery proof/attempt
+     evidence), so their relative order is immaterial. */
+  "0489",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);

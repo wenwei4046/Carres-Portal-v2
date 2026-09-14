@@ -282,7 +282,7 @@ describe("operation Work response composition", () => {
     expect(arrangement).toMatchObject({
       module: "delivery",
       object: { kind: "delivery_scope", id: "order-2041", label: "SO-2041" },
-      destination: "/operation/delivery/edit/order-2041",
+      destination: "/operation?tab=delivery&view=all&open=order-2041",
     });
 
     const [run] = projectSalesOrderWork({
@@ -625,7 +625,7 @@ describe("operation Work response composition", () => {
     });
   });
 
-  it("admits due invoice collection under Payment Duty and closes only on money truth", () => {
+  it("admits due invoice collection under the Responsible Delivery Operation and closes only on money truth", () => {
     const person = { userId: "payment-duty", name: "Shasha" };
     const [item] = projectPaymentCollectionWork({
       invoices: [{
@@ -662,8 +662,8 @@ describe("operation Work response composition", () => {
           }],
         },
       }],
-      paymentDuty: {
-        dutyKey: "payment_duty",
+      ownerFor: () => ({
+        dutyKey: "delivery_duty",
         onDate: "2026-09-08",
         normalOwner: person,
         buddy: null,
@@ -671,7 +671,7 @@ describe("operation Work response composition", () => {
         actingPerson: person,
         state: "primary",
         assignmentId: "assignment-payment",
-      },
+      }),
       today: "2026-09-08",
     });
 
@@ -680,11 +680,11 @@ describe("operation Work response composition", () => {
       module: "payment",
       object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
       problem: "Customer payment should have been received",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       recipient: "Tan Qu Qu",
-      owner: { dutyKey: "payment_duty", normal: person, acting: person },
+      owner: { dutyKey: "delivery_duty", normal: person, acting: person },
       timing: { dueOn: "2026-09-07", bucket: "overdue" },
-      destination: "/finance/invoices?invoice=invoice-1",
+      destination: "/finance/monitor?invoice=invoice-1",
     });
     expect(item?.completionFact).toContain("outstanding balance is RM 0");
     expect(item?.action).not.toContain("Shasha");
@@ -697,7 +697,7 @@ describe("operation Work response composition", () => {
 describe("payment.missed_promise — the promise outranks the window", () => {
   const person = { userId: "payment-duty", name: "Shasha" };
   const duty = {
-    dutyKey: "payment_duty" as const,
+    dutyKey: "delivery_duty" as const,
     onDate: "2026-09-08",
     normalOwner: person,
     buddy: null,
@@ -738,7 +738,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("raises the work on the day the CUSTOMER chose, even when the clock has no anchor", () => {
     const [item] = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -746,7 +746,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
       id: "payment:invoice-9:payment.missed_promise",
       module: "payment",
       problem: "Customer promise was missed",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
       timing: { dueOn: "2026-09-05", bucket: "overdue" },
     });
@@ -757,7 +757,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("raises ONE row, never the window item beside it", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice("2026-09-09")],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -768,7 +768,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("a promise still in the future is not missed", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({ promised_date: "2026-09-20" })],
     });
@@ -778,7 +778,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("the LATEST promise decides — a newer, later promise cancels the broken one", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [
         outcome({ promised_date: "2026-09-05", recorded_at: "2026-09-02T02:00:00Z" }),
@@ -793,7 +793,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("a said-paid order with money still owed is not a missed promise", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice("2026-09-09")],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({ outcome: "customer_paid", promised_date: null })],
     });
@@ -806,7 +806,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
     paid.orders.paid = 1000;
     const items = projectPaymentCollectionWork({
       invoices: [paid],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -914,7 +914,7 @@ describe("payment.review_overpayment", () => {
   });
 
   /** §12 gives this to the Payment Approver and nobody else, so an unassigned
-   *  duty leaves it honestly ownerless rather than borrowing Payment Duty. */
+   *  duty leaves it honestly ownerless rather than borrowing the collection owner. */
   it("an unassigned approver leaves it ownerless, never reassigned", () => {
     const [item] = projectOverpaymentReviewWork({
       invoices: [invoice(1200)], refunds: [], approver: null, today: "2026-09-08",

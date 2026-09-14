@@ -203,9 +203,34 @@ function firstSkuInput() {
   return screen.getAllByLabelText("Product SKU or description")[0]!;
 }
 
+/** Card 18 — every create carries the required delivery facts. The tests
+ *  below are about lines, payment and billing, so the facts ride a seeded
+ *  draft (the cascading address picker is not walked here). */
+function seedDeliveryFacts(customerOver: Record<string, unknown> = {}, over: Record<string, unknown> = {}) {
+  const d = emptyDraft();
+  sessionStorage.setItem(
+    RAW_DRAFT_STORAGE_KEY,
+    JSON.stringify({
+      ...d,
+      customer: {
+        ...d.customer,
+        addressLine1: "12 Jalan Besar",
+        addressState: "Selangor",
+        addressCity: "Petaling Jaya",
+        addressPostcode: "46200",
+        buildingType: "Condo",
+        ...customerOver,
+      },
+      delivery: { ...d.delivery, date: "2026-10-01" },
+      ...over,
+    }),
+  );
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   setHookDefaults();
+  seedDeliveryFacts();
 });
 afterEach(() => {
   cleanup();
@@ -377,7 +402,7 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     const input = mockRawCreate.mock.calls[0][0];
     expect(input.paid).toBe(2000);
     expect(input.paymentMethod).toBe("credit");
-    expect(input.entryData).toEqual({ payment: { bank: "Maybank" } });
+    expect(input.entryData).toEqual({ payment: { bank: "Maybank" }, fields: { building_type: "Condo" } });
   });
 
   it("billing address keys in with the SAME MY cascade as delivery and composes at submit", async () => {
@@ -393,12 +418,18 @@ describe("PrincipalNewOrder — single-page raw form", () => {
         customer: {
           ...d.customer,
           name: "Raw Customer",
+          addressLine1: "12 Jalan Besar",
+          addressState: "Selangor",
+          addressCity: "Petaling Jaya",
+          addressPostcode: "46200",
+          buildingType: "Condo",
           billingSame: false,
           billingLine1: "88 Jalan B",
           billingState: "Penang",
           billingCity: "George Town",
           billingPostcode: "10000",
         },
+        delivery: { ...d.delivery, date: "2026-10-01" },
         lines: [
           { localId: "l1", sku: "CUSTOM LINE", qty: 1, attrs: null, unitPrice: 100, label: "" },
         ],
@@ -460,13 +491,16 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(screen.queryByText("Order SO-1305 created")).toBeNull();
   });
 
-  it("nothing gates beyond dealer + name + one line: dates/payment empty submit as TBD/nulls; remarks + attrs ride", async () => {
+  it("the required delivery facts gate the door with the governed words, then payment stays optional; remarks + attrs ride", async () => {
     mockRawCreate.mockResolvedValue({
       id: "o-raw-2",
       so: 1302,
       customer: { name: "Raw Customer" },
       lines: [{ id: "ol1" }],
     } as unknown as Order);
+    /* The delivery address rides a prefilled draft (the cascading picker is
+       not walked here); building type and date are keyed below. */
+    seedDeliveryFacts({ buildingType: "" }, { delivery: { ...emptyDraft().delivery, date: "" }, payment: { ...emptyDraft().payment, method: "" } });
     wrap();
 
     // Submit disabled until the three raw floors are met.
@@ -483,10 +517,21 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     fireEvent.change(screen.getAllByLabelText("Line remarks")[0]!, {
       target: { value: "backfill from AutoCount" },
     });
+    /* ⛔ Card 18 — with the floors met, the door still refuses while a
+       delivery fact is missing, and names it in the governed words. */
+    expect(screen.getByTestId("raw-submit")).toHaveProperty("disabled", true);
+    expect(screen.getByTestId("raw-first-issue")).toHaveTextContent(
+      "Building type — pick the building the goods go to",
+    );
+    fireEvent.change(screen.getByTestId("raw-building-type"), { target: { value: "Condo" } });
+    expect(screen.getByTestId("raw-first-issue")).toHaveTextContent(
+      "Delivery date is required. Ask the customer for the date before you save the order.",
+    );
     // A PAST delivery date — the raw path accepts it untouched.
     fireEvent.change(screen.getByTestId("raw-delivery-date"), {
       target: { value: "2024-01-15" },
     });
+    expect(screen.queryByTestId("raw-first-issue")).toBeNull();
     fireEvent.change(screen.getByTestId("raw-paid"), { target: { value: "500" } });
 
     expect(screen.getByTestId("raw-submit")).toHaveProperty("disabled", false);
@@ -497,6 +542,8 @@ describe("PrincipalNewOrder — single-page raw form", () => {
     expect(input.dealerId).toBe(DEALER_ID);
     expect(input.customer.name).toBe("Raw Customer");
     expect(input.deliveryDate).toBe("2024-01-15"); // past date, saved as entered
+    expect(input.customer.addressState).toBe("Selangor");
+    expect(input.entryData).toEqual({ fields: { building_type: "Condo" } });
     expect(input.proceedDate).toBeNull();
     expect(input.paymentMethod).toBeNull(); // payment optional
     expect(input.paid).toBe(500);

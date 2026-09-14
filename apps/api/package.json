@@ -21,9 +21,11 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260811.1",
     "@electric-sql/pglite": "^0.5.8",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.28",
     "@vitejs/plugin-react": "^4.7.0",
     "msw": "^2.6.0",
+    "pg": "^8.23.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4",
     "wrangler": "4.122.0"

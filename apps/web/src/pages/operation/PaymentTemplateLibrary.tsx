@@ -38,14 +38,14 @@ const REQUIRED_FIELDS: Partial<Record<PaymentTemplatePurpose, string[]>> = {
   customer_promised: ["outstanding"],
 };
 
-function fieldProblems(purpose: PaymentTemplatePurpose, body: string): string[] {
+function fieldProblems(config: TemplateLibraryConfig, purpose: string, body: string): string[] {
   const problems: string[] = [];
   for (const match of body.matchAll(/\{([a-z_]+)\}/g)) {
-    if (!KNOWN_FIELDS.includes(match[1] as (typeof KNOWN_FIELDS)[number])) {
+    if (!config.knownFields.includes(match[1] as string)) {
       problems.push(`The field {${match[1]}} is not a known field.`);
     }
   }
-  for (const required of REQUIRED_FIELDS[purpose] ?? []) {
+  for (const required of config.requiredFields[purpose] ?? []) {
     if (!body.includes(`{${required}}`)) {
       problems.push(`Keep the {${required}} field. The message must say the amount.`);
     }
@@ -55,28 +55,69 @@ function fieldProblems(purpose: PaymentTemplatePurpose, body: string): string[] 
 
 interface EditorState {
   templateKey: string | null;
-  purpose: PaymentTemplatePurpose;
+  purpose: string;
   name: string;
   body: string;
   /** What the head said before this edit — shown by Review changes. */
   before: PaymentTemplateRow | null;
 }
 
+/**
+ * ⭐ ONE TEMPLATE LIBRARY GRAMMAR, TWO OWNERS (【DELIVERY】 CARD 12). Delivery
+ * Settings' `Message Templates` reuses this component's whole journey —
+ * versions, one Default per purpose, Review changes, history — with its own
+ * purposes, fields and doors. The Payment default below is byte-identical to
+ * what shipped; a caller passing nothing gets the Payment library.
+ */
+export interface TemplateLibraryConfig {
+  purposes: readonly string[];
+  purposeWord: Record<string, string>;
+  knownFields: readonly string[];
+  sampleFacts: Record<string, string>;
+  requiredFields: Partial<Record<string, string[]>>;
+  queryKey: readonly string[];
+  listPath: string;
+  savePath: string;
+  setDefaultPath: string;
+  setActivePath: string;
+  /** What the READER receives — `the customer`, or `the partner`. */
+  recipientWord: string;
+  /** Extra fields the save carries (Delivery's `channel`). */
+  extraSave?: Record<string, string>;
+}
+
+const PAYMENT_LIBRARY: TemplateLibraryConfig = {
+  purposes: PAYMENT_TEMPLATE_PURPOSES,
+  purposeWord: PAYMENT_TEMPLATE_PURPOSE_WORD,
+  knownFields: KNOWN_FIELDS,
+  sampleFacts: SAMPLE_FACTS,
+  requiredFields: REQUIRED_FIELDS,
+  queryKey: ["finance", "payment-templates"],
+  listPath: "/api/finance/payment-settings/templates",
+  savePath: "/api/finance/payment-settings/templates/save",
+  setDefaultPath: "/api/finance/payment-settings/templates/set-default",
+  setActivePath: "/api/finance/payment-settings/templates/set-active",
+  recipientWord: "the customer",
+};
+
 export default function PaymentTemplateLibrary() {
+  return <TemplateLibrary config={PAYMENT_LIBRARY} />;
+}
+
+export function TemplateLibrary({ config }: { config: TemplateLibraryConfig }) {
   const qc = useQueryClient();
   const query = useQuery<{ templates: PaymentTemplateRow[] }>({
-    queryKey: ["finance", "payment-templates"],
-    queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
+    queryKey: config.queryKey,
+    queryFn: () => apiFetch(config.listPath),
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [historyKey, setHistoryKey] = useState<string | null>(null);
-  const invalidate = () =>
-    void qc.invalidateQueries({ queryKey: ["finance", "payment-templates"] });
+  const invalidate = () => void qc.invalidateQueries({ queryKey: config.queryKey });
   const save = useMutation({
     mutationFn: (input: { templateKey: string | null; purpose: string; name: string; body: string }) =>
-      apiFetch("/api/finance/payment-settings/templates/save", {
-        method: "POST", body: JSON.stringify(input),
+      apiFetch(config.savePath, {
+        method: "POST", body: JSON.stringify({ ...config.extraSave, ...input }),
       }),
     onSuccess: () => {
       toast.success("Template saved");
@@ -88,7 +129,7 @@ export default function PaymentTemplateLibrary() {
   });
   const setDefault = useMutation({
     mutationFn: (templateKey: string) =>
-      apiFetch("/api/finance/payment-settings/templates/set-default", {
+      apiFetch(config.setDefaultPath, {
         method: "POST", body: JSON.stringify({ templateKey }),
       }),
     onSuccess: invalidate,
@@ -96,7 +137,7 @@ export default function PaymentTemplateLibrary() {
   });
   const setActive = useMutation({
     mutationFn: (input: { templateKey: string; active: boolean }) =>
-      apiFetch("/api/finance/payment-settings/templates/set-active", {
+      apiFetch(config.setActivePath, {
         method: "POST", body: JSON.stringify(input),
       }),
     onSuccess: invalidate,
@@ -116,12 +157,12 @@ export default function PaymentTemplateLibrary() {
   }
 
   if (editor) {
-    const problems = fieldProblems(editor.purpose, editor.body);
+    const problems = fieldProblems(config, editor.purpose, editor.body);
     const canReview = editor.name.trim() !== "" && editor.body.trim() !== "" && problems.length === 0;
     return <div className="grid gap-3 md:grid-cols-2" data-testid="template-editor">
       <div>
         <h3 className="text-body font-semibold mb-2">
-          {editor.templateKey ? "Edit template" : "New template"} · {PAYMENT_TEMPLATE_PURPOSE_WORD[editor.purpose]}
+          {editor.templateKey ? "Edit template" : "New template"} · {config.purposeWord[editor.purpose]}
         </h3>
         {!reviewing ? <div className="space-y-2">
           <Input id="template-name" label="Template name" value={editor.name}
@@ -133,7 +174,7 @@ export default function PaymentTemplateLibrary() {
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
           </label>
           <p className="text-label font-normal">
-            Protected fields fill themselves: {KNOWN_FIELDS.map((f) => `{${f}}`).join(" · ")}
+            Protected fields fill themselves: {config.knownFields.map((f) => `{${f}}`).join(" · ")}
           </p>
           {problems.map((p) => <p key={p} className="text-label font-normal text-danger">{p}</p>)}
           <div className="flex gap-2">
@@ -159,20 +200,20 @@ export default function PaymentTemplateLibrary() {
         </div>}
       </div>
       <div data-testid="template-preview">
-        <h3 className="text-body font-semibold mb-2">What the customer receives</h3>
+        <h3 className="text-body font-semibold mb-2">What {config.recipientWord} receives</h3>
         <pre className="whitespace-pre-wrap rounded-card border border-base-200 bg-white p-3 font-sans text-body">
-          {renderPaymentTemplate(editor.body, SAMPLE_FACTS)}
+          {renderPaymentTemplate(editor.body, config.sampleFacts)}
         </pre>
       </div>
     </div>;
   }
 
   return <div className="space-y-3" data-testid="template-library">
-    {PAYMENT_TEMPLATE_PURPOSES.map((purpose) => {
+    {config.purposes.map((purpose) => {
       const list = heads.filter((t) => t.purpose === purpose);
       return <div key={purpose}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-body font-semibold">{PAYMENT_TEMPLATE_PURPOSE_WORD[purpose]}</h3>
+          <h3 className="text-body font-semibold">{config.purposeWord[purpose]}</h3>
           <Button variant="neutral" size="sm" onClick={() => {
             setEditor({ templateKey: null, purpose, name: "", body: "", before: null });
             setReviewing(false);

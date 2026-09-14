@@ -36,7 +36,7 @@ import { fmtMoney } from "@carres/shared";
 import Loading from "@/components/kit/Loading";
 import EmptyState from "@/components/kit/EmptyState";
 import { fmtDate } from "@/lib/fmt-date";
-import { payMethodWord, viewSlip } from "@/lib/payment-display";
+import { atSalePaymentWord, payMethodWord, viewSlip } from "@/lib/payment-display";
 import { useOrderPayments } from "@/lib/queries";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 
@@ -48,30 +48,55 @@ function kindWord(kind: OrderPaymentRow["kind"]): string | null {
   return null;
 }
 
+ fix/ika2/dev-branch
 export default function PaymentLedger({ orderId, savedPayments = [], summaryLoading = false, summaryError = false }: {
   orderId: string | null;
   savedPayments?: SalesOrderTemplateData["payments"];
   summaryLoading?: boolean;
   summaryError?: boolean;
+
+export interface SavedPaymentDetails {
+  paid: number;
+  method?: string | null;
+  months?: number | null;
+  reference?: string | null;
+  slip?: string | null;
+}
+
+export default function PaymentLedger({ orderId, saved }: {
+  orderId: string | null;
+  saved?: SavedPaymentDetails;
+ main
 }) {
   const q = useOrderPayments(orderId);
 
   if (!orderId) return null;
-  if (q.isLoading) return <Loading label="Opening the payments" />;
+  const hasSavedEvidence = Boolean(saved && (saved.paid > 0 || saved.method || saved.reference || saved.slip));
+  const capture = hasSavedEvidence && saved ? (
+    <div className="mb-3 text-body" data-testid="so-payment-saved">
+      <p className="font-medium">Payment details recorded at sale</p>
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+        <dt>Method</dt><dd data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</dd>
+        <dt>Reference</dt><dd className="break-words font-mono text-meta">{saved.reference || "Not recorded"}</dd>
+        <dt>Slip</dt><dd>{saved.slip ? (
+          <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
+            className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
+        ) : "Not recorded"}</dd>
+      </dl>
+    </div>
+  ) : null;
+  if (q.isLoading || q.isPending) return <>{capture}<Loading label="Opening the payments" /></>;
 
-  /* A LEDGER THE READER MAY NOT SEE IS NOT AN EMPTY LEDGER. The route answers
-     403 to anyone who is not operation/principal, and printing "No payments"
-     at a salesperson would state, as a fact, that a customer has paid nothing.
-     Absence is not zero. */
+  // Saved order evidence remains visible when the separate transaction read fails.
   if (q.isError) {
     const forbidden = (q.error as { status?: number } | null)?.status === 403;
-    return (
+    return <>{capture}
       <p className="text-meta text-base-500" data-testid="so-payments-unreadable">
         {forbidden
           ? "Payments are not available to your role — open the order in Payments."
           : "The payments could not be opened."}
       </p>
-    );
+    </>;
   }
 
   const ledger = q.data?.payments ?? [];
@@ -86,16 +111,21 @@ export default function PaymentLedger({ orderId, savedPayments = [], summaryLoad
     ? ledger.map((payment) => ({ payment, summary: null }))
     : savedPayments.map((summary) => ({ payment: null, summary }));
   if (rows.length === 0) {
-    return (
-      <div data-testid="so-payments-empty">
-        <EmptyState title="No payment has been recorded on this order" />
-      </div>
-    );
+    if (saved && (saved.paid > 0 || saved.reference || saved.slip)) {
+      return <>{capture}<p className="text-meta text-base-600">
+        {saved.paid > 0
+          ? "The order records a paid amount. Individual payment transactions are not available."
+          : "Payment evidence is saved, but the recorded paid amount is zero. Check this order in Payments."}
+      </p></>;
+    }
+    return <>{capture}<div data-testid="so-payments-empty">
+      <EmptyState title="No payment transactions to show" />
+    </div></>;
   }
 
   return (
     /* The page never scrolls sideways; a narrow container scrolls THIS box. */
-    <div className="overflow-x-auto">
+    <>{capture}<div className="overflow-x-auto">
       <table className="w-full text-body" data-testid="so-payments">
         <thead>
           <tr className="text-label text-base-500">
@@ -155,6 +185,6 @@ export default function PaymentLedger({ orderId, savedPayments = [], summaryLoad
           })}
         </tbody>
       </table>
-    </div>
+    </div></>
   );
 }
