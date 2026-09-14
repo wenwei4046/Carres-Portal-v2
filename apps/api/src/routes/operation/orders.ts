@@ -45,6 +45,7 @@ import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
+import { resolveSkuLabels } from "../../lib/sku-labels";
 import { chunk } from "../../lib/purchase-demand-read";
 import type { AppEnv } from "../../types";
 
@@ -168,27 +169,9 @@ function actorKindOf(
  * name to find, so the caller falls back to that text: it is what the
  * salesperson actually wrote on the order.
  */
-async function resolveSkuLabels(
-  sb: ReturnType<typeof userClient>,
-  skus: readonly (string | null | undefined)[],
-): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  const wanted = [...new Set(skus.filter((s): s is string => !!s))];
-  if (wanted.length === 0) return out;
-  const { data, error } = await sb
-    .from("product_skus")
-    .select("sku, variant, product_models(name)")
-    .in("sku", wanted);
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const r of (data ?? []) as any[]) {
-    const label = [r.product_models?.name ?? "", r.variant ?? ""]
-      .filter(Boolean)
-      .join(" · ");
-    if (label) out[r.sku] = label;
-  }
-  return out;
-}
+// `resolveSkuLabels` moved to `../../lib/sku-labels.ts` (0493, 2026-09-13):
+// Receiving prints the same `Model · Variant` name, and Law D allows exactly
+// one implementation of it.
 
 // ----- GET / list -----
 operationOrdersRouter.get("/", requireOperation, async (c) => {

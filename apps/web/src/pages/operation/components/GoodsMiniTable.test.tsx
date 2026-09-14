@@ -311,3 +311,48 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     expect(screen.queryByText("never printed")).not.toBeInTheDocument();
   });
 });
+
+
+/**
+ * THE RECEIVING LAYOUT (owner instruction 2026-09-13) — the GRN Register's
+ * expansion: `Item · Received · Damaged · Wrong Item · Extra`, no SKU column,
+ * a zero exception quiet and door-less, an extra line with no `Received`.
+ */
+describe("the receiving layout", () => {
+  it("prints exactly Item · Received · Damaged · Wrong Item · Extra — no SKU, Category, Unit ID or Deliver To", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on GRN-1"
+        receivingLayout
+        lines={[
+          goodsLine({ item: "Jager · Super Single", itemDetail: "Gap 5\"", received: 1, damaged: 1, wrongItem: 0, extra: 0, damagedNode: <button type="button">Photos 1</button> }),
+          goodsLine({ key: "x1", sku: "PILLOW-X", item: "PILLOW-X", received: undefined, damaged: 0, wrongItem: 0, extra: 2, extraNode: <button type="button">Videos 0</button> }),
+        ]}
+      />,
+    );
+    const table = screen.getByRole("table", { name: "Goods on GRN-1" });
+    expect(within(table).getAllByRole("columnheader").map((c) => c.textContent)).toEqual([
+      "Item",
+      "Received",
+      "Damaged",
+      "Wrong Item",
+      "Extra",
+    ]);
+    expect(within(table).queryByText("B1201S-K")).not.toBeInTheDocument();
+    expect(within(table).getByText("Jager · Super Single")).toBeInTheDocument();
+    expect(within(table).getByText("Gap 5\"")).toBeInTheDocument();
+    // A positive exception carries the page's door; a zero one offers nothing.
+    expect(within(table).getByRole("button", { name: "Photos 1" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "Videos 0" })).toBeInTheDocument();
+    expect(within(table).getAllByRole("button")).toHaveLength(2);
+    // An extra line was never ordered — its Received cell is an absence.
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(within(rows[1]!).getAllByRole("cell")[1]).toHaveTextContent("—");
+  });
+
+  it("fixes every column but Item", () => {
+    const { container } = render(<GoodsMiniTable label="G" receivingLayout lines={[goodsLine({ received: 1 })]} />);
+    const cols = Array.from(container.querySelectorAll("colgroup col")).map((c) => (c as HTMLElement).style.width);
+    expect(cols).toEqual(["", "96px", "172px", "172px", "172px"]);
+  });
+});

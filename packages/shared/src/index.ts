@@ -1194,6 +1194,17 @@ export {
   type ReceivingExtraLine,
   type ReceivingSummary,
   type ReceivingWorkSource,
+  // 2026-09-13 owner instruction — the GRN Register redesign: the goods' name
+  // ladder, the exception facts and the GRN Date arithmetic, one copy each.
+  grnLineName,
+  grnExceptionFacts,
+  grnExceptionSummary,
+  grnDateOf,
+  GRN_EXCEPTION_WORD,
+  type GrnLineNameSource,
+  type GrnExceptionType,
+  type GrnMediaKind,
+  type GrnExceptionFact,
 } from "./warehouse-receipt";
 // 2026-09-06 owner correction (Receiving page) — server-side GRN Register
 // pagination/facets and the rail Calendar's expected-arrival markers, one

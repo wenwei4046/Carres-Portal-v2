@@ -162,6 +162,25 @@ const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width
  */
 const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 
+/**
+ * ⭐ THE RECEIVING LAYOUT — owner instruction 2026-09-13 (GRN Register).
+ *
+ * The GRN Register's expansion answers ONE question: what THIS receipt counted
+ * on each of its lines — `Item · Received · Damaged · Wrong Item · Extra`.
+ * There is no separate SKU column and no SKU repeated under a resolved name:
+ * `Item` carries the goods' full name (`grnLineName`) with its configuration.
+ * `Received` is the good count only — damaged, wrong and extra never sit
+ * inside it. Each exception cell prints its number and, only when that number
+ * is positive, the page's own Photos / Videos doors (`damagedNode` …). Law ①
+ * holds: `Item` is the one flexible column, every other width is fixed.
+ * Sales Orders, Delivery, SO Batch and Manual Purchase pass nothing and
+ * render byte-identically.
+ */
+const RECEIVED_COLUMN = { key: "received", label: "Received", width: 96 } as const;
+const DAMAGED_COLUMN = { key: "damaged", label: "Damaged", width: 172 } as const;
+const WRONG_ITEM_COLUMN = { key: "wrongItem", label: "Wrong Item", width: 172 } as const;
+const EXTRA_COLUMN = { key: "extra", label: "Extra", width: 172 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -238,6 +257,15 @@ export interface GoodsMiniLine {
   item: string;
   /** The configuration facts that identify the exact goods, already joined. */
   itemDetail?: string;
+  /** Receiving layout (2026-09-13): the five counts this receipt recorded on
+   *  the line, and the page's evidence doors for a POSITIVE exception. */
+  received?: number;
+  damaged?: number;
+  wrongItem?: number;
+  extra?: number;
+  damagedNode?: ReactNode;
+  wrongItemNode?: ReactNode;
+  extraNode?: ReactNode;
   /**
    * FALSE = nothing can be bought for this line (a Service). It prints `—` in
    * the ☑ cell and select-all skips it. Ignored when the page passes no
@@ -336,6 +364,7 @@ export default function GoodsMiniTable({
   showPoDeliveryDate = false,
   showPoNo = false,
   showUnitId = true,
+  receivingLayout = false,
   onPoClick,
   onOpenPoDetails,
 }: {
@@ -409,6 +438,9 @@ export default function GoodsMiniTable({
    * MASTER rather than fake a read.
    */
   showUnitId?: boolean;
+  /** The GRN Register's expansion: `Item · Received · Damaged · Wrong Item ·
+   *  Extra` — no SKU column (2026-09-13). */
+  receivingLayout?: boolean;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
@@ -442,8 +474,14 @@ export default function GoodsMiniTable({
     fromStock: { ...FROM_STOCK_COLUMN },
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
+    received: { ...RECEIVED_COLUMN },
+    damaged: { ...DAMAGED_COLUMN },
+    wrongItem: { ...WRONG_ITEM_COLUMN },
+    extra: { ...EXTRA_COLUMN },
   };
-  const order = salesOrderLayout
+  const order = receivingLayout
+    ? ["item", "received", "damaged", "wrongItem", "extra"]
+    : salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
@@ -458,8 +496,19 @@ export default function GoodsMiniTable({
     toBuy: showToBuy,
   };
   const columns: Column[] = order
-    .filter((key) => asked[key] ?? true)
+    .filter((key) => receivingLayout || (asked[key] ?? true))
     .map((key) => REGISTRY[key]!);
+  /** A count cell: the number, then the page's evidence doors — only for a
+   *  positive number; a zero prints quietly and offers nothing. */
+  const countCell = (n: number | undefined, node: ReactNode) =>
+    !n || n <= 0 ? (
+      <Absence>0</Absence>
+    ) : (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className="tabular-nums font-medium">{n}</span>
+        {node}
+      </span>
+    );
   /** A PO number is a DOOR only where the page can open one. */
   const poLink = (poId: string) =>
     onPoClick ? (
@@ -569,6 +618,20 @@ export default function GoodsMiniTable({
                   );
                 case "qty":
                   return <span className="tabular-nums">{line.qty}</span>;
+                case "received":
+                  /* An EXTRA line was never ordered, so it has no `Received`
+                     count — the cell stays an absence, never a `0`. */
+                  return line.received == null ? (
+                    <Absence>—</Absence>
+                  ) : (
+                    <span className="tabular-nums">{line.received}</span>
+                  );
+                case "damaged":
+                  return countCell(line.damaged, line.damagedNode);
+                case "wrongItem":
+                  return countCell(line.wrongItem, line.wrongItemNode);
+                case "extra":
+                  return countCell(line.extra, line.extraNode);
                 case "fromStock":
                   return !line.fromStock ? (
                     <Absence>—</Absence>

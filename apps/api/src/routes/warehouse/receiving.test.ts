@@ -192,7 +192,9 @@ describe("POST /api/warehouse/receipts", () => {
           wrong_item_qty: 0,
           wrong_item_claim_type: null,
           damaged_photos: [],
+          damaged_videos: [],
           wrong_item_photos: [],
+          wrong_item_videos: [],
           units: [],
         },
       ],
@@ -241,8 +243,10 @@ describe("POST /api/warehouse/receipts", () => {
       { path: "PO-1001/arrival-1.jpg", kind: "photo" },
       { path: "PO-1001/arrival-2.mp4", kind: "video" },
     ]);
+    // 0493 — an extra line carries its identity and its own evidence to the
+    // RPC; absent, they degrade to null / [] so the validator stamps the id.
     expect(args.p_extra_lines).toEqual([
-      { sku: "EXTRA-SKU", qty: 2, note: "not on the PO" },
+      { id: null, sku: "EXTRA-SKU", qty: 2, note: "not on the PO", photos: [], videos: [] },
     ]);
     // camelCase in, snake_case out — and a missing issueKind/note becomes
     // null, never undefined (jsonb drops undefined keys silently).

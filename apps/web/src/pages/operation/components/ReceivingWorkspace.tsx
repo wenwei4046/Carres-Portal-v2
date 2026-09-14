@@ -26,6 +26,7 @@ import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
+import { ExceptionEvidencePicker, type AmendLineEvidenceEntry } from "./ReceivingRecord";
 
 /**
  * ReceivingWorkspace — the pre-start Receiving object and the active Session
@@ -69,8 +70,12 @@ interface Count {
   damagedQty: number;
   wrongItemQty: number;
   damagedPhotos: string[];
+  /** 0493 — Damaged Videos beside the required photo. */
+  damagedVideos: string[];
   wrongItemClaimType: string;
   wrongItemPhotos: string[];
+  /** 0493 — Wrong Item Videos beside the required photo. */
+  wrongItemVideos: string[];
 }
 
 const EMPTY_COUNT: Count = {
@@ -78,9 +83,19 @@ const EMPTY_COUNT: Count = {
   damagedQty: 0,
   wrongItemQty: 0,
   damagedPhotos: [],
+  damagedVideos: [],
   wrongItemClaimType: "",
   wrongItemPhotos: [],
+  wrongItemVideos: [],
 };
+
+/** An extra line as the Session holds it — with the identity it will keep
+ *  forever (0493), so its evidence can be attached BEFORE Save. */
+interface ExtraDraft extends ReceivingExtraLine {
+  id: string;
+  photos: string[];
+  videos: string[];
+}
 
 interface UnitState {
   outcome: ReceivingUnitOutcome;
@@ -459,7 +474,7 @@ function ReceivingMode({
   const [arrivalEvidence, setArrivalEvidence] = useState<
     ReceivingArrivalEvidence[]
   >([]);
-  const [extraLines, setExtraLines] = useState<ReceivingExtraLine[]>([]);
+  const [extraLines, setExtraLines] = useState<ExtraDraft[]>([]);
   /** ONE key per Session entry — the idempotency contract (0426): a retried
    *  uncertain Save returns the first posting, never a second GRN. */
   const [saveKey] = useState(() => crypto.randomUUID());
@@ -537,8 +552,10 @@ function ReceivingMode({
       damagedQty,
       wrongItemQty,
       damagedPhotos: c.damagedPhotos,
+      damagedVideos: c.damagedVideos,
       wrongItemClaimType: c.wrongItemClaimType,
       wrongItemPhotos: c.wrongItemPhotos,
+      wrongItemVideos: c.wrongItemVideos,
     };
   });
 
@@ -608,7 +625,14 @@ function ReceivingMode({
         .length
         ? extraLines
             .filter((x) => x.sku.trim() !== "" && x.qty > 0)
-            .map((x) => ({ sku: x.sku.trim(), qty: x.qty, note: x.note ?? undefined }))
+            .map((x) => ({
+              id: x.id,
+              sku: x.sku.trim(),
+              qty: x.qty,
+              note: x.note ?? undefined,
+              photos: x.photos.length ? x.photos : undefined,
+              videos: x.videos.length ? x.videos : undefined,
+            }))
         : undefined,
       saveKey,
       lines: lineViews
@@ -618,9 +642,13 @@ function ReceivingMode({
           damagedQty: v.damagedQty || undefined,
           wrongItemQty: v.wrongItemQty || undefined,
           damagedPhotos: v.damagedPhotos.length ? v.damagedPhotos : undefined,
+          damagedVideos: v.damagedVideos.length ? v.damagedVideos : undefined,
           wrongItemClaimType: v.wrongItemClaimType || undefined,
           wrongItemPhotos: v.wrongItemPhotos.length
             ? v.wrongItemPhotos
+            : undefined,
+          wrongItemVideos: v.wrongItemVideos.length
+            ? v.wrongItemVideos
             : undefined,
           units: v.units.length
             ? v.units.map((u) => {
@@ -903,6 +931,17 @@ function ReceivingMode({
                     label={`Damage photo — ${l.sku}`}
                     testId={`damaged-photos-${l.id}`}
                   />
+                  {/* 0493 — Damaged Videos, optional, beside the required photo. */}
+                  <ExceptionEvidencePicker
+                    poId={po.id}
+                    doNumber={doNumber}
+                    lineKey={l.id}
+                    exceptionType="damaged"
+                    entries={c.damagedVideos.map((path): AmendLineEvidenceEntry => ({ lineKey: l.id, exceptionType: "damaged", kind: "video", path }))}
+                    onChange={(entries) => setCount(l.id, { damagedVideos: entries.filter((e) => e.kind === "video").map((e) => e.path) })}
+                    label={`Damage video (optional) — ${l.sku}`}
+                    testId={`damaged-videos-${l.id}`}
+                  />
                 </div>
               )}
               {v.wrongItemQty > 0 && (
@@ -938,6 +977,17 @@ function ReceivingMode({
                     label={`Wrong-item photo — ${l.sku}`}
                     testId={`wrong-photos-${l.id}`}
                   />
+                  {/* 0493 — Wrong Item Videos, optional, beside the required photo. */}
+                  <ExceptionEvidencePicker
+                    poId={po.id}
+                    doNumber={doNumber}
+                    lineKey={l.id}
+                    exceptionType="wrong_item"
+                    entries={c.wrongItemVideos.map((path): AmendLineEvidenceEntry => ({ lineKey: l.id, exceptionType: "wrong_item", kind: "video", path }))}
+                    onChange={(entries) => setCount(l.id, { wrongItemVideos: entries.filter((e) => e.kind === "video").map((e) => e.path) })}
+                    label={`Wrong-item video (optional) — ${l.sku}`}
+                    testId={`wrong-videos-${l.id}`}
+                  />
                 </div>
               )}
             </div>
@@ -954,7 +1004,7 @@ function ReceivingMode({
           extra goods never enter Inventory.
         </p>
         {extraLines.map((x, i) => (
-          <div key={i} className="mt-1 flex items-center gap-2" data-testid={`extra-line-${i}`}>
+          <div key={x.id} className="mt-1 flex flex-wrap items-center gap-2" data-testid={`extra-line-${i}`}>
             <input
               type="text"
               value={x.sku}
@@ -988,11 +1038,44 @@ function ReceivingMode({
             >
               Remove
             </button>
+            {/* 0493 — Extra Photos / Extra Videos, attached to THIS extra
+                line's own identity; only once the line names goods. */}
+            {x.sku.trim() !== "" && x.qty > 0 ? (
+              <div className="basis-full pl-2 border-l-2 border-kit-amber-11">
+                <ExceptionEvidencePicker
+                  poId={po.id}
+                  doNumber={doNumber}
+                  lineKey={x.id}
+                  exceptionType="extra"
+                  entries={[
+                    ...x.photos.map((path): AmendLineEvidenceEntry => ({ lineKey: x.id, exceptionType: "extra", kind: "photo", path })),
+                    ...x.videos.map((path): AmendLineEvidenceEntry => ({ lineKey: x.id, exceptionType: "extra", kind: "video", path })),
+                  ]}
+                  onChange={(entries) =>
+                    setExtraLines((xs) =>
+                      xs.map((y, j) =>
+                        j === i
+                          ? {
+                              ...y,
+                              photos: entries.filter((e) => e.kind === "photo").map((e) => e.path),
+                              videos: entries.filter((e) => e.kind === "video").map((e) => e.path),
+                            }
+                          : y,
+                      ),
+                    )
+                  }
+                  label={`Extra goods photo or video (optional) — ${x.sku.trim()}`}
+                  testId={`extra-evidence-${i}`}
+                />
+              </div>
+            ) : null}
           </div>
         ))}
         <button
           type="button"
-          onClick={() => setExtraLines((xs) => [...xs, { sku: "", qty: 1 }])}
+          onClick={() =>
+            setExtraLines((xs) => [...xs, { id: crypto.randomUUID(), sku: "", qty: 1, photos: [], videos: [] }])
+          }
           data-testid="add-extra-line"
           className="mt-1 text-body text-kit-blue-11 hover:underline"
         >

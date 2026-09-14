@@ -72,11 +72,11 @@ export type WarehouseReceiptStatus =
  *  for — "Pending" would leave a warehouse clerk wondering whether they still
  *  have something to do (they do not).
  *
- *  DOCUMENT STATUS WORDS (owner correction 2026-09-06): a GRN on the Register
- *  is `Valid` or `Cancelled` — clear document words, the same pair every
- *  formal document speaks. `Posted` / `Voided` remain internal database
- *  statuses and never reach a normal user's screen; `Void Receiving` stays
- *  the ACT's name (a door, not a status). */
+ *  DOCUMENT STATUS WORDS (owner instruction 2026-09-13, superseding the
+ *  2026-09-06 `Valid`): a GRN on the Register is `Confirmed` or `Cancelled` —
+ *  the document words, mapped onto the EXISTING internal states (`posted` /
+ *  `voided`), which never reach a normal user's screen. No new workflow state
+ *  was invented; `Void Receiving` stays the ACT's name (a door, not a status). */
 export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   WarehouseReceiptStatus,
   string
@@ -84,7 +84,7 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   draft: "Not sent yet",
   submitted: "Waiting Carres check",
   returned: "Sent back to recount",
-  posted: "Valid",
+  posted: "Confirmed",
   voided: "Cancelled",
 };
 
@@ -231,6 +231,13 @@ export interface WarehouseReceiptLine {
   wrong_item_claim_type: string | null;
   damaged_photos?: unknown[];
   wrong_item_photos?: unknown[];
+  /** 0493 — damaged / wrong-item VIDEOS beside the required photos. */
+  damaged_videos?: unknown[];
+  wrong_item_videos?: unknown[];
+  /** 0493 — the goods' full name (`Model · Variant`) SNAPSHOTTED at posting.
+   *  Absent on GRNs posted before 0493 — the reader then falls back to the
+   *  current catalog and says so (`grnLineName`). */
+  item_label?: string | null;
 }
 
 export interface WarehouseReceiptTotals {
@@ -474,9 +481,15 @@ export interface ReceivingArrivalEvidence {
 /** Extra goods are recorded separately: they never enter Inventory and never
  *  alter ordered/pending arithmetic (owner instruction §6). */
 export interface ReceivingExtraLine {
+  /** 0493 — the extra line's own stable identity (a uuid), minted by the
+   *  extras validator and kept forever; absent on pre-0493 records. */
+  id?: string | null;
   sku: string;
   qty: number;
   note?: string | null;
+  /** 0493 — evidence attached to THIS extra line. */
+  photos?: string[];
+  videos?: string[];
 }
 
 export function receivingExtraQty(
@@ -733,4 +746,111 @@ export function receivingWorkItems(
     });
   }
   return out;
+}
+
+// ── 0493 · the goods' name, and the exception facts ─────────────────────────
+
+/**
+ * WHAT ONE GRN LINE IS CALLED — the ONE ladder every Receiving surface reads
+ * (Register expansion · GRN object · GRN paper · search), owner instruction
+ * 2026-09-13.
+ *
+ *   1. `item_label`   — the name SNAPSHOTTED with the receipt at posting
+ *                        (0493: `Model · Variant` from the catalog that day).
+ *                        Historical truth; never re-resolved.
+ *   2. `catalogLabel` — the CURRENT catalog's `Model · Variant` for the SKU
+ *                        (`resolveGoodsFullNames`), for GRNs posted before 0493.
+ *                        A fallback, and the reader is told so.
+ *   3. the SKU        — nothing else is known; never a fabricated name and
+ *                        never the variant alone (`Super Single` names a size,
+ *                        not goods).
+ */
+export type GrnLineNameSource = "snapshot" | "catalog" | "sku";
+
+export function grnLineName(line: {
+  sku: string;
+  item_label?: string | null;
+  catalogLabel?: string | null;
+}): { name: string; source: GrnLineNameSource } {
+  const snap = (line.item_label ?? "").trim();
+  if (snap) return { name: snap, source: "snapshot" };
+  const cat = (line.catalogLabel ?? "").trim();
+  if (cat) return { name: cat, source: "catalog" };
+  return { name: line.sku, source: "sku" };
+}
+
+export type GrnExceptionType = "damaged" | "wrong_item" | "extra";
+export type GrnMediaKind = "photo" | "video";
+
+export const GRN_EXCEPTION_WORD: Record<GrnExceptionType, string> = {
+  damaged: "Damaged",
+  wrong_item: "Wrong Item",
+  extra: "Extra",
+};
+
+/** One exception fact: which line, which kind of exception, how many. Only
+ *  POSITIVE quantities exist here — a zero exception is not a fact and never
+ *  earns an evidence action (owner instruction 2026-09-13 §6). */
+export interface GrnExceptionFact {
+  type: GrnExceptionType;
+  /** The PO line id (damaged / wrong item) or the extra line's id. */
+  lineKey: string;
+  /** The line's SKU — the words are the caller's (`grnLineName`). */
+  sku: string;
+  qty: number;
+}
+
+/**
+ * The exceptions ONE receipt records, in reading order: damaged, then wrong
+ * item, then extra — each line named by its stable key. An extra line from
+ * before 0493 has no identity, so it is listed with `lineKey` = `""` and the
+ * caller must not offer it an evidence door (nothing could be scoped to it).
+ */
+export function grnExceptionFacts(
+  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  extras: readonly ReceivingExtraLine[] | null | undefined,
+): GrnExceptionFact[] {
+  const out: GrnExceptionFact[] = [];
+  for (const l of lines ?? []) {
+    const d = Math.max(0, num(l.damaged_qty));
+    if (d > 0) out.push({ type: "damaged", lineKey: l.id, sku: l.sku, qty: d });
+  }
+  for (const l of lines ?? []) {
+    const w = Math.max(0, num(l.wrong_item_qty));
+    if (w > 0) out.push({ type: "wrong_item", lineKey: l.id, sku: l.sku, qty: w });
+  }
+  for (const x of extras ?? []) {
+    const q = Math.max(0, num(x.qty));
+    if (q > 0) out.push({ type: "extra", lineKey: (x.id ?? "").trim(), sku: x.sku, qty: q });
+  }
+  return out;
+}
+
+/**
+ * The Register's `Exceptions` summary — `1 damaged · 2 wrong item · 1 extra`
+ * over the whole receipt, or `""` when the receipt recorded none (the cell then
+ * prints the governed absence, never a `0`).
+ */
+export function grnExceptionSummary(facts: readonly GrnExceptionFact[]): string {
+  const totals: Record<GrnExceptionType, number> = { damaged: 0, wrong_item: 0, extra: 0 };
+  for (const f of facts) totals[f.type] += f.qty;
+  const bits: string[] = [];
+  if (totals.damaged > 0) bits.push(`${totals.damaged} damaged`);
+  if (totals.wrong_item > 0) bits.push(`${totals.wrong_item} wrong item`);
+  if (totals.extra > 0) bits.push(`${totals.extra} extra`);
+  return bits.join(" · ");
+}
+
+/**
+ * `GRN Date` — the date the GRN DOCUMENT came into being. Purchasing MASTER
+ * §7.3: the formal `GRN-…` exists FROM the posted session, so its date is the
+ * posting's own stamp read in the business timezone (MYT). It is not derived
+ * from the number, and it is not `Goods received on` (the physical arrival
+ * date), which stays its own fact. Null while nothing has been posted.
+ */
+export function grnDateOf(postedAt: string | null | undefined): string | null {
+  if (!postedAt) return null;
+  const t = new Date(postedAt);
+  if (Number.isNaN(t.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(t);
 }

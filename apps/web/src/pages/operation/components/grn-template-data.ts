@@ -14,6 +14,7 @@
 import {
   countedOnLine,
   goodsCategoryWordOf,
+  grnLineName,
   receivingDisplayNo,
   RECEIVING_AUTHORITY_LABEL,
   RECEIVING_UNIT_OUTCOME_LABEL,
@@ -70,9 +71,17 @@ export function grnTemplateDataOf(
     const delta = receivedNow - l.received_now;
     const orderQty = pl?.qty ?? 0;
     const cumulativeReceived = (pl?.received_qty ?? 0) + delta;
+    /* The paper prints the goods' FULL name through the ONE ladder: the
+       posting-time snapshot first, then the current catalog's full name,
+       then the older variant-only description, then the SKU. */
+    const named = grnLineName({
+      sku: l.sku,
+      item_label: l.item_label,
+      catalogLabel: info[l.sku]?.label ?? info[l.sku]?.description ?? null,
+    });
     return {
       sku: l.sku,
-      description: info[l.sku]?.description ?? l.sku,
+      description: named.name,
       // Server-resolved word first; the same shared ladder covers version
       // skew (an older Worker sends no line_info).
       category: info[l.sku]?.category ?? goodsCategoryWordOf({ sku: l.sku }),

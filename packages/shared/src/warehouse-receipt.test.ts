@@ -270,11 +270,12 @@ describe("warehouseReceiptTotals / summary", () => {
 describe("status words", () => {
   it("names WHO a submitted receipt is waiting for", () => {
     expect(WAREHOUSE_RECEIPT_STATUS_LABEL.submitted).toBe("Waiting Carres check");
-    // Owner correction 2026-09-06: a GRN's DOCUMENT status words are
-    // `Valid` / `Cancelled` — `Posted` / `Voided` stay internal database
-    // statuses and never reach a normal user's screen. `Void Receiving`
+    // Owner instruction 2026-09-13 (superseding the 2026-09-06 `Valid`): a
+    // GRN's DOCUMENT status words are `Confirmed` / `Cancelled`, mapped onto
+    // the EXISTING internal states — `Posted` / `Voided` never reach a normal
+    // user's screen and no new workflow state exists. `Void Receiving`
     // remains the ACT's name (a door, not a status).
-    expect(warehouseReceiptStatusLabel("posted")).toBe("Valid");
+    expect(warehouseReceiptStatusLabel("posted")).toBe("Confirmed");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
     expect(warehouseReceiptStatusLabel("voided")).toBe("Cancelled");
     // An unknown key echoes rather than inventing a word.

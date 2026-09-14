@@ -678,3 +678,43 @@ select public.workspace_resolve_duty('purchasing_approver');
 `ops_manager` fallback is still carrying the approval.
 
 - `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
+
+
+## `receiving-grn-redesign-owner-review` — OWNER REVIEW OWED, opened 2026-09-13
+
+**🟡 The GRN Register redesign (owner instruction 2026-09-13) is BUILT on
+`build/receiving-grn-redesign` and is NOT merged, NOT deployed, and migration `0493` is NOT
+applied — the instruction authorised implementation and non-production verification only.**
+`docs/cards/CARD-2026-09-13-receiving-02-grn-register-redesign.md` carries the delivery matrix,
+the screenshots and every `NOT VERIFIED` row. What the owner is asked to rule on:
+
+0. **Second pass (same day):** draft PR #1274 is open. The instruction's attachments
+   (`receiving-proposal.html`, `CLAUDE-HANDOFF.md`) did NOT reach the build machine, so the
+   blueprint difference table is still owed. The page was walked INSIDE the real Portal shell (a
+   frame defect found and fixed), `0493` replayed on the full chain, and the duplicate-Unit,
+   void-blocker, duty-gate and concurrency paths were proven on a real multi-connection PostgreSQL
+   (`apps/api/src/test/receiving-postgres.integration.test.ts`). The Storage round-trips remain NOT
+   VERIFIED for want of a non-production Supabase project; the runnable test names its
+   prerequisites (`receiving-evidence-storage.integration.test.ts`).
+1. **Design refinements shown in the build, PENDING ACCEPTANCE (13 September review, not owner
+   decisions):** the overdue word and red count on a confirmed date already behind today · the
+   per-month sentence `No supplier arrivals expected in {Month YYYY}` · the count unit `expected
+   supplier arrival(s)` · the two-month display scrolling WITH the filters instead of sitting
+   fixed above them.
+2. **New screen words registered in COPY-STANDARD with the build** (the 2026-09-13 table) —
+   accept or strike.
+3. **Apply / merge / deploy of `0493`** — a governed production apply after the rolled-back probe;
+   re-measure the migration number before push.
+
+**`NOT VERIFIED` in this build (named, not hidden):** the six upload → save → close → reopen →
+view/play round-trips against a NON-production Storage + database (this machine has no local
+PostgreSQL, Docker or Supabase CLI, and the instruction forbids creating further production
+records — the SQL side is proven on PGlite, the viewer states on fixtures, the storage round-trip
+is not) · interleaved multi-connection concurrency of evidence appends (PGlite is one
+connection; the append is a plain INSERT under a unique key, which is the structural claim) ·
+the destination header inside the real portal shell (the dev preview draws the page without the
+shell; the header's 50px is asserted by `ModuleHeader`'s own class).
+
+**Falsifier / how to close this:** the owner's review rulings recorded in `purchasing/MASTER.md`
+§9.4, the branch merged, `0493` applied through the governed path and the six evidence
+round-trips walked on the deployed page with real files.

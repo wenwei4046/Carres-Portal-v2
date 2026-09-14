@@ -1157,6 +1157,20 @@ repeated as a `WORK TO DO` rail row. **Today is a ring and the selected date is 
 the two never compete, and the current work week carries a subtle band** — a marker that marks a
 day by shape and position, never by colour alone.
 
+**RECEIVING GRN REGISTER — BUILD 2026-09-13 (owner review pending; UI MASTER §6.7 grammar
+applied, no new visual language).** Three OPTIONAL kit powers joined with it, each byte-identical
+for every existing caller when not asked for: (1) `MonthCalendar` gained `months` (1 | 2) and
+`selectable` (false = a DISPLAY that filters nothing), plus `overdue` markers (word + red ink,
+never ink alone), a per-month `emptyWord` sentence and a THIN OUTLINE for today — the two-month
+expected-arrival display on the Receiving rail is its second use; (2) `GoodsMiniTable` gained
+`receivingLayout` — `Item · Received · Damaged · Wrong Item · Extra`, no SKU column, a positive
+exception cell carrying the page's evidence doors, an extra line's `Received` an absence; (3)
+`DataGrid` gained `hideClearFilters` — the active-condition strip keeps its removable chips and
+loses the one-click `Clear filters` button, for a Register the owner ruled must carry none. The
+Receiving rail opens CLOSED at 768–1129px unless the browser remembers otherwise and keeps its
+240px when opened. The rail calendar there is no longer a fixed header block: the display and the
+facet groups scroll as one column (13 Sep review refinement, pending owner acceptance).
+
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
 to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The
