@@ -1,11 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type {
-  CatalogResponse,
-  ProductCategory,
-  ProductModelDto,
-  ProductSkuDto,
-} from "@carres/shared";
+import type { CatalogResponse } from "@carres/shared";
 import { PRODUCT_CATEGORIES, activeSofaSizes } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -18,6 +13,7 @@ import { SupplierOffersModal } from "../components/SupplierOffers";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
+import { useSkuFilter, type FlatRow } from "./use-sku-filter";
 
 /**
  * Operation Catalog › SKU Master — the shared `product_skus` list.
@@ -70,26 +66,23 @@ const VISIBLE_CAP = 300;
 const GRID_COLS =
   "170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px minmax(150px,1.2fr) 110px 110px 110px 90px";
 
-type CatFilter = ProductCategory | "all";
-
-interface FlatRow {
-  sku: ProductSkuDto;
-  model: ProductModelDto | undefined;
-  category: ProductCategory | undefined;
-  productName: string;
-}
-
 export default function OperationSkuCostTab({ catalog }: { catalog: CatalogResponse }) {
   /* The SAME gate the server applies (0175) — price, PWP and the per-size grid
      are the principal's alone. Operation reads them; the cells never open. */
   const isPrincipal = useAuth((s) => s.role) === "principal";
-  const [category, setCategory] = useState<CatFilter>("all");
-  const [modelFilter, setModelFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const {
+    category,
+    pickCategory,
+    modelFilter,
+    setModelFilter,
+    search,
+    setSearch,
+    supplierFilter,
+    setSupplierFilter,
+    categoryModels,
+    filtered,
+  } = useSkuFilter(catalog);
   const [editMode, setEditMode] = useState(false);
-  /* Aligned with the selling grid (2026-08-26): "all" | "none" (no supplier on
-     the SKU) | a suppliers.id. Matched by FK, never by typed text. */
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   /* Which SKU's supplier offers are open. The PARENT owns it, exactly as
@@ -106,63 +99,6 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
     for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
     return m;
   }, [suppliersQ.data?.suppliers]);
-
-  const modelById = useMemo(() => {
-    const m = new Map<string, ProductModelDto>();
-    for (const model of catalog.models) m.set(model.id, model);
-    return m;
-  }, [catalog.models]);
-
-  const allRows = useMemo<FlatRow[]>(
-    () =>
-      catalog.skus.map((sku) => {
-        const model = modelById.get(sku.modelId);
-        return {
-          sku,
-          model,
-          category: model?.category,
-          productName: model?.name ?? "—",
-        };
-      }),
-    [catalog.skus, modelById],
-  );
-
-  const categoryModels = useMemo(
-    () =>
-      catalog.models
-        .filter((m) => category === "all" || m.category === category)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [catalog.models, category],
-  );
-
-  function pickCategory(next: CatFilter) {
-    setCategory(next);
-    setModelFilter("all");
-  }
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allRows
-      .filter((r) => (category === "all" ? true : r.category === category))
-      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
-      .filter((r) =>
-        supplierFilter === "all"
-          ? true
-          : supplierFilter === "none"
-            ? r.sku.supplierId == null
-            : r.sku.supplierId === supplierFilter,
-      )
-      .filter((r) => {
-        if (!q) return true;
-        return (
-          r.sku.sku.toLowerCase().includes(q) ||
-          (r.sku.description ?? "").toLowerCase().includes(q) ||
-          r.productName.toLowerCase().includes(q) ||
-          r.sku.variant.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search, supplierFilter]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
