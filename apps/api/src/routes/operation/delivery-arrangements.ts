@@ -3,6 +3,7 @@ import {
   assignLogisticsInputSchema,
   deliveryContactInputSchema,
   deliveryWarehouseScheduleEvents,
+  deliveryStopSchema,
   isSundayIso,
   laterThanRequested,
   myHolidaySet,
@@ -12,6 +13,7 @@ import {
   isLogisticsChange,
   type DeliveryContactInput,
   type DeliveryScopeRef,
+  type DeliveryStop,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
@@ -207,10 +209,9 @@ deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
 /**
  * Delivery's read-only Warehouse Schedule feed.
  *
- * This is visibility, never a second Schedule or Work queue. Only whole-order
- * scopes are projected today: Stock's current allocation read binds exact
- * Units to the Sales Order but cannot yet bind one Unit to one split-trip DO,
- * so a leg projection would be invented truth.
+ * This is visibility, never a second Schedule or Work queue. Documented legs
+ * use their recorded route and exact DO scope; later carrier handovers do not
+ * become work for the Unit's original Warehouse.
  */
 deliveryArrangementsRouter.get(
   "/warehouse-schedule",
@@ -254,7 +255,7 @@ deliveryArrangementsRouter.get(
       sb
         .from("orders")
         .select(
-          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
+          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at, delivery_stops",
         )
         .in("id", orderIds),
       sb
@@ -277,6 +278,7 @@ deliveryArrangementsRouter.get(
       pod_signature_url: string | null;
       placed_at: string | null;
       created_at: string | null;
+      delivery_stops?: unknown;
     };
     type DeliveryOrderFact = {
       id: string;
@@ -294,6 +296,17 @@ deliveryArrangementsRouter.get(
     ).filter((row) => !row.voided_at);
     const doIds = deliveryOrders.map((row) => row.id);
     if (doIds.length === 0) return c.json({ events: [] });
+
+    const stopsByOrder = new Map<string, DeliveryStop[]>();
+    for (const document of deliveryOrders) {
+      if (!(document.leg && document.leg > 0)) continue;
+      const order = orderById.get(document.order_id);
+      const parsed = deliveryStopSchema.array().safeParse(order?.delivery_stops);
+      if (!parsed.success || parsed.data.filter((stop) => stop.leg === document.leg).length !== 1) {
+        return c.json({ error: "Warehouse route source could not be read" }, 503);
+      }
+      stopsByOrder.set(document.order_id, parsed.data);
+    }
 
     /* The DO's required exact Units come from the ONE recorded scope (0424,
        delivery_order_units) — never re-derived from reservation refs here.
@@ -439,6 +452,11 @@ deliveryArrangementsRouter.get(
     const events = arrangements.flatMap((arrangement) => {
       const order = orderById.get(arrangement.order_id);
       if (!order) return [];
+      // 0497: leg 2..n leaves the previous carrier, never the original Site.
+      if (isWarehouse && arrangement.leg > 1) return [];
+      const stops = stopsByOrder.get(order.id) ?? [];
+      const stop = stops.find((row) => row.leg === arrangement.leg);
+      const isIntermediate = Boolean(stop && stops.some((row) => row.leg > stop.leg));
       return deliveryOrders
         .filter(
           (row) =>
@@ -488,11 +506,11 @@ deliveryArrangementsRouter.get(
           orderId: order.id,
           leg: arrangement.leg,
           so: order.so,
-          fromLocation: unit.warehouse_id
+          fromLocation: stop?.from_loc ?? (unit.warehouse_id
             ? warehouseName.get(unit.warehouse_id) ?? "Not recorded"
-            : "Not recorded",
-          warehouseSiteId: unit.warehouse_id,
-          toCustomer: order.customer_address ?? "Not recorded",
+            : "Not recorded"),
+          warehouseSiteId: arrangement.leg > 1 ? null : unit.warehouse_id,
+          toCustomer: stop?.to_loc ?? order.customer_address ?? "Not recorded",
           logisticsPartner: arrangement.partner_name as string,
           driverName: arrangement.driver_name,
           vehicle: arrangement.vehicle,
@@ -501,11 +519,9 @@ deliveryArrangementsRouter.get(
           collectionWindow: arrangement.confirmed_time,
           customerHandoverDate: arrangement.confirmed_date,
           actualCollectionAt: logisticsReceipt?.recorded_at ?? null,
-          actualArrivalAt: order.delivered_at,
+          actualArrivalAt: stop ? stop.delivered_at ?? null : order.delivered_at,
           hasCollectionEvidence: Boolean(logisticsReceipt?.proof_path),
-          hasDeliveryEvidence: Boolean(
-            order.pod_signature_url || order.do_file_path,
-          ),
+          hasDeliveryEvidence: stop ? Boolean(stop.pod_url) : Boolean(order.pod_signature_url || order.do_file_path),
           soDate: (order.placed_at ?? order.created_at)?.slice(0, 10) ?? null,
           sku: unit.sku,
           productName: unit.sku ? productName.get(unit.sku) ?? null : null,
@@ -521,7 +537,7 @@ deliveryArrangementsRouter.get(
             ? recorderName.get(acceptedEvent.recorded_by) ?? null
             : null,
           unitDeliveryPerson: acceptedEvent?.receiver_name ?? null,
-        });
+        }).filter((event) => !isIntermediate || event.kind !== "customer_handover");
           });
         });
     });
