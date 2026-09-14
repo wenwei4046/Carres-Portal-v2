@@ -50,7 +50,12 @@ const LANE = [
   // to production, and to the SUPPLIER's own dashboard, while every rule below
   // was green. A lane list that does not grow with the lane is a lane list
   // that quietly stops being one.
-  "pages/operation/OperationPurchaseOrders.tsx",
+  //
+  // The rules follow the page to `purchase-orders/PurchaseOrdersPage.tsx`
+  // (2026-09-15): `OperationPurchaseOrders.tsx` had become a re-export of it
+  // plus an unrendered legacy copy, so the scan was reading dead code while
+  // the live page went unscanned.
+  "pages/operation/purchase-orders/PurchaseOrdersPage.tsx",
   // Added by P14 (2026-08-04) as `CreatePurchaseDialog.tsx`; the dialog
   // retired on CARD-2026-08-18-manual-purchase and its door moved to the
   // Manual Purchase page — the scan follows the words to their new file for
@@ -239,32 +244,24 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
  * they are not true at all.
  */
 describe("Communication Truthfulness · the PO workspace claims only what it saw", () => {
-  const PO = "pages/operation/OperationPurchaseOrders.tsx";
+  const PO = "pages/operation/purchase-orders/PurchaseOrdersPage.tsx";
 
   it("never claims a send — no `sent via`, no `sent to`", () => {
-    const src = visibleSource(PO);
+    const src = visibleSource(PO)
+      // The ONE knowing exception, named rather than regexed around: the
+      // `Sent to Supplier` column (COPY-STANDARD) prints recorded
+      // `confirmed_sent` evidence, which is an observed fact, not a claim.
+      .replace(/"Sent to Supplier"/g, " ");
     expect(src, "the timeline may not say a message was sent").not.toMatch(/sent via/i);
     expect(src, "the timeline may not name a recipient it never reached").not.toMatch(
       /sent to /i,
     );
   });
 
-  it("says Snapshot, never Revision, to the operator", () => {
-    // `purchase_orders` is never edited by this path (proved 2026-08-03: the
-    // only writer of `po_revisions` is `purchasing_record_send`, and it only
-    // ever SELECTs the PO). Every other tool an operator has used — Git,
-    // Google Docs, Office, any ERP — means "the document changed" by
-    // `Revision`, so the word would keep manufacturing a belief that is false.
-    //
-    // The STORE keeps its names: `po_revisions` and `rev_no` are internal, and
-    // an internal name never defines UI truth (Jess, 2026-08-03). The scan
-    // therefore bans the visible word, not the identifiers.
-    const visibleWord = visibleSource(PO)
-      .replace(/po_revisions/g, " ")
-      .replace(/rev_no/g, " ");
-    expect(visibleWord, "the operator must read Snapshot").not.toMatch(/Revision/);
-    expect(visibleSource(PO)).toMatch(/· Snapshot \{/);
-  });
+  // "Says Snapshot, never Revision" is retired here, not moved. It banned
+  // `Revision` for the send-snapshot timeline, which the live page does not
+  // draw. The live page's `Revisions` view is the PO document changing, which
+  // COPY-STANDARD's 2026-09-06 correction card rules in by name.
 
   /**
    * ⭐ THE DOORS MOVED INTO THE ONE COMMUNICATION AREA
@@ -307,7 +304,7 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
       );
     }
     // It still supplies the supplier's real doors, because it knows the supplier.
-    expect(src).toMatch(/doors=\{\{ whatsapp: wa, mailto, message: text/);
+    expect(src).toMatch(/doors=\{doorsForIssuedPo\(/);
   });
 
   it("hands over a PDF, never the payload behind it", () => {

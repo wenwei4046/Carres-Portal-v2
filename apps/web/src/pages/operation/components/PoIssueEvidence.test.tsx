@@ -243,26 +243,34 @@ describe("both surfaces use THIS component — one law, not two", () => {
     expect(src).toContain("PoIssueEvidence");
   });
 
+  // The live Purchase Order page. These rules used to read
+  // `OperationPurchaseOrders.tsx`, which only re-exported this page and kept
+  // an unrendered legacy copy below it — so they guarded code nobody saw.
+  const PO_PAGE = ["..", "purchase-orders", "PurchaseOrdersPage.tsx"];
+
   it("Purchase Order detail mounts it too", () => {
-    const src = readFileSync(join(HERE, "..", "OperationPurchaseOrders.tsx"), "utf8");
-    expect(src).toContain('import PoIssueEvidence from "./components/PoIssueEvidence"');
+    const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");
+    expect(src).toMatch(/import PoIssueEvidence\b[^;]*from "\.\.\/components\/PoIssueEvidence"/);
     expect(src).toContain("<PoIssueEvidence");
     // It reads the PERSISTED rows and the PO's current version.
-    expect(src).toContain("evidence={sends}");
+    expect(src).toContain("evidence={po.sends ?? []}");
     expect(src).toContain("version={po.version ?? 1}");
   });
 
   it("Purchase Order detail no longer claims there is no `I've sent` action", () => {
-    const src = readFileSync(join(HERE, "..", "OperationPurchaseOrders.tsx"), "utf8");
+    const src = readFileSync(join(HERE, ...PO_PAGE), "utf8");
     expect(src).not.toMatch(/There is still no "I've sent" button/);
   });
 
   it("neither surface spells its own confirmation door", () => {
     for (const rel of [
       ["..", "so-batch", "SoBatchIssueWorkspace.tsx"],
-      ["..", "OperationPurchaseOrders.tsx"],
+      PO_PAGE,
     ]) {
-      const src = readFileSync(join(HERE, ...rel), "utf8");
+      // Comments stripped: a comment may name the endpoint; code may not.
+      const src = readFileSync(join(HERE, ...rel), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
       expect(src, rel.join("/")).not.toContain("confirm-sent");
     }
   });

@@ -9,13 +9,6 @@
  * A page-level recipe, not a kit component: the kit has no rail, and a
  * navigation rail is a WORKSPACE shape rather than a general one. When the kit
  * grows one, this file is what it replaces.
- *
- * `OperationPurchaseOrders` still holds its own copy. That is deliberate and
- * dated: PR 507 (the 4,047-conversion typography codemod) has that file open,
- * and hand-resolving codemod conflicts is how a codemod gets corrupted. The
- * next chat to open that page after 507 lands deletes its inline pair and
- * imports these — the shared home already exists, so it is one import, not a
- * decision.
  */
 import type { ReactNode } from "react";
 import { PanelLeftClose } from "lucide-react";

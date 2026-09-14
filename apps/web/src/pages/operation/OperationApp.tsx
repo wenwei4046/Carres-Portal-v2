@@ -48,7 +48,7 @@ import OperationManualPurchase from "./OperationManualPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
-import OperationPurchaseOrders from "./OperationPurchaseOrders";
+import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
