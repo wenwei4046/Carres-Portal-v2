@@ -21,18 +21,12 @@
  * parsing discipline as `DatePicker`, so a day never shifts across a timezone.
  */
 import { DayPicker } from "react-day-picker";
+import { toIso } from "./DatePicker";
 
 /** `YYYY-MM` → a Date at LOCAL midnight of the 1st. */
 function monthFromIso(iso: string): Date {
   const [y, m] = iso.split("-").map(Number);
   return new Date(y || 2026, (m || 1) - 1, 1);
-}
-
-/** A Date → `YYYY-MM-DD`, read in LOCAL time so the day never shifts. */
-function dayToIso(date: Date): string {
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
 const CLASSNAMES = {
@@ -103,7 +97,7 @@ export default function MonthCalendar({
       <DayPicker
         mode="single"
         month={monthFromIso(month)}
-        onMonthChange={(m) => onMonthChange(dayToIso(m).slice(0, 7))}
+        onMonthChange={(m) => onMonthChange(toIso(m).slice(0, 7))}
         selected={
           selected
             ? new Date(
@@ -118,7 +112,7 @@ export default function MonthCalendar({
         // internal state otherwise, so a selected day set from OUTSIDE — a
         // register date door, a week arrow — would never repaint), and its
         // single-mode select already fires undefined on pick-again.
-        onSelect={(day) => onSelect(day ? dayToIso(day) : null)}
+        onSelect={(day) => onSelect(day ? toIso(day) : null)}
         // Sunday leads the row and stays visible — a muted non-working day,
         // never a hidden one.
         weekStartsOn={0}
@@ -139,7 +133,7 @@ export default function MonthCalendar({
         classNames={CLASSNAMES}
         components={{
           DayButton: ({ day, modifiers, ...button }) => {
-            const iso = dayToIso(day.date);
+            const iso = toIso(day.date);
             const count = markers[iso] ?? 0;
             const word = markerWord ?? "expected supplier arrival";
             return (

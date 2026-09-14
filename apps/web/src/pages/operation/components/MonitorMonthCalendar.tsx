@@ -24,26 +24,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { DayPicker } from "react-day-picker";
-import { CALENDAR_CLASSNAMES } from "@/components/kit/DatePicker";
+import { CALENDAR_CLASSNAMES, fromIso, toIso } from "@/components/kit/DatePicker";
 import { fmtDate } from "@/lib/fmt-date";
 import { MONITOR_COPY, operatingWeekOf, scheduleSplitSentence, type MonthDayCounts } from "../delivery-monitor";
-
-/** `YYYY-MM-DD` → a Date at LOCAL midnight (the kit's own trick — a bare
- *  `new Date(iso)` is midnight UTC and shows the wrong day in the Americas). */
-function fromIso(iso: string): Date | undefined {
-  if (!iso || iso.length < 10) return undefined;
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  const date = new Date(y, m - 1, d);
-  return isNaN(date.getTime()) ? undefined : date;
-}
-
-/** A Date → `YYYY-MM-DD`, read in LOCAL time so the day never shifts. */
-function toIso(date: Date): string {
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
 
 /* The rail is 216px inside its padding: seven 28px cells fit; the kit's 32px
    popover cells do not. Size is the ONLY thing overridden — every colour and

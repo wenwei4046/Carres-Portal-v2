@@ -19,6 +19,7 @@
  * The page toolbar owns the month arrows, so navigation is hidden here.
  */
 import { DayPicker } from "react-day-picker";
+import { toIso } from "@/components/kit/DatePicker";
 import { fmtDate } from "@/lib/fmt-date";
 import { MONITOR_COPY, monthDaySentence, type MonthDayCounts } from "../delivery-monitor";
 
@@ -26,13 +27,6 @@ import { MONITOR_COPY, monthDaySentence, type MonthDayCounts } from "../delivery
 function fromIso(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(y || 2026, (m || 1) - 1, d || 1);
-}
-
-/** A Date → `YYYY-MM-DD`, read in LOCAL time so the day never shifts. */
-function toIso(date: Date): string {
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
 const CLASSNAMES = {
