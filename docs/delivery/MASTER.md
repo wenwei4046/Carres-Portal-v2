@@ -592,8 +592,15 @@ showed the full name, quantity and receipt uncertainty; Escape returned focus to
 The 949px view used three days, retained both calendars and reopened its dropdown filters
 after collapse. These trial rows prove rendering, not business volume or carrier coverage.
 The walk did not exercise Operation-role RLS, every receipt state, or any production write.
-The card-to-row reveal defect found during that walk is corrected in §8.6; that follow-up
-still requires its own deployment and authenticated verification.
+The card-to-row reveal correction in §8.6 is production-verified in PR #1317 at
+`718f00acb05557cc32045a298e7eef3cc0ec59ce`. Exact-head CI and production run
+`34835852993` passed; all five public probes matched. At both 1440×900 and 949×912,
+clicking SO-1209's calendar arrangement link expanded its exact first-leg row and placed it
+at y=179, immediately below the y=143 viewport and 36px sticky header. ScrollTop was 2161
+and the expanded disclosure received focus. At 949px, horizontal scrollLeft=1898 retained
+SO at x=370–520 and Customer at x=520–690, with the expanded brief still visible. The loaded
+production entry asset was `index-DFzOMPX6.js`; no browser console errors were observed.
+This was an authenticated Principal read-only walk, not an Operation-role permission test.
 
 Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
 overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
@@ -1181,7 +1188,7 @@ and test results. On deployed `e8456cb8365503e5a73af9710d94d30bbadf4aea`, the
 authenticated Principal walk at 949px additionally verified SO-1209's expanded brief after
 horizontal scrolling: pinned SO/Customer identity, both recorded route legs, wrapped address,
 and separate emergency-contact facts remained readable. Its calendar link expanded the correct
-row but left it below the viewport; §8.6 owns the positioning correction. No production
+row but left it below the viewport; the subsequently verified §8.6 correction is recorded above. No production
 arrangement was saved during this read-only walk.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
