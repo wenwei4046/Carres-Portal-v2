@@ -705,8 +705,8 @@ structured state (every AutoCount and rental order), 10 carry no address at all.
 addressed rows were warning about a state their own `State` column was printing.
 
 The location summary, the `State` column, the `STATE` dropdown and the `State not recorded` check
-now run **one reader** over **one address**, and it never writes anything back — correcting an
-address stays Sales work through `Open Sales Order to change`:
+now run **one reader** over **one address** — `resolveDeliveryLocality`. Correcting an address
+stays Sales work through `Open Sales Order to change`:
 
 ```
 STATE   1  the recorded customer_address_state, exactly as recorded
@@ -723,12 +723,44 @@ TOWN    1  the recorded customer_address_city, exactly as recorded
         ✗  otherwise nothing — the label prints the state alone
 ```
 
-**A recorded column always wins.** When the structured fields and the written address disagree, the
-explicit value is what a person chose and free text never overrules it. **The town the customer
-wrote outranks a postcode lookup** (rung 2 above rung 3): SO-1217 writes `Puchong` twice and
-carries `43300`, which the dataset files under Seri Kembangan. **A town is never paired with a
-state it is not in:** SO-1225 carries `43500` (Semenyih, Selangor) and ends `Sentul, Kuala Lumpur`,
-and resolves to `Kuala Lumpur` alone rather than `Semenyih, Kuala Lumpur`.
+**⭐ WHAT THE CELL IS SHOWING — AND WHAT IT IS NOT (correction 2026-09-14).** Rung 1 is a
+**recorded** fact: a value a person chose and the database stores. **Every other rung is a DERIVED
+INTERPRETATION** — a locality parsed out of free text, or looked up from a postcode. It is a
+reading, not a record, and the MASTER may not describe it as one:
+
+```
+the order's stored address     UNCHANGED. This reader performs no write of any
+                               kind — no migration, no backfill, no repair. The
+                               structured columns stay exactly as Sales left them.
+the printed locality           for rung 1, the recorded value.  For rungs 2 and 3,
+                               an INFERENCE this code drew from the written
+                               address. Truthful and evidence-backed, but derived.
+"no write-back"                means ONLY that the stored address did not change.
+                               It is NOT a claim that nothing was inferred.
+```
+
+Because rungs 2-3 are inferences, the full written address stays visible and unedited in panel 1
+of the brief (§8.5) — the reader never replaces, re-composes or truncates the record it read.
+
+**A recorded column always wins, and each HALF resolves on its own.** When the structured fields
+and the written address disagree, the explicit value stands and the free text is simply not
+consulted for that half — the two are never merged or reconciled, and neither is corrected against
+the other. One row may therefore print a recorded town beside a derived state, or the reverse.
+**The town the customer wrote outranks a postcode lookup** (rung 2 above rung 3): SO-1217 writes
+`Puchong` twice and carries `43300`, which the dataset files under Seri Kembangan. **A town is
+never paired with a state it is not in:** SO-1225 carries `43500` (Semenyih, Selangor) and ends
+`Sentul, Kuala Lumpur`; the two disagree, so the town resolves to nothing and the label is
+`Kuala Lumpur` alone rather than the false pair `Semenyih, Kuala Lumpur`.
+
+**⭐ THE ONE READING IS THE CUSTOMER'S ADDRESS — A JOURNEY LEG IS NOT AN EXCEPTION TO IT, IT IS A
+DIFFERENT QUESTION.** On a Journey-leg row the `State` column deliberately does NOT read the
+customer's address: a leg is classified by its own DESTINATION, so leg 1 of a Singapore journey is
+a Klang → JB run and counts under Johor (the rule below, unchanged since 2026-09-06 and untouched
+by this correction). `Delivery Location` on that row still prints the CUSTOMER's locality on line 1
+and the leg's own recorded route on line 2 — the route is never replaced by the customer address,
+and the customer address is never replaced by a transit destination. A leg row can therefore show
+`Sungai Buloh, Selangor` under `State` = `Johor` without contradiction: they answer *where the
+goods end up* and *where this leg goes*.
 
 **AN EXISTING ADDRESS IS NEVER CALLED ABSENT.** When no locality resolves but an address is
 recorded, `Delivery Location` prints that address; `Not recorded` is reserved for a record that
@@ -739,42 +771,175 @@ is a township and inventing a state from it would file the row under a state nob
 **Reading the state does not complete the order.** Every other required fact keeps its own
 sentence: SO-1217 still reads `Order details incomplete` over `Building type not recorded`.
 
+**⭐ WHAT `State not recorded` NOW MEANS — say it exactly.** The check tests the READER, not the
+column: it fires when **nothing on the record names a state**, and it is silent when a state was
+derived from the written address. So on SO-1217 the warning is gone while
+`customer_address_state` is still **empty in the database**. That is the approved behaviour (the
+address answers the question, and nagging the operator about a fact the address already carries is
+the noise this correction removed) — but it means **Delivery's warning is no longer a report on the
+structured column.** Two consequences, both deliberate: Delivery is not the surface that chases
+the Sales Portal's structured-field completeness, and a reader of this MASTER must not infer from a
+silent warning that the record is structurally complete.
+
 **The STATE rail did not move.** Replaying the previous `customerRegionOf` against all 99 open
-scopes put no row in a different bucket; what changed is that the label, the filter and the
-warning can no longer disagree.
+scopes put no row in a different bucket. **An unchanged bucket is not by itself proof of a correct
+interpretation** — it only shows this change moved nothing; what the cell prints is proven by the
+row-level evidence recorded below, not by the rail.
 
-**The Delivery Orders register reads the same interpretation (§3.1).** It printed `Delivery
-Location` from the same two structured columns on the same order row, so a document issued for one
-of those 46 orders would have read `Not recorded` beside a Monitor row reading `Puchong, Selangor`.
-No issued document differs today — all 4 in production carry the structured state — and converging
-it is what stops the first one that does not from splitting two Delivery surfaces (Architecture
-Law D). **Still Sales-owned and NOT changed here:** the Sales Orders register's own `Delivery
-Location`, `City`, `State`, `Address line 1` and `Postcode` columns read the structured columns
-raw and print `Not recorded` for the same 46 orders. That is the same false absence on a
-Sales-owned surface, reported and left to its owner rather than folded into this correction.
-
-**DELIVERED — PR #1311, main `d6abf2ac4bab3993a61b3dc75bd7e3963e2ed710`, deployed 2026-09-14.**
-CI passed on the full gate; all five canonical surfaces report that exact SHA (both Pages
-projects, both canonical domains, the API Worker), and the deployed ERP bundle carries the
-resolver.
-
-**What is proven, and what is not — stated exactly.**
+**The Delivery Orders register reads the same interpretation (§3.1), and that is its ENTIRE
+scope.** It printed `Delivery Location` from the same two structured columns on the same order row,
+so a document issued for one of those 46 orders would have read `Not recorded` beside a Monitor row
+reading `Puchong, Selangor`. No issued document differs today, and converging it is what stops the
+first one that does not from splitting two Delivery surfaces (Architecture Law D). The change is
+exactly three edits and nothing else:
 
 ```
-PROVEN  the shipped SHA on all five surfaces
-PROVEN  the fix renders: the REAL Monitor page over the two production records
-        (delivery-monitor-preview), SO-1217 reading `Puchong, Selangor` over
-        `Floor 1 · No lift` with `Order details incomplete / Building type not
-        recorded`, its brief showing the whole written address, and the STATE
-        dropdown keeping it under `Selangor` while SO-1246 stays out
-PROVEN  nothing was written back — SO-1217, SO-1225 and SO-1246 re-read from
-        production after the deploy, every address field byte-identical
-NOT YET the authenticated row-level walk on LIVE rows. The Browser pane's
-        Operation session had expired and no password may be typed, so the
-        rendering evidence above is the real page over real records, not the
-        live database. Anyone with a session should confirm SO-1217 on
-        `/operation/delivery` and record it here.
+apps/web  delivery-orders-register.ts   the `location` field swaps
+                                        conciseLocality(city, state) for
+                                        resolveDeliveryLocality(orders).label
+apps/web  queries.ts                    `customer_address` declared optional on
+                                        DeliveryOrderRow["orders"]
+apps/api  delivery-orders.ts            `customer_address` joins the existing
+                                        ORDER_EMBED select
 ```
+
+**No workflow and no permission changed.** `GET /api/operation/delivery-orders` keeps the
+`requireOperationOrPrincipal` guard it already had; the single-document read on the SAME router
+already selected `customer_address`, so the same role gained no column it could not already read.
+No RLS, no migration, no new table, no new query, no new route, no status, queue, action or door.
+
+**The shared helpers changed no other consumer, and that is under test.** `detectState` was
+rewritten as `classifyState(...)?.state ?? null` to expose HOW a state was read; it is also read by
+`AssignLogisticsDialog`, `OperationOrdersControl` and `region.ts`'s own
+`regionForAddress` · `areaForAddress` · `locationForAddress` · `suggestCarrier`. The rewrite swapped
+`??` for truthiness on the two postcode lookups, so `region.equivalence.test.ts` replays the exact
+pre-correction implementation against **all 100,000 five-digit codes** and the address shapes
+production carries, and asserts zero divergence. `postTownOf`, `postTownForPostcode` and
+`postcodeIn` are new exports with no prior consumer. `conciseLocality` is unchanged and its other
+callers were not touched.
+
+**Still Sales-owned and NOT changed here:** the Sales Orders register's own `Delivery Location`,
+`City`, `State`, `Address line 1` and `Postcode` columns, and the SO Batch register's locality, read
+the structured columns raw and print `Not recorded` for the same 46 orders. That is the same false
+absence on a Sales-owned surface, reported and left to its owner rather than folded into this
+correction.
+
+#### 8.3.1 · Evidence for the address reading — four tiers, never collapsed
+
+**A claim is only as strong as the tier that carries it.** An earlier version of this section wrote
+`DELIVERED` and `PROVEN the fix renders` over evidence that was a LOCAL preview, and quoted a
+deployment SHA that a later merge had already superseded. Both are corrected here, and the tiers
+are kept apart permanently so no future closure can blur them again:
+
+```
+1  DEPLOYED CODE        a SHA every canonical surface reports, re-probed at the
+                        time of writing — never quoted from an earlier deploy
+2  AUTOMATED TESTS      what CI proves about the arithmetic, over fixtures
+3  LOCAL RENDERING      the real page over real records in a dev preview.
+                        Evidence about LAYOUT. It is NOT production.
+4  AUTHENTICATED        the live page, live database, signed-in Operation
+   PRODUCTION           session. The only tier that closes a delivery.
+```
+
+**TIER 1 — deployed code, re-probed 2026-09-14T07:31Z.** All five surfaces report
+`c02cf8917c6057511e6d5991f3d683505393365b`, and that equals the `main` tip:
+
+```
+carres-portal Pages   c02cf891      POS canonical    c02cf891
+carres-pos Pages      c02cf891      API Worker       c02cf891
+ERP canonical         c02cf891
+```
+
+PR #1311 merged as `d6abf2ac`; `ef3d00f2` (this MASTER's first closure) and `c02cf891` (PR #1310)
+merged after it. **The first closure named `d6abf2ac` as the deployed SHA, and `c02cf891` merged
+about two minutes later** — true when written, stale almost immediately, and left standing in the
+MASTER as though it still described production. A SHA in this file is a claim about a moment; it is
+re-probed when written and it carries its timestamp, because a merge lands whenever it lands.
+
+**TIER 3 — local rendering.** `apps/web/src/dev/delivery-monitor-preview.tsx` carries the SO-1217
+and SO-1246 records as fixtures. That preview is evidence about LAYOUT over real record shapes; it
+is not production and never closes anything. It is kept because it walks states production has no
+row for.
+
+**TIER 2 — automated tests.** `locality.test.ts` covers structured, written-text-only, absent and
+conflicting addresses, every case named by the production SO it came from.
+`delivery-work.test.ts` covers the Monitor row, the warning and the bucket.
+`delivery-orders-register.test.ts` covers the register's convergence.
+`region.equivalence.test.ts` proves `detectState` is unchanged for its other consumers across all
+100,000 five-digit codes.
+
+**TIER 4 — authenticated production verification, 2026-09-14, signed-in Operation session on
+`https://erp.carresofficial.com/operation?tab=delivery`, 91 live rows.** Read off the live page,
+not a preview:
+
+| SO | `Delivery Location` | `Delivery Status` | `STATE` filter |
+|---|---|---|---|
+| SO-1217 · TCF0541 | `Puchong, Selangor` · `Floor 1 · No lift` | `Order details incomplete` · `Building type not recorded` | inside `Selangor` (24) |
+| SO-1225 · DL0595 | `Kuala Lumpur` · `Floor 1 · No lift` | `Order details incomplete` · `Building type not recorded` | inside `Kuala Lumpur` (38) |
+| SO-1246 · CR0678 | `Tuai Timur, Setia Alam` · `Floor 1 · No lift` | `Order details incomplete` · `State not recorded` | in NO state row; present under `All states` (91) |
+
+**SO-1225 is the conflict case, and the filter is what proves it.** It carries `43500` — Semenyih,
+SELANGOR — and its text ends `Sentul, Kuala Lumpur`. The row prints `Kuala Lumpur` alone and sits
+in the `Kuala Lumpur` bucket, NOT Selangor: the postcode did not win, and no false `Semenyih,
+Kuala Lumpur` pair was printed.
+
+**A MULTI-LEG DELIVERY PRINTS ITS OWN ROUTE — SO-1209, both legs, live.** The customer address is
+never substituted for a transit destination, and the route is never replaced by the customer
+address:
+
+| leg | `Delivery Location` line 1 | `Delivery Location` line 2 | `Logistics` |
+|---|---|---|---|
+| 1 | `Sungai Buloh, Selangor` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
+| 2 | `Sungai Buloh, Selangor` | `JB transit warehouse → Customer (Singapore)` | AL |
+
+Both routes match `orders.delivery_stops` exactly. Line 1 is the customer's locality on both rows
+because that is what it means; the leg's own destination governs the `State` bucket, per the
+Journey rule above.
+
+**THE DELIVERY ORDERS REGISTER, WALKED ON THE SAME SESSION.** All 4 issued documents render, and
+`Not recorded` appears exactly where it is TRUE:
+
+| document | `Delivery Location` | the record behind it |
+|---|---|---|
+| DO-130926-3223 · SO-1362 | `Singapore` | city and state both `Singapore`, collapsed to one word |
+| DO-130926-0842 · SO-1362 | `Singapore` | the same order, its other document |
+| DO-180826-3035 · SO-1322 | `Not recorded` | **every address column NULL** — a genuine absence |
+| DO-170826-5050 · SO-1321 | `Not recorded` | **every address column NULL** — a genuine absence |
+
+An earlier draft of this section said "all 4 carry the structured state". That was wrong: two of
+them carry no address at all. The convergence is still correct — `Not recorded` on those two is the
+honest answer, which is precisely the distinction the correction exists to keep.
+
+**The written address survives in full.** Panel 1 of the brief prints, byte-for-byte and unedited,
+`31,JALAN BK8/2B,ANGGUN, RESIDENCE,BANDAR KINRARA,, 43300 PUCHONG,SELANGOR, Puchong, Selangor`
+for SO-1217 and `Tuai Timur, Setia Alam` for SO-1246. SO-1246's brief still carries its
+`State not recorded` line; SO-1217's does not, because a state resolved.
+
+**The stored address did not change.** SO-1209, SO-1217, SO-1225 and SO-1246 were re-read from
+production after the deploy: `customer_address`, `customer_address_line1`, `customer_address_city`,
+`customer_address_state` and `customer_address_postcode` are identical to their pre-deploy values,
+the structured columns on SO-1217, SO-1225 and SO-1246 are still `NULL`, and all three rows were
+last touched **2026-07-23**, seven weeks before this deploy. **That is a statement about writes
+only** — see the derived-interpretation rule above for what the cell is showing.
+
+**🟡 COEXISTENCE FINDING — #1310 AND #1311 BOTH SHIP, AND ONE DOCUMENTED RULE NO LONGER HOLDS.**
+The two Delivery merges do not conflict in code; the address reading, the `State` bucket, the
+filter and the brief all behave as specified above. But §8.4's table says the `Order details
+incomplete` second line is **the missing fact**, and #1310 made line two the contact deadline
+whenever one is owed (`!booked && !settled && contactDueIso !== null`) — a condition that does not
+exclude an incomplete row. **Measured live on `c02cf891`: of 48 `Order details incomplete` rows,
+47 now print a date and 1 still names the fact** (the one owing no deadline). The table row is
+corrected to what ships, and the consequence is recorded rather than hidden:
+
+- **No information is lost.** The missing fact still prints in orange in panel 1 of the brief —
+  verified on SO-1217 (`Building type not recorded`) and SO-1246 (`State not recorded`).
+- **What is lost is the at-a-glance reason.** An operator scanning the list sees *that* an order
+  is incomplete but must expand the row to learn *which* fact is missing.
+- **This is an owner decision, not an engineering one,** because both lines are owner-ruled on the
+  same day: the deadline-on-line-two ruling (#1310) and the missing-fact ruling (2026-09-13). They
+  collide only on this one status. Restoring the fact to the row — by exempting
+  `Order details incomplete` from the deadline line, or by carrying both — is Jess's call and is
+  **not** made here.
 
 **THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
 not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
@@ -864,7 +1029,7 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
 | attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
 | attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
-| a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact |
+| a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the contact deadline when one is owed, otherwise the missing fact — see the coexistence finding in §8.3.1; the fact always prints in panel 1 |
 
 **Retired on Monitor by the 2026-09-14 ruling:** `{partner} must contact the customer` ·
 `Operation must call the customer` · `Call by {date}` on any visible line.
@@ -1031,7 +1196,11 @@ DO prints and the Warehouse handover shows. The templates exist since 2026-09-13
 `partner_drivers` · `partner_fleet.active`); the arrangement's binding is the remaining gap
 (§15.1).
 
-### 8.3.1 · DELIVERED AND PRODUCTION-VERIFIED — `c02cf891`, 2026-09-14
+### 8.9 · PR #1310 DELIVERED AND PRODUCTION-VERIFIED — `c02cf891`, 2026-09-14
+
+> Renumbered from `8.3.1` on 2026-09-14: two Delivery closures landed within the hour and both
+> claimed that number, and this one sits at the END of §8, after §8.8 — not inside §8.3. The
+> address reading's evidence keeps `8.3.1`, where it is nested under the rule it belongs to.
 
 PR #1310 merged and deployed. **All five canonical surfaces report
 `c02cf8917c6057511e6d5991f3d683505393365b`** — both Pages projects, both custom web domains and
@@ -1063,10 +1232,25 @@ The control proves the predecessor was really read rather than 404ing as a clean
 - **Every row measured 72px** and no cell overflowed. At 949px the filter rail stayed collapsed,
   `SO No` and `Customer` stayed pinned, and the page never scrolled horizontally.
 
-**NOT proven by this walk, and the boundary is stated rather than blurred:** production carries
-no Journey leg among its 91 open scopes, so the route-in-column-6 presentation is proven by the
-Monitor fixture and by test, NOT on live data. The first real Journey on Monitor is the thing to
-look at. Nothing else here is inferred.
+**⛔ CORRECTED 2026-09-14 — THE ROUTE *IS* PROVEN ON LIVE DATA.** This walk originally recorded
+*"production carries no Journey leg among its 91 open scopes, so the route-in-column-6
+presentation is proven by the Monitor fixture and by test, NOT on live data."* **That is wrong,
+and the boundary was stricter than the evidence required.** Re-walked on the SAME `c02cf891` and
+the SAME 91 rows, in an authenticated Operation session: **four Journey-leg rows are live**, each
+printing its own recorded route in column 6:
+
+| SO | `Delivery Location` line 1 | line 2 — the leg's own route | `Logistics` |
+|---|---|---|---|
+| SO-1209 | `Sungai Buloh, Selangor` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
+| SO-1209 | `Sungai Buloh, Selangor` | `JB transit warehouse → Customer (Singapore)` | AL |
+| SO-1282 | `Chini, Pahang` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
+| SO-1282 | `Chini, Pahang` | `JB transit warehouse → Customer (Singapore)` | AL |
+
+Both orders carry a two-leg `delivery_stops` and are `proceed_order`, so both legs enter Monitor
+under the entry rule. Each row's route matches its stored `from_loc → to_loc` exactly; the
+customer address is never substituted for a transit destination, nor the route for the address.
+**The route-in-column-6 presentation is therefore PRODUCTION-VERIFIED, not fixture-only.** Nothing
+else in this walk is changed.
 
 **Delivered in the same change:** the `DELIVERY STATUS` dropdown reads the new dictionary with one
 option per printed word; `callByDate` is gone from the shared status ladder, which no longer
