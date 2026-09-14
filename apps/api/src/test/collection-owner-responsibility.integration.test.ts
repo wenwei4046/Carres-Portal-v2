@@ -40,7 +40,7 @@ const U = {
 };
 const DEALER = uid("d1");
 const SALES = uid("d2");
-const ORDER = { a: uid("a1"), b: uid("a2"), c: uid("a3"), d: uid("a4") };
+const ORDER = { a: uid("a1"), b: uid("a2"), c: uid("a3"), d: uid("a4"), e: uid("a5") };
 
 type Client = pg.Client;
 const open: Client[] = [];
@@ -324,6 +324,23 @@ describe.skipIf(!URL)("the order's assigned person → collection owner → cove
     ]);
     expect(who).toMatchObject({ normal_user_id: U.yujun, source: "handover" });
     expect(assigned).toBe(U.yujun);
+  });
+
+  it("a handover on an order that was never assigned creates the assignment and exactly one ledger row", async () => {
+    // The handover writes ops_order_control, which carries five other triggers
+    // (updated_at, the storage-model guard, the booking stage, the delay stamp,
+    // the change log). The INSERT branch — an order with no control row at all —
+    // is the one the rolled-back production probe could not reach, because every
+    // production order already has one.
+    const pr = await connect();
+    await actAs(pr, U.principal);
+    // ORDER.e is touched by nothing else, so it genuinely has no control row
+    expect((await root.query("select count(*)::int as n from ops_order_control where order_id = $1", [ORDER.e])).rows[0].n).toBe(0);
+    await pr.query("select public.payment_collection_owner_handover($1, $2, 'first owner named by hand', null)", [ORDER.e, U.shasha]);
+    await pr.end();
+    expect(await assignedStaff(ORDER.e)).toBe(U.shasha);
+    expect(await responsibility(root, ORDER.e, TODAY)).toMatchObject({ normal_user_id: U.shasha, source: "handover" });
+    expect((await root.query("select count(*)::int as n from payment_collection_owners where order_id = $1", [ORDER.e])).rows[0].n).toBe(1);
   });
 
   it("no contact anywhere names a shared login as the responsible person", async () => {
