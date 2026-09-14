@@ -145,8 +145,9 @@ export function useWarehouseSchedule(
   });
 
   /* OPTIONAL — the CONFIGURED Site operating dates. Same guard, same
-     discipline: refused means the window falls back to plain calendar dates
-     and says so, never to an invented weekly closure. */
+     discipline: refused means the window falls back to the APPROVED standard
+     Warehouse week and says so. It never invents a closure, and it never
+     contradicts the approved one either. */
   const settingsQuery = useQuery<SettingsPayload, ApiError>({
     queryKey: ["operation", "warehouse-settings", siteId ?? ""],
     queryFn: () =>
@@ -240,7 +241,7 @@ export function useWarehouseSchedule(
       errors.push({
         direction,
         message:
-          "Site operating dates could not be read. Dates below are plain calendar days, not the configured schedule.",
+          "Site operating dates could not be read. Dates below follow the standard Warehouse week, not this Site's configured schedule.",
       });
 
     return {

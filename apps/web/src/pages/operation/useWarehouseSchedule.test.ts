@@ -193,7 +193,7 @@ describe("a source FAILURE is never an empty day", () => {
 });
 
 describe("an optional read that refuses degrades one field, honestly", () => {
-  it("falls back to plain calendar dates and SAYS SO when settings refuse", async () => {
+  it("falls back to the GOVERNED WEEK and SAYS SO when settings refuse", async () => {
     h.fetch.mockImplementation((url: string) => {
       if (url.startsWith("/api/operation/warehouse-settings"))
         return Promise.reject(new Error("operation only"));
@@ -204,12 +204,17 @@ describe("an optional read that refuses degrades one field, honestly", () => {
       { wrapper },
     );
     await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
-    // 2026-09-20 is a Sunday and is KEPT — no invented weekly closure.
-    expect(result.current.operatingDates).toContain("2026-09-20");
+    /* CORRECTED after the 2026-09-14 production finding: 2026-09-20 is a
+       Sunday and must NOT appear. An unreadable configuration is not a
+       licence to contradict the approved Warehouse week. */
+    expect(result.current.operatingDates).not.toContain("2026-09-20");
     expect(result.current.operatingDates).toHaveLength(6);
-    expect(result.current.errors.some((e) => e.message.includes("calendar"))).toBe(
-      true,
-    );
+    // The operator is still told the configuration was not read.
+    expect(
+      result.current.errors.some((e) =>
+        e.message.includes("standard Warehouse week"),
+      ),
+    ).toBe(true);
   });
 
   it("keeps a pickup date EXPECTED when the partner's reply cannot be read", async () => {

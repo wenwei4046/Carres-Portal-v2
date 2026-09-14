@@ -2,11 +2,15 @@ import { goodsCategoryWordOf, type GoodsCategoryWord } from "./line-category";
 import { poSupplierReplyOf, type PoDatePromise } from "./po-workspace";
 import {
   resolveWarehouseSchedule,
+  weekdayOfIsoDate,
   type WarehouseActivity,
   type WarehouseScheduleInput as WarehouseSettingsScheduleInput,
 } from "./warehouse-settings";
 import type { InboundArrival } from "./warehouse-inbound";
-import type { WarehouseOutboundCard } from "./warehouse-outbound";
+import {
+  WAREHOUSE_OFF_DAYS,
+  type WarehouseOutboundCard,
+} from "./warehouse-outbound";
 import type { IsoDate } from "./working-days";
 
 /**
@@ -502,17 +506,38 @@ export type WarehouseScheduleSettings = Omit<
 export const WAREHOUSE_SCHEDULE_DATE_COUNT = 6;
 
 /**
- * The operating dates of one activity, from the CONFIGURED Site schedule.
- * `resolveWarehouseSchedule` is the one ladder — this adds no second copy of
- * it, and no weekly closure of its own.
+ * The operating dates of one activity.
  *
- * A date the configuration proves CLOSED is dropped. A date it has nothing to
- * say about (`not_configured`) is KEPT: "nobody said" is not "closed", and
- * hiding an unconfigured day would hide the work standing on it.
+ * ── THE LADDER, AND WHY IT HAS THREE RUNGS NOT TWO ──────────────────────────
+ * `resolveWarehouseSchedule` is the one configured-schedule authority and this
+ * adds no second copy of it. What it returns is three-valued, and each value
+ * gets its own answer:
  *
- * `settings` absent — unreadable for this role, or no Site configured —
- * returns the plain calendar window. Honest, and the caller reports the
- * limitation rather than inventing a Sunday rule to fill the gap.
+ *   open             CONFIGURATION SAYS SO — keep the date, Sunday included.
+ *   closed           CONFIGURATION SAYS SO — drop it.
+ *   not_configured   nobody said. Fall back to the GOVERNED WEEKLY CLOSURE.
+ *
+ * The third rung is the production correction of 2026-09-14. It first read
+ * "keep it — nobody said is not closed", which is the right rule for the
+ * SETTINGS page (Stock MASTER §11: *no day is seeded and Sunday is not assumed
+ * closed*; an unconfigured day there must read `Not configured`, never
+ * `Closed`). But it is the wrong rule for THIS strip, whose own worked example
+ * in the same MASTER reads `Tue 1 · Wed 2 · Thu 3 · Fri 4 · Sat 5 · Mon 7 Sep`
+ * — Sunday omitted — and states that the governed weekly closure is omitted.
+ *
+ * Production holds ZERO `warehouse_working_hours` rows, so every weekday
+ * resolved `not_configured` and the strip printed `Sun 20 Sept — Fri 25 Sept`.
+ * The two MASTER statements are not in conflict: one governs what SETTINGS
+ * displays about a day, the other governs which days the STRIP walks. Silence
+ * in the configuration does not delete an approved operating rule — it just
+ * fails to override it.
+ *
+ * `WAREHOUSE_OFF_DAYS` is that approved closure, reused rather than re-spelled,
+ * so the repository keeps ONE weekly closure and not two that currently agree.
+ *
+ * `settings` absent — unreadable for this role, or no Site at all — lands on
+ * the same fallback, because knowing nothing is not a reason to contradict the
+ * approved week either.
  */
 export function warehouseScheduleOperatingDates(
   from: IsoDate,
@@ -525,16 +550,25 @@ export function warehouseScheduleOperatingDates(
   let cursor = from.slice(0, 10);
   let guard = 0;
   while (out.length < count && guard < count * 10 + 60) {
-    if (!settings) out.push(cursor);
-    else if (
-      resolveWarehouseSchedule({ ...settings, date: cursor })[activity]
-        .availability !== "closed"
-    )
-      out.push(cursor);
+    if (operatesOn(cursor, activity, settings)) out.push(cursor);
     cursor = stepIsoDate(cursor);
     guard += 1;
   }
   return out;
+}
+
+/** The three-rung ladder above, as one decision. */
+function operatesOn(
+  date: IsoDate,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+): boolean {
+  const availability = settings
+    ? resolveWarehouseSchedule({ ...settings, date })[activity].availability
+    : "not_configured";
+  if (availability === "open") return true;
+  if (availability === "closed") return false;
+  return !WAREHOUSE_OFF_DAYS.includes(weekdayOfIsoDate(date));
 }
 
 function stepIsoDate(iso: IsoDate): IsoDate {
