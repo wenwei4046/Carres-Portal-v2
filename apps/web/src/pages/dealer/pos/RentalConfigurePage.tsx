@@ -396,7 +396,3 @@ export default function RentalConfigurePage({
     document.body,
   );
 }
-
-/** Shown on the CTA once a line is staged (kept for parity with the bought
- *  configure page's Update-item affordance if editing lands later). */
-export const RENTAL_ADD_ICON = Check;

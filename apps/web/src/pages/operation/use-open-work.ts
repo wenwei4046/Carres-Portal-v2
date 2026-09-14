@@ -11,7 +11,6 @@ import type {
   WorkItem,
 } from "@carres/shared";
 import { useOperationWork } from "@/lib/queries";
-import { personLabel } from "@/lib/staff-avatar";
 
 export interface WorkRow extends WorkItem {
   id: string;
@@ -25,13 +24,6 @@ export interface WorkRow extends WorkItem {
   ownerId: string | null;
   normalOwnerId: string | null;
   deliveryDoNumber: string | null;
-}
-
-export interface OwnerWorkload {
-  userId: string;
-  member: OpsStaffMember;
-  open: number;
-  overdue: number;
 }
 
 export interface OpenWorkSet {
@@ -121,31 +113,4 @@ export function useOpenWorkSet(): OpenWorkSet {
     loading: !query.isError && (query.isLoading || !query.data),
     error: query.isError,
   };
-}
-
-export function ownerWorkloads(
-  items: readonly WorkRow[],
-  staff: readonly OpsStaffMember[],
-): OwnerWorkload[] {
-  const open = new Map<string, number>();
-  const overdue = new Map<string, number>();
-  for (const item of items) {
-    if (!item.ownerId) continue;
-    open.set(item.ownerId, (open.get(item.ownerId) ?? 0) + 1);
-    if (item.workingDaysLate > 0) {
-      overdue.set(item.ownerId, (overdue.get(item.ownerId) ?? 0) + 1);
-    }
-  }
-  return [...staff]
-    .map((member) => ({
-      userId: member.user_id,
-      member,
-      open: open.get(member.user_id) ?? 0,
-      overdue: overdue.get(member.user_id) ?? 0,
-    }))
-    .sort((a, b) =>
-      personLabel(a.member.name, a.member.email).localeCompare(
-        personLabel(b.member.name, b.member.email),
-      ),
-    );
 }
