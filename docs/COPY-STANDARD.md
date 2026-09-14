@@ -3143,8 +3143,9 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 
 `Advance` itself is **APPROVED** — YH ruled it on 11 Sep 2026 for money paid to a supplier before
 its bill: the voucher's advance box, the knock-off on the bill, and the unused-advance column on
-Unpaid by Supplier (see the Vocabulary row). Every other word below is **PROPOSAL — PENDING
-APPROVAL**, listed with where it appears.
+Unpaid by Supplier (see the Vocabulary row). The money back number's prefix `SMB` is **APPROVED**
+— YH ruled it on 14 Sep 2026. Every other word below is **PROPOSAL — PENDING APPROVAL**, listed
+with where it appears.
 
 | Word | Where · meaning |
 |---|---|
@@ -3160,7 +3161,7 @@ APPROVAL**, listed with where it appears.
 | `Advance applied` · `Advance taken off` · `Money back recorded` · `Money back cancelled` | History lines (event words) and toasts. |
 | `Applied` · `Taken off` | A knock-off's status (database `applied` / `cancelled`). |
 | `Recorded` · `Cancelled` | A money back's status (database `posted` / `voided`) — same pair as Other receipts. |
-| `Money back No` · `SRV-YYYYMMDD-NNNN` | The money back number; prefix SRV = supplier receipt voucher (the owner may choose SMB instead; it is one line, `supplier_money_back_prefix()` in 0485). |
+| `Money back No` · `SMB-YYYYMMDD-NNNN` | The money back number. Prefix SMB = supplier money back, **APPROVED** (YH, 14 Sep 2026); it is one line, `supplier_money_back_prefix()` in 0485. |
 | `This money back was already recorded as {No} with different details. Open the form again to record another.` | Refusal (`idempotency_mismatch`) when a key is re-sent with a different voucher, amount, account or date. |
 | `Received into` | Reused from 0478: the bank or cash account the money back came into. |
 | `Advance from {PV No}` | A knock-off row on a bill's Payments card. |

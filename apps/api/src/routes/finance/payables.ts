@@ -138,7 +138,10 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
     p_pay_method: d.payMethod,
     p_pay_reference: d.payReference ?? null,
     p_narration: d.narration ?? null,
-    p_advance_amount: d.advanceAmount ?? 0,
+    // Sent only when there is an advance. 0484's function defaults it to 0, and a
+    // database without 0484 has no such parameter: a voucher with no advance
+    // still saves in the time between this code going live and 0484 being applied.
+    ...(d.advanceAmount ? { p_advance_amount: d.advanceAmount } : {}),
   };
 }
 

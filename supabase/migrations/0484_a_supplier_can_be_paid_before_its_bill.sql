@@ -244,7 +244,7 @@ create trigger supplier_advance_money_back_frozen_trg
 comment on table public.supplier_advance_applications is
   '0484: an advance (payment_vouchers.advance_amount on an APPROVED voucher) knocked off a confirmed bill of the same supplier and payables account. Posts nothing: the advance and the bill are already on the same control account and party. Written only by supplier_advance_apply / supplier_advance_application_cancel (0485). Never deleted.';
 comment on table public.supplier_advance_money_back is
-  '0484: money a supplier sent back out of an advance. SRV-YYYYMMDD-RRRR. Posts Dr the money account / Cr the advance''s payables control (party = supplier). Written only by supplier_advance_money_back_record / _cancel (0485); cancel reverses the entry. Never deleted.';
+  '0484: money a supplier sent back out of an advance. SMB-YYYYMMDD-RRRR. Posts Dr the money account / Cr the advance''s payables control (party = supplier). Written only by supplier_advance_money_back_record / _cancel (0485); cancel reverses the entry. Never deleted.';
 
 
 -- ── 3 · ONE arithmetic for a bill, ONE for an advance (law D) ─────────────────

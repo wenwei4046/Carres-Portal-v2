@@ -41,7 +41,7 @@
 --      account must be a money account; the amount may not exceed what the
 --      advance has left. Number <prefix>-YYYYMMDD-RRRR, drawn at random (the
 --      formal document code, as PV); the prefix is written once, in
---      supplier_money_back_prefix() (section 2 — SRV today).
+--      supplier_money_back_prefix() (section 2 — SMB, YH's ruling of 14 Sep 2026).
 --   D. supplier_advance_money_back_cancel(money back, reason) — the finance
 --      approver, with a reason; gl_reverse on the original date (0478
 --      other_receipt_void).
@@ -130,11 +130,11 @@ comment on table public.ap_document_events is
 
 -- ── 2 · the money-back number ────────────────────────────────────────────────
 -- The prefix is written ONCE, in this function: the series row below, the
--- numbering in section 5 and the sanity check all read it. The owner may still
--- change it (SRV → SMB): that is this one line, before the file is applied.
--- Checked against every prefix in this repository on 2026-09-11: gl_doc_series
--- holds ARI JE MJ PV RV SB; no code, test or migration uses SRV or SMB.
--- SRV = supplier receipt voucher, the supplier twin of 0478's RV. The primary
+-- numbering in section 5 and the sanity check all read it.
+-- SMB = supplier money back. YH ruled it on 14 Sep 2026.
+-- Checked on 2026-09-14 against main and every remote branch: gl_doc_series
+-- holds ARI JE MJ PV RV SB; allocate_formal_document_code is called with ARI
+-- GRN MPR PO PV RO RV SB TR; no code, test or migration uses SMB. The primary
 -- key refuses a second claim, so a collision fails here instead of sharing a
 -- series.
 create or replace function public.supplier_money_back_prefix()
@@ -143,7 +143,7 @@ language sql
 immutable
 set search_path = public, pg_temp
 as $fn$
-  select 'SRV'::text
+  select 'SMB'::text
 $fn$;
 
 comment on function public.supplier_money_back_prefix() is

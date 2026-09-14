@@ -348,7 +348,7 @@ const advanceOf = () => ({
     bill_date: "2026-09-10", amount: "100.00", status: "cancelled", created_at: "2026-09-11T05:00:00Z",
     created_by_name: "Aina", cancelled_at: "2026-09-11T06:00:00Z", cancelled_by_name: "Boon",
     cancel_reason: "Supplier sent a new invoice" }],
-  money_back: [{ id: MB, money_back_no: "SRV-20260912-4821", money_back_date: "2026-09-12", money_account_code: "1120",
+  money_back: [{ id: MB, money_back_no: "SMB-20260912-4821", money_back_date: "2026-09-12", money_account_code: "1120",
     money_account_name: "Bank", amount: "50.00", reference: null, narration: null, status: "posted", entry_no: "JE-1",
     reversal_entry_no: null, created_at: "2026-09-12T02:00:00Z", created_by_name: "Aina", voided_at: null,
     voided_by_name: null, void_reason: null }],
@@ -367,7 +367,7 @@ describe("Supplier advance (0484–0485)", () => {
     expect(within(appRows[1]!).getByRole("button", { name: "Take advance off" })).toBeInTheDocument();
     expect(appRows[2]!).toHaveTextContent("Taken off — Supplier sent a new invoice");
     expect(within(appRows[2]!).queryByRole("button", { name: "Take advance off" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("voucher-money-back")).toHaveTextContent("SRV-20260912-4821");
+    expect(screen.getByTestId("voucher-money-back")).toHaveTextContent("SMB-20260912-4821");
     // An approver-only step is not offered to this person.
     expect(screen.queryByRole("button", { name: "Cancel money back" })).not.toBeInTheDocument();
 

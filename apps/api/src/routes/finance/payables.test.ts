@@ -278,8 +278,9 @@ describe("payment vouchers", () => {
       p_pay_method: "BANK_TRANSFER",
       p_pay_reference: "TT-1",
       p_narration: null,
-      p_advance_amount: 0,
     });
+    // No advance, no advance argument: this call also works on a database without 0484.
+    expect(sb.rpc.mock.calls[0]?.[1]).not.toHaveProperty("p_advance_amount");
   });
 
   it("POST /vouchers carries an advance with no bill (pay before the bill)", async () => {
