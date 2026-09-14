@@ -387,24 +387,24 @@ export function receivablesVerdict(r: ReceivablesCheck, money: Money): SectionVe
     findings.push(`${money(r.storage_uncollected)} of storage money was collected without reducing what customers owe in the ledger.`);
   }
   if (r.comparable && !isZeroMoney(r.difference)) {
-    findings.push(`The ledger says customers owe ${money(r.ledger_total)}. Invoices less payments say ${money(r.documents_total)}. Difference ${money(Math.abs(r.difference))}.`);
+    findings.push(`The ledger says ${owedWords("customers", r.ledger_total, money)}. Invoices less payments say ${owedWords("customers", r.documents_total, money)}. Difference ${money(Math.abs(r.difference))}.`);
   }
   if (r.pre_go_live_open_count > 0) {
     notes.push(`${r.pre_go_live_open_count} ${r.pre_go_live_open_count === 1 ? "invoice" : "invoices"} worth ${money(r.pre_go_live_open_amount)} ${r.pre_go_live_open_count === 1 ? "was" : "were"} issued before the ledger started. The ledger does not hold ${r.pre_go_live_open_count === 1 ? "it" : "them"}.`);
   }
-  return { findings, notes, clean: `The ledger and invoices less payments agree: customers owe ${money(r.ledger_total)}.` };
+  return { findings, notes, clean: `The ledger and invoices less payments agree: ${owedWords("customers", r.ledger_total, money)}.` };
 }
 
 export function payablesVerdict(p: PayablesCheck, money: Money): SectionVerdict {
   const findings: string[] = [];
   if (p.account_codes.length === 0) findings.push("The chart has no supplier account for money owed.");
   if (!isZeroMoney(p.difference)) {
-    findings.push(`The ledger says Carres owes suppliers ${money(p.ledger_total)}. Bills less payments say ${money(p.bills_total)}. Difference ${money(Math.abs(p.difference))}.`);
+    findings.push(`The ledger says ${owedWords("suppliers", p.ledger_total, money)}. Bills less payments say ${owedWords("suppliers", p.bills_total, money)}. Difference ${money(Math.abs(p.difference))}.`);
   }
   if (p.supplier_difference_count > 0) {
     findings.push(`${p.supplier_difference_count} ${p.supplier_difference_count === 1 ? "supplier does" : "suppliers do"} not agree.`);
   }
-  return { findings, notes: [], clean: `The ledger and bills less payments agree: Carres owes suppliers ${money(p.ledger_total)}.` };
+  return { findings, notes: [], clean: `The ledger and bills less payments agree: ${owedWords("suppliers", p.ledger_total, money)}.` };
 }
 
 /** Who owes whom on a control account. An asset control is money owed TO
@@ -417,6 +417,15 @@ export function controlBalanceSentence(kind: string, controlFor: string | null, 
   const owedToCarres = kind === "LIABILITY" ? naturalBalance < 0 : naturalBalance > 0;
   const amount = money(Math.abs(naturalBalance));
   return owedToCarres ? `${Who} owe Carres ${amount}.` : `Carres owes ${who} ${amount}.`;
+}
+
+/** One owed figure in words. Below zero turns it round, never a minus:
+ *  customers paid before their invoice, or Carres paid a supplier ahead. */
+function owedWords(party: "customers" | "suppliers", n: number, money: Money): string {
+  const round = n < 0 && !isZeroMoney(n);
+  const amount = money(Math.abs(n));
+  if (party === "customers") return round ? `Carres owes customers ${amount}` : `customers owe ${amount}`;
+  return round ? `suppliers owe Carres ${amount}` : `Carres owes suppliers ${amount}`;
 }
 
 /** `RM 5.00` when the lines sit on one side; both sides named when they do not. */

@@ -3026,6 +3026,8 @@ Sentences these pages print follow the Empty-state and Error patterns above, for
 `The Journal could not be loaded. Try again.` · `No entry has that number. Check it and try again.`
 The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
 `finance-ledger.ts` from the row's own numbers.
+A balance on the other side turns the sentence round (`Carres owes customers RM 2,815.00` ·
+`suppliers owe Carres RM 100.00`), never a negative figure.
 
 ### Reports (Profit and Loss · Balance Sheet)
 

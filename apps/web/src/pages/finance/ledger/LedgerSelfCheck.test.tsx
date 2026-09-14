@@ -94,6 +94,29 @@ describe("Self-check", () => {
     expect(rentals).toHaveTextContent("RA-9001-M03");
   });
 
+  it("a balance below zero turns the sentence round, never a minus", async () => {
+    // Customers paid before their invoice; Carres paid a supplier ahead (0484).
+    api.fetch.mockResolvedValue({ ...CLEAN,
+      receivables: { ...CLEAN.receivables, ledger_total: -2815, documents_total: -2815, difference: 0 },
+      payables: { ...CLEAN.payables, ledger_total: -100, bills_total: -100, difference: 0 } });
+    show();
+    const receivables = await screen.findByTestId("self-check-receivables");
+    expect(receivables).toHaveTextContent("Carres owes customers RM 2,815.00");
+    expect(receivables).not.toHaveTextContent("RM -");
+    const payables = screen.getByTestId("self-check-payables");
+    expect(payables).toHaveTextContent("suppliers owe Carres RM 100.00");
+    expect(payables).not.toHaveTextContent("RM -");
+  });
+
+  it("a finding turns each figure round on its own", async () => {
+    // -0.001 is under a cent, so it reads as zero the natural way round.
+    api.fetch.mockResolvedValue({ ...CLEAN,
+      receivables: { ...CLEAN.receivables, ledger_total: -2815, documents_total: -0.001, difference: -2815 } });
+    show();
+    expect(await screen.findByTestId("self-check-receivables")).toHaveTextContent(
+      "The ledger says Carres owes customers RM 2,815.00. Invoices less payments say customers owe RM 0.00. Difference RM 2,815.00.");
+  });
+
   it("a section that could not be read says Not checked, never a zero", async () => {
     api.fetch.mockResolvedValue({ ...CLEAN,
       payables: { ok: false, message: "Supplier payables could not be checked. Try again." },
