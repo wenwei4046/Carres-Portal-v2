@@ -2879,7 +2879,20 @@ export interface operationOrderThreadRow {
 export interface operationOrderListRow {
   id: string;
   so: number;
-  status: "place" | "proceed_order" | "delivered";
+  /**
+   * ⭐ `cancelled` RESTORED 2026-09-14 (Card 23). This row type listed three
+   * statuses while the canonical `OrderStatus` in `@carres/shared`
+   * (`db-types.ts`), `domain.ts` and `OperationAllOrders` all list FOUR, and
+   * the database stores the fourth — three cancelled orders were measured in
+   * production the day this was found.
+   *
+   * The narrow type was not a harmless omission: it told every reader that a
+   * row on this listing could never be cancelled, which is precisely why
+   * Delivery's entry predicate never tested for it and cancelled orders sat on
+   * Monitor telling operators to chase customers about goods nobody is
+   * sending. A type that disagrees with the table teaches the wrong rule.
+   */
+  status: OrderStatus;
   operation_stage:
     | "placed"
     | "confirmed"

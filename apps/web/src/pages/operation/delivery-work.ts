@@ -475,9 +475,19 @@ export function requiredSalesFactsMissing(o: operationOrderListRow): string[] {
  * travel. A delivered order is HISTORY — the Delivery Orders register and
  * Delivery History hold it — and leaving it here would make every count on the
  * rail answer a question nobody asked.
+ *
+ * ⭐ A CANCELLED ORDER IS NOT DELIVERY WORK (owner ruling 2026-09-14, Card 23).
+ * The ENTRY RULE has named cancelled orders since 2026-08-24 — "Cancelled
+ * orders, orders that need no delivery and delivered scopes are not on
+ * Monitor" — but this predicate only ever tested `delivered`, so every
+ * cancelled order carrying an address and goods walked straight in. Measured
+ * on production the day this shipped: THREE of them, one a two-leg Journey
+ * contributing two rows, and one of those rows was telling the operator to
+ * chase a customer about goods nobody is sending. The rule was never missing;
+ * its enforcement was.
  */
 export function isOpenDeliveryScope(o: operationOrderListRow): boolean {
-  return o.status !== "delivered" && !o.delivered_at;
+  return o.status !== "delivered" && o.status !== "cancelled" && !o.delivered_at;
 }
 
 export interface ScopeInputs {
