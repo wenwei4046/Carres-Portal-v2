@@ -263,6 +263,53 @@ outbound handover, external-holder truth, return handover and inspection. Suppli
 requires Purchasing authority and actual handover. Write-off approval and physical disposal are
 separate facts. Ended Units leave the default view but remain searchable in Delivered / history.
 
+### Physical source and completion contract
+
+**RESOLVED FROM AUTHORITY:** the following expands §1/§5 and Delivery §1.1 without creating
+another movement ledger. An arrangement is a promise; only the named physical evidence changes
+the Unit fact. Different modules may read the same evidence, never ask for it to be entered twice.
+
+| Physical journey | Source and operator door | Evidence and next consequence | Partial/exception boundary |
+|---|---|---|---|
+| Purchase or consignment arrival | Issued PO/Consignment arrangement → Inbound → Receiving Session | Per-Unit receipt/condition and posted Receiving evidence update Inventory; supplier/commercial consequence stays Purchasing | Received Units progress; absent Units remain expected; unexpected goods cannot be created through Inventory |
+| Customer-delivery pickup | Live DO's exact Unit scope at the actual authorised Site → Outbound | Personal preparation and accepted handover with receiver/proof; Delivery separately records collection and customer outcome | Same DO + Site Work retains unhanded Units; reservation or scan alone changes no holder |
+| First journey leg to a carrier stop | Leg's own DO and actual source Site → Outbound | Source handover and carrier receipt move only the accepted Units into the journey; arrival at the stop is not customer delivery | Missing collection/arrival remains Delivery's leg work; no premature customer completion |
+| Later journey leg | Leg's own DO, previous leg's actual holder and named stop → Delivery's authorised partner handover door | Previous carrier hands to the next carrier; each event names its own company/person and scope | Original Warehouse login gains no work or access merely from the Unit's permanent Warehouse ID |
+| Site-to-Site transfer | Stock Transfer exact scope/date → origin physical door and destination Receiving/arrival door | Origin handover, carrier collection and destination accepted arrival remain distinct facts | Destination receives only actual arrivals; mismatch keeps affected Units and journey visible with last evidenced holder |
+| Customer or failed-delivery return | Authorised Service/Delivery return source → dated Inbound → Receiving | Actual return receipt plus condition check determines availability | A failed customer visit cannot teleport Units to Warehouse; kept-by-carrier and returned Units remain distinct |
+| Repair outward and return | Authorised repair source → Outbound; return arrangement → Inbound/Receiving | Outward handover proves repair holder; physical return and inspection determine subsequent eligibility | Closing repair correspondence is not return receipt; failed inspection keeps the Unit unavailable |
+| Supplier collection/return | Purchasing authorisation → source-linked Outbound | Accepted exact-Unit collection/handover proves physical departure; Purchasing/Finance own credit and settlement | Claim approval or supplier credit alone cannot remove physical stock |
+| Supplier replacement | Purchasing/Service-authorised replacement source → Inbound/Receiving | Receive the replacement against its own governed identity/source; preserve relationship to the defective Unit | Replacement arrival cannot silently dispose of, rename or rewrite the original Unit |
+| Count difference and correction | Dated Count → repeat/investigation → governed Adjustment where required | Submitted observations and approved correction retain source evidence; material adjustment uses its approver | Equal totals do not clear mismatched IDs; missing Unit alone never reduces stock |
+| Write-off and disposal | Approved Adjustment → separately evidenced physical disposal | Approval records write-off; actual disposal records physical end | Approval and disposal cannot collapse into one generic completed state |
+
+**SOURCE CHANGE AND RETRY:** each write rechecks current source/version and exact Unit scope,
+eligible actual holder/Site and prior accepted results. A stale screen must show the current
+source after refusal, not submit against removed Units. A duplicate submission reconciles its
+earlier result; partial batches never replay the already accepted Units. Evidence upload and
+physical submission are separate: an uploaded file alone is not a handover. Failure after upload
+leaves the obligation open until the owning write accepts the event and its proof association.
+
+**CANCELLATION:** before receipt, a source cancellation can end only the never-received expected
+remainder. After a physical act, the original event survives; return, redirect or approved
+correction supplies new evidence. Cancelled planning cannot delete a receipt, restore a departed
+Unit to the source Site or make a handed-over Unit available for another Sales Order.
+
+**DATE CHANGE:** the owning source records the formal change and its reason/history. Warehouse
+reads the new authorised arrangement date; it does not rewrite the actual scan, receipt or
+handover time. Other unfinished sources retain their own dates. A leg's route is its actual
+From/To; intermediate stops do not inherit the final customer address.
+
+**CODE EVIDENCE / OPEN DEFECT:** `apps/api/src/routes/operation/delivery-arrangements.ts`
+admits documented journey legs in `/warehouse-schedule`, but currently builds `fromLocation`
+and `warehouseSiteId` from permanent `ops_stock_items.warehouse_id` and `toCustomer` from the
+order address. Migration `0497_a_later_leg_hands_over_from_the_previous_legs_partner.sql`
+already requires leg 2..n handover from the preceding partner. These sources disagree.
+Required fix: project each leg's actual route and physical origin authority; admit Warehouse Work
+only where that origin is an authorised Warehouse Site. Keep documented journey visibility in
+Delivery and do not solve the defect by hiding all multi-leg documents. A regression must show
+Klang → JB followed by JB → customer, with only the genuine Klang pickup in Klang's queue.
+
 ### Unit lifecycle outcomes
 
 `Ended` may exist only as an internal availability grouping. It is not a sufficient operator,
