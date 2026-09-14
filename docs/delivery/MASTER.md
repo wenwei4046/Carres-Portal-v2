@@ -719,7 +719,7 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
 | collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
 | confirmed day passed with no result | `Overdue` | red | `{partner} must record the result` |
-| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
+| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | none — the stop rides line ONE, and no proof is owed here; the customer leg owes it |
 | attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
 | attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
 | attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |

@@ -75,9 +75,9 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(s.label).toBe("NETS must contact the customer");
   });
 
-  it("a day AND a window → Confirmed for the day, green, the window beneath", () => {
+  it("a day AND a window → Confirmed, green, the window beneath — the DATE is column 8's job (2026-09-14)", () => {
     const s = status({ confirmedDate: "2026-09-14", confirmedTime: "2 PM to 5 PM" });
-    expect(s.label).toBe("Confirmed for D(2026-09-14)");
+    expect(s.label).toBe("Confirmed");
     expect(s.second).toBe("2 PM to 5 PM");
     expect(s.tone).toBe("green");
   });
@@ -101,7 +101,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     ).toBe("Waiting for NETS pickup");
   });
 
-  it("the partner's receipt → Goods collected by the partner, with its clock", () => {
+  it("the partner's receipt → Collected by the partner, with its clock", () => {
     const s = status({
       hasDeliveryOrder: true,
       handoverEvents: [
@@ -109,7 +109,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
         { kind: "received_by_logistics", recordedAt: "2026-09-14T09:30:00Z" },
       ],
     });
-    expect(s.label).toBe("Goods collected by NETS");
+    expect(s.label).toBe("Collected by NETS");
     expect(s.second).toBe("Collected T(2026-09-14T09:30:00Z)");
   });
 
@@ -119,7 +119,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       handoverEvents: at("received_by_logistics"),
       expectedArrival: "14:30",
     });
-    expect(s.label).toBe("NETS is delivering to the customer");
+    expect(s.label).toBe("On the way to customer");
     expect(s.second).toBe("ETA 14:30");
   });
 
@@ -138,7 +138,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
 
   it("without today handed in, no row is ever Overdue — the arithmetic keeps no clock", () => {
     expect(status({ confirmedDate: "2026-09-10", confirmedTime: "9 AM to 12 PM" }).label).toBe(
-      "Confirmed for D(2026-09-10)",
+      "Confirmed",
     );
   });
 
@@ -154,7 +154,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
         proof,
       });
     const accepted = delivered({ photoUploaded: true, signedDoUploaded: true, acceptedOn: "2026-08-25" });
-    expect(accepted.label).toBe("Delivered");
+    expect(accepted.label).toBe("Delivered to customer");
     expect(accepted.tone).toBe("green");
     expect(accepted.second).toBe("Proof accepted D(2026-08-25)");
     const noPhoto = delivered({ photoUploaded: false, signedDoUploaded: true, acceptedOn: null });
@@ -234,7 +234,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
           attempt("delivered", null, "2026-08-24T09:00:00Z"),
         ],
       }).label,
-    ).toBe("Delivered");
+    ).toBe("Delivered to customer");
   });
 
   it("a required Sales fact missing → Order details incomplete, naming the fact", () => {
@@ -248,7 +248,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(status({ partnerName: "  ", hasDeliveryOrder: true }).label).toBe(
       "Waiting for logistics pickup",
     );
-    expect(deliveryWorkStatusLabelOf("delivering", null)).toBe("Logistics is delivering to the customer");
+    expect(deliveryWorkStatusLabelOf("delivering", null)).toBe("On the way to customer");
     expect(deliveryWorkStatusLabelOf("partner_must_contact", "")).toBe(
       "Logistics must contact the customer",
     );
@@ -270,12 +270,14 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked|unscheduled/i);
       expect(label).not.toMatch(/^Waiting$/);
     }
-    expect(every).toHaveLength(13);
+    expect(every).toHaveLength(17);
   });
 
   it("every kind carries a colour word, and only the two exceptions are red", () => {
     const red = DELIVERY_WORK_STATUS_KINDS.filter((k) => DELIVERY_WORK_STATUS_TONE[k] === "red");
-    expect(red).toEqual(["overdue", "failed"]);
+    /* `transfer_failed` joined 2026-09-14 — a failed warehouse leg is as red
+       as a failed delivery; what it must never be is `Failed Delivery`. */
+    expect(red).toEqual(["overdue", "failed", "transfer_failed"]);
   });
 
   /* 【DELIVERY】 CARD 20 — `Delivered` is the CUSTOMER's word. An intermediate
@@ -299,22 +301,26 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
         SPELL,
       );
       expect(s.kind).toBe("arrived");
-      expect(s.label).toBe("Arrived");
+      expect(s.label).toBe("Arrived at JB transit warehouse");
       expect(s.tone).toBe("green");
-      expect(s.second).toBe("JB transit warehouse");
+      /* The stop rode line TWO until 2026-09-14; it is line ONE's own detail
+         now, and repeating it beneath would say the same thing twice. */
+      expect(s.second).toBeNull();
       expect(s.secondTone).toBeNull();
     });
 
     it("the same facts on the customer leg are Delivered, and the proof gap still prints", () => {
       const s = deliveryWorkStatusOf({ ...base, intermediateLeg: false }, SPELL);
       expect(s.kind).toBe("delivered");
-      expect(s.label).toBe("Delivered");
+      expect(s.label).toBe("Delivered to customer");
       expect(s.second).toBe("Delivery photo not uploaded");
     });
 
     it("an intermediate leg with no result yet keeps the transit rungs", () => {
       const s = deliveryWorkStatusOf({ ...base, attempts: [], intermediateLeg: true, legStop: "JB transit warehouse" }, SPELL);
-      expect(s.kind).toBe("collected");
+      /* A transfer climbs the TRANSFER ladder even mid-journey (Card 24). */
+      expect(s.kind).toBe("collected_transfer");
+      expect(s.label).toBe("Collected for transfer");
     });
 
     it("`Arrived` sits in the dropdown order before `Delivered`, and is green", () => {
@@ -322,7 +328,9 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       expect(i).toBeGreaterThan(-1);
       expect(DELIVERY_WORK_STATUS_KINDS[i + 1]).toBe("delivered");
       expect(DELIVERY_WORK_STATUS_TONE.arrived).toBe("green");
-      expect(deliveryWorkStatusLabelOf("arrived", "NETS")).toBe("Arrived");
+      expect(deliveryWorkStatusLabelOf("arrived", "NETS", "JB transit warehouse")).toBe(
+        "Arrived at JB transit warehouse",
+      );
     });
   });
 });

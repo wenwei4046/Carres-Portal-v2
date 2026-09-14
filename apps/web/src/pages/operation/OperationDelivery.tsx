@@ -122,6 +122,8 @@ import {
   deliveriesFooter,
   emptyRangeSentence,
   filterMonitorCalendarCards,
+  scheduleSplitOf,
+  scheduleSplitSentence,
   filterMonitorListRows,
   groupCardsByDay,
   matchesMonitorSearch,
@@ -1066,7 +1068,7 @@ export default function OperationDelivery() {
      deliveries tab's own badge. It is deliberately not window-scoped: a tab
      count that emptied when the operator paged to a quiet week would say the
      work had gone away. */
-  const confirmedCount = useMemo(
+  const confirmedInScope = useMemo(
     () =>
       cards.filter(
         (c) =>
@@ -1074,8 +1076,21 @@ export default function OperationDelivery() {
           (region === null || c.region === region) &&
           (logistics === null || c.logisticsPartnerId === logistics) &&
           (status === null || c.statusKey === status),
-      ).length,
+      ),
     [cards, region, logistics, status],
+  );
+  const confirmedCount = confirmedInScope.length;
+  /* ⭐ THE SCHEDULE'S SPLIT (owner ruling 2026-09-14, Card 24) — the tab's own
+     population, told apart. A transfer is never counted as a customer
+     delivery, and the sentence follows whatever is in scope rather than
+     preserving a total from elsewhere. */
+  const scheduleSplit = useMemo(() => scheduleSplitOf(confirmedInScope), [confirmedInScope]);
+  /* On the schedule, the split answers about the RANGE the operator is looking
+     at; from the work tab there is no range, so it answers about every agreed
+     appointment the current narrowings leave. */
+  const visibleSplit = useMemo(
+    () => (calendarMode ? scheduleSplitOf(calendarCards) : scheduleSplit),
+    [calendarMode, calendarCards, scheduleSplit],
   );
   /* The PHONE work list's own search box. It is deliberately LOCAL, not the
      URL's `?q=`: a carried-over URL search must never narrow a work list
@@ -1622,6 +1637,19 @@ export default function OperationDelivery() {
     </div>
   );
 
+  /* ⭐ TWO KINDS, ONE PLACE, NEVER ONE TOTAL (owner ruling 2026-09-14). The
+     count above says how much; this line says WHAT OF, because a warehouse
+     transfer and a delivery to a customer are not the same job and a single
+     number hid that for the whole life of the page. */
+  const scheduleSplitLine = (
+    <div
+      className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1.5 text-meta text-kit-slate-11"
+      data-testid="delivery-schedule-split"
+    >
+      {scheduleSplitSentence(visibleSplit)}
+    </div>
+  );
+
   /* ── THE CONTACT WEEK — Monday to Saturday, counted by CONTACT DEADLINE ───
      It appears under `Call customer` and nowhere else, because it answers only
      that queue's question. The `Overdue` chip stays visible WITH ITS COUNT at
@@ -1917,6 +1945,7 @@ export default function OperationDelivery() {
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
           {/* ⭐ THE TWO TOP-LEVEL VIEWS, above everything the page owns. */}
           {isError ? null : topTabs}
+          {isError ? null : scheduleSplitLine}
           {isError ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
               <p className="text-body text-kit-slate-12">{MONITOR_COPY.loadFailed}</p>

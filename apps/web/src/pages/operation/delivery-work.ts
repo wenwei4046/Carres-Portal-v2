@@ -198,6 +198,14 @@ export interface DeliveryScopeRow {
   leg: number | null;
   /** `Klang WH → JB transit` — the leg's own two places, never invented. */
   legRoute: string | null;
+  /** ⭐ Card 24 — how many legs the Journey has, so a row can say `Leg 1 of 2`.
+   *  null on a whole-order scope, which is not a Journey. */
+  legCount: number | null;
+  /** ⭐ Card 24 — this leg is BEFORE the last one, so it is a warehouse
+   *  TRANSFER, not a customer delivery. Always false on a whole-order scope. */
+  intermediateLeg: boolean;
+  /** ⭐ Card 24 — the place this leg is heading for (`JB transit warehouse`). */
+  legStop: string | null;
   customer: string;
   /** The SO's promise. null when the customer has not given one. */
   customerDeliveryIso: string | null;
@@ -267,13 +275,21 @@ export function legWorkStatusOf(
   confirmedIso: string | null,
   partnerName: string | null = null,
   confirmedTime: string | null = null,
+  /** ⭐ Card 24 — an intermediate leg climbs the TRANSFER ladder. Defaulting
+   *  to false keeps a whole-order scope and the last leg on the customer
+   *  words, which is what they are. */
+  intermediateLeg = false,
 ): DeliveryWorkStatus {
+  const stopName = stop.to_loc?.trim() || null;
   const say = (kind: DeliveryWorkStatusKind, second: string | null = null): DeliveryWorkStatus => ({
     kind,
+    /* The only rungs whose line one carries a detail are the transfer's two
+       stop-naming words; `confirmed` stopped carrying the date on
+       2026-09-14 — the date is `Confirmed Delivery`'s job. */
     label: deliveryWorkStatusLabelOf(
       kind,
       partnerName,
-      kind === "confirmed" && confirmedIso ? DELIVERY_STATUS_SPELL.date(confirmedIso) : null,
+      kind === "arrived" || kind === "in_transit" ? stopName : null,
     ),
     tone: DELIVERY_WORK_STATUS_TONE[kind],
     second,
@@ -282,21 +298,25 @@ export function legWorkStatusOf(
   });
   switch (stop.status) {
     case "delivered":
-      return say("delivered");
+      /* A leg recorded `delivered` that is NOT the customer's leg reached a
+         warehouse, and says so. */
+      return intermediateLeg ? say("arrived") : say("delivered");
     case "handed_off":
       /* A leg handed off at the named partner warehouse has ARRIVED there —
          the goods reached the stop, never the customer (Delivery MASTER
-         §14.1; Card 20). The customer leg is its own row with its own word. */
-      return say("arrived", stop.to_loc?.trim() || null);
+         §14.1; Card 20). The stop rides line ONE since 2026-09-14. */
+      return say("arrived");
     case "picked_up":
-      return say("collected");
+      return say(intermediateLeg ? "collected_transfer" : "collected");
     case "issue":
-      return say("failed");
+      return say(intermediateLeg ? "transfer_failed" : "failed");
     default:
       /* A leg nobody has moved yet is exactly the rungs the whole-order scope
          uses: a day and a window agreed, a partner still to contact the
          customer, or no partner at all. */
-      if (confirmedIso && confirmedTime) return say("confirmed", confirmedTime);
+      if (confirmedIso && confirmedTime) {
+        return say(intermediateLeg ? "transfer_confirmed" : "confirmed", confirmedTime);
+      }
       return say(partnerName ? "partner_must_contact" : "assign_logistics");
   }
 }
@@ -713,6 +733,9 @@ export function buildDeliveryScopeRows({
         key: o.id,
         leg: null,
         legRoute: null,
+        legCount: null,
+        intermediateLeg: false,
+        legStop: null,
         logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
         logisticsName,
         confirmedIso: confirmed.iso,
@@ -785,6 +808,20 @@ export function buildDeliveryScopeRows({
         key: `${o.id}#leg${stop.leg}`,
         leg: stop.leg,
         legRoute: legRouteOf(stop),
+        legCount: lastLeg,
+        intermediateLeg,
+        legStop: stop.to_loc?.trim() || null,
+        /* ⭐ A LEG GOES WHERE THE LEG GOES (owner ruling 2026-09-14, Card 24).
+           `location` is set once on `base` from the CUSTOMER's city and state,
+           and every leg used to inherit it — so a Klang → JB transit run
+           printed `Chini, Pahang`, the customer's home town 300km the wrong
+           way, as its destination. Measured in production on the schedule and
+           in the register on the same day. A leg names its own stop; the
+           customer's address stays in the expansion, where the crew needs it
+           on the leg that actually goes there. `regionBucketOf` has always
+           classified a leg by its destination, so this also closes a Law D
+           disagreement between two Monitor surfaces. */
+        location: stop.to_loc?.trim() || base.location,
         logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
         logisticsName: legPartner,
         confirmedIso,
@@ -823,7 +860,7 @@ export function buildDeliveryScopeRows({
               },
               DELIVERY_STATUS_SPELL,
             )
-          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
+          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime, intermediateLeg),
       });
     }
   }

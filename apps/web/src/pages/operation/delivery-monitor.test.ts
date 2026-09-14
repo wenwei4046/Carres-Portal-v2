@@ -365,7 +365,7 @@ describe("buildDeliveryMonitorCards", () => {
       },
     );
     expect(out[0]!.statusKey).toBe("confirmed");
-    expect(out[0]!.statusLabel).toBe("Confirmed for Fri, 4 Sep");
+    expect(out[0]!.statusLabel).toBe("Confirmed");
     expect(out[0]!.statusTone).toBe("green");
     expect(out[0]!.statusSecond).toBe("09:00–11:00");
     /* A DAY alone is still contact work (owner ruling 2026-09-11): the card
@@ -394,7 +394,7 @@ describe("buildDeliveryMonitorCards", () => {
       const c = delivered({ ops_order_control: { delivery_photos: [] } });
       expect(c.statusKey).toBe("delivered");
       /* The result stays `Delivered` — the evidence is a separate fact. */
-      expect(c.statusLabel).toBe("Delivered");
+      expect(c.statusLabel).toBe("Delivered to customer");
       expect(c.missingProof).toEqual({ photo: true, signedDo: true });
       expect(needsProof(c)).toBe(true);
       expect(missingProofLabels(c)).toEqual(["Upload delivery photo", "Upload signed Delivery Order"]);
@@ -602,7 +602,8 @@ describe("the two top-level views", () => {
     expect(DEFAULT_TOP_TAB).toBe("work");
     expect(DEFAULT_WORK_VIEW).toBe("all");
     expect(MONITOR_TOP_TAB_LABEL.work).toBe("Work to do");
-    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Confirmed deliveries");
+    /* ⭐ The tab names a PLACE, not a state (owner ruling 2026-09-14). */
+    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Delivery schedule");
   });
 
   it("a STATE pick narrows the calendar instead of replacing it", () => {
@@ -634,6 +635,12 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
   return {
     orderId: over.scopeId,
     leg: null,
+    /* Card 24 — a fixture is a CUSTOMER delivery unless it says otherwise,
+       which is what a whole-order scope and a last leg both are. */
+    isTransfer: false,
+    legRoute: null,
+    legStop: null,
+    legCount: null,
     deliveryOrderId: null,
     doNumber: null,
     /* A DATED fixture is a FINISHED arrangement — a day AND a window. The
@@ -652,7 +659,7 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     logisticsPartnerName: null,
     region: "Selangor",
     statusKey: "confirmed",
-    statusLabel: "Confirmed for Fri, 4 Sep",
+    statusLabel: "Confirmed",
     statusTone: "green",
     statusSecond: "09:00–11:00",
     statusSecondTone: null,
@@ -857,19 +864,24 @@ describe("monthDayCounts", () => {
       datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
     ];
     const counts = monthDayCounts(set, TODAY);
-    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, exceptions: 1, noLogistics: 2 });
-    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, exceptions: 2, noLogistics: 1 });
+    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 });
+    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, transfers: 0, exceptions: 2, noLogistics: 1 });
     // A dateless row sits on no day.
     expect(counts.size).toBe(2);
   });
 
   it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, exceptions: 1, noLogistics: 2 })).toBe(
-      "Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked",
-    );
-    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, exceptions: 0, noLogistics: 0 })).toBe(
-      "Fri, 4 Sep — 1 delivery",
-    );
+    expect(
+      monthDaySentence("Fri, 4 Sep", { deliveries: 3, transfers: 0, exceptions: 1, noLogistics: 2 }),
+    ).toBe("Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked");
+    expect(
+      monthDaySentence("Fri, 4 Sep", { deliveries: 1, transfers: 0, exceptions: 0, noLogistics: 0 }),
+    ).toBe("Fri, 4 Sep — 1 delivery");
+    /* ⭐ Card 24 — a transfer gets its OWN line and is never added to the
+       delivery count. A day of nothing but transfers says so. */
+    expect(
+      monthDaySentence("Tue, 15 Sep", { deliveries: 0, transfers: 2, exceptions: 0, noLogistics: 0 }),
+    ).toBe("Tue, 15 Sep — 2 transfers");
     expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep — No deliveries");
   });
 });
@@ -991,7 +1003,7 @@ describe("buildMonitorRails", () => {
   it("DELIVERY STATUS counts every rung of the shared dictionary, zero printed", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     expect(rails.status).toMatchObject({ waiting_pickup: 1, collected: 1, delivering: 1, assign_logistics: 0 });
-    expect(Object.keys(rails.status)).toHaveLength(13);
+    expect(Object.keys(rails.status)).toHaveLength(17);
     /* Card 20 — the intermediate leg's own word is a rung of its own. */
     expect(rails.status).toHaveProperty("arrived", 0);
     const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
@@ -1087,12 +1099,21 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
       "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
       "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "arrived", "delivered", "failed",
       "details_incomplete",
+      /* ⭐ Card 24 — the TRANSFER ladder. A warehouse leg runs a different
+         journey, so it gets its own rungs and shares no word with the
+         customer's. */
+      "transfer_confirmed", "collected_transfer", "in_transit", "transfer_failed",
     ]);
+    expect(MONITOR_STATUS_LABEL.confirmed).toBe("Confirmed");
+    expect(MONITOR_STATUS_LABEL.transfer_confirmed).toBe("Transfer confirmed");
+    expect(MONITOR_STATUS_LABEL.collected_transfer).toBe("Collected for transfer");
+    expect(MONITOR_STATUS_LABEL.transfer_failed).toBe("Transfer failed");
+    expect(MONITOR_STATUS_LABEL.delivered).toBe("Delivered to customer");
     expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");
     expect(MONITOR_STATUS_LABEL.waiting_pickup).toBe("Waiting for logistics pickup");
-    expect(MONITOR_STATUS_LABEL.delivering).toBe("Logistics is delivering to the customer");
+    expect(MONITOR_STATUS_LABEL.delivering).toBe("On the way to customer");
     expect(MONITOR_STATUS_LABEL.details_incomplete).toBe("Order details incomplete");
-    for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery", "Delivery confirmed", "Waiting for customer date"]) {
+    for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery", "Delivery confirmed", "Waiting for customer date", "Scheduled", "Transfer scheduled", "Delivery failed", "Arrived at customer"]) {
       expect(Object.values(MONITOR_STATUS_LABEL)).not.toContain(retired);
     }
   });
