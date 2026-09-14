@@ -149,7 +149,7 @@ export default function App() {
           path="/finance/*"
           element={
             <RequireAuth>
-              {/* Payment MASTER §12 — Payment Duty and Delivery Operation
+              {/* Payment MASTER §12 — the Responsible Delivery Operation
                   (role: operation) do daily collection, so the Payments and
                   Invoices destinations must open for them. FinanceApp itself
                   bounces operation off the finance-only pages. */}

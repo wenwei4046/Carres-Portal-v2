@@ -177,6 +177,7 @@ The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
 | Payment exception | `Payment Approver` |
 | Stock adjustment | `Stock Adjustment Approver` |
 | Service Case decision | `Service Case Approver` |
+| Routine Delivery arrangement, customer contact, result and proof work | `Delivery Duty` — the engine's existing `delivery_duty` owner rule, given its assignment key by the owner ruling of 2026-09-13 |
 
 Each Duty has exactly one active Primary holder and may have one governed Buddy cover. When the
 Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
@@ -663,11 +664,17 @@ or correct its event.
   Delivery owns the ONE derivation rule (Law D), and for multi-leg journeys the ONE backward
   calculation `customer date → latest partner-warehouse arrival → KL pickup day → latest Carres
   Warehouse ready date`, which Warehouse and Purchasing consume through dated Work.
-- The **proof**: the delivery photo and the signed document.
+- The **proof**: the delivery photo, the signed document and the proof review (`Proof Accepted` ·
+  `More Proof Required` · `Proof Rejected`).
+- The **customer contact record** for a delivery: purpose, channel, person, time, result and
+  reply evidence (owner ruling 2026-09-13). Silence is never a result.
 
-**ACTIONS** — assign or change a carrier · record the arrangement · record the delivery
-result · upload the proof · maintain the carrier's rules. (The SYSTEM issues the delivery
-order; `Request Delivery Order` is the one governed manual door.)
+**ACTIONS** — assign or change a Logistics Partner · record the arrangement inside the Monitor
+row's expanded panels · record a customer contact · record the delivery result · upload and
+review the proof · maintain the partner's rules in central Delivery Settings. (The SYSTEM issues
+the delivery order; `Request Delivery Order` is the one governed manual door.) Every routine act
+resolves its owner through the `delivery_duty` rule and the Shared Duty Resolver; the Loan offer
+and decision stay with the Customer Order.
 
 **SUMMARISES** — the customer's promised date and confirmed booking · what the order contains ·
 whether money holds it.
@@ -791,7 +798,7 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 ### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
 
 Workspace owns one Staff & Duties registry for every ERP module. Each work/approval type maps to
-its own duty (for example Payment Duty, Storage Waiver Approver, Purchasing Approver); there is no
+its own duty (for example Delivery Duty, Storage Waiver Approver, Purchasing Approver); there is no
 universal ERP Manager owner. A duty has a primary holder and optional buddy cover. Resolution
 retains normal owner, today's cover and actual actor, so absence changes today's work without
 rewriting history. Reassignment is one Workspace change and never a module code change.

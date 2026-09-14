@@ -39,7 +39,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
-import EditDelivery from "./EditDelivery";
+import EditDeliveryRedirect from "./EditDeliveryRedirect";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -53,6 +53,7 @@ import OperationPurchaseOrders from "./OperationPurchaseOrders";
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
 import OperationReceivingReport from "./OperationReceivingReport";
+import OperationDeliveryReport from "./OperationDeliveryReport";
 import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
@@ -368,6 +369,9 @@ export default function OperationApp() {
              row (the same defect the Warehouse walks caught, found live on
              this card's production walk). */
           tab !== "receiving-report" &&
+          /* 【DELIVERY】 CARD 17 — Reports → Delivery draws the Delivery
+             destination header (ModuleHeader embeds TopBarIcons). */
+          tab !== "delivery-report" &&
           tab !== "staff-duties" &&
           /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
              de-navigated legacy Stock pages and Unit Detail all draw their own
@@ -454,7 +458,10 @@ export default function OperationApp() {
                 scope. It is a REAL route, so the shell suppresses its slim top
                 bar the same way it does for every other page that draws its own
                 Destination Header. */}
-            <Route path="delivery/edit/:orderId" element={<EditDelivery />} />
+            {/* Edit Delivery is RETIRED (owner ruling 2026-09-13): the
+                Delivery-owned writes live inside the Monitor row's brief. A
+                saved or pasted link lands on that row, brief unfolded. */}
+            <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
@@ -504,6 +511,9 @@ export default function OperationApp() {
             {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
                 reachable by direct URL, like the Purchasing Report. */}
             {tab === "receiving-report" && <OperationReceivingReport />}
+            {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
+                reachable by direct URL, like the Receiving report. */}
+            {tab === "delivery-report" && <OperationDeliveryReport />}
             {/* Workspace → Staff & Duties — the ONE duty assignment door
                 (workspace/MASTER.md, LOCKED 2026-09-03). */}
             {tab === "staff-duties" && <StaffDuties />}
@@ -538,7 +548,7 @@ export default function OperationApp() {
                 reads as `?order=<SO No>`. */}
             {tab === "payments" && (
               <Navigate
-                to={`/finance/payments${
+                to={`/finance/monitor${
                   legacyPaymentsSo ? `?order=${encodeURIComponent(legacyPaymentsSo)}` : ""
                 }`}
                 replace

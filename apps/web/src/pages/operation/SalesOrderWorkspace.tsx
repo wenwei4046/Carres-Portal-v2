@@ -35,6 +35,8 @@ import {
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
+  salesOrderNumberWord,
+  salesOrderParamOf,
   supplierClaimStatusLabel,
   myHolidaySet,
   unitsShortWords,
@@ -51,9 +53,13 @@ import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import { UnitEvidence } from "./components/GoodsMiniTable";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
+ fix/ika2/dev-branch
 import { amendmentValidation, type AmendmentField } from "./sales-order-amendment-validation";
 import { payMethodWord } from "@/lib/payment-display";
+
+main
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
@@ -81,6 +87,7 @@ import {
   useSalesOrderRevisions,
   useSalesOrderExpansion,
   useSalesOrderRouteFacts,
+  useSalesOrderIdByNumber,
   useSalespersons,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
@@ -953,7 +960,66 @@ type Mode = "object" | "create" | "oldrev";
 const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
+/**
+ * 【DELIVERY】 CARD 19 — THE NUMBER DOOR. `/operation/orders/so/:orderId`
+ * carries either the order's id or the operator's own document word
+ * (`SO-1362`). The object page below reads TEN doors by the id; handing it a
+ * number reached the database as `invalid input syntax for type uuid` and the
+ * page printed an empty Order Route (measured on production 2026-09-13).
+ *
+ * A number is resolved ONCE through the by-number door and the page re-enters
+ * by the id with the same search (`?route=1` survives), so every fan-in read
+ * still happens by the canonical id — one resolver, no second fan-in (Law C).
+ * `new` stays the create door. Anything else is an absence, never a 500.
+ */
 export default function SalesOrderWorkspace() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
+  const isNew = location.pathname.endsWith("/so/new");
+  const ident = isNew ? null : salesOrderParamOf(orderId);
+  if (ident && ident.kind === "number") {
+    return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
+  }
+  if (ident && ident.kind === "invalid") {
+    return <SalesOrderAbsence />;
+  }
+  return <SalesOrderWorkspaceBody />;
+}
+
+function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
+  const navigate = useNavigate();
+  const resolved = useSalesOrderIdByNumber(so);
+  const id = resolved.data?.id ?? null;
+  useEffect(() => {
+    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true });
+  }, [id, navigate, search]);
+  if (resolved.isError) return <SalesOrderAbsence />;
+  return (
+    <div className="flex h-full items-center justify-center" data-testid="so-number-door">
+      <Loading label={`Opening ${salesOrderNumberWord(so)}`} />
+    </div>
+  );
+}
+
+/** The absence the object page prints for a number or param no order carries
+ *  (COPY-STANDARD: `Sales Order not found.`). */
+function SalesOrderAbsence() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2" data-testid="so-not-found">
+      <p className="text-body text-base-700">Sales Order not found.</p>
+      <button
+        type="button"
+        className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+        onClick={() => navigate("/operation/orders")}
+      >
+        Back to Sales Orders
+      </button>
+    </div>
+  );
+}
+
+function SalesOrderWorkspaceBody() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1609,18 +1675,6 @@ export default function SalesOrderWorkspace() {
   };
 
 
-  /* The at-sale payment plan, in words, or null when nothing was recorded.
-     `installment_months` is only meaningful with a method behind it; either
-     one alone is stated on its own rather than padded out. */
-  const instalmentWord = useMemo(() => {
-    const months = (order as { installment_months?: number | null } | undefined)?.installment_months;
-    const method = (order as { payment_method?: string | null } | undefined)?.payment_method;
-    const plan = months != null && Number(months) > 0 ? `${Number(months)}-month instalment` : null;
-    const word = method ? payMethodWord(method) : null;
-    if (plan && word) return `${plan} · ${word}`;
-    return plan ?? word ?? null;
-  }, [order]);
-
   /* ── The money the left side states (same arithmetic as the register). ── */
   const money = useMemo(() => {
     if (mode === "oldrev" && viewedRevision) {
@@ -1812,6 +1866,17 @@ export default function SalesOrderWorkspace() {
         label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
         qty: 1,
         returned: loan.status === "returned",
+        unitId: loan.item_unit_code ?? null,
+      })),
+      /* 0492 (Card 15) — the offer conversation; the map prints the current
+         state, the drawer keeps the history. */
+      loanOffers: (facts.loanOffers ?? []).map((offer) => ({
+        id: offer.id,
+        seq: offer.seq,
+        event: offer.event,
+        label: offer.label,
+        reason: offer.reason,
+        recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */
@@ -2021,7 +2086,7 @@ export default function SalesOrderWorkspace() {
       <Block
         title="Customer"
         headerSlot={
-          customerBuiltins["customerType"]?.enabled !== false ? (
+          !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
             <span
               className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
               data-pos-field="customerType"
@@ -2707,14 +2772,20 @@ export default function SalesOrderWorkspace() {
                       read the commitment without opening the PDF beside it.
                       A free gift is a line at RM 0.00: visible as goods,
                       charged nothing, counted nowhere twice. */}
+                  fix/ika2/dev-branch
                   <th className="align-middle py-1 pr-3 text-right font-medium">Unit price</th>
                   <th className="align-middle py-1 text-right font-medium">Line total</th>
+
+                  <th className="py-1 text-right font-medium">
+                    <div>Unit price</div><div>Line total</div>
+                  </th>
+ main
                 </tr>
               </thead>
               <tbody>
                 {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => {
-                  const liveLine = detailQ.data?.lines?.[i];
-                  const truth = (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
+                  const liveLine = mode === "oldrev" ? viewedRevision?.snapshot.lines[i] : detailQ.data?.lines?.[i];
+                  const truth = mode === "oldrev" ? undefined : (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
                   const destinations = truth?.deliverTo ?? [];
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
@@ -2733,23 +2804,26 @@ export default function SalesOrderWorkspace() {
                         is in flight; this one did not, so a slow read printed
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
+ fix/ika2/dev-branch
                     <td className="align-middle py-1.5 pr-3">
                       {goodsTruthQ.isLoading && !truth ? (
+
+                    <td className="py-1.5 pr-3">
+                      {mode === "oldrev" ? (
+                        <span className="text-meta">Not recorded in this revision</span>
+                      ) : goodsTruthQ.isError ? (
+                        <span className="text-meta">The goods could not be opened.</span>
+                      ) : goodsTruthQ.isLoading && !truth ? (
+ main
                         <span className="font-mono text-meta">Loading…</span>
-                      ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
-                        <div className="flex max-w-[220px] flex-wrap gap-1">
-                          {truth.unitIds.map((id) => (
-                            <span
-                              key={id}
-                              className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700"
-                            >
-                              {id}
-                            </span>
-                          ))}
+                      ) : truth && ((truth.verifiedUnitIds ?? truth.unitIds).length > 0 || (truth.unverifiedUnitIds?.length ?? 0) > 0 || truth.unitQuantityMismatch) ? (
+                        <div className="font-mono text-meta">
+                          <UnitEvidence ids={truth.verifiedUnitIds ?? truth.unitIds} unverified={truth.unverifiedUnitIds ?? []} mismatch={truth.unitQuantityMismatch ?? false} />
+                          {(truth.verifiedUnitIds ?? truth.unitIds).length < r.qty && <div className="mt-1 text-base-600">{unitsShortWords((truth.verifiedUnitIds ?? truth.unitIds).length, r.qty).join(" · ")}</div>}
                         </div>
                       ) : (
                         (() => {
-                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          const [count, waiting] = unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty);
                           return (
                             <div className="font-mono text-meta">
                               <div>{count}</div>
@@ -2767,9 +2841,17 @@ export default function SalesOrderWorkspace() {
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
+ fix/ika2/dev-branch
                     <td className="align-middle py-1.5 pr-3">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
                     <td className="align-middle py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
                     <td className="align-middle py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
+                      
+                    <td className="py-1.5 pr-3">{mode === "oldrev" ? "Not recorded in this revision" : goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(r.unitPrice)}</div>
+                      <div className="font-medium">{fmtMoney(r.total)}</div>
+                    </td>
+ main
                   </tr>
                   );
                 })}
@@ -2795,7 +2877,7 @@ export default function SalesOrderWorkspace() {
                     and off-dictionary. `Not recorded` is also what the goods
                     rows already print in `Deliver To`, so the column now reads
                     one way down its whole length. */}
-                {(detailQ.data?.addons ?? []).map((a, i) => {
+                {(mode === "oldrev" ? (viewedRevision?.snapshot.addons ?? []).map((a) => ({ ...a, id: a.addon_key, unit_price: Number(a.unit_price), attrs: null })) : (detailQ.data?.addons ?? [])).map((a, i) => {
                   const serviceName = addonNameByKey.get(a.addon_key) ?? a.addon_key;
                   const size = a.attrs?.size ?? null;
                   return (
@@ -2829,9 +2911,17 @@ export default function SalesOrderWorkspace() {
                         />
                       )}
                     </td>
+ fix/ika2/dev-branch
                     <td className="align-middle py-1.5 pr-3">Not recorded</td>
                     <td className="align-middle py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
                     <td className="align-middle py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
+
+                    <td className="py-1.5 pr-3">Not recorded</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(Number(a.unit_price ?? 0))}</div>
+                      <div className="font-medium">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</div>
+                    </td>
+ main
                   </tr>
                   );
                 })}
@@ -2925,6 +3015,7 @@ export default function SalesOrderWorkspace() {
             of it is owed (owner ruling 2026-08-15), and all three keep
             `text-strong` so the numerals stay one size — the 2026-08-28 fix,
             untouched. */}
+ fix/ika2/dev-branch
         {/* ⭐ THE PLAN THE ORDER WAS SOLD ON, ONLY WHERE IT WAS RECORDED
             (2026-09-11). `orders.installment_months` + `orders.payment_method`
             are the at-sale capture — an ORDER-level fact, not a per-transaction
@@ -2942,6 +3033,13 @@ export default function SalesOrderWorkspace() {
         )}
         <PaymentLedger orderId={isNew ? null : (orderId ?? null)}
           savedPayments={base?.payments} summaryLoading={baseQ.isLoading} summaryError={baseQ.isError} />
+
+        <PaymentLedger orderId={isNew ? null : (orderId ?? null)} saved={{
+          paid: Number(order?.paid ?? 0), method: order?.payment_method,
+          months: order?.installment_months, reference: order?.approval_code,
+          slip: order?.payment_slip_url,
+        }} />
+ main
         {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
             RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
             2026-09-10). `Total` is NOT repeated here — it is stated once,
@@ -2994,7 +3092,7 @@ export default function SalesOrderWorkspace() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-so-theme={mode !== "create" ? "trial" : undefined}>
+    <div className="flex h-full min-h-0 flex-col" data-so-theme="trial">
       <SalesOrderTabs
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the

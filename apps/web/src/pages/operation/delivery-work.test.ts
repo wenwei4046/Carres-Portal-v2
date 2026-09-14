@@ -21,6 +21,7 @@ import {
   confirmedDeliveryOf,
   legWorkStatusOf,
   entersDeliveryWork,
+  requiredSalesFactsMissing,
   deliveryEntryBlockers,
   regionBucketOf,
   SINGAPORE_KEY,
@@ -44,6 +45,10 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Landed",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
     delivery_date: "2026-08-30",
     delivery_date_tbd: false,
@@ -125,14 +130,60 @@ describe("delivery scopes and journey legs", () => {
     expect(rows[0]!.key).not.toBe(rows[1]!.key);
   });
 
-  it("speaks a leg's status in the SEVEN OPERATIONAL words, never `Pending`", () => {
+  it("0491 — a leg with its OWN document takes the document's number, id and the shared ladder", () => {
+    const stops = [
+      { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: "2026-08-25T04:00:00.000Z", status: "pending" as const },
+      { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: "2026-08-27T04:00:00.000Z", status: "pending" as const },
+    ];
+    const legDoc: DeliveryOrderRow = {
+      id: "do-leg-1",
+      order_id: "b",
+      do_number: "DO-250826-0001",
+      leg: 1,
+      issued_at: "2026-08-24T02:00:00Z",
+      trip_groups: null,
+      delivery_date: "2026-08-25",
+      time_slot: null,
+      logistics_partner: "TEOW",
+      voided_at: null,
+      void_reason: null,
+      orders: { id: "b", so: 1302, customer_name: "kong chai yin" },
+    };
+    const rows = buildDeliveryScopeRows({
+      orders: [order({ id: "b", so: 1302, delivery_stops: stops })],
+      deliveryOrders: [legDoc],
+      attempts: [],
+      handoverEvents: [{ delivery_order_id: "do-leg-1", kind: "received_by_logistics", recorded_at: "2026-08-25T03:00:00Z" }],
+      partnerNameById: NO_PARTNERS,
+    });
+    expect(rows.map((r) => r.doNumber)).toEqual(["DO-250826-0001", null]);
+    expect(rows[0]!.deliveryOrderId).toBe("do-leg-1");
+    /* The document's own handover facts speak: the partner collected. */
+    expect(rows[0]!.status.kind).toBe("collected");
+    expect(rows[0]!.receivedAt).toBe("2026-08-25T03:00:00Z");
+    /* Leg 2, no document yet: the chain's own words, as before. */
+    expect(rows[1]!.status.kind).toBe("partner_must_contact");
+  });
+
+  it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
     // One vocabulary across the workspace: a leg and a whole-order scope must
     // not be readable on two different scales.
-    expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Waiting for customer date");
-    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25").label).toBe("Delivery confirmed");
-    expect(legWorkStatusOf({ status: "picked_up" }, null).label).toBe("Out for delivery");
-    // Leg 1 handing over at the named JB warehouse IS that leg's delivery.
-    expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Delivered");
+    expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Operation must assign logistics");
+    expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("TEOW must contact the customer");
+    /* A day alone is still contact work; a day AND a window is the booking. */
+    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe("TEOW must contact the customer");
+    const booked = legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW", "9am–12pm");
+    expect(booked.label).toBe("Confirmed for Tue, 25 Aug");
+    expect(booked.second).toBe("9am–12pm");
+    expect(legWorkStatusOf({ status: "picked_up" }, null, "TEOW").label).toBe("Goods collected by TEOW");
+    /* Leg 1 handing over at the named JB warehouse is that leg's ARRIVAL —
+       the goods reached the stop, never the customer (Card 20). */
+    const arrived = legWorkStatusOf({ status: "handed_off", to_loc: "JB transit warehouse" }, null);
+    expect(arrived.kind).toBe("arrived");
+    expect(arrived.label).toBe("Arrived");
+    expect(arrived.second).toBe("JB transit warehouse");
+    expect(arrived.tone).toBe("green");
+    expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Arrived");
     expect(legWorkStatusOf({ status: "delivered" }, null).label).toBe("Delivered");
     expect(legWorkStatusOf({ status: "issue" }, null).label).toBe("Failed Delivery");
   });
@@ -140,7 +191,7 @@ describe("delivery scopes and journey legs", () => {
   it("⭐ never prints the DOCUMENT's `Created` on a leg or a scope", () => {
     const rows = build([order({ id: "a", so: 1301 })]);
     expect(rows[0]!.status.label).not.toBe("Created");
-    expect(rows[0]!.status.label).toBe("Waiting for customer date");
+    expect(rows[0]!.status.label).toBe("Operation must assign logistics");
   });
 
   it("leaves a delivered order out — that is history, not planning", () => {
@@ -234,20 +285,32 @@ describe("the entry rule keeps Sales work out of Delivery Work", () => {
     expect(entersDeliveryWork(o)).toBe(true);
   });
 
-  it("refuses a scope with no building or access facts", () => {
-    const o = order({ id: "a", so: 1301, building_type: null });
-    expect(entersDeliveryWork(o)).toBe(false);
+  it("⭐ a scope with no building facts ENTERS as a data problem (owner ruling 2026-09-13)", () => {
+    /* Only a missing ADDRESS keeps an order out of Monitor. Every other
+       required Sales fact that is missing is named on the row: the status
+       reads `Order details incomplete` and the brief names the fact. */
+    const o = order({ id: "a", so: 1301, building_type: null, delivery_floor: null, delivery_has_lift: null });
+    expect(entersDeliveryWork(o)).toBe(true);
     expect(deliveryEntryBlockers(o)).toContain(DW.blockerNoBuilding);
+    expect(requiredSalesFactsMissing(o)).toEqual([
+      DW.buildingNotRecorded,
+      DW.floorNotRecorded,
+      DW.liftNotRecorded,
+    ]);
+    const rows = build([o]);
+    expect(rows[0]!.status.label).toBe("Order details incomplete");
+    expect(rows[0]!.status.second).toBe(DW.buildingNotRecorded);
+    expect(rows[0]!.missingFacts).toContain(DW.floorNotRecorded);
   });
 
-  it("accepts floor or lift as the building facts when `building_type` predates the field", () => {
-    expect(entersDeliveryWork(order({ id: "a", so: 1301, building_type: null, delivery_floor: 3 })))
-      .toBe(true);
+  it("a complete row lacks nothing — the requested-date answer `not yet` counts as recorded", () => {
+    expect(requiredSalesFactsMissing(order({ id: "a", so: 1301 }))).toEqual([]);
     expect(
-      entersDeliveryWork(
-        order({ id: "a", so: 1301, building_type: null, delivery_has_lift: false }),
-      ),
-    ).toBe(true);
+      requiredSalesFactsMissing(order({ id: "a", so: 1301, delivery_date: null, delivery_date_tbd: true })),
+    ).toEqual([]);
+    expect(
+      requiredSalesFactsMissing(order({ id: "a", so: 1301, delivery_date: null, delivery_date_tbd: false })),
+    ).toContain(DW.requestedDateNotRecorded);
   });
 
   it("⭐ refuses an order whose only line is a SERVICE — a truck carries goods", () => {
@@ -283,6 +346,8 @@ describe("the entry rule keeps Sales work out of Delivery Work", () => {
       customer_address_city: null,
       customer_address_state: null,
       building_type: null,
+      delivery_floor: null,
+      delivery_has_lift: null,
       order_lines: [],
     });
     expect(deliveryEntryBlockers(o)).toHaveLength(3);
@@ -345,7 +410,9 @@ describe("the arrangement is what Delivery wrote", () => {
     });
     expect(rows[0]!.confirmedIso).toBe("2026-08-28");
     expect(rows[0]!.confirmedTime).toBe("9am–12pm");
-    expect(rows[0]!.status.label).toBe("Delivery confirmed");
+    expect(rows[0]!.status.label).toBe("Confirmed for Fri, 28 Aug");
+    expect(rows[0]!.status.second).toBe("9am–12pm");
+    expect(rows[0]!.status.tone).toBe("green");
   });
 
   it("gives each Journey LEG its own arrangement", () => {
@@ -415,4 +482,58 @@ describe("REGION classification — direct state names (owner correction 2026-09
   });
 
 
+});
+
+/* ── 【DELIVERY】 CARD 20 — a Journey leg's arrival on Monitor ──────────────
+   `Delivered` is the customer's word. Leg 1's `delivered` result on its own
+   document is the goods reaching the JB warehouse: `Arrived` over the stop,
+   green, no `Delivery photo not uploaded` line, no proof queue. */
+describe("an intermediate leg's arrival reads Arrived on Monitor (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", scheduled_at: "2026-09-15T02:00:00.000Z", status: "handed_off" },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", scheduled_at: "2026-09-17T06:00:00.000Z", status: "pending" },
+  ] as never;
+  const legDoc: DeliveryOrderRow = {
+    id: "do-leg-1",
+    order_id: "sg",
+    do_number: "DO-130926-0842",
+    leg: 1,
+    issued_at: "2026-09-13T02:00:00Z",
+    trip_groups: null,
+    delivery_date: "2026-09-15",
+    time_slot: "10 AM to 1 PM",
+    logistics_partner: "NETS",
+    voided_at: null,
+    void_reason: null,
+    orders: { id: "sg", so: 1362, customer_name: "kong chai yin", ops_order_control: { delivery_photos: [] } },
+  } as unknown as DeliveryOrderRow;
+  const chain = ["ready_for_handover", "handed_over", "received_by_logistics"].map((kind) => ({
+    delivery_order_id: "do-leg-1",
+    kind,
+    recorded_at: "2026-09-13T03:00:00Z",
+  })) as never;
+
+  it("with its own document and a delivered result, leg 1 is Arrived over the JB warehouse; leg 2 keeps its own word", () => {
+    const rows = buildDeliveryScopeRows({
+      orders: [order({ id: "sg", so: 1362, delivery_stops: stops })],
+      deliveryOrders: [legDoc],
+      attempts: [{ do_number: "DO-130926-0842", leg: 1, result: "delivered", reason_key: null, recorded_at: "2026-09-13T04:23:00Z" }],
+      handoverEvents: chain,
+      partnerNameById: NO_PARTNERS,
+    });
+    expect(rows[0]!.status.kind).toBe("arrived");
+    expect(rows[0]!.status.label).toBe("Arrived");
+    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+    expect(rows[0]!.status.tone).toBe("green");
+    expect(rows[0]!.missingProof).toEqual({ photo: false, signedDo: false });
+    expect(rows[0]!.proofReview.state).toBe("none");
+    expect(rows[1]!.status.kind).not.toBe("arrived");
+    expect(rows[1]!.status.kind).not.toBe("delivered");
+  });
+
+  it("without a document, a chain stop already handed off reads Arrived over its stop too", () => {
+    const rows = build([order({ id: "sg", so: 1362, delivery_stops: stops })]);
+    expect(rows[0]!.status.kind).toBe("arrived");
+    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+  });
 });

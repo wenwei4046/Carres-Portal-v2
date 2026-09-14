@@ -38,7 +38,10 @@
  * and this reading cannot drift apart.
  */
 
+import { myHolidaySet } from "./my-holidays";
 import { normalizeSkuKey } from "./sku-code";
+import { tomorrowDeliveryCallOf } from "./purchasing-supplier-calls";
+import { poReplyDateOf, type PoDatePromise } from "./po-workspace";
 
 /**
  * The latest recorded supplier answer about a purchase order's arrival date.
@@ -180,19 +183,60 @@ export function deliveryStockReadinessOf(
 export type DeliveryArrivalState =
   | { kind: "on_hand" }
   | { kind: "no_purchase_order" }
-  | { kind: "no_date"; poId: string }
+  /* ⭐ THREE DIFFERENT ABSENCES, NEVER ONE (owner ruling 2026-09-11). They
+     used to share a single `no_date`, which told an operator the factory had
+     failed to answer when nobody had asked, and told them nobody had asked
+     when the real gap was a production time Purchasing had never set. */
+  | { kind: "no_calculation"; poId: string }
+  | { kind: "awaiting_reply"; dateIso: string; askedByIso: string | null; poId: string }
+  | { kind: "late_no_date"; originalIso: string | null; poId: string }
   | { kind: "planned"; dateIso: string; poId: string }
   | { kind: "confirmed"; dateIso: string; poId: string }
   | { kind: "moved"; dateIso: string; originalIso: string; later: boolean; poId: string }
   | { kind: "reported"; dateIso: string; poId: string }
   | { kind: "passed"; dateIso: string; originalIso: string | null; poId: string };
 
-/** The supplier's own answer date for one purchase order, or null. A legacy
- *  `shipping` row carries no `new_date`: it confirmed the date it was asked
- *  ABOUT, so that is the date it means. */
+/**
+ * The supplier's own answer date for one purchase order, or null.
+ *
+ * ⭐ ONE ARITHMETIC (Architecture Law D). `poReplyDateOf` already owns this
+ * rule for the Purchase Orders workspace, and this file must not hold a second
+ * one that agrees on most rows and disagrees on the row that matters: a
+ * **legacy `shipping`** answer confirmed the date it was asked ABOUT, and
+ * every 0430 answer names its date in `new_date`.
+ *
+ * The disagreement this delegation removes (found in the 2026-09-11 render
+ * walk): a local `newIso ?? aboutIso` fallback made a `delayed` reply that
+ * named NO new day mean *"the supplier confirmed the day we asked about"*. A
+ * supplier saying **"late, and I cannot tell you when"** was therefore shown as
+ * that dead date, and — once it went by — as `Supplier delivery date passed`.
+ * That is precisely the conflation the owner's correction forbids: a missing
+ * calculation, an unanswered enquiry and an evidenced *late, no date* answer
+ * are three different facts.
+ */
 function replyDateOf(reply: PoArrivalReply | null): string | null {
   if (!reply) return null;
-  return reply.newIso ?? reply.aboutIso ?? null;
+  return poReplyDateOf({
+    kind: "tomorrow_delivery",
+    answer: reply.answer,
+    about_date: reply.aboutIso,
+    previous_date: reply.previousIso,
+    new_date: reply.newIso,
+    /* The shared row carries recording metadata this projection does not; the
+       date rule reads none of it, and the API has already proved the evidence
+       (only an evidenced reply reaches `po_arrivals` at all). */
+    id: "",
+    po_id: "",
+    po_version: 0,
+    channel: null,
+    recipient: null,
+    evidence: null,
+    reported_by: null,
+    reported_at: null,
+    recorded_by: null,
+    reason: null,
+    recorded_at: reply.recordedAt,
+  } as PoDatePromise);
 }
 
 /** Per purchase order: reply → original → our prediction (0432's precedence). */
@@ -207,6 +251,46 @@ export interface ArrivalStateInput {
    *  purchase order being absent. */
   readiness: DeliveryStockReadiness;
   todayIso: string;
+  /** Malaysian public holidays, for the arrival-check clock. Omitted → the
+   *  live set, the same one every other Carres clock counts on. */
+  holidays?: ReadonlySet<string>;
+}
+
+/**
+ * ⭐ HAS ANYBODY ACTUALLY ASKED THE SUPPLIER YET?
+ *
+ * The answer is NOT this module's to invent: `tomorrowDeliveryCallOf` owns the
+ * advance arrival check — when it opens, when it is late, and when a moved date
+ * re-opens it (Law D). This asks that ONE engine and reports what it said.
+ *
+ * The engine needs a line to know the order still owes something; `owedSkus`
+ * has already proved exactly that, so one standing line carries the fact rather
+ * than a quantity this row does not have and would otherwise invent.
+ */
+function arrivalEnquiryOf(
+  po: PoArrival,
+  todayIso: string,
+  holidays: ReadonlySet<string>,
+): { open: boolean; dueIso: string | null } {
+  const call = tomorrowDeliveryCallOf(
+    {
+      poId: po.poId,
+      supplierId: "",
+      status: (po.status ?? "open") as string,
+      etaDateIso: po.plannedIso ?? po.originalIso ?? null,
+      tomorrowAnswerAboutDateIso: po.reply?.aboutIso ?? null,
+      lines: po.owedSkus.map((sku) => ({
+        id: `${po.poId}#${sku}`,
+        sku,
+        qty: 1,
+        receivedQty: 0,
+        shortSinceIso: null,
+        balanceAnswerAboutQty: null,
+      })),
+    },
+    { todayIso, holidays },
+  );
+  return { open: call !== null, dueIso: call?.dueIso ?? null };
 }
 
 /**
@@ -218,12 +302,32 @@ export interface ArrivalStateInput {
  */
 export function deliveryArrivalStateOf(input: ArrivalStateInput): DeliveryArrivalState {
   const { arrivals, readiness, todayIso } = input;
+  const holidays = input.holidays ?? myHolidaySet();
   if (readiness.ready) return { kind: "on_hand" };
 
   const owing = arrivals.filter(
     (a) => (a.status ?? "open") === "open" && a.owedSkus.length > 0,
   );
   if (owing.length === 0) return { kind: "no_purchase_order" };
+
+  /* ⭐ AN ANSWER THAT NAMES NO DAY KILLS THE DAY IT WAS ABOUT.
+     A supplier who says *late, and I cannot tell you when* has told us the
+     date we were holding is gone. Falling back to that original — as the
+     per-order precedence otherwise would — reports a date nobody stands
+     behind, and once it goes by the row reads `Supplier delivery date
+     passed`, which blames the calendar for a fact the supplier stated.
+     This case therefore outranks every dated order still owing: the delivery
+     waits for the last piece, and the last piece has no date. */
+  const answeredWithNoDate = owing.find(
+    (po) => po.reply !== null && replyDateOf(po.reply) === null,
+  );
+  if (answeredWithNoDate) {
+    return {
+      kind: "late_no_date",
+      originalIso: answeredWithNoDate.originalIso,
+      poId: answeredWithNoDate.poId,
+    };
+  }
 
   /* The LATEST effective date across everything still owed — the delivery
      waits for the last piece, not the first (0432's own `max`). */
@@ -237,10 +341,12 @@ export function deliveryArrivalStateOf(input: ArrivalStateInput): DeliveryArriva
       chosenDate = date;
     }
   }
+
   if (!chosen || chosenDate === null) {
-    /* Something is owed and nobody has a date for it. The gap is real and it
-       is Purchasing's to close; Delivery states it and invents nothing. */
-    return { kind: "no_date", poId: owing[0]!.poId };
+    /* Nothing owing carries a date and nobody has answered: the gap is OURS,
+       not the factory's. Telling the operator the supplier failed to answer
+       when nobody asked is the lie the single old `no_date` state told. */
+    return { kind: "no_calculation", poId: owing[0]!.poId };
   }
 
   if (chosenDate < todayIso) {
@@ -254,7 +360,20 @@ export function deliveryArrivalStateOf(input: ArrivalStateInput): DeliveryArriva
   }
 
   const reply = chosen.reply;
-  if (!reply) return { kind: "planned", dateIso: chosenDate, poId: chosen.poId };
+  if (!reply) {
+    /* A date with no reply is one of TWO facts, and the advance arrival check
+       tells them apart: before the check opens it is simply our plan; once it
+       is open the supplier has been asked and has not answered. */
+    const enquiry = arrivalEnquiryOf(chosen, todayIso, holidays);
+    return enquiry.open
+      ? {
+          kind: "awaiting_reply",
+          dateIso: chosenDate,
+          askedByIso: enquiry.dueIso,
+          poId: chosen.poId,
+        }
+      : { kind: "planned", dateIso: chosenDate, poId: chosen.poId };
+  }
 
   const original = chosen.originalIso;
   if (reply.answer === "reported" || original === null) {
@@ -286,9 +405,19 @@ export function deliveryArrivalStateOf(input: ArrivalStateInput): DeliveryArriva
  * Date reported                     a reply on a purchase order whose original
  *                                   was never recorded (0432's fourth answer)
  * Supplier delivery date passed     the purchasing action's own fact line
- * The factory has not given a date  the booking-call words' own absence
+ * Waiting supplier reply            the Receiving exception lifecycle's own
+ *                                   word for an asked-and-unanswered enquiry
+ * The factory has not given a date  the booking-call words' own absence — and
+ *                                   it belongs to exactly ONE case: a supplier
+ *                                   who ANSWERED and named no day
  * Everything is on hand             the booking-call words' positive state
  * ```
+ *
+ * ONE word is new and is registered in COPY-STANDARD beside these:
+ * `No expected arrival calculated` — nobody has asked the supplier and nobody
+ * could compute a date either, because the production or transit time this
+ * supplier and category need has never been set. Saying `The factory has not
+ * given a date` there would blame a factory nobody contacted.
  */
 export const ARRIVAL_COPY = {
   column: "Expected arrival",
@@ -299,6 +428,11 @@ export const ARRIVAL_COPY = {
   delayed: "Delayed",
   reported: "Date reported",
   passed: "Supplier delivery date passed",
+  /** The supplier was ASKED and has not answered — never a missing date. */
+  awaitingReply: "Waiting supplier reply",
+  /** No date exists and nobody has asked for one: the gap is OURS. */
+  noCalculation: "No expected arrival calculated",
+  /** A recorded supplier answer that named no new day. */
   noDate: "The factory has not given a date",
   onHand: "Everything is on hand",
   /** Goods are short and nothing has been bought for them — the Orders
@@ -309,6 +443,9 @@ export const ARRIVAL_COPY = {
   stockNotReady: "Not ready",
   /** `2 short` — the exact missing pieces on one goods line. */
   short: (n: number) => `${n} short`,
+  /** The day the advance arrival check was due — evidence that the enquiry is
+   *  genuinely open, not a guess that somebody probably asked. */
+  askedBy: (date: string) => `asked by ${date}`,
 } as const;
 
 /** The one-line note under the date — every state has one, because a date with
@@ -319,7 +456,11 @@ export function arrivalNoteOf(state: DeliveryArrivalState): string {
       return ARRIVAL_COPY.onHand;
     case "no_purchase_order":
       return ARRIVAL_COPY.noPurchaseOrder;
-    case "no_date":
+    case "no_calculation":
+      return ARRIVAL_COPY.noCalculation;
+    case "awaiting_reply":
+      return ARRIVAL_COPY.awaitingReply;
+    case "late_no_date":
       return ARRIVAL_COPY.noDate;
     case "planned":
       return ARRIVAL_COPY.notConfirmed;
@@ -331,6 +472,49 @@ export function arrivalNoteOf(state: DeliveryArrivalState): string {
       return ARRIVAL_COPY.reported;
     case "passed":
       return ARRIVAL_COPY.passed;
+  }
+}
+
+/**
+ * ⭐ THE CELL'S OWN SENTENCE — the date AND what it means, for the tooltip and
+ * the screen reader (owner ruling 2026-09-11).
+ *
+ * The cell shows an icon and a compact date; repeating `Delayed` under every
+ * row turned a column of dates into a column of the same four words. The
+ * MEANING does not disappear with the visible line — it moves here, where a
+ * hover and a screen reader both find it, and where the ORIGINAL date is named
+ * rather than left as an unexplained second number.
+ *
+ * The caller supplies the printed date strings; `fmt-date.ts` owns spelling.
+ */
+export function arrivalSentenceOf(
+  state: DeliveryArrivalState,
+  fmt: (iso: string) => string,
+): string {
+  const note = arrivalNoteOf(state);
+  switch (state.kind) {
+    case "on_hand":
+    case "no_purchase_order":
+    case "no_calculation":
+      return note;
+    case "late_no_date":
+      return state.originalIso
+        ? `${note} · ${ARRIVAL_COPY.original} ${fmt(state.originalIso)}`
+        : note;
+    case "awaiting_reply":
+      return state.askedByIso
+        ? `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note} · ${ARRIVAL_COPY.askedBy(fmt(state.askedByIso))}`
+        : `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note}`;
+    case "moved":
+      return `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note} · ${ARRIVAL_COPY.original} ${fmt(state.originalIso)}`;
+    case "passed":
+      return state.originalIso
+        ? `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note} · ${ARRIVAL_COPY.original} ${fmt(state.originalIso)}`
+        : `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note}`;
+    case "planned":
+    case "confirmed":
+    case "reported":
+      return `${ARRIVAL_COPY.column} ${fmt(state.dateIso)} · ${note}`;
   }
 }
 
@@ -351,5 +535,9 @@ export function arrivalDateOf(state: DeliveryArrivalState): string | null {
  * colour on the day it means something.
  */
 export function isArrivalException(state: DeliveryArrivalState): boolean {
-  return state.kind === "passed" || state.kind === "no_date";
+  return (
+    state.kind === "passed" ||
+    state.kind === "late_no_date" ||
+    state.kind === "no_calculation"
+  );
 }

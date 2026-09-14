@@ -11,7 +11,7 @@
  *   `Goods ready` · `Arriving Monday, 7 Sep` · `Arrival not confirmed`
  */
 import { z } from "zod";
-import { collectionClock, type CollectionClock } from "./collection-clock";
+import { collectionClock, type CollectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
 import { orderMoney } from "./order-money";
 import { paymentCollectionReadiness } from "./payment-collection";
 import type { WorkingDayOptions } from "./working-days";
@@ -79,6 +79,10 @@ export interface InvoiceRegisterRow {
      *  through the shared `storageHold` (the 2026-09-08 correction) so the
      *  Payment screens, Work and the gate cannot disagree on a legacy order. */
     legacy_storage_owing?: number;
+    /** The customer's latest standing promise (0446 `will_pay_on_date`),
+     *  attached server-side so the Monitor's `Customer promised to pay
+     *  today` reads the same ledger the Work feed does. */
+    latest_promise?: { promised_date: string; recorded_at: string } | null;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
     order_addons: Array<{ qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
@@ -261,6 +265,12 @@ export function invoicePaymentTiming(
    *  but owing storage is NOT `paid`. Absent, the goods arithmetic answers
    *  (a caller holding one row alone). */
   rows?: InvoiceRegisterRow[],
+  /** `Settings → Payments → Collection timing` — the effective pair for this
+   *  invoice's clock (owner ruling 2026-09-12). Absent ⇒ the ruled default. */
+  timing?: CollectionTiming,
+  /** The action owner's governed working days (owner ruling 2026-09-13).
+   *  Absent ⇒ the Operation week — the collection owner is Operation staff. */
+  owner?: OwnerCalendar,
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);
   const clock = collectionClock(
@@ -270,6 +280,8 @@ export function invoicePaymentTiming(
     },
     todayIso,
     opts,
+    timing,
+    owner,
   );
   const money = rows ? soRemaining(rows, row.order_id) : invoiceNeeded(row);
   if (money.known && money.outstanding <= 0) return { timing: { kind: "paid" }, clock };

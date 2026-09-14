@@ -389,15 +389,19 @@ ARRIVAL card is one expected-arrival source scope. It shows, in this order: the 
 sentence · the event name with its direction · the source document identity · the party and
 what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
 shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
-or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
-return/collection work that requires a Warehouse physical act.
+or any Delivery arrangement action. Warehouse never shows or completes a Delivery arrangement
+action. A Failed Delivery appears only through the exact governed return/collection work that
+requires a Warehouse physical act.
 
 Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
 document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
 nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
-may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
-never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
-editor.
+may show a clickable `DO No`, and that DO opens as a read-only source document. Warehouse never
+enters Delivery's `Update date and time`, `Assign logistics`, `Change logistics`, driver/vehicle
+or ETA editors (the Monitor row's expanded panels, `../delivery/MASTER.md` §8.5 and §8.6).
+Delivery remains the only owner of the Logistics Partner, the confirmed operational date and
+time, the driver and vehicle and the ETA. Warehouse only reads the relevant Delivery facts and
+owns its own physical preparation and handover facts.
 
 For any selected date, the operator journey is always:
 
@@ -2069,10 +2073,12 @@ draft lands. Both routes now carry a `PRODUCTION SHAPE` regression test that rep
 deployed schema; the Inbound and Receiving suites fail if either read is made unconditional
 again.
 
-Still owed (not this card's build): land the arrival-sources draft
-(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered) — until it does, the
-Inbound rail's Transfer / Customer Return / Failed Delivery return / Return from repair /
-Supplier replacement rows honestly count zero. Migration **0437** (Khor Yee offboard /
+**Landed 2026-09-13 as migration `0490` (Delivery Card 14):** the arrival-sources draft is the
+numbered migration, guarded object by object, with one addition — a `failed-delivery-return`
+may be bound to the Delivery Visit that failed (`arrival_sources.attempt_id`) instead of a
+Service Case, so Delivery's result plans the return itself and Inbound names it by the DO the
+goods went out on (`DO No`). The Inbound rail's Transfer / Customer Return / Failed Delivery
+return / Return from repair / Supplier replacement rows now read real records. Migration **0437** (Khor Yee offboard /
 two-person duty) was found unapplied while 0438–0440 were — with nobody resolving `po_duty` or
 `grn_duty`, which blocked every GRN posting. It was applied on 2026-09-07 as
 `20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the

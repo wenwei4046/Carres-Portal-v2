@@ -55,7 +55,7 @@ financePaymentsRouter.get("/register", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error, count } = await sb
     .from(ORDER_PAYMENTS)
-    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
+    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_channel,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })

@@ -8,6 +8,18 @@
  * The fixture walks the Card's own example week (Fri 4 Sep 2026): cards with
  * and without a DO, a failed delivery, a delivered-with-no-proof, a scope with
  * no confirmed date, an overdue one, a Singapore Journey, and three partners.
+ *
+ * ⭐ EXTENDED 2026-09-11 for the owner's Monitor corrections. Production holds
+ * no order in most of these states, so they cannot be walked on live data and
+ * must not be waited for:
+ *
+ *   every ARRIVAL state, including the three the correction insists on keeping
+ *   apart — no calculation · an unanswered enquiry · a supplier who answered
+ *   and named no day — plus a confirmed date with NO agreed time, a trip whose
+ *   result is already recorded, and readiness scoped to THIS trip's goods.
+ *
+ * The Delivery Orders register has its own fixture next door
+ * (`delivery-orders-preview`); this one stays the Monitor's.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -15,6 +27,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationDelivery from "@/pages/operation/OperationDelivery";
+import OperationApp from "@/pages/operation/OperationApp";
 import DeliveryOrdersRegister from "@/pages/operation/DeliveryOrdersRegister";
 import "@/index.css";
 
@@ -169,8 +182,91 @@ const ORDERS = [
     customer_name: "siti nurhaliza",
     delivery_date: "2026-09-11",
     order_addons: [{ addon_key: "STAIR_CARRY", qty: 2 }],
-    /* An open purchase order carrying NO date — the truthful gap. */
+    /* NO CALCULATION — an open purchase order the arithmetic cannot date at
+       all. Distinct from the two below, which the correction insists must not
+       share one word (2026-09-11). */
     po_arrivals: [arrival({ poId: "PO-2102" })],
+  }),
+  /* ⭐ AN UNANSWERED ENQUIRY. The arithmetic HAS a date and the supplier has
+     been asked about it; nobody has answered yet. That is not the same fact as
+     "no date exists", and it is not the same as a supplier saying it is late. */
+  order({
+    id: "j",
+    so: 1331,
+    customer_name: "goh mei ling",
+    delivery_date: "2026-09-16",
+    po_arrivals: [
+      arrival({ poId: "PO-2104", plannedIso: "2026-09-12", originalIso: "2026-09-12" }),
+    ],
+  }),
+  /* ⭐ LATE, AND NO NEW DATE. The supplier answered — the evidence exists —
+     and the answer contained no day. The row must say that rather than show
+     the old date as if it still stood. */
+  order({
+    id: "k",
+    so: 1332,
+    customer_name: "sharifah aziz",
+    delivery_date: "2026-09-17",
+    po_arrivals: [
+      arrival({
+        poId: "PO-2105",
+        originalIso: "2026-09-08",
+        plannedIso: "2026-09-08",
+        reply: {
+          answer: "delayed",
+          aboutIso: "2026-09-08",
+          previousIso: null,
+          newIso: null,
+          recordedAt: "2026-09-06T00:00:00Z",
+        },
+      }),
+    ],
+  }),
+  /* A supplier who CONFIRMED the date, and one who reported shipping. */
+  order({
+    id: "l",
+    so: 1333,
+    customer_name: "abdul rahman",
+    delivery_date: "2026-09-19",
+    po_arrivals: [
+      arrival({
+        poId: "PO-2106",
+        originalIso: "2026-09-15",
+        plannedIso: "2026-09-15",
+        reply: {
+          answer: "confirmed",
+          aboutIso: "2026-09-15",
+          previousIso: null,
+          newIso: "2026-09-15",
+          recordedAt: "2026-09-07T00:00:00Z",
+        },
+      }),
+    ],
+  }),
+  /* ON HAND — every piece already allocated, so no supplier question is open
+     and readiness is complete for THIS trip. */
+  order({
+    id: "m",
+    so: 1334,
+    customer_name: "yeoh chin huat",
+    delivery_date: "2026-09-15",
+    order_lines: [
+      { id: "l-m1", sku: "mattress:M1401F-K", qty: 1, label: "Serena · King" },
+      { id: "l-m2", sku: "sofa:S200-3", qty: 1, label: "Pisa · 3 seater" },
+    ],
+    allocated_units: [
+      { sku: "mattress:M1401F-K", status: "reserved", qty: 1 },
+      { sku: "sofa:S200-3", status: "reserved", qty: 1 },
+    ],
+  }),
+  /* ⭐ A DATE WITH NO AGREED TIME. The correction's own case: a confirmed day
+     is NOT a confirmed appointment, so the work stays open and the row says
+     which half is missing. */
+  order({
+    id: "n",
+    so: 1335,
+    customer_name: "leong sook yee",
+    delivery_date: "2026-09-14",
   }),
   order({
     id: "i",
@@ -252,6 +348,21 @@ const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
       /* A partner carries these two and has not given a day back yet. */
       arrangement({ order_id: "h", partner_id: "p-al", partner_name: "AL" }),
       arrangement({ order_id: "i", partner_id: "p-nets", partner_name: "NETS" }),
+      /* ⭐ A DAY, AND NO TIME. Booked is BOTH — this one is half-answered, so
+         it keeps its follow-up and never counts as a confirmed appointment. */
+      arrangement({
+        order_id: "n",
+        partner_id: "p-nets",
+        partner_name: "NETS",
+        confirmed_date: "2026-09-14",
+      }),
+      arrangement({
+        order_id: "m",
+        partner_id: "p-nets",
+        partner_name: "NETS",
+        confirmed_date: "2026-09-15",
+        confirmed_time: "09:00–11:00",
+      }),
     ],
   })],
   [(url) => url.includes("/api/operation/delivery-orders"), () => ({
@@ -326,7 +437,7 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/operation/delivery-orders" element={<DeliveryOrdersRegister />} />
-          <Route path="*" element={<OperationDelivery />} />
+          <Route path="*" element={new URLSearchParams(window.location.search).has("shell") ? <OperationApp /> : <OperationDelivery />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

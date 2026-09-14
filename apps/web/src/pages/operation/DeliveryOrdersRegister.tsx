@@ -68,6 +68,7 @@ import {
   DELIVERY_RESULT_LABEL,
   DOR_COPY,
   DO_QUEUE_LABEL,
+  groupProofRecords,
   DO_STATUS_KEYS,
   DO_WORK_QUEUES,
   buildDoRegisterRails,
@@ -106,6 +107,9 @@ export function statusDetailOf(row: {
     const outcome = row.latestResult ? DELIVERY_RESULT_LABEL[row.latestResult] : null;
     return [outcome, reason].filter(Boolean).join(" · ") || null;
   }
+  /* An intermediate leg's arrival names the partner warehouse the goods
+     reached (Card 20) — the place is the fact, never `Delivered`. */
+  if (row.status.kind === "arrived") return row.status.stop;
   /* Cancelled carries its void reason; Delivered, Out for delivery and
      Created need no second line - the pill already is the whole fact. */
   return reason;
@@ -116,6 +120,7 @@ export function statusDetailOf(row: {
 const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
   created: "neutral",
   out_for_delivery: "info",
+  arrived: "success",
   delivered: "success",
   exception: "warning",
   cancelled: "neutral",
@@ -124,6 +129,7 @@ const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
 const STATUS_LABEL: Record<DeliveryOrderStatus["kind"], string> = {
   created: "Created",
   out_for_delivery: "Out for delivery",
+  arrived: "Arrived",
   delivered: "Delivered",
   exception: "Delivery exception",
   cancelled: "Cancelled",
@@ -229,13 +235,14 @@ type ViewerPick = { row: DoRegisterRow; kind: "photo" | "video" } | null;
  * voided before anything came back", and inventing one to fill a cell is how a
  * dictionary rots, so the cell simply says nothing.
  *
+ * Intermediate warehouse trips likewise owe no customer delivery proof.
  * It is NOT silent when files exist: a document voided AFTER a driver sent
  * something still shows what was sent. Those are recorded facts and a void
  * never erases them.
  */
-function voidedWithNothingSubmitted(r: DoRegisterRow): boolean {
+function noSubmissionDueOrRecorded(r: DoRegisterRow): boolean {
   return (
-    r.status.kind === "cancelled" &&
+    (r.status.kind === "cancelled" || r.intermediateLeg === true) &&
     r.submission.photos === 0 &&
     r.submission.videos === 0 &&
     !r.signedDoPresent
@@ -249,9 +256,11 @@ function voidedWithNothingSubmitted(r: DoRegisterRow): boolean {
  * would be a second arithmetic (Law D).
  */
 function submissionSearchText(r: DoRegisterRow): string {
-  if (voidedWithNothingSubmitted(r)) return "";
+  if (noSubmissionDueOrRecorded(r)) return "";
   const reached = r.latestResult === "delivered" || r.latestResult === "partial";
-  const media = !r.submission.known
+  const media = r.intermediateLeg && r.submission.photos === 0 && r.submission.videos === 0
+    ? ""
+    : !r.submission.known
     ? DOR_COPY.notRecorded
     : r.submission.photos === 0 && r.submission.videos === 0
       ? reached
@@ -263,8 +272,8 @@ function submissionSearchText(r: DoRegisterRow): string {
         ]
           .filter(Boolean)
           .join(" · ");
-  const paper = r.signedDoPresent ? DOR_COPY.signedDoOnFile : DOR_COPY.noSignedDo;
-  return `${media} · ${paper}`;
+  const paper = r.signedDoPresent ? DOR_COPY.signedDoOnFile : r.intermediateLeg ? "" : DOR_COPY.noSignedDo;
+  return [media, paper].filter(Boolean).join(" · ");
 }
 
 /** A count button: the number is the ledger's own, never a placeholder. */
@@ -326,12 +335,12 @@ function DriverSubmissionCell({
     unbound > 0 ? `${unbound} ${DOR_COPY.unboundNote}` : undefined;
 
   /* Nothing was ever due and nothing ever came — the pill already said why. */
-  if (voidedWithNothingSubmitted(row)) return null;
+  if (noSubmissionDueOrRecorded(row)) return null;
 
   return (
     <span className="block min-w-0">
       <span className="flex items-center gap-1 truncate">
-        {!known ? (
+        {row.intermediateLeg && photos === 0 && videos === 0 ? null : !known ? (
           <Absent>{DOR_COPY.notRecorded}</Absent>
         ) : photos === 0 && videos === 0 ? (
           <span title={unboundTitle}>
@@ -363,7 +372,7 @@ function DriverSubmissionCell({
         )}
       </span>
       <span className="block truncate text-label font-normal">
-        <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} />
+        {!row.intermediateLeg || row.signedDoPresent ? <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} /> : null}
       </span>
     </span>
   );
@@ -382,28 +391,31 @@ function DriverSubmissionCell({
  *   Upload delivery photo         `DeliveryProofUploadButton` - the same
  *                                 uploader the Sales Order drawer renders,
  *                                 stamped with THIS document's number
- *   Upload signed Delivery Order  a door to the Sales Order, which owns the
- *                                 order's documents. The one existing writer
- *                                 (`operation_attach_do_and_deliver`) also
- *                                 marks the whole order delivered, so it is
- *                                 NOT offered against a partial trip: a button
- *                                 that would record a falsehood is worse than
- *                                 a link. The gap is named in the MASTER.
+ *   Upload signed Delivery Order  a door to the DO object's Evidence section,
+ *                                 whose own attach door (Card 13, §6.1) files
+ *                                 the paper against the latest recorded
+ *                                 attempt without re-recording the delivery —
+ *                                 so a partial trip is served truthfully.
+ *   Check delivery proof          the same door: the three review acts live
+ *                                 on the Evidence section (§6.1).
  */
 function QueueAction({
   row,
   queue,
-  onOpenOrder,
+  onOpenDeliveryOrder,
 }: {
   row: DoRegisterRow;
   queue: DoWorkQueue;
-  onOpenOrder: (row: DoRegisterRow) => void;
+  onOpenDeliveryOrder: (row: DoRegisterRow) => void;
 }) {
   if (queue === "record_result") {
     return (
       <DeliveryResultAction
         order={{ id: row.orderId, so: row.so, do_number: row.doNumber }}
         lines={row.lines}
+        leg={row.leg}
+        lastLeg={row.lastLeg}
+        legDestination={row.legRoute?.split(" → ").at(-1) ?? null}
       />
     );
   }
@@ -419,15 +431,15 @@ function QueueAction({
   return (
     <button
       type="button"
-      data-testid="do-queue-open-order"
+      data-testid={queue === "check_proof" ? "do-queue-check-proof" : "do-queue-open-delivery-order"}
       className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
-        onOpenOrder(row);
+        onOpenDeliveryOrder(row);
       }}
     >
       <ExternalLink size={13} strokeWidth={1.75} aria-hidden />
-      <span className="truncate">Open SO-{row.so}</span>
+      <span className="truncate">{queue === "check_proof" ? DOR_COPY.checkProof : DOR_COPY.uploadSignedDo}</span>
     </button>
   );
 }
@@ -520,8 +532,10 @@ export default function DeliveryOrdersRegister() {
       list.push(e.kind);
       handoverByDoId.set(e.delivery_order_id, list);
     }
+    // §6.1 (0489) — the review and evidence records, grouped once.
+    const proofRecords = groupProofRecords(data?.proofReviews, data?.attemptEvidence);
     return (data?.deliveryOrders ?? []).map((r) =>
-      buildDoRegisterRow(r, attemptsByDo, handoverByDoId),
+      buildDoRegisterRow(r, attemptsByDo, handoverByDoId, proofRecords),
     );
   }, [data]);
 
@@ -821,6 +835,7 @@ export default function DeliveryOrdersRegister() {
         searchValue: (r) => submissionSearchText(r),
         exportValue: (r) => submissionSearchText(r),
         filterValue: (r) => {
+          if (r.intermediateLeg) return submissionSearchText(r);
           const reached = r.latestResult === "delivered" || r.latestResult === "partial";
           if (!reached) return DOR_COPY.notDelivered;
           if (!r.submission.known) return DOR_COPY.notRecorded;
@@ -881,7 +896,7 @@ export default function DeliveryOrdersRegister() {
                 <QueueAction
                   row={r}
                   queue={filters.queue as DoWorkQueue}
-                  onOpenOrder={openSalesOrder}
+                  onOpenDeliveryOrder={openDeliveryOrder}
                 />
               ),
               /* A door is not a fact: it never joins the search, the export or

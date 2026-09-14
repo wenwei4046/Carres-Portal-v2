@@ -194,6 +194,9 @@ export interface ArrivalSource {
   kind: Exclude<ArrivalSourceType, "supplier-delivery">;
   claim_id: string | null;
   case_id: string | null;
+  /** 0490 — a failed-delivery return bound to the Delivery Visit that failed
+   *  (Delivery MASTER §7); such a source names the DO the goods went out on. */
+  attempt_id?: string | null;
   from_site_id: string | null;
   to_site_id: string;
   party_id: string;

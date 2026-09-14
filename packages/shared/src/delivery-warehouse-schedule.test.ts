@@ -55,8 +55,9 @@ describe("Delivery → Warehouse Schedule", () => {
       driverName: "Ahmad",
       vehicle: "VAN-7",
       custody: null,
+      /* Edit Delivery is retired: the door is the Monitor row, brief unfolded. */
       deliveryHref:
-        "/operation/delivery/edit/00000000-0000-0000-0000-0000000a0001?leg=0",
+        "/operation?tab=delivery&view=all&open=00000000-0000-0000-0000-0000000a0001",
       deliveryOrderHref: "/operation/delivery-orders/DO-180826-3035",
       sourceHref:
         "/operation/orders/so/00000000-0000-0000-0000-0000000a0001",

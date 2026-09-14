@@ -55,6 +55,7 @@ function tableMock(read: Result, write?: Result) {
     select: vi.fn(() => b),
     eq: vi.fn(() => b),
     in: vi.fn(() => b),
+    order: vi.fn(() => b),
     limit: vi.fn(() => b),
     upsert: vi.fn(() => b),
     maybeSingle: vi.fn().mockResolvedValue(read),
@@ -294,6 +295,8 @@ describe("POST /delivery-photo/attach", () => {
       orders: tableMock(DELIVERED_ORDER),
       ops_delivery_orders: tableMock({ data: { do_number: "DO-1" }, error: null }),
       ops_order_control: control,
+      /* §6.1 (0489) — the latest recorded attempt of the named document. */
+      delivery_attempts: tableMock({ data: { id: "attempt-1" }, error: null }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
@@ -304,6 +307,13 @@ describe("POST /delivery-photo/attach", () => {
       kind: "video",
     });
     expect(res.status).toBe(201);
+    /* The SAME act binds the file to the Delivery Visit it proves (§6.1). */
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_attempt_evidence_record", {
+      p_attempt_id: "attempt-1",
+      p_path: GOOD_PATH,
+      p_kind: "video",
+    });
+    expect(((await res.json()) as { evidenceBound: boolean }).evidenceBound).toBe(true);
     const upsertArg = control.upsert.mock.calls[0][0] as {
       delivery_photos: { doNumber: string | null; kind: string }[];
     };

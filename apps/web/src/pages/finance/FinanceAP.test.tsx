@@ -38,7 +38,6 @@ const ROW_MATCHED = {
   supplier_id:         "s1",
   supplier_name:       "Acme Bedworks",
   warehouse_id:        "w1",
-  delivery_partner_id: null,
   placed_at:           "2026-04-29T00:00:00Z",
   expected_ready_date: "2026-05-10",
   eta_date:            "2026-05-12",

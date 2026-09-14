@@ -513,7 +513,6 @@ export {
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -525,7 +524,6 @@ export {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
@@ -546,7 +544,6 @@ export {
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
   type AbandonOrderInput,
-  type WarehousePickInput,
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
@@ -557,7 +554,6 @@ export {
   type ReselectPartnerInput,
   type LpAcceptOrderInput,
   type LpRejectOrderInput,
-  type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
@@ -874,6 +870,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  planOpsAssignment,
+  type OpsAssignmentCandidate,
   seenTodayMYT,
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
@@ -958,6 +956,8 @@ export {
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
+  orderActionLines,
+  type OrderActionLines,
   orderActionQueue,
   purchasingActionButton,
   purchasingActionDone,
@@ -2078,11 +2078,24 @@ export {
 // `Created` belongs to the Register and may never appear on the workspace.
 export {
   deliveryWorkStatusOf,
-  DELIVERY_WORK_STATUS_LABEL,
+  deliveryWorkStatusLabelOf,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  LOGISTICS_ROLE_WORD,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
+  type DeliveryWorkStatusTone,
+  type DeliveryStatusSpell,
 } from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
 // nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
@@ -2110,6 +2123,10 @@ export {
   type DeliveryArrangementRow,
   type DeliveryArrangementEventRow,
   type ChangeLogisticsReasonKey,
+  operationCannotDeliverInput,
+  type OperationCannotDeliverInput,
+  type DeliveryCannotDeliverRow,
+  cannotDeliverReasonLabel,
 } from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
@@ -3086,12 +3103,19 @@ export * from "./work-engine";
 // Workspace foundation — company-wide owner-Duty assignments, cover resolution,
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
+export * from "./workspace-duties-catalogue";
+export * from "./delivery-contact";
+export * from "./delivery-settings";
+export * from "./delivery-proof";
+export * from "./schemas/loan-offer";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";
+export * from "./payment-monitor";
+export * from "./payment-collection-owner";
 export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";

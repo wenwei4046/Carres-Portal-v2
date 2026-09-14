@@ -40,17 +40,18 @@
  * clock.
  */
 
-import type { DeliveryWorkStatusKind } from "@carres/shared";
+import type { DeliveryWorkStatusKind, DeliveryWorkStatusTone } from "@carres/shared";
 import {
-  DELIVERY_WORK_STATUS_LABEL,
+  DELIVERY_WORK_STATUS_KINDS,
   ARRIVAL_COPY,
   deliveryArrivalStateOf,
-  deliveryStepDueIso,
   deliveryStockReadinessOf,
+  deliveryWorkStatusLabelOf,
   goodsCategoryWordOf,
   lineKind,
   lineShortagesOf,
   myHolidaySet,
+  orderActionLines,
   type DeliveryArrivalState,
   type DeliveryQueueLeads,
   type DeliveryStockReadiness,
@@ -64,12 +65,13 @@ import {
 } from "./delivery-work";
 import {
   DOR_COPY,
-  driverSubmissionOf,
-  missingDeliveryProofOf,
-  UNKNOWN_SUBMISSION,
+  proofReopened,
+  tripLinesOf,
+  type DoProofReview,
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
-import { lineName } from "./sales-order-facts";
+import { lineName, moneyOfOrder } from "./sales-order-facts";
+import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
@@ -88,6 +90,11 @@ export const MONITOR_COPY = {
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
   railWork: "WORK TO DO",
+  /** The three dropdowns own clear-this-one-condition word (2026-09-12).
+   *  `All` alone would read as all of everything; each says WHAT it clears. */
+  allStates: "All states",
+  allPartners: "All partners",
+  allStatuses: "All",
   railState: "STATE",
   railLogistics: "LOGISTICS PARTNER",
   railStatus: "DELIVERY STATUS",
@@ -105,14 +112,118 @@ export const MONITOR_COPY = {
    */
   callCustomer: "Call customer",
   noConfirmedDate: "No confirmed date",
-  overdue: "Overdue",
+  /** A day agreed with no window on it — the arrangement's own half-state. */
+  noTimeAgreed: "No time agreed",
+  /**
+   * ⭐ TWO DIFFERENT OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
+   * 2026-09-11). The rail's `Overdue delivery` is a confirmed trip whose day
+   * has passed with no result; the contact strip's `Overdue contact` is a
+   * customer conversation that missed its T−3 deadline. They answer different
+   * questions, they are worked by different people, and two bare `Overdue`
+   * counts on one screen read as one number that disagrees with itself.
+   */
+  overdue: "Overdue delivery",
+  overdueContact: "Overdue contact",
   failed: "Failed Delivery",
   /** Owner correction 2026-09-07 — the queue names the JOB; each row then
    *  names the exact missing file (`DOR_COPY.uploadPhoto` / `uploadSignedDo`). */
   uploadProof: "Upload delivery proof",
+  /** §6.1 (0489) — the review queue; its door is the DO object's Evidence
+   *  section. Joins the rail now that the proof-review record exists. */
+  checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
+  /* ── THE TWELVE-COLUMN REGISTER (owner ruling 2026-09-12, MASTER §8.3) ── */
+  confirmed: "Confirmed",
+  notConfirmed: "Not confirmed",
+  paid: "Paid",
+  doNotDeliver: "Do not deliver",
+  stillToCollect: (amount: string) => `${amount} still to collect`,
+  financeHolding: "Finance is holding this delivery",
+  collect: (amount: string) => `Collect ${amount}`,
+  cashOnDelivery: "Cash on delivery",
+  ofPieces: (have: number, total: number) => `${have} of ${total}`,
+  arrivingAfterRequested: "Arriving after the requested date",
+  doDate: (date: string) => `DO date ${date}`,
+  /* ── THE FOUR PANELS (owner ruling 2026-09-12, MASTER §8.5) ─────────────── */
+  panelCustomer: "Customer, Address & Access",
+  panelDates: "Delivery Dates",
+  panelLogistics: "Logistics Details",
+  panelItems: "Items, Services & Stock",
+  updateDateTime: "Update date and time",
+  changeLogistics: "Change logistics",
+  customer: "Customer",
+  phone: "Phone",
+  emergencyContact: "Emergency contact",
+  address: "Address",
+  buildingType: "Building type",
+  lift: "Lift",
+  access: "Access",
+  customerRequested: "Customer requested",
+  confirmedDate: "Confirmed delivery date",
+  confirmedTime: "Confirmed delivery time",
+  partner: "Logistics Partner",
+  driver: "Driver",
+  driverPhone: "Driver phone",
+  vehiclePlate: "Vehicle plate",
+  pickup: "Pickup",
+  eta: "ETA",
+  pickupNotRecorded: "Pickup not recorded",
+  handedOver: (at: string) => `Handed over ${at}`,
+  receivedBy: (partner: string, at: string) => `Received by ${partner} ${at}`,
+  condoRegistration: "Condo registration",
+  stairCarry: (n: number, floor: number | null) =>
+    floor == null ? `Stair carry · ${n} items` : `Stair carry · ${n} items · floor ${floor}`,
+  item: "Item",
+  qty: "Qty",
+  source: "Source",
+  status: "Status",
+  location: "Location",
+  countedStock: "Counted stock",
+  arriving: (date: string) => `Arriving ${date}`,
+  notReceivedYet: "Not received yet",
+  withHolder: (holder: string) => `With ${holder}`,
+  loanLine: (unit: string | null) =>
+    unit ? `Loan ${unit} · collect back on delivery day` : `Loan item · collect back on delivery day`,
+  services: "Services",
+  accessories: "Accessories",
+  /* ── THE IN-PANEL WRITES (owner ruling 2026-09-13, MASTER §8.6) ────────── */
+  confirmedDateField: "Confirmed date",
+  confirmedTimeField: "Confirmed time",
+  informationReceivedFrom: "Information received from",
+  customerWord: "Customer",
+  operationOnBehalfOf: (partner: string) => `Operation on behalf of ${partner}`,
+  whatsappProof: "WhatsApp proof",
+  saveConfirmedDelivery: "Save confirmed delivery",
+  saveConfirmedDeliveryNeedsReply: "Save confirmed delivery — upload the WhatsApp reply",
+  cancel: "Cancel",
+  notDeliveryDay: "Sunday and Malaysian public holidays are not delivery days",
+  deliveryConfirmedDone: (date: string, slot: string | null) =>
+    slot ? `Delivery confirmed ${date} · ${slot}` : `Delivery confirmed ${date}`,
+  uploadReply: "Upload reply screenshot",
+  replaceReply: "Replace screenshot",
+  replyAttached: "Reply screenshot attached",
+  uploadFailed: "The screenshot could not be uploaded",
+  uploadWrongType: "Use a JPG, PNG or WEBP screenshot",
+  uploadTooLarge: "That screenshot is too large (max 10 MB)",
+  copyMessage: "Copy message",
+  copied: "Message copied",
+  openGroup: "Open WhatsApp group",
+  groupNotSet: "No WhatsApp group saved for this partner",
+  sentIsNotConfirmed:
+    "Sending is not confirmation. Record the date only after the partner replies, and upload the reply.",
+  whyChanging: "Why is the logistics partner changing?",
+  pickOne: "Pick one",
+  driverName: "Driver name",
+  condoRegistrationHint:
+    "What the building's management needs before the truck may enter — permit reference, registered time, in their words.",
+  recordCannotDeliver: (partner: string) => `Record Cannot Deliver on behalf of ${partner}`,
+  cannotDeliverReason: "Reason",
+  cannotDeliverNote: "Note",
+  cannotDeliverRecorded: (partner: string) => `${partner} cannot deliver — recorded`,
+  showBrief: "Show delivery brief",
+  hideBrief: "Hide delivery brief",
   /** The first carrier on a scope — the governed word, never `Set partner`. */
   assignLogistics: "Assign logistics",
   hideFilters: "Hide filters",
@@ -142,8 +253,11 @@ export const MONITOR_COPY = {
   tabs: "Monitor views",
   /** The calendar's own boundary, stated ON the calendar rather than learned
    *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
-   *  never enters a date cell). */
-  calendarScope: "Only deliveries with a confirmed date and time appear here.",
+   *  never enters a date cell). A day WITHOUT an agreed window does enter,
+   *  because the operator must see the day — and its card says `No time
+   *  agreed` rather than passing as a finished booking (owner ruling
+   *  2026-09-11). */
+  calendarScope: "Only deliveries with a confirmed date appear here.",
   /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
   /** The strip's own caption — these dates are CONTACT deadlines, and a reader
    *  who mistakes them for delivery appointments will call on the wrong day. */
@@ -155,9 +269,20 @@ export const MONITOR_COPY = {
    *  named a day, so nothing about this row is late (delivery-queue's own
    *  "a step with no anchor is never late"). */
   noContactDeadline: "No contact deadline",
-  /** The governed late spelling, unchanged from every other late step. */
+  /**
+   * ⭐ THE COMPACT DEADLINE IS A PHONE AND A DATE (owner ruling 2026-09-11).
+   * `Call by` and `Late — was due` repeated the same two phrases down an
+   * entire column, and the icon plus its colour already carry both. The WORDS
+   * do not disappear: they move into the tooltip and the accessible name,
+   * where a hover and a screen reader both find them.
+   */
   lateWasDue: (date: string) => `Late — was due ${date}`,
   callBy: (date: string) => `Call by ${date}`,
+  /** The compact cell's own accessible sentence — who to call, by when, and
+   *  whether that day has already gone. */
+  contactDueSentence: (date: string) => `Contact deadline ${date}`,
+  contactLateSentence: (date: string) =>
+    `Contact deadline ${date} — overdue, the deadline does not move`,
   /* ── THE GOODS COLUMNS (owner ruling 2026-09-10) ───────────────────────── */
   items: "Items",
   extras: "Accessories & services",
@@ -181,6 +306,8 @@ export const MONITOR_COLUMN = {
   state: "State",
   requestedDelivery: "Requested Delivery Date",
   logisticsPartner: "Logistics Partner",
+  /** The register's own heading for the partner column (§8.3 column 9). */
+  logistics: "Logistics",
   confirmedDelivery: "Confirmed Delivery",
   confirmedTime: "Confirmed Time",
   doNumber: "DO No",
@@ -193,6 +320,10 @@ export const MONITOR_COLUMN = {
   expectedArrival: ARRIVAL_COPY.column,
   /** Whether the register already holds the goods. */
   stock: MONITOR_COPY.stock,
+  /** §8.3 column 10 — readiness and the exact count, one cell. */
+  itemsStock: "Items & Stock",
+  /** §8.3 column 11 — the one money rule's answer, never a door. */
+  payment: "Payment",
   goods: "Goods",
   deliveryStatus: "Delivery Status",
   /** The ROW's open-action list — the governed word (COPY-STANDARD). */
@@ -327,7 +458,8 @@ export type MonitorWorkView =
   | "no_confirmed_date"
   | "overdue"
   | "failed"
-  | "upload_proof";
+  | "upload_proof"
+  | "check_proof";
 
 export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "all",
@@ -336,6 +468,7 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "overdue",
   "failed",
   "upload_proof",
+  "check_proof",
 ];
 
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
@@ -347,6 +480,7 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
   upload_proof: MONITOR_COPY.uploadProof,
+  check_proof: MONITOR_COPY.checkProof,
 };
 
 /**
@@ -379,23 +513,17 @@ export const DEFAULT_TOP_TAB: MonitorTopTab = "work";
 export const DEFAULT_WORK_VIEW: MonitorWorkView = "all";
 
 /**
- * The DELIVERY STATUS group (owner correction 2026-09-07) — filters over the
- * shared operational ladder's three "arranged and moving" rungs. Not actions,
- * not document statuses, and never a WORK TO DO queue: `Waiting for warehouse`
- * means Delivery has arranged the trip and Warehouse has not yet recorded
- * `Ready for handover` — it never means missing stock.
+ * The DELIVERY STATUS group — a kit dropdown over the Monitor status words
+ * (Delivery MASTER §8.4, owner ruling 2026-09-13): the same actor-first
+ * dictionary the column prints, in the ladder's own order. Not actions, not
+ * document statuses, and never a WORK TO DO queue. The option words carry the
+ * role word where the column would carry the partner's name.
  */
-export type MonitorDeliveryStatus = "waiting_warehouse" | "ready_for_handover" | "out_for_delivery";
-export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] = [
-  "waiting_warehouse",
-  "ready_for_handover",
-  "out_for_delivery",
-];
-export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = {
-  waiting_warehouse: DELIVERY_WORK_STATUS_LABEL.waiting_warehouse,
-  ready_for_handover: DELIVERY_WORK_STATUS_LABEL.ready_for_handover,
-  out_for_delivery: DELIVERY_WORK_STATUS_LABEL.out_for_delivery,
-};
+export type MonitorDeliveryStatus = DeliveryWorkStatusKind;
+export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] = DELIVERY_WORK_STATUS_KINDS;
+export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = Object.fromEntries(
+  DELIVERY_WORK_STATUS_KINDS.map((kind) => [kind, deliveryWorkStatusLabelOf(kind, null)]),
+) as Record<MonitorDeliveryStatus, string>;
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
@@ -419,13 +547,22 @@ export interface DeliveryMonitorCard {
   logisticsPartnerName: string | null;
   region: string | null;
   statusKey: DeliveryWorkStatusKind;
+  /** Line one of the status — the actor and the fact (§8.4). */
   statusLabel: string;
+  /** Its text colour: green · orange · red · none. Never an icon. */
+  statusTone: DeliveryWorkStatusTone;
+  /** Line two — the day, window, deadline, ETA, proof state or reason. */
+  statusSecond: string | null;
+  statusSecondTone: "orange" | "red" | null;
   /**
    * The evidence a RECORDED delivered result still lacks — the Delivery
    * Orders register's own arithmetic, never from a planned window ending. Both
    * false for any row whose result has not reached the customer.
    */
   missingProof: MissingDeliveryProof;
+  /** §6.1 (0489) — Operation's review of that evidence: pending, accepted,
+   *  more required or rejected with its reason. The register's arithmetic. */
+  proofReview: DoProofReview;
   /** THE MAIN GOODS on the truck, with their size and quantity. */
   items: MonitorGoodsLine[];
   /** Accessories and services, kept APART from the main goods (owner ruling
@@ -450,17 +587,120 @@ export interface DeliveryMonitorCard {
    * anything went wrong.
    */
   contactDueIso: string | null;
-  /** The deadline is behind us and no date has been agreed. A RECORDED fact
-   *  about a RECORDED absence — never an inference about the customer. */
+  /** The deadline is behind us and the arrangement is still not complete. A
+   *  RECORDED fact about a RECORDED absence — never an inference about the
+   *  customer. */
   contactOverdue: boolean;
+  /**
+   * ⭐ BOTH HALVES AGREED — a confirmed day AND a confirmed time (owner ruling
+   * 2026-09-11). A day with no window is a half-finished arrangement: the
+   * customer does not know when to be home, so the delivery is not booked, the
+   * contact work stays open, and the calendar does not print it as settled.
+   */
+  booked: boolean;
+  /**
+   * ⭐ The trip has a RECORDED OUTCOME — delivered, an exception, or cancelled.
+   * Nothing about the appointment is still open, whatever the arrangement
+   * recorded, so no contact work survives it (owner correction 2026-09-11).
+   */
+  settled: boolean;
   /** The full row behind the card — the work list's own columns and the
    *  governed `Assign logistics` door read it; the calendar card never does. */
   scope: DeliveryScopeRow;
+  /** §8.3 `Payment` — the one money rule's two lines and their colour. */
+  payment: MonitorPayment;
+  /** §8.3 `Items & Stock` — line one the readiness word, line two the count. */
+  stock: MonitorStock;
+}
+
+export interface MonitorPayment {
+  line1: string;
+  line2: string | null;
+  tone: "green" | "red" | "none";
+}
+
+export interface MonitorStock {
+  line1: string;
+  line2: string | null;
+  ready: boolean;
+}
+
+/**
+ * ⭐ `Payment` ARITHMETIC (Delivery MASTER §8.3): `orderMoney.outstanding`
+ * through the one money rule and the OPEN Finance exception — the same
+ * predicate the DO gate asks. `Paid` when nothing is outstanding and no
+ * exception holds; `Do not deliver` over `RM {amount} still to collect` while
+ * money is owed, or over `Finance is holding this delivery` while an exception
+ * is open; `Collect RM {amount}` over `Cash on delivery` only when an approval
+ * opened the gate. Monitor adds no payment door.
+ */
+export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
+  const money = moneyOfOrder(o);
+  const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
+  const owed = money.known ? money.outstanding : 0;
+  if (financeHolds) {
+    return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
+  }
+  if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
+  const approvals = (o.order_delivery_payment_approvals ?? []).map((a) => ({
+    status: a.status as "pending" | "approved" | "refused",
+  }));
+  if (paymentApprovalOpensGate(approvals)) {
+    return {
+      line1: MONITOR_COPY.collect(fmtMoney(owed)),
+      line2: MONITOR_COPY.cashOnDelivery,
+      tone: "none",
+    };
+  }
+  return {
+    line1: MONITOR_COPY.doNotDeliver,
+    line2: MONITOR_COPY.stillToCollect(fmtMoney(owed)),
+    tone: "red",
+  };
+}
+
+/** The arrival's own day, when the shared reader names one. */
+export function arrivalDayOf(arrival: DeliveryArrivalState): string | null {
+  return "dateIso" in arrival ? arrival.dateIso : null;
+}
+
+/**
+ * ⭐ `Items & Stock` ARITHMETIC (§8.3): `deliveryStockReadinessOf` over THIS
+ * shipment's goods (`tripLinesOf`); the count is the committed pieces the
+ * register holds against the total; `Arriving after the requested date` is
+ * `deliveryArrivalStateOf`'s day against Sales' requested day. Delivery
+ * computes no arrival of its own.
+ */
+export function monitorStockOf(input: {
+  readiness: DeliveryStockReadiness;
+  totalQty: number;
+  arrival: DeliveryArrivalState;
+  requestedIso: string | null;
+}): MonitorStock {
+  const { readiness, totalQty } = input;
+  const have = Math.max(0, totalQty - readiness.shortQty);
+  if (readiness.ready) {
+    return { line1: ARRIVAL_COPY.stockReady, line2: totalQty > 0 ? MONITOR_COPY.ofPieces(have, totalQty) : null, ready: true };
+  }
+  const arrivalDay = arrivalDayOf(input.arrival);
+  if (arrivalDay && input.requestedIso && arrivalDay > input.requestedIso) {
+    return { line1: ARRIVAL_COPY.stockNotReady, line2: MONITOR_COPY.arrivingAfterRequested, ready: false };
+  }
+  const count = MONITOR_COPY.ofPieces(have, totalQty);
+  return {
+    line1: ARRIVAL_COPY.stockNotReady,
+    line2: readiness.shortQty > 0 ? `${count} · ${ARRIVAL_COPY.short(readiness.shortQty)}` : count,
+    ready: false,
+  };
 }
 
 /** One goods line as the work list prints it. */
 export interface MonitorGoodsLine {
   key: string;
+  /** The order line's own id — the brief's Unit and PO facts are read by it
+   *  from the Sales Order expansion (Stock owns the Unit, Purchasing the PO). */
+  lineId: string | null;
+  sku: string;
   /** `Trion · Queen` — the catalog's own resolved name (model AND size), or
    *  the text the order carries when the catalog does not know the SKU. */
   name: string;
@@ -527,12 +767,6 @@ export interface DeliveryMonitorFilters {
    to notice `Clear filters`. Two NAMED tabs (`MonitorTopTab`) now decide which
    view is showing, and every narrowing applies to whichever one is open. */
 
-/** PostgREST may embed a to-one overlay as an object or a one-row array. */
-function overlayOf<T>(value: T | T[] | null | undefined): T | null {
-  if (value == null) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
 /**
  * Every open delivery row as one card. The rows, the entry rule and the
  * status ladder are `delivery-work.ts`'s — the ONE arithmetic — so Monitor
@@ -544,36 +778,13 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
   const rows = buildDeliveryScopeRows(input);
   const holidays = input.holidays ?? myHolidaySet();
   const docByNumber = new Map(input.deliveryOrders.map((d) => [d.do_number, d] as const));
-  /* The LATEST recorded attempt per document — the same "latest" the Delivery
-     Orders register reads (newest `recorded_at`). */
-  const latestByDo = new Map<string, { result: "delivered" | "partial" | "failed"; at: string }>();
-  for (const a of input.attempts) {
-    if (!a.do_number) continue;
-    const prev = latestByDo.get(a.do_number);
-    if (!prev || a.recorded_at > prev.at) {
-      latestByDo.set(a.do_number, { result: a.result, at: a.recorded_at });
-    }
-  }
 
   return rows.map((row): DeliveryMonitorCard => {
     const doc = row.doNumber ? docByNumber.get(row.doNumber) ?? null : null;
-    /* The T6 photo ledger rides the list on the ops_order_control overlay
-       (migration 0280) — the order's own embed first (what the workspace
-       read carries), the document's embed second. */
-    const control =
-      overlayOf(row.o.ops_order_control) ?? overlayOf(doc?.orders.ops_order_control ?? null);
-    const photos = control?.delivery_photos;
-    /* ⭐ SCOPED TO THE DOCUMENT (owner ruling 2026-09-11). The ledger belongs
-       to the Sales Order; the question is whether THIS trip came back with a
-       photo. Reading the whole order's ledger closed one document's work on
-       another document's file. driverSubmissionOf is the ONE reader of the
-       stamp (Law D) - no card computes the scope itself. */
-    const submission = doc ? driverSubmissionOf(photos, doc.do_number) : UNKNOWN_SUBMISSION;
-    const missingProof = missingDeliveryProofOf({
-      latestResult: doc ? latestByDo.get(doc.do_number)?.result ?? null : null,
-      photosPresent: submission.known ? submission.photos > 0 : null,
-      signedDoPresent: Boolean(doc?.orders.do_file_path),
-    });
+    /* The missing evidence and the contact deadline are the scope row's own
+       facts — counted once in `delivery-work.ts`, the same reading the status
+       line, the rail and the calendar share (Law D). */
+    const missingProof = row.missingProof;
     /* ── THE GOODS, THE STOCK AND THE ARRIVAL (owner ruling 2026-09-10) ────
        Every one of these comes from a shared arithmetic and none of them is
        recomputed here: the shortage is `lineShortagesOf` over the register
@@ -586,12 +797,20 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        allocated. The predicate is the ENTRY RULE's own (`lineKind !==
        "service"`), so what makes an order delivery work and what makes it
        ready are decided by one test. */
-    const lines = row.o.order_lines ?? [];
+    /* ⭐ READINESS FOLLOWS THE SHIPMENT, NOT THE WHOLE SALES ORDER (owner
+       ruling 2026-09-11). A split trip carries only its own groups, and
+       counting the order's OTHER trip as this one's shortage told the operator
+       a van was short of goods it was never going to carry. The scoping is the
+       DO's own `trip_groups` derivation — the SAME `tripLinesOf` the register,
+       the document page and the print path run (Law D), and a row with no
+       document yet is the whole order by that function's own rule. */
+    const lines = tripLinesOf(row.o.order_lines ?? [], doc?.trip_groups);
     const physical = lines
       .map((l, index) => ({ index, sku: l.sku, qty: l.qty }))
       .filter((l) => lineKind(l.sku) !== "service");
     const units = row.o.allocated_units ?? [];
     const readiness = deliveryStockReadinessOf(physical, units);
+    const totalQty = physical.reduce((sum, l) => sum + Number(l.qty || 0), 0);
     const shortByLineIndex = new Map<number, number>();
     lineShortagesOf(physical, units).forEach((s, i) => {
       shortByLineIndex.set(physical[i]!.index, s.shortQty);
@@ -602,6 +821,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       const kind = lineKind(line.sku);
       const entry: MonitorGoodsLine = {
         key: line.id ?? `${line.sku}-${index}`,
+        lineId: line.id ?? null,
+        sku: line.sku,
         name: lineName(line),
         category: goodsCategoryWordOf(line),
         qty: line.qty,
@@ -618,6 +839,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       const key = addon.addon_key ?? "";
       extras.push({
         key: `addon-${index}-${key}`,
+        lineId: null,
+        sku: key,
         name: addonName(key, input.addonNameByKey),
         category: "Service",
         qty: addon.qty,
@@ -625,13 +848,20 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         kind: "service",
       });
     }
-    /* ── THE CONTACT DEADLINE — the `chase` step, counted once ────────────── */
-    const contactDueIso = deliveryStepDueIso(
-      "chase",
-      row.customerDeliveryIso,
-      { holidays },
-      input.queueLeads,
-    );
+    const contactDueIso = row.contactDueIso;
+    /* The arrangement is COMPLETE only with a day AND a window on it. */
+    const booked = row.confirmedIso !== null && row.confirmedTime !== null;
+    /* ⭐ THE VAN HAS ALREADY BEEN (owner correction 2026-09-11, found in the
+       rendered walk). Contact work is about arranging a delivery that has not
+       happened. Once a RESULT is recorded — `Delivered`, or the one
+       `Failed Delivery` rung that carries both a failure and a partial —
+       there is nothing left to agree with the customer on this trip, and its
+       remaining work is proof or a rebooking, which are the
+       `Upload delivery proof` and `Failed Delivery` queues' own rows. A
+       delivered trip sitting in `Call customer` because nobody recorded a
+       time window sends an operator to phone a customer whose furniture is
+       already in the house. */
+    const settled = row.status.kind === "delivered" || row.status.kind === "failed";
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -640,6 +870,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       doNumber: row.doNumber,
       confirmedDate: row.confirmedIso,
       confirmedTime: row.confirmedTime,
+      booked,
+      settled,
       customerName: row.customer,
       locality: row.location || null,
       goodsSummary: row.goods,
@@ -648,7 +880,11 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       region: regionBucketOf(row),
       statusKey: row.status.kind,
       statusLabel: row.status.label,
+      statusTone: row.status.tone,
+      statusSecond: row.status.second,
+      statusSecondTone: row.status.secondTone,
       missingProof,
+      proofReview: row.proofReview,
       items,
       extras,
       siteAccess: siteAccessOf(row.o),
@@ -657,15 +893,36 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         arrivals: row.o.po_arrivals ?? [],
         readiness,
         todayIso: input.todayIso,
+        /* The arrival-check clock counts on the same holidays as every other
+           Carres clock — handed in, never read from a second source. */
+        holidays,
       }),
       contactDueIso,
-      /* Late is a question about a RECORDED absence: a deadline behind us with
-         no agreed date. It is never an inference about what the customer said
-         — a contact ATTEMPT is not a confirmed booking, and neither is
-         silence. */
+      /* ⭐ A DATE WITHOUT AN AGREED TIME IS NOT A BOOKING (owner ruling
+         2026-09-11). A customer who has been given a day but no window has not
+         been told when to be home, and the old reading — `confirmedIso !==
+         null` — closed the follow-up on exactly that half-finished
+         arrangement. The conversation stays open until BOTH facts are
+         recorded.
+
+         Late is still a question about a RECORDED absence, never an inference
+         about what the customer said: a contact ATTEMPT is not a confirmed
+         booking, and neither is silence. */
       contactOverdue:
-        contactDueIso !== null && contactDueIso < input.todayIso && row.confirmedIso === null,
+        contactDueIso !== null && contactDueIso < input.todayIso && !booked && !settled,
       scope: row,
+      payment: monitorPaymentOf(row.o),
+      stock: monitorStockOf({
+        readiness,
+        totalQty,
+        arrival: deliveryArrivalStateOf({
+          arrivals: row.o.po_arrivals ?? [],
+          readiness,
+          todayIso: input.todayIso,
+          holidays,
+        }),
+        requestedIso: row.customerDeliveryIso,
+      }),
     };
   });
 }
@@ -741,44 +998,50 @@ export function overdueContactCards(
   return sortByRequestedDeliveryDate(cards.filter((c) => c.contactOverdue));
 }
 /** A recorded delivered result still owed evidence — the `Upload delivery
- *  proof` queue's one membership test. */
+ *  proof` queue's one membership test. §6.1: `Proof Rejected` and `More
+ *  Proof Required` reopen it although a file is on record. */
 export function needsProof(card: DeliveryMonitorCard): boolean {
-  return card.missingProof.photo || card.missingProof.signedDo;
+  return card.missingProof.photo || card.missingProof.signedDo || proofReopened(card.proofReview);
 }
 
-/** The exact missing action(s), in the governed words — both when both. */
+/** §6.1 — a file on record that no review has judged yet: the `Check
+ *  delivery proof` queue's one membership test. */
+export function needsProofReview(card: DeliveryMonitorCard): boolean {
+  return card.proofReview.state === "pending";
+}
+
+/** The exact missing action(s), in the governed words — both when both. A
+ *  reopened upload names the file the driver sends, with the review's reason
+ *  as the row's second line (the status line already carries it). */
 export function missingProofLabels(card: DeliveryMonitorCard): string[] {
   const out: string[] = [];
   if (card.missingProof.photo) out.push(DOR_COPY.uploadPhoto);
   if (card.missingProof.signedDo) out.push(DOR_COPY.uploadSignedDo);
+  if (out.length === 0 && proofReopened(card.proofReview)) out.push(DOR_COPY.uploadPhoto);
   return out;
 }
 
 /**
  * The one href arithmetic. An issued DO opens the formal Delivery Order; a
- * row without one opens Edit Delivery — Monitor never issues the document.
+ * row without one opens its Monitor row, brief unfolded — Monitor never
+ * issues the document.
  */
 export function monitorCardHref(card: DeliveryMonitorCard): string {
   if (card.deliveryOrderId) {
     return `/operation/delivery-orders/${encodeURIComponent(card.deliveryOrderId)}`;
   }
-  return `/operation/delivery/edit/${encodeURIComponent(card.orderId)}${
-    card.leg != null ? `?leg=${card.leg}` : ""
-  }`;
+  /* Edit Delivery is RETIRED (owner ruling 2026-09-13): a row without a
+     document opens on Monitor with its brief already unfolded. */
+  return monitorRowHref(card.scopeId);
+}
+
+/** The Monitor row itself, brief unfolded — the one address of a scope's
+ *  Delivery-owned writes since Edit Delivery retired (§8.6). */
+export function monitorRowHref(scopeId: string): string {
+  return `/operation?tab=delivery&view=all&open=${encodeURIComponent(scopeId)}`;
 }
 
 /* ── THE CHASE — who must be called, and what the operator does next ────── */
-
-/**
- * `Call NETS — confirm delivery date` — the governed row line for the
- * `Confirm delivery date` queue (COPY-STANDARD, "The delivery queue words":
- * `Call {logistics} — confirm delivery date`). The partner NAME comes from
- * the row; no company is ever hard-coded, and a row with no partner never
- * reaches this sentence — it is asked to `Assign logistics` first.
- */
-export function callToConfirmDeliveryDate(partnerName: string): string {
-  return `Call ${partnerName} — confirm delivery date`;
-}
 
 /**
  * ⭐ ONE ROW, ONE NEXT ACT (the chase workflow, Delivery MASTER §8).
@@ -803,8 +1066,9 @@ export function callToConfirmDeliveryDate(partnerName: string): string {
  */
 export type MonitorRowAction =
   | { kind: "upload_proof"; label: string }
+  | { kind: "check_proof"; label: string }
   | { kind: "assign_logistics"; label: string }
-  | { kind: "confirm_date"; call: string; label: string }
+  | { kind: "confirm_date"; call: string; result: string; label: string }
   | { kind: "edit_delivery"; label: string };
 
 export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
@@ -813,16 +1077,36 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
        when both are missing (owner correction 2026-09-07). */
     return { kind: "upload_proof", label: missingProofLabels(card).join(" · ") };
   }
+  if (needsProofReview(card)) {
+    /* §6.1 — the file is there; the judgement is the next act. */
+    return { kind: "check_proof", label: MONITOR_COPY.checkProof };
+  }
   if (card.logisticsPartnerId === null) {
     return { kind: "assign_logistics", label: MONITOR_COPY.assignLogistics };
   }
-  if (card.confirmedDate === null) {
+  /* ⭐ AND A TRIP THAT HAS ALREADY RUN IS NOT A CHASE (owner correction
+     2026-09-11). `Call {partner} — confirm delivery date` is about arranging
+     a delivery that has not happened. A DELIVERED trip whose time window was
+     never written down is `booked: false` and used to print that line — the
+     same mistake the `Call customer` queue made, in the one cell that tells
+     the operator what to DO. A recorded result outranks it, exactly as it
+     already outranks an unassigned partner. */
+  if (!card.booked && !card.settled) {
+    /* The partner's own name, from the row — never a hard-coded company. A
+       partner id whose name has not resolved would print an id at the
+       operator, so the governed absence word stands in for it. */
+    /* ⭐ TWO STRUCTURED LINES from the one word module (owner ruling
+       2026-09-13): `Call {partner}` over `Confirm the delivery date` — or over
+       `Confirm the delivery time` when the DAY is agreed and only the window
+       is missing (owner ruling 2026-09-12). No carrier is ever hard-coded. */
+    const lines = orderActionLines("confirm_delivery_date", {
+      logistics: card.logisticsPartnerName,
+      dayAgreed: card.confirmedDate !== null,
+    });
     return {
       kind: "confirm_date",
-      /* The partner's own name, from the row — never a hard-coded company.
-         A partner id whose name has not resolved would print an id at the
-         operator, so the governed absence word stands in for it. */
-      call: callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics),
+      call: lines.act,
+      result: lines.result ?? "",
       label: MONITOR_COPY.editDelivery,
     };
   }
@@ -833,7 +1117,9 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
  *  the sheet and the screen never say two different things. */
 export function monitorRowActionText(card: DeliveryMonitorCard): string {
   const action = monitorRowAction(card);
-  return action.kind === "confirm_date" ? `${action.call} · ${action.label}` : action.label;
+  return action.kind === "confirm_date"
+    ? `${action.call} · ${action.result} · ${action.label}`
+    : action.label;
 }
 
 /* ── The filters — each one answers, and they COMBINE ──────────────────── */
@@ -848,7 +1134,12 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
          dates, with or without a DO or a confirmed date. */
       return card.logisticsPartnerId === null;
     case "no_confirmed_date":
-      return card.confirmedDate === null;
+      /* ⭐ A DAY WITHOUT A WINDOW IS STILL CONTACT WORK (owner ruling
+         2026-09-11): the customer has not been told when to be home, so the
+         conversation is not finished and the row does not leave the queue.
+         A trip that has already RUN is the one exception — there is nothing
+         left to arrange, and its remaining work is a different queue's. */
+      return !card.booked && !card.settled;
     case "overdue":
       /* A confirmed date behind us with no delivered result. A recorded
          delivery is never overdue — its remaining work is proof, below. */
@@ -861,6 +1152,8 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
       return card.statusKey === "failed";
     case "upload_proof":
       return needsProof(card);
+    case "check_proof":
+      return needsProofReview(card);
   }
 }
 
@@ -1155,6 +1448,17 @@ export interface MonitorRails {
   regions: MonitorRailRow[];
   logistics: MonitorRailRow[];
   status: Record<MonitorDeliveryStatus, number>;
+  /**
+   * WHAT `All` WOULD GIVE BACK (owner ruling 2026-09-12). Each dropdown
+   * needs the count for clearing its OWN condition, and it is the same
+   * cross-computed number the rows under it already obey: the cards surviving
+   * every OTHER group unchanged. Printing the whole register size instead
+   * would make `All states (89)` disagree with the 12 rows a picked queue
+   * actually leaves.
+   */
+  regionTotal: number;
+  logisticsTotal: number;
+  statusTotal: number;
 }
 
 /**
@@ -1194,6 +1498,11 @@ export function buildMonitorRails(
   const forRegion = cards.filter((c) => survives(c, "region"));
   const forLogistics = cards.filter((c) => survives(c, "logistics"));
   const forStatus = cards.filter((c) => survives(c, "status"));
+  /* Each group own `All` is that group own population — the same list its
+     rows are counted from, so the dropdown and the rows cannot disagree. */
+  const regionTotal = forRegion.length;
+  const logisticsTotal = forLogistics.length;
+  const statusTotal = forStatus.length;
 
   const work = Object.fromEntries(
     MONITOR_WORK_VIEWS.map((v) => [
@@ -1253,5 +1562,5 @@ export function buildMonitorRails(
     MONITOR_STATUS_FILTERS.map((s) => [s, forStatus.filter((c) => c.statusKey === s).length]),
   ) as Record<MonitorDeliveryStatus, number>;
 
-  return { work, regions, logistics, status };
+  return { work, regions, logistics, status, regionTotal, logisticsTotal, statusTotal };
 }

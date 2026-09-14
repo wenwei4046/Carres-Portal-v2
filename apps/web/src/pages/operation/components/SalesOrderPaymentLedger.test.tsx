@@ -16,6 +16,8 @@ vi.mock("@/lib/supabase", () => ({
 const useOrderPayments = vi.fn();
 vi.mock("@/lib/queries", () => ({ useOrderPayments: (...a: unknown[]) => useOrderPayments(...a) }));
 
+const { atSalePaymentWord } = await import("@/lib/payment-display");
+
 const { default: PaymentLedger } = await import("./SalesOrderPaymentLedger");
 
 /** One live goods payment, one deposit, one VOIDED row — the shape a real
@@ -127,11 +129,33 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.getAllByText("Not recorded")).toHaveLength(4);
   });
 
-  it("says nothing has been recorded when the ledger is genuinely empty", () => {
+  it("reports an empty transaction list without claiming the order has never been paid", () => {
     useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
     render(<PaymentLedger orderId="o1" />);
     expect(screen.getByTestId("so-payments-empty")).toBeTruthy();
+    expect(screen.getByText("No payment transactions to show")).toBeTruthy();
+    expect(screen.queryByText("No payment has been recorded on this order")).toBeNull();
     expect(screen.queryByTestId("so-payments")).toBeNull();
+  });
+
+  it("shows the saved customer payment evidence when the transaction list is empty", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" saved={{ paid: 1250, method: "online", reference: "BANK-1319", slip: "orders-attachments/slip.jpg" }} />);
+    expect(screen.getByText("Online transfer")).toBeTruthy();
+    expect(screen.getByText("BANK-1319")).toBeTruthy();
+    expect(screen.getByText("View slip")).toBeTruthy();
+    expect(screen.getByText(/The order records a paid amount/)).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    expect(screen.queryByTestId("so-payment-row")).toBeNull();
+  });
+
+  it("flags a saved slip with zero recorded paid instead of claiming the customer never paid", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" saved={{ paid: 0, method: "online", reference: "FT2083020", slip: "orders-attachments/slip.jpg" }} />);
+    expect(screen.getByText(/Payment evidence is saved, but the recorded paid amount is zero/)).toBeTruthy();
+    expect(screen.getByText("FT2083020")).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    expect(screen.queryByText("RM 2,874.00")).toBeNull();
   });
 
   it("⭐ does NOT read an unreadable ledger as a zero", () => {
@@ -164,5 +188,18 @@ describe("the Sales Order payment ledger", () => {
     useOrderPayments.mockReturnValue({ data: undefined, isLoading: false, isError: false });
     rerender(<PaymentLedger orderId={null} />);
     expect(screen.queryByTestId("so-payments")).toBeNull();
+  });
+});
+
+describe("saved POS payment details", () => {
+  it("preserves the POS online-transfer meaning independently of transaction labels", () => {
+    expect(atSalePaymentWord("online", null)).toBe("Online transfer");
+    expect(atSalePaymentWord("installment", 12)).toBe("12-month instalment");
+  });
+  it("preserves a recorded custom method and never invents a missing plan", () => {
+    expect(atSalePaymentWord("CUSTOM_BANK", null)).toBe("CUSTOM_BANK");
+    expect(atSalePaymentWord(null, null)).toBeNull();
+    expect(atSalePaymentWord("cash", 0)).toBe("Cash");
+    expect(atSalePaymentWord(null, 1.5)).toBeNull();
   });
 });

@@ -57,6 +57,8 @@ import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
 
+import { ViewportExpansion } from "./ViewportExpansion";
+
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
 
 export type DataGridColumn<T> = {
@@ -206,6 +208,8 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Keep frequent controls labelled while the container has room. */
+  labelledToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -273,7 +277,15 @@ export type DataGridProps<T> = {
    * intervening columns slide beneath it. `true` keeps the original
    * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean | { columnKey: string };
+  stickyIdentity?: boolean | { columnKey: string | readonly string[] };
+  /**
+   * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
+   * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
+   * every cell carries one primary fact and one supporting line. Omitted =
+   * the Register baseline (38px), byte-identical for every other caller. A
+   * page passes the governed number; the engine never invents a third.
+   */
+  rowHeight?: 38 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -298,6 +310,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
     flush?: boolean;
+    /** Keep the child within the visible width, retaining the data-column indent. */
+    fitExpansionToViewport?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -503,6 +517,7 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  labelledToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -516,6 +531,7 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -920,9 +936,21 @@ function DataGridInner<T>({
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
-    const identityKey =
-      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
+    /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
+       2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
+       `Call NETS — confirm delivery date` with no customer attached to it, so
+       a page may now name the identity AND the column that says whose row it
+       is. The set stays a CONTIGUOUS RUN: pinning two columns with a third
+       between them would leave a gap the rows slide through, so the run stops
+       at the first column that is not named. */
+    const named =
+      typeof stickyIdentity === "object"
+        ? Array.isArray(stickyIdentity.columnKey)
+          ? stickyIdentity.columnKey
+          : [stickyIdentity.columnKey as string]
+        : null;
     let left = 0;
+    let pinned = 0;
     for (const col of visibleColumns) {
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
@@ -930,14 +958,26 @@ function DataGridInner<T>({
         left += Number(layout.widths[col.key] ?? col.width ?? 140);
         continue;
       }
-      if (identityKey == null || col.key === identityKey) {
-        // The identity: the first data column, or the NAMED one — pinned
-        // directly after the gutter, so a scrolled sheet slides the columns
-        // before it underneath. If the named column is hidden, only the
-        // gutter pins: a wrong identity is worse than none.
+      if (named == null) {
+        // No name: the identity is the first data column, pinned directly
+        // after the gutter, so a scrolled sheet slides the rest underneath.
         m.set(col.key, left);
         break;
       }
+      if (named.includes(col.key)) {
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        pinned += 1;
+        // Every named column found: the block is complete.
+        if (pinned === named.length) break;
+        continue;
+      }
+      // Not named. BEFORE the run starts this is an ordinary column the
+      // identity sits after — scan past it, exactly as the single-name form
+      // always did, and let it scroll under the block. ONCE the run has
+      // started, a gap would let rows slide through it, so the run ends here
+      // and whatever is already pinned stays correct.
+      if (pinned > 0) break;
     }
     return m;
   }, [stickyIdentity, visibleColumns, layout.widths]);
@@ -1720,7 +1760,11 @@ function DataGridInner<T>({
                  column's, the right edge is the parent table's. */
               style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
-              {expandable.renderExpansion(row)}
+              {expandable.fitExpansionToViewport ? (
+                <ViewportExpansion>
+                  {expandable.renderExpansion(row)}
+                </ViewportExpansion>
+              ) : expandable.renderExpansion(row)}
             </td>
           </tr>
         )}
@@ -1734,10 +1778,13 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        labelledToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
+      style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
+      data-row-height={rowHeight}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
@@ -1748,7 +1795,7 @@ function DataGridInner<T>({
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          isReference && !searchOpen && !search ? (
+          isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
               aria-label="Search"
@@ -1766,6 +1813,7 @@ function DataGridInner<T>({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="search"
+                aria-label="Search"
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -1818,7 +1866,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1832,7 +1880,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && (
+            {(!isReference || labelledToolbar) && (
               <>
                 <span>Export</span>
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
@@ -1894,7 +1942,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Columns"
             title="Columns"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1908,7 +1956,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Columns</span>}
+            {(!isReference || labelledToolbar) && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>
@@ -2156,7 +2204,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
+        <table className={`${styles.table}${typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey) ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}
