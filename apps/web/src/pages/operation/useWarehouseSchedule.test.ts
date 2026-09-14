@@ -392,3 +392,81 @@ describe("pickup product category", () => {
     expect(result.current.errors).toEqual([]);
   });
 });
+
+describe("a DEGRADATION is reported where something is degraded", () => {
+  /* `errors` is the field the board branches on to tell a genuinely quiet day
+     from a failed one: `cards: []` with `errors: []` means nothing is
+     scheduled, and `cards: []` with a non-empty `errors` means a source
+     failed and must never be read as "no arrangements".
+     A degradation notice on an EMPTY result breaks exactly that: it makes a
+     healthy quiet day render as a failure. Zero cards is zero mislabelled
+     lines — the degradation has no victim, so it has nothing to report. A
+     real FAILURE is never gated this way. */
+  const empty = { ...PO_ARRIVAL, arrivals: [], page: { offset: 0, limit: 200, total: 0 } };
+
+  it("stays silent about the catalog when there is nothing to classify", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound")) {
+        const { skuCategories: _drop, ...rest } = empty;
+        return Promise.resolve(rest);
+      }
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards).toEqual([]);
+    // A quiet day must stay a quiet day.
+    expect(result.current.errors).toEqual([]);
+  });
+
+  it("stays silent about ordered lines when there is nothing to line up", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound")) {
+        const { sourceFacts: _drop, ...rest } = empty;
+        return Promise.resolve(rest);
+      }
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.errors).toEqual([]);
+  });
+
+  it("still reports a real FAILURE on an empty result — never gated", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound"))
+        return Promise.reject(new Error("permission denied"));
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
+    expect(result.current.cards).toEqual([]);
+  });
+
+  it("still reports a TRUNCATION on an empty page — rows exist and none came", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound"))
+        return Promise.resolve({
+          ...PO_ARRIVAL,
+          arrivals: [],
+          page: { offset: 0, limit: 200, total: 640 },
+        });
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
+    expect(result.current.errors[0].message).toContain("640");
+  });
+});
