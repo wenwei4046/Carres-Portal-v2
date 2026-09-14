@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { ZodTypeAny, infer as ZodInfer } from "zod";
 
 /**
@@ -69,4 +70,19 @@ export async function parseJsonBody<S extends ZodTypeAny>(c: Context, schema: S)
     };
   }
   return { ok: true, data: parsed.data };
+}
+
+/** The throwing form, for the ops routes: a bad body is a 400 HTTPException. */
+export async function parseBody<S extends ZodTypeAny>(c: Context, schema: S): Promise<ZodInfer<S>> {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new HTTPException(400, { message: "Invalid input: " + parsed.error.issues[0]?.message });
+  }
+  return parsed.data;
 }

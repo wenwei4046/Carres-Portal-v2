@@ -49,6 +49,7 @@ import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
 
 /**
  * Per-unit stock register (migration 0137) — Carres Klang scope.
@@ -1269,25 +1270,6 @@ async function nameMap(
     if (u.name) map.set(u.id, u.name);
   }
   return map;
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
 }
 
 function mapErr(error: { code?: string; message?: string }): HTTPException {
