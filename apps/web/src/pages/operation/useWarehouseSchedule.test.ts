@@ -73,6 +73,7 @@ const PO_ARRIVAL = {
       lines: [{ id: "l1", sku: "sofa:Muro-K", qty: 1 }],
     },
   ],
+  skuCategories: [{ sku: "sofa:Muro-K", category: "sofa" }],
   page: { offset: 0, limit: 200, total: 1 },
 };
 
@@ -193,7 +194,7 @@ describe("a source FAILURE is never an empty day", () => {
 });
 
 describe("an optional read that refuses degrades one field, honestly", () => {
-  it("falls back to plain calendar dates and SAYS SO when settings refuse", async () => {
+  it("falls back to the GOVERNED WEEK and SAYS SO when settings refuse", async () => {
     h.fetch.mockImplementation((url: string) => {
       if (url.startsWith("/api/operation/warehouse-settings"))
         return Promise.reject(new Error("operation only"));
@@ -204,12 +205,17 @@ describe("an optional read that refuses degrades one field, honestly", () => {
       { wrapper },
     );
     await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
-    // 2026-09-20 is a Sunday and is KEPT — no invented weekly closure.
-    expect(result.current.operatingDates).toContain("2026-09-20");
+    /* CORRECTED after the 2026-09-14 production finding: 2026-09-20 is a
+       Sunday and must NOT appear. An unreadable configuration is not a
+       licence to contradict the approved Warehouse week. */
+    expect(result.current.operatingDates).not.toContain("2026-09-20");
     expect(result.current.operatingDates).toHaveLength(6);
-    expect(result.current.errors.some((e) => e.message.includes("calendar"))).toBe(
-      true,
-    );
+    // The operator is still told the configuration was not read.
+    expect(
+      result.current.errors.some((e) =>
+        e.message.includes("standard Warehouse week"),
+      ),
+    ).toBe(true);
   });
 
   it("keeps a pickup date EXPECTED when the partner's reply cannot be read", async () => {
@@ -281,6 +287,108 @@ describe("the Site filter narrows the RESULT, not the permission", () => {
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.cards).toEqual([]);
+    expect(result.current.errors).toEqual([]);
+  });
+});
+
+describe("the CATALOG reaches categoryKey", () => {
+  it("labels a line from the catalog, not from the SKU text", async () => {
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.cards[0].lines[0].categoryKey).toBe("Sofa");
+  });
+
+  it("reports when the server cannot supply the catalog", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/warehouse/inbound")) {
+        const { skuCategories: _drop, ...rest } = PO_ARRIVAL;
+        return Promise.resolve(rest);
+      }
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "arrival", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.errors.length).toBeGreaterThan(0));
+    expect(
+      result.current.errors.some((e) => e.message.includes("catalog")),
+    ).toBe(true);
+    // It still renders — the classifier rung is a degradation, not an outage.
+    expect(result.current.cards).toHaveLength(1);
+  });
+});
+
+/**
+ * PICKUP SIDE — the same SKU must not get two answers.
+ *
+ * Delivery's feed carried neither the model name nor the catalog category, so
+ * a 5539 sofa read `Sofa` on Arrival and `Other goods` on Pickup. The hook now
+ * asks for the catalog on this side too, and SAYS SO when the server cannot
+ * supply it rather than classifying in silence.
+ */
+describe("pickup product category", () => {
+  const EVENT = {
+    orderId: "order-19",
+    deliveryOrderId: "do-19",
+    doNumber: "DO-2609-019",
+    leg: 0,
+    kind: "customer_delivery_pickup",
+    unitId: "unit-1",
+    unitCode: "U-1",
+    sku: "5539-CNR",
+    product: "5539 Corner",
+    warehouseSiteId: "site-1",
+    fromLocation: "Carres Klang",
+    toCustomer: "Ms Tan",
+    eventDate: "2026-09-21",
+    logisticsPartner: "NETS",
+  };
+
+  it("passes the CATALOG categories through to the pickup cards", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/delivery-arrangements/warehouse-schedule"))
+        return Promise.resolve({
+          events: [EVENT],
+          skuCategories: [{ sku: "5539-CNR", category: "sofa" }],
+        });
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(
+      result.current.errors.some((e) => /catalog/i.test(e.message)),
+    ).toBe(false);
+  });
+
+  it("REPORTS a missing catalog instead of classifying in silence", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/delivery-arrangements/warehouse-schedule"))
+        return Promise.resolve({ events: [EVENT] });
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(
+      result.current.errors.some((e) => /catalog is not available/i.test(e.message)),
+    ).toBe(true);
+  });
+
+  it("stays quiet on an empty feed — there is nothing to classify", async () => {
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.errors).toEqual([]);
   });
 });

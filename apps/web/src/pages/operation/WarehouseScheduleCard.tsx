@@ -30,8 +30,10 @@ import {
   categoryVisualOf,
   dateStatusPillOf,
   exceptionLinesOf,
+  extraRelatedRecordsOf,
   lineProgressOf,
   specialMovementLabelOf,
+  type CardReference,
   type LineProgress,
 } from "./warehouse-schedule-view";
 
@@ -49,6 +51,7 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
   const pill = dateStatusPillOf(card.dateStatus);
   const special = specialMovementLabelOf(card.kind);
   const exceptions = exceptionLinesOf(card);
+  const extraRelated = extraRelatedRecordsOf(card);
   const party = card.partyName ?? "Party not recorded";
 
   return (
@@ -58,7 +61,7 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
       /* 1px border · 10px corner · NO decorative shadow. The tint says one
          thing only: whether this date is agreed (`cardTintClassOf`). */
       className={`min-w-0 rounded-card border ${cardTintClassOf(card.dateStatus)}`}
-      aria-label={`${party} · ${refs.primary}`}
+      aria-label={`${party} · ${refs.primary.ref}`}
     >
       {/* ── 1 · HEADER — 8px/12px padding, 4px gaps, and it WRAPS.
              A long party name or a long reference must push the door onto the
@@ -95,25 +98,27 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
               <StatusPill tone={pill.tone}>{pill.word}</StatusPill>
             </span>
           )}
-          <OpenWorkControl card={card} party={party} sourceRef={refs.primary} />
+          <OpenWorkControl card={card} party={party} sourceRef={refs.primary.ref} />
         </span>
       </header>
 
       <div className="px-3 pb-3">
-        {/* ── 2 · SOURCE REFERENCES. */}
+        {/* ── 2 · SOURCE REFERENCES — each on its own line, each ONCE, each
+               still openable. The link rides on the reference itself rather
+               than on a repeat of it further down the card. */}
         <div className="min-w-0">
           <div
             className="break-words text-body font-semibold text-kit-slate-12"
             data-testid="ws-card-ref-primary"
           >
-            {refs.primary}
+            <ReferenceText reference={refs.primary} />
           </div>
           {refs.secondary && (
             <div
               className="break-words text-label leading-4 text-kit-slate-11"
               data-testid="ws-card-ref-secondary"
             >
-              {refs.secondary}
+              <ReferenceText reference={refs.secondary} />
             </div>
           )}
         </div>
@@ -161,9 +166,9 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
           </div>
         )}
 
-        {card.relatedRecords.length > 0 && (
+        {extraRelated.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-x-2" data-testid="ws-card-related">
-            {card.relatedRecords.map((r) => (
+            {extraRelated.map((r) => (
               <Link
                 key={r.id}
                 to={r.href}
@@ -176,6 +181,19 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
         )}
       </div>
     </article>
+  );
+}
+
+/** A reference — a link when the projection gave it one, plain text otherwise. */
+function ReferenceText({ reference }: { reference: CardReference }) {
+  if (!reference.href) return <>{reference.ref}</>;
+  return (
+    <Link
+      to={reference.href}
+      className="underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+    >
+      {reference.ref}
+    </Link>
   );
 }
 

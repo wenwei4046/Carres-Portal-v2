@@ -545,20 +545,26 @@ describe("operating dates come from the CONFIGURED Site schedule", () => {
       ...over,
     }) as WarehouseScheduleSettings;
 
-  it("falls back to plain calendar days when settings are unreadable", () => {
-    // No invented weekly closure — 2026-09-20 is a Sunday and it is KEPT.
+  it("falls back to the GOVERNED WEEK when settings are unreadable", () => {
+    /* CORRECTED 2026-09-14 after the production finding. This test used to
+       assert that Sunday 2026-09-20 was KEPT — it encoded the defect as law.
+       Knowing nothing about the configuration is not a reason to contradict
+       the approved operating week. */
     const dates = warehouseScheduleOperatingDates("2026-09-18", 4, "arrival", null);
-    expect(dates).toEqual(["2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21"]);
+    expect(dates).toEqual(["2026-09-18", "2026-09-19", "2026-09-21", "2026-09-22"]);
   });
 
-  it("keeps an unconfigured day — nobody said is not closed", () => {
+  it("keeps an unconfigured WEEKDAY — nobody said is not closed", () => {
+    // Fri and Sat carry no configuration and are kept; only the governed
+    // weekly closure is skipped, and it is skipped because it is APPROVED,
+    // not because this function invented it.
     const dates = warehouseScheduleOperatingDates(
       "2026-09-18",
       3,
       "arrival",
       settings(),
     );
-    expect(dates).toEqual(["2026-09-18", "2026-09-19", "2026-09-20"]);
+    expect(dates).toEqual(["2026-09-18", "2026-09-19", "2026-09-21"]);
   });
 
   it("drops a date the configuration proves CLOSED", () => {
@@ -572,7 +578,7 @@ describe("operating dates come from the CONFIGURED Site schedule", () => {
         ] as WarehouseScheduleSettings["specialDates"],
       }),
     );
-    expect(dates).toEqual(["2026-09-18", "2026-09-20", "2026-09-21"]);
+    expect(dates).toEqual(["2026-09-18", "2026-09-21", "2026-09-22"]);
   });
 
   it("reads ARRIVAL against Receiving hours and PICKUP against Collection", () => {
@@ -588,7 +594,7 @@ describe("operating dates come from the CONFIGURED Site schedule", () => {
     });
     expect(
       warehouseScheduleOperatingDates("2026-09-18", 2, "arrival", only),
-    ).toEqual(["2026-09-18", "2026-09-20"]);
+    ).toEqual(["2026-09-18", "2026-09-21"]);
     // The same date stays open for collection — the two acts are configured
     // separately and one may never speak for the other.
     expect(warehouseScheduleOperatingDates("2026-09-18", 2, "pickup", only)).toEqual([
@@ -642,5 +648,253 @@ describe("facts scoping", () => {
     expect(facts.find((f) => f.sourceId === "PO-B")!.lines).toEqual([
       { id: "l2", sku: "mattress:Breeze-Q", qty: 5 },
     ]);
+  });
+});
+
+describe("the governed weekly closure survives an UNCONFIGURED Site", () => {
+  /* PRODUCTION, 2026-09-14: `warehouse_working_hours` holds ZERO rows for the
+     one Site, so every weekday resolves `not_configured`. The Schedule then
+     showed `Sun 20 Sept — Fri 25 Sept`. The Stock MASTER's own worked example
+     for the strip is `Tue 1 · Wed 2 · Thu 3 · Fri 4 · Sat 5 · Mon 7 Sep` —
+     Sunday 6 Sep omitted — so an unconfigured Site must still omit the
+     governed weekly closure. Configuration OVERRIDES it; silence does not
+     delete it. */
+  const unconfigured = {
+    siteStatus: "active",
+    workingHours: [],
+    specialDates: [],
+    holidayPolicy: null,
+    holidayDates: [],
+  } as unknown as WarehouseScheduleSettings;
+
+  it("reproduces the MASTER's worked example from Tue 1 Sep", () => {
+    expect(
+      warehouseScheduleOperatingDates("2026-09-01", 6, "arrival", unconfigured),
+    ).toEqual([
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+      "2026-09-05",
+      "2026-09-07",
+    ]);
+  });
+
+  it("omits Sunday when the window is ADVANCED onto one", () => {
+    // The reported production window. 2026-09-20 is a Sunday.
+    expect(
+      warehouseScheduleOperatingDates("2026-09-20", 6, "arrival", unconfigured),
+    ).not.toContain("2026-09-20");
+  });
+
+  it("reproduces the EXACT reported production advance, corrected", () => {
+    /* The operator was on 14–19 Sept (Mon–Sat). The board advances by setting
+       `from` to the day after the last date shown — 2026-09-20, a Sunday —
+       and the strip then read `Sun 20 Sept — Fri 25 Sept`. With the closure
+       restored the same advance lands on Mon 21 — Sat 26. */
+    const firstWindow = warehouseScheduleOperatingDates(
+      "2026-09-14",
+      6,
+      "arrival",
+      unconfigured,
+    );
+    expect(firstWindow).toEqual([
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-19",
+    ]);
+    // The advance anchor A uses: the day after the last date shown.
+    const advanced = warehouseScheduleOperatingDates(
+      "2026-09-20",
+      6,
+      "arrival",
+      unconfigured,
+    );
+    expect(advanced).toEqual([
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+      "2026-09-26",
+    ]);
+  });
+
+  it("omits Sunday when settings cannot be read at all", () => {
+    expect(
+      warehouseScheduleOperatingDates("2026-09-20", 6, "arrival", null),
+    ).not.toContain("2026-09-20");
+  });
+
+  it("KEEPS a Sunday the Site explicitly configured OPEN", () => {
+    // Configuration outranks the default closure in both directions.
+    const sundayOpen = {
+      ...unconfigured,
+      workingHours: [
+        {
+          weekday: 0,
+          activity: "receiving",
+          closed: false,
+          opensAt: "09:00",
+          closesAt: "17:00",
+        },
+      ],
+    } as unknown as WarehouseScheduleSettings;
+    expect(
+      warehouseScheduleOperatingDates("2026-09-20", 3, "arrival", sundayOpen),
+    ).toContain("2026-09-20");
+  });
+
+  it("still drops a weekday the Site explicitly configured CLOSED", () => {
+    const mondayClosed = {
+      ...unconfigured,
+      workingHours: [
+        { weekday: 1, activity: "receiving", closed: true, opensAt: null, closesAt: null },
+      ],
+    } as unknown as WarehouseScheduleSettings;
+    expect(
+      warehouseScheduleOperatingDates("2026-09-21", 3, "arrival", mondayClosed),
+    ).not.toContain("2026-09-21");
+  });
+});
+
+describe("undated work is REACHABLE, not merely counted", () => {
+  it("leads to each exact record with Site and direction preserved", () => {
+    const input = inboundInput({
+      pos: [
+        po("PO-DATED", { eta_date: "2026-09-20" }),
+        po("PO-UNDATED", { eta_date: null, official_delivery_date: null }),
+      ],
+      lines: [
+        { po_id: "PO-UNDATED", qty: 1, destination_id: null, sku: "sofa:Muro-K" },
+      ],
+      units: [
+        unit("u1", "PO-DATED", "sofa:Muro-K"),
+        unit("u2", "PO-UNDATED", "sofa:Muro-K"),
+      ],
+    });
+    const cards = warehouseArrivalScheduleCards(
+      inboundArrivals(input),
+      warehouseArrivalSourceFacts(input),
+      TODAY,
+    );
+    const undated = cards.filter((c) => c.date === null);
+    expect(undated).toHaveLength(1);
+    const url = new URL(undated[0].openHref!, "https://x.test");
+    // The direction and the Site survive the jump...
+    expect(url.searchParams.get("tab")).toBe("warehouse-inbound");
+    expect(url.searchParams.get("site")).toBe("site-1");
+    expect(url.searchParams.get("source")).toBe("PO-UNDATED");
+    // ...and NO date is invented, which is what keeps the row findable: a
+    // date filter would exclude the very record the link is for.
+    expect(url.searchParams.get("date")).toBeNull();
+    expect(undated[0].overdue).toBe(false);
+    expect(undated[0].dateStatus).toBeNull();
+  });
+});
+
+
+describe("categoryKey asks the CATALOG, not the SKU text", () => {
+  /* MEASURED ON PRODUCTION 2026-09-14. The governed ladder
+     (`goodsCategoryWordOf`) asks a recorded category, then the catalog, then
+     a keyword classifier. I was calling it with the SKU alone, so the top two
+     rungs were empty and only the classifier ever ran. 15 of the 37 distinct
+     SKUs on the live purchasing surface rendered `Other goods` while the
+     catalog knew exactly what they were — every `5539-*` and `LYYAR-*` sofa
+     among them, which are the very families `line-category.ts` names as the
+     trap that adding keywords rebuilds. */
+  const input = () =>
+    inboundInput({
+      pos: [po("PO-A")],
+      lines: [
+        { po_id: "PO-A", qty: 1, destination_id: null, sku: "5539-CNR" },
+        { po_id: "PO-A", qty: 1, destination_id: null, sku: "N1001S-Q" },
+      ],
+      units: [unit("u1", "PO-A", "5539-CNR"), unit("u2", "PO-A", "N1001S-Q")],
+    });
+
+  it("reads the catalog category when it is supplied", () => {
+    const i = input();
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([
+        ["5539-CNR", "sofa"],
+        ["N1001S-Q", "mattress"],
+      ]),
+    );
+    expect(card.lines.map((l) => l.categoryKey)).toEqual(["Sofa", "Mattress"]);
+  });
+
+  it("falls through to the classifier only where the catalog is SILENT", () => {
+    const i = input();
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([["5539-CNR", null]]),
+    );
+    // Catalog asked and silent, and no keyword recognises it — it says so
+    // rather than claiming a category nobody recorded.
+    expect(card.lines[0].categoryKey).toBe("Other goods");
+  });
+
+  it("lets the CATALOG outrank a keyword the classifier would have matched", () => {
+    const i = inboundInput({
+      pos: [po("PO-A")],
+      lines: [{ po_id: "PO-A", qty: 1, destination_id: null, sku: "CODY-K" }],
+      units: [unit("u1", "PO-A", "CODY-K")],
+    });
+    // `cody` is a bedframe keyword; the catalog is still the authority.
+    expect(
+      warehouseArrivalScheduleCards(
+        inboundArrivals(i),
+        warehouseArrivalSourceFacts(i),
+        TODAY,
+        new Map([["CODY-K", "sofa"]]),
+      )[0].lines[0].categoryKey,
+    ).toBe("Sofa");
+  });
+
+  it("applies the catalog to UNIT-derived lines too", () => {
+    const i = inboundInput({
+      arrivalSources: [
+        {
+          id: "src-1",
+          source_no: "TR-001",
+          kind: "transfer",
+          from_site_id: null,
+          to_site_id: "site-1",
+          party_id: null,
+          expected_date: "2026-09-20",
+          cancelled_at: null,
+        },
+      ] as unknown as InboundInput["arrivalSources"],
+      sourceUnits: [
+        { source_id: "src-1", stock_item_id: "u1" },
+      ] as unknown as InboundInput["sourceUnits"],
+      units: [unit("u1", "", "5539-CNR")],
+    });
+    const [card] = warehouseArrivalScheduleCards(
+      inboundArrivals(i),
+      warehouseArrivalSourceFacts(i),
+      TODAY,
+      new Map([["5539-CNR", "sofa"]]),
+    );
+    expect(card.lines[0].categoryKey).toBe("Sofa");
+  });
+
+  it("applies the catalog to PICKUP lines when one is supplied", () => {
+    const [card] = warehousePickupScheduleCards(
+      warehouseOutboundCards(pickupEvents([{ unitId: "U-1", sku: "5539-CNR" }])),
+      TODAY,
+      undefined,
+      new Map([["5539-CNR", "sofa"]]),
+    );
+    expect(card.lines[0].categoryKey).toBe("Sofa");
   });
 });

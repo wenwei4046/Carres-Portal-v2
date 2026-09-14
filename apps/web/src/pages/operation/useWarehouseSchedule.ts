@@ -60,6 +60,9 @@ interface InboundPayload {
   sites: Array<{ id: string; name: string }>;
   /** Additive, read-only (this card). Absent on a Worker built before it. */
   sourceFacts?: WarehouseArrivalSourceFacts[];
+  /** Additive, read-only: the CATALOG's own answer per SKU. Absent on a
+   *  Worker built before it, which drops the ladder to its classifier rung. */
+  skuCategories?: Array<{ sku: string; category: string | null }>;
   page: { offset: number; limit: number; total: number };
 }
 
@@ -117,16 +120,21 @@ export function useWarehouseSchedule(
   });
 
   const pickupQuery = useQuery<
-    { events: DeliveryWarehouseScheduleEvent[] },
+    {
+      events: DeliveryWarehouseScheduleEvent[];
+      /** Additive, read-only. Absent on a Worker built before this card. */
+      skuCategories?: Array<{ sku: string; category: string | null }>;
+    },
     ApiError
   >({
     /* The SAME key the existing feed consumer uses, so the two share one
        cache entry instead of doubling the request. */
     queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
     queryFn: () =>
-      apiFetch<{ events: DeliveryWarehouseScheduleEvent[] }>(
-        "/api/operation/delivery-arrangements/warehouse-schedule",
-      ),
+      apiFetch<{
+        events: DeliveryWarehouseScheduleEvent[];
+        skuCategories?: Array<{ sku: string; category: string | null }>;
+      }>("/api/operation/delivery-arrangements/warehouse-schedule"),
     enabled: !isArrival,
     staleTime: 30_000,
   });
@@ -145,8 +153,9 @@ export function useWarehouseSchedule(
   });
 
   /* OPTIONAL — the CONFIGURED Site operating dates. Same guard, same
-     discipline: refused means the window falls back to plain calendar dates
-     and says so, never to an invented weekly closure. */
+     discipline: refused means the window falls back to the APPROVED standard
+     Warehouse week and says so. It never invents a closure, and it never
+     contradicts the approved one either. */
   const settingsQuery = useQuery<SettingsPayload, ApiError>({
     queryKey: ["operation", "warehouse-settings", siteId ?? ""],
     queryFn: () =>
@@ -197,10 +206,19 @@ export function useWarehouseSchedule(
             direction,
             message: `Showing ${payload.arrivals.length} of ${payload.page.total} arrival arrangements. The rest are not on this page.`,
           });
+        if (!payload.skuCategories)
+          errors.push({
+            direction,
+            message:
+              "The product catalog is not available from this server. Categories fall back to the shared classifier.",
+          });
         cards = warehouseArrivalScheduleCards(
           payload.arrivals,
           payload.sourceFacts ?? [],
           today,
+          payload.skuCategories
+            ? new Map(payload.skuCategories.map((r) => [r.sku, r.category]))
+            : undefined,
         );
       }
     } else {
@@ -225,7 +243,25 @@ export function useWarehouseSchedule(
               "The partner's reply on file could not be read, so no pickup date can be shown as agreed.",
           });
         const outbound = warehouseOutboundCards(pickupQuery.data.events);
-        cards = warehousePickupScheduleCards(outbound, today, proofs);
+        /* The CATALOG answers on this side too. Without it a 5539 sofa read
+           `Sofa` on Arrival and `Other goods` on Pickup — the same SKU, two
+           answers, visible the moment the two boards sit side by side. */
+        if (!pickupQuery.data.skuCategories && outbound.length > 0)
+          errors.push({
+            direction,
+            message:
+              "The product catalog is not available from this server. Categories fall back to the shared classifier.",
+          });
+        cards = warehousePickupScheduleCards(
+          outbound,
+          today,
+          proofs,
+          pickupQuery.data.skuCategories
+            ? new Map(
+                pickupQuery.data.skuCategories.map((r) => [r.sku, r.category]),
+              )
+            : undefined,
+        );
       }
     }
 
@@ -240,7 +276,7 @@ export function useWarehouseSchedule(
       errors.push({
         direction,
         message:
-          "Site operating dates could not be read. Dates below are plain calendar days, not the configured schedule.",
+          "Site operating dates could not be read. Dates below follow the standard Warehouse week, not this Site's configured schedule.",
       });
 
     return {

@@ -2,11 +2,15 @@ import { goodsCategoryWordOf, type GoodsCategoryWord } from "./line-category";
 import { poSupplierReplyOf, type PoDatePromise } from "./po-workspace";
 import {
   resolveWarehouseSchedule,
+  weekdayOfIsoDate,
   type WarehouseActivity,
   type WarehouseScheduleInput as WarehouseSettingsScheduleInput,
 } from "./warehouse-settings";
 import type { InboundArrival } from "./warehouse-inbound";
-import type { WarehouseOutboundCard } from "./warehouse-outbound";
+import {
+  WAREHOUSE_OFF_DAYS,
+  type WarehouseOutboundCard,
+} from "./warehouse-outbound";
 import type { IsoDate } from "./working-days";
 
 /**
@@ -229,7 +233,42 @@ export function warehouseArrivalSourceFacts(
 
 // ── ARRIVAL cards ────────────────────────────────────────────────────────────
 
-const NO_SKU_KEY = " no-sku";
+const NO_SKU_KEY = " no-sku";
+
+/**
+ * SKU → the CATALOG's own category (`product_models.category`), or `null`
+ * where the catalog holds no row for that SKU. A SKU absent from the map was
+ * never asked about at all — a different thing again, and the ladder's
+ * `undefined` branch handles it.
+ *
+ * MEASURED ON PRODUCTION 2026-09-14. `goodsCategoryWordOf` is the governed
+ * ladder — recorded category, then the CATALOG, then a keyword classifier —
+ * and it was being called with the SKU alone, so the top two rungs were empty
+ * and only the classifier ever ran. 15 of the 37 distinct SKUs on the live
+ * purchasing surface rendered `Other goods` while the catalog knew exactly
+ * what they were: every `5539-*` and `LYYAR-*` sofa among them.
+ *
+ * Those are precisely the families `line-category.ts` names in its own D9
+ * note — *"adding 5539 and lyyar would clear today's twelve orders and
+ * rebuild the same trap for the next model Ohana names"*. So the fix is not a
+ * keyword. It is asking the authority that already knows.
+ */
+export type WarehouseSkuCategories = ReadonlyMap<string, string | null>;
+
+/** The governed ladder, asked properly. Passing `category: undefined` is NOT
+ *  the same as passing `null`: undefined means nobody asked (version skew),
+ *  null means the catalog was asked and holds no row. `goodsCategoryWordOf`
+ *  distinguishes them and this preserves that distinction rather than
+ *  flattening it. */
+function categoryKeyOf(
+  sku: string | null | undefined,
+  categories: WarehouseSkuCategories | undefined,
+): GoodsCategoryWord | null {
+  if (!sku) return null;
+  return categories?.has(sku)
+    ? goodsCategoryWordOf({ sku, category: categories.get(sku) ?? null })
+    : goodsCategoryWordOf({ sku });
+}
 
 /** The Units of one arrangement, counted at one line's SKU scope. */
 function unitCountsForSku(
@@ -259,6 +298,7 @@ function modelLabelOf(arrival: InboundArrival, sku: string | null): string | nul
 function arrivalLines(
   arrival: InboundArrival,
   facts: WarehouseArrivalSourceFacts | undefined,
+  categories: WarehouseSkuCategories | undefined,
 ): WarehouseScheduleLine[] {
   const sourceLines = facts?.lines ?? [];
   if (sourceLines.length > 0) {
@@ -275,7 +315,7 @@ function arrivalLines(
       const counts = unique ? unitCountsForSku(arrival.units, line.sku) : null;
       return {
         id: line.id,
-        categoryKey: line.sku ? goodsCategoryWordOf({ sku: line.sku }) : null,
+        categoryKey: categoryKeyOf(line.sku, categories),
         modelLabel: modelLabelOf(arrival, line.sku),
         plannedQty: line.qty,
         receivedQty: counts ? counts.received : null,
@@ -295,7 +335,7 @@ function arrivalLines(
       unit.outcome === "received" || unit.outcome === "received_with_issue";
     return {
       id: unit.id,
-      categoryKey: unit.sku ? goodsCategoryWordOf({ sku: unit.sku }) : null,
+      categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.product ?? unit.sku ?? null,
       plannedQty: 1,
       receivedQty: unmapped ? null : received ? 1 : 0,
@@ -335,6 +375,7 @@ export function warehouseArrivalScheduleCards(
   arrivals: readonly InboundArrival[],
   facts: readonly WarehouseArrivalSourceFacts[],
   todayIso: IsoDate,
+  categories?: WarehouseSkuCategories,
 ): WarehouseScheduleCard[] {
   const factsById = new Map(facts.map((f) => [f.sourceId, f]));
   return arrivals.map((arrival) => {
@@ -369,7 +410,7 @@ export function warehouseArrivalScheduleCards(
                of any kind — an estimate is all that exists to report. */
             ("expected" as const)
         : null,
-      lines: arrivalLines(arrival, fact),
+      lines: arrivalLines(arrival, fact, categories),
       driverConfirmedQty: null,
       logisticsName: null,
       relatedRecords: related,
@@ -425,6 +466,7 @@ export function warehousePickupScheduleCards(
   cards: readonly WarehouseOutboundCard[],
   todayIso: IsoDate,
   proofs?: WarehousePickupAgreementProofs,
+  categories?: WarehouseSkuCategories,
 ): WarehouseScheduleCard[] {
   return cards.map((card) => ({
     id: `pickup:${card.deliveryOrderId ?? card.doNumber}@${
@@ -448,7 +490,7 @@ export function warehousePickupScheduleCards(
        own line and two Units of one model stay two lines. */
     lines: card.units.map((unit) => ({
       id: unit.unitId,
-      categoryKey: unit.sku ? goodsCategoryWordOf({ sku: unit.sku }) : null,
+      categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.productName ?? unit.sku ?? null,
       plannedQty: 1,
       receivedQty: null,
@@ -502,17 +544,38 @@ export type WarehouseScheduleSettings = Omit<
 export const WAREHOUSE_SCHEDULE_DATE_COUNT = 6;
 
 /**
- * The operating dates of one activity, from the CONFIGURED Site schedule.
- * `resolveWarehouseSchedule` is the one ladder — this adds no second copy of
- * it, and no weekly closure of its own.
+ * The operating dates of one activity.
  *
- * A date the configuration proves CLOSED is dropped. A date it has nothing to
- * say about (`not_configured`) is KEPT: "nobody said" is not "closed", and
- * hiding an unconfigured day would hide the work standing on it.
+ * ── THE LADDER, AND WHY IT HAS THREE RUNGS NOT TWO ──────────────────────────
+ * `resolveWarehouseSchedule` is the one configured-schedule authority and this
+ * adds no second copy of it. What it returns is three-valued, and each value
+ * gets its own answer:
  *
- * `settings` absent — unreadable for this role, or no Site configured —
- * returns the plain calendar window. Honest, and the caller reports the
- * limitation rather than inventing a Sunday rule to fill the gap.
+ *   open             CONFIGURATION SAYS SO — keep the date, Sunday included.
+ *   closed           CONFIGURATION SAYS SO — drop it.
+ *   not_configured   nobody said. Fall back to the GOVERNED WEEKLY CLOSURE.
+ *
+ * The third rung is the production correction of 2026-09-14. It first read
+ * "keep it — nobody said is not closed", which is the right rule for the
+ * SETTINGS page (Stock MASTER §11: *no day is seeded and Sunday is not assumed
+ * closed*; an unconfigured day there must read `Not configured`, never
+ * `Closed`). But it is the wrong rule for THIS strip, whose own worked example
+ * in the same MASTER reads `Tue 1 · Wed 2 · Thu 3 · Fri 4 · Sat 5 · Mon 7 Sep`
+ * — Sunday omitted — and states that the governed weekly closure is omitted.
+ *
+ * Production holds ZERO `warehouse_working_hours` rows, so every weekday
+ * resolved `not_configured` and the strip printed `Sun 20 Sept — Fri 25 Sept`.
+ * The two MASTER statements are not in conflict: one governs what SETTINGS
+ * displays about a day, the other governs which days the STRIP walks. Silence
+ * in the configuration does not delete an approved operating rule — it just
+ * fails to override it.
+ *
+ * `WAREHOUSE_OFF_DAYS` is that approved closure, reused rather than re-spelled,
+ * so the repository keeps ONE weekly closure and not two that currently agree.
+ *
+ * `settings` absent — unreadable for this role, or no Site at all — lands on
+ * the same fallback, because knowing nothing is not a reason to contradict the
+ * approved week either.
  */
 export function warehouseScheduleOperatingDates(
   from: IsoDate,
@@ -525,16 +588,25 @@ export function warehouseScheduleOperatingDates(
   let cursor = from.slice(0, 10);
   let guard = 0;
   while (out.length < count && guard < count * 10 + 60) {
-    if (!settings) out.push(cursor);
-    else if (
-      resolveWarehouseSchedule({ ...settings, date: cursor })[activity]
-        .availability !== "closed"
-    )
-      out.push(cursor);
+    if (operatesOn(cursor, activity, settings)) out.push(cursor);
     cursor = stepIsoDate(cursor);
     guard += 1;
   }
   return out;
+}
+
+/** The three-rung ladder above, as one decision. */
+function operatesOn(
+  date: IsoDate,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+): boolean {
+  const availability = settings
+    ? resolveWarehouseSchedule({ ...settings, date })[activity].availability
+    : "not_configured";
+  if (availability === "open") return true;
+  if (availability === "closed") return false;
+  return !WAREHOUSE_OFF_DAYS.includes(weekdayOfIsoDate(date));
 }
 
 function stepIsoDate(iso: IsoDate): IsoDate {

@@ -365,7 +365,7 @@ deliveryArrangementsRouter.get(
         ? sb.from("warehouses").select("id, name").in("id", warehouseIds)
         : Promise.resolve({ data: [], error: null }),
       skus.length
-        ? sb.from("product_skus").select("sku, variant").in("sku", skus)
+        ? sb.from("product_skus").select("sku, variant, model_id").in("sku", skus)
         : Promise.resolve({ data: [], error: null }),
     ]);
     const nameError = warehousesRes.error ?? skusRes.error;
@@ -378,11 +378,58 @@ deliveryArrangementsRouter.get(
         (row) => [row.id, row.name],
       ),
     );
-    const productName = new Map(
-      ((skusRes.data ?? []) as Array<{ sku: string; variant: string | null }>).map(
-        (row) => [row.sku, row.variant],
+    /* PRODUCT IDENTITY IS MODEL + VARIANT, and the CATALOG owns the category.
+       This feed had the same two defects the Inbound read had (2026-09-14):
+       it named a product by its `variant` alone — so a whole delivery read
+       `King`, `King`, `King` — and it carried no category at all, leaving the
+       Schedule's governed ladder with only its keyword classifier. The model
+       row holds both answers and was simply never joined.
+
+       Read here rather than inferred: no supplier rule, no SKU-text parsing.
+       A SKU with no model keeps its variant, and a model with no category
+       stays `null` — "asked and silent" — which is the documented fall to the
+       classifier, not a guess dressed as an answer. */
+    const modelIds = [
+      ...new Set(
+        (
+          (skusRes.data ?? []) as Array<{ model_id: string | null }>
+        )
+          .map((row) => row.model_id)
+          .filter((id): id is string => Boolean(id)),
       ),
+    ];
+    const modelsRes = modelIds.length
+      ? await sb.from("product_models").select("id, name, category").in("id", modelIds)
+      : { data: [], error: null };
+    if (modelsRes.error) {
+      const m = mapPgError(modelsRes.error);
+      return c.json(m.body, m.status);
+    }
+    const model = new Map(
+      (
+        (modelsRes.data ?? []) as Array<{
+          id: string;
+          name: string | null;
+          category: string | null;
+        }>
+      ).map((row) => [row.id, row]),
     );
+    const skuRows = (skusRes.data ?? []) as Array<{
+      sku: string;
+      variant: string | null;
+      model_id: string | null;
+    }>;
+    const productName = new Map(
+      skuRows.map((row) => {
+        const m = row.model_id ? model.get(row.model_id) : undefined;
+        const name = [m?.name ?? null, row.variant].filter(Boolean).join(" ").trim();
+        return [row.sku, name || null];
+      }),
+    );
+    const skuCategories = skuRows.map((row) => ({
+      sku: row.sku,
+      category: (row.model_id ? model.get(row.model_id)?.category : null) ?? null,
+    }));
 
     const handovers = (handoversRes.data ?? []) as Array<{
       id: string;
@@ -525,7 +572,13 @@ deliveryArrangementsRouter.get(
           });
         });
     });
-    return c.json({ events });
+    /* ADDITIVE, READ-ONLY. `skuCategories` rides beside the events so the
+       Warehouse Schedule's governed category ladder can consult the CATALOG on
+       the pickup side exactly as it already does on the arrival side. Existing
+       consumers that ignore the field are unaffected; without it the two
+       directions disagree about the same SKU, which is visible the moment the
+       boards are put side by side. */
+    return c.json({ events, skuCategories });
   },
 );
 
