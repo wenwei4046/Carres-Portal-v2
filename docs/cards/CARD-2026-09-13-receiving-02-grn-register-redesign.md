@@ -225,7 +225,7 @@ child table should stay pinned under the identity column is a presentation quest
 ## Third pass — 2026-09-14, the owner's inspection of the hosted candidate
 
 The owner inspected the hosted review package (built from `26e68c2a`) independently and reported
-two defects. Both are fixed in `b824aee8`; the package was rebuilt and republished to the SAME
+two defects. Both are fixed in `299a0420`; the package was rebuilt from `5f0aea01` and republished to the SAME
 artifact URL, and the review remains open — **no acceptance is asked for in this pass.**
 
 ### 🔴 D1 · `Quinn · King` printed a redundant `BF-03` beneath its resolved name and in its evidence viewer
@@ -289,11 +289,11 @@ render blank in the package and correctly in production. The fixture contains no
 | web suite | **4590 passed / 330 files** | local |
 | shared suite | **3294 passed / 154 files** | local |
 | D1 in the built package — expansion, record, viewer `For:` line, tile caption | no `BF-03` anywhere; tile reads `Thu, 3 Sep · Shasha` | package served over http, walked in a real browser |
-| D2 — GRN paper | 1 canvas page drawn, `846×1196`, no error text, **0 requests to jsdelivr/fontsource** (Playwright request log) | same |
+| D2 — GRN paper | 1 canvas page drawn (`545×770` at the 1440 pane), no error text, **0 requests to jsdelivr/fontsource** (Playwright request log) | same |
 | Print | real `application/pdf` blob, 18,306 bytes, opened | same |
 | Download PDF | same blob, anchor named `GRN-20260903-1184.pdf` | same |
 | The PDF itself | `%PDF-1.3`, 1 page, embeds `NotoSansSC…-Regular/-SemiBold/-Bold` subsets — the embedded fonts really were used | same |
-| The HOSTED artifact | loads and renders, footer reads `built from b824aee8`; its `assets/portal-shell-preview-C6tXiiNG.js` is **byte-identical** to the walked file (sha256 `79e1d35d43a5a1d8ccf7cbd8afd2bce32c54417744c68a73926d28aa6b1a2467`), with 0 jsdelivr references and 4 embedded TTFs | hosted |
+| The HOSTED artifact | loads and renders, footer reads `built from 5f0aea01` (screenshot-confirmed); it serves `assets/portal-shell-preview-DVX8AJfi.js`, the same file the walk drove, with 0 jsdelivr references and 4 embedded TTFs | hosted |
 
 **Honest limit on the hosted walk.** The artifact viewer runs the package in a cross-origin
 sandboxed iframe (`allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups` —
