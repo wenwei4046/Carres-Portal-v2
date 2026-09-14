@@ -64,6 +64,8 @@ const ICON = { size: 14, strokeWidth: 1.75 } as const;
 export type DataGridColumn<T> = {
   key: string;
   label: string;
+  /** Deliberate two-line presentation; label remains the accessible/export/filter name. */
+  headerLines?: readonly [string, string];
   accessor: (row: T) => ReactNode;
   /** default width in px */
   width?: number;
@@ -310,6 +312,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
     flush?: boolean;
+    /** Align a child to this visible data column after saved reordering; first data column if hidden. */
+    alignToColumn?: string;
     /** Keep the child within the visible width, retaining the data-column indent. */
     fitExpansionToViewport?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
@@ -1017,8 +1021,13 @@ function DataGridInner<T>({
    * a page-local hack — `docs/ui/MASTER.md` §4.)
    */
   const expansionGutter = useMemo(
-    () => visibleColumns.filter((c) => c.key.startsWith("__")).map((c) => c.key),
-    [visibleColumns],
+    () => {
+      const index = expandable?.alignToColumn
+        ? visibleColumns.findIndex((c) => c.key === expandable.alignToColumn)
+        : -1;
+      return (index >= 0 ? visibleColumns.slice(0, index) : visibleColumns.filter((c) => c.key.startsWith("__"))).map((c) => c.key);
+    },
+    [visibleColumns, expandable?.alignToColumn],
   );
 
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
@@ -2247,7 +2256,7 @@ function DataGridInner<T>({
                 return (
                   <th
                     key={col.key}
-                    className={`${styles.th} ${col.align === "right" ? styles.thAlignRight : ""} ${
+                    className={`${styles.th} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
                       dropTarget === col.key ? styles.thDragOver : ""
                     }${pinClass(col.key)}`}
                     style={style}
@@ -2267,12 +2276,13 @@ function DataGridInner<T>({
                         <button
                           type="button"
                           className={styles.sortBtn}
+                          aria-label={col.headerLines ? col.label : undefined}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleSort(col.key);
                           }}
                         >
-                          {col.label}
+                          {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
                           {arrow && <span className={styles.sortArrow}>{arrow === "A" ? "^" : "v"}</span>}
                         </button>
                       ) : (

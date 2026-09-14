@@ -130,6 +130,7 @@ function toGridColumn(
   const base: DataGridColumn<RegisterRow> = {
     key: f.key,
     label: f.label,
+    headerLines: f.key === "customer_delivery" ? ["Requested", "Delivery Date"] : undefined,
     width: Math.round(parseFloat(f.width)),
     align: f.align,
     sortable: true,
@@ -416,7 +417,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
         category: goodsCategoryOf(line),
         unitIds: fact?.verifiedUnitIds ?? fact?.unitIds ?? [],
         unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
-          <UnitEvidence ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
+          <UnitEvidence singleLineCodes ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
         ),
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the
@@ -623,7 +624,7 @@ export default function SalesOrdersRegister() {
   );
 
   const expandable = useMemo(
-    () => ({ flush: true, fitExpansionToViewport: true, renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
+    () => ({ alignToColumn: "so", renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
     [],
   );
 

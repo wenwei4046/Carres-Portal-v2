@@ -254,12 +254,12 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "ordered", label: "SO Date", width: "104px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "customer_delivery", label: "Requested Delivery Date", width: "192px", group: "Dates", on: true,
+  { key: "customer_delivery", label: "Requested Delivery Date", width: "128px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "144px", group: "Customer", on: true,
+  { key: "customer", label: "Customer", width: "208px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "delivery_location", label: "Delivery Location", width: "160px", group: "Customer", on: true,
+  { key: "delivery_location", label: "Delivery Location", width: "184px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
   /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
      Sales-ownership fact the order already carries (`outlets.name`) — it is
