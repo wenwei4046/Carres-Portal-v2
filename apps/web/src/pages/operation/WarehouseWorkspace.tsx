@@ -5,11 +5,11 @@ import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ModuleHeader from "./components/ModuleHeader";
 import WarehouseScheduleCard from "./WarehouseScheduleCard";
-import { useWarehouseSchedule } from "./warehouse-schedule-source";
+import { useWarehouseSchedule } from "./useWarehouseSchedule";
 import type {
-  ScheduleDirection,
   WarehouseScheduleCard as ScheduleCard,
-} from "./warehouse-schedule-contract";
+  WarehouseScheduleDirection,
+} from "@carres/shared";
 import {
   SCHEDULE_PAGE_WORD,
   cardsOnDate,
@@ -80,7 +80,7 @@ export function __resetScheduleContext() {
 export default function WarehouseWorkspace({
   direction = "arrival",
 }: {
-  direction?: ScheduleDirection;
+  direction?: WarehouseScheduleDirection;
 }) {
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
@@ -245,14 +245,21 @@ export function ScheduleBoard({
 }: {
   dates: string[];
   cards: ScheduleCard[];
-  direction: ScheduleDirection;
+  direction: WarehouseScheduleDirection;
   feedFailed: boolean;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-board">
+      {/* `gridTemplateRows: auto 1fr` is load-bearing. Without it the two
+          implicit rows SHARE the leftover height, the heading row stretches to
+          half the viewport, and every column's first card starts hundreds of
+          pixels below its own date. */}
       <div
         className="grid min-h-full"
-        style={{ gridTemplateColumns: `repeat(${dates.length || 1}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${dates.length || 1}, minmax(0, 1fr))`,
+          gridTemplateRows: "auto 1fr",
+        }}
       >
         {dates.map((date, i) => (
           <DateHeading key={`h-${date}`} date={date} first={i === 0} />
@@ -302,7 +309,7 @@ function AgendaDay({
 }: {
   date: string;
   cards: ScheduleCard[];
-  direction: ScheduleDirection;
+  direction: WarehouseScheduleDirection;
   feedFailed: boolean;
 }) {
   const { weekday, day, month } = dateHeadingPartsOf(date);
@@ -331,7 +338,7 @@ function DayCards({
 }: {
   date: string;
   cards: ScheduleCard[];
-  direction: ScheduleDirection;
+  direction: WarehouseScheduleDirection;
   feedFailed: boolean;
 }) {
   const day = cardsOnDate(cards, date);

@@ -131,9 +131,11 @@ export interface PortalModule {
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
  *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Monitor` is the module's Calendar-summary page and the daily journey
- *  OPENS on it (Stock MASTER §7) — by name, never derived from row order. */
-export const WAREHOUSE_LANDING_KEY = "wh-monitor";
+ *  `Arrival Schedule` is where the warehouse day OPENS (Stock MASTER §7): the
+ *  first question of the morning is what is coming in, because goods that have
+ *  not arrived are the ones that stop every other job. Named, never derived
+ *  from row order — owner ruling 2026-09-14 moved it off the retired Monitor. */
+export const WAREHOUSE_LANDING_KEY = "wh-arrival-schedule";
 
 /** The collapsed Payments icon lands on `Monitor` — the daily collection
  *  desk — by name, never by row order (owner ruling 2026-09-12). */

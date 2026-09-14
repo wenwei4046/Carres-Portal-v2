@@ -289,8 +289,9 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // Monitor is Warehouse's landing (2026-09-06 Card) — the rail navigated there.
-    expect(child("wh-monitor").className).toContain("bg-kit-blue-3");
+    // Arrival Schedule is Warehouse's landing (owner ruling 2026-09-14) —
+    // the rail navigated there.
+    expect(child("wh-arrival-schedule").className).toContain("bg-kit-blue-3");
   });
 
   it("clicking the open module closes it again", () => {
@@ -317,7 +318,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("wh-monitor").className).toContain("bg-kit-blue-3");
+    expect(child("wh-arrival-schedule").className).toContain("bg-kit-blue-3");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -1312,7 +1313,13 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Monitor", "Inbound", "Inventory", "Outbound"]);
+    expect(rows).toEqual([
+      "Arrival Schedule",
+      "Pickup Schedule",
+      "Inbound",
+      "Inventory",
+      "Outbound",
+    ]);
   });
 
   it("Inventory is a live door and keeps the `?tab=stock-onhand` address", () => {
@@ -1321,21 +1328,25 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("all four destinations are live links — Monitor, Inbound, Outbound included", () => {
+  it("all five destinations are live links — both Schedules, Inbound, Outbound included", () => {
     renderAt("/operation?tab=stock-onhand");
-    const monitor = child("wh-monitor") as HTMLAnchorElement;
-    expect(monitor.tagName).toBe("A");
-    expect(monitor).toHaveAttribute("href", "/operation?tab=warehouse-monitor");
+    const arrival = child("wh-arrival-schedule") as HTMLAnchorElement;
+    expect(arrival.tagName).toBe("A");
+    expect(arrival).toHaveAttribute("href", "/operation?tab=warehouse-arrival-schedule");
+    const pickup = child("wh-pickup-schedule") as HTMLAnchorElement;
+    expect(pickup.tagName).toBe("A");
+    expect(pickup).toHaveAttribute("href", "/operation?tab=warehouse-pickup-schedule");
     const inbound = child("wh-inbound") as HTMLAnchorElement;
     expect(inbound.tagName).toBe("A");
     expect(inbound).toHaveAttribute("href", "/operation?tab=warehouse-inbound");
     const outbound = child("wh-outbound") as HTMLAnchorElement;
     expect(outbound.tagName).toBe("A");
     expect(outbound).toHaveAttribute("href", "/operation?tab=warehouse-outbound");
-    // No Warehouse-local Dashboard label remains.
-    expect(
-      within(screen.getByTestId("nav-children-warehouse")).queryByText("Dashboard"),
-    ).toBeNull();
+    // No Warehouse-local Dashboard label remains, and the retired combined
+    // Monitor is gone from the rail (owner ruling 2026-09-14).
+    const warehouseRail = within(screen.getByTestId("nav-children-warehouse"));
+    expect(warehouseRail.queryByText("Dashboard")).toBeNull();
+    expect(warehouseRail.queryByText("Monitor")).toBeNull();
   });
 
   /* The superseded subtree is GONE from the rail. The pages behind
@@ -1357,14 +1368,14 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
   });
 
   /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
-   * Warehouse names `Monitor` as its landing (2026-09-06 Card) — by name,
-   * never derived from row order. */
-  it("the collapsed Warehouse icon links to Monitor, and lights on a Warehouse page", () => {
+   * Warehouse names `Arrival Schedule` as its landing (owner ruling
+   * 2026-09-14) — by name, never derived from row order. */
+  it("the collapsed Warehouse icon links to Arrival Schedule, and lights on a Warehouse page", () => {
     localStorage.setItem("ops-sidebar-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
-      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-monitor");
+      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-arrival-schedule");
       expect(icon.className).toContain("bg-kit-blue-3");
     } finally {
       localStorage.removeItem("ops-sidebar-collapsed");

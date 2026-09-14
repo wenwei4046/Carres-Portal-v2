@@ -18,12 +18,12 @@ import {
 import type {
   WarehouseScheduleCard,
   WarehouseScheduleLine,
-} from "./warehouse-schedule-contract";
+} from "@carres/shared";
 
 function line(over: Partial<WarehouseScheduleLine> = {}): WarehouseScheduleLine {
   return {
     id: "l1",
-    categoryKey: "mattress",
+    categoryKey: "Mattress",
     modelLabel: "Ohana King",
     plannedQty: 3,
     receivedQty: null,

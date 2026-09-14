@@ -23,7 +23,7 @@ import { Link } from "react-router-dom";
 import Icon from "@/components/kit/Icon";
 import StatusPill from "@/components/kit/StatusPill";
 import Tooltip from "@/components/kit/Tooltip";
-import type { WarehouseScheduleCard as ScheduleCard } from "./warehouse-schedule-contract";
+import type { WarehouseScheduleCard as ScheduleCard } from "@carres/shared";
 import {
   cardReferencesOf,
   cardTintClassOf,
@@ -65,32 +65,38 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
              next line, never be clipped: the operator identifies the work by
              exactly the characters a truncation would eat. */}
       <header className="flex flex-wrap items-center gap-1 px-3 py-2">
+        {/* `flex-[1_1_6rem]` rather than `flex-1`: the name keeps a readable
+            floor, so in a narrow date column the PILL AND DOOR wrap to the
+            next line as a unit instead of the party name being squeezed into
+            a two-character gutter. The name is the identity — it gets the
+            room, and nothing is ever clipped. */}
         {card.detailHref ? (
           <Link
             to={card.detailHref}
-            className="min-w-0 flex-1 break-words text-body font-semibold text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            className="min-w-0 flex-[1_1_6rem] break-words text-body font-semibold text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
             data-testid="ws-card-party"
           >
             {party}
           </Link>
         ) : (
           <span
-            className="min-w-0 flex-1 break-words text-body font-semibold text-kit-slate-12"
+            className="min-w-0 flex-[1_1_6rem] break-words text-body font-semibold text-kit-slate-12"
             data-testid="ws-card-party"
           >
             {party}
           </span>
         )}
 
-        {/* The pill comes BEFORE the door — the operator reads what kind of
-            date this is, then decides whether to walk into the work. */}
-        {pill && (
-          <span data-testid="ws-card-date-status">
-            <StatusPill tone={pill.tone}>{pill.word}</StatusPill>
-          </span>
-        )}
-
-        <OpenWorkControl card={card} party={party} sourceRef={refs.primary} />
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          {/* The pill comes BEFORE the door — the operator reads what kind of
+              date this is, then decides whether to walk into the work. */}
+          {pill && (
+            <span data-testid="ws-card-date-status">
+              <StatusPill tone={pill.tone}>{pill.word}</StatusPill>
+            </span>
+          )}
+          <OpenWorkControl card={card} party={party} sourceRef={refs.primary} />
+        </span>
       </header>
 
       <div className="px-3 pb-3">
@@ -269,17 +275,23 @@ function ProgressFigure({ progress }: { progress: LineProgress }) {
       data-testid="ws-line-progress"
       data-state={progress.state}
     >
-      <span className="text-meta tabular-nums" title={progress.status}>
+      <span className="text-meta tabular-nums text-right" title={progress.status}>
         {progress.text}
       </span>
-      {progress.state === "none" && (
-        <span
-          aria-hidden="true"
-          className="h-3.5 w-3.5 rounded-full border-2 border-kit-slate-9"
-        />
-      )}
-      {progress.state === "partial" && <Icon name="waiting" size={14} />}
-      {progress.state === "complete" && <Icon name="ready" size={14} />}
+      {/* The symbol slot is ALWAYS 14px, even when there is no symbol to draw.
+          Collapsing it would let `3` end where `12/12` starts, and a column of
+          counts that do not line up is a column an operator has to read one
+          row at a time. */}
+      <span
+        aria-hidden="true"
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center"
+      >
+        {progress.state === "none" && (
+          <span className="h-3.5 w-3.5 rounded-full border-2 border-kit-slate-9" />
+        )}
+        {progress.state === "partial" && <Icon name="waiting" size={14} />}
+        {progress.state === "complete" && <Icon name="ready" size={14} />}
+      </span>
       {/* The numbers alone do not say `received` or `loaded`. This does. */}
       <span className="sr-only">{progress.status}</span>
     </span>

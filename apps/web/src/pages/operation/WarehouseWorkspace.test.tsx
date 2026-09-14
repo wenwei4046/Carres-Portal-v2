@@ -12,11 +12,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
   WarehouseScheduleCard,
   WarehouseScheduleLine,
   WarehouseScheduleResult,
-} from "./warehouse-schedule-contract";
+} from "@carres/shared";
 
 /* The page derives "today" from the app clock — pin it to the fixture week. */
 vi.mock("@/lib/fmt-date", async () => {
@@ -26,7 +27,7 @@ vi.mock("@/lib/fmt-date", async () => {
 
 /** BUILD B's projection, mocked at the seam the two builds agreed on. */
 let result: WarehouseScheduleResult;
-vi.mock("./warehouse-schedule-source", () => ({
+vi.mock("./useWarehouseSchedule", () => ({
   useWarehouseSchedule: () => result,
 }));
 
@@ -44,7 +45,7 @@ const DATES = [
 function line(over: Partial<WarehouseScheduleLine> = {}): WarehouseScheduleLine {
   return {
     id: `l${Math.random()}`,
-    categoryKey: "mattress",
+    categoryKey: "Mattress",
     modelLabel: "Ohana King",
     plannedQty: 3,
     receivedQty: null,
@@ -118,7 +119,9 @@ function mount(
   direction: "arrival" | "pickup" = "arrival",
   url = "/operation?tab=warehouse-arrival-schedule",
 ) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
+    <QueryClientProvider client={qc}>
     <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route
@@ -131,7 +134,8 @@ function mount(
           }
         />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -184,7 +188,7 @@ describe("one card per owning record — never merged, never capped", () => {
     });
     mount();
     const col = screen.getByTestId("ws-col-2026-09-15");
-    expect(within(col).getAllByTestId(/^ws-card-/)).toHaveLength(2);
+    expect(col.querySelectorAll("article[data-direction]")).toHaveLength(2);
     expect(within(col).getByText("PO-2609-0001")).toBeInTheDocument();
     expect(within(col).getByText("PO-2609-0002")).toBeInTheDocument();
   });
@@ -194,14 +198,14 @@ describe("one card per owning record — never merged, never capped", () => {
       cards: [
         card({
           lines: [
-            line({ id: "m", categoryKey: "mattress", modelLabel: "Ohana King" }),
-            line({ id: "b", categoryKey: "bedframe", modelLabel: "Ohana Frame" }),
+            line({ id: "m", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "b", categoryKey: "Bedframe", modelLabel: "Ohana Frame" }),
           ],
         }),
       ],
     });
     mount();
-    expect(screen.getAllByTestId(/^ws-card-/)).toHaveLength(1);
+    expect(document.querySelectorAll("article[data-direction]")).toHaveLength(1);
     expect(screen.getAllByTestId("ws-line")).toHaveLength(2);
   });
 
@@ -210,9 +214,9 @@ describe("one card per owning record — never merged, never capped", () => {
       cards: [
         card({
           direction: "pickup",
-          lines: ["mattress", "bedframe", "sofa", "pillow", "topper"].map((c, i) =>
-            line({ id: `l${i}`, categoryKey: c, loadedQty: null }),
-          ),
+          lines: (
+            ["Mattress", "Bedframe", "Sofa", "Pillow", "Topper"] as const
+          ).map((c, i) => line({ id: `l${i}`, categoryKey: c, loadedQty: null })),
         }),
       ],
     });
@@ -225,9 +229,9 @@ describe("one card per owning record — never merged, never capped", () => {
       cards: [
         card({
           lines: [
-            line({ id: "1", categoryKey: "mattress", modelLabel: "Ohana King" }),
-            line({ id: "2", categoryKey: "mattress", modelLabel: "Ohana King" }),
-            line({ id: "3", categoryKey: "mattress", modelLabel: "Ohana King" }),
+            line({ id: "1", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "2", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "3", categoryKey: "Mattress", modelLabel: "Ohana King" }),
           ],
         }),
       ],

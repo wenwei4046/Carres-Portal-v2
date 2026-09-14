@@ -39,10 +39,15 @@ function renderAt(entry: string) {
 beforeEach(() => vi.clearAllMocks());
 
 const WAREHOUSE_PAGES = [
-  "/operation?tab=warehouse-monitor",
+  "/operation?tab=warehouse-arrival-schedule",
+  "/operation?tab=warehouse-pickup-schedule",
   "/operation?tab=warehouse-inbound",
   "/operation?tab=stock-onhand",
   "/operation?tab=warehouse-outbound",
+  // The retired Calendar addresses still resolve to Arrival Schedule, so a
+  // bookmark that lands there must still be offered Warehouse Settings.
+  "/operation?tab=warehouse-monitor",
+  "/operation?tab=warehouse-dashboard",
 ];
 
 describe("Settings → Warehouse", () => {
@@ -56,7 +61,7 @@ describe("Settings → Warehouse", () => {
   });
 
   it("opens the working Warehouse Settings route, not a placeholder", () => {
-    renderAt("/operation?tab=warehouse-monitor");
+    renderAt("/operation?tab=warehouse-arrival-schedule");
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Warehouse Settings" }));
     expect(navigate).toHaveBeenCalledWith("/operation/settings/warehouse/details");

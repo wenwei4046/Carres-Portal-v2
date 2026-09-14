@@ -16,26 +16,26 @@
  * Words come from `docs/COPY-STANDARD.md`; colour arrives as a kit tone name.
  */
 import type { IconName } from "@/components/kit/Icon";
-import type { OrderActionTone } from "@carres/shared";
 import type {
-  ScheduleDateStatus,
-  ScheduleDirection,
+  OrderActionTone,
   WarehouseScheduleCard,
+  WarehouseScheduleDateStatus,
+  WarehouseScheduleDirection,
   WarehouseScheduleLine,
-} from "./warehouse-schedule-contract";
+} from "@carres/shared";
 
 /* ─────────────────────────────────────────────────────────────────────────
  * The two pages.
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** The `?tab=` address of each Schedule page. */
-export const SCHEDULE_TAB: Record<ScheduleDirection, string> = {
+export const SCHEDULE_TAB: Record<WarehouseScheduleDirection, string> = {
   arrival: "warehouse-arrival-schedule",
   pickup: "warehouse-pickup-schedule",
 };
 
 /** The page's own name — COPY-STANDARD, owner ruling 2026-09-14. */
-export const SCHEDULE_PAGE_WORD: Record<ScheduleDirection, string> = {
+export const SCHEDULE_PAGE_WORD: Record<WarehouseScheduleDirection, string> = {
   arrival: "Arrival Schedule",
   pickup: "Pickup Schedule",
 };
@@ -156,20 +156,20 @@ export interface LineProgress {
 }
 
 /** Arrivals are received; pickups are loaded. One verb each, never mixed. */
-const DONE_WORD: Record<ScheduleDirection, string> = {
+const DONE_WORD: Record<WarehouseScheduleDirection, string> = {
   arrival: "received",
   pickup: "loaded",
 };
 
 /** What the planned number alone means, when nothing has been recorded. */
-const PLANNED_WORD: Record<ScheduleDirection, string> = {
+const PLANNED_WORD: Record<WarehouseScheduleDirection, string> = {
   arrival: "expected, receipt not recorded",
   pickup: "to load, loading not recorded",
 };
 
 export function lineProgressOf(
   line: Pick<WarehouseScheduleLine, "plannedQty" | "receivedQty" | "loadedQty">,
-  direction: ScheduleDirection,
+  direction: WarehouseScheduleDirection,
 ): LineProgress {
   const planned = line.plannedQty;
   const done = direction === "arrival" ? line.receivedQty : line.loadedQty;
@@ -204,7 +204,7 @@ export function lineProgressOf(
 
 /** COPY-STANDARD words. `null` in → nothing out: an unknown stays unknown. */
 export function dateStatusPillOf(
-  status: ScheduleDateStatus | null,
+  status: WarehouseScheduleDateStatus | null,
 ): { word: string; tone: OrderActionTone } | null {
   if (status === "expected") return { word: "Expected", tone: "warning" };
   if (status === "scheduled") return { word: "Scheduled", tone: "info" };
@@ -216,7 +216,7 @@ export function dateStatusPillOf(
  * It never encodes progress, damage or lateness — those are their own lines,
  * and a tint that meant two things would mean neither.
  */
-export function cardTintClassOf(status: ScheduleDateStatus | null): string {
+export function cardTintClassOf(status: WarehouseScheduleDateStatus | null): string {
   if (status === "expected") return "border-kit-amber-6 bg-kit-amber-3";
   if (status === "scheduled") return "border-kit-blue-6 bg-kit-blue-3";
   return "border-kit-slate-5 bg-white";
@@ -329,7 +329,7 @@ export function undatedCards(cards: WarehouseScheduleCard[]): WarehouseScheduleC
  * sentence an operator must never be told in that state is that their day is
  * clear.
  */
-export function emptyDayWordOf(direction: ScheduleDirection, feedFailed: boolean): string {
+export function emptyDayWordOf(direction: WarehouseScheduleDirection, feedFailed: boolean): string {
   if (feedFailed) return "The schedule could not be read for this date.";
   return direction === "arrival" ? "Nothing arriving." : "Nothing for pickup.";
 }
