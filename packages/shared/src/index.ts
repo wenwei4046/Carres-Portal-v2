@@ -3134,3 +3134,5 @@ export * from "./warehouse-inbound";
 export * from "./arrival-source";
 
 export * from "./warehouse-settings";
+
+export * from "./warehouse-schedule";
