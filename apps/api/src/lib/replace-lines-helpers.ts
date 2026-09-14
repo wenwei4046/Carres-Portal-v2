@@ -6,7 +6,12 @@ import {
   type PwpRule,
   type RuleLineInput,
 } from "@carres/shared";
-import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "./rule-line-input";
 
 /**
  * 0256 — line-EDIT promo parity helpers (Loo 2026-07-25: "edited/added items
@@ -99,21 +104,6 @@ export type PromoEntitlementOutcome =
   | { status: "ok" }
   | { status: "blocked"; message: string }
   | { status: "server_error"; message: string };
-
-const upper = (s: string): string => String(s ?? "").toUpperCase();
-
-/** A flat line → the matcher's RuleLineInput (mirrors the sweep's
- *  deriveRuleLine — triggers are flat real SKUs). */
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
 
 /** Guard: would the post-edit cart still back everything this order's promos
  *  already handed out? Dormant orders (no reward lines, no sourced vouchers)
