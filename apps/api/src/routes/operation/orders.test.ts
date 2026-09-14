@@ -2776,7 +2776,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(body.lines.every((line) => line.deliverTo.length === 0)).toBe(true);
   });
 
-  it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
+  it.each([[false, false], [true, false], [false, true]])("reads incoming IDs only from complete exclusive sources (shared=%s, truncated=%s)", async (shared, truncated) => {
     const orderId = "00000000-0000-0000-0000-000000000a01";
     const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
     const secondSource = { ...source, po_line_id: "pol-2" };
@@ -2798,7 +2798,9 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         const chain: Record<string, unknown> = {};
         for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
         chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
-        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null,
+          count: Array.isArray(data) ? data.length + (table === "po_line_sources" && columns.includes("order_id") && truncated ? 1 : 0) : null,
+        });
         return chain;
       }),
     }));
@@ -2814,8 +2816,8 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       unitCoverage: Record<string, string>;
       unitLines: Record<string, string | null>;
     };
-    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070", "U1-000-071"]);
-    expect(body.unitCoverage).toEqual(shared ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
+    expect(body.lines[0].unitIds).toEqual(shared || truncated ? [] : ["U1-000-070", "U1-000-071"]);
+    expect(body.unitCoverage).toEqual(shared || truncated ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
     expect(body.lines[1].unitIds).toEqual([]);
     /**
      * ⭐ THE INVARIANT A READER IS ALLOWED TO STAND ON (owner correction
@@ -2829,7 +2831,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
      * Without this, a gap in the data proved a fact about the goods.
      */
     expect(body.unitLines).toEqual(
-      shared ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
+      shared || truncated ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
     );
     // Incoming goods are not reported as physical allocated stock for Delivery.
     expect(body.place).toEqual([]);

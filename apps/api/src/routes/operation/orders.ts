@@ -1314,11 +1314,12 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const poLineByUnit = new Map<string, string>();
   const exclusive = new Map<string, string>();
   if (sourcePoLineIds.length) {
-    const { data: owners, error: ownerErr } = await sb.from("po_line_sources")
-      .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
+    const { data: owners, error: ownerErr, count: ownerCount } = await sb.from("po_line_sources")
+      .select("po_line_id, order_id, order_line_id", { count: "exact" }).in("po_line_id", sourcePoLineIds);
     if (ownerErr) { const m = mapPgError(ownerErr); return c.json(m.body, m.status); }
     const ownerRows = (owners ?? []) as Array<{ po_line_id: string; order_id: string | null; order_line_id: string | null }>;
-    for (const [poLineId, binding] of exclusivePoSourceBindings(ownerRows)) {
+    // A capped owner response cannot prove that no other order shares the PO line.
+    for (const [poLineId, binding] of exclusivePoSourceBindings(ownerCount === ownerRows.length ? ownerRows : [])) {
       if (binding.orderId === id) exclusive.set(poLineId, binding.lineId);
     }
     if (exclusive.size) {

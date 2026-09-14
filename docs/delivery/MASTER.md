@@ -547,10 +547,13 @@ because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfer
 transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
 selection; arrows replace the whole window and never scroll it.
 
-**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** In order: the
-type label (`DELIVERY` · `TRANSFER`) with the Logistics · the confirmed window · who and
-where · the goods summary · the identity (`DO No`, or `SO No · Leg {n} of {m}` on a transfer, or
-`DO not released`) · **line 1 the journey progress · line 2 the readiness or blocker** (§8.4).
+**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** The compact
+card shows its type (`DELIVERY` · `TRANSFER`), the DO number when present, the SO on its own
+line and the confirmed window. It carries the actual route or delivery locality, each physical
+product line's icon and quantity, written service details and the assigned Logistics name.
+Customer names and legacy references stay off the card face. Below those facts are
+**line 1 the journey progress · line 2 the readiness or blocker** (§8.4), then the existing
+DO or arrangement door. No missing DO placeholder is added to the calendar card.
 Progress and readiness never merge into one line. The status never repeats the date of the column
 it already sits in, and it is a text line, never a pill that can truncate. A transfer card is
 visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
@@ -576,7 +579,8 @@ custody, loading, driver confirmation or customer delivery. Explicit incoming Un
 prove zero received when they cover the entire product line. They must belong to an open PO
 whose complete `po_line_sources` read names only that SO and item line. Shared sources,
 truncated reads, duplicate Units and excess quantities never establish this fact. The same
-exclusive-source rule is used by the order expansion. Incoming evidence is read in page-wide
+exclusive-source rule, including the complete-owner-read check, is used by the order expansion.
+Incoming evidence is read in page-wide
 batches and never counted as reserved stock or permission to dispatch. The zero-received mark
 is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
 Whole-workspace conformance and production verification remain open. Local fixtures and passing
