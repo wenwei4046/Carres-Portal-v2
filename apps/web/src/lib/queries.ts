@@ -2994,6 +2994,8 @@ export interface operationOrderListRow {
    * degrade-do-not-crash reason as `po_arrivals`.
    */
   allocated_units?: AllocatedUnit[];
+  /** Explicit incoming pieces, bound by exclusive PO source lineage. */
+  incoming_units?: import("@carres/shared").IncomingLineUnit[];
   delivery_partner_id: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey

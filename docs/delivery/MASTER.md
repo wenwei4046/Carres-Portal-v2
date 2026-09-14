@@ -572,9 +572,15 @@ Receipt marks currently require exact `reserved_order_line_id` bindings in reser
 stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
 excess bindings remain `Receipt not verified`; intermediate-leg receipt remains unknown,
 because an initial receipt is not arrival at the next site. This read does not prove current
-custody, loading, driver confirmation or customer delivery. The ordinary not-yet-received
-case still needs explicit receipt evidence; absence is not that evidence. Whole-workspace
-conformance and production verification remain open. Local fixtures and passing tests do not close them.
+custody, loading, driver confirmation or customer delivery. Explicit incoming Units can now
+prove zero received when they cover the entire product line. They must belong to an open PO
+whose complete `po_line_sources` read names only that SO and item line. Shared sources,
+truncated reads, duplicate Units and excess quantities never establish this fact. The same
+exclusive-source rule is used by the order expansion. Incoming evidence is read in page-wide
+batches and never counted as reserved stock or permission to dispatch. The zero-received mark
+is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
+Whole-workspace conformance and production verification remain open. Local fixtures and passing
+tests do not close them.
 
 Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
 overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
@@ -603,6 +609,10 @@ separate, the correct line's details stay inside the viewport, Escape returns fo
 trigger, and mobile product/footer targets measure 40px high. The calendar control reads
 `Work week`, `3 days` and `Day` for the corresponding windows. These are fixture checks,
 not production screenshots or proof of the missing receipt states.
+The incoming correction adds local coverage for the gray zero-received case beside green,
+partial and unknown marks. Validation: 224 targeted web tests, 33 shared receipt tests,
+3,275 API tests pass (14 optional integration tests skipped); typecheck and the production-mode
+web build pass. No migration, RLS change or new writer is introduced.
 
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 

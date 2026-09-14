@@ -590,6 +590,18 @@ describe("the spanning empty range", () => {
 });
 
 describe("one card", () => {
+  it("shows a gray pending mark only from explicit incoming line evidence", () => {
+    const orders = ordersState.data!.orders;
+    const first = orders.find(o => o.id === "b")!;
+    first.allocated_units = [];
+    first.incoming_units = [{ unitCode: "U-INCOMING", orderLineId: first.order_lines![0]!.id!, qty: 1 }];
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-b");
+    expect(within(card).getByText("Received Qty 0/1")).toBeTruthy();
+    expect(card.querySelector('[data-icon="ready"]')).toBeNull();
+    fireEvent.click(within(card).getByRole("button", { name: /Qty 1/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Received Qty 0/1");
+  });
   beforeEach(seedTwoScopes);
 
   it("keeps repeated product lines separate and reveals complete names on tap", () => {

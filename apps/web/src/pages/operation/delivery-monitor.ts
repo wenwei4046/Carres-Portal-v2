@@ -882,7 +882,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         category: goodsCategoryWordOf(line),
         qty: line.qty,
         shortQty: shortByLineIndex.get(index) ?? 0,
-        receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units),
+        receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units, row.o.incoming_units),
       };
       /* `unknown` is a physical thing nobody recognised — it travels on the
          truck, so it belongs with the MAIN goods, never buried under the

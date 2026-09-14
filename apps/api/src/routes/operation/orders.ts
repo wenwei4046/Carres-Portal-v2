@@ -35,6 +35,8 @@ import {
   type AllocatedUnit as OrderAllocatedUnit,
   type CommitmentBundle,
   normalizeSkuKey,
+  exclusivePoSourceBindings,
+  type IncomingLineUnit,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -429,6 +431,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
      supplier was given, `reply` the latest recorded supplier answer. The
      browser decides what that means; this route never says "delayed". */
   const poArrivalsBySo = new Map<number, OrderPoArrival[]>();
+  const openArrivalPoIds = new Set<string>();
   if (soNumbers.length > 0) {
     const inList = soNumbers.join(",");
     const { data: pos, error: e_pos } = await sb
@@ -447,6 +450,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     const poRows = pos ?? [];
+    for (const po of poRows) if (po.status === "open") openArrivalPoIds.add(po.id);
     if (poRows.length > 0) {
       const { data: poLines, error: e_lines } = await sb
         .from("purchase_order_lines")
@@ -629,6 +633,46 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  // Read incoming evidence page-wide, never one request per calendar card.
+  // Use the same exclusive source-line rule as the order expansion below.
+  const incomingByOrder = new Map<string, IncomingLineUnit[]>();
+  const listedOrders = orders as Array<{ id: string; order_lines?: { id: string }[] }>;
+  const listedLines = new Map(listedOrders.map(o => [o.id, new Set((o.order_lines ?? []).map(l => l.id))]));
+  const candidatePoLines = new Set<string>();
+  let sourceReadComplete = true;
+  if (openArrivalPoIds.size) {
+    for (const batch of chunk(listedOrders.map(o => o.id), 100)) {
+      const { data: sources, error, count } = await sb.from("po_line_sources")
+        .select("po_id, po_line_id, order_id, order_line_id", { count: "exact" }).in("order_id", batch);
+      if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+      // A server row cap must not turn a partial owner read into exclusivity.
+      if (count !== (sources ?? []).length) { sourceReadComplete = false; break; }
+      for (const source of sources ?? []) {
+        if (source.po_line_id && openArrivalPoIds.has(source.po_id)) candidatePoLines.add(source.po_line_id);
+      }
+    }
+    for (const batch of chunk(sourceReadComplete ? [...candidatePoLines] : [], 100)) {
+      const { data: owners, error: ownerError, count: ownerCount } = await sb.from("po_line_sources")
+        .select("po_line_id, order_id, order_line_id", { count: "exact" }).in("po_line_id", batch);
+      if (ownerError) { const m = mapPgError(ownerError); return c.json(m.body, m.status); }
+      if (ownerCount !== (owners ?? []).length) continue;
+      const bindings = exclusivePoSourceBindings(owners ?? []);
+      const eligible = [...bindings].filter(([, binding]) => listedLines.get(binding.orderId)?.has(binding.lineId)).map(([id]) => id);
+      if (!eligible.length) continue;
+      const { data: incoming, error: incomingError, count: incomingCount } = await sb.from("ops_stock_items")
+        .select("unit_code, po_line_id, qty", { count: "exact" }).eq("status", "incoming").eq("identity_scope", "unit").in("po_line_id", eligible);
+      if (incomingError) { const m = mapPgError(incomingError); return c.json(m.body, m.status); }
+      if (incomingCount !== (incoming ?? []).length) continue;
+      for (const unit of incoming ?? []) {
+        const binding = bindings.get(unit.po_line_id);
+        if (!binding || !unit.unit_code || !Number.isFinite(unit.qty) || unit.qty <= 0) continue;
+        incomingByOrder.set(binding.orderId, [...(incomingByOrder.get(binding.orderId) ?? []), {
+          unitCode: unit.unit_code, orderLineId: binding.lineId, qty: unit.qty,
+        }]);
+      }
+    }
+  }
+
   return c.json({
     orders: orders.map((o: { id?: string; so?: number | null }) => ({
       ...o,
@@ -636,6 +680,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       po_numbers: [...(poNumbersBySo.get(o.so ?? -1) ?? [])],
       po_arrivals: poArrivalsBySo.get(o.so ?? -1) ?? [],
       allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
+      incoming_units: incomingByOrder.get(o.id ?? "") ?? [],
     })),
   });
 });
@@ -1273,10 +1318,8 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
       .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
     if (ownerErr) { const m = mapPgError(ownerErr); return c.json(m.body, m.status); }
     const ownerRows = (owners ?? []) as Array<{ po_line_id: string; order_id: string | null; order_line_id: string | null }>;
-    for (const poLineId of sourcePoLineIds) {
-      const linked = ownerRows.filter((s) => s.po_line_id === poLineId);
-      const lineId = linked[0]?.order_line_id;
-      if (lineId && linked.every((s) => s.order_id === id && s.order_line_id === lineId)) exclusive.set(poLineId, lineId);
+    for (const [poLineId, binding] of exclusivePoSourceBindings(ownerRows)) {
+      if (binding.orderId === id) exclusive.set(poLineId, binding.lineId);
     }
     if (exclusive.size) {
       const { data: incoming, error: incomingErr } = await sb.from("ops_stock_items")

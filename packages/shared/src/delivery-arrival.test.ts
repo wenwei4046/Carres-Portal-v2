@@ -17,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import {
   receivedForBoundLine,
+  exclusivePoSourceBindings,
   ARRIVAL_COPY,
   arrivalNoteOf,
   deliveryArrivalStateOf,
@@ -29,6 +30,24 @@ import {
 } from "./delivery-arrival";
 
 describe("receipt evidence for one product line", () => {
+  it("proves zero only from a full set of explicitly incoming pieces", () => {
+    const incoming = [{ unitCode: "U1", orderLineId: "a", qty: 1 }];
+    expect(receivedForBoundLine("a", 1, [], incoming)).toBe(0);
+    expect(receivedForBoundLine("a", 2, [], incoming)).toBeNull();
+    expect(receivedForBoundLine("b", 1, [], incoming)).toBeNull();
+    expect(receivedForBoundLine("a", 2, [], [...incoming, ...incoming])).toBeNull();
+    expect(receivedForBoundLine("a", 1, [{ sku: "same", status: "reserved", orderLineId: "a", qty: 1 }], incoming)).toBeNull();
+  });
+  it("binds only exclusively sourced PO lines, rejecting shared and unidentified owners", () => {
+    const bindings = exclusivePoSourceBindings([
+      { po_line_id: "exclusive", order_id: "o1", order_line_id: "a" },
+      { po_line_id: "shared", order_id: "o1", order_line_id: "a" },
+      { po_line_id: "shared", order_id: "o2", order_line_id: "b" },
+      { po_line_id: "mixed", order_id: "o1", order_line_id: "a" },
+      { po_line_id: "mixed", order_id: null, order_line_id: null },
+    ]);
+    expect([...bindings]).toEqual([["exclusive", { orderId: "o1", lineId: "a" }]]);
+  });
   it("does not turn missing data or a same-SKU allocation into receipt evidence", () => {
     expect(receivedForBoundLine("a", 1, undefined)).toBeNull();
     expect(receivedForBoundLine("a", 1, [{ sku: "same", qty: 1, status: "reserved" }])).toBeNull();

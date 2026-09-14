@@ -131,6 +131,8 @@ const ORDERS = [
   order({
     id: "b",
     so: 1323,
+    // Explicit fixture evidence: this whole line is still incoming.
+    incoming_units: [{ unitCode: "U-PREVIEW-B", orderLineId: "l-1", qty: 1 }],
     customer_name: "aida rahim",
     customer_address: "8 Jalan Ampang, Kuala Lumpur",
     customer_address_city: "Kuala Lumpur",
