@@ -2175,6 +2175,23 @@ the missing-route failure, and existing exact-Unit scope/readiness cases: 49 tes
 fixes the known reader boundary in code; it does not prove the production schema has the same route
 data, apply migrations, or complete the personal operator and handover gates in §14.4.
 
+### 13.13 · BUILD / VERIFIED IN BRANCH — External Warehouse Work door (2026-09-14)
+
+The external Warehouse shell now has a dedicated `/warehouse/work` route beside Incoming,
+My receiving and Outbound. It reads `GET /api/warehouse/work`, which returns only the bound
+Site queue and never the Carres Team directory. An unaccepted DO + Site row offers `Accept
+work`; after the governed acceptance RPC succeeds, the same row links to the existing
+`/warehouse/outbound` exact-Unit door. The Work page does not record a second completion fact:
+prep, receiver and proof still use the shared delivery handover doors, and the Work cache is
+invalidated after acceptance. The sidebar and content margin collapse to a narrow icon rail
+below the small-screen breakpoint so the floor operator can reach the controls without a
+horizontal page overflow.
+
+The branch test covers Site-queue rendering, the acceptance request and the explicit empty
+state. This proves the client composition and route contract only; it does not prove that the
+committed branch is deployed, that the 0459/0460 schema exists in production, or that Chan has
+completed an authenticated mobile acceptance and exact-Unit handover.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
