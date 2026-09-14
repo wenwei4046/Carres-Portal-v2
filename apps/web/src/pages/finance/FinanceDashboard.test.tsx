@@ -9,6 +9,7 @@ import ApOutstanding from "./payables/ApOutstanding";
 import LedgerJournal from "./ledger/LedgerJournal";
 import { customerBalanceRows } from "./FinancePaymentReport";
 import { rm } from "@/lib/format-currency";
+import { fmtDate } from "@/lib/fmt-date";
 
 /* Reads answer by path (a function gets the whole URL); a path in `fail` throws. Names are invented. */
 const api = vi.hoisted(() => ({
@@ -272,6 +273,36 @@ describe("Finance Dashboard", () => {
     expect(within(chart).getByTestId(`dashboard-cashflow-week-${GO_LIVE}`)).toHaveTextContent("RM 750.00");
     expect(within(chart).queryByTestId("dashboard-cashflow-week-2026-09-07")).not.toBeInTheDocument();
     expect(screen.getByTestId("dashboard-cashflow-short")).toHaveTextContent("The ledger started on Thu, 10 Sep. 6 of 12 weeks so far.");
+  });
+
+  it("twelve columns whose first starts mid-week on go-live name the date, never '12 of 12 weeks'", async () => {
+    vi.setSystemTime(new Date("2026-11-25T02:00:00Z")); // 10:00 on Wed 25 Nov, Malaysia
+    show(<FinanceDashboard />);
+    expect(await screen.findByTestId("dashboard-net-cash-amount")).toHaveTextContent("RM 750.00");
+    const chart = screen.getByTestId("dashboard-cashflow");
+    expect(within(chart).getAllByRole("listitem")).toHaveLength(12);
+    expect(within(chart).getByTestId(`dashboard-cashflow-week-${GO_LIVE}`)).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-net-cash-short").textContent).toBe(`Since ${fmtDate(GO_LIVE)}`);
+    expect(screen.getByTestId("dashboard-cashflow-short").textContent).toBe(`The ledger started on ${fmtDate(GO_LIVE)}.`);
+    expect(document.body).not.toHaveTextContent(/12 of 12/);
+  });
+
+  it("a go-live still ahead says when the ledger starts — no RM figure, no chart, no 'started on'", async () => {
+    const ahead = "2026-10-20";
+    api.routes[CHART_URL] = { ...CHART, go_live_on: ahead };
+    show(<FinanceDashboard />);
+    const tile = screen.getByTestId("dashboard-net-cash");
+    const sentence = `The ledger starts on ${fmtDate(ahead)}.`;
+    expect(await within(tile).findByText(sentence)).toBeInTheDocument();
+    const chart = panel("Cashflow · Last 12 weeks");
+    expect(within(chart).getByText(sentence)).toBeInTheDocument();
+    for (const el of [tile, chart]) {
+      expect(el).not.toHaveTextContent("RM");
+      expect(el).not.toHaveTextContent("started on");
+    }
+    expect(screen.queryByTestId("dashboard-net-cash-amount")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-cashflow")).not.toBeInTheDocument();
+    expect(api.urls.some((u) => u.startsWith(ACCOUNT_LEDGER))).toBe(false);
   });
 
   it("Activity lists the newest entries from go-live, and each number opens that entry in the Journal", async () => {

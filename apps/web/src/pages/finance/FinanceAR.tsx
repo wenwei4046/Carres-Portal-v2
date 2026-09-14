@@ -74,6 +74,8 @@ export default function FinanceAR() {
     { key: "age", label: "Age", width: 110, align: "right",
       accessor: (r) => ageWord(orderAgeDays(r.placedAt, today)),
       numberValue: (r) => orderAgeDays(r.placedAt, today), filterType: "number",
+      // By the number of days, never the words: "120 days" sorts after "45 days". No date sorts first.
+      sortFn: (a, b) => (orderAgeDays(a.placedAt, today) ?? -1) - (orderAgeDays(b.placedAt, today) ?? -1),
       exportValue: (r) => orderAgeDays(r.placedAt, today) ?? "", searchValue: () => "" },
     { key: "outstanding", label: "Outstanding", width: 180, align: "right",
       accessor: (r) => (

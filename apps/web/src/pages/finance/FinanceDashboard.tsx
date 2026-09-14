@@ -66,7 +66,9 @@ export default function FinanceDashboard() {
   const overdueValue = aging && invoicesOk ? rm(aging.overdue.total) : null;
   const unpaidValue = unpaid && !payables.isError ? rm(unpaid.total) : null;
   const cashOk = !cash.isError && !chart.isError;
-  const cashData = cash.data && cashOk ? cash.data : null;
+  // Go-live still ahead: no week has begun, so there is nothing to measure — a sentence, never RM 0.00.
+  const startsOn = cash.data && cashOk && cash.data.weeks.length === 0 ? cash.data.goLiveOn : null;
+  const cashData = cash.data && cashOk && !startsOn ? cash.data : null;
 
   // An owing order whose placing date did not arrive makes the aging unreadable, not zero.
   const agingRead = aging === null && owingRows !== null
@@ -82,6 +84,7 @@ export default function FinanceDashboard() {
   const overdueMissing = <NoFigure source="Invoices" query={agingRead} last={aging?.overdue.total ?? null} />;
   const unpaidMissing = <NoFigure source="AP · Payables" query={payables} last={unpaid?.total ?? null} />;
   const cashMissing = notStarted ? <NotStarted />
+    : startsOn ? <StartsOn date={startsOn} />
     : <NoFigure source="Cash and bank" query={cashRead} last={cash.data?.net ?? null} />;
 
   return (
@@ -171,7 +174,15 @@ export default function FinanceDashboard() {
 
 const ordersWord = (n: number) => `${n} ${n === 1 ? "order" : "orders"}`;
 const suppliersWord = (n: number) => `${n} ${n === 1 ? "supplier" : "suppliers"}`;
-const weeksWord = (cash: CashMovement) => `Since ${fmtDate(cash.goLiveOn)} · ${cash.weeks.length} of ${CASH_WEEKS} weeks`;
+/**
+ * The count prints only while fewer than twelve columns exist. Twelve columns can
+ * still be short (the first starts mid-week on go-live); then the date says it
+ * alone — "12 of 12 weeks" would call the window short and whole in one line.
+ */
+const fewerWeeks = (cash: CashMovement) => cash.weeks.length < CASH_WEEKS;
+const weeksWord = (cash: CashMovement) => fewerWeeks(cash)
+  ? `Since ${fmtDate(cash.goLiveOn)} · ${cash.weeks.length} of ${CASH_WEEKS} weeks`
+  : `Since ${fmtDate(cash.goLiveOn)}`;
 
 function NetCashHint({ cash }: { cash: CashMovement }) {
   return <>
@@ -189,11 +200,12 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
       <span>Money in less money out on cash and bank accounts · No opening balances</span>
       <span className="flex gap-3.5">
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-green-11" />Inflow</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-blue-9" />Outflow</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-slate-11" />Outflow</span>
       </span>
     </div>
     {cash.short && <p className="text-body" data-testid="dashboard-cashflow-short">
-      The ledger started on {fmtDate(cash.goLiveOn)}. {cash.weeks.length} of {CASH_WEEKS} weeks so far.
+      {`The ledger started on ${fmtDate(cash.goLiveOn)}.`}
+      {fewerWeeks(cash) && ` ${cash.weeks.length} of ${CASH_WEEKS} weeks so far.`}
     </p>}
     <div className="overflow-x-auto">
       <ol className="flex min-w-max gap-2">
@@ -201,7 +213,7 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
           <li key={w.from} className="flex w-20 flex-col items-center gap-1" data-testid={`dashboard-cashflow-week-${w.from}`}>
             <span className="flex h-24 w-full items-end justify-center gap-1" aria-hidden>
               <span className="w-3 rounded-sm bg-kit-green-11" style={{ height: height(w.moneyIn) }} />
-              <span className="w-3 rounded-sm bg-kit-blue-9" style={{ height: height(w.moneyOut) }} />
+              <span className="w-3 rounded-sm bg-kit-slate-11" style={{ height: height(w.moneyOut) }} />
             </span>
             <span className="text-label text-kit-slate-11">{fmtDateShort(w.from)}</span>
             <span className="text-label tabular-nums">{rm(w.net)}</span>
@@ -227,7 +239,7 @@ function Total({ label, value, testId }: { label: string; value: string; testId:
 
 const BUCKET_TONE: Record<(typeof AGE_BUCKETS)[number], string> = {
   "0-30": "bg-kit-green-11",
-  "31-60": "bg-kit-blue-9",
+  "31-60": "bg-kit-slate-9",
   "61-90": "bg-kit-amber-11",
   "90+": "bg-kit-red-9",
 };
@@ -302,6 +314,13 @@ function MonthEndPack({ today, goLive, ready }: { today: string; goLive: string 
 
 function NotStarted(): ReactNode {
   return <p className="text-body" role="status">The ledger has no start date yet.</p>;
+}
+
+/** Go-live is still ahead: no week has begun, so there is no figure to show yet. */
+function StartsOn({ date }: { date: string }): ReactNode {
+  return <p className="text-body" role="status" data-testid="dashboard-cash-starts-on">
+    The ledger starts on {fmtDate(date)}.
+  </p>;
 }
 
 /** In place of a number: the loading bars, or `Could not load {source}` with the last figure it had. */
