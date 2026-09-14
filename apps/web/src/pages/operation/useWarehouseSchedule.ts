@@ -202,8 +202,17 @@ export function useWarehouseSchedule(
            degradation notice on an EMPTY result breaks that: it makes a
            healthy quiet day render as a failure. Zero arrangements is zero
            mislabelled lines, so the degradation has no victim and nothing to
-           say. A real FAILURE below is never gated this way, and neither is a
-           truncation — rows existing while none arrive IS the problem. */
+           say.
+
+           A real FAILURE is never gated this way — it is the branch ABOVE
+           that this `else if` hangs off. Neither is the TRUNCATION below:
+           rows existing while none arrive IS the problem, and it is the one
+           case where an empty board genuinely is a failure.
+
+           What protects that distinction is the two ungated TESTS, not the
+           order these three blocks happen to sit in. Reordering them for
+           readability would look like housekeeping and would cost nothing;
+           removing either test goes loudly red. */
         const anyArrivals = payload.arrivals.length > 0;
         if (!payload.sourceFacts && anyArrivals)
           errors.push({
