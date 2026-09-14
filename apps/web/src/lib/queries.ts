@@ -650,6 +650,7 @@ export const qk = {
   warehousePortal: {
     incoming: () => ["warehouse-portal", "incoming"] as const,
     receipts: () => ["warehouse-portal", "receipts"] as const,
+    work: () => ["warehouse-portal", "work"] as const,
   },
   // 2026-05-15 (Loo) — Supplier per-thread readiness + pickup event keys.
   // Top-level (not nested under `supplier`) because thread + pickup-event
@@ -4274,6 +4275,37 @@ export function useWarehouseMyReceipts(
       apiFetch<{ receipts: WarehouseReceiptRow[] }>("/api/warehouse/receipts"),
     staleTime: 30_000,
     ...opts,
+  });
+}
+
+/** Site queue for the external Warehouse operator. The server owns scope and
+ * projection; this hook only reads the governed Work contract. */
+export function useWarehouseWork(
+  opts?: Partial<UseQueryOptions<OperationWorkResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.warehousePortal.work(),
+    queryFn: () => apiFetch<OperationWorkResponse>("/api/warehouse/work"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useAcceptWarehouseWorkMutation(
+  opts?: Partial<UseMutationOptions<unknown, ApiError, string>>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deliveryOrderId) =>
+      apiFetch<unknown>(`/api/warehouse/work/${deliveryOrderId}/accept`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.warehousePortal.work() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 
