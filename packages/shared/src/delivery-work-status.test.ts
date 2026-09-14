@@ -41,25 +41,34 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(s.second).toBeNull();
   });
 
-  it("partner set, nothing agreed → the PARTNER must contact the customer, with the deadline", () => {
+  it("⭐ partner set, nothing agreed → the ACT, and the act alone (owner ruling 2026-09-14)", () => {
     const s = status({ callByDate: "2026-09-10" });
-    expect(s.label).toBe("NETS must contact the customer");
-    expect(s.second).toBe("Call by D(2026-09-10)");
+    /* The party is NOT in the sentence: `Logistics` is its own column, and
+       the status says the job. */
+    expect(s.label).toBe("Call customer");
+    expect(s.label).not.toContain("NETS");
     expect(s.tone).toBe("orange");
+    /* And the deadline is NOT a sentence on line two any more — the surface
+       draws the day from `contactDueIso` with the kit's glyph, once. */
+    expect(s.second).toBeNull();
+    expect(s.secondTone).toBeNull();
   });
 
-  it("a contact deadline behind us turns line two red and keeps the day it missed", () => {
+  it("a contact deadline behind us adds NO second line either — the row carries the day", () => {
     const s = status({ callByDate: "2026-09-01", todayIso: "2026-09-12" });
-    expect(s.label).toBe("NETS must contact the customer");
-    expect(s.second).toBe("Call by D(2026-09-01)");
-    expect(s.secondTone).toBe("red");
-    expect(status({ callByDate: "2026-09-20", todayIso: "2026-09-12" }).secondTone).toBeNull();
+    expect(s.label).toBe("Call customer");
+    expect(s.second).toBeNull();
+    expect(s.secondTone).toBeNull();
   });
 
-  it("Carres contacts the customer where the record says so", () => {
+  it("who contacts the customer changes the RUNG, never the words on the row", () => {
+    /* Delivery Settings still decides whether the partner or Operation owns
+       the call; the operator's job is the same act either way, so the row
+       reads the same and the owner stays a settings fact. */
     const s = status({ contactBy: "operation", callByDate: "2026-09-10" });
-    expect(s.label).toBe("Operation must call the customer");
-    expect(s.second).toBe("Call by D(2026-09-10)");
+    expect(s.kind).toBe("operation_must_call");
+    expect(s.label).toBe("Call customer");
+    expect(s.second).toBeNull();
   });
 
   it("the latest contact waiting for a reply names that wait and the day asked", () => {
@@ -70,9 +79,14 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(s.second).toBe("Asked D(2026-09-08)");
   });
 
-  it("⭐ a DAY without a WINDOW is still contact work — never Confirmed", () => {
+  it("⭐ a DAY without a WINDOW is still contact work — and it names the HALF that is missing", () => {
     const s = status({ confirmedDate: "2026-09-14" });
-    expect(s.label).toBe("NETS must contact the customer");
+    /* Never `Confirmed` — and never `Call customer` either, which would send
+       the operator to re-open a day the customer already agreed. */
+    expect(s.kind).toBe("confirm_time");
+    expect(s.label).toBe("Confirm delivery time");
+    expect(s.tone).toBe("orange");
+    expect(s.second).toBeNull();
   });
 
   it("a day AND a window → Confirmed for the day, green, the window beneath", () => {
@@ -249,9 +263,11 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       "Waiting for logistics pickup",
     );
     expect(deliveryWorkStatusLabelOf("delivering", null)).toBe("Logistics is delivering to the customer");
-    expect(deliveryWorkStatusLabelOf("partner_must_contact", "")).toBe(
-      "Logistics must contact the customer",
-    );
+    /* The contact rungs name no party at all now, so there is no gap for a
+       role word to fill: the act is the same whoever owns it. */
+    expect(deliveryWorkStatusLabelOf("partner_must_contact", "")).toBe("Call customer");
+    expect(deliveryWorkStatusLabelOf("operation_must_call", null)).toBe("Call customer");
+    expect(deliveryWorkStatusLabelOf("confirm_time", "NETS")).toBe("Confirm delivery time");
   });
 
   it("⭐ the retired words never return, and no word names a mood", () => {
@@ -270,7 +286,10 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked|unscheduled/i);
       expect(label).not.toMatch(/^Waiting$/);
     }
-    expect(every).toHaveLength(13);
+    /* And no label joins an act to a party or an explanation with a dash
+       (owner ruling 2026-09-14). */
+    for (const label of every) expect(label).not.toMatch(/[—–-]/);
+    expect(every).toHaveLength(14);
   });
 
   it("every kind carries a colour word, and only the two exceptions are red", () => {

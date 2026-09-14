@@ -1163,9 +1163,16 @@ describe("a Journey row on the work list", () => {
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
-    /* The route shares COLUMN 4's ONE supporting line with the customer's
-       own reference (§8.3 row law) — the SO number never joins them. */
-    expect(within(list).getByText("CR0854 · Klang WH → JB transit")).toBeTruthy();
+    /* ⭐ THE ROUTE IS A PLACE, SO IT RIDES THE LOCATION CELL (owner ruling
+       2026-09-14) — never bolted onto the document number, and never joined
+       to the customer's reference. */
+    expect(within(list).getByText("Klang WH → JB transit")).toBeTruthy();
+    /* COLUMN 4 stays identity: the number, and the customer's own reference
+       under it, with nothing else on that line. */
+    const soCell = within(list).getAllByRole("button", { name: "SO-1350" })[0]!
+      .closest("span.block.min-w-0")!;
+    expect(soCell.textContent).toBe("SO-1350CR0854");
+    expect(list.textContent).not.toContain("CR0854 · Klang WH");
     expect(within(list).getByText("2 deliveries")).toBeTruthy();
     expect(list.textContent).not.toMatch(/\bLeg\b/);
     expect(list.textContent).not.toMatch(/\bscopes?\b/i);
@@ -1367,15 +1374,19 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(screen.queryByTestId("delivery-brief-logistics-edit")).toBeNull();
   });
 
-  it("a row WITH a Logistics Partner names that partner as the actor — `NETS must contact the customer`", () => {
+  it("⭐ a row WITH a Logistics Partner names the ACT; the partner stays in its own column", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    /* The register carries no Actions column (owner ruling 2026-09-12); the
-       STATUS names who must act (§8.4), and the brief's Change logistics act
-       names the partner. Never `Call NETS — …`. */
+    /* Owner ruling 2026-09-14. The register carries no Actions column (owner
+       ruling 2026-09-12); the STATUS names the JOB, and the party it used to
+       name — `NETS must contact the customer` — is the `Logistics` column's
+       own fact. Never `Call NETS — …`, and never a dash joining the two. */
     const list = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(list).getAllByText("NETS must contact the customer").length).toBeGreaterThan(0);
-    expect(within(list).getAllByText(/^Call by /).length).toBeGreaterThan(0);
+    expect(within(list).getAllByText("Call customer").length).toBeGreaterThan(0);
+    expect(list.textContent).not.toContain("must contact the customer");
+    expect(list.textContent).not.toContain("Call by");
+    /* The partner is still ON the row — in the Logistics cell. */
+    expect(within(list).getAllByText("NETS").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Call NETS — /)).toBeNull();
     fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
     expect(screen.getByTestId("delivery-brief-logistics-act").textContent).toBe("Change logistics");
@@ -1647,20 +1658,70 @@ describe("Call customer — the contact week", () => {
     expect(within(list).queryByText("SO-1601")).toBeNull();
   });
 
-  it("prints the deadline on the row, and the LATE one keeps the day it missed", () => {
+  it("⭐ shows the deadline ONCE, in Work, and the LATE one keeps the day it missed", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&late=1");
-    /* The deadline lives on `Confirmed Delivery`'s second line (§8.3):
-       `Call by {date}` — red once the day has passed, and the day it missed
-       is the day it keeps. */
+    /* Owner ruling 2026-09-14. The deadline used to print TWICE on one row —
+       once under the status and again under `Confirmed Delivery` — in the
+       same spelling, `Call by Mon, 24 Aug`. It is now stated once, in Work:
+       the day, drawn with the kit's glyph, and the whole sentence in the
+       tooltip and the accessible name. The day it missed is the day it keeps. */
     const list = screen.getByTestId("delivery-monitor-work-list");
-    /* Both the status's second line and `Confirmed Delivery`'s carry it. */
-    const late = within(list).getAllByText("Call by Mon, 24 Aug");
-    expect(late.length).toBe(2);
-    for (const el of late) expect(el.className).toContain("text-kit-red-11");
-    for (const el of within(list).getAllByText(/^Call by /)) {
-      if (el.textContent !== "Call by Mon, 24 Aug") expect(el.className).not.toContain("text-kit-red-11");
+    expect(list.textContent).not.toContain("Call by");
+
+    const late = within(list).getAllByTestId("delivery-monitor-contact-late");
+    expect(late.length).toBe(1);
+    expect(late[0]!.textContent).toBe("Mon, 24 Aug");
+    expect(late[0]!.className).toContain("text-kit-red-11");
+    /* The words did not disappear — they moved, and no dash joins them. */
+    const sentence = late[0]!.getAttribute("title")!;
+    expect(sentence).toBe("Contact deadline Mon, 24 Aug · overdue, the deadline does not move");
+    expect(late[0]!.getAttribute("aria-label")).toBe(sentence);
+    expect(sentence).not.toMatch(/[—–]/);
+    /* The kit's LATE glyph, not the phone, and not a bare colour. */
+    expect(late[0]!.querySelector("[data-icon='late']")).toBeTruthy();
+    expect(late[0]!.querySelector("[data-icon='call']")).toBeNull();
+
+  });
+
+  it("⭐ a deadline still ahead of us is the kit's CALL glyph, and it is not red", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    const due = within(list).getAllByTestId("delivery-monitor-contact-due");
+    expect(due.length).toBeGreaterThan(0);
+    for (const el of due) {
+      expect(el.className).not.toContain("text-kit-red-11");
+      expect(el.querySelector("[data-icon='call']")).toBeTruthy();
+      expect(el.querySelector("[data-icon='late']")).toBeNull();
+      expect(el.getAttribute("title")).toMatch(/^Contact deadline /);
+      expect(el.getAttribute("aria-label")).toBe(el.getAttribute("title"));
     }
+    /* One row, one deadline: it is never restated in another cell. */
+    expect(list.textContent).not.toContain("Call by");
+  });
+
+  it("⭐ the day is agreed and the window is not: the row asks for the TIME", () => {
+    /* Owner ruling 2026-09-14. `Call customer` here would send the operator
+       to re-open a day the customer has already answered. */
+    ordersState.data = { orders: [order({ id: "a", so: 1217 })] };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({
+          order_id: "a",
+          partner_id: "p-nets",
+          partner_name: "NETS",
+          confirmed_date: "2026-09-18",
+          confirmed_time: null,
+        }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("Confirm delivery time")).toBeTruthy();
+    expect(within(list).queryByText("Call customer")).toBeNull();
+    /* Still one line of act and one of deadline — the glyph and the day. */
+    expect(within(list).getAllByTestId("delivery-monitor-contact-due").length).toBe(1);
   });
 
   it("an order with NO confirmed delivery date stays in the queue", () => {

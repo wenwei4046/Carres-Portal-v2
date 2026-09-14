@@ -368,14 +368,16 @@ describe("buildDeliveryMonitorCards", () => {
     expect(out[0]!.statusLabel).toBe("Confirmed for Fri, 4 Sep");
     expect(out[0]!.statusTone).toBe("green");
     expect(out[0]!.statusSecond).toBe("09:00–11:00");
-    /* A DAY alone is still contact work (owner ruling 2026-09-11): the card
-       names who must contact the customer, never `Confirmed`. */
+    /* A DAY alone is still contact work (owner ruling 2026-09-11) — and the
+       card names the HALF that is missing, never `Confirmed` and never a
+       party (owner ruling 2026-09-14). */
     const dayOnly = cards(
       [order({ id: "a", so: 1301 })],
       { arrangements: [arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-04" })] },
     );
-    expect(dayOnly[0]!.statusKey).toBe("partner_must_contact");
-    expect(dayOnly[0]!.statusLabel).toBe("NETS must contact the customer");
+    expect(dayOnly[0]!.statusKey).toBe("confirm_time");
+    expect(dayOnly[0]!.statusLabel).toBe("Confirm delivery time");
+    expect(dayOnly[0]!.statusSecond).toBeNull();
   });
 
   describe("the missing evidence — the Delivery Orders register's own arithmetic", () => {
@@ -1083,11 +1085,21 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   });
 
   it("DELIVERY STATUS is the shared actor-first dictionary in ladder order (§8.4)", () => {
+    /* ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14). Both contact
+       rungs print `Call customer`, so the menu offers it ONCE —
+       `operation_must_call` is not a second option spelling the same word. */
     expect(MONITOR_STATUS_FILTERS).toEqual([
-      "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
+      "assign_logistics", "partner_must_contact", "waiting_customer_reply", "confirm_time",
       "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "arrived", "delivered", "failed",
       "details_incomplete",
     ]);
+    expect(MONITOR_STATUS_LABEL.partner_must_contact).toBe("Call customer");
+    expect(MONITOR_STATUS_LABEL.operation_must_call).toBe("Call customer");
+    expect(MONITOR_STATUS_LABEL.confirm_time).toBe("Confirm delivery time");
+    /* No option names a party or joins its clauses with a dash. */
+    for (const key of MONITOR_STATUS_FILTERS) {
+      expect(MONITOR_STATUS_LABEL[key]).not.toMatch(/[—–]/);
+    }
     expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");
     expect(MONITOR_STATUS_LABEL.waiting_pickup).toBe("Waiting for logistics pickup");
     expect(MONITOR_STATUS_LABEL.delivering).toBe("Logistics is delivering to the customer");

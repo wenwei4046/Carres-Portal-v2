@@ -444,8 +444,8 @@ Delivery Order document — the DOCUMENT's own life
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
   before the arrangement is agreed — the ACTOR rungs, unchanged:
-    Operation must assign logistics · {partner} must contact the customer ·
-    Operation must call the customer · Waiting for customer reply
+    Operation must assign logistics · Call customer · Waiting for customer reply ·
+    Confirm delivery time
   once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
     customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
                    On the way to customer · Delivered to customer · Failed Delivery
@@ -563,7 +563,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | Where | The words |
 |---|---|
 | Column headings, in order | `Delivery Status` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Confirmed Delivery` · `Logistics` · `Items & Stock` · `Payment` · `DO No` (after the checkbox and expand columns) |
-| `Confirmed Delivery` | `Confirmed` · `Not confirmed` on line one; the day, then the window (`Thu, 22 Oct` · `2 PM to 5 PM`), `Mon, 14 Sep · No time agreed`, or `Call by {date}` on line two |
+| `Confirmed Delivery` | `Confirmed` · `Not confirmed` on line one; the day, then the window (`Thu, 22 Oct` · `2 PM to 5 PM`) or `Mon, 14 Sep · No time agreed` on line two — and NOTHING on line two while unconfirmed (owner ruling 2026-09-14: the contact deadline is stated once, in `Delivery Status`) |
 | `Items & Stock` | `Ready` · `Not ready` on line one; `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` on line two |
 | `Payment`, paid | **`Paid`** |
 | `Payment`, unpaid | **`Do not deliver`** over **`RM {amount} still to collect`**, or over `Finance is holding this delivery` |
@@ -600,6 +600,20 @@ date`, `Call NETS` over `Confirm the delivery time`, `Call the customer` over `C
 delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delivery photo` over
 `Attach the photo from NETS`, `Check the delivery proof` over `Accept it, ask for more, or reject
 it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
+
+**THE MONITOR `Delivery Status` CELL — owner ruling 2026-09-14.** The same law, applied to the
+register column that used to name a party: line one is the ACT — **`Call customer`**, or
+**`Confirm delivery time`** when the day is agreed and only the window is missing — and line two
+is the CONTACT DEADLINE, drawn as a kit glyph and a day (`call` while there is time, `late` in red
+once there is not). **`{partner} must contact the customer` and `Operation must call the customer`
+are retired on Monitor**: the party is the `Logistics` column's own fact and may not re-enter the
+action sentence. **`Call by {date}` is retired from every visible line** — it printed the verb the
+status word above it had just said, and it printed the same day twice on one row. The words move
+to the tooltip, the accessible name, Search and the Excel export: `Contact deadline {date}`, and
+`Contact deadline {date} · overdue, the deadline does not move` once it has passed. No `—`
+appears in either, and no glyph replaces the action text. `Call by {date}` survives ONLY on the
+order detail's `Before you call` panel, whose entry below is unchanged. The complete cell law is
+`delivery/MASTER.md` §8.3.
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
 

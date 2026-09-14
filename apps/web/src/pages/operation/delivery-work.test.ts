@@ -162,17 +162,24 @@ describe("delivery scopes and journey legs", () => {
     /* The document's own handover facts speak: the partner collected. */
     expect(rows[0]!.status.kind).toBe("collected");
     expect(rows[0]!.receivedAt).toBe("2026-08-25T03:00:00Z");
-    /* Leg 2, no document yet: the chain's own words, as before. */
-    expect(rows[1]!.status.kind).toBe("partner_must_contact");
+    /* Leg 2, no document yet: the chain's own words. Its day is scheduled and
+       no window is agreed, so the rung is the one that asks for the TIME
+       (owner ruling 2026-09-14) — never the one that re-opens the day. */
+    expect(rows[1]!.status.kind).toBe("confirm_time");
+    expect(rows[1]!.status.label).toBe("Confirm delivery time");
   });
 
   it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
     // One vocabulary across the workspace: a leg and a whole-order scope must
     // not be readable on two different scales.
     expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Operation must assign logistics");
-    expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("TEOW must contact the customer");
-    /* A day alone is still contact work; a day AND a window is the booking. */
-    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe("TEOW must contact the customer");
+    /* The ACT, never the actor (owner ruling 2026-09-14): the party is the
+       row's Logistics field, and a leg speaks the same words as a scope. */
+    expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("Call customer");
+    /* A day alone is still contact work — and it names the missing HALF. */
+    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe(
+      "Confirm delivery time",
+    );
     const booked = legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW", "9am–12pm");
     expect(booked.label).toBe("Confirmed for Tue, 25 Aug");
     expect(booked.second).toBe("9am–12pm");

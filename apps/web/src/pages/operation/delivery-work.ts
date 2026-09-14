@@ -304,7 +304,11 @@ export function legWorkStatusOf(
          uses: a day and a window agreed, a partner still to contact the
          customer, or no partner at all. */
       if (confirmedIso && confirmedTime) return say("confirmed", confirmedTime);
-      return say(partnerName ? "partner_must_contact" : "assign_logistics");
+      if (!partnerName) return say("assign_logistics");
+      /* ONE vocabulary across the workspace (owner ruling 2026-09-14): a leg
+         whose day is agreed and whose window is not asks for the TIME, in
+         the same words the whole-order scope uses. */
+      return say(confirmedIso ? "confirm_time" : "partner_must_contact");
   }
 }
 
