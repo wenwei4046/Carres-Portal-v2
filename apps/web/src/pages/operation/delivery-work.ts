@@ -757,7 +757,6 @@ export function buildDeliveryScopeRows({
           {
             partnerName: logisticsName,
             latestContact: latestContactOf(`${o.id}#0`),
-            callByDate: contactDueIso,
             confirmedDate: confirmed.iso,
             confirmedTime: confirmed.time,
             /* A VOIDED document is not a live one: its scope is waiting to be
@@ -830,7 +829,6 @@ export function buildDeliveryScopeRows({
               {
                 partnerName: legPartner,
                 latestContact: latestContactOf(`${o.id}#${stop.leg}`),
-                callByDate: contactDueIso,
                 confirmedDate: confirmedIso,
                 confirmedTime: legTime,
                 hasDeliveryOrder: true,

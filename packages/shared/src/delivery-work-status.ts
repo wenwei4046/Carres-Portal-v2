@@ -223,8 +223,6 @@ export interface DeliveryWorkStatusInput {
   /** The latest customer-contact record on the scope (Card 11); null until one
    *  exists. */
   latestContact?: { result: "waiting_customer_reply" | "answered"; recordedOn: string } | null;
-  /** The contact deadline — the chase step's own due day. */
-  callByDate?: string | null;
   /** Delivery's own agreed operational date for this scope. */
   confirmedDate: string | null;
   /** The agreed window. A day without one is still contact work. */

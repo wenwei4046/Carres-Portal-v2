@@ -42,7 +42,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
   });
 
   it("⭐ partner set, nothing agreed → the ACT, and the act alone (owner ruling 2026-09-14)", () => {
-    const s = status({ callByDate: "2026-09-10" });
+    const s = status({});
     /* The party is NOT in the sentence: `Logistics` is its own column, and
        the status says the job. */
     expect(s.label).toBe("Call customer");
@@ -54,18 +54,23 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(s.secondTone).toBeNull();
   });
 
-  it("a contact deadline behind us adds NO second line either — the row carries the day", () => {
-    const s = status({ callByDate: "2026-09-01", todayIso: "2026-09-12" });
+  it("the ladder no longer takes a contact deadline at all — the row owns that fact", () => {
+    /* The deadline used to enter here and leave as `Call by {date}` on line
+       two. It is now read once, from the row's own `contactDueIso`, by the
+       surface that draws it — so no rung can disagree with the strip, the
+       chip or the phone card about which day is owed. */
+    const s = status({ todayIso: "2026-09-12" });
     expect(s.label).toBe("Call customer");
     expect(s.second).toBeNull();
     expect(s.secondTone).toBeNull();
+    expect(Object.keys(s)).toEqual(["kind", "label", "tone", "second", "secondTone", "reasonLabel"]);
   });
 
   it("who contacts the customer changes the RUNG, never the words on the row", () => {
     /* Delivery Settings still decides whether the partner or Operation owns
        the call; the operator's job is the same act either way, so the row
        reads the same and the owner stays a settings fact. */
-    const s = status({ contactBy: "operation", callByDate: "2026-09-10" });
+    const s = status({ contactBy: "operation" });
     expect(s.kind).toBe("operation_must_call");
     expect(s.label).toBe("Call customer");
     expect(s.second).toBeNull();
@@ -252,7 +257,7 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
   });
 
   it("a required Sales fact missing → Order details incomplete, naming the fact", () => {
-    const s = status({ missingFacts: ["Building type not recorded"], callByDate: "2026-09-10" });
+    const s = status({ missingFacts: ["Building type not recorded"] });
     expect(s.label).toBe("Order details incomplete");
     expect(s.second).toBe("Building type not recorded");
     expect(s.tone).toBe("orange");
