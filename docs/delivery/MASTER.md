@@ -444,31 +444,70 @@ It has two tabs, each the page's own first control, each carrying its live count
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Confirmed deliveries
+the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Delivery schedule
 page-owned 240px FilterRail  ·  the complete current month above the complete next month, fixed
                                 on top; the filter groups scroll below
 Work to do (DEFAULT)         ·  the selectable Register work list (shared DataGrid, §8.3) over the
                                 picked WORK TO DO queue; `All delivery work` when the URL names none
-Confirmed deliveries         ·  Day / Week / Month in the page toolbar; Week is the desktop default
-                                and its six Mon–Sat columns fit without horizontal date scrolling
+Delivery schedule            ·  Day / Work week / Month in the page toolbar; `Work week` is the
+                                desktop default and its six Mon–Sat columns fit without horizontal
+                                date scrolling
 ```
+
+**`Delivery schedule` — owner ruling 2026-09-14, APPROVED / LOCKED.** The tab names a PLACE, not a
+state: confirmation is one condition of a row inside the schedule, never the name of the whole
+view. `Confirmed deliveries` is the RETIRED spelling — it still resolves from any stored URL, and
+it survives only inside dated §16 production-walk records, which are historical observation and are
+never rewritten. No current law, dictionary, label, test or comment may spell it.
+
+**TWO KINDS OF WORK, ONE PLACE, NEVER ONE TOTAL — owner ruling 2026-09-14, APPROVED / LOCKED.**
+Operations monitors all logistics work in one place, so the schedule carries BOTH the final
+customer delivery and the intermediate warehouse transfer. Their meaning and their totals never
+merge:
+
+```
+DELIVERY    the final customer leg — the goods reach the person who bought them
+TRANSFER    an intermediate Journey leg — the goods reach a named partner warehouse
+```
+
+The tab prints the count of the CURRENT SCOPE and, beneath it, the split that scope actually holds:
+
+```
+Delivery schedule  {n}
+{c} customer deliveries · {t} transfers
+```
+
+**The split follows the selected range and every active filter, and an old total is never
+preserved.** A range holding no customer delivery and two transfers reads exactly
+`0 customer deliveries · 2 transfers` — never `2 customer deliveries` because four rows somewhere
+else carry a confirmed date. **A transfer is never counted as a customer delivery, never enters
+customer-delivery performance, and never produces a `Delivered to customer` result** — in the tab
+count, the day and month counts, the rail marks, Logistics Partner Performance, Commitment, First
+Delivery or any report. A transfer's completion is `Arrived at {stop}` and nothing else.
 
 **The rail's two-month calendar.** The rail's first, fixed region is the complete current month
 above the complete next month on the kit's one calendar primitive (`MonthCalendar`), never a
-one-week strip. One pair of arrows moves both months by one month. The selected date wears the
-governed blue selected state; today stays distinguishable; Sundays stay visible, muted and take
-no click; a date holding confirmed deliveries carries a count under the date and the same fact in
-its accessible sentence, never colour alone. Clicking a date opens that date's Day view on
-`Confirmed deliveries` and keeps every STATE, LOGISTICS PARTNER and DELIVERY STATUS narrowing.
+one-week strip. One pair of arrows moves both months by one month. **Today is visibly distinct
+(a blue ring) and the selected date keeps the governed blue FILL, so the two never compete. The
+current work week carries a subtle grey band.** Sundays stay visible, muted and take no click. A
+date carries **two separate marks — customer delivery and transfer — never one mark for both**, by
+shape and position so colour is never the only carrier, and the same split rides its accessible
+sentence. **Marks and counts follow the picked scope and every active filter.** Clicking a date
+opens that date's Day view on `Delivery schedule` and keeps every STATE, LOGISTICS PARTNER and
+DELIVERY STATUS narrowing.
 
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
 counts computed over the rows the other groups already narrowed (Law D):
 
 - **`WORK TO DO`**, rows in this order: `All delivery work` · `No logistics picked` · `Call
   customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
-  proof` (joined 2026-09-13 with the §6.1 record). Every queue comes from recorded
-  facts, never a clock inference. The group belongs to `Work to do` and is not drawn on the
-  calendar tab.
+  proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
+  2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
+  to `Work to do` and is not drawn on the schedule tab.
+  **`Order details incomplete` is a door, not a backlog (owner ruling 2026-09-14).** A row missing
+  a required Sales fact gets its own queue so it can be worked deliberately, and it never competes
+  for the top of `All delivery work`. It licenses NO data cleanup, repair worklist or backfill —
+  Constitution §6 rules every such row today is imported test data that go-live discards.
 - **`STATE`**: a kit dropdown of the direct state names the data genuinely carries, ordered by
   count; leg 1 of a Singapore journey counts under Johor and leg 2 under Singapore; `All` clears
   only this group.
@@ -492,14 +531,33 @@ queue: a confirmed trip whose day has passed with no result) and `Overdue contac
 that missed its deadline) are two populations and never share one bare `Overdue` count. `Call
 customer` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
 
-**The calendar writes nothing.** `Day` shows the selected operating day with full cards; `Week`
-the Mon–Sat week containing the selected date; `Month` a capacity overview printing `Deliveries
-{n}`, `Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted. A card shows
-only the confirmed time, DO No or `No delivery order yet`, customer, city and state, goods
-summary, Logistics Partner and the §8.4 status word; never a phone, money, an employee name,
-driver, vehicle, expected arrival or upload time. An unconfirmed delivery never enters a date
-cell. A fully empty range shows one spanning state `No deliveries are scheduled from {first} to
-{last}.` with the real `{n} deliveries need a confirmed date.` count and its door.
+**The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
+it does not honour (owner ruling 2026-09-14):
+
+```
+Day         < 768px, and any width on demand   one operating day, full cards
+3 days      768 – 1279px                       a fixed half-week, Mon–Wed or Thu–Sat
+Work week   ≥ 1280px, the desktop DEFAULT      the six Mon–Sat operating days
+Month       any width                          the capacity overview
+```
+
+**No three-day layout is ever labelled `Week`,** and the six-day desktop view is `Work week`
+because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfers {n}`,
+`Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted, with deliveries and
+transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
+selection; arrows replace the whole window and never scroll it.
+
+**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** In order: the
+type label (`DELIVERY` · `TRANSFER`) with the Logistics Partner · the confirmed window · who and
+where · the goods summary · the identity (`DO No`, or `SO No · Leg {n} of {m}` on a transfer, or
+`DO not released`) · **line 1 the journey progress · line 2 the readiness or blocker** (§8.4).
+Progress and readiness never merge into one line. The status never repeats the date of the column
+it already sits in, and it is a text line, never a pill that can truncate. A transfer card is
+visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
+never the customer's town**. Never a phone, money detail, employee name, driver, vehicle,
+expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
+range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
+`{n} deliveries need a confirmed date.` count and its door.
 
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 
@@ -578,18 +636,74 @@ fact prints in orange inside panel 1 (`Building type not recorded`), and the row
 Sales Order to change`. An order with no delivery address at all is not a delivery and stays
 Sales-owned Work under the entry rule below.
 
-**THE ENTRY RULE (owner ruling 2026-08-24).** A Sales Order does not become delivery work merely
-by existing. A scope reaches Monitor only when it has a delivery address, goods that require
-delivering and a valid scope or Journey leg. Cancelled orders, orders that need no delivery and
-delivered scopes are not on Monitor; a delivered order lives in Delivery Orders and Delivery
-History. One card = one delivery scope or one Journey leg.
+**THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
+not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
+address, goods that require delivering and a valid scope or Journey leg. Cancelled orders, orders
+that need no delivery and delivered scopes are not on Monitor; a delivered order lives in Delivery
+Orders and Delivery History. One card = one delivery scope or one Journey leg.
+
+**A CANCELLED ORDER IS NOT DELIVERY WORK, AND THE PREDICATE MUST SAY SO.** The rule above always
+named cancelled orders; the predicate only ever tested `delivered`, so every cancelled order with
+an address and goods entered Monitor. The open-scope test now excludes a cancelled order
+explicitly. **Completed work leaves too:** a delivered scope is gone, and the one delivered row
+that legitimately remains is the one still owing evidence, which is the `Upload delivery proof` /
+`Check delivery proof` queue's own job and leaves when the proof is accepted.
+
+**THE WORK ORDER — owner ruling 2026-09-14, APPROVED / LOCKED.** `All delivery work` sorts by
+what is actually most urgent, never by document number:
+
+```
+1  overdue                     a confirmed day has passed with no result
+2  due today                   the action deadline is today
+3  nearest action deadline     soonest first
+4  everything else             then the governed customer-name + row-id tie-break
+```
+
+**`Order details incomplete` never hides `Overdue`.** Those rows sort into their own band beneath
+live work and carry the §8.2 rail queue of the same name. The status word keeps its §8.4 rung;
+what changes is that a data problem can no longer occupy the top of the operator's day.
 
 ### 8.4 · The Monitor status dictionary — owner ruling 2026-09-13, APPROVED / LOCKED
 
 `Delivery Status` on Monitor is the OPERATION's progress in primary-school English that names the
 actor and the fact. It is one arithmetic, read by the column, the `DELIVERY STATUS` dropdown, the
-calendar card and every report; the partner's real name comes from the data and no partner is
+schedule card and every report; the partner's real name comes from the data and no partner is
 ever hard-coded.
+
+**PROGRESS AND READINESS ARE TWO FACTS ON TWO LINES — owner ruling 2026-09-14, APPROVED / LOCKED.**
+A journey rung says *how far the goods have got*. A readiness word says *what would stop them*.
+They answer different questions, they come from different arithmetics, and **they are never
+combined into one vague status.** A green rung no longer implies a ready job, because the readiness
+line sits beside it and says otherwise.
+
+```
+LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
+  customer leg          transfer leg             Ready
+  Confirmed             Transfer confirmed       Stock risk
+  Collected by {p}      Collected for transfer   Payment blocked
+  On the way to         In transit to {stop}     Logistics details incomplete
+    customer                                     DO not released
+  Delivered to          Arrived at {stop}
+    customer
+  Failed Delivery       Transfer failed
+```
+
+**The two ladders share no word,** so `Delivered to customer` can never be reached by a warehouse
+leg and `Arrived at {stop}` never claims a customer received anything. Readiness precedence when
+more than one applies: `Payment blocked` → `Stock risk` → `Logistics details incomplete` →
+`DO not released` → `Ready`; money first, because a trip that may not legally go is the harder stop.
+
+**`Arrived at customer` does not exist and may not be added by inference (owner ruling 2026-09-14).**
+Carres records no arrival-at-customer event: `delivery_attempts` holds `delivered` / `partial` /
+`failed`, `delivery_stops.status` holds `pending` / `picked_up` / `handed_off` / `delivered`, and
+`delivery_handover_events` holds `handed_over` / `received_by_logistics`. The rung may never be
+derived from a time, an ETA or a location. It becomes available only when the crew records a real
+arrival, which is a new capability and its own card.
+
+**Retired by this ruling:** `Scheduled` and `Transfer scheduled` (both banned status words —
+`COPY-STANDARD.md` §"Banned as status words", `01-design-tokens.md` §10, which also ban `Booked`)
+and `Delivery failed` (the governed spelling is `Failed Delivery`, so the card and the rail queue
+say one word for one fact). `Out for delivery` stays retired and is not restored.
 
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
@@ -597,14 +711,18 @@ ever hard-coded.
 | partner set, no contact record, the partner contacts the customer | `{partner} must contact the customer` | orange | `Call by {date}` |
 | partner set, no contact record, Carres contacts the customer | `Operation must call the customer` | orange | `Call by {date}` |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
-| day and window recorded, no DO yet | `Confirmed for {weekday, date}` | green | the window |
+| day and window recorded — a CUSTOMER leg | `Confirmed` | green | the window |
+| day and window recorded — a TRANSFER leg | `Transfer confirmed` | none | the window |
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
-| Warehouse handed over and the partner's receipt is recorded | `Goods collected by {partner}` | none | `Collected {date} {time}` |
-| collected, and the partner recorded departure or an ETA | `{partner} is delivering to the customer` | none | `ETA {time}` |
+| Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
+| Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
+| collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
+| collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
 | confirmed day passed with no result | `Overdue` | red | `{partner} must record the result` |
-| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
-| attempt `delivered` | `Delivered` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
-| attempt `partial` or `failed` | `Failed Delivery` | red | the one reason |
+| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
+| attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
+| attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
+| attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
 | a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact |
 
 **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
@@ -659,6 +777,29 @@ shared connector:
 Panel 4 reads `tripLinesOf`, `deliveryStockReadinessOf`, `deliveryArrivalStateOf` and `unitIdOf`,
 the same arithmetics the register, the DO page and the print path run. The expansion never
 duplicates Sales, Stock, Warehouse, Purchasing or Payment truth; it reads and links.
+
+**THE BRIEF IS READABLE, LEG-AWARE AND HONEST — owner ruling 2026-09-14, APPROVED / LOCKED.**
+The four panels and their inline doors are unchanged. Six corrections bind:
+
+1. **The brief never clips.** It is laid out clear of the register's horizontal scroll, so no
+   value is cut at the right edge at any governed width. A field wraps; it is never truncated to
+   a single letter.
+2. **A leg names its own journey.** The expansion opens with the leg strip — `Leg {n} of {m}`,
+   the leg's own `{from} → {to}` route printed in full, and that leg's own partner, date and
+   window — for every leg of the Journey, with the open one marked. Panel 4 shows only the items
+   travelling on THAT leg. **The customer's town is never printed as a transfer's destination.**
+3. **Services are not stock.** Panel 4 separates `Items` from a `Services` subsection. The
+   services subsection carries description and quantity ONLY; it has no Source, Status or
+   Location column, so a service never renders an em-dash in a stock cell.
+4. **A delivery fee is money, not goods.** It never appears in Panel 4 in any form; it is
+   Payment's fact and lives there.
+5. **`Access not recorded` is an actionable alert,** printed in the orange problem treatment with
+   the panel's `Open Sales Order to change` door — never the neutral grey absence word.
+6. **Logistics completeness is stated once.** When a delivery is confirmed and driver, vehicle
+   plate, pickup or ETA is missing, Panel 3 prints **`Logistics details incomplete`** above the
+   facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
+   having to notice five absences. The emergency contact prints **name, relationship and phone**
+   as three distinct facts.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 

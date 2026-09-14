@@ -2084,30 +2084,32 @@ two-person duty) was found unapplied while 0438–0440 were — with nobody reso
 `20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
 2026-10 → 2027-09 alternating rotation exists.
 
-### 13.10 · BUILD / NOT READY — Outbound joins shared Work (2026-09-14)
+### 13.10 · FACT — Warehouse scope and source readiness (2026-09-14)
 
-**RULING:** §8 and §12.11 identify one obligation by Delivery Order + Warehouse Site. The first
-authorised personal operator accepts or begins scanning; exact-Unit handover with receiver and
-proof closes it. Monitor creates no Work. Carres staff and shared mailboxes cannot substitute for
-NETS individuals; offboarding and reassignment must retain actor evidence.
+The shared Outbound projection groups exact Units by Delivery Order + Warehouse Site. Monitor
+links carry Site IDs; both Outbound doors consume DO/Site context, and the internal selected scope
+expands after data arrives. Display names remain compatible with existing links. Monitor checks
+schedule, PO, Supplier and Site sources; unread Work/Outbound stays loading, and a failed source
+cannot report an authoritative empty desk. Regression tests accompany the shared projection and
+both Outbound/Monitor surfaces. These reader fixes add no schema or ownership-write dependency.
 
-**FACT — branch implementation:** `warehouse-outbound.ts` groups exact Units by DO + Site;
-`warehouse-work.ts` uses that same pair in Work identity and rejects cards outside its Site.
-Monitor and Work links carry Site identity; both Outbound doors honour the DO/Site filter, and
-the internal door expands the selected scope after its data loads. `warehouse/work.ts` forwards
-Worker bindings to its schedule reader and refuses missing or failed sources. Monitor surfaces
-failures from its schedule, PO, Supplier and Site reads. Regression tests live beside these files.
+This is not personal Warehouse go-live. Production SQL at 2026-09-14 02:47 UTC still reports zero
+Warehouse-role accounts and no 0459/0460 tracker entries. PR #1198 separately owns the unfinished
+Site queue/acceptance integration; personal identity, offboarding/transfer evidence, external Work
+UI, later-leg physical origin and mobile execution still require completion and production proof.
 
-**FACT — production SQL, 2026-09-14 02:10 UTC:** zero `app_users` with role `warehouse`;
-0459/0460 absent from `supabase_migrations.schema_migrations`, assignment table and reader/accept
-functions absent. Yu Jun and Shasha are active `operation` accounts with no Warehouse Site.
+### 13.11 · BUILD / NOT READY — Outbound joins shared Work (2026-09-14)
 
-**NOT READY:** committed 0459 checks active role/Site but does not enforce the existing personal
-identity predicate or implement offboarding/transfer history. Preserve 0459/0460 unchanged;
-correct these guards through the governed new-migration path before applying and admitting Work.
-External personal Work/acceptance UI, physical later-leg origin, mobile floor execution, migration
-negative controls, real personal-operator closure and main-tip deployment proof remain outstanding.
-Local regression success is not production acceptance or a go-live declaration.
+PR #1198 implements the §8 DO + Site identity in `warehouse-work.ts`, excludes cards outside the
+queue Site, and forwards Worker bindings in `warehouse/work.ts` while rejecting failed sources.
+Acceptance remains separate from exact-Unit handover completion. Monitor creates no Work.
+
+Committed 0459 checks active role/Site but does not enforce personal identity or implement
+offboarding/transfer history. Preserve 0459/0460 unchanged; correct these guards through the
+governed new-migration path before applying and admitting Work. The 02:47 UTC account/tracker
+measurement in §13.10 remains the production gate. Yu Jun and Shasha are Carres Operation staff,
+not Warehouse substitutes. Real-person acceptance, concurrency, cross-Site refusal and closure
+must be proven; passing branch CI is not personal Warehouse go-live.
 
 ## 14 · Whole-domain completion gate
 
