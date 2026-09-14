@@ -1,7 +1,9 @@
 /**
  * The Profit and Loss and the Balance Sheet, read from the ledger's own
  * statement functions (gl_profit_and_loss and gl_balance_sheet, migration
- * 0469) through the ledger API.
+ * 0469) through the ledger API. Since 0506 the Balance Sheet shows customers
+ * who paid before their invoice under 2210 instead of as negative receivables;
+ * the database does that move too.
  *
  * The database does every sum. This file only checks that the rows arrived
  * whole and files each one where the page prints it. If anything is missing
@@ -14,11 +16,15 @@ import { apiFetch } from "@/lib/api";
 export const PL_SECTIONS = ["INCOME", "EXPENSE"] as const;
 export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
 
-/** One account and the amount the ledger summed for it. */
+/** One account and the amount the ledger summed for it. `reclassified` is
+ *  what the Balance Sheet moved onto (plus) or off (minus) this line from
+ *  customers who paid before their invoice (0506); the move is already inside
+ *  `amount`. Null when nothing was moved, or before 0506 is applied. */
 export interface StatementLine {
   code: string;
   name: string | null;
   amount: number;
+  reclassified: number | null;
 }
 
 /** The accounts under one chart header, and the subtotal the ledger served. */
@@ -168,7 +174,13 @@ function readBody(
     switch (r.row_kind) {
       case "ACCOUNT": {
         const g = group(section(r.section), r);
-        g.lines.push({ code: code(r.account_code, bad), name: nameOf(r.account_name, bad), amount: money(r.amount, bad) });
+        g.lines.push({
+          code: code(r.account_code, bad),
+          name: nameOf(r.account_name, bad),
+          amount: money(r.amount, bad),
+          // Absent before 0506, and on the Profit and Loss.
+          reclassified: r.reclassified === undefined || r.reclassified === null ? null : money(r.reclassified, bad),
+        });
         break;
       }
       case "HEADER_SUBTOTAL": {

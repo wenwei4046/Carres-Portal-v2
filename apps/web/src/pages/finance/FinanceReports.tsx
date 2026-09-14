@@ -26,7 +26,7 @@ import Select from "@/components/kit/Select";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import StatementTable from "./reports/StatementTable";
+import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
 import { useBalanceSheet, useProfitAndLoss } from "./reports/report-queries";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -80,9 +80,6 @@ function readPeriod(params: URLSearchParams, today: string): { from: string; to:
 
 const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
 
-// Entries can cancel out, so an account at RM 0.00 is not "no entries".
-const PL_ALL_ZERO = "Every account is at RM 0.00 in this period.";
-const BS_ALL_ZERO = "Every account is at RM 0.00 on this day.";
 
 const beforeGoLive =(goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
 
@@ -191,8 +188,8 @@ export default function FinanceReports() {
                 : <StatementTable label="Profit and Loss" testId="profit-and-loss"
                   sections={plReport?.status === "ok" ? plReport.sections : []}
                   loading={pl.isPending}
-                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : PL_ALL_ZERO}
-                  nothing={PL_ALL_ZERO}
+                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
+                  nothing={nothingInPeriod}
                   accountHref={(code) => ledgerAccountHref(code, from, to)}
                   bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
               </div>
@@ -216,9 +213,10 @@ export default function FinanceReports() {
                 : <StatementTable label="Balance Sheet" testId="balance-sheet"
                   sections={bsReport?.status === "ok" ? bsReport.sections : []}
                   loading={bs.isPending}
-                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : BS_ALL_ZERO}
-                  nothing={BS_ALL_ZERO}
+                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : nothingOnDay("ASSET")}
+                  nothing={nothingOnDay}
                   accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
+                  lineNote={paidBeforeInvoiceNote}
                   bottomLine={null} />}
               </div>
             </Panel>
