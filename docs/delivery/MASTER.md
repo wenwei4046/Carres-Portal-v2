@@ -1031,6 +1031,48 @@ DO prints and the Warehouse handover shows. The templates exist since 2026-09-13
 `partner_drivers` · `partner_fleet.active`); the arrangement's binding is the remaining gap
 (§15.1).
 
+### 8.3.1 · DELIVERED AND PRODUCTION-VERIFIED — `c02cf891`, 2026-09-14
+
+PR #1310 merged and deployed. **All five canonical surfaces report
+`c02cf8917c6057511e6d5991f3d683505393365b`** — both Pages projects, both custom web domains and
+the Worker's `/health` — and the `Deploy production` run completed `success`.
+
+**The deployed bundle was read in BOTH directions** (`index-CVjnnxC0.js` → `index-CWWzSEqJ.js`,
+6.66 MB, so a real bundle and not the 1.7 kB SPA fallback):
+
+| string | before | after |
+|---|---|---|
+| `must contact the customer` | 1 | **0** |
+| `Call by ` | 2 | **0** |
+| `Confirm delivery time` | 0 | **1** |
+| `No contact deadline` — CONTROL | 1 | 1 |
+
+The control proves the predecessor was really read rather than 404ing as a clean zero.
+
+**Walked in an authenticated Operation session over the 91 real work rows, at 1440×900 and
+949×800:**
+
+- **37 of the 91 rows carry a customer reference**, each on its own muted line under the blue
+  number — `SO-1217` over `TCF0541`, `SO-1218` over `TCF0549`, `SO-1220` over `CR1175`.
+  The other 54 print the number alone, with no placeholder line.
+- `Call customer` over the kit's `late` glyph and the missed day in red, with
+  `Contact deadline Fri, 31 Jul · overdue, the deadline does not move` as both `title` and
+  `aria-label`.
+- **No `Call by` and no `must contact` anywhere in the sheet.** `Confirmed Delivery` reads
+  `Not confirmed` and stops.
+- **Every row measured 72px** and no cell overflowed. At 949px the filter rail stayed collapsed,
+  `SO No` and `Customer` stayed pinned, and the page never scrolled horizontally.
+
+**NOT proven by this walk, and the boundary is stated rather than blurred:** production carries
+no Journey leg among its 91 open scopes, so the route-in-column-6 presentation is proven by the
+Monitor fixture and by test, NOT on live data. The first real Journey on Monitor is the thing to
+look at. Nothing else here is inferred.
+
+**Delivered in the same change:** the `DELIVERY STATUS` dropdown reads the new dictionary with one
+option per printed word; `callByDate` is gone from the shared status ladder, which no longer
+accepts a deadline it does not read; and `docs/COPY-STANDARD.md` carries the same retirement so
+the two documents cannot drift.
+
 ## 9 · Delivery Order object
 
 The DO object uses the existing Carres Object Detail Template and only its governed section and
@@ -1479,7 +1521,10 @@ against **89 real delivery rows**.
 - **The compact contact deadline is live on 87 rows** — 17 ahead of time, 70 late — as
   `[phone] {date}`, with `Contact deadline Thu, 23 Jul — overdue, the deadline does not move` as
   the cell's accessible name. **`Call by` and `Late — was due` no longer appear anywhere on the
-  page.**
+  page.** ⚠️ That sentence's own SPELLING is superseded: the 2026-09-14 ruling forbids the `—`,
+  and the current accessible name is `Contact deadline {date} · overdue, the deadline does not
+  move`. The observation — a compact glyph-and-date cell on 87 rows, and no `Call by` on the
+  page — is unchanged evidence and still holds, now on the desktop sheet as well as the phone.
 - **The two overdue populations are distinguishable on one screen at last:** the rail reads
   `Overdue delivery 1` and the contact strip's chip reads `Overdue contact 70`. They used to be
   two bare `Overdue` counts of 1 and 70.
