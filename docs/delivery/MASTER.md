@@ -1196,7 +1196,11 @@ DO prints and the Warehouse handover shows. The templates exist since 2026-09-13
 `partner_drivers` · `partner_fleet.active`); the arrangement's binding is the remaining gap
 (§15.1).
 
-### 8.3.1 · DELIVERED AND PRODUCTION-VERIFIED — `c02cf891`, 2026-09-14
+### 8.9 · PR #1310 DELIVERED AND PRODUCTION-VERIFIED — `c02cf891`, 2026-09-14
+
+> Renumbered from `8.3.1` on 2026-09-14: two Delivery closures landed within the hour and both
+> claimed that number, and this one sits at the END of §8, after §8.8 — not inside §8.3. The
+> address reading's evidence keeps `8.3.1`, where it is nested under the rule it belongs to.
 
 PR #1310 merged and deployed. **All five canonical surfaces report
 `c02cf8917c6057511e6d5991f3d683505393365b`** — both Pages projects, both custom web domains and
@@ -1228,10 +1232,25 @@ The control proves the predecessor was really read rather than 404ing as a clean
 - **Every row measured 72px** and no cell overflowed. At 949px the filter rail stayed collapsed,
   `SO No` and `Customer` stayed pinned, and the page never scrolled horizontally.
 
-**NOT proven by this walk, and the boundary is stated rather than blurred:** production carries
-no Journey leg among its 91 open scopes, so the route-in-column-6 presentation is proven by the
-Monitor fixture and by test, NOT on live data. The first real Journey on Monitor is the thing to
-look at. Nothing else here is inferred.
+**⛔ CORRECTED 2026-09-14 — THE ROUTE *IS* PROVEN ON LIVE DATA.** This walk originally recorded
+*"production carries no Journey leg among its 91 open scopes, so the route-in-column-6
+presentation is proven by the Monitor fixture and by test, NOT on live data."* **That is wrong,
+and the boundary was stricter than the evidence required.** Re-walked on the SAME `c02cf891` and
+the SAME 91 rows, in an authenticated Operation session: **four Journey-leg rows are live**, each
+printing its own recorded route in column 6:
+
+| SO | `Delivery Location` line 1 | line 2 — the leg's own route | `Logistics` |
+|---|---|---|---|
+| SO-1209 | `Sungai Buloh, Selangor` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
+| SO-1209 | `Sungai Buloh, Selangor` | `JB transit warehouse → Customer (Singapore)` | AL |
+| SO-1282 | `Chini, Pahang` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
+| SO-1282 | `Chini, Pahang` | `JB transit warehouse → Customer (Singapore)` | AL |
+
+Both orders carry a two-leg `delivery_stops` and are `proceed_order`, so both legs enter Monitor
+under the entry rule. Each row's route matches its stored `from_loc → to_loc` exactly; the
+customer address is never substituted for a transit destination, nor the route for the address.
+**The route-in-column-6 presentation is therefore PRODUCTION-VERIFIED, not fixture-only.** Nothing
+else in this walk is changed.
 
 **Delivered in the same change:** the `DELIVERY STATUS` dropdown reads the new dictionary with one
 option per printed word; `callByDate` is gone from the shared status ladder, which no longer
