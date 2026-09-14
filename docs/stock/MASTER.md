@@ -2187,6 +2187,9 @@ invalidated after acceptance. The sidebar and content margin collapse to a narro
 below the small-screen breakpoint so the floor operator can reach the controls without a
 horizontal page overflow. Each card prints the DO and its Site queue label once in the object
 header, keeping the immutable `Delivery Order + Warehouse Site` identity visible to the operator.
+The shared exact-Unit expansion now contains its wide evidence table inside a local horizontal
+scroll region, leaving Scan and Record controls in the narrow viewport; the existing Workspace
+regression test asserts that containment.
 
 The branch tests cover Site-queue rendering, the acceptance request, the personal acceptance
 RPC door, the internal-role refusal and the explicit empty state. This proves the client composition and route contract only; it does not prove that the
