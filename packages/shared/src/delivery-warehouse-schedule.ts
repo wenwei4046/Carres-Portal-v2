@@ -14,6 +14,7 @@ export interface DeliveryWarehouseScheduleInput {
   leg: number;
   so: number;
   fromLocation: string;
+  warehouseSiteId?: string | null;
   toCustomer: string;
   logisticsPartner: string;
   driverName: string | null;
@@ -58,6 +59,7 @@ export interface DeliveryWarehouseScheduleEvent {
   leg: number;
   source: string;
   fromLocation: string;
+  warehouseSiteId: string | null;
   toCustomer: string;
   logisticsPartner: string;
   driverName: string | null;
@@ -145,6 +147,7 @@ export function deliveryWarehouseScheduleEvents(
     leg: input.leg,
     source: `SO-${input.so}`,
     fromLocation: input.fromLocation,
+    warehouseSiteId: input.warehouseSiteId ?? null,
     toCustomer: input.toCustomer,
     logisticsPartner: input.logisticsPartner,
     driverName: input.driverName,

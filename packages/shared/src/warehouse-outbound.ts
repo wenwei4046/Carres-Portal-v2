@@ -89,7 +89,7 @@ export function warehouseEmptyDaySentence(dateLabel: string): string {
 }
 
 /**
- * ONE Calendar card = ONE active customer Delivery Order scope (never one
+ * ONE Calendar card = ONE active customer Delivery Order + Warehouse Site scope (never one
  * Sales Order, never one Unit). Aggregation is display-only: every count
  * carries the exact Unit rows it was counted from.
  */
@@ -104,6 +104,7 @@ export interface WarehouseOutboundCard {
   soDate: string | null;
   eventDate: IsoDate;
   fromLocation: string;
+  warehouseSiteId?: string | null;
   toCustomer: string;
   logisticsPartner: string;
   /** The individual the Partner assigned — a separate stored fact, never
@@ -143,7 +144,7 @@ export interface OutboundProduct {
 }
 
 /**
- * Group the schedule feed's per-Unit pickup events into DO cards — the ONE
+ * Group the schedule feed's per-Unit pickup events into DO + Site cards — the ONE
  * arithmetic the Dashboard, Outbound and their tests all read (Law D).
  * Only `customer_delivery_pickup` events participate; `customer_handover`
  * is the Delivery calendar's projection, not Warehouse work.
@@ -154,9 +155,10 @@ export function warehouseOutboundCards(
   const byDo = new Map<string, DeliveryWarehouseScheduleEvent[]>();
   for (const e of events) {
     if (e.kind !== "customer_delivery_pickup") continue;
-    const list = byDo.get(e.doNumber);
+    const scope = JSON.stringify([e.deliveryOrderId ?? e.doNumber, e.warehouseSiteId ?? e.fromLocation]);
+    const list = byDo.get(scope);
     if (list) list.push(e);
-    else byDo.set(e.doNumber, [e]);
+    else byDo.set(scope, [e]);
   }
   const cards: WarehouseOutboundCard[] = [];
   for (const units of byDo.values()) {
@@ -191,6 +193,7 @@ export function warehouseOutboundCards(
       soDate: first.soDate ?? null,
       eventDate: first.eventDate,
       fromLocation: first.fromLocation,
+      warehouseSiteId: first.warehouseSiteId,
       toCustomer: first.toCustomer,
       logisticsPartner: first.logisticsPartner,
       driverName: first.driverName ?? null,
@@ -258,7 +261,7 @@ export function filterOutboundCards(
   return cards.filter((c) => {
     if (omit !== "view" && !outboundViewMatches(c, p.get("view")))
       return false;
-    if (omit !== "site" && p.get("site") && p.get("site") !== c.fromLocation)
+    if (omit !== "site" && p.get("site") && p.get("site") !== c.warehouseSiteId && p.get("site") !== c.fromLocation)
       return false;
     if (p.get("do") && p.get("do") !== c.doNumber) return false;
     if (start && c.eventDate < start) return false;
