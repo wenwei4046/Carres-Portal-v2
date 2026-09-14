@@ -145,7 +145,7 @@ import { waLink } from "@/lib/wa-link";
 import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
+import { MiniStopsBar, StopsEditor } from "./RouteStops";
 import {
   useOrderControlForm,
   RoutingFields,
