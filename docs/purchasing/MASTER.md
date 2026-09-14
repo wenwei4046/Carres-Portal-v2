@@ -2906,6 +2906,13 @@ notification-driven workflow, duplicate editors, blank return/repair creation, r
 new Unit on repair, historical renumbering, invisible partial quantity, forced matched-pair answers,
 Carres customer-site inspection, external supplier cutover, Cards and application implementation.
 
+**Repair claim closure — OWNER-APPROVED 2026-09-14; target, not implementation proof.**
+For an approved repair outcome, the Supplier Claim stays open until the item has been repaired,
+the same Unit has been received back and the return inspection confirms the repair is complete.
+A supplier's agreement to repair is not completion. Read the linked Repair Order and authoritative
+receipt/inspection evidence; recording a reply alone cannot close the repair claim. This ruling
+does not decide closure requirements for other claim outcomes or close the parent Service Case.
+
 ### 9.6 Purchase Returns
 
 **Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
