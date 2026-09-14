@@ -195,9 +195,7 @@ import {
   type TopUpOrderInput,
   type CreateStripeCheckoutInput,
   type StripeCheckoutSessionInfo,
-  type TransferReadyInput,
   type UpdateOrderInput,
-  type WarehousePickInput,
   type DeliveryStop,
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
@@ -482,6 +480,9 @@ export const qk = {
      * modules. The cache key stays under the order so every existing order
      * invalidation refreshes the projection without creating a new owner. */
     orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
+    /** 【DELIVERY】 CARD 19 — the document word resolved to the id, keyed by
+     *  the number the URL carried. */
+    orderByNumber: (so: number) => ["operation", "orders", "by-number", so] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -5659,6 +5660,24 @@ export function useOperationOrders(
 }
 
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
+/**
+ * 【DELIVERY】 CARD 19 — the operator's document word (`SO-1362`) resolved to
+ * the order's id through the one by-number door. The object page calls this
+ * ONCE for a number URL and then re-enters by the id, so every other read
+ * still happens by the id (Law C — one door, never a second fan-in).
+ */
+export function useSalesOrderIdByNumber(so: number | null) {
+  return useQuery({
+    queryKey: so ? qk.operation.orderByNumber(so) : (["operation", "orders", "by-number", "null"] as const),
+    queryFn: () =>
+      apiFetch<{ id: string; so: number }>(`/api/operation/orders/by-number/${so}`),
+    enabled: so !== null,
+    /* A miss is a fact about the number, not a flake — no retry. */
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
 export function useOperationOrder(
   id: string | null,
   opts?: Partial<UseQueryOptions<operationOrderDetailResponse>>,
@@ -7001,6 +7020,7 @@ export interface DeliveryOrderRow {
     /** The signed DO on file (0087) — the `Upload signed Delivery Order`
      *  queue's canonical fact (register correction 2026-09-06) — and its
      *  clock, one of the §6.1 files that can reopen the review question. */
+    do_number?: string | null;
     do_file_path?: string | null;
     do_uploaded_at?: string | null;
     /** 0156 — the order's Journey legs, when it travels in legs. */
@@ -8107,30 +8127,6 @@ export function useRevertOrderDispatchMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 in_production). */
-export function useWarehousePickMutation(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<operationOrderMutationResponse, ApiError, WarehousePickInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationOrderMutationResponse, ApiError, WarehousePickInput>({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/warehouse`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 /** Pipeline v2 (C2 / migration 0024) — confirm a `confirmed` order.
  *  RPC `operation_confirm_proceed_request` decides in_production vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
@@ -8289,49 +8285,6 @@ export function usePartnerIncomingOrders() {
     queryKey: qk.partner.incoming(),
     queryFn: () => apiFetch<PartnerIncomingResponse>("/api/partner/orders/incoming"),
     refetchInterval: 15_000,
-  });
-}
-
-/** Pipeline v2 (C2 / migration 0024) — flip a `confirmed` or
- *  `in_production` order directly to `ready_to_dispatch`. Wraps
- *  `operation_warehouse_pick` whose source-stage guard widens to permit both
- *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
- *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
- *  RPC, do not conflate). Reserves stock; busts warehouse cache. */
-export function useTransferReady(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<
-      operationOrderMutationResponse,
-      ApiError,
-      TransferReadyInput
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    operationOrderMutationResponse,
-    ApiError,
-    TransferReadyInput
-  >({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/transfer-ready`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
   });
 }
 

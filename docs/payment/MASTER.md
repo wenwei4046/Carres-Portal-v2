@@ -376,28 +376,50 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
 
-**ONE SALES ORDER, ONE COLLECTION OWNER (owner ruling 2026-09-13; migration 0489).** One Sales
-Order's ordinary payment follow-up keeps one normal owner until the balance is fully paid. The
-system resolves that normal owner from the authoritative Responsible Delivery Operation when
-collection first becomes actionable (balance in the window, a missed promise, or a live Storage
-Invoice): **the order's own recorded customer-contact owner** — the Operation person named on the
-earliest Delivery contact record for that order (0487 `ops_delivery_contacts`, a contact with the
-customer first, else the arrangement with the partner; Delivery MASTER §5.1) **provided that
-person is an individual staff identity (a People record — `staff_code`), never a shared role
-login, and was not acting as Delivery Duty buddy cover on the day of the contact** — and otherwise
-the Delivery Duty NORMAL holder on that day (Delivery MASTER §13.1, the routine customer-contact
-rule), never the cover. The result is written once to `payment_collection_owners` (append-only)
-with its basis in the row's reason (0489 · 0495 · 0498). The owner does not rotate every day — a changed
-date, a duty rotation, a filter or a page reload never changes it, and a split delivery has one
-owner because the owner is keyed by the Sales Order. Only two things change who acts: governed
-buddy cover (a `delivery_duty` cover on the owner's person makes the cover today's acting person;
-the normal owner is preserved and work returns to them when the cover ends) and a formal handover
-(`payment_collection_owner_handover`, gated like Staff & Duties) that appends previous owner ·
-new owner · reason · changed by · changed on · effective from. No holder on the first actionable
-day → nothing is established; the action stays visible under the Delivery Duty word with the
-governed failure `Nobody holds Delivery Duty.` and the Staff & Duties door. `Payment Duty` is
-RETIRED: no caller remained, so the catalogue no longer offers it. There is no universal Sales
-Order Owner.
+**ONE SALES ORDER, ONE COLLECTION OWNER — AND IT IS THE PERSON THE ORDER WAS DEALT TO (owner
+ruling 2026-09-13; migrations 0489 · 0504).** One Sales Order's ordinary payment follow-up keeps
+one normal owner until the balance is fully paid. That owner is the INDIVIDUAL Operation person
+the Sales Order was dealt to when it entered Operations — the same person who has been following
+the customer up — read through the ONE authority Delivery and Payment share,
+`delivery_responsible_operation(order, day)` (0504):
+
+```text
+the order's responsibility ledger row effective that day — an establishment or a formal
+handover, when its person is still an active individual
+  else  ops_order_control.assigned_staff, when it is an ACTIVE INDIVIDUAL (a People record
+        with a staff_code)
+  else  nobody
+```
+
+**Contact history and the Delivery Duty holder are NOT owner sources, and this replaces the rule
+that used to stand here.** 0495/0498 inferred the owner from the order's earliest customer contact
+and 0489/0499 from the configured Delivery Duty holder. The owner rejected both inferences on
+2026-09-13 and forbade asking for a Delivery Duty holder as a workaround; 0504 removed them. The
+real assignment had been sitting in `ops_order_control.assigned_staff` since July (0232/0235) and
+this lane had overlooked it.
+
+**Today's acting person** is that owner's governed `delivery_duty` buddy cover; when the owner is
+away today (planned leave, or no heartbeat from 10:00 MYT) and no cover was named, it is the
+least-loaded individual who IS in, for that day only; otherwise it is the owner. **Absence is
+cover, never a reassignment** — the order does not move and the work returns when they are back.
+
+The responsibility ledger `payment_collection_owners` stays append-only and is written by ONE
+trigger, so the assignment and the ledger can never disagree: a deal appends `established`, a
+reassignment or a formal handover appends `handover` with previous owner · new owner · reason ·
+changed by · changed on · effective from. Its `changed_at` stamps `clock_timestamp()` (0504) — an
+append-only ledger whose clock does not advance is not ordered. `payment_collection_owner_establish`
+keeps its shape and reads the same authority, so an order dealt before the ledger existed still
+resolves. The owner does not rotate: a changed date, a duty rotation, a later contact by somebody
+else, a filter or a page reload never changes it, and a split delivery has one owner because the
+owner is keyed by the Sales Order. Only two things change who acts: buddy cover (today) and a
+formal handover (`payment_collection_owner_handover`, gated like Staff & Duties), which now moves
+the assignment with it and refuses a new owner who is not an individual. Nobody resolvable →
+nothing is established and the action stays visible with its governed failure sentence. 🔴 That
+sentence still reads `Nobody holds Delivery Duty.` with the Staff & Duties door and is now WRONG —
+after 0504 an unresolved owner means no individual is in the Operation assignment pool. Approved
+copy is the owner's to change; the recommended replacement is `Nobody is assigned to this order.`
+with the door `Assign it in Sales Orders → Team`. `Payment Duty` is RETIRED: no caller remained,
+so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
 and actor. Every Payment item deep-links to `/finance/monitor?invoice={id}` — the same collection
@@ -460,7 +482,7 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 
 | Duty/role | Authority |
 |---|---|
-| Responsible Delivery Operation (the order's collection owner, from Delivery Duty) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
+| Responsible Delivery Operation (the order's collection owner — the individual the Sales Order was dealt to, 0504) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
 | Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
 | Payment Approver | void, reallocation, overpayment review |
@@ -1885,6 +1907,40 @@ built. What keeps the module short of DELIVERED is not engineering:
 
 Until 1–3 are closed, several slices carry deployment and DB-layer evidence but no visual or
 authenticated-interaction acceptance — stated per slice in §14 rather than averaged away.
+
+### SEAM COMPLETED — one responsible Operation person per order; the contact carries four identities, 2026-09-13
+
+The user outcome is automatic, stable customer-payment ownership; the 0498 guard alone left every
+real order unassigned. **Migration 0499 (APPLIED after a rolled-back production probe of the whole
+chain)** fixes the seam at its source and gives Delivery and Payment ONE authority (Law D):
+`delivery_responsible_operation(order, day)` → normal responsible person (the order's ledger row,
+else the individual on its earliest contact, else the configured NORMAL Delivery Duty holder) and
+today's acting person (that person's buddy cover, else the person). The Delivery contact writer
+(`recordContact`) now fills **four identities separately**: `contact_owner_user_id` = the normal
+responsible person from that read · `acting_user_id` (new) = today's acting person or cover ·
+`recorded_by` = the actual signed-in recorder (a shared login may record evidence, never
+responsibility) · `on_behalf_of_partner_id` = partner provenance. Payment's establish reads the
+same function. No backfill: the five pre-0499 contacts (all recorded by the shared `Operations`
+login) keep their values and establish nobody. Payment UI unchanged.
+
+**Full-chain probe (rolled back, production):** real state → `not_assigned`; Delivery Duty
+Shasha (one-time staffing) → responsible **Shasha**; cover 17–18 Sep → normal Shasha · acting Yu
+Jun; a contact recorded by the shared login on 17 Sep carries **normal Shasha · acting Yu Jun ·
+recorder Operations · partner null**, and the order's responsibility read returns Shasha; on 26
+Sep, with Yu Jun now holding the duty, collection becomes actionable → `SO-1321` (has a contact)
+owner **Shasha**, `SO-1313`/`SO-1358` (no individual contact) owner Yu Jun (the day's normal
+holder); handover `SO-1321` → Yu Jun from 28 Sep → Delivery's read returns Yu Jun, history
+`established Shasha → handover Shasha→Yu Jun by principal`. API tests: the writer takes the
+responsible/acting pair from the read, never from the recorder; a cover recording during leave is
+acting, not owner; nobody responsible → owner null, recorder kept, the contact still lands;
+partner provenance kept beside the three people (`delivery-arrangements.test.ts`).
+
+**Automatic ownership is usable the moment one one-time staffing fact exists:** the initial
+Delivery Duty holder in Workspace → Staff & Duties. No authoritative source names it today
+(`org_position_duties` holds Jess's manager/approver keys only; Workspace holds GRN → Shasha and
+PO → Yu Jun; every partner is `customer_contact_by = partner`), so it is reported to the owner as
+a staffing configuration — not a per-customer assignment. Until it exists, every real order
+prints `Nobody holds Delivery Duty.` with its door and the action stays visible.
 
 ### SEMANTIC CHECK — a contact establishes an owner only when it names an individual who was not covering, 2026-09-13
 

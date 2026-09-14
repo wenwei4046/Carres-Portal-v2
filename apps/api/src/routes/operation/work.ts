@@ -866,7 +866,10 @@ export function projectSalesOrderWork(input: {
             item.ruleKey === "upload_delivery_photo" ||
             item.ruleKey === "check_delivery_proof")
           ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
-          : `/operation/delivery/edit/${encodeURIComponent(input.context.orderId)}`
+          : /* The Edit Delivery page is retired (Card 11): every arrangement
+               write lives in the Monitor row's expanded brief, so the Work
+               row names that door directly (Card 20). */
+            `/operation?tab=delivery&view=all&open=${encodeURIComponent(input.context.orderId)}`
         : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
       today: input.today,
     });

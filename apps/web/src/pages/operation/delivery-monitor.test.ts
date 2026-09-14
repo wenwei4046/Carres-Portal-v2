@@ -441,10 +441,16 @@ describe("buildDeliveryMonitorCards", () => {
     it("the signed document on file (`orders.do_file_path`) clears that half", () => {
       const c = delivered(
         { ops_order_control: { delivery_photos: [] } },
-        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf" } },
       );
       expect(c.missingProof).toEqual({ photo: true, signedDo: false });
       expect(missingProofLabels(c)).toEqual(["Upload delivery photo"]);
+    });
+
+    it("another DO’s signature neither clears missing proof nor reopens this DO’s review", () => {
+      const c = delivered({}, { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-OTHER", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } });
+      expect(c.missingProof.signedDo).toBe(true);
+      expect(c.proofReview.state).toBe("none");
     });
 
     it("both on file — nothing owed, the row leaves the queue", () => {
@@ -456,7 +462,7 @@ describe("buildDeliveryMonitorCards", () => {
             ],
           },
         },
-        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf" } },
       );
       expect(needsProof(c)).toBe(false);
     });
@@ -469,7 +475,7 @@ describe("buildDeliveryMonitorCards", () => {
 
     /* ── §6.1 (0489) — the review, over the SAME document row ─────────── */
     const withFile = { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" as const }] } };
-    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
+    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_number: "DO-1", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
     const reviewed = (reviews: DeliveryProofReviewRow[]) =>
       cards([order({ id: "a", so: 1301, do_number: "DO-1", ...withFile })], {
         deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
@@ -985,7 +991,9 @@ describe("buildMonitorRails", () => {
   it("DELIVERY STATUS counts every rung of the shared dictionary, zero printed", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     expect(rails.status).toMatchObject({ waiting_pickup: 1, collected: 1, delivering: 1, assign_logistics: 0 });
-    expect(Object.keys(rails.status)).toHaveLength(12);
+    expect(Object.keys(rails.status)).toHaveLength(13);
+    /* Card 20 — the intermediate leg's own word is a rung of its own. */
+    expect(rails.status).toHaveProperty("arrived", 0);
     const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
     expect(narrowed.status.delivering).toBe(0);
   });
@@ -1075,7 +1083,7 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   it("DELIVERY STATUS is the shared actor-first dictionary in ladder order (§8.4)", () => {
     expect(MONITOR_STATUS_FILTERS).toEqual([
       "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
-      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "delivered", "failed",
+      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "arrived", "delivered", "failed",
       "details_incomplete",
     ]);
     expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");

@@ -33,6 +33,7 @@
 import {
   deliveryGroupOf,
   deliveryOrderStatusOf,
+  signedDeliveryDocumentOf,
   latestEvidenceAtOf,
   proofDecisionLabel,
   proofReviewStateOf,
@@ -243,10 +244,13 @@ export function proofReviewOf(input: {
   };
 }
 
-/** The document ladder's five kinds, in register reading order. */
+/** The document ladder's kinds, in register reading order. `arrived` (Card
+ *  20) is an intermediate Journey leg's document whose goods reached the named
+ *  partner warehouse — a sixth word, never a synonym of `Delivered`. */
 export const DO_STATUS_KEYS: readonly DeliveryOrderStatus["kind"][] = [
   "created",
   "out_for_delivery",
+  "arrived",
   "delivered",
   "exception",
   "cancelled",
@@ -286,6 +290,7 @@ export interface DoRegisterRow {
    *  Journey's last leg; and the leg's route (`Klang WH → JB transit`). */
   leg: number;
   lastLeg: number;
+  intermediateLeg?: boolean;
   legRoute: string | null;
   /** THIS TRIP's goods lines (trip_groups NULL = the whole order). */
   lines: Array<{ id?: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }>;
@@ -337,8 +342,12 @@ export function missingDeliveryProofOf(row: {
   latestResult: DoRegisterRow["latestResult"];
   photosPresent: boolean | null;
   signedDoPresent: boolean;
+  /** Card 20 — an intermediate Journey leg's `delivered` is an ARRIVAL at a
+   *  partner warehouse; the customer leg owes the delivery proof, not this one. */
+  intermediateLeg?: boolean;
 }): MissingDeliveryProof {
-  const reached = row.latestResult === "delivered" || row.latestResult === "partial";
+  const reached =
+    !row.intermediateLeg && (row.latestResult === "delivered" || row.latestResult === "partial");
   if (!reached) return { photo: false, signedDo: false };
   return {
     /* photosPresent === null is UNKNOWN — never a missing photo. */
@@ -360,8 +369,12 @@ export function doWorkQueueOf(row: {
   photosPresent: boolean | null;
   signedDoPresent: boolean;
   proofReview?: DoProofReview;
+  intermediateLeg?: boolean;
 }): DoWorkQueue | null {
   if (row.status.kind === "cancelled") return null;
+  /* An arrival at a partner warehouse closes the leg's work: the next leg's
+     document carries the next act, and the customer leg carries the proof. */
+  if (row.status.kind === "arrived") return null;
   if (row.status.kind === "out_for_delivery") return "record_result";
   const missing = missingDeliveryProofOf(row);
   if (missing.photo) return "upload_photo";
@@ -406,6 +419,14 @@ export function buildDoRegisterRow(
   proofRecords?: DoProofRecords,
 ): DoRegisterRow {
   const attempts = attemptsByDo.get(r.do_number) ?? [];
+  /* 0491 — the Delivery scope this document carries: 0 the whole order,
+     1..n a Journey leg. A leg BEFORE the last one is a warehouse trip: its
+     success is an ARRIVAL, and it owes no delivery proof (Card 20). */
+  const leg = r.leg ?? 0;
+  const stops = r.orders.delivery_stops ?? [];
+  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
+  const stop = leg > 0 ? stops.find((s) => Number(s.leg) === leg) ?? null : null;
+  const intermediateLeg = leg > 0 && leg < lastLeg;
   const status = deliveryOrderStatusOf({
     voidedAt: r.voided_at,
     voidReason: r.void_reason,
@@ -415,6 +436,8 @@ export function buildDoRegisterRow(
       recordedAt: a.recorded_at,
     })),
     handoverEvents: (handoverByDoId.get(r.id) ?? []).map((kind) => ({ kind })),
+    intermediateLeg,
+    legStop: stop?.to_loc ?? null,
   });
   const latest = [...attempts].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
   const control = overlayOf(r.orders.ops_order_control);
@@ -423,13 +446,19 @@ export function buildDoRegisterRow(
   /* ⭐ Scoped to THIS document (owner ruling 2026-09-11): the ledger belongs
      to the Sales Order, the count belongs to the trip. */
   const submission = driverSubmissionOf(photos, r.do_number);
-  const reached = latest?.result === "delivered" || latest?.result === "partial";
+  const signedDocument = signedDeliveryDocumentOf({
+    documentNumber: r.do_number,
+    order: r.orders,
+    evidence: proofRecords?.evidenceByDo.get(r.do_number),
+  });
+  const reached =
+    !intermediateLeg && (latest?.result === "delivered" || latest?.result === "partial");
   /* §6.1 — only a result that reached the customer has proof to review. */
   const proofReview = reached
     ? proofReviewOf({
         doNumber: r.do_number,
         ledger: photos,
-        signedDoUploadedAt: r.orders.do_file_path ? r.orders.do_uploaded_at ?? null : null,
+        signedDoUploadedAt: signedDocument?.uploadedAt ?? null,
         reviews: proofRecords?.reviewsByDo.get(r.do_number) ?? [],
         attemptEvidence: proofRecords?.evidenceByDo.get(r.do_number) ?? [],
       })
@@ -440,13 +469,10 @@ export function buildDoRegisterRow(
     submission,
     submissionLedger: (photos ?? null) as readonly DriverSubmissionFile[] | null,
     photosPresent: submission.known ? submission.photos > 0 : null,
-    signedDoPresent: Boolean(r.orders.do_file_path),
+    signedDoPresent: Boolean(signedDocument),
     proofReview,
+    intermediateLeg,
   };
-  const leg = r.leg ?? 0;
-  const stops = r.orders.delivery_stops ?? [];
-  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
-  const stop = leg > 0 ? stops.find((s) => Number(s.leg) === leg) ?? null : null;
   return {
     id: r.id,
     doNumber: r.do_number,
@@ -508,6 +534,7 @@ export function buildDoRegisterRails(
   const status: DoRegisterRails["status"] = {
     created: 0,
     out_for_delivery: 0,
+    arrived: 0,
     delivered: 0,
     exception: 0,
     cancelled: 0,

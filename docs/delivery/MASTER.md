@@ -160,7 +160,11 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
   facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
-  Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** `Out for delivery`
+  Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** **`Arrived`
+  (BUILT 2026-09-13, Card 20):** an intermediate Journey leg's document — a leg before the
+  last — whose `delivered` result (0491/0496) is the goods reaching the named partner warehouse
+  reads `Arrived` over that stop; `Delivered` is reserved for the customer leg and the
+  whole-order document, and a warehouse arrival owes no delivery proof. `Out for delivery`
   on the document = the §4 chain's `Received by logistics` fact with no result recorded yet; it is
   never derived from the calendar. The document ladder and the Monitor status dictionary in §8.4
   never borrow each other's words.
@@ -270,7 +274,13 @@ Address` · `Confirm Site Access` · `Confirm Receiver` · `Obtain Missing Infor
 New Delivery Date after Failed Delivery` · `Confirm Cancellation`.
 
 Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
-reply evidence, recorder, proxy provenance and explicit next action. Results: `Confirmed` · `No
+reply evidence, recorder, proxy provenance and explicit next action. **Four identities, separately
+(0499, owner ruling 2026-09-13):** `contact_owner_user_id` is the order's NORMAL responsible
+Operation person, filled by the writer from the one responsibility read
+(`delivery_responsible_operation`) — never the recorder as such, never a shared login, never the
+cover; `acting_user_id` is today's acting person (the buddy cover, else the normal person);
+`recorded_by` is the actual signed-in recorder, evidence only; `on_behalf_of_partner_id` is
+partner provenance when a partner's reply is recorded. Results: `Confirmed` · `No
 Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details Incorrect` ·
 `Customer Refused Delivery` · `Waiting for Customer Reply`.
 
@@ -434,31 +444,70 @@ It has two tabs, each the page's own first control, each carrying its live count
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Confirmed deliveries
+the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Delivery schedule
 page-owned 240px FilterRail  ·  the complete current month above the complete next month, fixed
                                 on top; the filter groups scroll below
 Work to do (DEFAULT)         ·  the selectable Register work list (shared DataGrid, §8.3) over the
                                 picked WORK TO DO queue; `All delivery work` when the URL names none
-Confirmed deliveries         ·  Day / Week / Month in the page toolbar; Week is the desktop default
-                                and its six Mon–Sat columns fit without horizontal date scrolling
+Delivery schedule            ·  Day / Work week / Month in the page toolbar; `Work week` is the
+                                desktop default and its six Mon–Sat columns fit without horizontal
+                                date scrolling
 ```
+
+**`Delivery schedule` — owner ruling 2026-09-14, APPROVED / LOCKED.** The tab names a PLACE, not a
+state: confirmation is one condition of a row inside the schedule, never the name of the whole
+view. `Confirmed deliveries` is the RETIRED spelling — it still resolves from any stored URL, and
+it survives only inside dated §16 production-walk records, which are historical observation and are
+never rewritten. No current law, dictionary, label, test or comment may spell it.
+
+**TWO KINDS OF WORK, ONE PLACE, NEVER ONE TOTAL — owner ruling 2026-09-14, APPROVED / LOCKED.**
+Operations monitors all logistics work in one place, so the schedule carries BOTH the final
+customer delivery and the intermediate warehouse transfer. Their meaning and their totals never
+merge:
+
+```
+DELIVERY    the final customer leg — the goods reach the person who bought them
+TRANSFER    an intermediate Journey leg — the goods reach a named partner warehouse
+```
+
+The tab prints the count of the CURRENT SCOPE and, beneath it, the split that scope actually holds:
+
+```
+Delivery schedule  {n}
+{c} customer deliveries · {t} transfers
+```
+
+**The split follows the selected range and every active filter, and an old total is never
+preserved.** A range holding no customer delivery and two transfers reads exactly
+`0 customer deliveries · 2 transfers` — never `2 customer deliveries` because four rows somewhere
+else carry a confirmed date. **A transfer is never counted as a customer delivery, never enters
+customer-delivery performance, and never produces a `Delivered to customer` result** — in the tab
+count, the day and month counts, the rail marks, Logistics Partner Performance, Commitment, First
+Delivery or any report. A transfer's completion is `Arrived at {stop}` and nothing else.
 
 **The rail's two-month calendar.** The rail's first, fixed region is the complete current month
 above the complete next month on the kit's one calendar primitive (`MonthCalendar`), never a
-one-week strip. One pair of arrows moves both months by one month. The selected date wears the
-governed blue selected state; today stays distinguishable; Sundays stay visible, muted and take
-no click; a date holding confirmed deliveries carries a count under the date and the same fact in
-its accessible sentence, never colour alone. Clicking a date opens that date's Day view on
-`Confirmed deliveries` and keeps every STATE, LOGISTICS PARTNER and DELIVERY STATUS narrowing.
+one-week strip. One pair of arrows moves both months by one month. **Today is visibly distinct
+(a blue ring) and the selected date keeps the governed blue FILL, so the two never compete. The
+current work week carries a subtle grey band.** Sundays stay visible, muted and take no click. A
+date carries **two separate marks — customer delivery and transfer — never one mark for both**, by
+shape and position so colour is never the only carrier, and the same split rides its accessible
+sentence. **Marks and counts follow the picked scope and every active filter.** Clicking a date
+opens that date's Day view on `Delivery schedule` and keeps every STATE, LOGISTICS PARTNER and
+DELIVERY STATUS narrowing.
 
 **The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
 counts computed over the rows the other groups already narrowed (Law D):
 
 - **`WORK TO DO`**, rows in this order: `All delivery work` · `No logistics picked` · `Call
   customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
-  proof` (joined 2026-09-13 with the §6.1 record). Every queue comes from recorded
-  facts, never a clock inference. The group belongs to `Work to do` and is not drawn on the
-  calendar tab.
+  proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
+  2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
+  to `Work to do` and is not drawn on the schedule tab.
+  **`Order details incomplete` is a door, not a backlog (owner ruling 2026-09-14).** A row missing
+  a required Sales fact gets its own queue so it can be worked deliberately, and it never competes
+  for the top of `All delivery work`. It licenses NO data cleanup, repair worklist or backfill —
+  Constitution §6 rules every such row today is imported test data that go-live discards.
 - **`STATE`**: a kit dropdown of the direct state names the data genuinely carries, ordered by
   count; leg 1 of a Singapore journey counts under Johor and leg 2 under Singapore; `All` clears
   only this group.
@@ -482,14 +531,33 @@ queue: a confirmed trip whose day has passed with no result) and `Overdue contac
 that missed its deadline) are two populations and never share one bare `Overdue` count. `Call
 customer` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
 
-**The calendar writes nothing.** `Day` shows the selected operating day with full cards; `Week`
-the Mon–Sat week containing the selected date; `Month` a capacity overview printing `Deliveries
-{n}`, `Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted. A card shows
-only the confirmed time, DO No or `No delivery order yet`, customer, city and state, goods
-summary, Logistics Partner and the §8.4 status word; never a phone, money, an employee name,
-driver, vehicle, expected arrival or upload time. An unconfirmed delivery never enters a date
-cell. A fully empty range shows one spanning state `No deliveries are scheduled from {first} to
-{last}.` with the real `{n} deliveries need a confirmed date.` count and its door.
+**The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
+it does not honour (owner ruling 2026-09-14):
+
+```
+Day         < 768px, and any width on demand   one operating day, full cards
+3 days      768 – 1279px                       a fixed half-week, Mon–Wed or Thu–Sat
+Work week   ≥ 1280px, the desktop DEFAULT      the six Mon–Sat operating days
+Month       any width                          the capacity overview
+```
+
+**No three-day layout is ever labelled `Week`,** and the six-day desktop view is `Work week`
+because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfers {n}`,
+`Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted, with deliveries and
+transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
+selection; arrows replace the whole window and never scroll it.
+
+**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** In order: the
+type label (`DELIVERY` · `TRANSFER`) with the Logistics Partner · the confirmed window · who and
+where · the goods summary · the identity (`DO No`, or `SO No · Leg {n} of {m}` on a transfer, or
+`DO not released`) · **line 1 the journey progress · line 2 the readiness or blocker** (§8.4).
+Progress and readiness never merge into one line. The status never repeats the date of the column
+it already sits in, and it is a text line, never a pill that can truncate. A transfer card is
+visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
+never the customer's town**. Never a phone, money detail, employee name, driver, vehicle,
+expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
+range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
+`{n} deliveries need a confirmed date.` count and its door.
 
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 
@@ -568,18 +636,74 @@ fact prints in orange inside panel 1 (`Building type not recorded`), and the row
 Sales Order to change`. An order with no delivery address at all is not a delivery and stays
 Sales-owned Work under the entry rule below.
 
-**THE ENTRY RULE (owner ruling 2026-08-24).** A Sales Order does not become delivery work merely
-by existing. A scope reaches Monitor only when it has a delivery address, goods that require
-delivering and a valid scope or Journey leg. Cancelled orders, orders that need no delivery and
-delivered scopes are not on Monitor; a delivered order lives in Delivery Orders and Delivery
-History. One card = one delivery scope or one Journey leg.
+**THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
+not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
+address, goods that require delivering and a valid scope or Journey leg. Cancelled orders, orders
+that need no delivery and delivered scopes are not on Monitor; a delivered order lives in Delivery
+Orders and Delivery History. One card = one delivery scope or one Journey leg.
+
+**A CANCELLED ORDER IS NOT DELIVERY WORK, AND THE PREDICATE MUST SAY SO.** The rule above always
+named cancelled orders; the predicate only ever tested `delivered`, so every cancelled order with
+an address and goods entered Monitor. The open-scope test now excludes a cancelled order
+explicitly. **Completed work leaves too:** a delivered scope is gone, and the one delivered row
+that legitimately remains is the one still owing evidence, which is the `Upload delivery proof` /
+`Check delivery proof` queue's own job and leaves when the proof is accepted.
+
+**THE WORK ORDER — owner ruling 2026-09-14, APPROVED / LOCKED.** `All delivery work` sorts by
+what is actually most urgent, never by document number:
+
+```
+1  overdue                     a confirmed day has passed with no result
+2  due today                   the action deadline is today
+3  nearest action deadline     soonest first
+4  everything else             then the governed customer-name + row-id tie-break
+```
+
+**`Order details incomplete` never hides `Overdue`.** Those rows sort into their own band beneath
+live work and carry the §8.2 rail queue of the same name. The status word keeps its §8.4 rung;
+what changes is that a data problem can no longer occupy the top of the operator's day.
 
 ### 8.4 · The Monitor status dictionary — owner ruling 2026-09-13, APPROVED / LOCKED
 
 `Delivery Status` on Monitor is the OPERATION's progress in primary-school English that names the
 actor and the fact. It is one arithmetic, read by the column, the `DELIVERY STATUS` dropdown, the
-calendar card and every report; the partner's real name comes from the data and no partner is
+schedule card and every report; the partner's real name comes from the data and no partner is
 ever hard-coded.
+
+**PROGRESS AND READINESS ARE TWO FACTS ON TWO LINES — owner ruling 2026-09-14, APPROVED / LOCKED.**
+A journey rung says *how far the goods have got*. A readiness word says *what would stop them*.
+They answer different questions, they come from different arithmetics, and **they are never
+combined into one vague status.** A green rung no longer implies a ready job, because the readiness
+line sits beside it and says otherwise.
+
+```
+LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
+  customer leg          transfer leg             Ready
+  Confirmed             Transfer confirmed       Stock risk
+  Collected by {p}      Collected for transfer   Payment blocked
+  On the way to         In transit to {stop}     Logistics details incomplete
+    customer                                     DO not released
+  Delivered to          Arrived at {stop}
+    customer
+  Failed Delivery       Transfer failed
+```
+
+**The two ladders share no word,** so `Delivered to customer` can never be reached by a warehouse
+leg and `Arrived at {stop}` never claims a customer received anything. Readiness precedence when
+more than one applies: `Payment blocked` → `Stock risk` → `Logistics details incomplete` →
+`DO not released` → `Ready`; money first, because a trip that may not legally go is the harder stop.
+
+**`Arrived at customer` does not exist and may not be added by inference (owner ruling 2026-09-14).**
+Carres records no arrival-at-customer event: `delivery_attempts` holds `delivered` / `partial` /
+`failed`, `delivery_stops.status` holds `pending` / `picked_up` / `handed_off` / `delivered`, and
+`delivery_handover_events` holds `handed_over` / `received_by_logistics`. The rung may never be
+derived from a time, an ETA or a location. It becomes available only when the crew records a real
+arrival, which is a new capability and its own card.
+
+**Retired by this ruling:** `Scheduled` and `Transfer scheduled` (both banned status words —
+`COPY-STANDARD.md` §"Banned as status words", `01-design-tokens.md` §10, which also ban `Booked`)
+and `Delivery failed` (the governed spelling is `Failed Delivery`, so the card and the rail queue
+say one word for one fact). `Out for delivery` stays retired and is not restored.
 
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
@@ -587,13 +711,18 @@ ever hard-coded.
 | partner set, no contact record, the partner contacts the customer | `{partner} must contact the customer` | orange | `Call by {date}` |
 | partner set, no contact record, Carres contacts the customer | `Operation must call the customer` | orange | `Call by {date}` |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
-| day and window recorded, no DO yet | `Confirmed for {weekday, date}` | green | the window |
+| day and window recorded — a CUSTOMER leg | `Confirmed` | green | the window |
+| day and window recorded — a TRANSFER leg | `Transfer confirmed` | none | the window |
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
-| Warehouse handed over and the partner's receipt is recorded | `Goods collected by {partner}` | none | `Collected {date} {time}` |
-| collected, and the partner recorded departure or an ETA | `{partner} is delivering to the customer` | none | `ETA {time}` |
+| Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
+| Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
+| collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
+| collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
 | confirmed day passed with no result | `Overdue` | red | `{partner} must record the result` |
-| attempt `delivered` | `Delivered` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
-| attempt `partial` or `failed` | `Failed Delivery` | red | the one reason |
+| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
+| attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
+| attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
+| attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
 | a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact |
 
 **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
@@ -648,6 +777,29 @@ shared connector:
 Panel 4 reads `tripLinesOf`, `deliveryStockReadinessOf`, `deliveryArrivalStateOf` and `unitIdOf`,
 the same arithmetics the register, the DO page and the print path run. The expansion never
 duplicates Sales, Stock, Warehouse, Purchasing or Payment truth; it reads and links.
+
+**THE BRIEF IS READABLE, LEG-AWARE AND HONEST — owner ruling 2026-09-14, APPROVED / LOCKED.**
+The four panels and their inline doors are unchanged. Six corrections bind:
+
+1. **The brief never clips.** It is laid out clear of the register's horizontal scroll, so no
+   value is cut at the right edge at any governed width. A field wraps; it is never truncated to
+   a single letter.
+2. **A leg names its own journey.** The expansion opens with the leg strip — `Leg {n} of {m}`,
+   the leg's own `{from} → {to}` route printed in full, and that leg's own partner, date and
+   window — for every leg of the Journey, with the open one marked. Panel 4 shows only the items
+   travelling on THAT leg. **The customer's town is never printed as a transfer's destination.**
+3. **Services are not stock.** Panel 4 separates `Items` from a `Services` subsection. The
+   services subsection carries description and quantity ONLY; it has no Source, Status or
+   Location column, so a service never renders an em-dash in a stock cell.
+4. **A delivery fee is money, not goods.** It never appears in Panel 4 in any form; it is
+   Payment's fact and lives there.
+5. **`Access not recorded` is an actionable alert,** printed in the orange problem treatment with
+   the panel's `Open Sales Order to change` door — never the neutral grey absence word.
+6. **Logistics completeness is stated once.** When a delivery is confirmed and driver, vehicle
+   plate, pickup or ETA is missing, Panel 3 prints **`Logistics details incomplete`** above the
+   facts. The individual `Not recorded` lines remain; the verdict is what stops the operator
+   having to notice five absences. The emergency contact prints **name, relationship and phone**
+   as three distinct facts.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 
@@ -762,7 +914,11 @@ kit `Panel`s — section one prints the customer, address, Warehouse, partner, a
 window, ETA, driver, vehicle from `ops_delivery_arrangements`), route, trip scope, site
 requirements (building, floor, lift, stairs, access, customer request, instruction for
 logistics), the goods and the live document rendered inline by the governed DO renderer;
-Delivery history lists `Delivery on {day} · {result}`; Exceptions lists failed and partial
+On a Journey leg's document the `Warehouse` fact is that leg's own source stop — leg 1 the
+configured Carres source, a later leg the previous partner's warehouse (`from_loc`) — never the
+order-level warehouse (Card 20). Delivery history lists `Delivery on {day} · {result}`, an
+intermediate leg's arrival spelled `Arrived`, and its Evidence section states that a warehouse
+arrival owes no delivery proof; Exceptions lists failed and partial
 visits, the open Finance exception, the pending payment approval, a cancellation and the Work
 action lines with their owner (`No open problems` otherwise); History merges the issue, the
 handover chain, the attempts and the order's own History lines in time order; Related records
@@ -875,7 +1031,9 @@ arrival); each listing opens with its source fact, date basis and coverage sente
 five records reads `Rate withheld · fewer than 5 records`; an unreadable read prints `Not
 available`; Excel export writes one sheet per listing. The Cannot Deliver records (0417) reach the
 report through the arrangements read (`cannotDeliver`, absent when unreadable). The words are in
-`docs/COPY-STANDARD.md` (Reports → Delivery words).
+`docs/COPY-STANDARD.md` (Reports → Delivery words). A Journey leg before the last is a warehouse
+trip: Commitment, First Delivery, Proof Control and `Logistics Partner Performance` count
+customer-leg results only and say so in their coverage sentence (Card 20, 2026-09-13).
 
 ## 13 · Owners, permissions and the external boundary
 
@@ -888,24 +1046,40 @@ Engine; the approved architecture correction is only that it gains its assignmen
 cover are configured only in `Workspace → Staff & Duties`. This is not a Delivery-local duty
 system.
 
-**The Responsible Delivery Operation owns the customer's money follow-up (owner ruling
-2026-09-13; Payment MASTER §10, migrations 0489 · 0495).** When a Sales Order's collection first
-becomes actionable, the order's recorded **contact owner** (§5.1 — the Operation person named on
-its earliest customer contact, else its partner arrangement) becomes that order's stable
-collection owner — provided the record names an individual staff identity (a People record) who
-was not acting as Delivery Duty buddy cover that day: the same person who has been contacting the
-customer about delivery asks for the money. Otherwise the Delivery Duty NORMAL holder on that day
-stands in (§13.1), never the cover. **Measured gap (2026-09-13):** the one contact writer stores
-`contact_owner_user_id = recorded_by` (the signed-in subject) and resolves no cover; a proxy record
-names only the partner. A recorder cannot yet name a different responsible owner — Payment guards
-the seam (0498) until this writer separates the two. The owner stays until the balance is RM 0; later duty rotation or a
-later contact by someone else never moves it; only buddy cover (acting today) or a formal handover
-changes who acts. Delivery configures nothing extra for this: the Payment module reads the contact
-record and the resolver on the first actionable day and keeps its own append-only owner record.
+**The Responsible Delivery Operation owns the customer's money follow-up, and it is the person
+the Sales Order was DEALT to (owner ruling 2026-09-13; Payment MASTER §10, Orders MASTER
+§"How the PIC is decided", migrations 0489 · 0504).** A Sales Order is dealt to one individual
+Operation person when it enters Operations (`ops_order_control.assigned_staff`, 0232/0235). That
+person continues the customer follow-up — the delivery contact, the ordinary balance and the
+storage collection. Delivery and Payment read ONE authority,
+`delivery_responsible_operation(order, day)` (0504): the order's responsibility ledger row
+(an establishment or a formal handover) · else the individual the order was dealt to · else
+nobody. Today's acting person is that person's governed buddy cover, else — when they are away
+today and no cover was named — the least-loaded individual who is in, else the person.
 
-When the resolver returns no active holder and no cover, the action stays visible in Team Work
-under its duty word and the surface prints the governed configuration failure with its door:
-`Nobody holds Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`. The protected
+**Contact history and the Delivery Duty holder are NOT owner sources.** 0495/0498 inferred the
+owner from the earliest customer contact and 0489/0499 from the Delivery Duty holder; the owner
+rejected both, and 0504 removed them. Delivery Duty keeps its own work and remains the key the
+buddy-cover law is written against; it no longer decides who chases a customer's money. **Nobody
+needs to be asked for an initial Delivery Duty holder** — that request was the workaround the
+owner refused, and automatic ownership no longer waits on it.
+
+The contact writer still fills the record's four identities from that read (§5.1); the
+recorder — including the shared `Operations` login — is evidence, never responsibility, and an
+account with no `staff_code` may record but never own. The owner stays until the balance is
+RM 0; a later contact by someone else, a duty rotation, a changed date, a filter or a reload
+never moves it. Only two things change who acts: buddy cover (today only) and a formal handover,
+which moves the assignment and appends the ledger row together. Delivery configures nothing extra
+for this.
+
+When the resolver returns nobody, the action stays visible in Team Work under its duty word and
+the surface prints the governed configuration failure with its door: `Nobody holds Delivery Duty.`
+and `Set the holder in Workspace → Staff & Duties`. 🔴 **Those words are now WRONG and wait on the
+owner** — after 0504 an unresolved owner means no individual is in the Operation assignment pool,
+and Staff & Duties cannot fix it. Approved copy is the owner's to change; the recommended
+replacement is `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`. The state is unreachable while the pool holds an individual,
+which is why this is recorded rather than shipped. The protected
 act refuses with the same sentence. No action is routed to an Operations Superuser by default and
 no fallback identity is invented; an authorised superuser who does act is recorded as the actual
 actor with the normal owner and cover kept separate. Governed delivery-charge exceptions route to
@@ -1070,6 +1244,36 @@ scopes from.
 
 ## 16 · Production closure
 
+**2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
+number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on top of the sibling PR #1288).
+
+- **Card 20 (`9dd3945b`, PR #1289) — an intermediate leg ARRIVES.** `Delivered` is the customer's word: an
+  intermediate Journey leg's `delivered` result reads `Arrived` over the partner warehouse on Monitor, the Delivery
+  Orders register (a sixth `DOCUMENT STATUS` word), the DO header, Delivery history, History and the Evidence section
+  (which states that a warehouse arrival owes no delivery proof); a leg document's `Warehouse` fact is its own
+  `from_loc`; `Logistics Partner Performance` counts customer legs only; the Work Engine's Delivery deep-link is the
+  Monitor row, not the retired Edit Delivery address. Notes (1) and (2) closed in law (§3.1 · §8.4 · §9 · §12) and in
+  code. The deploy of `9dd3945b` converged on all three surfaces at 00:2x MYT.
+- **Card 19 (`334c3720`, PR #1291) — a number and an id open the same page.** `salesOrderParamOf` classifies the URL
+  param; `GET /api/operation/orders/by-number/:so` resolves the document word to the id; the object page resolves a
+  number once and re-enters by the id with its search kept, so every fan-in read is by the canonical id; a miss prints
+  `Sales Order not found.`. Measured before: `SO-1362` in the URL → 500 `invalid input syntax for type uuid` and an
+  empty Order Route.
+- **Card 21 (`a38d77c8` Part A #1288 · `a5646d2d` Part B #1292, migration 0501 APPLIED) — no writer stores a second
+  stock quantity truth.** `operation_warehouse_pick`, `_operation_reserve_order` and `operation_receive_po_line` are
+  dropped (`pg_proc` re-read: 0 remaining; tracker tail `0501`); 0366's `stock_balances_derived_only` stays armed (a
+  hand-written `reserved` still refuses `stock_total_is_derived`, proven in the rolled-back probe); the two API doors
+  answer 410 and the drawer offers no `Transfer to ready`; a negative regression scans every later migration and every
+  app source. Note (3) closed.
+- **Cards 12 and 18 — the role-specific walks** were done by the sibling session on `f2fb3efe` as principal (PR
+  #1288): the Delivery Settings save on the E2E LP-X fixture is re-read here in `delivery_setting_changes` (two
+  `partner_details` rows by the principal at 15:32 UTC, value changed then restored); the office create form's
+  governed refusals were observed. **Still open, not hidden:** the dealer POS wizard walk — `dealer-test@x.com`
+  stops at the store's first-time staff PIN setup before the wizard; a dealer login whose PIN setup is complete
+  is the minimum owner action.
+
+**Authenticated follow-up completed:** Operation verified Card 20 on all-five-converged `9dd3945b`: intermediate DO Arrived in header/history/Evidence, source warehouses Klang and JB respectively, customer delivery and partner reports exclude the intermediate leg. On all-five-converged `a5646d2d`, Card 19’s three number spellings resolve to the same UUID, the browser retains `?route=1` and renders Order Route by both number and UUID, and an unknown number shows the governed absence. Card 21’s two application doors return 410; allocation and order facts are unchanged before/after. Cards 19 and 21 carry the detailed observations. Card 22 separately owns the newly measured borrowed sibling signature and Register intermediate proof-absence correction; its production acceptance is complete on `12d1a264` (below).
+
 **2026-09-13 · Cards 08–15 and 18 production-verified; the two-leg Journey walked end to end.** Journey legs
 (0490/0491) landed on `d78b4e26` and were corrected on the authenticated walk of the governed fixture SO-1362 by
 **0494** (`45238b71`), **0496** (`1984a7ba`) and **0497** (`9ee6db65`): leg 1 NETS `Carres Klang Warehouse → JB
@@ -1079,12 +1283,9 @@ each leg on its own document with its own facts; the Journey completed only on t
 arrived; the exact Unit `id-dtd627907` went reserved → with NETS → with AL → sold. Card 15 (0492, `0dc51c6b`) and
 Card 18 (`4e944e51`) walked the same day. **Card 16** (`e0a6dc49`, the seven DO object sections) and **Card 17**
 (`a2bc7d53`, `Reports → Delivery`) were then walked on the same two documents and the same month. Evidence: the
-Card files. 🟡 Open after the walk, none blocking: (1) an intermediate leg's arrival is an `arrived` result but the
-register/Monitor status word, the DO `Evidence` heading and the `Logistics Partner Performance` listing print it as
-`Delivered` (+ `Delivery photo not uploaded`) — the Commitment and First Delivery listings already exclude it; the
-status vocabulary for `arrived` is the next Delivery correction; (2) the DO object's `Warehouse` fact reads the
-order's warehouse, so a Journey document prints `No warehouse recorded` beside a named source stop — read the leg's
-`from_loc` there; (3) the legacy warehouse-pick door still writes a derived stock total (Card 14 note).
+Card files. The three 🟡 notes recorded after that walk — an intermediate leg printed as `Delivered`, a Journey document's
+`Warehouse` reading the order-level warehouse, the legacy warehouse-pick door still writing a stock total — are
+CLOSED by Cards 20 and 21 (the 2026-09-14 entry above).
 
 **DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
 appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA
@@ -1424,3 +1625,24 @@ window · plain REGION rows) were fixed before merge. Named follow-ups, not acci
 `Assign logistics` surface (the retired listing's door), the Delivery Orders register's own
 redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar` ·
 `NEEDS CHECKING` · `Search deliveries…`).
+
+
+### Supplemental production acceptance · 2026-09-13 23:32 MYT
+
+Card 12’s representative manager save is now verified as principal on the existing E2E LP-X fixture, persisted after reload and restored to its original value with both audit entries retained. Card 18’s office form was walked as principal: Building type is required, the retired address-later control is absent, and missing address/building/date facts disable Create order with the governed message. These are authenticated observations on `f2fb3efeb89c395dd9f7ee96cdc49d60e6e103ff`; see the supplemental sections of Cards 12 and 18 for exact test facts. Dealer POS remains open: the working dealer-test login reaches first-time staff PIN setup, not the wizard. No identity/security setup was changed. Cards 19/20 are being handled in their existing Delivery workspaces; Card 21 owns only legacy warehouse-pick application retirement, with database retirement explicitly still outstanding.
+
+### Document ownership correction · Card 22 · production verified
+
+The SO-1362 acceptance read found that an intermediate DO borrowed its sibling final DO’s signed document from the order mirror. Card 22 binds signed-file presence, download and review timestamps to the exact DO, using document-bound evidence or an explicitly matching order mirror. Intermediate arrivals retain their own recorded photos and show no customer signed-paper demand. This is a read correction with no migration or Unit write; production closure is recorded below.
+
+### Production convergence checkpoint · 2026-09-14
+
+All five production surfaces converged to `9dd3945b8d451e142d223752bbe91f243357bd0e`. Authenticated checks confirm the intermediate SO-1362 DO is Arrived, each DO uses its own source warehouse, and customer delivery/partner/proof reports exclude the intermediate trip while warehouse handovers retain it. Both legacy warehouse-pick application doors return 410 without changing the fixture order or allocation. Database 0501 is recorded, its three retired functions are absent, and the post-migration derived-total refusal probe rolled back with qty 4 / reserved 2 unchanged. Exact observations are appended to Card 21. Signed-file ownership and the Register’s remaining intermediate proof absence are Card 22 work; the dealer POS staff-PIN login remains outstanding; SO-number acceptance was subsequently completed on `a5646d2d` as recorded above.
+
+### Signed-document convergence closed · 2026-09-14 01:26 MYT
+
+PR #1295 is deployed and authenticated on all-five-converged `12d1a264bcf17cd9c813f739dfd9d446c6813023`. Final PR CI passed 11,201 tests (7 optional integration tests skipped), and the exact-SHA deployment repeated all required checks successfully. Card 22 records the precise CI/merge ordering and production proof. Intermediate DO-130926-0842 has no borrowed signed file or customer proof demand; final DO-130926-3223 retains its downloadable nonempty signed PNG. Register distinguishes the two documents and counts one missing customer photo, no missing signed paper. Both retired warehouse doors still refuse with 410 and the exact order/allocation facts are unchanged.
+
+**Acceptance boundaries retained:** Card 12 manager Settings save was persisted, re-opened and restored. Card 18 office form has both missing-fact refusals and a complete draft reaching enabled Create; no new post-gate order was submitted. Dealer POS remains blocked before the wizard by first-time staff PIN setup and needs an existing test staff login whose setup is complete. Responsive smoke measured 582×704 only; requested 375/1130 overrides did not change the actual browser width, so exact-width acceptance is not claimed. SO-1362 is completed and correctly absent from Monitor, so an active intermediate Monitor row was not recreated for this walk. Loan offer/acceptance and the Journey’s exact Unit handovers use the earlier recorded production evidence; actual loan Unit issue/collection, returned-goods arrival and every split/conditional/postpone variant were not newly replayed end to end in this convergence pass. The prior Card probes and automated coverage remain evidence at their stated level. These boundaries prevent this checkpoint from being read as a completed exhaustive production matrix.
+
+**Separate observed Orders follow-up:** number/UUID fan-in now loads Order Route, but the completed Journey’s existing whole-order route still displays unchosen logistics/date and a not-ready gate beside its Delivered result. Card 19 intentionally changes identity resolution only. The Journey-aware Order Route projection needs its own scoped correction; this convergence record does not certify that unrelated arithmetic.

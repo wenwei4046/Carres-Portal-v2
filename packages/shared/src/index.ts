@@ -513,7 +513,6 @@ export {
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -525,7 +524,6 @@ export {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
@@ -546,7 +544,6 @@ export {
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
   type AbandonOrderInput,
-  type WarehousePickInput,
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
@@ -557,7 +554,6 @@ export {
   type ReselectPartnerInput,
   type LpAcceptOrderInput,
   type LpRejectOrderInput,
-  type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
@@ -874,6 +870,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  planOpsAssignment,
+  type OpsAssignmentCandidate,
   seenTodayMYT,
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
@@ -2090,6 +2088,14 @@ export {
   type DeliveryWorkStatusTone,
   type DeliveryStatusSpell,
 } from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
 // nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.

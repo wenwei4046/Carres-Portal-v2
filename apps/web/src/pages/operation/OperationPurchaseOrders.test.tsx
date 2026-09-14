@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -39,9 +39,10 @@ const DESTINATIONS = [
 
 /** Today in MYT — PO-9003 arrives today, so the engine opens its
  *  tomorrow's-delivery call (the Open Actions fixture). */
+const TEST_NOW = new Date("2026-09-13T04:00:00.000Z");
 const TODAY = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kuala_Lumpur",
-}).format(new Date());
+}).format(TEST_NOW);
 
 function line(
   id: string,
@@ -391,7 +392,12 @@ function mockApi(pos: unknown[] = POS) {
   });
 }
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
+  // Fixtures and rendered calendars must share one day even across MYT midnight.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(TEST_NOW);
   mockApi();
 });
 

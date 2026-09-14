@@ -23,7 +23,7 @@ let detailState: {
 };
 
 const useDeliveryOrderSpy = vi.fn((..._args: unknown[]) => detailState);
-const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] }, isLoading: false }));
+const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] as Array<{ path: string; at: string; doNumber: string; url: string }> }, isLoading: false }));
 const recordHandoverMutate = vi.fn();
 const reviewMutate = vi.fn();
 const attachSignedMutate = vi.fn();
@@ -138,6 +138,7 @@ function mount(data: DeliveryOrderDetailPayload) {
 
 beforeEach(() => {
   useDeliveryOrderSpy.mockClear();
+  useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [] }, isLoading: false });
   recordHandoverMutate.mockClear();
   reviewMutate.mockClear();
   attachSignedMutate.mockClear();
@@ -572,6 +573,12 @@ describe("DeliveryOrderPage", () => {
     });
   });
 
+  it("does not show the final DO’s signature as this document’s paper", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } }));
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByTestId("signed-do-link")).toBeNull();
+  });
+
   it("0491 — a Journey leg's document prints its route and records an ARRIVAL, never a delivery", () => {
     const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
     mount(
@@ -691,5 +698,60 @@ describe("DeliveryOrderPage", () => {
     expect(screen.getByText(/Collect back on delivery day/)).toBeTruthy();
     /* 0492 (Card 15) — the EXACT Unit the crew brings back. */
     expect(screen.getByTestId("do-loan-lines")).toHaveTextContent("Loan U1-000-082 · collect back on delivery day");
+  });
+});
+
+/* ── 【DELIVERY】 CARD 20 — an intermediate leg ARRIVES; each leg names its
+   own source. `Delivered` is the customer's word; a leg before the last whose
+   goods reached the partner warehouse reads `Arrived`, leaves from its own
+   `from_loc`, and owes no delivery proof on its document. */
+describe("a Journey leg's document — Arrived, its own Warehouse, no proof owed (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" as const },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" as const },
+  ];
+  const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
+  const legDoc = (leg: number) =>
+    payload(
+      { leg, orders: { ...payload().deliveryOrder.orders, warehouse_id: null, delivery_stops: stops } },
+      { attempts: [attempt("delivered")], handoverEvents: received },
+    );
+
+  it("an arrival keeps its own ledger files and never borrows the final signature or asks for one", () => {
+    const data = legDoc(1);
+    data.deliveryOrder.orders.do_number = "DO-FINAL";
+    data.deliveryOrder.orders.do_file_path = "order/final.pdf";
+    useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [{ path: "arrival.jpg", url: "https://example.test/arrival.jpg", doNumber: data.deliveryOrder.do_number, at: "2026-09-13T10:00:00Z" }] }, isLoading: false });
+    mount(data);
+    expect(screen.getByTestId("do-evidence-document-files")).toBeTruthy();
+    expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://example.test/arrival.jpg");
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+  });
+
+  it("leg 1 of 2: the pill reads Arrived, the Warehouse is the leg's own source, history says Arrived, no proof is owed", () => {
+    mount(legDoc(1));
+    expect(screen.getAllByText("Arrived").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Delivered")).toBeNull();
+    expect(screen.getByText("Carres Klang Warehouse")).toBeTruthy();
+    expect(screen.queryByText("No warehouse recorded")).toBeNull();
+    expect(screen.getAllByText(/^Delivery on .* · Arrived$/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("do-evidence-arrival-only")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-photo")).toBeNull();
+  });
+
+  it("leg 2 of 2: the customer leg keeps Delivered and leaves from the previous partner's warehouse", () => {
+    mount(legDoc(2));
+    expect(screen.getAllByText("Delivered").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Arrived")).toBeNull();
+    expect(screen.getByText("JB transit warehouse")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-arrival-only")).toBeNull();
+  });
+
+  it("a whole-order document still reads the order's own warehouse", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, warehouses: { name: "Carres Klang" } } }));
+    expect(screen.getByText("Carres Klang")).toBeTruthy();
   });
 });

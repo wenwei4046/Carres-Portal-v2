@@ -437,19 +437,77 @@ name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Addre
 borrow the other's words.
 
 ```
-Delivery Order document — the DOCUMENT's own life (unchanged)
-  Created · Out for delivery · Delivered · Delivery exception · Cancelled
+Delivery Order document — the DOCUMENT's own life
+  Created · Out for delivery · Arrived · Delivered · Delivery exception · Cancelled
+  (`Arrived` only on an intermediate Journey leg's document — the goods reached the
+   named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
-  Operation must assign logistics · {partner} must contact the customer ·
-  Operation must call the customer · Waiting for customer reply ·
-  Confirmed for {weekday, date} · Waiting for {partner} pickup ·
-  Goods collected by {partner} · {partner} is delivering to the customer ·
-  Overdue · Delivered · Failed Delivery · Order details incomplete
+  before the arrangement is agreed — the ACTOR rungs, unchanged:
+    Operation must assign logistics · {partner} must contact the customer ·
+    Operation must call the customer · Waiting for customer reply
+  once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
+    customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
+                   On the way to customer · Delivered to customer · Failed Delivery
+    transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
+                   Arrived at {stop} · Transfer failed
+  across both      Overdue · Order details incomplete
 ```
+
+**Re-ruled 2026-09-14, replacing the 2026-09-13 spellings one-for-one** (one fact, one word — the
+column, the `DELIVERY STATUS` dropdown, the schedule card and every report read the SAME
+arithmetic): `Confirmed for {weekday, date}` → **`Confirmed`** (the day and window are column 8's
+job, and on a card the date column already names the day) · `Goods collected by {partner}` →
+**`Collected by {partner}`** · `{partner} is delivering to the customer` → **`On the way to
+customer`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
+`Waiting for {partner} pickup` is KEPT: it is a recorded fact (the document exists, the partner
+has not collected) that the new ladder does not otherwise express.
+
+**`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
+intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
+reached on line two (`JB transit warehouse`) — on Monitor, the Delivery Orders register, the DO
+object header, Delivery history and every report — through the same two arithmetics. A warehouse
+arrival owes no delivery photo, signed paper or proof review; the customer leg's document carries
+them. `Logistics Partner Performance` counts customer-leg results only.
 
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
+
+**THE DELIVERY SCHEDULE CARD — TWO FACTS, TWO LINES (owner ruling 2026-09-14).** The Monitor tab
+is **`Delivery schedule`**; `Confirmed deliveries` is retired and survives only in dated historical
+walk records. The schedule carries both kinds of logistics work under a type label that is never
+mixed and never summed:
+
+```
+DELIVERY   the final customer leg          TRANSFER   an intermediate warehouse leg
+
+tab count and split, following the SELECTED RANGE and every active filter:
+  Delivery schedule {n}
+  {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
+
+LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
+  customer leg        transfer leg           Ready · Stock risk · Payment blocked ·
+  Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
+  Collected by {p}    Collected for transfer
+  On the way to       In transit to {stop}
+    customer
+  Delivered to        Arrived at {stop}
+    customer
+  Failed Delivery     Transfer failed
+```
+
+Progress and readiness never merge into one status. The two ladders share no word. A transfer is
+never counted as a customer delivery and never produces a `Delivered to customer` result. A
+transfer card prints its own `{from} → {to}` route, never the customer's town.
+
+**`Arrived at customer` is not a Carres word** — no arrival-at-customer fact is recorded, and it
+may never be inferred from a time, an ETA or a location.
+
+**Schedule view words:** `Day` · **`3 days`** (768–1279px) · **`Work week`** (≥1280px, Mon–Sat) ·
+`Month`. **A three-day layout is never labelled `Week`.**
+
+**Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
+**`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
 
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
 `Waiting for warehouse` · `Ready for handover` · `Out for delivery` · `Created` · any bare
@@ -459,6 +517,10 @@ may not appear in the Delivery Orders register, which describes documents.
 
 Banned as status words on either surface, because each names a mood rather than a fact:
 `Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
+**This ban was tested and upheld on 2026-09-14:** a proposed schedule ladder opened with
+`Scheduled` / `Transfer scheduled`, and the owner ruled the governed **`Confirmed`** /
+**`Transfer confirmed`** instead. `Delivery failed` is likewise not a second spelling of
+**`Failed Delivery`**.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -552,7 +614,7 @@ coverage** — the exclusion is always stated, never silent:
 | `Delivery Commitment Performance` | `Kept the requested date` · `After the requested date` · `No requested date` · `{n} deliveries · Kept the requested date {rate}` |
 | `First Delivery Success` | `Delivered on the first visit` · `Partly delivered on the first visit` · `Failed on the first visit` |
 | `Failed Delivery Analysis` | the reason library's own words with the category in brackets, e.g. `Customer unreachable (Customer)` |
-| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named` |
+| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named`; customer-leg results only — `Journey legs before the last are warehouse trips and are excluded.` (Card 20) |
 | `Warehouse Performance` | `Ready {date} · Handed over {date} · Received by logistics {date}` · `Handed over by the delivery day` · `Handed over after the delivery day` |
 | `Delivery Proof Control` | `No proof yet` · `Not reviewed yet` · `Proof Accepted` · `More Proof Required` · `Proof Rejected` · `Delivery photo missing` · `Signed Delivery Order missing` |
 | `Schedule and Capacity` | `{n} deliveries confirmed across {n} days · busiest {day} with {n}` · `{n} deliveries · {n} booked` |
@@ -2628,10 +2690,12 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Delivery on {day} · {result}` · `Goods: {location}` | the Delivery history entry and its second line | **RULED 2026-09-13** (Card 16) |
 | `No open problems` · `Finance is holding this delivery — {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
 | `Open Payments →` · `Open Unit {Unit ID} →` · `Open Case {Case No} →` · `Open {DO No} →` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors (beside `Open SO-{n} →` and `Open Order Route →`) and their absences | **RULED 2026-09-13** (Card 16) |
+| `Opening SO-{n}` · `Sales Order not found.` · `Back to Sales Orders` | the Sales Order object page opened by its NUMBER (`/operation/orders/so/SO-1362`): the one-moment loading word while the number resolves to the id, the absence when no order carries that number (the existing Unknown-SO word, reused), and its door | **REGISTERED 2026-09-13** (Delivery Card 19 — a number and an id open the same page; the owner may re-word) |
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
 | `DELIVERY STATUS` | Monitor's operational-status filter group, a kit dropdown over the §8.4 status words of `delivery/MASTER.md` | **RULED 2026-09-07**, words re-ruled **2026-09-13** |
-| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's five words, each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's words (`Arrived` joined 2026-09-13, Card 20), each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `Arrived` over `{partner warehouse}` · `This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.` | an intermediate Journey leg's document: its pill word and line two on the register, Monitor and the DO header; and the Evidence section's one sentence on such a document | **BUILT 2026-09-13** (Card 20 — the word is Card 14's ruled `Arrived`) |
 | `Driver submission` | the Delivery Orders register's column for what came back from THIS delivery order's trip. It replaces the default `Proof Status` column (retired 2026-09-11) | **RULED 2026-09-11** |
 | `Photos {n}` · `Videos {n}` | the two count buttons inside `Driver submission`. The number is the ledger's own count of files stamped with THIS document; a count is NEVER printed when the answer is unknown, and no button is offered for a kind with no files. **No video is not a shortage** — video is not required, so an absent video prints nothing at all | **RULED 2026-09-11** |
 | `Signed Delivery Order` | the viewing link to the signed paper on file, on the second line of `Driver submission`. Already the governed proof name; here it is a door | **REUSED 2026-09-11** |
@@ -2643,11 +2707,11 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 
 **ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
 Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own pill word
-(`Created` · `Out for delivery` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
+(`Created` · `Out for delivery` · `Arrived` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
 `Delivery exception` carries the RESULT that was actually recorded and its reason —
 `Partially Delivered · {reason}` or `Failed Delivery · {reason}` — which is what the retired
 default `Delivery Result` column used to print three columns away. `Cancelled` keeps its void
-reason on line 2. **The search, the per-column filter and the Excel export print the same
+reason on line 2; `Arrived` carries the partner warehouse the goods reached (Card 20). **The search, the per-column filter and the Excel export print the same
 spelling as the cell**, so a reader looking for `Partially Delivered` finds the row that recorded
 it even though its pill spells `Delivery exception`. Combining a DISPLAY never changes the status
 arithmetic and never removes a recorded result: the Delivery Order's own page still holds every
@@ -2980,7 +3044,9 @@ a second entry because a sentence told her to try again after the first one stoo
 | | **`Record journal entry — {gap}`**, gaps: `choose the date` · `choose a day from {date} on` · `type the narration` · `check line {n}` · `choose an account on line {n}` · `type a debit or a credit on line {n}` · `add a second line` · `the total is larger than the ledger can hold` · `make debits equal credits` | The disabled button names the first thing missing (the `Save method — type a name` pattern). |
 | Dialog | **`Record this journal entry?`** · **`{money} debit and credit, dated {date}. A recorded entry cannot be changed. To correct it, record another entry.`** · **`It gets its entry number now.`** · **`Cancel`** · **`Record journal entry`** | The ask-first dialog. |
 | Done | **`Journal entry recorded.`** | The toast; the new entry then opens. |
-| Unknown outcome | **`The connection dropped. Check the Journal for this entry before you record it again.`** · **`The answer did not come back. Check the Journal for this entry before you record it again.`** | No answer came back, so the entry may stand. Never `Try again`: a second press is a second entry. |
+| Unknown outcome | **`The connection dropped. Check the Journal for this entry before you record it again.`** · **`The answer did not come back. Check the Journal for this entry before you record it again.`** | No answer came back, so the entry may stand, and the API cannot vouch that the request key (0502) is honoured. Never `Try again`: a second press could be a second entry. |
+| | **`The answer did not come back. Press Record journal entry again. This entry is never recorded twice.`** | No answer came back, and the API has seen the keyed `gl_manual_journal` answer (0502 applied). The form keeps one request key per entry, so a second press returns the first entry or records it once. Shown only on a 503 with `retry_safe: true`. |
+| Resend refused | **`This entry was already recorded as {entry no} before it was changed. Open it in the Journal. To record another, start a New journal entry.`** (without a number: `This entry was already recorded before it was changed. …`) | The same request key came back with other details (`idempotency_mismatch`): the first press stood, then the form was edited. Nothing new is recorded. |
 | Field refusals | `Type the amount in numbers, like 1500.00.` · `The amount must be more than RM 0.00.` · `An amount has at most two decimals.` · `The amount is larger than the ledger can hold.` · `A line takes a debit or a credit, not both.` | Under the field as it is typed. |
 | Entry refusals | `Choose the entry date.` · `Type the narration.` · `The narration is at most 500 characters.` · `A memo is at most 500 characters.` · `Choose an account on every line.` · `Type a debit or a credit on every line.` · `A journal entry needs at least two lines.` · `A journal entry takes at most 100 lines.` · `Debits and credits must be equal.` · `The total is larger than the ledger can hold.` · `The entry adds up to RM 0.00.` · `The ledger started on {date}. Pick a day from then on.` · `The entry date is before the ledger started.` · `The ledger has no start date yet.` · `The lines could not be read. Check them and try again.` | The whole entry is refused; the form stays as typed. |
 | Line refusals | `Line {n} ` + `uses a customer, supplier or other party account. Those accounts move only through their own documents.` · `has no account. Choose one.` · `names an account that is not in the chart.` · `names an account that is no longer in use.` · `names a heading account. Choose an account under it.` · `needs its amount in numbers.` · `has an amount below RM 0.00. Put it on the other side instead.` · `has a debit and a credit. A line takes one of them, not both.` · `has no debit and no credit.` · `could not be read. Check it and try again.` | The ledger refused one line and names it (`A line …` when it gives no number). |
@@ -3160,3 +3226,8 @@ Before merging a UI change:
 - [ ] Zero jargon (rule 9).
 - [ ] Tooltips do not repeat the label.
 - [ ] Dates go through `fmtDate()`.
+
+
+### Delivery legacy warehouse pick refusal · Card 21 · 2026-09-13
+
+`This action is no longer available. Use Ready Stock in SO Batch Purchase.` — HTTP 410 refusal for the retired `warehouse` and `transfer-ready` doors. The drawer no longer offers `Transfer to ready`. The destination uses the existing governed Ready Stock journey, never a replacement stock writer.

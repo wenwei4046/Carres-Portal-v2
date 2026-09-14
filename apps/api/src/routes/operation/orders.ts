@@ -27,8 +27,8 @@ import {
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
-  transferReadyInputSchema,
-  warehousePickInput,
+  salesOrderNumberWord,
+  salesOrderParamOf,
   type AllocationUnit,
   type PoArrival as OrderPoArrival,
   type PoArrivalReply as OrderPoArrivalReply,
@@ -638,6 +638,44 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
     })),
   });
+});
+
+// ----- GET /by-number/:so — 【DELIVERY】 CARD 19 -----
+// The operator's document word (`SO-1362`) resolved to the order's id, so a
+// link carrying the number lands on the SAME object page as a link carrying
+// the id. A read door only: it answers `{ id, so }` and nothing else; every
+// fact is then read by the id through the existing doors (Law C — one door,
+// never a second fan-in).
+operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
+  const ident = salesOrderParamOf(c.req.param("so"));
+  if (ident.kind !== "number") {
+    return c.json(
+      { error: "invalid_so_number", code: "invalid_so_number", message: "Sales Order not found." },
+      400,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("so", ident.so)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json(
+      {
+        error: "not_found",
+        code: "not_found",
+        message: "Sales Order not found.",
+        so: salesOrderNumberWord(ident.so),
+      },
+      404,
+    );
+  }
+  return c.json({ id: (data as { id: string }).id, so: ident.so });
 });
 
 // ----- GET /:id detail -----
@@ -2551,21 +2589,12 @@ operationOrdersRouter.post("/:id/abandon", requireOperation, async (c) => {
   return c.json({ order: data });
 });
 
-// ----- POST /:id/warehouse -----
-operationOrdersRouter.post("/:id/warehouse", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, warehousePickInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_warehouse_pick", {
-    p_order_id: c.req.param("id"),
-    p_warehouse_id: parsed.data.warehouseId,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ order: data });
-});
+// ----- POST /:id/warehouse — retired (Delivery Card 21) -----
+// Exact Unit reservation belongs to SO Batch Purchase → Ready Stock.
+// Never call the legacy quantity writer, including for stale clients.
+operationOrdersRouter.post("/:id/warehouse", requireOperation, (c) =>
+  c.json({ error: "This action is no longer available. Use Ready Stock in SO Batch Purchase.", code: "warehouse_pick_retired" }, 410),
+);
 
 // ----- POST /:id/confirm-proceed -----
 // Migration 0147 (item h, 2026-05-23) — v3 RPC now requires the LP at the
@@ -2623,26 +2652,12 @@ operationOrdersRouter.post("/:id/reselect-partner", requireOperation, async (c) 
   return c.json(data);
 });
 
-// ----- POST /:id/transfer-ready -----
-// Pipeline v2 (C2 / migration 0024). Wraps `operation_warehouse_pick` whose
-// source-stage guard now permits IN ('confirmed', 'in_production').
-// Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
-// (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
-// accepts NULL via a different RPC; do not conflate.
-operationOrdersRouter.post("/:id/transfer-ready", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, transferReadyInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_warehouse_pick", {
-    p_order_id: c.req.param("id"),
-    p_warehouse_id: parsed.data.warehouseId,
-  });
-  if (error) {
-    const m = mapPipelineV2Error(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ order: data });
-});
+// ----- POST /:id/transfer-ready — retired (Delivery Card 21) -----
+// Exact Unit reservation belongs to SO Batch Purchase → Ready Stock.
+// Never call the legacy quantity writer, including for stale clients.
+operationOrdersRouter.post("/:id/transfer-ready", requireOperation, (c) =>
+  c.json({ error: "This action is no longer available. Use Ready Stock in SO Batch Purchase.", code: "warehouse_pick_retired" }, 410),
+);
 
 // ----- POST /:id/recheck-stock -----
 operationOrdersRouter.post("/:id/recheck-stock", requireOperation, async (c) => {

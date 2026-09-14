@@ -207,7 +207,7 @@ describe("Warehouse Performance — the handover chain against the delivery day"
 describe("Delivery Proof Control — the register's own state", () => {
   it("names each reached result's proof state and counts them", () => {
     const docs = [
-      doc({ id: "d1", do_number: "DO-1", orders: { id: "o1", so: 1301, customer_name: "a", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-10T09:00:00Z", ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-10T08:30:00Z", doNumber: "DO-1" }] } as never } }),
+      doc({ id: "d1", do_number: "DO-1", orders: { id: "o1", so: 1301, customer_name: "a", do_number: "DO-1", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-10T09:00:00Z", ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-10T08:30:00Z", doNumber: "DO-1" }] } as never } }),
       doc({ id: "d2", do_number: "DO-2", orders: { id: "o2", so: 1302, customer_name: "b", do_file_path: null, ops_order_control: { delivery_photos: [] } as never } }),
     ];
     const attempts = [
@@ -390,5 +390,25 @@ describe("reportMonthsOf — the months that hold a dated Delivery event", () =>
         cannotDeliver: [{ id: "c", order_id: "o", leg: 0, partner_id: null, reason_key: null, note: null, recorded_at: "2026-06-01T00:00:00Z" }],
       }),
     ).toEqual(["2026-09", "2026-08", "2026-07", "2026-06"]);
+  });
+});
+
+/* ── 【DELIVERY】 CARD 20 — the partner listing counts customer legs only ── */
+describe("Logistics Partner Performance excludes a warehouse leg's arrival (Card 20)", () => {
+  it("NETS's leg-1 arrival at the JB warehouse is not a delivered trip; AL's customer leg is", () => {
+    const stops = [{ leg: 1 }, { leg: 2 }] as never;
+    const docs = [
+      doc({ id: "l1", do_number: "DO-L1", leg: 1, logistics_partner: "NETS", orders: { id: "o-sg", so: 1362, customer_name: "sg", delivery_date: "2026-09-18", delivery_date_tbd: false, delivery_stops: stops } }),
+      doc({ id: "l2", do_number: "DO-L2", leg: 2, logistics_partner: "AL", orders: { id: "o-sg", so: 1362, customer_name: "sg", delivery_date: "2026-09-18", delivery_date_tbd: false, delivery_stops: stops } }),
+    ];
+    const attempts = [
+      attempt({ do_number: "DO-L1", result: "delivered", recorded_at: "2026-09-13T12:23:00Z" }),
+      attempt({ do_number: "DO-L2", result: "delivered", recorded_at: "2026-09-13T12:56:00Z" }),
+    ];
+    const rows = registerRowsOf({ deliveryOrders: docs, attempts, handoverEvents: [] });
+    expect(rows.find((r) => r.doNumber === "DO-L1")?.status.kind).toBe("arrived");
+    const out = partnerRowsOf({ rows, attempts, cannotDeliver: [], partners, month: M });
+    expect(out.map((r) => [r.name, r.trips, r.delivered])).toEqual([["AL", 1, 1]]);
+    expect(partnerLine(out[0]!)).toBe("1 trip · 1 delivered · 0 failed · Cannot Deliver 0");
   });
 });

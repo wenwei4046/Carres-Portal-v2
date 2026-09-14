@@ -5,6 +5,7 @@ import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { userClient } from "../../lib/supabase";
+import { _resetKeyedJournalLiveForTesting } from "./manual-journals";
 
 const env = {
   SUPABASE_URL: "https://t.x",
@@ -37,6 +38,7 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
+  _resetKeyedJournalLiveForTesting();
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -338,5 +340,182 @@ describe("manual journal — the database's refusals become sentences", () => {
     const { calls } = happy({ rpc: refused("23514", "gl_post_out_of_balance") });
     await post(OPENING);
     expect(calls.some((c) => c.kind === "from" && c.name === "gl_entries")).toBe(false);
+  });
+});
+
+// ── the request key (0502) ───────────────────────────────────────────────────
+
+describe("manual journal — a resend with the same request key", () => {
+  const KEY = "5e5e5e5e-0000-4000-8000-000000000001";
+  const KEYED = { ...OPENING, requestKey: KEY };
+  const READ_BACK = ok({ entry_no: "JE-202609-0007", source_doc_no: "MJ-202609-0001" });
+
+  /** A database with 0502 applied: the keyed function remembers each key and
+   *  the details it came with, the way `gl_manual_journal_requests` does. */
+  function keyedDatabase() {
+    const seen = new Map<string, { id: string; details: string }>();
+    let posted = 0;
+    const fake = fakeClient((call) => {
+      if (call.kind === "from" && call.name === "gl_config") return ok({ go_live_on: "2026-09-10" });
+      if (call.kind === "from" && call.name === "gl_entries") return READ_BACK;
+      if (call.kind === "rpc" && call.name === "gl_manual_journal") {
+        const { p_request_key: key, ...details } = call.args as AnyJson;
+        const first = key ? seen.get(key) : undefined;
+        if (first) {
+          return first.details === JSON.stringify(details)
+            ? ok(first.id)
+            : refused("P0001", "idempotency_mismatch",
+                "gl_manual_journal refused: this request was already recorded as JE-202609-0007 with different details");
+        }
+        posted += 1;
+        const id = `aaaaaaaa-0000-4000-8000-00000000000${posted}`;
+        if (key) seen.set(key, { id, details: JSON.stringify(details) });
+        return ok(id);
+      }
+      throw new Error(`unexpected call ${call.kind} ${call.name}`);
+    });
+    return { ...fake, posted: () => posted };
+  }
+
+  it("passes the key to the keyed function when it is sent", async () => {
+    const { calls } = happy();
+    expect((await post(KEYED)).status).toBe(201);
+    const rpc = calls.filter((c) => c.kind === "rpc");
+    expect(rpc).toHaveLength(1);
+    expect(Object.keys(rpc[0]?.args as AnyJson).sort()).toEqual(["p_entry_date", "p_lines", "p_narration", "p_request_key"]);
+    expect((rpc[0]?.args as AnyJson).p_request_key).toBe(KEY);
+  });
+
+  it("same key, same details: the same entry id, and nothing new is posted", async () => {
+    const db = keyedDatabase();
+    const first = await post(KEYED);
+    const second = await post(KEYED);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect((await json(second)).id).toBe((await json(first)).id);
+    expect(db.posted()).toBe(1);
+  });
+
+  it("same key, different details: refused with 409, naming the entry already recorded", async () => {
+    const db = keyedDatabase();
+    expect((await post(KEYED)).status).toBe(201);
+    const changed = await post({
+      ...KEYED,
+      lines: [{ account_code: "1120", debit: 200 }, { account_code: "3300", credit: 200 }],
+    });
+    expect(changed.status).toBe(409);
+    expect(await json(changed)).toMatchObject({
+      code: "idempotency_mismatch",
+      message: "This entry was already recorded as JE-202609-0007 before it was changed. Open it in the Journal. To record another, start a New journal entry.",
+    });
+    expect(db.posted()).toBe(1);
+  });
+
+  it("no key: the old call, and every press is a new entry", async () => {
+    const db = keyedDatabase();
+    const a = await post(OPENING);
+    const b = await post(OPENING);
+    expect((await json(a)).id).not.toBe((await json(b)).id);
+    expect(db.posted()).toBe(2);
+    for (const c of db.calls.filter((x) => x.kind === "rpc")) {
+      expect(Object.keys(c.args as AnyJson)).not.toContain("p_request_key");
+    }
+  });
+
+  it("refuses a key that is not a uuid before any database call", async () => {
+    const { calls } = happy();
+    const res = await post({ ...OPENING, requestKey: "not-a-key" });
+    expect(res.status).toBe(422);
+    expect(calls).toEqual([]);
+  });
+
+  describe("before 0502 is applied", () => {
+    it.each(["PGRST202", "42883"])("falls back to the old call when the keyed function is not found (%s)", async (code) => {
+      const { calls } = fakeClient((call) => {
+        if (call.kind === "from" && call.name === "gl_config") return ok({ go_live_on: "2026-09-10" });
+        if (call.kind === "from" && call.name === "gl_entries") return READ_BACK;
+        if (call.kind === "rpc" && "p_request_key" in (call.args as AnyJson)) {
+          return { data: null, error: { code, message: "Could not find the function public.gl_manual_journal" } };
+        }
+        if (call.kind === "rpc") return ok(ENTRY_ID);
+        throw new Error(`unexpected call ${call.kind} ${call.name}`);
+      });
+      const res = await post(KEYED);
+      expect(res.status).toBe(201);
+      expect((await json(res)).id).toBe(ENTRY_ID);
+      const rpc = calls.filter((c) => c.kind === "rpc");
+      expect(rpc).toHaveLength(2);
+      expect(Object.keys(rpc[1]?.args as AnyJson).sort()).toEqual(["p_entry_date", "p_lines", "p_narration"]);
+    });
+
+    it("keeps \"check the Journal first\" when the fallback call's answer does not come back", async () => {
+      fakeClient((call) => {
+        if (call.kind === "from" && call.name === "gl_config") return ok({ go_live_on: "2026-09-10" });
+        if (call.kind === "rpc" && "p_request_key" in (call.args as AnyJson)) {
+          return { data: null, error: { code: "PGRST202", message: "not found" } };
+        }
+        if (call.kind === "rpc") return { data: null, error: { message: "fetch failed" } };
+        throw new Error(`unexpected call ${call.kind} ${call.name}`);
+      });
+      const res = await post(KEYED);
+      expect(res.status).toBe(503);
+      expect(await json(res)).toMatchObject({
+        code: "outcome_unknown",
+        retry_safe: false,
+        message: "The answer did not come back. Check the Journal for this entry before you record it again.",
+      });
+    });
+
+    it("never falls back on any other refusal — the keyed function answered", async () => {
+      const { calls } = happy({ rpc: refused("23514", "gl_post_out_of_balance") });
+      const res = await post(KEYED);
+      expect(res.status).toBe(422);
+      expect(calls.filter((c) => c.kind === "rpc")).toHaveLength(1);
+    });
+  });
+
+  describe("an unknown outcome once the key is live", () => {
+    it("says a second press is safe once the keyed function has answered in this isolate", async () => {
+      let n = 0;
+      fakeClient((call) => {
+        if (call.kind === "from" && call.name === "gl_config") return ok({ go_live_on: "2026-09-10" });
+        if (call.kind === "from" && call.name === "gl_entries") return READ_BACK;
+        if (call.kind === "rpc") {
+          n += 1;
+          return n === 1 ? ok(ENTRY_ID) : { data: null, error: { message: "<html>502 Bad Gateway</html>" } };
+        }
+        throw new Error(`unexpected call ${call.kind} ${call.name}`);
+      });
+      expect((await post(KEYED)).status).toBe(201);
+      const res = await post({ ...KEYED, requestKey: "5e5e5e5e-0000-4000-8000-000000000002" });
+      expect(res.status).toBe(503);
+      expect(await json(res)).toMatchObject({
+        code: "outcome_unknown",
+        retry_safe: true,
+        message: "The answer did not come back. Press Record journal entry again. This entry is never recorded twice.",
+      });
+    });
+
+    it("stays careful when nothing yet shows the keyed function is live", async () => {
+      happy({ rpc: { data: null, error: { message: "<html>502 Bad Gateway</html>" } } });
+      const res = await post(KEYED);
+      expect(res.status).toBe(503);
+      expect(await json(res)).toMatchObject({ retry_safe: false });
+    });
+
+    it("does not count an unkeyed press as proof the key is live", async () => {
+      let n = 0;
+      fakeClient((call) => {
+        if (call.kind === "from" && call.name === "gl_config") return ok({ go_live_on: "2026-09-10" });
+        if (call.kind === "from" && call.name === "gl_entries") return READ_BACK;
+        if (call.kind === "rpc") {
+          n += 1;
+          return n === 1 ? ok(ENTRY_ID) : { data: null, error: { message: "fetch failed" } };
+        }
+        throw new Error(`unexpected call ${call.kind} ${call.name}`);
+      });
+      expect((await post(OPENING)).status).toBe(201);
+      expect(await json(await post(KEYED))).toMatchObject({ retry_safe: false });
+    });
   });
 });

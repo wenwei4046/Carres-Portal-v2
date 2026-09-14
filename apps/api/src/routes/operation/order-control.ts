@@ -191,6 +191,34 @@ orderControlRouter.put("/:id/control", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+  // 0504 — ONLY A PERSON CARRIES A CUSTOMER (owner ruling 2026-09-13). The
+  // responsible Operation person is answerable for the follow-up, the balance
+  // and the storage collection, so the assignment must name an ACTIVE
+  // INDIVIDUAL — a People record with a `staff_code`. A shared login or a robot
+  // account may record evidence and never owns; the responsibility read ignores
+  // one, which would leave the order silently unowned.
+  if ("assigned_staff" in parsed.data && parsed.data.assigned_staff != null) {
+    const { data: person } = await sb
+      .from("app_users")
+      .select("status, role, staff_code")
+      .eq("id", parsed.data.assigned_staff)
+      .maybeSingle();
+    const owns =
+      !!person &&
+      (person.status ?? "active") === "active" &&
+      (person.role === "operation" || person.role === "principal") &&
+      person.staff_code != null;
+    if (!owns) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: "The order can only be assigned to an active Operation person",
+        },
+        422,
+      );
+    }
+  }
   // Staff owner (0232): assigned_by / assigned_at are SERVER-stamped whenever
   // the assigned_staff key rides the patch — never trusted from the client.
   const assignStamp =

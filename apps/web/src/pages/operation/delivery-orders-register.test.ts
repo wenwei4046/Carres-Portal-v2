@@ -27,7 +27,9 @@ import {
   tripLinesOf,
   type DoRegisterRow,
   groupProofRecords,
+  missingDeliveryProofOf,
   NO_PROOF_REVIEW,
+  DO_STATUS_KEYS,
   DO_WORK_QUEUES,
   DO_QUEUE_LABEL,
 } from "./delivery-orders-register";
@@ -51,6 +53,7 @@ function doRow(over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow {
       customer_address_state: "Selangor",
       delivery_date: "2026-08-25",
       delivery_date_tbd: false,
+      do_number: over.do_number ?? "DO-180826-3035",
       do_file_path: null,
       order_lines: [
         { id: "l-1", sku: "mattress:M1401F-K", qty: 1 },
@@ -291,7 +294,7 @@ describe("doWorkQueueOf — one primary queue, canonical facts only", () => {
   it("a voided document queues nowhere, whatever its history", () => {
     expect(
       doWorkQueueOf({
-        status: { kind: "cancelled", label: "Cancelled", reasonLabel: null },
+        status: { kind: "cancelled", label: "Cancelled", reasonLabel: null, stop: null },
         latestResult: "delivered",
         photosPresent: false,
         signedDoPresent: false,
@@ -429,5 +432,67 @@ describe("the footer", () => {
     expect(doRegisterFooter(4, 4)).toBe("4 delivery orders");
     expect(doRegisterFooter(1, 4)).toBe("1 of 4 delivery orders");
     expect(doRegisterFooter(1, 1)).toBe("1 delivery order");
+  });
+});
+
+
+describe("a signed file belongs to this DO, not its sibling", () => {
+  it("does not count the final signature on an intermediate DO", () => {
+    const raw = doRow();
+    const row = build({ orders: { ...raw.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } }, [DELIVERED]);
+    expect(row.signedDoPresent).toBe(false);
+    expect(row.proofReview.state).toBe("none");
+  });
+  it("counts a signed paper bound to the old DO even after the order mirror changes", () => {
+    const raw = doRow();
+    const evidence = { id: "e1", attempt_id: "a1", order_id: raw.orders.id, do_number: raw.do_number, kind: "document" as const, path: "order/own.pdf", recorded_at: "2026-09-13T10:00:00Z", recorded_by: null };
+    const row = buildDoRegisterRow({ ...raw, orders: { ...raw.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf" } }, new Map(), new Map(), groupProofRecords([], [evidence]));
+    expect(row.signedDoPresent).toBe(true);
+  });
+});
+
+/* ── 【DELIVERY】 CARD 20 — an intermediate Journey leg ARRIVES ─────────────
+   `Delivered` is the customer's word. A leg before the last whose goods reached
+   the named partner warehouse reads `Arrived` over that stop, owes no delivery
+   proof and queues nowhere; the customer leg keeps `Delivered` and its proof. */
+describe("an intermediate Journey leg's document (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" },
+  ] as never;
+  const chain = ["ready_for_handover", "handed_over", "received_by_logistics"] as const;
+
+  it("leg 1 of 2 with a delivered result is Arrived over the stop, no proof owed, no queue", () => {
+    const row = build({ leg: 1, orders: { ...doRow().orders, delivery_stops: stops } }, [DELIVERED], [...chain]);
+    expect(row.status.kind).toBe("arrived");
+    expect(row.status.label).toBe("Arrived");
+    expect(row.status.stop).toBe("JB transit warehouse");
+    expect(row.queue).toBeNull();
+    expect(row.proofReview).toEqual(NO_PROOF_REVIEW);
+    expect(missingDeliveryProofOf({ latestResult: "delivered", photosPresent: false, signedDoPresent: false, intermediateLeg: true })).toEqual({ photo: false, signedDo: false });
+  });
+
+  it("the same result on the LAST leg is the customer's Delivered, and the proof is owed", () => {
+    const row = build({ leg: 2, orders: { ...doRow().orders, delivery_stops: stops } }, [DELIVERED], [...chain]);
+    expect(row.status.kind).toBe("delivered");
+    expect(row.status.stop).toBeNull();
+    expect(row.queue).toBe("upload_signed_do");
+  });
+
+  it("an intermediate leg still on the road is Out for delivery and owes its result", () => {
+    const row = build({ leg: 1, orders: { ...doRow().orders, delivery_stops: stops } }, [], [...chain]);
+    expect(row.status.kind).toBe("out_for_delivery");
+    expect(row.queue).toBe("record_result");
+  });
+
+  it("the DOCUMENT STATUS rail counts Arrived as its own word", () => {
+    const rows = [
+      build({ id: "d-leg1", do_number: "DO-LEG-1", leg: 1, orders: { ...doRow().orders, delivery_stops: stops } }, [{ ...DELIVERED, do_number: "DO-LEG-1" }], [...chain]),
+      build({}, [DELIVERED]),
+    ];
+    const rails = buildDoRegisterRails(rows, { queue: null, status: null });
+    expect(rails.status.arrived).toBe(1);
+    expect(rails.status.delivered).toBe(1);
+    expect(DO_STATUS_KEYS).toContain("arrived");
   });
 });

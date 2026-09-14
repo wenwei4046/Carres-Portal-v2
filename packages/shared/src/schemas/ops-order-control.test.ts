@@ -10,6 +10,7 @@ import {
   decideStorageWaiverInput,
   recordStorageExtensionInput,
   distributeOrders,
+  planOpsAssignment,
   seenTodayMYT,
   countsAsInToday,
 } from "./ops-order-control";
@@ -421,5 +422,98 @@ describe("decideStorageWaiverInput", () => {
 
   it("refuses anything else — a release is not a free-text field", () => {
     expect(decideStorageWaiverInput.safeParse({ decision: "maybe" }).success).toBe(false);
+  });
+});
+
+// ── 0504 · THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13) ─────────
+describe("planOpsAssignment", () => {
+  const SHASHA = "u-shasha";
+  const YUJUN = "u-yujun";
+  const SHARED = "u-shared-login"; // no People record — records evidence, never owns
+  const LEFT = "u-resigned";
+  const individuals = new Set([SHASHA, YUJUN]);
+  const mayOwn = (id: string | null | undefined) => !!id && individuals.has(id);
+  const pool = [SHASHA, YUJUN];
+
+  it("deals only what nobody carries, and never moves an order that already rests with a person", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: null, assignedBy: null },
+        { orderId: "o2", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o3", assignedStaff: YUJUN, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    // both carry one already, so the tie breaks deterministically on userId
+    expect(plan).toEqual([{ orderId: "o1", userId: SHASHA }]);
+  });
+
+  it("a quiet re-run writes nothing — every open order already has its person", () => {
+    expect(planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o2", assignedStaff: YUJUN, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("an order the SYSTEM put on an account that may not own is dealt again — a shared login and somebody who left both count as nobody", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHARED, assignedBy: null },
+        { orderId: "o2", assignedStaff: LEFT, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    expect(plan.map((p) => p.orderId).sort()).toEqual(["o1", "o2"]);
+    expect(new Set(plan.map((p) => p.userId))).toEqual(new Set([SHASHA, YUJUN]));
+  });
+
+  it("a HUMAN assignment is never touched, even when it names an account that may not own", () => {
+    expect(planOpsAssignment(
+      [{ orderId: "o1", assignedStaff: SHARED, assignedBy: "manager" }],
+      pool,
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("loads count every open order a person already carries, so the deal levels the real workload", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o2", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o3", assignedStaff: null, assignedBy: null },
+        { orderId: "o4", assignedStaff: null, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    // Yu Jun carries nothing, so both new orders go to her before Shasha
+    expect(plan).toEqual([
+      { orderId: "o3", userId: YUJUN },
+      { orderId: "o4", userId: YUJUN },
+    ]);
+  });
+
+  it("nobody in the pool may own → nothing is dealt, and no order lands on a shared login", () => {
+    expect(planOpsAssignment(
+      [{ orderId: "o1", assignedStaff: null, assignedBy: null }],
+      [SHARED],
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("two operators sweeping at once agree — the plan is deterministic", () => {
+    const open = [
+      { orderId: "o9", assignedStaff: null, assignedBy: null },
+      { orderId: "o1", assignedStaff: null, assignedBy: null },
+      { orderId: "o5", assignedStaff: null, assignedBy: null },
+    ];
+    expect(planOpsAssignment(open, pool, mayOwn))
+      .toEqual(planOpsAssignment([...open].reverse(), [...pool].reverse(), mayOwn));
   });
 });
