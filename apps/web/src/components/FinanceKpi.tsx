@@ -31,7 +31,8 @@ export function FinanceKpi({
 }: {
   label: string;
   value: string | null;
-  hint?: string;
+  /** A string, or (the Dashboard's Net cash) two short lines. */
+  hint?: ReactNode;
   tone?: FinanceKpiTone;
   accent?: boolean;
   noValue?: ReactNode;

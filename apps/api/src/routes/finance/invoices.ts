@@ -56,6 +56,9 @@ const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
+  // The Finance Dashboard's A/R Aging counts an order's age from the day it
+  // was placed — the same date finance_ar_aging (0062/0125) aged it by.
+  "placed_at," +
   "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
   // §5 likely-duplicate: the comparison needs the reference and the method
   // beside the amount and the paid date, so the operator inspects the RIGHT
