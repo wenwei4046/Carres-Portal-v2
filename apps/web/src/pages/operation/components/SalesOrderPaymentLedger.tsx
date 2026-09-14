@@ -48,7 +48,12 @@ function kindWord(kind: OrderPaymentRow["kind"]): string | null {
   return null;
 }
 
-export default function PaymentLedger({ orderId, savedPayments = [], summaryLoading = false, summaryError = false }: {
+export default function PaymentLedger({
+  orderId,
+  savedPayments,
+  summaryLoading,
+  summaryError,
+}: {
   orderId: string | null;
   savedPayments?: SalesOrderTemplateData["payments"];
   summaryLoading?: boolean;
@@ -84,7 +89,7 @@ export default function PaymentLedger({ orderId, savedPayments = [], summaryLoad
   }
   const rows = ledger.length > 0
     ? ledger.map((payment) => ({ payment, summary: null }))
-    : savedPayments.map((summary) => ({ payment: null, summary }));
+    : (savedPayments ?? []).map((summary) => ({ payment: null, summary }));
   if (rows.length === 0) {
     return (
       <div data-testid="so-payments-empty">
