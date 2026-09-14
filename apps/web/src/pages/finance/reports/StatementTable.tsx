@@ -10,7 +10,9 @@
  */
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
+import Button from "@/components/kit/Button";
 import DataTable, { type Column, type GroupRowCell } from "@/components/kit/DataTable";
+import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
 import type { StatementSection } from "./report-queries";
 
@@ -107,7 +109,8 @@ export default function StatementTable({
   /** The line under a section band where every account is at RM 0.00, by section kind. */
   nothing: (section: string) => string;
   accountHref: (code: string) => string;
-  /** A second line under an account, or null for none. */
+  /** A note about an account, or null for none. It shows in the tooltip of a
+   *  small mark after the account name, so the row stays one line. */
   lineNote?: (line: { code: string; reclassified: number | null }) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
@@ -125,14 +128,17 @@ export default function StatementTable({
           case "group":
             return <span className="font-semibold">{r.name}</span>;
           case "line": {
+            // The account link, then (only when there is a note) a mark that
+            // shows the note on hover or keyboard focus. A long name cuts off
+            // with "…"; the mark never does.
             const note = lineNote?.(r) ?? null;
-            const link = <Link className="underline underline-offset-2" to={accountHref(r.code)}>
-              {r.code} {r.name ?? "Account name not available"}
-            </Link>;
-            if (!note) return <span className={`block truncate ${r.nested ? "pl-4" : ""}`}>{link}</span>;
-            return <span className={`block ${r.nested ? "pl-4" : ""}`}>
-              <span className="block truncate">{link}</span>
-              <span className="block truncate text-label text-kit-slate-11">{note}</span>
+            return <span className={`flex items-center ${r.nested ? "pl-4" : ""}`}>
+              <Link className="min-w-0 truncate underline underline-offset-2" to={accountHref(r.code)}>
+                {r.code} {r.name ?? "Account name not available"}
+              </Link>
+              {note && <Tooltip content={note}>
+                <Button variant="ghost" size="sm" icon="help" aria-label={note} />
+              </Tooltip>}
             </span>;
           }
           case "unclosed":
