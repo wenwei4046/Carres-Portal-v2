@@ -963,11 +963,11 @@ describe("Cancel SO", () => {
 describe("Sales Orders table correction", () => {
   it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    const sort = screen.getByRole("button", { name: "Requested Delivery Date", exact: true });
+    const sort = screen.getByRole("button", { name: "Requested Delivery Date" });
     expect(sort.querySelector("br")).not.toBeNull();
     fireEvent.click(sort);
-    expect(screen.getByRole("button", { name: "Requested Delivery Date", exact: true })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Filter Requested Delivery Date", exact: true }));
+    expect(screen.getByRole("button", { name: "Requested Delivery Date" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Requested Delivery Date" }));
     expect(screen.getByText("Today")).toBeInTheDocument();
   });
 
@@ -979,9 +979,9 @@ describe("Sales Orders table correction", () => {
     };
     localStorage.setItem("carres.salesOrders.register.v4.anon", JSON.stringify(saved));
     mount();
-    expect(screen.getByRole("button", { name: "Customer", exact: true }).closest("th")).toHaveStyle({width: "288px"});
-    expect(screen.getByRole("button", { name: "Requested Delivery Date", exact: true }).closest("th")).toHaveStyle({width: "240px"});
-    expect(screen.getByRole("button", { name: "Filter Phone", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
+    expect(screen.getByRole("button", { name: "Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
       "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__", "grid-expansion-gutter-customer",
