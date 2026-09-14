@@ -44,13 +44,6 @@ vi.mock("@/lib/queries", async () => {
     // Card 4B — the CreatePOModal-only stubs went with the modal. Only
     // `useDeliveryPartners` stays: the child tabs read it too.
     useDeliveryPartners: () => ({ data: { partners: [] } }),
-    useAwaitingStockShortage: () => ({
-      data: undefined,
-      isFetching: false,
-      isFetched: false,
-      isError: false,
-      refetch: vi.fn(),
-    }),
     useStockAlerts: () => ({
       data: undefined,
       isFetching: false,
