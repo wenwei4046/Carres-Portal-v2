@@ -568,12 +568,12 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 |---|---|---|---|
 | 1 | checkbox | one per delivery | |
 | 2 | expand | opens the four panels (§8.5) | |
-| 3 | `Delivery Status` | one status word set (§8.4) | the failure reason, or the overdue act |
-| 4 | `SO No` | `SO-1358`, opens the Sales Order | |
+| 3 | `Delivery Status` | one status word set (§8.4) | the failure reason, the overdue act, the proof gap — or, on a row that owes a customer conversation, the CONTACT DEADLINE drawn as a glyph and a day |
+| 4 | `SO No` | `SO-1358`, opens the Sales Order | the customer's own reference, and nothing else |
 | 5 | `Customer` | customer name | phone |
-| 6 | `Delivery Location` | city and state, from the one address reading below | building type, floor and lift when recorded |
+| 6 | `Delivery Location` | city and state, from the one address reading below | building type, floor and lift when recorded; on a JOURNEY LEG, that leg's route instead |
 | 7 | `Requested Delivery Date` | `Thu, 24 Sep` · `To be confirmed` · `No delivery date` | `Customer requested this date` only when a window, not a date, was given |
-| 8 | `Confirmed Delivery` | `Confirmed` · `Not confirmed` | `Thu, 22 Oct` then `2 PM to 5 PM`; `Mon, 14 Sep · No time agreed` for a half booking; `Call by Thu, 22 Oct` while unconfirmed |
+| 8 | `Confirmed Delivery` | `Confirmed` · `Not confirmed` | `Thu, 22 Oct` then `2 PM to 5 PM`; `Mon, 14 Sep · No time agreed` for a half booking; NOTHING while unconfirmed — the contact deadline is column 3's, and it is stated once |
 | 9 | `Logistics` | partner name · `No logistics picked` | driver name once assigned |
 | 10 | `Items & Stock` | `Ready` · `Not ready` | `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` |
 | 11 | `Payment` | `Paid` · `Do not deliver` · `Collect RM {amount}` | `RM {amount} still to collect` · `Finance is holding this delivery` · `Cash on delivery` |
@@ -588,6 +588,65 @@ scrolling; the sheet scrolls, never squeezes. The layout storage key moves to `w
 No cell joins facts with an em dash. The SO, customer, Logistics Partner and object identity are
 named once on the row. Dates print `Tue, 18 Aug`, the year only when not current. Every absence
 is a governed word, never a dash. `Requested Delivery Date` opens no editor here.
+
+**`SO No` FORMAT — owner ruling 2026-09-14, APPROVED / LOCKED.** The number and the customer's
+reference are TWO LINES, never one string:
+
+```
+SO-1217          line 1 · blue, monospace, opens the same Sales Order
+TCF0541          line 2 · smaller, muted
+```
+
+The reference used to ride line 1 as an inline span, so `SO-1217 TCF0541` read as one mangled
+number and an operator matching a reference off WhatsApp had to work out where the document
+number ended. The two values are never concatenated on one line. **No reference, no line** — the
+number sits alone, with no placeholder and no dash. **The cell is IDENTITY and carries nothing
+else:** a Journey leg's route is a PLACE and rides column 6, the way the Delivery Orders register
+retired its own inline route from this same cell (2026-09-06). Search still reaches the row by
+either value and sorting stays on the number.
+
+**THE JOURNEY LEG'S ROUTE — owner ruling 2026-09-14, APPROVED / LOCKED.** `Klang WH → JB transit`
+is column 6's supporting line on that row, in place of the building facts. An intermediate leg
+never reaches the customer's door, so `Condominium · Floor 12` against a warehouse-to-transit run
+describes a building those goods are not going to; the CUSTOMER leg keeps its building facts
+because it does arrive there. This is the reading the shared region arithmetic already uses —
+`regionBucketOf` classifies a leg by its destination. The route is never appended to the
+reference, never stacked as a third line, and never hidden: the WHOLE journey — every leg, every
+place, every recorded result — is one right-click away on `Open Order Route`, the same door the
+Delivery Orders register offers from the same menu.
+
+**THE WORK FORMAT — owner ruling 2026-09-14, APPROVED / LOCKED.** Column 3 states the ACT, then
+the contact deadline as a glyph and a day:
+
+```
+Call customer                 nothing has been agreed yet
+[call] Fri, 18 Sep
+
+Confirm delivery time         the DAY is agreed and the window is not
+[call] Fri, 18 Sep
+
+Call customer                 the deadline has passed
+[late] Fri, 18 Sep            red, and it keeps the day it missed
+```
+
+The glyphs are the kit's own (`components/kit/Icon`: `call` and `late`) at the row size. No glyph
+replaces the action text and the action text never becomes an icon. **The party leaves the
+sentence:** `NETS must contact the customer` spent the column naming a company the `Logistics`
+column already carries, and buried the one word that says what to do. Who owns the call stays a
+Delivery Settings fact and its own status rung; the row reads the same either way. **No dash
+joins an act to a party or to an explanation**, in the cell or in its tooltip.
+
+**The deadline is stated ONCE, and it is stated in Work.** `Call by {date}` is retired from every
+visible line: it printed the verb column 3 had just said, and it printed the same day twice on
+one row — once under the status and again under `Confirmed Delivery`. The words did not
+disappear. `Contact deadline {date}`, and `Contact deadline {date} · overdue, the deadline does
+not move` once it has passed, are the cell's `title` and its accessible name, and they are what
+Search matches and what the Excel export prints. A row whose customer named no day owes no
+deadline and shows none: a step with no anchor can never be late.
+
+**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS, so
+the two contact rungs — which now print one sentence — are ONE option, and the pick narrows by
+the label rather than by the internal key.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
@@ -789,8 +848,9 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
 | no partner on the scope | `Operation must assign logistics` | orange | |
-| partner set, no contact record, the partner contacts the customer | `{partner} must contact the customer` | orange | `Call by {date}` |
-| partner set, no contact record, Carres contacts the customer | `Operation must call the customer` | orange | `Call by {date}` |
+| partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, the DAY is agreed and the window is not | `Confirm delivery time` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
 | day and window recorded — a CUSTOMER leg | `Confirmed` | green | the window |
 | day and window recorded — a TRANSFER leg | `Transfer confirmed` | none | the window |
@@ -805,6 +865,9 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
 | attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
 | a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact |
+
+**Retired on Monitor by the 2026-09-14 ruling:** `{partner} must contact the customer` ·
+`Operation must call the customer` · `Call by {date}` on any visible line.
 
 **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
 `Waiting for warehouse` · `Ready for handover` · `Out for delivery` · `Created` · any bare
