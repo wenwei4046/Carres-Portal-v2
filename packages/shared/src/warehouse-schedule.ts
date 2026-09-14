@@ -2,7 +2,6 @@ import { goodsCategoryWordOf, type GoodsCategoryWord } from "./line-category";
 import { poSupplierReplyOf, type PoDatePromise } from "./po-workspace";
 import {
   resolveWarehouseSchedule,
-  weekdayOfIsoDate,
   type WarehouseActivity,
   type WarehouseScheduleInput as WarehouseSettingsScheduleInput,
 } from "./warehouse-settings";
@@ -11,7 +10,7 @@ import {
   WAREHOUSE_OFF_DAYS,
   type WarehouseOutboundCard,
 } from "./warehouse-outbound";
-import type { IsoDate } from "./working-days";
+import { isWorkingDay, type IsoDate } from "./working-days";
 
 /**
  * WAREHOUSE — ARRIVAL / PICKUP SCHEDULE, the authoritative data projection.
@@ -159,6 +158,9 @@ export interface WarehouseScheduleResult {
    *  genuine "nothing scheduled"; `cards: []` with a non-empty `errors` is a
    *  failure and must never be read as "no arrangements". */
   errors: WarehouseScheduleError[];
+  /** The `from` that lands the window immediately BEFORE this one — computed
+   *  here because only this layer knows the Site's operating rule. */
+  previousFrom: IsoDate;
 }
 
 // ── ARRIVAL source facts ─────────────────────────────────────────────────────
@@ -582,13 +584,14 @@ export function warehouseScheduleOperatingDates(
   count: number = WAREHOUSE_SCHEDULE_DATE_COUNT,
   direction: WarehouseScheduleDirection = "arrival",
   settings?: WarehouseScheduleSettings | null,
+  holidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
 ): IsoDate[] {
   const activity = warehouseScheduleActivityOf(direction);
   const out: IsoDate[] = [];
   let cursor = from.slice(0, 10);
   let guard = 0;
   while (out.length < count && guard < count * 10 + 60) {
-    if (operatesOn(cursor, activity, settings)) out.push(cursor);
+    if (operatesOn(cursor, activity, settings, holidays)) out.push(cursor);
     cursor = stepIsoDate(cursor);
     guard += 1;
   }
@@ -600,13 +603,68 @@ function operatesOn(
   date: IsoDate,
   activity: WarehouseActivity,
   settings: WarehouseScheduleSettings | null | undefined,
+  holidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
 ): boolean {
   const availability = settings
     ? resolveWarehouseSchedule({ ...settings, date })[activity].availability
     : "not_configured";
   if (availability === "open") return true;
   if (availability === "closed") return false;
-  return !WAREHOUSE_OFF_DAYS.includes(weekdayOfIsoDate(date));
+  /* Nobody configured this day, so the GOVERNED calendar answers — and it has
+     two halves, not one. The weekly closure was already here; the governed
+     closed DATES belong beside it for the same reason, or a public holiday
+     shows as a working day the moment a Site has no holiday policy saved
+     (which is every Site in production today). A Site that does configure its
+     own policy still overrides both, above. */
+  return isWorkingDay(date, { offDays: WAREHOUSE_OFF_DAYS, holidays });
+}
+
+/**
+ * The `from` that makes a window of `count` operating dates end on the
+ * operating date immediately BEFORE `before`.
+ *
+ * WHY THIS EXISTS RATHER THAN SUBTRACTING DAYS. `Previous` first stepped back
+ * by the shown window's CALENDAR span, which is only right when the preceding
+ * stretch contains the same number of closed days as the current one. Measured
+ * on production 2026-09-14: from `Mon 21 – Sat 26` it produced
+ * `Tue 15 – Mon 21`, re-showing Mon 21, because the Sunday inside the earlier
+ * stretch made six calendar days cover only five operating ones. Paging back
+ * therefore repeated a column and drifted a day each press.
+ *
+ * Counting operating dates BACKWARDS through the same predicate the forward
+ * walk uses is the only thing that cannot drift: whatever the configuration
+ * closes, both directions agree about it.
+ */
+export function warehouseSchedulePreviousFrom(
+  before: IsoDate,
+  count: number = WAREHOUSE_SCHEDULE_DATE_COUNT,
+  direction: WarehouseScheduleDirection = "arrival",
+  settings?: WarehouseScheduleSettings | null,
+  holidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): IsoDate {
+  const activity = warehouseScheduleActivityOf(direction);
+  let cursor = stepIsoDateBack(before.slice(0, 10));
+  let earliest = cursor;
+  let found = 0;
+  let guard = 0;
+  while (found < count && guard < count * 10 + 60) {
+    if (operatesOn(cursor, activity, settings, holidays)) {
+      found += 1;
+      earliest = cursor;
+    }
+    if (found < count) cursor = stepIsoDateBack(cursor);
+    guard += 1;
+  }
+  return earliest;
+}
+
+function stepIsoDateBack(iso: IsoDate): IsoDate {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const prev = new Date(Date.UTC(y, m - 1, d - 1));
+  return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(prev.getUTCDate()).padStart(2, "0")}`;
 }
 
 function stepIsoDate(iso: IsoDate): IsoDate {

@@ -7,6 +7,8 @@ import {
   warehousePickupScheduleCards,
   warehousePickupScopeKey,
   warehouseScheduleOperatingDates,
+  warehouseSchedulePreviousFrom,
+  myHolidaySet,
   WAREHOUSE_SCHEDULE_DATE_COUNT,
   type DeliveryWarehouseScheduleEvent,
   type InboundArrival,
@@ -298,13 +300,30 @@ export function useWarehouseSchedule(
           "Site operating dates could not be read. Dates below follow the standard Warehouse week, not this Site's configured schedule.",
       });
 
+    /* The governed Malaysian closed dates ride alongside the Site
+       configuration — the same set the rest of the Warehouse counts by. A Site
+       that saves its own holiday policy still overrides them. */
+    const holidays = myHolidaySet();
+    const dates = warehouseScheduleOperatingDates(
+      windowFrom,
+      count,
+      direction,
+      settings,
+      holidays,
+    );
     return {
       cards: sortWarehouseScheduleCards(scoped),
-      operatingDates: warehouseScheduleOperatingDates(
-        windowFrom,
+      operatingDates: dates,
+      /* Where `Previous` lands. Computed HERE because only this layer holds the
+         Site configuration, and counted BACKWARDS through the same predicate
+         the forward walk uses, so the two can never disagree about a closed
+         day. The page does no date arithmetic of its own. */
+      previousFrom: warehouseSchedulePreviousFrom(
+        dates[0] ?? windowFrom,
         count,
         direction,
         settings,
+        holidays,
       ),
       loading: isArrival ? inboundQuery.isPending : pickupQuery.isPending,
       errors,

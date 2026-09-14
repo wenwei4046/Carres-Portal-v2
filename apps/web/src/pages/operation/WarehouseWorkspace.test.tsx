@@ -85,6 +85,8 @@ function setSchedule(over: Partial<WarehouseScheduleResult> = {}) {
     operatingDates: DATES,
     loading: false,
     errors: [],
+    /* The projection owns backward paging; the page just uses the answer. */
+    previousFrom: "2026-09-08",
     ...over,
   };
 }
@@ -493,24 +495,28 @@ describe("long values and the narrow viewport", () => {
     expect(screen.getByTestId("ws-card-open")).toBeInTheDocument();
   });
 
-  it("the board pages a WHOLE window, never one day at a time", () => {
-    /* Six operating dates across a closed Sunday — the window SPANS seven
-       calendar days, so Previous must jump seven, not one. */
+  it("Previous uses the PROJECTION's answer, never its own arithmetic", () => {
+    /* Measured on production 2026-09-14: stepping back by the window's
+       calendar span produced `Tue 15 – Mon 21` from `Mon 21 – Sat 26`,
+       repeating a column, because the Sunday inside the earlier stretch made
+       six calendar days cover only five operating ones. Only the layer that
+       holds the Site configuration can count operating dates backwards. */
     setSchedule({
       operatingDates: [
-        "2026-09-14",
-        "2026-09-15",
-        "2026-09-16",
-        "2026-09-17",
-        "2026-09-18",
-        "2026-09-19",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-26",
       ],
+      previousFrom: "2026-09-14",
     });
     mount();
     fireEvent.click(screen.getByTestId("ws-prev"));
-    /* 2026-09-14 minus the window's own 6-day span. Anything closer would put
-       five already-visible dates back on the board. */
-    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-08");
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-14");
+    /* The date we came from must NOT be the one we land on. */
+    expect(screen.getByTestId("location")).not.toHaveTextContent("from=2026-09-15");
   });
 
   it("Next starts the day AFTER the last date shown — never a repeated column", () => {
