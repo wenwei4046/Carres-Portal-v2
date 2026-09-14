@@ -21,6 +21,7 @@ import {
   confirmedDeliveryOf,
   legWorkStatusOf,
   entersDeliveryWork,
+  isOpenDeliveryScope,
   requiredSalesFactsMissing,
   deliveryEntryBlockers,
   regionBucketOf,
@@ -311,6 +312,29 @@ describe("the entry rule keeps Sales work out of Delivery Work", () => {
     expect(
       requiredSalesFactsMissing(order({ id: "a", so: 1301, delivery_date: null, delivery_date_tbd: false })),
     ).toContain(DW.requestedDateNotRecorded);
+  });
+
+  it("⭐ CARD 23 · refuses a CANCELLED order — the entry rule always said so", () => {
+    /* Delivery MASTER §8.3's entry rule has named cancelled orders since
+       2026-08-24. `isOpenDeliveryScope` only ever tested `delivered`, so
+       every cancelled order carrying an address and goods walked in.
+       Measured on production 2026-09-14: three of them, one a two-leg
+       Journey contributing two rows. */
+    const cancelled = order({ id: "x", so: 1399, status: "cancelled" });
+    expect(isOpenDeliveryScope(cancelled)).toBe(false);
+    expect(entersDeliveryWork(cancelled)).toBe(false);
+  });
+
+  it("⭐ CARD 23 · a delivered scope stays out, and an open one stays in", () => {
+    expect(isOpenDeliveryScope(order({ id: "d", so: 1398, status: "delivered" }))).toBe(false);
+    expect(
+      isOpenDeliveryScope(
+        order({ id: "d2", so: 1397, delivered_at: "2026-09-01T00:00:00Z" }),
+      ),
+    ).toBe(false);
+    /* A trip still owing proof is NOT delivered-and-gone: the order stays
+       open until its result is recorded, and the proof queues own it. */
+    expect(isOpenDeliveryScope(order({ id: "o", so: 1396 }))).toBe(true);
   });
 
   it("⭐ refuses an order whose only line is a SERVICE — a truck carries goods", () => {
