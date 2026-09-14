@@ -1,3 +1,34 @@
+## `stock-register-pglite-timeout` — AN INTERMITTENT TEST WITH A KNOWN ONE-LINE FIX, opened 2026-09-14
+
+**🟡 `apps/api/src/routes/ops/stock-register.test.ts:181` flakes**, and the mechanism is known, so
+the only thing it costs now is whoever meets it next believing it is their change.
+
+`GET /register — the one current listing > executes both real route projections against the
+committed SQL and catches the missing migration` builds a **PGlite** WASM Postgres INSIDE the `it`
+body (`const db = await stockRegisterDatabase();`, line 182). `apps/api/vitest.config.ts` sets no
+`testTimeout`, so vitest's default 5000ms applies and WASM instantiation plus all the DDL is paid
+against it. Its only sibling PGlite test, `src/test/ready-stock-reservation.test.ts:78`, does the
+identical work in a `beforeEach` **hook** and gets the 10000ms hook budget. Same cost, half the
+budget — which is why one flakes and the other never has.
+
+**It is NOT embedded-postgres and it is NOT a contention or test-ordering bug.** Both labels were
+tried and both are wrong. `@electric-sql/pglite` is WASM: no libpq, no `psql`, no external binary,
+so this repo's earlier embedded-postgres history does not apply. And it is **intermittent, not
+suite-deterministic** — measured on one commit (`66eea424`): a quiescent full suite RED, a
+concurrent full suite RED, a third full suite GREEN, isolation GREEN (14/14, ~2.4s), GitHub CI
+GREEN, and the production deploy's own full re-run GREEN. Anyone hunting a test-isolation defect
+is hunting something that does not exist.
+
+**The fix:** give that `it` an explicit timeout, or move the database build into a hook as the
+sibling already does. Prefer the hook, so the two PGlite tests share one shape.
+
+**Why it was reported and not fixed:** it is a Stock Register test with no relationship to the
+Warehouse Schedule card that surfaced it, and widening a card to chase an unrelated red is how a
+card stops shipping. **Closes when the timeout or the hook lands.**
+
+**Falsifier:** a full `apps/api` suite that goes red on this file after the build moves into a
+hook — that would mean the budget was never the cause.
+
 ## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
 
 **🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
