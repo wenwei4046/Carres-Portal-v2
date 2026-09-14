@@ -25,7 +25,7 @@
  *  7. **Mobile** is only ever the Day list; **tablet** Week is three days.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type {
@@ -1078,6 +1078,74 @@ describe("the URL is the state", () => {
   });
 });
 
+describe("COLUMN 4 — the SO number and the customer's reference (owner correction 2026-09-14)", () => {
+  it("⭐ prints the reference on its OWN line beneath the number, never joined to it", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1217, source_ref: ["TCF0541"] })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+
+    /* Line 1 is the number ALONE, still the blue door to the Sales Order. */
+    const door = within(list).getByRole("button", { name: "SO-1217" });
+    expect(door.className).toContain("text-blue-700");
+
+    /* Line 2 is the reference on its own, smaller and muted — so neither
+       `SO-1217 TCF0541` nor any other joined spelling exists on the row. */
+    const ref = within(list).getByText("TCF0541");
+    expect(ref).not.toBe(door);
+    expect(ref.className).toContain("text-label");
+    expect(ref.className).toContain("text-kit-slate-11");
+    expect(list.textContent).not.toContain("SO-1217 TCF0541");
+    expect(within(list).queryByText(/^SO-1217s+TCF0541$/)).toBeNull();
+  });
+
+  it("the door still OPENS the same sales order", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1217, source_ref: ["TCF0541"] })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(within(screen.getByTestId("delivery-monitor-work-list")).getByRole("button", { name: "SO-1217" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("/operation/orders/so/a");
+  });
+
+  it("a row with NO reference carries no empty second line", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1217, source_ref: null })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    const door = within(list).getByRole("button", { name: "SO-1217" });
+    /* The cell is the button's line and nothing else — no placeholder, no
+       dash, no blank line holding the row open. */
+    const cell = door.closest("span.block.min-w-0")!;
+    expect(cell.querySelectorAll("span.text-label")).toHaveLength(0);
+    expect(cell.textContent).toBe("SO-1217");
+  });
+
+  it("search still reaches the row by BOTH its number and its reference", async () => {
+    ordersState.data = {
+      orders: [
+        order({ id: "a", so: 1217, source_ref: ["TCF0541"] }),
+        order({ id: "b", so: 1218, customer_name: "aida rahim", source_ref: ["TCF0999"] }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    /* The reference sheet keeps Search behind its icon until it is asked for,
+       and the term is debounced before the sheet narrows. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    const type = async (value: string) => {
+      fireEvent.change(screen.getByPlaceholderText(MONITOR_COPY.search), { target: { value } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+    };
+    fireEvent.click(screen.getByTestId("search-icon"));
+
+    await type("TCF0541");
+    expect(within(list).getByText("SO-1217")).toBeTruthy();
+    expect(within(list).queryByText("SO-1218")).toBeNull();
+
+    await type("1218");
+    expect(within(list).getByText("SO-1218")).toBeTruthy();
+    expect(within(list).queryByText("SO-1217")).toBeNull();
+  });
+});
+
 describe("a Journey row on the work list", () => {
   it("names its route, never the word Leg; its door carries the leg in the URL only", () => {
     ordersState.data = {
@@ -1095,7 +1163,9 @@ describe("a Journey row on the work list", () => {
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(list).getByText("Klang WH → JB transit")).toBeTruthy();
+    /* The route shares COLUMN 4's ONE supporting line with the customer's
+       own reference (§8.3 row law) — the SO number never joins them. */
+    expect(within(list).getByText("CR0854 · Klang WH → JB transit")).toBeTruthy();
     expect(within(list).getByText("2 deliveries")).toBeTruthy();
     expect(list.textContent).not.toMatch(/\bLeg\b/);
     expect(list.textContent).not.toMatch(/\bscopes?\b/i);

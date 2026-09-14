@@ -675,6 +675,13 @@ function joinLines(a: string, b: string | null | undefined): string {
   return b ? `${a} · ${b}` : a;
 }
 
+/** COLUMN 4's supporting line: the customer's own reference, and the leg's
+    route on a Journey leg — ONE line under the SO number, never a third. */
+function soSecondLine(r: DeliveryMonitorCard): string | null {
+  const parts = [...r.scope.refs, r.scope.legRoute].filter((p): p is string => Boolean(p));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 /** `Condominium · Floor 12` — the crew's building facts under the locality. */
 /**
  * COLUMN 6's second line — what the crew is walking into, in the governed
@@ -1214,41 +1221,50 @@ export default function OperationDelivery() {
         filterValue: (r) => r.statusLabel,
       },
       {
-        /* COLUMN 4 — THE IDENTITY, pinned while the sheet scrolls. The
-           customer's own reference rides the cell; a Journey leg prints its
-           route (`leg` never reaches the screen). */
+        /* ⭐ COLUMN 4 — THE IDENTITY, pinned while the sheet scrolls, in the
+           SAME two-line grammar as every other cell (§8.3, owner correction
+           2026-09-14). The customer's own reference used to ride the FIRST
+           line as an inline span: `SO-1217 TCF0541` read as one mangled
+           number, and an operator matching a reference off WhatsApp had to
+           work out where the document number ended. It is now the SUPPORTING
+           line — smaller, muted, beneath the number. A Journey leg's route
+           shares that one line (`leg` never reaches the screen); the row law
+           allows one supporting line, never a third. */
         key: "so",
         label: MONITOR_COLUMN.so,
         width: 150,
         sortable: true,
         filterType: "numbering",
         chooserGroup: "Document",
-        accessor: (r) => (
-          <span className="block min-w-0">
-            <button
-              type="button"
-              className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-              onClick={(event) => {
-                event.stopPropagation();
-                openOrder(r);
-              }}
-            >
-              SO-{r.scope.so}
-            </button>
-            {r.scope.refs.length > 0 ? (
-              <span className="ml-1.5 text-kit-slate-11">{r.scope.refs.join(" · ")}</span>
-            ) : null}
-            {r.scope.legRoute ? (
-              <span className="block truncate text-label text-kit-slate-11" title={r.scope.legRoute}>
-                {r.scope.legRoute}
+        accessor: (r) => {
+          const second = soSecondLine(r);
+          return (
+            <span className="block min-w-0">
+              <span className="block truncate">
+                <button
+                  type="button"
+                  className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openOrder(r);
+                  }}
+                >
+                  SO-{r.scope.so}
+                </button>
               </span>
-            ) : null}
-          </span>
-        ),
+              {/* No reference and no route: NO empty second line — the number
+                  sits alone rather than above a placeholder. */}
+              {second ? (
+                <span className="block truncate text-label text-kit-slate-11" title={second}>
+                  {second}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
         searchValue: (r) => `SO-${r.scope.so} ${r.scope.so} ${r.scope.refs.join(" ")}`,
         filterValue: (r) => `SO-${r.scope.so}`,
-        exportValue: (r) =>
-          `SO-${r.scope.so}${r.scope.refs.length ? ` ${r.scope.refs.join(" ")}` : ""}`,
+        exportValue: (r) => joinLines(`SO-${r.scope.so}`, soSecondLine(r)),
         sortFn: (a, b) => a.scope.so - b.scope.so || (a.leg ?? 0) - (b.leg ?? 0),
       },
       {

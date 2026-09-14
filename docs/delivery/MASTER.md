@@ -569,7 +569,7 @@ search, typed column filters, Columns and Export. Twelve columns, exactly, in th
 | 1 | checkbox | one per delivery | |
 | 2 | expand | opens the four panels (§8.5) | |
 | 3 | `Delivery Status` | one status word set (§8.4) | the failure reason, or the overdue act |
-| 4 | `SO No` | `SO-1358`, opens the Sales Order | |
+| 4 | `SO No` | `SO-1358`, opens the Sales Order | the customer's own reference; a Journey leg's route shares the line |
 | 5 | `Customer` | customer name | phone |
 | 6 | `Delivery Location` | city and state, from the one address reading below | building type, floor and lift when recorded |
 | 7 | `Requested Delivery Date` | `Thu, 24 Sep` · `To be confirmed` · `No delivery date` | `Customer requested this date` only when a window, not a date, was given |
@@ -588,6 +588,23 @@ scrolling; the sheet scrolls, never squeezes. The layout storage key moves to `w
 No cell joins facts with an em dash. The SO, customer, Logistics Partner and object identity are
 named once on the row. Dates print `Tue, 18 Aug`, the year only when not current. Every absence
 is a governed word, never a dash. `Requested Delivery Date` opens no editor here.
+
+**`SO No` FORMAT — owner correction 2026-09-14, APPROVED / LOCKED.** The number and the
+customer's reference are TWO LINES, never one string:
+
+```
+SO-1217          line 1 · blue, monospace, opens the same Sales Order
+TCF0541          line 2 · smaller, muted
+```
+
+The reference used to ride line 1 as an inline span, so `SO-1217 TCF0541` read as one mangled
+number and an operator matching a reference off WhatsApp had to work out where the document
+number ended. The two values are never concatenated on one line. **No reference, no line** —
+the number sits alone, with no placeholder and no dash. A Journey leg's route SHARES that one
+supporting line (`TCF0541 · Klang WH → JB transit`) because the row law above allows one
+supporting line and never a third. Search still reaches the row by either value; sorting stays
+on the number; the cell is Delivery's only SO No presentation and changes nothing in the Sales
+Orders register, the Warehouse pages, the calendar cards or the shared table styling.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is

@@ -123,6 +123,11 @@ const ORDERS = [
     customer_address_city: "Kuala Lumpur",
     customer_address_state: "Kuala Lumpur",
     building_type: "Condominium",
+    /* THE ONE ORDER WITH NO CUSTOMER REFERENCE (2026-09-14). Every other
+       fixture carries `CR0854`, so nothing in the walk showed what COLUMN 4
+       does when there is nothing to put under the number: the answer is
+       nothing — no second line, no placeholder, no dash. */
+    source_ref: null,
   }),
   order({
     id: "c",
