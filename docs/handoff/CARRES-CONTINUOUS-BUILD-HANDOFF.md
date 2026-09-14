@@ -7,123 +7,77 @@ Paste everything below the line into a fresh session. It is self-contained.
 > Two prompts existed here for four hours on 2026-09-01 and disagreed; a fresh
 > session could not tell which one ruled (Law 5: *can the project have one file
 > fewer?*). **When this lane's mission changes, OVERWRITE this file — never add a
-> second one beside it.** Re-measure every number in §2 before trusting it.
+> second one beside it.** Re-measure every number in §1 before trusting it.
 
 ---
 
-CARRES PORTAL v2 — CONTINUOUS BUILD · PAYMENT OWNERSHIP SEAM · checkpoint 2026-09-13
+CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-09-14
 
 ## 1 · Where main and production stand
 
-- `origin/main` = `f2fb3efe` (#1283); deployed on erp · pos · pages.dev · api (`/__carres_deploy.json`, `/health`).
-  Working tree: clean on branch `build/so-assignment-source` from `f2fb3efe` (this file is the only change).
-- Production tracker tail `0499`. Applied this lane: `0489` (collection-owner ledger + three doors), `0495`,
-  `0498`, `0499` (all forward-only; function bodies reconcile by `md5(prosrc)`). Delivery's `0489…proof_is_reviewed`
-  shares its number — baselined in `scripts/check-migrations.mjs` (#1269), both halves applied.
-- `payment_collection_owners`: **0 rows**. `payment_duty`: 0 assignment rows, retired from the catalogue.
-  `delivery_duty`: **not assigned**. `ops_delivery_contacts`: 5 rows, all recorded by the shared `Operations` login,
-  0 with `acting_user_id`.
+- `origin/main` = the Payment-ownership-seam merge (this lane); deployed on erp · pos · pages.dev ·
+  api (`/__carres_deploy.json`, `/health`). Re-measure the SHA before quoting it.
+- Production tracker tail `0504`. Applied by this lane: `0489` (collection-owner ledger + three
+  doors), `0495`, `0498`, `0499`, `0504`. All forward-only. `0503` is taken by the unmerged
+  `fix/finance-gates-no-role`; take the MAX of the tracker tail, the repo tail and every branch
+  before writing a new one.
+- Migration replay: `PG_BIN=<bin> node scripts/dry-run-migrations.mjs --baseline
+  scripts/migration-replay-baseline.json --keep` runs the whole chain on a throwaway cluster. The
+  server binaries come from `@embedded-postgres/darwin-arm64`; `psql` is **not** in that package —
+  symlink `/opt/homebrew/opt/libpq/bin/psql` into the same folder or the script cannot start.
+  Five migrations fail by baseline; `0463`/`0466` now replay cleanly and can leave the baseline.
 
-## 2 · Completed Payment functionality (production-verified, do not rebuild)
+## 2 · What this lane finished (production-verified; do not rebuild)
 
-- PAYMENTS → Monitor · Payment Records (#1252–#1254), Work cache-key fix + regression proof (#1257/#1258),
-  the two-calendar clock, collection timing as a setting (0486), 7-day free storage, approval doors shut.
-- **Owner ruling 2026-09-13 delivered:** `Payment Duty` is gone from ordinary collection; the owner rule is
-  `collection_owner` (shared engine) — ordinary balance, missed promise and storage-invoice collection resolve
-  the same stable per-order owner; Finance exception → `finance_duty`; wrong/duplicate Payment → Payment
-  Approver. Web: Monitor owner cell (`Nobody holds Delivery Duty. Staff & Duties` when unresolved; avatar title
-  `Normal owner: X · Today's cover: Y`), workspace `Collection owner` section with `Hand over collection`
-  (principal/manager), Communication History merges recorded results. API `/api/finance/collection-owner`
-  (GET, POST /handover). All proven on the deployed UI with a labelled read-only injection (Monitor · Team Work ·
-  My Work · Quick Rail agree; an unowned action stays visible and never enters an unrelated My Work).
-- Ledger law (0489, keep): append-only `payment_collection_owners`; `payment_collection_owner_establish` is
-  idempotent (an order with a row is never touched); `_handover` gated by `workspace_duty_settings_gate` with
-  previous owner · new owner · reason · changed by · changed on · effective from; `_context` returns normal ·
-  today's cover · acting · history. Cover = `workspace_duty_covers` on `delivery_duty` keyed by the NORMAL
-  person; cover never rewrites the owner; work returns when cover ends.
+- PAYMENTS → Monitor · Payment Records, the two-calendar clock, collection timing as a setting
+  (0486), 7-day free storage, the shut approval doors (#1252–#1269).
+- **AUTOMATIC, STABLE customer-payment ownership is RESOLVED (0504).** The responsible Operation
+  person for a Sales Order is the INDIVIDUAL the order was dealt to when it entered Operations
+  (`ops_order_control.assigned_staff`, 0232/0235). `delivery_responsible_operation(order, day)` is
+  the ONE read: the responsibility ledger row (establishment or formal handover) → that individual
+  → nobody. Contact history and the Delivery Duty holder are no longer owner sources; **nobody is
+  ever asked for an initial Delivery Duty holder.**
+- The sweep (`POST /api/operation/staff/auto-assign`) deals only orders nobody carries and never
+  re-spreads. Absence — planned leave, or no heartbeat from 10:00 MYT — is COVER for the day, not a
+  reassignment. Only an active individual (a People record with a `staff_code`) may be dealt an
+  order or handed one; the manual door answers 422 and `payment_collection_owner_handover` refuses
+  `new_owner_not_individual`.
+- The assignment and the ledger cannot disagree: one trigger appends `established` on the first
+  deal and `handover` on every change, carrying previous owner · reason · changed by. The formal
+  handover moves both facts.
 
-## 3 · The newly discovered SO assignment source (VERIFIED on main + production)
+## 3 · Open, owned by Jess
 
-`docs/orders/MASTER.md` §"How the PIC is decided" (LIVE, 0232 + 0235):
-`ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings` (available) + the
-server-side sweep `POST /api/operation/staff/auto-assign` (`apps/api/src/routes/operation/staff.ts`) and
-heartbeat `touch_last_seen` (0235). Rules as written: *one order, one owner, decided when the order arrives;
-the system never moves an order off a person mid-flight on its own* — **and, in the same section**: *the sweep
-re-spreads SYSTEM-assigned orders (`assigned_by` null) evenly across whoever is IN today; from 10:00 MYT a
-member with no heartbeat counts as out and their system-assigned orders flow to whoever is in, then flow back*.
-Human-assigned orders (`assigned_by` set, `ops_manager` only, `order-control.ts`) never move.
+- 🔴 **The unresolved-owner sentence is wrong.** Every surface still prints `Nobody holds Delivery
+  Duty.` with `Set the holder in Workspace → Staff & Duties` (COPY-STANDARD; `NO_DELIVERY_DUTY_HOLDER`
+  / `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
+  `PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and `OperationWork.tsx`). After 0504 an
+  unresolved owner means no individual is in the Operation assignment pool, and that door cannot fix
+  it. Recommended: `Nobody is assigned to this order.` · `Assign it in Sales Orders → Team`.
+  Approved copy is the owner's to change, so it was reported, not shipped. The state is unreachable
+  while the pool holds an individual.
+- 🟡 **The assignment pool has no permanent home.** It is managed in `TeamPopover` on
+  `/operation/old-orders`, a route the shell itself calls temporary and the sidebar does not list.
+  Worth a placement decision when the Sales Order register replaces that page.
+- 🟡 **The test account is still pooled.** `operation-test@x.com` (`staff_code` null) keeps its
+  `ops_staff_settings` row. It can no longer be dealt an order, but it still lists as pooled in the
+  TEAM rail. Removing the row is a production data change and was not made.
 
-Measured in code (`staff.ts`): the pool is `ops_staff_settings` — a non-manager `operation` account is
-auto-enrolled on its FIRST login unless `isOpsGenericAccount(email)` matches (an email heuristic; the test
-account `operation-test@x.com` passed it, which is why it holds 100 orders); `available=false` is the existing
-PERSON-LEVEL planned-leave flag ("temporarily away — new orders skip them"); `countsAsInToday(last_seen_at)`
-is the 10:00 MYT heartbeat rule; the sweep (`POST /auto-assign`, fired by the web after each heartbeat)
-re-splits EVERY open system-assigned order plus the unassigned evenly across members in today, every run —
-so a system-assigned `assigned_staff` is an actor of the day, not a stable owner.
+## 4 · How this lane verifies
 
-**Measured 2026-09-13:** 101 controls, 101 `assigned_by` null (all system); 100 → `E2E Test · operation`
-(a test account, `staff_code` null), 1 → Shasha; `SO-1321`/`SO-1313` PIC = the test account.
-The Work engine already resolves `order_pic` from `assigned_staff` (`work.ts`, `work-engine.ts`).
+- Rolled-back production probe: one `begin; … select …; rollback;` through
+  `mcp__supabase__execute_sql` (the batch returns the last `select`). Switch identity with
+  `set_config('request.jwt.claims', …, true)`, create temp tables AFTER switching, and collect
+  results into a temp table so one final `select` returns the whole walk. **A refusal that fires
+  aborts the batch** — prove refusals in the integration suite, not in the probe.
+- Real-PostgreSQL suite: `apps/api/src/test/collection-owner-responsibility.integration.test.ts`
+  (13 cases) runs against the replay cluster via `CARRES_TEST_DATABASE_URL`. Skipped, never passed,
+  without it.
+- **Prove a regression test fails without its fix.** The probe's finding here (a duplicate ledger
+  row and a stale read) only reproduces when two ledger rows are written in ONE transaction; the
+  first test written for it passed either way and proved nothing.
 
-## 4 · The exact ownership mismatch to resolve (NOT resolved — hypothesis, not law)
+## 5 · Next step
 
-Owner's rule (2026-09-13): an SO is auto-assigned to an INDIVIDUAL Operation follow-up person when it enters
-Operations; that person continues customer follow-up incl. ordinary balance and storage collection; normal
-responsibility stays stable; leave = buddy cover; permanent change = handover; PO/GRN/Finance keep their own
-specialist rules (no universal SO owner).
-
-- Today `assigned_staff` is **two things at once**: a stable owner for human-assigned orders, and a
-  heartbeat-redistributed *actor* for system-assigned ones. That contradicts "stable normal responsibility";
-  the redistribution is what buddy cover should express instead.
-- This lane's 0489→0499 chain **overlooked `assigned_staff`** and inferred responsibility from the earliest
-  contact (0495/0498) and the Delivery Duty holder (0489/0499). Per the owner: do not infer from contact
-  history and do not ask for a Delivery Duty holder as a workaround.
-
-Resolution direction to verify and build (forward-only; keep 0489 ledger/handover/cover; consolidate sources):
-1. `delivery_responsible_operation(order, day)` → **ledger row (establishment/handover) → `assigned_staff`
-   when an individual (`staff_code`), active, and the assignment is the NORMAL one → nobody**. Remove the
-   contact-history and Delivery-Duty inference as owner sources (the contact writer keeps writing the four
-   identities FROM this read; `acting_user_id` stays).
-2. Make system assignment **stable**: the sweep deals UNASSIGNED orders once on arrival and stops re-spreading
-   system-assigned ones; heartbeat absence becomes **cover** (acting today), not reassignment. Decide where the
-   person-level cover fact lives (today cover is per DUTY in `workspace_duty_covers`; `ops_staff_settings.
-   available` is a person-level leave flag) — reuse, do not add a third source.
-3. A non-person account (`staff_code` null, e.g. `E2E Test · operation`, `Operations`) must never be a normal
-   owner: keep the pool to individuals (Orders MASTER already says a generic account never joins — measure why
-   the test account did).
-4. Payment then reads the same function; `payment_collection_owner_establish` unchanged in shape.
-Files: `apps/api/src/routes/operation/staff.ts` (sweep, `countsAsInToday`, `autoEnroll`),
-`order-control.ts:188-198`, `orders.ts`, `work.ts` (`order_pic`, `collectionOwnerFor`),
-`packages/shared/src/work-engine.ts`, `apps/web/src/pages/operation/OperationOrdersControl.tsx` (TeamPopover),
-`supabase/migrations/0232_ops_staff_assignment.sql`, `0235_…presence.sql`, `0489/0495/0498/0499`,
-`docs/orders/MASTER.md` §PIC, `docs/workspace/MASTER.md` §3–§4, `docs/delivery/MASTER.md` §5.1 · §13.1,
-`docs/payment/MASTER.md` §10 · §14.
-
-## 5 · Tests, migrations, PR state
-
-- Green on main: `work.collection-owner.test.ts` (14), `collection-owner.test.ts` (5),
-  `InvoiceCollectionOwner.test.tsx` (6), `delivery-arrangements.test.ts` (46 incl. the four-identity tests),
-  `work-cache-isolation.test.tsx` (8); full web/API/shared suites green at #1267.
-- Migrations: next free number = **0500** (re-measure across `git branch -r`; the Delivery lane moves fast).
-- Open PRs from this lane: none. Rolled-back production probes are the SQL verification method
-  (`begin … set_config(request.jwt.claims …) … rollback`; use the governed doors for assignments/covers; create
-  temp tables AFTER switching role).
-
-## 6 · Approved rules to preserve (owner, 2026-09-13)
-
-Normal owner · today's cover · actual recorder · partner provenance are FOUR separate facts. A shared login may
-record evidence, never own. Cover never rewrites the normal owner; work returns when cover ends. Only a formal
-handover (full evidence, append-only) changes the normal owner. Owner identity is avatar/metadata, never words
-in the action sentence. An unresolved owner keeps the action visible under its duty word with the Staff & Duties
-door and never lands in an unrelated My Work. Payment UI stays unchanged. No new owner field; no daily rotating
-owner; no per-customer manual assignment.
-
-## 7 · Next step
-
-Resolve §4 as one BUILD slice: verify the sweep/heartbeat behaviour in `staff.ts` against the owner's rule,
-consolidate `delivery_responsible_operation` onto `assigned_staff` (forward-only migration 05xx), make system
-assignment stable with cover instead of redistribution, keep the individual-only guard, re-run the full-chain
-rolled-back probe (assignment → collection owner → cover → Monitor/My Work/Team Work/Quick Rail → handover
-history), overwrite Orders/Workspace/Delivery/Payment MASTERs, PR → CI → merge → deploy → authenticated walk.
-Ask the owner only if a genuine business choice remains (e.g. how the FIRST individual is dealt when the pool
-holds no individual) — not for engineering mechanics.
+No scope from this lane is outstanding. Pick the next module from the ERP AUTHORITY MAP in
+`CLAUDE.md` §3, or close §3's owner decision first.

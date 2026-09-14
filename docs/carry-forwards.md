@@ -1,44 +1,34 @@
-## `delivery-duty-initial-holder` — ONE-TIME STAFFING CONFIGURATION OWED, opened 2026-09-13
+## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
 
-**🟡 Automatic customer-payment ownership is built, applied and verified (0489 · 0495 · 0498 ·
-0499). It is complete, and today it is DORMANT rather than blocking: nobody holds `delivery_duty`,
-so the third source in the responsibility order can name nobody.** The order the chain reads is
-unchanged: the order's own collection-owner ledger row → else the normal responsible individual on
-its earliest qualifying customer contact → else the configured normal Delivery Duty holder that day
-→ else unresolved. Ownership is established when collection first becomes actionable and kept until
-the balance is RM 0; dates, reloads, duty rotations and later contacts never reassign it; cover
-changes only today's acting person; a formal handover changes the normal owner; a shared-login
-recorder is evidence, never an owner.
+**🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
+meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
+`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
+and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
+`apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
+`apps/web/src/pages/operation/OperationWork.tsx`).
 
-**Measured read-only on production, 2026-09-13 — the scope is small, and it is not "every order":**
+After 0504 the Delivery Duty holder has nothing to do with this answer. The responsible person is
+the individual the Sales Order was dealt to, so an unresolved owner means **no individual is in the
+Operation assignment pool** — and Staff & Duties cannot fix it. The sentence sends the operator to
+the wrong door, and the owner explicitly forbade asking for a Delivery Duty holder as a workaround.
 
-```
-104 orders (101 not cancelled)
-  2 carry a live ISSUED invoice — the whole collection population today (SO-1313, SO-1321).
-    Both are fixture rows, neither is delivered, and neither carries line stock status or an
-    arrival date, so the goods readiness gate holds their collection clock shut.
-  0 orders are actionable for collection today ⇒ nothing is unowned in the present tense
-  0 collection-owner ledger rows
-  5 customer contacts — every one recorded by the shared `Operations` login,
-    0 naming an individual ⇒ the contact source establishes nobody
-  0 `delivery_duty` assignment rows · 0 covers
-  duties configured: grn_duty → Shasha (CR005) · po_duty → Yu Jun (CR004) ·
-    payment_approver and storage_waiver_approver → Jess. No delivery responsibility anywhere.
-```
+**The fix, ready to apply on her word:** `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`.
 
-**What that means.** The staffing gap costs nothing until a real order's goods are ready (or
-delivered) while money is still owed — that is the first moment an order enters the actionable set
-and asks for an owner. From that day on, without a `delivery_duty` row, each such order is
-established from nobody and the surface prints `Nobody holds Delivery Duty.` The owner names the
-initial holder once in `Workspace → Staff & Duties`; everything after it is automatic. This is a
-staffing configuration, not a per-customer assignment, and no acceptance step or second assignment
-workflow is to be added. **Closes when the `delivery_duty` assignment row exists.**
+**Why it was reported and not shipped:** an approved on-screen word changes only when the owner
+says so (CLAUDE.md §10, and one of the four reasons to interrupt her). Nothing operational depends
+on it today — the state is unreachable while the pool holds an individual, and production's pool
+holds two (Shasha CR005 · Yu Jun CR004). **Closes when she rules on the words.**
 
-**Falsifier for the "0 actionable today" line:** an authenticated Work feed load that lists a
-`payment.collect_customer_balance` or `payment.missed_promise` item today. The count above is
-derived from the projection rules (`projectPaymentCollectionWork` · `projectStorageInvoiceWork`,
-`apps/api/src/routes/operation/work.ts`) applied to the measured production rows, not from an
-authenticated load — authenticated walks are the owner's.
+**Falsifier:** an authenticated load that renders `monitor-owner-unassigned` or
+`collection-owner-none` on a real order. That would mean the pool has emptied and the wrong door is
+in front of an operator.
+
+**Supersedes `delivery-duty-initial-holder` (opened 2026-09-13, closed 2026-09-14 without being
+done).** That carry-forward asked the owner to name an initial `delivery_duty` holder so automatic
+ownership could resolve. She rejected the premise on 2026-09-13: responsibility is not a duty
+holder, it is the person the order was dealt to. 0504 removed the Delivery-Duty source, so the
+holder is no longer owed and automatic ownership no longer waits on anybody.
 
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 

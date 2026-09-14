@@ -957,6 +957,55 @@ export function distributeOrders(
   return plan;
 }
 
+/** One open order as the sweep sees it: who carries it, and how they got it. */
+export interface OpsAssignmentCandidate {
+  orderId: string;
+  assignedStaff: string | null;
+  assignedBy: string | null;
+}
+
+/**
+ * THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13; migration 0504).
+ *
+ * A Sales Order is dealt to ONE individual when it enters Operations and stays
+ * with that person — they carry the customer follow-up, the balance and the
+ * storage collection. So the sweep hands out only what nobody carries:
+ *
+ *   · never assigned at all, or
+ *   · the SYSTEM put it on an account that may not own one — a shared login, a
+ *     robot account, or somebody who has since left.
+ *
+ * An order already resting with an active individual is never touched again —
+ * not by a later login, not by an absence, not by a re-run — and a human's
+ * deliberate assignment is never touched at all. Absence is expressed as COVER
+ * (`delivery_responsible_operation`), never as a reassignment, which is what
+ * the old every-sweep redistribution got wrong: it made `assigned_staff` an
+ * actor of the day rather than a stable owner.
+ *
+ * Loads count EVERY open order a member already carries, so the deal levels the
+ * real workload and not only the untouched remainder. Deterministic (sorted
+ * ids, ties broken on userId): two operators sweeping at once agree.
+ *
+ * @param mayOwn — active INDIVIDUAL (a People record with a `staff_code`).
+ */
+export function planOpsAssignment(
+  open: readonly OpsAssignmentCandidate[],
+  poolIds: readonly string[],
+  mayOwn: (userId: string | null | undefined) => boolean,
+): { orderId: string; userId: string }[] {
+  const owners = poolIds.filter(mayOwn);
+  if (owners.length === 0) return [];
+  const unowned = open.filter(
+    (o) => !mayOwn(o.assignedStaff) && o.assignedBy == null,
+  );
+  if (unowned.length === 0) return [];
+  const loads = owners.map((userId) => ({
+    userId,
+    openCount: open.filter((o) => o.assignedStaff === userId).length,
+  }));
+  return distributeOrders(unowned.map((o) => o.orderId).sort(), loads);
+}
+
 /** HR-P2 (0260): "who may manage the pool" moved to duty keys — the grant now
  *  hangs off the POSITION (`org_position_duties`), not an email list, so a
  *  promotion in the Team tab is the whole change. `isOpsManager` lives in

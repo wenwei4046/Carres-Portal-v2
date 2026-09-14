@@ -3239,13 +3239,34 @@ what the shared Workspace Duty resolver already applies is not re-derived here.
   **Nothing in code changes; this freezes what already ships.**
 - **Only a manager may assign by hand** (`ops_manager`; the web hides the control, the API
   answers 403).
-- **The sweep only re-spreads what the SYSTEM handed out.** Unowned orders and orders with
-  `assigned_by` NULL are re-split evenly; **an order a human assigned never moves.** The split
-  is deterministic, so two operators triggering it at once produce the same plan.
-- **Absence needs no click.** A heartbeat is stamped while an operator has the portal open.
-  **Before 10:00 MYT everybody keeps their share** — late is not absent. From 10:00 a member
-  with no heartbeat counts as out and their system-assigned orders flow to whoever is in; they
-  log in later and the share flows straight back.
+- **THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13; migration 0504).** The sweep
+  deals only orders **nobody carries** — never assigned, or the SYSTEM put it on an account that
+  may not own one. An order already resting with an active individual is never touched again: not
+  by a later login, not by an absence, not by a re-run. An order a human assigned never moves at
+  all. The plan is deterministic, so two operators triggering it at once produce the same plan,
+  and it levels the REAL workload — the loads count every open order a person already carries.
+  **This replaces the sentence that used to sit here**: *"orders with `assigned_by` NULL are
+  re-split evenly on every sweep"*. That contradicted *"one order, one owner, decided when the
+  order arrives"* two lines above, and the redistribution won in code — which is why
+  `assigned_staff` had become an actor of the day rather than an owner, and why 100 production
+  orders sat on a test account nobody was answerable for.
+- **ONLY A PERSON CARRIES A CUSTOMER.** An account may be dealt an order only if it is an active
+  INDIVIDUAL — a People record with a `staff_code`. A shared login or a robot account records
+  evidence and never owns; the manual assignment door answers 422 and the sweep skips it. The
+  old guard was an email list (`isOpsGenericAccount`), which `operation-test@x.com` walked
+  straight past.
+- **Absence needs no click, and absence is COVER — never a reassignment.** A heartbeat is stamped
+  while an operator has the portal open. **Before 10:00 MYT everybody counts as in** — late is not
+  absent. From 10:00 a member with no heartbeat counts as out for the day, and so does anyone on
+  planned leave (`ops_staff_settings.available`). Their orders **do not move**: for that day the
+  work is acted on by their governed buddy cover, or — when none is named — by the least-loaded
+  individual who is in. The normal owner is preserved and the work returns when they are back.
+  **The one read that answers all of this is `delivery_responsible_operation(order, day)`** (0504),
+  which Delivery's contact writer and Payment's collection owner both use.
+- **A permanent change is a formal handover.** Management reassigning the order, and the
+  `Hand over collection` door, write the same two facts — the assignment and the append-only
+  responsibility ledger (`payment_collection_owners`: previous owner · new owner · reason ·
+  changed by · changed on · effective from). Neither can move one without the other.
 
 ## 2.3 · Row order
 

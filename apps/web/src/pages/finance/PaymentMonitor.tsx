@@ -124,11 +124,14 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const person = owner.acting ?? owner.normal;
   if (!person?.userId) {
     // A governed configuration exception, never a blank or an invented owner
-    // (owner ruling 2026-09-13): the action stays visible, management sees
-    // nobody holds the duty the owner is set from, and the one assignment
-    // door is linked. Ordinary collection is the Responsible Delivery
-    // Operation (0489) — established from Delivery Duty, so its failure is
-    // Delivery's governed sentence.
+    // (owner ruling 2026-09-13): the action stays visible, and the one door
+    // that can fix it is linked.
+    //
+    // 🔴 0504 — ordinary collection is the Responsible Delivery Operation, and
+    // that person is now the individual the SALES ORDER was dealt to, not a
+    // duty holder. These words therefore name a door that cannot fix it. They
+    // are approved copy, so they wait on the owner rather than change here;
+    // the state is unreachable while an individual is in the assignment pool.
     const duty = DUTY_WORD[owner.dutyKey ?? owner.rule] ?? owner.dutyKey ?? owner.rule;
     return <span className="text-label font-normal text-kit-red-11" data-testid="monitor-owner-unassigned">
       Nobody holds {duty}. <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">Staff &amp; Duties</Link>
