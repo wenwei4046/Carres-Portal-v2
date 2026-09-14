@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/api";
 import { useSetCatalogFabricCost } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
+import { fmtRm } from "../format";
 
 /**
  * Operation Catalog › Fabric (0226) — the procurement fabric master
@@ -18,13 +19,6 @@ import { CodeChip } from "../components/atoms";
 
 // code · series · description · supplier · cost
 const GRID_COLS = "150px minmax(90px,0.9fr) minmax(150px,1.2fr) minmax(120px,1fr) 130px";
-
-function fmtRm(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 export default function OperationFabricCostTab({ catalog }: { catalog: CatalogResponse }) {
   const fabrics = (catalog.fabrics ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
