@@ -6,6 +6,7 @@ import {
   warehousePickupScheduleCards,
   warehousePickupScopeKey,
   warehouseScheduleOperatingDates,
+  warehouseSchedulePreviousFrom,
   type WarehouseArrivalSourceFacts,
   type WarehouseScheduleSettings,
 } from "./warehouse-schedule";
@@ -898,3 +899,51 @@ describe("categoryKey asks the CATALOG, not the SKU text", () => {
     expect(card.lines[0].categoryKey).toBe("Sofa");
   });
 });
+
+/**
+ * BACKWARD PAGING — the production defect of 2026-09-14.
+ *
+ * `Previous` stepped back by the shown window's CALENDAR span. From
+ * `Mon 21 – Sat 26` that produced `Tue 15 – Mon 21`: six calendar days back
+ * only covers five operating days when a Sunday sits inside the earlier
+ * stretch, so the board repeated a column and drifted a day per press.
+ */
+describe("warehouseSchedulePreviousFrom", () => {
+  it("lands the window that ENDS the operating day before, with no overlap", () => {
+    /* 2026-09-21 is a Monday; the six operating dates before it are
+       Mon 14 - Sat 19, with Sunday 20 skipped. */
+    expect(warehouseSchedulePreviousFrom("2026-09-21", 6, "arrival", null)).toBe(
+      "2026-09-14",
+    );
+  });
+
+  it("round-trips: forward then back returns the original window", () => {
+    const first = warehouseScheduleOperatingDates("2026-09-14", 6, "arrival", null);
+    const next = warehouseScheduleOperatingDates(
+      stepOneDay(first[first.length - 1]!),
+      6,
+      "arrival",
+      null,
+    );
+    const backFrom = warehouseSchedulePreviousFrom(next[0]!, 6, "arrival", null);
+    expect(warehouseScheduleOperatingDates(backFrom, 6, "arrival", null)).toEqual(
+      first,
+    );
+  });
+
+  it("skips a governed holiday walking backwards too", () => {
+    /* Fri 18 Sep closed → the six before Mon 21 reach back one further day. */
+    expect(
+      warehouseSchedulePreviousFrom("2026-09-21", 6, "arrival", null, [
+        "2026-09-18",
+      ]),
+    ).toBe("2026-09-12");
+  });
+});
+
+function stepOneDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const at = new Date(Date.UTC(y!, m! - 1, d! + 1));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${at.getUTCFullYear()}-${p(at.getUTCMonth() + 1)}-${p(at.getUTCDate())}`;
+}

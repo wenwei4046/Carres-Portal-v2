@@ -134,29 +134,25 @@ export default function WarehouseWorkspace({
       }
       return;
     }
-    /* A BOARD MOVES A PAGE, NOT A DAY — and the two directions are not
-       symmetric, because the projection only builds a window FORWARD from
-       `from`.
+    /* A BOARD MOVES A PAGE, NOT A DAY, and the two directions are not
+       symmetric.
 
        Forward is easy: start the day after the last date shown and the
        governed resolver returns the next six operating dates.
 
-       Backward has to jump a whole window in one go. Anchoring on
-       `first − 1 day` looked right and was the bug: the resolver would return
-       six dates starting there, FIVE of which are already on screen, so
-       `Previous` crawled one day at a time and an operator paging back a week
-       would press it thirty times. Stepping back by the window's own calendar
-       SPAN lands a full page earlier, and because the span already contains
-       whatever closures the Site has, it neither overlaps nor skips. */
+       Backward is NOT a subtraction and this page no longer tries to make it
+       one. Stepping back by the window's calendar span looked right and was
+       wrong: measured on production, `Mon 21 – Sat 26` went back to
+       `Tue 15 – Mon 21`, repeating a column, because the Sunday inside the
+       earlier stretch made six calendar days cover only five operating ones.
+       Only the layer holding the Site configuration can count operating dates
+       backwards, so it does, and this page just uses the answer. */
     if (delta === 1) {
       const last = dates[dates.length - 1];
       if (last) setParam("from", shiftIso(last, 1));
       return;
     }
-    const first = dates[0];
-    const last = dates[dates.length - 1];
-    if (!first) return;
-    setParam("from", addDays(first, -spanDays(first, last ?? first)));
+    setParam("from", schedule.previousFrom);
   }
 
   const word = SCHEDULE_PAGE_WORD[direction];
@@ -431,16 +427,6 @@ function addDays(iso: string, days: number): string {
   return `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}`;
 }
 
-/** How many CALENDAR days the shown window covers — six operating dates across
- *  a closed Sunday span seven. Minimum 1, so a one-date window still moves. */
-function spanDays(first: string, last: string): number {
-  const toUtc = (iso: string) => {
-    const [y, m, d] = iso.split("-").map(Number);
-    return Date.UTC(y!, m! - 1, d!);
-  };
-  const days = Math.round((toUtc(last) - toUtc(first)) / 86_400_000) + 1;
-  return Math.max(1, days);
-}
 
 function headingSentence(iso: string): string {
   const { weekday, day, month } = dateHeadingPartsOf(iso);
