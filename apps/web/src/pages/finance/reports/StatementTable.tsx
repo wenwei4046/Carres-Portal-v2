@@ -16,16 +16,19 @@ import type { StatementSection } from "./report-queries";
 
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number }
-  | { id: string; section: string; kind: "line"; code: string; name: string | null; amount: number; nested: boolean }
+  | {
+      id: string; section: string; kind: "line"; code: string; name: string | null; amount: number;
+      nested: boolean; reclassified: number | null;
+    }
   | { id: string; section: string; kind: "unclosed"; amount: number }
   | { id: string; section: string; kind: "nothing" };
 
 /**
  * The rows the table prints, in the served order. An account at RM 0.00 is
  * left out, as the Trial Balance does. A section where every account is at
- * RM 0.00 keeps its band and gets one line saying so. At RM 0.00 is not "no
- * entries": entries can cancel out. So even when every section is at zero,
- * the bands stay, and so does the bottom strip under them.
+ * RM 0.00 keeps its band and gets one line saying so (`No income in this
+ * period.`). So even when every section is at zero, the bands stay, and so
+ * does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
@@ -41,7 +44,10 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
         out.push({ id: `${s.kind}:group:${g.code}`, section: s.kind, kind: "group", name: g.name ?? g.code, amount: g.subtotal });
       }
       for (const l of lines) {
-        out.push({ id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name, amount: l.amount, nested: headed });
+        out.push({
+          id: `${s.kind}:line:${l.code}`, section: s.kind, kind: "line", code: l.code, name: l.name,
+          amount: l.amount, nested: headed, reclassified: l.reclassified,
+        });
       }
     }
     if (s.unclosedResult !== null && !isZeroMoney(s.unclosedResult)) {
@@ -60,6 +66,7 @@ export default function StatementTable({
   empty,
   nothing,
   accountHref,
+  lineNote,
   bottomLine,
 }: {
   /** What the table is, for a screen reader. */
@@ -69,9 +76,11 @@ export default function StatementTable({
   loading: boolean;
   /** Shown instead of rows when no statement was served (before go-live). */
   empty: string;
-  /** The line under a section band where every account is at RM 0.00. */
-  nothing: string;
+  /** The line under a section band where every account is at RM 0.00, by section kind. */
+  nothing: (section: string) => string;
   accountHref: (code: string) => string;
+  /** A second line under an account, or null for none. */
+  lineNote?: (line: { code: string; reclassified: number | null }) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
 }) {
@@ -87,16 +96,21 @@ export default function StatementTable({
         switch (r.kind) {
           case "group":
             return <span className="font-semibold">{r.name}</span>;
-          case "line":
-            return <span className={`block truncate ${r.nested ? "pl-4" : ""}`}>
-              <Link className="underline underline-offset-2" to={accountHref(r.code)}>
-                {r.code} {r.name ?? "Account name not available"}
-              </Link>
+          case "line": {
+            const note = lineNote?.(r) ?? null;
+            const link = <Link className="underline underline-offset-2" to={accountHref(r.code)}>
+              {r.code} {r.name ?? "Account name not available"}
+            </Link>;
+            if (!note) return <span className={`block truncate ${r.nested ? "pl-4" : ""}`}>{link}</span>;
+            return <span className={`block ${r.nested ? "pl-4" : ""}`}>
+              <span className="block truncate">{link}</span>
+              <span className="block truncate text-label text-kit-slate-11">{note}</span>
             </span>;
+          }
           case "unclosed":
             return "Net result not yet closed";
           case "nothing":
-            return <span className="text-kit-slate-11">{nothing}</span>;
+            return <span className="text-kit-slate-11">{nothing(r.section)}</span>;
         }
       },
     },

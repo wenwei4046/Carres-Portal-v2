@@ -186,6 +186,54 @@ describe("Reports — the statements read the ledger", () => {
     ]);
     expect(within(table).queryByText("Difference")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
+    // Rows without 0506's `reclassified` column print as before, with no note.
+    expect(within(table).queryByText(/paid before their invoice/)).not.toBeInTheDocument();
+  });
+
+  // 0506: customer A paid RM 5,000 before a RM 2,185 invoice (balance -2,815);
+  // customer B owes RM 2,000. The database moves A's RM 2,815 onto 2210.
+  const reclassedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 6000),
+    subtotal("ASSET", "1100", "Cash and bank", 6000),
+    { ...account("ASSET", "1200", "Receivables", "1210", "Trade receivables — customers", 2000), reclassified: -2815 },
+    subtotal("ASSET", "1200", "Receivables", 2000),
+    total("ASSET", 8000),
+    account("LIABILITY", "2100", "Payables", "2110", "Trade payables — suppliers", 0),
+    subtotal("LIABILITY", "2100", "Payables", 0),
+    { ...account("LIABILITY", "2200", "Customer money held", "2210", "Customer deposits held", 2815), reclassified: 2815 },
+    subtotal("LIABILITY", "2200", "Customer money held", 2815),
+    total("LIABILITY", 2815),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 5185 },
+    total("EQUITY", 5185),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+
+  it("shows customers who paid before their invoice under Customer deposits held, as the ledger served it", async () => {
+    serve({ bs: (a) => bs(a, reclassedBody()) });
+    show();
+    const table = screen.getByTestId("balance-sheet");
+    await within(table).findByRole("link", { name: "2210 Customer deposits held" });
+    expect(lines(table)).toEqual([
+      "Asset | RM 8,000.00",
+      "Cash and bank | RM 6,000.00",
+      "1120 Bank — current account | RM 6,000.00",
+      "Receivables | RM 2,000.00",
+      "1210 Trade receivables — customers | RM 2,000.00",
+      "Liability | RM 2,815.00",
+      "2210 Customer deposits heldIncludes RM 2,815.00 from customers who paid before their invoice. | RM 2,815.00",
+      "Equity | RM 5,185.00",
+      "Net result not yet closed | RM 5,185.00",
+    ]);
+    expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
+  });
+
+  it("a reclassified amount that is not a number is refused as a whole", async () => {
+    serve({ bs: (a) => bs(a, reclassedBody().map((r) => r.account_code === "2210" ? { ...r, reclassified: "lots" } : r)) });
+    show();
+    expect(await screen.findByTestId("balance-sheet-failed"))
+      .toHaveTextContent("The balance sheet could not be loaded. Try again.");
   });
 
   it("opens each account in the Journal, narrowed to that account and the statement's dates", async () => {
@@ -275,28 +323,29 @@ describe("Reports — when there is nothing, or no answer", () => {
     expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
   });
 
-  it("every account at RM 0.00 says so, keeps the served totals, and never claims there were no entries", async () => {
+  it("a section with every account at RM 0.00 names what it has none of, and keeps the served totals", async () => {
     serve({ pl: (f, t) => pl(f, t, zero(PL_BODY)), bs: (a) => bs(a, zero(bsBody(0))) });
     show();
     const plTable = screen.getByTestId("profit-and-loss");
-    await within(plTable).findAllByText("Every account is at RM 0.00 in this period.");
+    await within(plTable).findByText("No income in this period.");
     expect(lines(plTable)).toEqual([
       "Income | RM 0.00",
-      "Every account is at RM 0.00 in this period. |",
+      "No income in this period. |",
       "Expense | RM 0.00",
-      "Every account is at RM 0.00 in this period. |",
+      "No expenses in this period. |",
       "Net result | RM 0.00",
     ]);
     const bsTable = screen.getByTestId("balance-sheet");
-    await within(bsTable).findAllByText("Every account is at RM 0.00 on this day.");
+    await within(bsTable).findByText("No assets on this day.");
     expect(lines(bsTable)).toEqual([
       "Asset | RM 0.00",
-      "Every account is at RM 0.00 on this day. |",
+      "No assets on this day. |",
       "Liability | RM 0.00",
-      "Every account is at RM 0.00 on this day. |",
+      "No liabilities on this day. |",
       "Equity | RM 0.00",
-      "Every account is at RM 0.00 on this day. |",
+      "No equity on this day. |",
     ]);
+    expect(screen.queryByText(/Every account is at/)).not.toBeInTheDocument();
     expect(screen.queryByText(/No entries/)).not.toBeInTheDocument();
   });
 
@@ -308,7 +357,7 @@ describe("Reports — when there is nothing, or no answer", () => {
     await within(table).findByRole("link", { name: "4100 Furniture sales" });
     expect(lines(table).slice(3)).toEqual([
       "Expense | RM 0.00",
-      "Every account is at RM 0.00 in this period. |",
+      "No expenses in this period. |",
       "Net result | RM 12,850.00",
     ]);
   });
