@@ -684,6 +684,16 @@ sentence: SO-1217 still reads `Order details incomplete` over `Building type not
 scopes put no row in a different bucket; what changed is that the label, the filter and the
 warning can no longer disagree.
 
+**The Delivery Orders register reads the same interpretation (§3.1).** It printed `Delivery
+Location` from the same two structured columns on the same order row, so a document issued for one
+of those 46 orders would have read `Not recorded` beside a Monitor row reading `Puchong, Selangor`.
+No issued document differs today — all 4 in production carry the structured state — and converging
+it is what stops the first one that does not from splitting two Delivery surfaces (Architecture
+Law D). **Still Sales-owned and NOT changed here:** the Sales Orders register's own `Delivery
+Location`, `City`, `State`, `Address line 1` and `Postcode` columns read the structured columns
+raw and print `Not recorded` for the same 46 orders. That is the same false absence on a
+Sales-owned surface, reported and left to its owner rather than folded into this correction.
+
 **THE ENTRY RULE (owner ruling 2026-08-24, enforcement re-ruled 2026-09-14).** A Sales Order does
 not become delivery work merely by existing. A scope reaches Monitor only when it has a delivery
 address, goods that require delivering and a valid scope or Journey leg. Cancelled orders, orders

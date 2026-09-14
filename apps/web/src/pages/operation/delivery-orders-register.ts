@@ -45,7 +45,8 @@ import {
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderAttemptRow, DeliveryOrderRow } from "@/lib/queries";
-import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
+import { resolveDeliveryLocality } from "@/lib/locality";
+import { requestedDeliveryOf } from "./sales-order-columns";
 import { lineName } from "./sales-order-facts";
 
 /** ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section). */
@@ -488,10 +489,14 @@ export function buildDoRegisterRow(
     requestedTbd: requestedDeliveryOf(r.orders).tbd,
     confirmedDelivery: r.delivery_date ? r.delivery_date.slice(0, 10) : null,
     confirmedTime: r.time_slot,
-    location: conciseLocality(
-      r.orders.customer_address_city,
-      r.orders.customer_address_state,
-    ),
+    /* ⭐ THE SAME ADDRESS READING MONITOR RUNS (owner correction
+       2026-09-14). Both pages read the SAME order row, so a second
+       interpretation here is how one Delivery surface starts printing
+       `Not recorded` over an address the other prints as `Puchong,
+       Selangor`. No live row differs today — all 4 issued documents carry
+       the structured state — and this is what stops the first one that does
+       not from splitting the two registers. */
+    location: resolveDeliveryLocality(r.orders).label,
     logisticsPartner: r.logistics_partner,
     issuedAt: r.issued_at,
     lines,
