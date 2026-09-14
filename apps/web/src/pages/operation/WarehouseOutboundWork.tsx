@@ -552,7 +552,11 @@ export default function WarehouseOutboundWork() {
                   <Link
                     to={`/operation?${(() => {
                       const back = new URLSearchParams(params);
-                      back.set("tab", "warehouse-monitor");
+                      /* Outbound IS pickup work, so it returns to the Pickup
+                         Schedule — carrying `date` and `site` untouched, which
+                         is what puts the operator back on the column they
+                         opened this from. */
+                      back.set("tab", "warehouse-pickup-schedule");
                       back.delete("do");
                       back.delete("view");
                       back.delete("q");
@@ -561,7 +565,7 @@ export default function WarehouseOutboundWork() {
                     className="text-meta text-base-600 underline-offset-2 hover:underline"
                     data-testid="wo-back-monitor"
                   >
-                    ← Monitor
+                    ← Pickup Schedule
                   </Link>
                   {!isNarrow && dateControls}
                   {selectedDo && (

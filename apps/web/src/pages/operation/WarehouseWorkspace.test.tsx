@@ -1,42 +1,102 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import {
-  deliveryWarehouseScheduleEvents,
-  type DeliveryWarehouseScheduleInput,
-} from "@carres/shared";
-import WarehouseWorkspace from "./WarehouseWorkspace";
-import WarehouseOutboundWork from "./WarehouseOutboundWork";
-
 /**
- * WAREHOUSE — the 2026-09-06 replacement Card's completion standard:
- * Monitor alone renders the six-working-day Calendar, full width with NO
- * 240px rail; both directions show with governed time sentences; an
- * ARRIVAL card opens filtered Inbound, a PICKUP card filtered Outbound;
- * Outbound is rail + work rows with the carrier and the driver as separate
- * fields and the loading act named exactly.
+ * WAREHOUSE — ARRIVAL SCHEDULE · PICKUP SCHEDULE (owner ruling 2026-09-14).
+ *
+ * The acceptance cases of the approved card, and they are almost all about the
+ * same thing: **the board may not invent, merge or hide a fact.** Two POs on
+ * one date are two cards; five categories in one scope are five lines on one
+ * card; an absent receipt is not a zero; a broken feed is not an empty day.
+ *
+ * The data projection is BUILD B's and is mocked here — these tests own what
+ * the UI DOES with a contract-shaped answer, not where the answer comes from.
  */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, within, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type {
+  WarehouseScheduleCard,
+  WarehouseScheduleLine,
+  WarehouseScheduleResult,
+} from "@carres/shared";
 
-const apiFetchMock = vi.fn();
-vi.mock("@/lib/api", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...args: unknown[]) => apiFetchMock(...args) };
-});
-
-/* The pages derive "today" from the app clock — pin it to the fixture week
-   (Thu, 3 Sep 2026). */
+/* The page derives "today" from the app clock — pin it to the fixture week. */
 vi.mock("@/lib/fmt-date", async () => {
   const actual = await vi.importActual<typeof import("@/lib/fmt-date")>("@/lib/fmt-date");
-  return { ...actual, appTodayIso: () => "2026-09-03" };
+  return { ...actual, appTodayIso: () => "2026-09-14" };
 });
 
-let mediaMatches = false;
+/** BUILD B's projection, mocked at the seam the two builds agreed on. */
+let result: WarehouseScheduleResult;
+vi.mock("./useWarehouseSchedule", () => ({
+  useWarehouseSchedule: () => result,
+}));
+
+import WarehouseWorkspace, { __resetScheduleContext } from "./WarehouseWorkspace";
+
+const DATES = [
+  "2026-09-14",
+  "2026-09-15",
+  "2026-09-16",
+  "2026-09-17",
+  "2026-09-18",
+  "2026-09-19",
+];
+
+function line(over: Partial<WarehouseScheduleLine> = {}): WarehouseScheduleLine {
+  return {
+    id: `l${Math.random()}`,
+    categoryKey: "Mattress",
+    modelLabel: "Ohana King",
+    plannedQty: 3,
+    receivedQty: null,
+    loadedQty: null,
+    damagedQty: null,
+    ...over,
+  };
+}
+
+function card(over: Partial<WarehouseScheduleCard> = {}): WarehouseScheduleCard {
+  return {
+    id: "c1",
+    direction: "arrival",
+    kind: "supplier-delivery",
+    sourceId: "po-1",
+    sourceRef: "PO-2609-0001",
+    soRef: null,
+    doRef: null,
+    partyName: "Ohana",
+    siteId: "wh-1",
+    date: "2026-09-15",
+    dateStatus: "expected",
+    lines: [line()],
+    driverConfirmedQty: null,
+    logisticsName: "NETS Delivery",
+    relatedRecords: [],
+    openHref: "/operation?tab=warehouse-inbound&po=po-1",
+    detailHref: null,
+    overdue: false,
+    ...over,
+  };
+}
+
+function setSchedule(over: Partial<WarehouseScheduleResult> = {}) {
+  result = {
+    cards: [],
+    operatingDates: DATES,
+    loading: false,
+    errors: [],
+    ...over,
+  };
+}
+
+let wide = true;
 beforeEach(() => {
-  mediaMatches = false;
-  apiFetchMock.mockReset();
+  __resetScheduleContext();
+  wide = true;
+  setSchedule();
   window.matchMedia = ((query: string) => ({
-    matches: mediaMatches,
+    /* The page asks `(max-width: 1279px)` — true means the agenda. */
+    matches: !wide,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -46,453 +106,449 @@ beforeEach(() => {
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
 });
-
-/** DO-2609-019, Klang → PJ, NETS Delivery, two Units, pickup Fri 4 Sep. */
-function unitInput(
-  overrides: Partial<DeliveryWarehouseScheduleInput> & { unitId: string },
-): DeliveryWarehouseScheduleInput {
-  return {
-    orderId: "order-19",
-    deliveryOrderId: "do-19",
-    leg: 0,
-    so: 260919,
-    fromLocation: "Carres Klang Warehouse",
-    toCustomer: "Petaling Jaya",
-    logisticsPartner: "NETS Delivery",
-    driverName: null,
-    vehicle: null,
-    doNumber: "DO-2609-019",
-    collectionDate: "2026-09-04",
-    collectionWindow: null,
-    customerHandoverDate: null,
-    actualCollectionAt: null,
-    actualArrivalAt: null,
-    hasCollectionEvidence: false,
-    hasDeliveryEvidence: false,
-    soDate: "2026-09-01",
-    sku: "SOFA-1",
-    productName: "Jager Sofa (Grey)",
-    ...overrides,
-  };
-}
-
-const TWO_UNIT_EVENTS = [
-  ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-019" })),
-  ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
-];
-
-/** One open PO owing 3 units, expected Fri 4 Sep at the Klang warehouse. */
-const OPEN_PO = {
-  id: "PO-2646-0107",
-  supplier_id: "sup-1",
-  warehouse_id: "wh-1",
-  status: "open",
-  sup_status: "confirmed",
-  so: null,
-  so_refs: null,
-  eta_date: "2026-09-04",
-  placed_at: "2026-08-20",
-  purchase_order_lines: [
-    { id: "l1", sku: "MAT-1", qty: 3, received_qty: 0 },
-  ],
-};
-
-function stubApi({
-  events = TWO_UNIT_EVENTS,
-  pos = [OPEN_PO],
-  receipts = [] as unknown[],
-} = {}) {
-  apiFetchMock.mockImplementation((url: string) => {
-    if (String(url).includes("warehouse-schedule"))
-      return Promise.resolve({ events });
-    if (String(url).includes("/api/operation/pos"))
-      return Promise.resolve({ pos });
-    if (String(url).includes("/api/operation/suppliers"))
-      return Promise.resolve({ suppliers: [{ id: "sup-1", name: "Nice Future" }] });
-    if (String(url).includes("/api/operation/warehouse-receipts"))
-      return Promise.resolve({ receipts });
-    if (String(url).includes("/api/operation/warehouse"))
-      return Promise.resolve({ warehouses: [{ id: "wh-1", name: "Carres Klang Warehouse" }] });
-    return Promise.resolve({});
-  });
-}
+afterEach(() => {
+  __resetScheduleContext();
+});
 
 function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+  const loc = useLocation();
+  return <div data-testid="location">{`${loc.pathname}${loc.search}`}</div>;
 }
 
-function mountMonitor(initialUrl = "/operation?tab=warehouse-monitor") {
+function mount(
+  direction: "arrival" | "pickup" = "arrival",
+  url = "/operation?tab=warehouse-arrival-schedule",
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[initialUrl]}>
-        <Routes>
-          <Route
-            path="/operation"
-            element={
-              <>
-                <WarehouseWorkspace />
-                <LocationProbe />
-              </>
-            }
-          />
-          <Route path="/operation/delivery-orders/:doId" element={<div data-testid="do-object" />} />
-        </Routes>
-      </MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route
+          path="/operation"
+          element={
+            <>
+              <WarehouseWorkspace direction={direction} />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-function mountOutbound(initialUrl = "/operation?tab=warehouse-outbound") {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[initialUrl]}>
-        <Routes>
-          <Route
-            path="/operation"
-            element={
-              <>
-                <WarehouseOutboundWork />
-                <LocationProbe />
-              </>
-            }
-          />
-          <Route path="/operation/delivery-orders/:doId" element={<div data-testid="do-object" />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
-describe("Warehouse Monitor — the only Calendar", () => {
-  it.each(["/api/operation/pos", "/api/operation/suppliers", "/api/operation/warehouse"])(
-    "shows a failed source instead of an empty desk: %s", async (failedUrl) => {
-      stubApi({ events: [], pos: [] });
-      const normal = apiFetchMock.getMockImplementation()!;
-      apiFetchMock.mockImplementation((url: string) =>
-        url === failedUrl ? Promise.reject(new Error("Source unavailable")) : normal(url),
-      );
-      mountMonitor();
-      expect(await screen.findByText(/The schedule could not be loaded/)).toBeInTheDocument();
-      expect(screen.queryByTestId("wm-empty-2026-09-05")).toBeNull();
-    },
-  );
-  it("shows six operating dates full-width, with NO 240px filter rail", async () => {
-    stubApi();
-    mountMonitor();
-    await waitFor(() => expect(screen.getByTestId("wm-board")).toBeInTheDocument());
-    for (const d of ["2026-09-03", "2026-09-04", "2026-09-05", "2026-09-07", "2026-09-08", "2026-09-09"]) {
-      expect(screen.getByTestId(`wm-col-${d}`)).toBeInTheDocument();
-    }
-    expect(screen.queryByTestId("wm-col-2026-09-06")).toBeNull();
-    // The replacement Card: Monitor renders no page filter rail and no
-    // Filters toggle — filtering lives on Inbound/Outbound.
-    expect(screen.queryByTestId("wd-rail")).toBeNull();
-    expect(screen.queryByTestId("wm-rail")).toBeNull();
-    expect(screen.queryByText("Filters")).toBeNull();
-    // The page title is Monitor, not Dashboard.
-    expect(screen.getByTestId("warehouse-monitor-header")).toHaveTextContent("Monitor");
+describe("the board", () => {
+  it("is six equal date columns, and it is NOT the combined Monitor", () => {
+    mount();
+    for (const d of DATES) expect(screen.getByTestId(`ws-col-${d}`)).toBeInTheDocument();
+    const grid = screen.getByTestId("ws-board").firstElementChild as HTMLElement;
+    expect(grid.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
   });
 
-  it("shows BOTH directions with governed time sentences — never a bare clock", async () => {
-    stubApi();
-    mountMonitor();
-    const pickup = await screen.findByTestId("wm-card-DO-2609-019");
-    expect(within(pickup).getByTestId("wm-card-time")).toHaveTextContent("Time not provided");
-    expect(within(pickup).getByTestId("wm-card-kind")).toHaveTextContent(
-      "Pickup · Customer-delivery pickup",
+  it("names the page Arrival Schedule or Pickup Schedule — never Monitor", () => {
+    mount("arrival");
+    expect(screen.getByTestId("warehouse-arrival-schedule-header")).toHaveTextContent(
+      "Arrival Schedule",
     );
-    expect(within(pickup).getByText(/2 Units to Petaling Jaya/)).toBeInTheDocument();
-
-    const arrival = screen.getByTestId("wm-card-PO-2646-0107");
-    expect(within(arrival).getByTestId("wm-card-time")).toHaveTextContent("Time not provided");
-    expect(within(arrival).getByTestId("wm-card-kind")).toHaveTextContent(
-      "Arrival · Supplier arrival",
-    );
-    expect(within(arrival).getByText(/Nice Future · Pending Delivery Qty 3/)).toBeInTheDocument();
+    expect(screen.queryByText("Monitor")).toBeNull();
   });
 
-  it("a recorded pickup window reads `Driver pickup {time}`", async () => {
-    stubApi({
-      events: [
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({ unitId: "U1-260-019", collectionWindow: "14:30" }),
-        ),
-      ],
-      pos: [],
-    });
-    mountMonitor();
-    const pickup = await screen.findByTestId("wm-card-DO-2609-019");
-    expect(within(pickup).getByTestId("wm-card-time")).toHaveTextContent("Driver pickup 14:30");
+  it("carries NO internal direction tab and no upper/lower split", () => {
+    setSchedule({ cards: [card()] });
+    mount("arrival");
+    expect(screen.queryByText("Pickup")).toBeNull();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 
-  it("an empty date says the governed both-directions sentence", async () => {
-    stubApi();
-    mountMonitor();
-    const empty = await screen.findByTestId("wm-empty-2026-09-05");
-    expect(empty).toHaveTextContent("No arrivals or pickups on Sat, 5 Sep. Choose another date.");
+  it("uses the projection's operating dates and applies NO off-day rule of its own", () => {
+    /* A Sunday (2026-09-20) the Site DOES operate must render. */
+    setSchedule({ operatingDates: ["2026-09-20", "2026-09-21"] });
+    mount();
+    expect(screen.getByTestId("ws-col-2026-09-20")).toBeInTheDocument();
   });
 
-  it("a PICKUP card opens Outbound filtered to date, Site and DO", async () => {
-    stubApi();
-    mountMonitor();
-    const card = await screen.findByTestId("wm-card-DO-2609-019");
-    fireEvent.click(card);
-    const loc = screen.getByTestId("location");
-    expect(loc).toHaveTextContent("tab=warehouse-outbound");
-    expect(loc).toHaveTextContent("date=2026-09-04");
-    expect(loc).toHaveTextContent("do=DO-2609-019");
-  });
-
-  it("an ARRIVAL card opens Inbound filtered to date, Site and PO", async () => {
-    stubApi();
-    mountMonitor();
-    const card = await screen.findByTestId("wm-card-PO-2646-0107");
-    fireEvent.click(card);
-    const loc = screen.getByTestId("location");
-    expect(loc).toHaveTextContent("tab=warehouse-inbound");
-    expect(loc).toHaveTextContent("date=2026-09-04");
-    expect(loc).toHaveTextContent("po=PO-2646-0107");
-  });
-
-  it("`DO No` is a separate read-only document door — never Edit Delivery", async () => {
-    stubApi();
-    mountMonitor();
-    const card = await screen.findByTestId("wm-card-DO-2609-019");
-    fireEvent.click(within(card).getByTestId("wm-card-source-link"));
-    expect(screen.getByTestId("do-object")).toBeInTheDocument();
-    expect(screen.queryByText("Edit Delivery")).toBeNull();
-  });
-
-  it("narrow width renders one selected day; previous/next move one operating date", async () => {
-    mediaMatches = true;
-    stubApi();
-    mountMonitor();
-    await waitFor(() => expect(screen.getByTestId("wm-agenda")).toBeInTheDocument());
-    expect(screen.queryByTestId("wm-board")).toBeNull();
-    fireEvent.click(screen.getByTestId("wm-next"));
-    expect(screen.getByTestId("location")).toHaveTextContent("date=2026-09-04");
+  it("the date heading carries the weekday, the number and the month", () => {
+    mount();
+    const head = screen.getByTestId("ws-head-2026-09-15");
+    expect(head).toHaveTextContent("Tue");
+    expect(head).toHaveTextContent("15");
+    expect(head).toHaveTextContent("Sep");
   });
 });
 
-describe("Warehouse Outbound — the unified Register", () => {
-  it("has the pickup-status rail and separate carrier/driver facts, and keeps the two evidence records apart", async () => {
-    stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
-    await waitFor(() =>
-      expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
-    );
-    const rail = screen.getByTestId("wo-rail");
-    expect(within(rail).getByText("PICKUP STATUS")).toBeInTheDocument();
-    expect(within(rail).getByTestId("wo-view-open")).toBeInTheDocument();
-    expect(within(rail).getByTestId("wo-view-loaded")).toBeInTheDocument();
-    // One Site today — the group never renders as a dead one-option control.
-    expect(within(rail).queryByText("SITE")).toBeNull();
-    // The column headers speak the shared row grammar.
-    expect(screen.getByText("Scheduled handover")).toBeInTheDocument();
-    expect(screen.getByText("Document")).toBeInTheDocument();
-    expect(screen.getByText("Exceptions")).toBeInTheDocument();
-    const row = screen.getByTestId("wo-row-DO-2609-019");
-    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
-      "Waiting for NETS Delivery to assign a driver",
-    );
-    // Required / Loaded / Driver confirmed stay three numbers.
-    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
-      "Required 2 · Loaded 0",
-    );
-    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
-      "Driver confirmed 0",
-    );
-    // The two evidence records live in the arrangement's own detail.
-    fireEvent.click(screen.getByTestId("wo-row-toggle-DO-2609-019"));
-    expect(screen.getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
-      "Warehouse loaded — nothing yet",
-    );
-    expect(screen.getByTestId("wo-collected-DO-2609-019")).toHaveTextContent(
-      "NETS Delivery has not confirmed collection yet",
-    );
-  });
-
-  it("an assigned driver renders by name, and the vehicle stays its own fact", async () => {
-    stubApi({
-      events: [
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({
-            unitId: "U1-260-019",
-            driverName: "Ahmad Rahman",
-            vehicle: "VBM 1234",
-          }),
-        ),
+describe("one card per owning record — never merged, never capped", () => {
+  it("two POs from the same supplier on the same date are TWO cards", () => {
+    setSchedule({
+      cards: [
+        card({ id: "a", sourceId: "po-a", sourceRef: "PO-2609-0001" }),
+        card({ id: "b", sourceId: "po-b", sourceRef: "PO-2609-0002" }),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
-    const row = await screen.findByTestId("wo-row-DO-2609-019");
-    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
-    expect(screen.getByText("Vehicle VBM 1234")).toBeInTheDocument();
+    mount();
+    const col = screen.getByTestId("ws-col-2026-09-15");
+    expect(col.querySelectorAll("article[data-direction]")).toHaveLength(2);
+    expect(within(col).getByText("PO-2609-0001")).toBeInTheDocument();
+    expect(within(col).getByText("PO-2609-0002")).toBeInTheDocument();
   });
 
-  it("a Monitor deep link opens its exact arrangement already unfolded, with derived per-Unit reasons", async () => {
-    stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
-    await waitFor(() =>
-      expect(screen.getByTestId("wo-units-DO-2609-019")).toBeInTheDocument(),
-    );
-    const units = screen.getByTestId("wo-units-DO-2609-019");
-    expect(within(units).getByText("Goods scheduled for pickup")).toBeInTheDocument();
-    expect(within(units).getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent(
-      "Not scanned yet",
-    );
-    // No loading act before scan/check/pack; no generic Mark done ever.
-    expect(screen.queryByTestId("wo-record-loaded")).toBeNull();
-    expect(screen.queryByText("Mark done")).toBeNull();
-    // The whole row navigates nowhere; the DO No is the document door.
-    expect(screen.getByTestId("outbound-document-DO-2609-019")).toHaveAttribute(
-      "href",
-      "/operation/delivery-orders/DO-2609-019",
-    );
-  });
-
-  it("the menu default lists every unfinished arrangement; a done arrangement stays queryable", async () => {
-    stubApi({
-      events: [
-        ...TWO_UNIT_EVENTS,
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({
-            unitId: "U1-260-030",
-            doNumber: "DO-2609-030",
-            deliveryOrderId: "do-30",
-            orderId: "order-30",
-            collectionDate: "2026-09-05",
-            unitHandedOverAt: "2026-09-05T09:00:00+08:00",
-            unitHasEvidence: true,
-          }),
-        ),
-      ],
-    });
-    mountOutbound();
-    await waitFor(() =>
-      expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
-    );
-    // Finished work is not in the default scope…
-    expect(screen.queryByTestId("wo-row-DO-2609-030")).toBeNull();
-    // …but its count is honest in the SAME scope, and one click shows it.
-    expect(screen.getByTestId("wo-view-loaded")).toHaveTextContent("Loaded1");
-    fireEvent.click(screen.getByTestId("wo-view-loaded"));
-    await waitFor(() =>
-      expect(screen.getByTestId("wo-row-DO-2609-030")).toBeInTheDocument(),
-    );
-    expect(screen.queryByTestId("wo-row-DO-2609-019")).toBeNull();
-  });
-
-  it("an empty exact date says the governed pickup sentence and the summary matches the range", async () => {
-    stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-05");
-    await waitFor(() =>
-      expect(
-        screen.getByText("No pickups on Sat, 5 Sep. Choose another date."),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("wo-range-summary")).toHaveTextContent(
-      "0 pickup arrangements · Units: Required 0 · Loaded 0 · Driver confirmed 0",
-    );
-  });
-
-  it("scanning a Unit outside this DO's scope is refused in words; a valid scan calls the governed door", async () => {
-    stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
-    await screen.findByTestId("wo-units-DO-2609-019");
-    const input = screen.getByTestId("wo-scan-input");
-    const prepCalls = () =>
-      apiFetchMock.mock.calls.filter(([url]) => String(url).includes("outbound-prep"));
-    fireEvent.change(input, { target: { value: "U9-999-999" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(prepCalls()).toHaveLength(0);
-    fireEvent.change(input, { target: { value: "U1-260-019" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() =>
-      expect(apiFetchMock).toHaveBeenCalledWith(
-        "/api/operation/delivery-orders/do-19/outbound-prep",
-        expect.objectContaining({
-          body: JSON.stringify({ fact: "scanned", unitCodes: ["U1-260-019"] }),
+  it("one PO holding two categories is ONE card with TWO lines", () => {
+    setSchedule({
+      cards: [
+        card({
+          lines: [
+            line({ id: "m", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "b", categoryKey: "Bedframe", modelLabel: "Ohana Frame" }),
+          ],
         }),
-      ),
+      ],
+    });
+    mount();
+    expect(document.querySelectorAll("article[data-direction]")).toHaveLength(1);
+    expect(screen.getAllByTestId("ws-line")).toHaveLength(2);
+  });
+
+  it("one delivery scope holding five categories is ONE card with FIVE lines", () => {
+    setSchedule({
+      cards: [
+        card({
+          direction: "pickup",
+          lines: (
+            ["Mattress", "Bedframe", "Sofa", "Pillow", "Topper"] as const
+          ).map((c, i) => line({ id: `l${i}`, categoryKey: c, loadedQty: null })),
+        }),
+      ],
+    });
+    mount("pickup");
+    expect(screen.getAllByTestId("ws-line")).toHaveLength(5);
+  });
+
+  it("repeated same-category source lines stay SEPARATE — no aggregation, no `+N more`", () => {
+    setSchedule({
+      cards: [
+        card({
+          lines: [
+            line({ id: "1", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "2", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+            line({ id: "3", categoryKey: "Mattress", modelLabel: "Ohana King" }),
+          ],
+        }),
+      ],
+    });
+    mount();
+    expect(screen.getAllByTestId("ws-line")).toHaveLength(3);
+    expect(screen.queryByText(/\+\d+ more/)).toBeNull();
+  });
+});
+
+describe("progress — the four states are distinguishable", () => {
+  it("an ABSENT receipt shows the planned quantity alone, never 0/3", () => {
+    setSchedule({ cards: [card({ lines: [line({ receivedQty: null, plannedQty: 3 })] })] });
+    mount();
+    const p = screen.getByTestId("ws-line-progress");
+    expect(p).toHaveAttribute("data-state", "unknown");
+    expect(p).toHaveTextContent("3 expected, receipt not recorded");
+    expect(p.textContent).not.toContain("0/3");
+  });
+
+  it("a RECORDED zero is visibly a different answer from an absent one", () => {
+    setSchedule({ cards: [card({ lines: [line({ receivedQty: 0, plannedQty: 3 })] })] });
+    mount();
+    const p = screen.getByTestId("ws-line-progress");
+    expect(p).toHaveAttribute("data-state", "none");
+    expect(p).toHaveTextContent("0/3");
+    expect(p).toHaveTextContent("0 of 3 received");
+  });
+
+  it("partial and complete each carry their numbers and their meaning", () => {
+    setSchedule({
+      cards: [
+        card({
+          lines: [
+            line({ id: "p", receivedQty: 2, plannedQty: 3 }),
+            line({ id: "c", receivedQty: 3, plannedQty: 3 }),
+          ],
+        }),
+      ],
+    });
+    mount();
+    const states = screen
+      .getAllByTestId("ws-line-progress")
+      .map((n) => n.getAttribute("data-state"));
+    expect(states).toEqual(["partial", "complete"]);
+  });
+
+  it("a pickup reads the LOADING count, never a receipt count", () => {
+    setSchedule({
+      cards: [
+        card({
+          direction: "pickup",
+          lines: [line({ loadedQty: 1, receivedQty: 3, plannedQty: 2 })],
+        }),
+      ],
+    });
+    mount("pickup");
+    expect(screen.getByTestId("ws-line-progress")).toHaveTextContent("1 of 2 loaded");
+  });
+});
+
+describe("damage, the driver, and the records a card may link to", () => {
+  it("damage stays INSIDE the received count and gets its own warning", () => {
+    setSchedule({
+      cards: [card({ lines: [line({ receivedQty: 3, plannedQty: 3, damagedQty: 1 })] })],
+    });
+    mount();
+    /* 3 of 3 arrived — the damaged Unit is one of them, not a fourth. */
+    expect(screen.getByTestId("ws-line-progress")).toHaveTextContent("3/3");
+    expect(screen.getByTestId("ws-card-exception-damaged")).toHaveTextContent(
+      "1 received with issue · counted in received, not available stock",
     );
   });
 
-  it("the loading act names the exact count and receiver, and requires receiver + proof", async () => {
-    stubApi({
-      events: [
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({
-            unitId: "U1-260-019",
-            driverName: "Ahmad Rahman",
-            unitScannedAt: "t",
-            unitCheckedAt: "t",
-            unitPackedAt: "t",
-          }),
-        ),
-        ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
+  it("damage ALONE creates no related record and no return link", () => {
+    setSchedule({
+      cards: [
+        card({ lines: [line({ receivedQty: 3, damagedQty: 1 })], relatedRecords: [] }),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
-    const open = await screen.findByTestId("wo-record-loaded");
-    expect(open).toHaveTextContent("Record 1 Unit loaded to Ahmad Rahman");
-    expect(screen.getByTestId("wo-receiver-consequence")).toHaveTextContent("NETS Delivery");
-    fireEvent.click(open);
-    // Only the prepared Unit is offered; the un-prepared one cannot ride.
-    expect(screen.getByTestId("wo-pick-U1-260-019")).toBeInTheDocument();
-    expect(screen.queryByTestId("wo-pick-U1-260-020")).toBeNull();
-    const submit = screen
-      .getAllByRole("button", { name: /loaded to/ })
-      .at(-1) as HTMLButtonElement;
-    expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByTestId("wo-receiver"), { target: { value: "Ahmad Rahman" } });
-    // Still disabled — proof is required, not optional.
-    expect(submit).toBeDisabled();
+    mount();
+    expect(screen.queryByTestId("ws-card-related")).toBeNull();
   });
 
-  it("a confirmed collection with an unloaded Unit names that exact Unit — never `Needs checking`", async () => {
-    stubApi({
-      events: [
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({
-            unitId: "U1-260-019",
-            driverName: "Ahmad Rahman",
-            unitScannedAt: "t",
-            unitCheckedAt: "t",
-            unitPackedAt: "t",
-            unitHandedOverAt: "2026-09-04T11:18:00+08:00",
-            unitHasEvidence: true,
-            actualCollectionAt: "2026-09-04T15:02:00+08:00",
-            hasCollectionEvidence: true,
-          }),
-        ),
-        ...deliveryWarehouseScheduleEvents(
-          unitInput({
-            unitId: "U1-260-020",
-            driverName: "Ahmad Rahman",
-            actualCollectionAt: "2026-09-04T15:02:00+08:00",
-            hasCollectionEvidence: true,
-          }),
-        ),
+  it("an authorised return links back to the source record the projection named", () => {
+    setSchedule({
+      cards: [
+        card({
+          kind: "customer-return",
+          relatedRecords: [
+            { id: "r1", ref: "DO-2609-019", href: "/operation/delivery-orders/do-19" },
+          ],
+        }),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
-    const block = await screen.findByTestId("wo-not-collected");
-    expect(block).toHaveTextContent(
-      "U1-260-020 was not confirmed by Ahmad Rahman. It remains with Carres Klang Warehouse.",
+    mount();
+    expect(screen.getByText("DO-2609-019")).toHaveAttribute(
+      "href",
+      "/operation/delivery-orders/do-19",
     );
-    expect(screen.queryByText("Needs checking")).toBeNull();
   });
 
-  it("Back goes to Monitor and keeps the URL context", async () => {
-    stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04&do=DO-2609-019&site=X");
-    await screen.findByTestId("warehouse-outbound");
-    const back = screen.getByTestId("wo-back-monitor");
-    expect(back).toHaveAttribute("href", expect.stringContaining("tab=warehouse-monitor"));
-    expect(back).toHaveAttribute("href", expect.stringContaining("site=X"));
+  it("driver confirmation is its own line and never the loading progress", () => {
+    setSchedule({
+      cards: [
+        card({
+          direction: "pickup",
+          driverConfirmedQty: 2,
+          lines: [line({ loadedQty: 3, plannedQty: 3 })],
+        }),
+      ],
+    });
+    mount("pickup");
+    expect(screen.getByTestId("ws-card-exception-driver")).toHaveTextContent(
+      "Driver confirmed 2",
+    );
+    expect(screen.getByTestId("ws-line-progress")).toHaveTextContent("3/3");
+  });
+
+  it("an unevidenced driver count shows nothing at all", () => {
+    setSchedule({ cards: [card({ direction: "pickup", driverConfirmedQty: null })] });
+    mount("pickup");
+    expect(screen.queryByTestId("ws-card-exception-driver")).toBeNull();
+  });
+});
+
+describe("the card's own anatomy", () => {
+  it("prints NO event-type heading for an ordinary arrival or an ordinary pickup", () => {
+    setSchedule({
+      cards: [
+        card({ kind: "supplier-delivery" }),
+        card({ id: "c2", direction: "pickup", kind: "customer_delivery_pickup" }),
+      ],
+    });
+    mount();
+    expect(screen.queryByTestId("ws-card-special")).toBeNull();
+  });
+
+  it("names a SPECIAL movement", () => {
+    setSchedule({ cards: [card({ kind: "transfer" })] });
+    mount();
+    expect(screen.getByTestId("ws-card-special")).toHaveTextContent("Transfer arrival");
+  });
+
+  it("a customer pickup leads with the SO and puts the DO second", () => {
+    setSchedule({
+      cards: [card({ direction: "pickup", soRef: "SO-1362", doRef: "DO-2609-019" })],
+    });
+    mount("pickup");
+    expect(screen.getByTestId("ws-card-ref-primary")).toHaveTextContent("SO-1362");
+    expect(screen.getByTestId("ws-card-ref-secondary")).toHaveTextContent("DO-2609-019");
+  });
+
+  it("has NO footer, NO `Received` heading and NO visible Logistics row", () => {
+    setSchedule({ cards: [card({ logisticsName: "NETS Delivery" })] });
+    mount();
+    const c = screen.getByTestId("ws-card-c1");
+    expect(within(c).queryByText("Received")).toBeNull();
+    expect(within(c).queryByText(/NETS Delivery/)).toBeNull();
+    expect(c.querySelector("footer")).toBeNull();
+  });
+
+  it("an unknown date agreement stays neutral — a date alone is never `Scheduled`", () => {
+    setSchedule({ cards: [card({ dateStatus: null })] });
+    mount();
+    expect(screen.queryByTestId("ws-card-date-status")).toBeNull();
+    expect(screen.getByTestId("ws-card-c1").className).not.toContain("amber");
+    expect(screen.getByTestId("ws-card-c1").className).not.toContain("blue");
+  });
+});
+
+describe("the door into work", () => {
+  it("opens the source the projection named, and says so to a screen reader", () => {
+    setSchedule({ cards: [card()] });
+    mount();
+    const open = screen.getByTestId("ws-card-open");
+    expect(open).toHaveAttribute("href", "/operation?tab=warehouse-inbound&po=po-1");
+    expect(open).toHaveAccessibleName("Open receiving work for Ohana · PO-2609-0001");
+  });
+
+  it("is reachable by keyboard", () => {
+    setSchedule({ cards: [card()] });
+    mount();
+    const open = screen.getByTestId("ws-card-open");
+    open.focus();
+    expect(open).toHaveFocus();
+  });
+
+  it("renders NO door when there is no scope to open — never a link to something adjacent", () => {
+    setSchedule({ cards: [card({ openHref: null })] });
+    mount();
+    expect(screen.queryByTestId("ws-card-open")).toBeNull();
+  });
+});
+
+describe("a broken feed is never an empty day", () => {
+  it("announces the failure and refuses to say `Nothing arriving`", () => {
+    setSchedule({
+      cards: [],
+      errors: [{ direction: "arrival", message: "The schedule could not be read." }],
+    });
+    mount();
+    expect(screen.getByTestId("ws-feed-error")).toHaveTextContent(
+      "The schedule could not be read.",
+    );
+    expect(screen.getByTestId("ws-empty-2026-09-15")).toHaveTextContent(
+      "The schedule could not be read for this date.",
+    );
+    expect(screen.queryByText("Nothing arriving.")).toBeNull();
+  });
+
+  it("a partial failure still renders the cards that DID arrive", () => {
+    setSchedule({
+      cards: [card()],
+      errors: [{ direction: "arrival", message: "Site operating dates unavailable." }],
+    });
+    mount();
+    expect(screen.getByTestId("ws-feed-error")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-card-c1")).toBeInTheDocument();
+  });
+
+  it("a genuinely clear day says so", () => {
+    setSchedule({ cards: [], errors: [] });
+    mount();
+    expect(screen.getByTestId("ws-empty-2026-09-15")).toHaveTextContent("Nothing arriving.");
+    expect(screen.queryByTestId("ws-feed-error")).toBeNull();
+  });
+
+  it("a card with NO date is reported, never silently dropped", () => {
+    setSchedule({ cards: [card({ date: null })] });
+    mount();
+    expect(screen.getByTestId("ws-undated")).toHaveTextContent("1 with no date yet");
+    expect(screen.queryByTestId("ws-card-c1")).toBeNull();
+  });
+});
+
+describe("long values and the narrow viewport", () => {
+  it("a long party name and a long reference WRAP — they are never clipped away", () => {
+    const longName = "Ohana Furniture Manufacturing Sendirian Berhad (Klang Branch)";
+    setSchedule({
+      cards: [card({ partyName: longName, sourceRef: "PO-2609-0001-REV-B-REISSUE" })],
+    });
+    mount();
+    expect(screen.getByTestId("ws-card-party")).toHaveTextContent(longName);
+    expect(screen.getByTestId("ws-card-party").className).toContain("break-words");
+    expect(screen.getByTestId("ws-card-party").className).not.toContain("truncate");
+    expect(screen.getByTestId("ws-card-ref-primary")).toHaveTextContent(
+      "PO-2609-0001-REV-B-REISSUE",
+    );
+  });
+
+  it("below 1280px shows ONE date with the same records and the same doors", () => {
+    wide = false;
+    setSchedule({ cards: [card({ date: "2026-09-14" })] });
+    mount();
+    expect(screen.getByTestId("ws-agenda")).toBeInTheDocument();
+    expect(screen.queryByTestId("ws-board")).toBeNull();
+    expect(screen.getByTestId("ws-card-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-card-open")).toBeInTheDocument();
+  });
+
+  it("the board pages a WHOLE window, never one day at a time", () => {
+    /* Six operating dates across a closed Sunday — the window SPANS seven
+       calendar days, so Previous must jump seven, not one. */
+    setSchedule({
+      operatingDates: [
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-19",
+      ],
+    });
+    mount();
+    fireEvent.click(screen.getByTestId("ws-prev"));
+    /* 2026-09-14 minus the window's own 6-day span. Anything closer would put
+       five already-visible dates back on the board. */
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-08");
+  });
+
+  it("Next starts the day AFTER the last date shown — never a repeated column", () => {
+    setSchedule();
+    mount();
+    fireEvent.click(screen.getByTestId("ws-next"));
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-20");
+  });
+
+  it("narrow previous/next walks ONE governed operating date, not a raw calendar day", () => {
+    wide = false;
+    setSchedule();
+    mount();
+    fireEvent.click(screen.getByTestId("ws-next"));
+    expect(screen.getByTestId("location")).toHaveTextContent("date=2026-09-15");
+  });
+});
+
+describe("context survives the walk", () => {
+  it("keeps `site` when the date window moves", () => {
+    setSchedule();
+    mount("arrival", "/operation?tab=warehouse-arrival-schedule&site=wh-1");
+    fireEvent.click(screen.getByTestId("ws-next"));
+    expect(screen.getByTestId("location")).toHaveTextContent("site=wh-1");
+  });
+
+  it("the sibling Schedule opens on the date and Site the operator was standing on", () => {
+    setSchedule();
+    const first = mount(
+      "arrival",
+      "/operation?tab=warehouse-arrival-schedule&date=2026-09-17&site=wh-9",
+    );
+    first.unmount();
+
+    /* The sidebar link carries no parameters — the page must remember. */
+    setSchedule({ cards: [card({ direction: "pickup", date: "2026-09-17" })] });
+    mount("pickup", "/operation?tab=warehouse-pickup-schedule");
+    expect(screen.getByTestId("ws-card-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-col-2026-09-17")).toBeInTheDocument();
   });
 });

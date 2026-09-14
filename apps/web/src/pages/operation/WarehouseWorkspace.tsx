@@ -1,55 +1,50 @@
-// design-standard: not-a-list-page — dated Warehouse Monitor Calendar
-// (read-only projection of arrivals and pickups), not a Register list.
+// design-standard: not-a-list-page — a dated Warehouse Schedule board
+// (read-only projection of one direction's work), not a Register list.
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  addWorkingDays,
-  myHolidaySet,
-  subtractWorkingDays,
-  WAREHOUSE_OFF_DAYS,
-  warehouseMonitorArrivalEvents,
-  warehouseMonitorDayEvents,
-  warehouseMonitorEmptyDaySentence,
-  warehouseMonitorPickupEvents,
-  warehouseOperatingDates,
-  warehouseOutboundCards,
-  warehouseRangeShift,
-  type DeliveryWarehouseScheduleEvent,
-  type WarehouseExpectedArrival,
-  type WarehouseMonitorEvent,
+import ModuleHeader from "./components/ModuleHeader";
+import WarehouseScheduleCard from "./WarehouseScheduleCard";
+import { useWarehouseSchedule } from "./useWarehouseSchedule";
+import type {
+  WarehouseScheduleCard as ScheduleCard,
+  WarehouseScheduleDirection,
 } from "@carres/shared";
 import {
-  useDeliveryWarehouseSchedule,
-  useOperationPos,
-  useOperationSuppliers,
-  useOperationWarehouse,
-} from "@/lib/queries";
-import { appTodayIso, fmtDate } from "@/lib/fmt-date";
-import ModuleHeader from "./components/ModuleHeader";
+  SCHEDULE_PAGE_WORD,
+  cardsOnDate,
+  dateHeadingPartsOf,
+  emptyDayWordOf,
+  undatedCards,
+} from "./warehouse-schedule-view";
+import { appTodayIso } from "@/lib/fmt-date";
+/* §4.4 — the z ladder is reachable only through the kit, never by typing a
+   number into a page. A sticky date heading is layer 1: chrome floating over
+   its own rows, which is exactly what `Z_TABLE_HEADER` names. */
+import { Z_TABLE_HEADER } from "@/components/kit/overlay-layer";
 
 /**
- * WAREHOUSE — MONITOR: the module's ONLY Calendar-summary page
- * (owner replacement Card 2026-09-06; Stock MASTER §2).
+ * WAREHOUSE — ARRIVAL SCHEDULE · PICKUP SCHEDULE (owner ruling 2026-09-14).
  *
- * Six governed working dates, full width — deliberately NO 240px filter
- * rail: Monitor summarises the whole site's day; filtering belongs to the
- * destination pages (Inbound · Outbound) each card opens.
+ * Two INDEPENDENT pages, one component. The former combined Monitor is
+ * superseded: it put both directions on one board, and an operator receiving
+ * goods and an operator loading a lorry are two different people doing two
+ * different jobs on two different sides of the building. `direction` is the
+ * only thing that differs, so it is a prop rather than a fork — and because it
+ * is a prop, there are NO internal direction tabs and no upper/lower split.
  *
- * BOTH directions render on one board, arranged by actual time inside each
- * date: ARRIVAL work projected from Purchasing's expected arrivals, PICKUP
- * work projected from Delivery's schedule feed. Every card says what its
- * time MEANS (`Driver pickup 14:30`) or says exactly `Time not provided` —
- * never a bare clock.
+ * The board is six equal date columns at ≥1280px and ONE selected date below
+ * that width, with the same records and the same doors either way — a narrow
+ * screen loses columns, never work.
  *
- * Monitor is read-only. It completes nothing: an ARRIVAL card opens Inbound
- * already filtered to the date, Site and source record; a PICKUP card opens
- * Outbound the same way; `DO No` opens the formal read-only Delivery Order.
- * Warehouse never reaches Edit Delivery from here.
+ * THE DATE SEQUENCE IS NOT OURS. `operatingDates` arrives from the governed
+ * projection, which resolves the Site's own configured calendar. This page
+ * applies no weekend rule, no holiday rule and no Sunday rule of its own: a
+ * warehouse that receives on a Sunday is a real warehouse, and a hardcoded
+ * off-day here would silently hide its work.
  */
 
-/** Below this width six readable date columns cannot fit — the same
- *  projection becomes a one-day agenda list (card §3, mobile). */
+/** Below this width six readable date columns cannot fit. */
 const AGENDA_BREAKPOINT = 1280;
 
 export function useIsAgendaWidth(): boolean {
@@ -66,72 +61,49 @@ export function useIsAgendaWidth(): boolean {
   return narrow;
 }
 
-export default function WarehouseWorkspace() {
-  const [params, setParams] = useSearchParams();
+/**
+ * The date and Site the operator last stood on, remembered across the two
+ * Schedule pages.
+ *
+ * Kept in module memory rather than in the URL because the sidebar rows are
+ * plain addresses: without this, moving from Arrival Schedule to Pickup
+ * Schedule would throw the operator back to today and to every Site, and they
+ * would have to re-find the day they were working on. Deliberately NOT
+ * persisted to storage — remembering a date within a session is a convenience;
+ * restoring yesterday's date tomorrow morning would be a lie about today.
+ */
+const lastContext: { from?: string; date?: string; site?: string } = {};
 
-  const holidays = useMemo(() => myHolidaySet(), []);
+/** Test seam only — a module-scoped memory would otherwise leak between tests. */
+export function __resetScheduleContext() {
+  delete lastContext.from;
+  delete lastContext.date;
+  delete lastContext.site;
+}
+
+export default function WarehouseWorkspace({
+  direction = "arrival",
+}: {
+  direction?: WarehouseScheduleDirection;
+}) {
+  const [params, setParams] = useSearchParams();
   const today = appTodayIso();
-  const from = params.get("from") ?? today;
-  const dates = useMemo(
-    () => warehouseOperatingDates(from, 6, holidays),
-    [from, holidays],
-  );
-  const selectedDate = params.get("date") ?? dates[0] ?? today;
+
+  const from = params.get("from") ?? lastContext.from ?? today;
+  const site = params.get("site") ?? lastContext.site ?? null;
   const isAgenda = useIsAgendaWidth();
 
-  const sched = useDeliveryWarehouseSchedule();
-  const posQ = useOperationPos();
-  const suppliersQ = useOperationSuppliers();
-  const warehouseQ = useOperationWarehouse();
+  const schedule = useWarehouseSchedule({ direction, siteId: site, from });
+  const dates = schedule.operatingDates;
+  const selectedDate = params.get("date") ?? lastContext.date ?? dates[0] ?? from;
 
-  const pickupEvents = useMemo(() => {
-    const events = (sched.data?.events ?? []) as DeliveryWarehouseScheduleEvent[];
-    return warehouseMonitorPickupEvents(warehouseOutboundCards(events));
-  }, [sched.data]);
-
-  const arrivalEvents = useMemo(() => {
-    const supplierName = new Map(
-      (suppliersQ.data?.suppliers ?? []).map((s: { id: string; name: string }) => [
-        s.id,
-        s.name,
-      ]),
-    );
-    const siteName = new Map(
-      (warehouseQ.data?.warehouses ?? []).map((w: { id: string; name: string }) => [
-        w.id,
-        w.name,
-      ]),
-    );
-    const arrivals: WarehouseExpectedArrival[] = (posQ.data?.pos ?? [])
-      .filter((po) => po.status === "open")
-      .map((po) => ({
-        poId: po.id,
-        supplierName: supplierName.get(po.supplier_id) ?? null,
-        siteName:
-          siteName.get(po.destination_id ?? po.warehouse_id) ??
-          siteName.get(po.warehouse_id) ??
-          null,
-        siteId: siteName.has(po.destination_id ?? po.warehouse_id)
-          ? po.destination_id ?? po.warehouse_id
-          : siteName.has(po.warehouse_id)
-            ? po.warehouse_id
-            : null,
-        etaDate: po.eta_date,
-        pendingQty: (po.purchase_order_lines ?? []).reduce(
-          (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),
-          0,
-        ),
-      }));
-    return warehouseMonitorArrivalEvents(arrivals);
-  }, [posQ.data, suppliersQ.data, warehouseQ.data]);
-
-  const events = useMemo(
-    () => [...arrivalEvents, ...pickupEvents],
-    [arrivalEvents, pickupEvents],
-  );
-
-  const error = sched.error || posQ.error || suppliersQ.error || warehouseQ.error;
-  const isLoading = !error && [sched, posQ, suppliersQ, warehouseQ].some((source) => source.isLoading || !source.data);
+  /* Remember where the operator is standing, so the sibling page opens there
+     instead of on today. Written in an effect, never during render. */
+  useEffect(() => {
+    lastContext.from = from;
+    lastContext.date = selectedDate;
+    if (site) lastContext.site = site;
+  }, [from, selectedDate, site]);
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -140,125 +112,195 @@ export default function WarehouseWorkspace() {
     setParams(next, { replace: false });
   }
 
-  /** Card §4 — a card opens its work page ALREADY filtered: date, Site,
-   *  source document, exact record. Same `/operation?tab=` address space. */
-  function openEvent(e: WarehouseMonitorEvent) {
-    const next = new URLSearchParams(params);
-    next.set("tab", e.open.tab);
-    next.set("date", e.open.date);
-    if (e.open.site) next.set("site", e.open.site);
-    else next.delete("site");
-    if (e.open.tab === "warehouse-inbound") {
-      next.set("po", e.open.po);
-      next.delete("do");
-    } else {
-      next.set("do", e.open.do);
-      next.delete("po");
+  /** Previous/next moves the WINDOW on a board and ONE DATE on an agenda —
+   *  both walk the governed operating dates, never a raw calendar day. */
+  function step(delta: -1 | 1) {
+    if (isAgenda) {
+      const at = dates.indexOf(selectedDate);
+      const next = at >= 0 ? dates[at + delta] : undefined;
+      if (next) {
+        setParam("date", next);
+        return;
+      }
+      /* Off the end of the known window: move the window and let the
+         projection say which date really operates next. */
+      const anchor = delta === 1 ? dates[dates.length - 1] : dates[0];
+      if (anchor) {
+        const nextParams = new URLSearchParams(params);
+        nextParams.set("from", shiftIso(anchor, delta));
+        nextParams.delete("date");
+        setParams(nextParams);
+      }
+      return;
     }
-    setParams(next);
+    /* A BOARD MOVES A PAGE, NOT A DAY — and the two directions are not
+       symmetric, because the projection only builds a window FORWARD from
+       `from`.
+
+       Forward is easy: start the day after the last date shown and the
+       governed resolver returns the next six operating dates.
+
+       Backward has to jump a whole window in one go. Anchoring on
+       `first − 1 day` looked right and was the bug: the resolver would return
+       six dates starting there, FIVE of which are already on screen, so
+       `Previous` crawled one day at a time and an operator paging back a week
+       would press it thirty times. Stepping back by the window's own calendar
+       SPAN lands a full page earlier, and because the span already contains
+       whatever closures the Site has, it neither overlaps nor skips. */
+    if (delta === 1) {
+      const last = dates[dates.length - 1];
+      if (last) setParam("from", shiftIso(last, 1));
+      return;
+    }
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    if (!first) return;
+    setParam("from", addDays(first, -spanDays(first, last ?? first)));
   }
 
-  const rangeLabel =
-    dates.length > 0
-      ? `${fmtDate(dates[0])} — ${fmtDate(dates[dates.length - 1])}`
-      : "—";
+  const word = SCHEDULE_PAGE_WORD[direction];
+  const feedFailed = schedule.errors.length > 0;
+  const stranded = useMemo(() => undatedCards(schedule.cards), [schedule.cards]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-monitor">
+    <div
+      className="flex h-full min-h-0 flex-1 flex-col"
+      data-testid={`warehouse-${direction}-schedule`}
+    >
       <ModuleHeader
-        testId="warehouse-monitor-header"
-        word="Monitor"
-        docTitle="Monitor · Warehouse — Carres"
+        testId={`warehouse-${direction}-schedule-header`}
+        word={word}
+        docTitle={`${word} · Warehouse — Carres`}
         destinationHeader
       />
+
       <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
-        <div className="flex items-center gap-1" data-testid="wm-range">
+        <div className="flex items-center gap-1" data-testid="ws-range">
           <button
             type="button"
             aria-label="Previous dates"
-            className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-            onClick={() =>
-              isAgenda
-                ? setParam(
-                    "date",
-                    subtractWorkingDays(selectedDate, 1, {
-                      offDays: WAREHOUSE_OFF_DAYS,
-                      holidays,
-                    }),
-                  )
-                : setParam("from", warehouseRangeShift(dates, -1, holidays))
-            }
-            data-testid="wm-prev"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-control border border-kit-slate-5 hover:bg-hovertint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            onClick={() => step(-1)}
+            data-testid="ws-prev"
           >
             <ChevronLeft size={16} />
           </button>
-          <span className="min-w-0 px-1 text-[13px] font-medium text-base-800">
-            {isAgenda ? fmtDate(selectedDate) : rangeLabel}
+          <span className="min-w-0 px-1 text-body font-medium text-kit-slate-12">
+            {isAgenda ? headingSentence(selectedDate) : rangeSentence(dates)}
           </span>
           <button
             type="button"
             aria-label="Next dates"
-            className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-            onClick={() =>
-              isAgenda
-                ? setParam(
-                    "date",
-                    addWorkingDays(selectedDate, 1, {
-                      offDays: WAREHOUSE_OFF_DAYS,
-                      holidays,
-                    }),
-                  )
-                : setParam("from", warehouseRangeShift(dates, 1, holidays))
-            }
-            data-testid="wm-next"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-control border border-kit-slate-5 hover:bg-hovertint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            onClick={() => step(1)}
+            data-testid="ws-next"
           >
             <ChevronRight size={16} />
           </button>
         </div>
       </div>
+
+      {/* A FAILED READ IS ANNOUNCED, ALWAYS — and it never replaces the cards
+          that DID arrive. One direction can fail while real work stands on the
+          board, so the banner sits above the board rather than instead of it.
+          The empty-day sentence changes too: `Nothing arriving` is a promise
+          this page has no right to make while a feed is broken. */}
+      {feedFailed && (
+        <div
+          role="status"
+          className="border-b border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
+          data-testid="ws-feed-error"
+        >
+          {schedule.errors.map((e) => e.message).join(" · ")}
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1 flex-col">
-        {isLoading ? (
-          <p className="p-4 text-[13px] text-base-500">Loading…</p>
-        ) : error ? (
-          <p className="p-4 text-[13px] text-base-600" data-testid="wm-error">
-            The schedule could not be loaded. {error.message}
-          </p>
+        {schedule.loading ? (
+          <p className="p-4 text-body text-kit-slate-11">Loading…</p>
         ) : isAgenda ? (
-          <AgendaDay date={selectedDate} events={events} onOpen={openEvent} />
+          <AgendaDay
+            date={selectedDate}
+            cards={schedule.cards}
+            direction={direction}
+            feedFailed={feedFailed}
+          />
         ) : (
-          <CalendarBoard dates={dates} events={events} onOpen={openEvent} />
+          <ScheduleBoard
+            dates={dates}
+            cards={schedule.cards}
+            direction={direction}
+            feedFailed={feedFailed}
+          />
         )}
       </div>
+
+      {/* A card the board cannot PLACE is reported, never dropped: an
+          arrangement with no date is not secretly today's work. */}
+      {stranded.length > 0 && (
+        <p
+          className="border-t border-kit-slate-5 bg-white px-3 py-2 text-meta text-kit-slate-11"
+          data-testid="ws-undated"
+        >
+          {stranded.length} with no date yet — not shown on any column.
+        </p>
+      )}
     </div>
   );
 }
 
-/** Desktop board — six operating dates in ONE chronological horizontal
- *  sequence (never 3 × 2), one shared vertical scroll, full width (no rail). */
-function CalendarBoard({
+/**
+ * THE BOARD — six equal date columns, ONE vertical scroll region.
+ *
+ * The date headings are `sticky` INSIDE that single scroll container rather
+ * than sitting in a second container above it. That is the whole trick: two
+ * containers would each need a scrollbar gutter, the two gutters would differ
+ * by the width of a scrollbar, and every heading would sit a few pixels off
+ * its own column. One container makes the gutter structurally equal, so no
+ * width has to be hardcoded to compensate for one.
+ *
+ * No card gets its own scrollbar and no column gets a fixed height — a card
+ * grows to hold every product line it has.
+ */
+export function ScheduleBoard({
   dates,
-  events,
-  onOpen,
+  cards,
+  direction,
+  feedFailed,
 }: {
   dates: string[];
-  events: WarehouseMonitorEvent[];
-  onOpen: (e: WarehouseMonitorEvent) => void;
+  cards: ScheduleCard[];
+  direction: WarehouseScheduleDirection;
+  feedFailed: boolean;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-auto" data-testid="wm-board">
-      {/* min-w-full, not min-w-max: a long empty-day sentence must WRAP inside
-          its 232px-floor column, not widen every column until six days cannot
-          fit even at full page width. Below the floor the container scrolls. */}
+    <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-board">
+      {/* `gridTemplateRows: auto 1fr` is load-bearing. Without it the two
+          implicit rows SHARE the leftover height, the heading row stretches to
+          half the viewport, and every column's first card starts hundreds of
+          pixels below its own date. */}
       <div
-        className="grid min-w-full gap-px bg-kit-slate-5"
-        style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(232px, 1fr))` }}
+        className="grid min-h-full"
+        style={{
+          gridTemplateColumns: `repeat(${dates.length || 1}, minmax(0, 1fr))`,
+          gridTemplateRows: "auto 1fr",
+        }}
       >
-        {dates.map((date) => (
-          <div key={date} className="bg-base-50" data-testid={`wm-col-${date}`}>
-            <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-2 py-1.5 text-label font-semibold uppercase tracking-wide text-base-600">
-              {fmtDate(date)}
-            </div>
-            <DayEvents date={date} events={events} onOpen={onOpen} />
+        {dates.map((date, i) => (
+          <DateHeading key={`h-${date}`} date={date} first={i === 0} />
+        ))}
+        {dates.map((date, i) => (
+          <div
+            key={`c-${date}`}
+            className={`flex flex-col gap-2 p-2 ${i === 0 ? "" : "border-l border-kit-slate-5"}`}
+            data-testid={`ws-col-${date}`}
+          >
+            <DayCards
+              date={date}
+              cards={cards}
+              direction={direction}
+              feedFailed={feedFailed}
+            />
           </div>
         ))}
       </div>
@@ -266,111 +308,119 @@ function CalendarBoard({
   );
 }
 
-/** Narrow width — one selected day as a vertical time-ordered list;
- *  previous/next moves one operating date (card §3, mobile). */
+/** 24px/32px number between two 11px/14px labels; 12px/16px cell padding. */
+function DateHeading({ date, first }: { date: string; first: boolean }) {
+  const { weekday, day, month } = dateHeadingPartsOf(date);
+  return (
+    <div
+      className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3 ${
+        first ? "" : "border-l border-l-kit-slate-5"
+      }`}
+      data-testid={`ws-head-${date}`}
+    >
+      <div className="text-label text-kit-slate-11">{weekday}</div>
+      <div className="text-page text-kit-slate-12">{day}</div>
+      <div className="text-label text-kit-slate-11">{month}</div>
+    </div>
+  );
+}
+
+/** Narrow width — one selected date, the SAME cards and the same doors. */
 function AgendaDay({
   date,
-  events,
-  onOpen,
+  cards,
+  direction,
+  feedFailed,
 }: {
   date: string;
-  events: WarehouseMonitorEvent[];
-  onOpen: (e: WarehouseMonitorEvent) => void;
+  cards: ScheduleCard[];
+  direction: WarehouseScheduleDirection;
+  feedFailed: boolean;
 }) {
+  const { weekday, day, month } = dateHeadingPartsOf(date);
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="wm-agenda">
-      <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
-        {fmtDate(date)}
-      </h2>
-      <div className="max-w-xl">
-        <DayEvents date={date} events={events} onOpen={onOpen} />
+    <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-agenda">
+      <div
+        className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3`}
+        data-testid={`ws-head-${date}`}
+      >
+        <div className="text-label text-kit-slate-11">{weekday}</div>
+        <div className="text-page text-kit-slate-12">{day}</div>
+        <div className="text-label text-kit-slate-11">{month}</div>
+      </div>
+      <div className="flex flex-col gap-2 p-2">
+        <DayCards date={date} cards={cards} direction={direction} feedFailed={feedFailed} />
       </div>
     </div>
   );
 }
 
-function DayEvents({
+function DayCards({
   date,
-  events,
-  onOpen,
+  cards,
+  direction,
+  feedFailed,
 }: {
   date: string;
-  events: WarehouseMonitorEvent[];
-  onOpen: (e: WarehouseMonitorEvent) => void;
+  cards: ScheduleCard[];
+  direction: WarehouseScheduleDirection;
+  feedFailed: boolean;
 }) {
-  const day = warehouseMonitorDayEvents(events, date);
+  const day = cardsOnDate(cards, date);
   if (day.length === 0) {
     return (
-      <p className="px-3 py-4 text-[13px] leading-5 text-base-500" data-testid={`wm-empty-${date}`}>
-        {warehouseMonitorEmptyDaySentence(fmtDate(date))}
+      <p className="px-1 py-2 text-meta text-kit-slate-11" data-testid={`ws-empty-${date}`}>
+        {emptyDayWordOf(direction, feedFailed)}
       </p>
     );
   }
   return (
-    <div className="space-y-2 p-2">
-      {day.map((e) => (
-        <MonitorCard key={`${e.kind}-${e.sourceLabel}-${e.open.site}`} event={e} onOpen={onOpen} />
+    <>
+      {day.map((card) => (
+        <WarehouseScheduleCard key={card.id} card={card} />
       ))}
-    </div>
+    </>
   );
 }
 
-/** ONE card = one dated piece of physical work. Field order is fixed:
- *  the time sentence · the event name with its direction · the source
- *  document · the party and what moves · the Site. The card body opens the
- *  filtered work page; `DO No` is a separate read-only document door. */
-function MonitorCard({
-  event,
-  onOpen,
-}: {
-  event: WarehouseMonitorEvent;
-  onOpen: (e: WarehouseMonitorEvent) => void;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      className="cursor-pointer rounded border border-kit-slate-5 bg-white p-2.5 text-left shadow-sm outline-offset-2 hover:border-base-300 focus-visible:outline focus-visible:outline-2"
-      onClick={() => onOpen(event)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen(event);
-        }
-      }}
-      data-testid={`wm-card-${event.sourceLabel.split(" ")[0]}`}
-      aria-label={`Open ${event.group === "arrival" ? "Inbound" : "Outbound"} for ${event.sourceLabel}`}
-    >
-      <div className="text-[13px] font-medium text-base-800" data-testid="wm-card-time">
-        {event.timeSentence}
-      </div>
-      <div className="mt-0.5 text-label uppercase tracking-wide text-base-500" data-testid="wm-card-kind">
-        {event.group === "arrival" ? "Arrival" : "Pickup"} · {event.label}
-      </div>
-      <div className="mt-0.5 flex items-baseline gap-2">
-        {event.sourceHref ? (
-          <Link
-            to={event.sourceHref}
-            className="font-mono text-[13px] font-semibold text-base-800 underline-offset-2 hover:underline"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="wm-card-source-link"
-          >
-            {event.sourceLabel}
-          </Link>
-        ) : (
-          <span className="font-mono text-[13px] font-semibold text-base-800">
-            {event.sourceLabel}
-          </span>
-        )}
-      </div>
-      <div className="mt-0.5 truncate text-[13px] text-base-700" title={`${event.party} · ${event.detail}`}>
-        {event.party} · {event.detail}
-      </div>
-      {event.site && (
-        <div className="text-label text-base-500" data-testid="wm-card-site">
-          {event.site}
-        </div>
-      )}
-    </div>
-  );
+/* ── small date helpers ─────────────────────────────────────────────────── */
+
+/**
+ * One calendar day either side of a known operating date. The PROJECTION
+ * decides which dates actually operate; this only moves the window's anchor,
+ * which is why it may safely land on a closed day — the next read returns the
+ * governed window that starts at or after it.
+ */
+function shiftIso(iso: string, delta: -1 | 1): string {
+  return addDays(iso, delta);
+}
+
+/** Calendar-day arithmetic on an ISO date, in LOCAL time — `new Date(iso)`
+ *  would read a bare `YYYY-MM-DD` as UTC and land a day early in +08. */
+function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const at = new Date(y!, m! - 1, d! + days);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}`;
+}
+
+/** How many CALENDAR days the shown window covers — six operating dates across
+ *  a closed Sunday span seven. Minimum 1, so a one-date window still moves. */
+function spanDays(first: string, last: string): number {
+  const toUtc = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y!, m! - 1, d!);
+  };
+  const days = Math.round((toUtc(last) - toUtc(first)) / 86_400_000) + 1;
+  return Math.max(1, days);
+}
+
+function headingSentence(iso: string): string {
+  const { weekday, day, month } = dateHeadingPartsOf(iso);
+  return `${weekday} ${day} ${month}`;
+}
+
+function rangeSentence(dates: string[]): string {
+  if (dates.length === 0) return "—";
+  return `${headingSentence(dates[0]!)} — ${headingSentence(dates[dates.length - 1]!)}`;
 }

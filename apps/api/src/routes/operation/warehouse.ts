@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, type InboundInput } from "@carres/shared";
+import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, type InboundInput } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
@@ -111,9 +111,23 @@ operationWarehouseRouter.get("/inbound", async (c) => {
     for (const key of ["status", "sourceType", "site", "source", "date", "from", "to", "q"])
       if (c.req.query(key)) filters.set(key, c.req.query(key)!);
     const view = buildInboundRegisterView(all, filters, offset, limit);
+    /* ADDITIVE, READ-ONLY — the two arrival facts an `InboundArrival` row
+       cannot carry: which ORIGINAL lines the arrangement ordered, and whether
+       its date rests on an agreement or an estimate. Both are computed from
+       rows this handler ALREADY reads, so no new query, table or permission is
+       involved; the arithmetic lives in `@carres/shared` so there is no second
+       copy of it here. Scoped to the sources this page actually returned.
+       Existing consumers that ignore the field are unaffected. */
+    const pagedSourceIds = new Set(view.rows.map((row) => row.sourceId));
+    const sourceFacts = warehouseArrivalSourceFacts({
+      pos: pos as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["pos"],
+      lines: lines as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["lines"],
+      promises: promises as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["promises"],
+    }).filter((fact) => pagedSourceIds.has(fact.sourceId));
     return c.json({
       arrivals: view.rows,
       sites,
+      sourceFacts,
       unresolvedSources: inboundUnresolvedSources(input),
       page: { offset, limit, total: view.total },
       facets: view.facets,

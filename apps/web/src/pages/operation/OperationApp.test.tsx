@@ -46,6 +46,15 @@ vi.mock("./OperationWarehouse", () => ({
 vi.mock("./WarehouseUnitDetail", () => ({
   default: () => <div data-testid="unit-detail-stub">unit-detail</div>,
 }));
+/* The Schedule stub ECHOES its `direction`, because the one thing this suite
+   has to prove about it is WHICH of the two pages an address resolves to. */
+vi.mock("./WarehouseWorkspace", () => ({
+  default: ({ direction }: { direction?: string }) => (
+    <div data-testid="schedule-stub" data-direction={direction}>
+      schedule
+    </div>
+  ),
+}));
 vi.mock("./WarehouseStockRegister", () => ({
   default: () => <div data-testid="stock-register-stub">stock-register</div>,
 }));
@@ -353,6 +362,56 @@ describe("OperationApp — Warehouse surfaces draw one top row, not two", () => 
   it("the dashboard keeps the slim bar — suppression is per surface, not global", () => {
     renderApp("/operation?tab=dashboard");
     expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
+  });
+
+  /* THE TWO SCHEDULES (owner ruling 2026-09-14). Each draws its own 50px
+     Destination Header, so neither may sit under the slim bar. */
+  it("?tab=warehouse-arrival-schedule mounts the ARRIVAL board with no slim bar", () => {
+    renderApp("/operation?tab=warehouse-arrival-schedule");
+    expect(screen.getByTestId("schedule-stub")).toHaveAttribute("data-direction", "arrival");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("?tab=warehouse-pickup-schedule mounts the PICKUP board with no slim bar", () => {
+    renderApp("/operation?tab=warehouse-pickup-schedule");
+    expect(screen.getByTestId("schedule-stub")).toHaveAttribute("data-direction", "pickup");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("renders exactly ONE board — the two branches can never both match", () => {
+    renderApp("/operation?tab=warehouse-pickup-schedule");
+    expect(screen.getAllByTestId("schedule-stub")).toHaveLength(1);
+  });
+});
+
+/**
+ * THE RETIRED WAREHOUSE CALENDAR ADDRESSES (owner ruling 2026-09-14).
+ *
+ * `Monitor` is gone as a Warehouse page, but the addresses an operator
+ * bookmarked are not allowed to go with it. Both land on Arrival Schedule AND
+ * keep the `date` and `site` they were bookmarked with — a redirect that drops
+ * the day is a redirect to the wrong day, which is worse than a 404 because it
+ * looks like it worked.
+ */
+describe("OperationApp — the retired Warehouse Calendar addresses", () => {
+  it.each(["warehouse-monitor", "warehouse-dashboard"])(
+    "?tab=%s lands on Arrival Schedule",
+    (tab) => {
+      renderApp(`/operation?tab=${tab}`);
+      expect(screen.getByTestId("schedule-stub")).toHaveAttribute(
+        "data-direction",
+        "arrival",
+      );
+      expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+    },
+  );
+
+  it("keeps the bookmarked date and Site", () => {
+    renderApp("/operation?tab=warehouse-monitor&date=2026-09-17&site=wh-9");
+    expect(screen.getByTestId("schedule-stub")).toBeInTheDocument();
+    const at = screen.getByTestId("location-probe").textContent ?? "";
+    expect(at).toContain("date=2026-09-17");
+    expect(at).toContain("site=wh-9");
   });
 });
 

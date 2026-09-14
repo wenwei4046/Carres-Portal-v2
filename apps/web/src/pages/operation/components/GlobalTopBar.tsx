@@ -67,9 +67,13 @@ export default function GlobalTopBar() {
  *  reads the tab, because reading only the pathname would offer Warehouse
  *  Settings on every Operations page or on none. */
 const WAREHOUSE_TABS = new Set([
-  "warehouse-monitor",
+  "warehouse-arrival-schedule",
+  "warehouse-pickup-schedule",
   "warehouse-inbound",
   "warehouse-outbound",
+  // The two retired Calendar addresses still resolve to Arrival Schedule, so
+  // a bookmark that lands there must still be offered Warehouse Settings.
+  "warehouse-monitor",
   "warehouse-dashboard",
   "stock-onhand",
 ]);

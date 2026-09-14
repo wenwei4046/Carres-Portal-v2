@@ -299,9 +299,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 function TabSwitch() {
   const [params] = useSearchParams();
-  const tab = params.get("tab") ?? "warehouse-monitor";
+  const tab = params.get("tab") ?? "warehouse-arrival-schedule";
   if (tab === "warehouse-inbound") return <WarehouseInbound />;
   if (tab === "warehouse-outbound") return <WarehouseOutboundWork />;
+  if (tab === "warehouse-pickup-schedule")
+    return <WarehouseWorkspace direction="pickup" />;
   if (tab === "receiving")
     return (
       <div className="p-6 text-[13px]">
@@ -309,7 +311,7 @@ function TabSwitch() {
         <code>{params.toString()}</code>
       </div>
     );
-  return <WarehouseWorkspace />;
+  return <WarehouseWorkspace direction="arrival" />;
 }
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
