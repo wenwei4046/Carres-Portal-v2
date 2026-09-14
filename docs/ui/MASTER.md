@@ -645,17 +645,13 @@ directory only and said so.*
   action anywhere cascades to the relevant widgets.
 - **The rail is quick peek, not navigation truth and not a second place to act.** A row may
   deep-link to the authoritative object/action. The owning module remains the writer.
-  **ONE ruled exception: the duty edit door on Team** — duty identity has no other home
-  (`../purchasing/MASTER.md` §2.2 makes this panel the one home), so the only place it can be
-  corrected is the only place it is stated. It is not a precedent for a second writer.
-- **`My Work` in the rail is a preview of the formal `Work` destination.** The full destination
-  owns the `My Work · Team Work` views over one work set; the rail may not create another work set.
-  **It therefore wears the Work destination's own icon** (`portal-nav.ts`, `ListTodo`) in both
-  the collapsed strip and the expanded header — owner ruling 2026-08-15. A peek wearing a
-  different face than the door it previews reads as a different feature; the `Flag` it replaced
-  was borrowed from the Orders follow-up column, a different system. Asserted by
-  `OperationRightRail.ui-contract.test.ts`, which reads the icon out of the nav rather than
-  hard-coding it, so the two can never drift.
+  Duty and Buddy cover are edited only in `Workspace → Staff & Duties`, as ruled by ERP
+  Architecture Law F.1 and Workspace MASTER §4. No Team-panel editing exception remains.
+- **The Rail's My Work slot is counts and navigation, not an action-row preview**
+  (`../workspace/MASTER.md` §7). It uses the formal Work projection and opens main My Work with
+  the selected filter visible. No independent owner/date arithmetic, assignment, cover editor or
+  completion button is admitted. It retains Work's governed `ListTodo` icon; icon consistency
+  does not authorise duplicate Work content.
 - **Team** previews availability/coverage and per-person `{n} open · {n} overdue`, and
   People/HR remains the owner. **The numbers come from the ONE work engine** — `useOpenWorkSet`,
   literally the function the Work destination runs — so the rail and Team Work are structurally

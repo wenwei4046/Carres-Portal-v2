@@ -695,7 +695,7 @@ The shared Quick Rail remains `Team · Calendar · My Work · Activity`:
 - **Calendar** projects expected arrivals, Counts/Count again, collections, arrivals, Outbound
   handovers, returns, repair out/back, supplier collection and Month-end commitment on their actual
   dates. It deep-links to the source and never edits it.
-- **My Work** is only the compact preview of formal My Work, never another work set.
+- **My Work** shows shared Work counts and the filtered main-Work door, not a second action list.
 - **Activity** projects append-only Unit/receipt/Count/handover facts with actual date/time,
   actor/avatar and source link. It never replaces Unit or object History.
 
@@ -2221,11 +2221,79 @@ eligibility mechanism. User-provided contact details stay in the account system,
 **REAL DOCUMENT CONTRADICTIONS — resolution boundary:** §7's older four-date-strip and
 five-section Monitor composition have been replaced by §2's newer four-destination ruling.
 Month-end belongs in shared Work/Calendar, not a second Monitor action section. Workspace → Staff
-& Duties is the assignment door. The UI MASTER's older Team-panel editing exception and preview
-wording conflict with Workspace §4/§7; shared Rail composition needs authority reconciliation
-before a Warehouse-specific Rail implementation is frozen. Warehouse must not invent a local fix.
+& Duties is the assignment door. The UI MASTER's older Team-panel editing exception and Work-row
+preview have been removed in favour of Workspace §4/§7. My Work in the Rail is shared counts and
+filtered navigation. External Warehouse must not reuse the internal Carres directory or invent
+a local Duty editor.
 
 **NOT YET PROVEN:** every gate above requires recorded source-specific evidence. §13 contains
 bounded implementation evidence, not a blanket completion certificate. Detailed blueprint review
 continues across the full domain; no unknown is converted into an approved business rule merely
 to declare the plan or tomorrow's release finished.
+
+### 14.5 External identity and access — detailed recommendation, NOT LAW
+
+**DECISION:** make the approved individual-operator rule enforceable without treating a NETS
+person as a Carres employee or creating a second Warehouse account directory.
+
+**PRIMARY EVIDENCE / FACT:** `hrCreateTeamAccountInput` in
+`packages/shared/src/schemas/hr-team.ts` accepts name, email, role and one existing Warehouse ID;
+it rejects Carres position/reporting fields for Warehouse. `apps/api/src/routes/hr-team.ts`
+creates the auth login and `app_users` record, allocating a staff code only for internal roles.
+`requireWarehouse` in `apps/api/src/lib/auth-guards.ts` checks role and Warehouse binding.
+0458's `warehouse_is_person` checks an active account with a staff code. 0459 checks active
+Warehouse role/Site at acceptance but has no independent external-person qualification.
+
+**EXCLUDED:** Carres payroll, personal legal identifiers, NETS labour scheduling, rack/bin and
+device fleet management: none is necessary to establish who may record this Site's physical act.
+2990's live backend was not inspected in this pass; it supplies no new claimed evidence here.
+
+**REFERENCE / FACT:** Microsoft distinguishes warehouse workers, login records and their
+warehouse assignments, with worker-specific permissions and inactivity controls. This supports
+separating identity from access, not copying its employee/device account model into Carres.
+[Microsoft warehouse user accounts](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/mobile-device-work-users).
+The Odoo receipts/deliveries detail page could not be fetched in this pass; no unseen workflow is
+used as evidence for the recommendation.
+
+**CURRENT → PROBLEM → RECOMMENDATION:** a Warehouse login currently identifies a role and Site,
+but a mailbox with a plausible personal name passes the same shape. Reusing the staff-code guard
+would instead reject valid external people. Extend the shared HR Team/People identity contract
+with an explicit, audited external-person registration linked to the existing login; Warehouse
+consumes eligibility from that source. This is a proposed implementation model, not an applied
+migration or an assertion that email verification proves a human identity.
+
+| Distinct fact | Owning source / recommended contract | Consumer and refusal condition |
+|---|---|---|
+| Login access | Existing auth identity plus `app_users` access status | Every protected request; disabled access refuses new acts even with an old browser token |
+| Individual identity | Shared HR Team/People external-person registration linked to login; registrant and recorded time retained | Acceptance, scan, count and handover; absent/unconfirmed personal registration refuses |
+| External organisation | Existing operating party, with effective membership evidence | Event's actor context; role mailbox or another organisation cannot impersonate this person |
+| Site authorisation | Existing Warehouse binding is the current single-Site source; effective changes are audited | DO/Unit physical source checked inside each write; Site display text or URL alone never authorises |
+| Operational capability | Governed Warehouse role/capabilities, separate from employment and Duty ownership | A person may only record their permitted physical acts; no implied account administration or commercial edits |
+| Accepted obligation | DO + physical Site, acceptance event and current resolver | Shared Work; acceptance never changes Unit holder or means goods have moved |
+| Physical actor | Immutable event snapshot/references for person, organisation, role, Site and actual time | History and evidence remain attributable after rename, disabled access or reassignment |
+
+**OPERATOR JOURNEY:** authorised HR/Principal opens the existing Team door, identifies the real
+external person and existing operating party/Site, and records their permitted access. The
+operator signs in personally and sees only that Site's queue and their own Work. Chan being the
+NETS owner does not grant him a Principal role or a staff-account creation door. Future staff use
+separate personal accounts through the same governed creator; no shared Chan session or automatic
+copy of his active Work. Disabling someone ends new write eligibility; the §8 started/unstarted
+split governs unresolved Work, and immutable completed evidence remains visible to authorised readers.
+
+**RECOVERY DETAIL:** a failed request is not a completed act. An uncertain response after submit
+must reconcile the original request/result before retrying; it cannot create another acceptance,
+handover or proof association. Reload recovers committed progress from the server. Replacement
+authority is checked at transfer and again at the physical write. No automatic reassignment may
+erase the original accepted owner or attribute their scans to the replacement.
+
+**TRADE-OFF:** explicit personal registration adds an audited setup step, but avoids unreliable
+email/name heuristics and fake Carres employment. It does not prevent a person sharing credentials
+outside the system; the blueprint must not claim that it does. Database table/column choice and
+exact migration are deliberately not frozen here before shared identity reconciliation.
+
+**FALSIFIER:** overturn this proposal if the current HR/People schema already contains an
+audited external-person-to-login and effective organisation/Site membership source which can be
+used by production write guards. Reuse that source instead of adding another. Multi-Site or
+multi-role expansion requires evidence beyond today's single Warehouse binding; do not silently
+grant it to Chan. This design review remains open until that source search and ownership review
+are complete, and the migration remains subject to ENGINEERING §5.
