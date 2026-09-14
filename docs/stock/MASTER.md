@@ -2213,8 +2213,10 @@ owning write/read path. A successful neighbouring capability does not close the 
 
 **FACT — account prerequisite changed:** production HR Team now lists Chan as Active Warehouse
 under External & Store Accounts, following the owner's submission of the prepared account form.
-The selected form Site was Carres Klang Warehouse. This supersedes §13's earlier zero-account
-observation; persisted Site binding and an authenticated Warehouse walkthrough remain unverified.
+Production SQL at `2026-09-14T07:44:22.237157Z` independently confirms Active Warehouse,
+`warehouse_id=00000000-0000-0000-0000-000000000c03`, the active Carres Klang Warehouse Site,
+and no Carres staff code. This supersedes §13's earlier zero-account observation and closes
+the persisted Site-binding check. An authenticated Warehouse execution walkthrough remains unverified.
 The account must not be represented as a Carres staff member or an automatically verified personal
 eligibility mechanism. User-provided contact details stay in the account system, not source code.
 
@@ -2297,3 +2299,38 @@ used by production write guards. Reuse that source instead of adding another. Mu
 multi-role expansion requires evidence beyond today's single Warehouse binding; do not silently
 grant it to Chan. This design review remains open until that source search and ownership review
 are complete, and the migration remains subject to ENGINEERING §5.
+
+**SOURCE-REUSE AUDIT / FACT — 2026-09-14.** A production `information_schema.columns` search for
+person/app-user/operating-party/staff-code links and person/people/member/contact table names returned
+`app_users`, `hr_employees`, `salespersons`, `salesperson_pins`, `commission_run_lines`,
+`delivery_partners`, `ops_delivery_contacts` and `warehouse_site_profiles`. This is a bounded
+candidate search, not proof that no differently named source can exist. The repository's relevant
+definitions explain which candidates can legitimately supply the required fact:
+
+| Existing source | Reuse result | Boundary and evidence |
+|---|---|---|
+| Auth + `app_users` | READY for login/access and current single-Site link | HR Team route writes Warehouse ID and active status; it has no external-person registration field |
+| `warehouses` + `warehouse_site_profiles` | READY for Site and its operating organisation | 0456 keeps Site/operator separate and references existing `stock_operating_parties`; it does not establish the person's membership |
+| `warehouse_capability_grants` | READY for its existing audited capability grants only | 0457 retains grant/revocation actor/time; grant rows have neither Site nor organisation membership and cannot be reinterpreted as personal identity |
+| `hr_employees` | REJECT as the external-person record | 0269 contains Carres employment and private HR fields; HR MASTER §3 limits this domain to Carres people; do not create fake employment to pass 0458 |
+| `salespersons` / PINs | REJECT for NETS Warehouse | 0001 binds salespersons to dealer/outlet; 0233 is the sales staff PIN door, not Warehouse identity |
+| `delivery_partners` | REUSE only as Delivery's company source | 0001 defines the partner organisation; a company is not the operator who scanned a Unit |
+| `ops_delivery_contacts` | REJECT for personal eligibility | 0487 records purpose/result of a customer or partner conversation, not a registered Warehouse person |
+| Commission records | REJECT for access or identity | Financial output is downstream evidence, never an account qualification source |
+| External individual registration + effective organisation membership | NOT READY in the inspected contract | Existing account, Site and grant sources can be retained; only the missing qualification/membership evidence needs a shared identity extension |
+
+**INFERENCE:** the recommendation is not a new Warehouse user directory. Reuse the existing login,
+name and Site IDs; link the missing personal qualification and effective organisation context from
+the shared identity owner. Never infer that changing a Site's operating company automatically
+makes every old login an employee/member of the new company. A company change must preserve
+earlier event context and revalidate current authorisation before the next physical write.
+
+**PRODUCTION OBSERVATION:** Chan's bound Site has an operating-party reference, while
+`key_contact_id` is null. This is not a failed login or missing Warehouse binding. Key contact is
+coordination metadata; it neither grants account access nor makes Chan the owner of every DO.
+Do not auto-fill it or assign all Work merely because the user described Chan as NETS owner.
+
+**NEXT DESIGN EVIDENCE:** reconcile the missing external-person qualification with HR Team/People
+ownership, then specify the exact auditable registration/disable/organisation-change door. The
+blueprint must name this extension explicitly before SQL is numbered or applied; a boolean inferred
+from a personal-looking mailbox is not an acceptable substitute.
