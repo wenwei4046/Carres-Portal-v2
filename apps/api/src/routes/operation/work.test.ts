@@ -11,6 +11,7 @@ import {
   projectManualPurchaseWork,
   projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
+  projectPurchaseOrderArrivalCheckWork,
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
@@ -176,12 +177,46 @@ describe("operation Work response composition", () => {
     expect(approval[0]?.action).toBe("Approve purchase");
     expect(approval[0]?.owner.acting?.userId).toBe("jess");
     expect(approval[0]?.completionFact).toContain("stored approval or refusal");
+    /* ⭐ THE APPROVER LANDS ON THE DECISION (owner ruling 2026-09-11) — the
+       object is one six-section scroll, and hunting for the section is the
+       step this row exists to remove. */
+    expect(approval[0]?.destination).toBe(
+      "/operation?tab=manual-purchase&mp=request-1&section=approval",
+    );
     expect(issuance[0]?.action).toBe("Issue PO");
     expect(issuance[0]?.owner.normal?.userId).toBe("shasha");
     expect(issuance[0]?.owner.acting?.userId).toBe("yujun");
+    /* `Issue PO` has no section of its own — its act is the Register's
+       selected action — so it opens the object plainly. */
     expect(issuance[0]?.destination).toBe(
       "/operation?tab=manual-purchase&mp=request-1",
     );
+    expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+  });
+
+  it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
+    /* ⭐ Owner ruling 2026-09-11, measured on production the same day: 62
+       purchase orders exist and 3 carry confirmed-sent evidence. The old rule
+       therefore raised an `Issue PO` task against 59 already-issued
+       documents. An existing numbered PO is an existing commitment, and the
+       absence of proof of sending is not a reason to buy again. */
+    const items = projectManualPurchaseWork({
+      requests: [
+        {
+          requestId: "request-2",
+          context: "Manual Purchase · Ready Stock · Klang · Ohana",
+          status: "ordered",
+          remainingQty: 0,
+          orderBy: "2026-09-06",
+          hasPos: true,
+          posAllSent: false,
+        },
+      ],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty: null,
+      today: "2026-09-06",
+    });
+    expect(items).toEqual([]);
   });
 
   it("projects separate Sales Order actions with their own owner rules", () => {
@@ -247,7 +282,7 @@ describe("operation Work response composition", () => {
     expect(arrangement).toMatchObject({
       module: "delivery",
       object: { kind: "delivery_scope", id: "order-2041", label: "SO-2041" },
-      destination: "/operation/delivery/edit/order-2041",
+      destination: "/operation?tab=delivery&view=all&open=order-2041",
     });
 
     const [run] = projectSalesOrderWork({
@@ -502,7 +537,95 @@ describe("operation Work response composition", () => {
     expect(item?.completionFact).toContain("exact current PO version");
   });
 
-  it("admits due invoice collection under Payment Duty and closes only on money truth", () => {
+  /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling
+     2026-09-10). The rule and its engine both existed; the projection that
+     puts the obligation in front of the duty holder did not. ───────────── */
+  describe("purchasing.confirm_tomorrows_delivery in shared Work", () => {
+    const person = { userId: "po-duty", name: "Khor Yee" };
+    const poDuty = {
+      dutyKey: "po_duty" as const,
+      onDate: "2026-09-10",
+      normalOwner: person,
+      buddy: null,
+      activeCover: null,
+      actingPerson: person,
+      state: "primary" as const,
+      assignmentId: "assignment-1",
+    };
+    const po = (over: Record<string, unknown> = {}) => ({
+      id: "PO-3001",
+      supplier_id: "supplier-1",
+      status: "open" as const,
+      version: 1,
+      eta_date: "2026-09-11",
+      tomorrow_answer_about_date: null,
+      promises: [],
+      sends: [],
+      purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+      ...over,
+    });
+    const project = (over: Record<string, unknown> = {}, today = "2026-09-10") =>
+      projectPurchaseOrderArrivalCheckWork({
+        pos: [po(over)],
+        suppliers: [{ id: "supplier-1", name: "Ohana" }],
+        poDuty,
+        today,
+      });
+
+    it("opens one office working day before the arrival, owned by the current PO Duty", () => {
+      const [item] = project();
+      expect(item).toMatchObject({
+        id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery",
+        module: "purchasing",
+        object: { kind: "purchase_order", id: "PO-3001", label: "PO-3001" },
+        action: "Call Ohana — confirm tomorrow's delivery",
+        recipient: "Ohana",
+        owner: { dutyKey: "po_duty", normal: person, acting: person },
+        destination: "/operation?tab=purchase-orders&po=PO-3001",
+      });
+      /* Fri 11 Sep arrival − 1 OFFICE working day = Thu 10 Sep. */
+      expect(item?.timing).toMatchObject({ dueOn: "2026-09-10", workingDaysLate: 0 });
+      /* The owner is a resolved person, never spelled into the sentence. */
+      expect(item?.action).not.toContain("Khor Yee");
+    });
+
+    it("skips a public holiday when stepping back to the check day", () => {
+      /* Malaysia Day, Wed 16 Sep 2026, is in `MY_HOLIDAYS_2026`. Thu 17 Sep
+         arrival steps back over it to Tue 15 Sep — the shared calendar's
+         answer, not a second one. */
+      const [item] = project({ eta_date: "2026-09-17" }, "2026-09-15");
+      expect(item?.timing?.dueOn).toBe("2026-09-15");
+    });
+
+    it("stays silent with no anchor, on a settled PO, and before the window opens", () => {
+      expect(project({ eta_date: null })).toHaveLength(0);
+      expect(project({ purchase_order_lines: [{ qty: 4, received_qty: 4 }] })).toHaveLength(0);
+      expect(project({ status: "cancelled" })).toHaveLength(0);
+      /* Arrival still four days out — the check has not opened yet. */
+      expect(project({ eta_date: "2026-09-18" }, "2026-09-10")).toHaveLength(0);
+    });
+
+    it("closes on an answer about THIS date and reopens when the factory moves it", () => {
+      /* Answered about the arrival we hold → nothing left to ask. */
+      expect(project({ tomorrow_answer_about_date: "2026-09-11" })).toHaveLength(0);
+      /* The factory then moved the day: the old answer is about nothing, and
+         the obligation is open again against the new date. */
+      const [reopened] = project({
+        eta_date: "2026-09-14",
+        tomorrow_answer_about_date: "2026-09-11",
+      }, "2026-09-12");
+      expect(reopened?.timing?.dueOn).toBe("2026-09-11");
+    });
+
+    it("stays open and turns late once the check day has passed", () => {
+      const [late] = project({}, "2026-09-14");
+      expect(late).toBeTruthy();
+      expect(late?.timing?.bucket).toBe("overdue");
+      expect(late?.timing?.workingDaysLate).toBeGreaterThan(0);
+    });
+  });
+
+  it("admits due invoice collection under the Responsible Delivery Operation and closes only on money truth", () => {
     const person = { userId: "payment-duty", name: "Shasha" };
     const [item] = projectPaymentCollectionWork({
       invoices: [{
@@ -539,8 +662,8 @@ describe("operation Work response composition", () => {
           }],
         },
       }],
-      paymentDuty: {
-        dutyKey: "payment_duty",
+      ownerFor: () => ({
+        dutyKey: "delivery_duty",
         onDate: "2026-09-08",
         normalOwner: person,
         buddy: null,
@@ -548,7 +671,7 @@ describe("operation Work response composition", () => {
         actingPerson: person,
         state: "primary",
         assignmentId: "assignment-payment",
-      },
+      }),
       today: "2026-09-08",
     });
 
@@ -557,11 +680,11 @@ describe("operation Work response composition", () => {
       module: "payment",
       object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
       problem: "Customer payment should have been received",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       recipient: "Tan Qu Qu",
-      owner: { dutyKey: "payment_duty", normal: person, acting: person },
+      owner: { dutyKey: "delivery_duty", normal: person, acting: person },
       timing: { dueOn: "2026-09-07", bucket: "overdue" },
-      destination: "/finance/invoices?invoice=invoice-1",
+      destination: "/finance/monitor?invoice=invoice-1",
     });
     expect(item?.completionFact).toContain("outstanding balance is RM 0");
     expect(item?.action).not.toContain("Shasha");
@@ -574,7 +697,7 @@ describe("operation Work response composition", () => {
 describe("payment.missed_promise — the promise outranks the window", () => {
   const person = { userId: "payment-duty", name: "Shasha" };
   const duty = {
-    dutyKey: "payment_duty" as const,
+    dutyKey: "delivery_duty" as const,
     onDate: "2026-09-08",
     normalOwner: person,
     buddy: null,
@@ -615,7 +738,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("raises the work on the day the CUSTOMER chose, even when the clock has no anchor", () => {
     const [item] = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -623,7 +746,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
       id: "payment:invoice-9:payment.missed_promise",
       module: "payment",
       problem: "Customer promise was missed",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
       timing: { dueOn: "2026-09-05", bucket: "overdue" },
     });
@@ -634,7 +757,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("raises ONE row, never the window item beside it", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice("2026-09-09")],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -645,7 +768,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("a promise still in the future is not missed", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({ promised_date: "2026-09-20" })],
     });
@@ -655,7 +778,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("the LATEST promise decides — a newer, later promise cancels the broken one", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice(null)],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [
         outcome({ promised_date: "2026-09-05", recorded_at: "2026-09-02T02:00:00Z" }),
@@ -670,7 +793,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
   it("a said-paid order with money still owed is not a missed promise", () => {
     const items = projectPaymentCollectionWork({
       invoices: [invoice("2026-09-09")],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({ outcome: "customer_paid", promised_date: null })],
     });
@@ -683,7 +806,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
     paid.orders.paid = 1000;
     const items = projectPaymentCollectionWork({
       invoices: [paid],
-      paymentDuty: duty,
+      ownerFor: () => duty,
       today: "2026-09-08",
       outcomes: [outcome({})],
     });
@@ -791,7 +914,7 @@ describe("payment.review_overpayment", () => {
   });
 
   /** §12 gives this to the Payment Approver and nobody else, so an unassigned
-   *  duty leaves it honestly ownerless rather than borrowing Payment Duty. */
+   *  duty leaves it honestly ownerless rather than borrowing the collection owner. */
   it("an unassigned approver leaves it ownerless, never reassigned", () => {
     const [item] = projectOverpaymentReviewWork({
       invoices: [invoice(1200)], refunds: [], approver: null, today: "2026-09-08",

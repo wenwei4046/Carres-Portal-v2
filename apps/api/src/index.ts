@@ -27,6 +27,7 @@ import operationMovementsRouter from "./routes/operation/movements";
 import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
+import deliverySettingsRouter from "./routes/operation/delivery-settings";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
@@ -46,6 +47,7 @@ import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import soBatchReadyStockRouter from "./routes/operation/so-batch-ready-stock";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
@@ -80,10 +82,17 @@ import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
+import collectionOwnerRouter from "./routes/finance/collection-owner";
 import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
+import financePayablesRouter from "./routes/finance/payables";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
+import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
+// The read-only Finance Ledger — Journal, Trial Balance, Self-check.
+import financeLedgerRouter from "./routes/finance/ledger";
+// The manual journal door — the principal's one write to the ledger (0462).
+import financeManualJournalsRouter from "./routes/finance/manual-journals";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
@@ -220,6 +229,10 @@ api.route("/operation/purchase/to-order", toOrderRouter);
 // CARD-2026-08-20 — the read-only customer-demand Register. Mounted beside To
 // Order, on the same recomputation; it issues nothing.
 api.route("/operation/purchase/demands", purchaseDemandsRouter);
+// 0471 — SO Batch Purchase's Ready Stock: the offer for one Sales Order, and
+// the one act that commits an exact Unit to an exact item line. Mounted on the
+// same path so the page reads one base, not two.
+api.route("/operation/purchase/demands", soBatchReadyStockRouter);
 // Manual Purchase requests (0359) — the typed lane's header + lines + register.
 api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
@@ -228,6 +241,7 @@ api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
+api.route("/operation/delivery-settings", deliverySettingsRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
 api.route("/operation/pos", dispatchCustomerLegRouter);
@@ -259,11 +273,21 @@ api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
+// 0489 — one Sales Order keeps one collection owner (owner ruling 2026-09-13).
+api.route("/finance/collection-owner", collectionOwnerRouter);
 api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
+// Money in that is not a sale (0478): other debtor invoices and receipts.
+api.route("/finance/other-money-in", financeOtherMoneyInRouter);
+// Supplier bills and payment vouchers (0477). Before the `/finance` catch-all.
+api.route("/finance/payables", financePayablesRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
 api.route("/finance/exceptions", financeExceptionsRouter);
+// The read-only Finance Ledger. Also before the catch-all `/finance` router.
+api.route("/finance/ledger", financeLedgerRouter);
+// The manual journal (principal only). Before the catch-all as well.
+api.route("/finance/manual-journals", financeManualJournalsRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);

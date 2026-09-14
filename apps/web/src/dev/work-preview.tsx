@@ -9,7 +9,7 @@
  *   · the never-asked missing date under the SALESPERSON'S NAME (Mei Ling)
  *   · the PIC (Shasha) keeping delivery/collect work — collect as governed
  *     cover for the roster-less payment duty
- *   · the loan collection under the duty word `Delivery staff`
+ *   · the loan collection under the duty word `Delivery Duty`
  *
  * A separate vite entry (`work-preview.html`), not a route: `vite build` only
  * emits `index.html`'s graph, so this cannot reach production. The fetch stub
@@ -107,7 +107,7 @@ const ORDERS = {
       salespersons: { name: "Mei Ling" },
     },
     // Delivered with the loan still out: Collect the loan item →
-    // `Delivery staff` (duty word — no roster fact exists).
+    // `Delivery Duty` (duty word — no holder resolved in the preview).
     {
       ...baseRow,
       id: "o-1320",

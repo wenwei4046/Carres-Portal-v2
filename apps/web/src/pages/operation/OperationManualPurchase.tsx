@@ -1,6 +1,14 @@
+// design-standard: not-a-list-page — this is a governed PURCHASING REGISTER
+// destination, not a generic List page. Its frame is the module's own shell —
+// `PurchasingTabs` draws the destination header, the 240px `FilterRail` draws
+// the facets, and `register/DataGrid` (appearance="reference") draws the
+// 36px/38px/32px Register Template. That is the approved shape for this
+// module (docs/ui/MASTER.md; docs/purchasing/MASTER.md §8.1), and it is the
+// shape its sibling SO Batch Purchase already carries; wrapping it in a
+// second `ListPageShell` would draw a page header inside a page header.
 import { useEffect, useMemo, useState } from "react";
 import "./manual-purchase-create.css";
-import registerStyles from "./PurchasingRegister.module.css";
+import registerStyles from "./ManualPurchaseRegister.module.css";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -81,6 +89,12 @@ import {
   type PurchaseRequestRow,
 } from "@/lib/queries";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
+import GoodsMiniTable, {
+  categoryWord,
+  goodsCategoryOf,
+  type GoodsMiniLine,
+} from "./components/GoodsMiniTable";
+import ManualPurchaseReadyStock from "./ManualPurchaseReadyStock";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { Block } from "./SalesOrderWorkspace";
@@ -93,6 +107,7 @@ import {
   FilterRail,
   FilterRailGroup,
   FilterRailRow,
+  FilterRailSelect,
 } from "./components/workspace-rail";
 
 function addDaysToIso(iso: string, days: number): string {
@@ -110,15 +125,23 @@ function addDaysToIso(iso: string, days: number): string {
  * (PURCHASING CARD 04 — the permanent Register;
  *  docs/purchasing/MASTER.md §9.2; docs/COPY-STANDARD.md).
  *
- * The permanent right-side Register: one Manual Purchase request per parent
- * row, complete history by default (ordered records included — `All not
- * ordered` is Card 03's explicit rail filter, never a silent default), the
- * ten governed columns in Card 08's exact order (no visible document
- * number — before `Issue PO` a Manual Purchase has none; after it the only
- * purchasing identity is the actual `PO No`), the read-only
- * expansion, and selection that admits ONLY `Ready to order` remainder.
- * PO Duty appears nowhere until a selection exists, then once, beside the
- * issue action (the SO Batch sibling grammar).
+ * The permanent Register: one Manual Purchase request per parent row,
+ * complete history by default (ordered records included — `All not ordered`
+ * is an explicit rail filter, never a silent default), the SETTLED NINE
+ * columns in the settled order (owner ruling 2026-09-11 —
+ * `Approval · Requested By · Proceed Date · PO No · Purpose · Items ·
+ * Supplier · Deliver To · Delivery Date`; no visible document number, because
+ * before `Issue PO` a Manual Purchase has none and after it the only
+ * purchasing identity is the actual `PO No`), the shared read-only goods
+ * table with its Ready Stock sibling below it, and selection that admits ONLY
+ * `Ready to order` remainder. PO Duty appears nowhere until a selection
+ * exists, then once, beside the issue action (the SO Batch sibling grammar).
+ *
+ * ⭐ ONE REGISTER GRAMMAR, TWO PURCHASING PAGES (owner ruling 2026-09-11).
+ * This page and SO Batch Purchase share the Register engine, the goods table
+ * (`GoodsMiniTable`), the Ready Stock box (`ReadyStockTable`) and the rail's
+ * compact fact dropdowns. Where they differ, they differ because the BUSINESS
+ * differs — never because two files drifted.
  *
  * Status is ONE arithmetic — `manualPurchaseStatusOf` in packages/shared
  * (Law D) — over facts the register read returns. Nothing here computes a
@@ -151,18 +174,34 @@ const STATUS_TONE: Record<ManualPurchaseStatusKind, OrderActionTone> = {
   not_going_ahead: "neutral",
 };
 
-/** One expansion line — exact per-line quantities and lineage (Card 04). */
-interface ExpansionLine {
-  id: string;
+/**
+ * ⭐ ONE GOODS ROW = ONE ALLOCATION (settled design, owner ruling 2026-09-11).
+ *
+ * The expansion used to draw one row per REQUEST LINE carrying the whole
+ * requested quantity beside a comma-joined `PO-A, PO-B`. Read left to right
+ * that says both documents ordered the full amount, which on a split line
+ * overstates the buy by exactly the split — and the `Still To Order` column
+ * beside it was a second arithmetic waiting to disagree with it.
+ *
+ * So a row is now the quantity as it was ACTUALLY committed: one row per
+ * purchase order the line went onto, with that document's own quantity,
+ * destination, supplier and PO Delivery Date, plus one `To purchase` row for
+ * what is still to buy. The original ask and the approver's number keep their
+ * authoritative home in the object's `Items Requested` and `Approval`.
+ */
+interface GoodsRow {
+  key: string;
   sku: string;
   item: string;
-  requestedQty: number;
-  approvedQty: number | null;
-  orderedQty: number;
-  stillToOrder: number;
+  category: string | null;
+  qty: number;
   supplier: string;
   deliverTo: string;
+  /** The document this quantity went onto; empty = still to purchase. */
   poNos: string[];
+  poDeliveryDate: string | null;
+  /** Issued, but no document can be named — a different absence entirely. */
+  issuedWithoutDocument?: boolean;
   cancelled: boolean;
   cancelReason: string | null;
 }
@@ -180,11 +219,13 @@ interface RequestRegisterRow {
   /** The SERVER-derived earliest line Order By (Card 06 §3.3), or null. */
   orderBy: string | null;
   forText: string;
+  /** The six governed purchase purposes, spelt once (`purposeLabelOf`). */
+  purposeLabel: string;
   itemsText: string;
-  qty: number;
   supplierText: string;
   deliverToText: string;
-  requestedBy: string;
+  /** The real staff name, or null when the individual cannot be recovered. */
+  requestedBy: string | null;
   status: ManualPurchaseStatus;
   /** Live remainder still issuable — the selection gate's other half. */
   remainingQty: number;
@@ -211,7 +252,8 @@ interface RequestRegisterRow {
     deliveryDate: string | null;
     remainingQty: number;
   }>;
-  lines: ExpansionLine[];
+  /** The expansion's goods, at the grain each quantity was allocated. */
+  goods: GoodsRow[];
   /** Every searchable token the columns cannot carry alone (SKUs). */
   skuTokens: string;
 }
@@ -227,6 +269,11 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   const userName = new Map(data.users.map((u) => [u.id, u.name ?? ""]));
   const supplierName = new Map(data.suppliers.map((s) => [s.id, s.name]));
   const poNo = new Map(data.pos.map((p) => [p.id, p.po_no]));
+  /* The document's own facts, for the goods table's exact mapping: the
+     ORIGINAL supplier-facing date (0428/0430) and the supplier the PO was
+     actually raised on — which can differ from the Catalog's supplier for the
+     SKU, and the DOCUMENT is the truth once one exists. */
+  const poFacts = new Map(data.pos.map((p) => [p.id, p]));
   const caseNo = new Map(data.serviceCases.map((sc) => [sc.id, sc.case_no]));
   const linesByReq = new Map<string, PurchaseRequestLineRow[]>();
   for (const l of data.lines) {
@@ -300,10 +347,10 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
         subsidiaryName: r.for_subsidiary_name,
         why: r.why,
       }),
+      purposeLabel: purposeLabelOf(r.purpose),
       itemsText: manualPurchaseItemsSummary(
         live.map((l) => l.item_label ?? l.sku),
       ),
-      qty: live.reduce((n, l) => n + l.qty, 0),
       supplierText: manualPurchaseSupplierSummary(
         live.map((l) =>
           l.supplier_id ? (supplierName.get(l.supplier_id) ?? "") : "",
@@ -312,7 +359,16 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       deliverToText: manualPurchaseDeliverToSummary(
         deliverNames.length > 0 ? deliverNames : [destName.get(r.destination_id) ?? ""],
       ),
-      requestedBy: userName.get(r.created_by ?? "") ?? "",
+      /* ⭐ AN UNRECOVERABLE INDIVIDUAL SAYS SO (production walk, 2026-09-11).
+         `app_users` RLS does not show every account to every reader — the
+         `principal` seed row is hidden from an `operation` caller — so this
+         lookup MISSES and used to print an empty string. Three of the four
+         live requests were raised by that account, and `Requested By` is now
+         the SECOND column rather than the tenth: a blank there reads as a
+         broken page, not as an absence. The object has always printed the
+         governed sentence for exactly this case; the Register now prints it
+         too, so the two surfaces answer alike. A person is never invented. */
+      requestedBy: userName.get(r.created_by ?? "") || null,
       status,
       remainingQty: live.reduce((n, l) => n + remainingOf(l), 0),
       lineCategories: live.map(
@@ -336,20 +392,78 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
         deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,
         remainingQty: remainingOf(l),
       })),
-      lines: lines.map((l) => ({
-        id: l.id,
-        sku: l.sku,
-        item: l.item_label ?? l.sku,
-        requestedQty: l.qty,
-        approvedQty: l.approved_qty,
-        orderedQty: l.issued_qty,
-        stillToOrder: remainingOf(l),
-        supplier: l.supplier_id ? (supplierName.get(l.supplier_id) ?? "") : "",
-        deliverTo: destName.get(l.destination_id ?? r.destination_id) ?? "",
-        poNos: linePoNos(l),
-        cancelled: l.cancelled_at !== null,
-        cancelReason: l.cancel_reason,
-      })),
+      /* ── THE GOODS, AT THE GRAIN THEY WERE ALLOCATED ────────────────── */
+      goods: lines.flatMap((l): GoodsRow[] => {
+        const cancelled = l.cancelled_at !== null;
+        const item = l.item_label ?? l.sku;
+        const catalogSupplier = l.supplier_id
+          ? (supplierName.get(l.supplier_id) ?? "")
+          : "";
+        const lineDestination = destName.get(l.destination_id ?? r.destination_id) ?? "";
+        const base = {
+          sku: l.sku,
+          item,
+          category: (l.category as string | null | undefined) ?? null,
+          cancelled,
+          cancelReason: l.cancel_reason,
+        };
+        /* One row per document, carrying THAT document's quantity — never the
+           whole request's, and never the same number twice. */
+        const allocations: GoodsRow[] = (l.allocations ?? []).map((a, index) => ({
+          ...base,
+          key: `${l.id}::po::${a.poId}::${index}`,
+          qty: a.qty,
+          /* The DOCUMENT decides, because the document is what the supplier
+             holds; the Catalog's supplier stands in only when the PO fact is
+             missing (an older API, or a PO the read could not resolve). */
+          supplier:
+            (poFacts.get(a.poId)?.supplier_id
+              ? supplierName.get(poFacts.get(a.poId)!.supplier_id!)
+              : null) || catalogSupplier,
+          deliverTo:
+            (a.destinationId ? destName.get(a.destinationId) : null) || lineDestination,
+          poNos: [poNo.get(a.poId) ?? a.poId],
+          poDeliveryDate: poFacts.get(a.poId)?.official_delivery_date ?? null,
+        }));
+        /* Pre-0361 lineage the allocation read cannot see: the line names a
+           PO but no PO line carries its `demand_id`. `linePoNos` already
+           recovers those numbers, so the row states the document it can name
+           with the issued quantity that is the only stored account of it.
+           When it can name NONE, the row still appears — the goods were
+           bought and the quantity is real — wearing an absence that says the
+           document is missing rather than `Not ordered yet`, which would be
+           the opposite fact. */
+        if (allocations.length === 0 && l.issued_qty > 0) {
+          allocations.push({
+            ...base,
+            key: `${l.id}::po::legacy`,
+            qty: l.issued_qty,
+            supplier: catalogSupplier,
+            deliverTo: lineDestination,
+            poNos: linePoNos(l),
+            poDeliveryDate: null,
+            issuedWithoutDocument: linePoNos(l).length === 0,
+          });
+        }
+        const remaining = cancelled ? 0 : remainingOf(l);
+        /* A cancelled line with nothing ordered still has to appear — the
+           request asked for it, and `Not going ahead` is the answer. */
+        const toPurchase =
+          remaining > 0 || (allocations.length === 0)
+            ? [
+                {
+                  ...base,
+                  key: `${l.id}::open`,
+                  qty: cancelled ? l.qty : remaining,
+                  supplier: catalogSupplier,
+                  deliverTo: lineDestination,
+                  poNos: [] as string[],
+                  poDeliveryDate: null,
+                },
+              ]
+            : [];
+        return [...allocations, ...toPurchase];
+      }),
       skuTokens: lines.map((l) => l.sku).join(" "),
     };
   });
@@ -379,12 +493,20 @@ export default function OperationManualPurchase() {
      the Register, not a loop. */
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedRequest = searchParams.get("mp") ?? searchParams.get("mpr");
+  /* ⭐ `Approve purchase` OPENS THE APPROVAL SECTION (owner ruling
+     2026-09-11). The object is one six-section scroll; landing an approver at
+     the top of it and letting them hunt for the decision is a step the Work
+     row exists to remove. `&section=approval` is consumed with the id, so
+     `‹ Manual Purchase` still returns to the Register rather than reopening. */
+  const [openSection, setOpenSection] = useState<string | null>(null);
   useEffect(() => {
     if (!linkedRequest) return;
     setMode({ detail: linkedRequest });
+    setOpenSection(searchParams.get("section"));
     const next = new URLSearchParams(searchParams);
     next.delete("mp");
     next.delete("mpr");
+    next.delete("section");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedRequest]);
@@ -475,11 +597,19 @@ export default function OperationManualPurchase() {
   );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
-  /** The sentence beside a row the tick refuses; null when it may be ticked.
-   *  A row still waiting for approval already says so in the same cell, so
-   *  it gets no second line. */
+  /**
+   * The sentence beside a row the tick refuses; null when it may be ticked.
+   *
+   * ⭐ THE CELL NEVER SAYS THE SAME THING TWICE (production walk, 2026-09-11).
+   * A row waiting for approval already reads `Need approval`, and a REFUSED
+   * one already reads `Refused` — printing `Waiting for approval.` or
+   * `Not going ahead.` underneath is the redundant second line the owner
+   * removed from `{name} approves` and `Ordered.`, met again. The line exists
+   * for the case it was built for: a tick that is dead for a reason the
+   * approval pill does NOT state (`Approved at 0. Nothing to order.`).
+   */
   const deadReason = (r: RequestRegisterRow) =>
-    r.status.kind === "waiting_approval"
+    r.approval.kind === "need_approval" || r.approval.kind === "refused"
       ? null
       : manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
   const selectedRows = useMemo(
@@ -571,25 +701,39 @@ export default function OperationManualPurchase() {
     }
   }
 
+  /**
+   * ⭐ THE SETTLED NINE COLUMNS, exactly and in this order (owner ruling
+   * 2026-09-11):
+   *
+   * ```
+   * Approval · Requested By · Proceed Date · PO No · Purpose · Items ·
+   * Supplier · Deliver To · Delivery Date
+   * ```
+   *
+   * The row now opens with WHO IS WAITING ON WHOM — the approval fact and the
+   * person who asked — before it says when and what. `Qty` and `For` left the
+   * row (`MANUAL_PURCHASE_WORDS` carries why); `Status`, `Partial`,
+   * `PO Sent`, `PO Created`, `Reason` and any request-number column are
+   * banned and do not return.
+   *
+   * The chooser groups are the SO Batch sibling's grammar — `Request` for the
+   * request's own facts, `Documents` for the purchase order's, `Buying` for
+   * what is being bought — so the two purchasing registers hide and show
+   * columns the same way.
+   */
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
-      {
-        key: "proceed_date",
-        label: MW.colProceedDate,
-        width: 118,
-        sortable: true,
-        filterType: "date",
-        dateValue: (r) => r.proceedDate,
-        accessor: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        filterValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
-      },
       {
         key: "approval",
         label: MW.colApproval,
         width: 168,
         sortable: true,
+        chooserGroup: "Request",
+        /* THE APPROVAL FACT AND NOTHING ELSE (owner ruling 2026-09-11): no
+           stacked approver name, no Approve/Refuse button. Who decides is the
+           object's Approval section and the Work row; a Register cell that
+           carried a second name made the row two lines tall for a fact the
+           reader could not act on from here. */
         accessor: (r) => (
           <span className="block min-w-0">
             <StatusPill tone={APPROVAL_TONE[r.approval.kind]}>
@@ -600,7 +744,9 @@ export default function OperationManualPurchase() {
                 checkbox was greyed with nothing on screen naming the cause —
                 the SO Batch Deliver To cell's defect (#1056), met again here.
                 The sentence comes from the same two facts the tick reads, so
-                it can never disagree with the checkbox. */}
+                it can never disagree with the checkbox. It is an explanation
+                of THIS ROW'S selectability, not a second approval fact and
+                not a person's name. */}
             {r.status.kind !== "ordered" && deadReason(r) ? (
               <span
                 className="block text-label font-normal text-kit-amber-11"
@@ -613,12 +759,48 @@ export default function OperationManualPurchase() {
         ),
         searchValue: (r) => r.approval.label,
         filterValue: (r) => r.approval.label,
+        exportValue: (r) => r.approval.label,
+      },
+      {
+        key: "requested_by",
+        label: MW.colRequestedBy,
+        width: 130,
+        sortable: true,
+        chooserGroup: "Request",
+        accessor: (r) =>
+          r.requestedBy ? (
+            <span className="block truncate" title={r.requestedBy}>
+              {r.requestedBy}
+            </span>
+          ) : (
+            <span className="block truncate text-base-500" title={MW.staffIdentityNotRecorded}>
+              {MW.staffIdentityNotRecorded}
+            </span>
+          ),
+        searchValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
+        filterValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
+        exportValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
+      },
+      {
+        key: "proceed_date",
+        label: MW.colProceedDate,
+        width: 118,
+        sortable: true,
+        chooserGroup: "Request",
+        filterType: "date",
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        filterValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        exportValue: (r) => r.proceedDate.slice(0, 10),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
       },
       {
         key: "po_no",
         label: MW.colPoNo,
         width: 150,
         sortable: true,
+        chooserGroup: "Documents",
         accessor: (r) => {
           /* ONLY real lineage (Card 04 §3.4; Card 08 §3.2): `—` is a fact,
              never a button; ONE PO is the clickable document; several open
@@ -663,59 +845,47 @@ export default function OperationManualPurchase() {
         exportValue: (r) => manualPurchasePoSummary(r.poNos),
       },
       {
-        key: "delivery_date",
-        label: MW.colDeliveryDate,
-        width: 113,
-        sortable: true,
-        filterType: "date",
-        dateValue: (r) => r.deliveryDate,
-        /* A historical null Delivery Date prints the honest sentence, never
-           a bare dash — and gains no invented Order By (Card 06 §6). */
-        accessor: (r) =>
-          r.deliveryDate ? (
-            fmtDate(r.deliveryDate)
-          ) : (
-            <span className="text-base-500">{MW.notRecorded}</span>
-          ),
-        searchValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
-        filterValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
-        exportValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
-        sortFn: (a, b) => (a.deliveryDate ?? "").localeCompare(b.deliveryDate ?? ""),
-      },
-      {
-        key: "for",
-        label: MW.colFor,
+        key: "purpose",
+        label: MW.colPurpose,
         width: 170,
         sortable: true,
-        /* Card 08 §3.2 — `For` is the clear single-click entrance to the
-           Manual Purchase object (the retired number column's one job); the
-           row's deep-link identity stays the invisible UUID. */
+        chooserGroup: "Request",
+        /* ⭐ PURPOSE REPLACES `For` AS THE ROW'S ENTRANCE (owner ruling
+           2026-09-11). `For` was the structured object a purchase serves —
+           useful on the object, but it varies by purpose and read as nine
+           different kinds of sentence down one column. The purpose is the
+           SIX-word governed vocabulary the rail filters by, so the column and
+           the rail now say the same thing, and it keeps the entrance job the
+           retired number column left behind. The deep-link identity stays the
+           invisible UUID; the structured `For` keeps its home on the object. */
         accessor: (r) => (
           <button
             type="button"
             className="block max-w-full truncate text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-            title={r.forText || purposeLabelOf(r.purpose)}
+            title={r.forText || r.purposeLabel}
             data-testid={`mp-open-${r.id}`}
             onClick={(event) => {
               event.stopPropagation();
               setMode({ detail: r.id });
             }}
           >
-            {/* A historical row whose structured For was never stored still
-                needs its entrance — the purpose word stands in, never a
-                number and never an empty button. */}
-            {r.forText || purposeLabelOf(r.purpose)}
+            {r.purposeLabel}
           </button>
         ),
-        searchValue: (r) => r.forText,
-        filterValue: (r) => r.forText,
-        exportValue: (r) => r.forText,
+        /* SEARCH AND EXPORT KEEP THE ACCURATE SOURCE VALUES. The cell prints
+           the governed word; the structured `For` behind it is still how an
+           operator finds "the one for Ah Meng" or the Service Case number. */
+        searchValue: (r) => `${r.purposeLabel} ${r.forText}`,
+        filterValue: (r) => r.purposeLabel,
+        exportValue: (r) => r.purposeLabel,
+        sortFn: (a, b) => a.purposeLabel.localeCompare(b.purposeLabel),
       },
       {
         key: "items",
         label: MW.colItems,
         width: 210,
         sortable: true,
+        chooserGroup: "Buying",
         accessor: (r) => (
           <span className="block truncate" title={r.itemsText}>
             {r.itemsText}
@@ -727,22 +897,11 @@ export default function OperationManualPurchase() {
         exportValue: (r) => r.itemsText,
       },
       {
-        key: "qty",
-        label: MW.colQty,
-        width: 60,
-        sortable: true,
-        filterType: "number",
-        numberValue: (r) => r.qty,
-        accessor: (r) => <span className="block text-right tabular-nums">{r.qty}</span>,
-        searchValue: (r) => String(r.qty),
-        filterValue: (r) => String(r.qty),
-        sortFn: (a, b) => a.qty - b.qty,
-      },
-      {
         key: "supplier",
         label: MW.colSupplier,
         width: 150,
         sortable: true,
+        chooserGroup: "Buying",
         accessor: (r) => (
           <span className="block truncate" title={r.supplierText}>
             {r.supplierText}
@@ -758,6 +917,7 @@ export default function OperationManualPurchase() {
         label: MW.colDeliverTo,
         width: 150,
         sortable: true,
+        chooserGroup: "Buying",
         accessor: (r) => (
           <span className="block truncate" title={r.deliverToText}>
             {r.deliverToText}
@@ -765,19 +925,28 @@ export default function OperationManualPurchase() {
         ),
         searchValue: (r) => r.deliverToText,
         filterValue: (r) => r.deliverToText,
+        exportValue: (r) => r.deliverToText,
       },
       {
-        key: "requested_by",
-        label: MW.colRequestedBy,
-        width: 130,
+        key: "delivery_date",
+        label: MW.colDeliveryDate,
+        width: 113,
         sortable: true,
-        accessor: (r) => (
-          <span className="block truncate" title={r.requestedBy}>
-            {r.requestedBy}
-          </span>
-        ),
-        searchValue: (r) => r.requestedBy,
-        filterValue: (r) => r.requestedBy,
+        chooserGroup: "Documents",
+        filterType: "date",
+        dateValue: (r) => r.deliveryDate,
+        /* A historical null Delivery Date prints the honest sentence, never
+           a bare dash — and gains no invented Order By (Card 06 §6). */
+        accessor: (r) =>
+          r.deliveryDate ? (
+            fmtDate(r.deliveryDate)
+          ) : (
+            <span className="text-base-500">{MW.notRecorded}</span>
+          ),
+        searchValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        filterValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        exportValue: (r) => (r.deliveryDate ? fmtDate(r.deliveryDate) : MW.notRecorded),
+        sortFn: (a, b) => (a.deliveryDate ?? "").localeCompare(b.deliveryDate ?? ""),
       },
     ],
     [navigate],
@@ -887,82 +1056,75 @@ export default function OperationManualPurchase() {
               />
             ))}
           </FilterRailGroup>
+          {/* ── THE THREE FACT SECTIONS ARE COMPACT DROPDOWNS (owner ruling
+              2026-09-11) ─────────────────────────────────────────────────
+              Purpose, Product and Supplier are FACT lists, not the daily
+              worklist: six purposes, three categories and a supplier list
+              that grows with the business were pushing `WORK TO DO` and
+              `ORDER TIMING` — the rows that say what to do today — below the
+              fold of a 240px rail. Each collapses to ONE control writing the
+              same single-slot section value the rows wrote, so sections still
+              combine with AND and `All …` still clears only its own section.
+              The counts ride in the option text rather than disappearing. */}
           <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading}>
             {/* The approved purposes — `DEMAND_PURPOSES`, the one creatable
-                list. A retired historical value matches no row and lives
+                list. A retired historical value matches no option and lives
                 under `All purposes` only (never falsely relabelled). */}
-            <FilterRailRow
-              active={railFilter.purpose == null}
-              onClick={() => setRailFilter((prev) => ({ ...prev, purpose: null }))}
-              testId="mp-purpose-all"
-              label={MANUAL_PURCHASE_RAIL.purpose.all}
+            <FilterRailSelect
+              label={MANUAL_PURCHASE_RAIL.purpose.heading}
+              allLabel={MANUAL_PURCHASE_RAIL.purpose.all}
+              testId="mp-purpose-select"
+              value={railFilter.purpose}
+              options={MANUAL_PURCHASE_RAIL.purpose.rows.map((p) => ({
+                value: p.value,
+                label: p.label,
+                count: rail.purposeCounts[p.value],
+              }))}
+              onChange={(purpose) =>
+                setRailFilter((prev) => ({
+                  ...prev,
+                  purpose: purpose as ManualPurchaseRailFilter["purpose"],
+                }))
+              }
             />
-            {MANUAL_PURCHASE_RAIL.purpose.rows.map((p) => (
-              <FilterRailRow
-                key={p.value}
-                active={railFilter.purpose === p.value}
-                onClick={() =>
-                  setRailFilter((prev) => ({
-                    ...prev,
-                    purpose: prev.purpose === p.value ? null : p.value,
-                  }))
-                }
-                testId={`mp-purpose-${p.value}`}
-                label={p.label}
-                count={rail.purposeCounts[p.value]}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading}>
             {/* The CATALOG's categories, never SKU-text inference. */}
-            <FilterRailRow
-              active={railFilter.product == null}
-              onClick={() => setRailFilter((prev) => ({ ...prev, product: null }))}
-              testId="mp-product-all"
-              label={MANUAL_PURCHASE_RAIL.product.all}
+            <FilterRailSelect
+              label={MANUAL_PURCHASE_RAIL.product.heading}
+              allLabel={MANUAL_PURCHASE_RAIL.product.all}
+              testId="mp-product-select"
+              value={railFilter.product}
+              options={MANUAL_PURCHASE_RAIL.product.categories.map((c) => ({
+                value: c.category,
+                label: c.word,
+                count: rail.productCounts[c.category],
+              }))}
+              onChange={(product) =>
+                setRailFilter((prev) => ({
+                  ...prev,
+                  product: product as ManualPurchaseRailFilter["product"],
+                }))
+              }
             />
-            {MANUAL_PURCHASE_RAIL.product.categories.map((c) => (
-              <FilterRailRow
-                key={c.category}
-                active={railFilter.product === c.category}
-                onClick={() =>
-                  setRailFilter((prev) => ({
-                    ...prev,
-                    product: prev.product === c.category ? null : c.category,
-                  }))
-                }
-                testId={`mp-product-${c.category}`}
-                label={c.word}
-                count={rail.productCounts[c.category]}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading}>
             {/* Actual names — the demand line's Catalog-derived supplier,
                 dynamic and alphabetical, never hardcoded. A name with no
                 match under the other filters drops off; the SELECTED name
                 stays, with its honest 0. */}
-            <FilterRailRow
-              active={railFilter.supplier == null}
-              onClick={() => setRailFilter((prev) => ({ ...prev, supplier: null }))}
-              testId="mp-supplier-all"
-              label={MANUAL_PURCHASE_RAIL.supplier.all}
+            <FilterRailSelect
+              label={MANUAL_PURCHASE_RAIL.supplier.heading}
+              allLabel={MANUAL_PURCHASE_RAIL.supplier.all}
+              testId="mp-supplier-select"
+              value={railFilter.supplier}
+              options={rail.suppliers.map((s) => ({
+                value: s.name,
+                label: s.name,
+                count: s.count,
+              }))}
+              onChange={(supplier) => setRailFilter((prev) => ({ ...prev, supplier }))}
             />
-            {rail.suppliers.map((s) => (
-              <FilterRailRow
-                key={s.name}
-                active={railFilter.supplier === s.name}
-                onClick={() =>
-                  setRailFilter((prev) => ({
-                    ...prev,
-                    supplier: prev.supplier === s.name ? null : s.name,
-                  }))
-                }
-                testId={`mp-supplier-${s.name}`}
-                label={s.name}
-                count={s.count}
-              />
-            ))}
           </FilterRailGroup>
           {/* Card 06 §5 — SETUP TO FIX renders ONLY while an affected request
               exists: it states the missing configuration; the owning action
@@ -1025,7 +1187,11 @@ export default function OperationManualPurchase() {
             /* The grid's own filtered+sorted order feeds the object header's
                `‹ n of m ›` (Card 05 §3.1) — a STABLE setter, per the engine. */
             onFilteredRowsChange={setGridRows}
-            storageKey="carres.manualPurchase.register.v3"
+            /* v4 — the settled design changed the DEFAULT column order and
+               dropped two columns, so a saved v3 layout must not be replayed
+               over it: a remembered order would put `Qty` back at the front
+               of a register that no longer has one. */
+            storageKey="carres.manualPurchase.register.v4"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
             exportName="Manual Purchase"
@@ -1036,12 +1202,14 @@ export default function OperationManualPurchase() {
             }
             groupBanner={false}
             /* The identity survives horizontal scrolling — the DataGrid's
-               governed capability, pinned on the business fact `For`
-               (Card 08 §3.2: the sticky column is a fact, never a hidden
-               number). */
-            stickyIdentity={{ columnKey: "for" }}
+               governed capability, pinned on the business fact `Purpose`
+               (the sticky column is a fact, never a hidden number, and
+               `Purpose` is the column the entrance now lives on). */
+            stickyIdentity={{ columnKey: "purpose" }}
+            chooserGroupOrder={["Request", "Documents", "Buying"]}
             expandable={{
-              renderExpansion: (r) => <RequestExpansion row={r} />,
+              flush: true,
+              renderExpansion: (r) => <RequestExpansion row={r} navigate={navigate} />,
               testId: (r) => `mp-expand-${r.id}`,
             }}
             selectable={{
@@ -1151,6 +1319,7 @@ export default function OperationManualPurchase() {
                 }
               : null
           }
+          openSection={openSection}
           position={
             gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
           }
@@ -1205,88 +1374,102 @@ function PoDutyChip({ data }: { data: ManualPurchaseRegisterPayload }) {
 }
 
 /**
- * ▸ THE REQUEST'S OWN LINES — read-only (Card 04): exact per-line
- * quantities and lineage, nothing else. No Approve, no Refuse, no
- * Receive, no price, no PO creation, no PDF. The quantities are the ONE
- * governed arithmetic (`manualPurchaseLineRemainingOf`); the PO numbers
- * are the line's real lineage.
+ * ▸ THE REQUEST'S GOODS — the SHARED `GoodsMiniTable`, and the Ready Stock
+ * section beneath it (settled design, owner ruling 2026-09-11).
+ *
+ * ⭐ ONE GOODS TABLE, TWO PURCHASING PAGES. This expansion used to draw its
+ * own raw `<table>` beside SO Batch Purchase's `GoodsMiniTable` — two boxes
+ * that already disagreed about column widths, about the header treatment and
+ * about what an absence looks like, and that would have kept drifting. It is
+ * now the same component the sibling draws, asked for the columns Manual
+ * Purchase actually has:
+ *
+ * ```
+ * Category · Deliver To · SKU · Qty · Supplier · PO No · PO Delivery Date · Item
+ * ```
+ *
+ * ── RECONCILED WITH THE SO BATCH DESIGN, NOT COPIED FROM IT ────────────────
+ *
+ * The owner's target names `SKU · Qty · Supplier · Deliver To · PO No ·
+ * PO Delivery Date · Item`. `GoodsMiniTable`'s ruled positions put
+ * `Category` first and `Deliver To` before `SKU` (owner ruling 2026-08-15,
+ * and law ① keeps `Item` last and flexible), so those ruled slots are kept
+ * and the owner's mapping cluster — Supplier → PO No → PO Delivery Date →
+ * Item — lands intact at the end. Two expansions opened together still read
+ * as one listing, which is the whole point of the ruled widths.
+ *
+ * TWO COLUMNS ARE DELIBERATELY ABSENT.
+ *   · `Covered by` — the owner ruled it off this page. It answers *what
+ *     covers this customer line*, which has no Manual Purchase meaning: a
+ *     replenishment is not covered by the shelf.
+ *   · `Unit ID` — no door maps a Manual Purchase line to its Units; drawing
+ *     the column would print `Not allocated` on every row forever.
+ *   · `Still To Order` — retired with the whole-request quantity that made it
+ *     necessary. Every row is now one ALLOCATION, so the remainder is a row
+ *     (`To purchase`) rather than a column beside a number it disagreed with.
  */
-// design-standard: not-a-list-page — the raw <table> below is the CHILD of a
-// register row (the DataGrid expansion), not a page: it has no destination, no
-// toolbar and no header of its own; the register above it owns all three
-// (GoodsMiniTable's own precedent).
-/* Every column is a FIXED width (GoodsMiniTable's own alignment law: two
-   expansions opened together must read as one listing). The Card fixes the
-   ORDER with Item second, so Item gets a constant width rather than flex —
-   a flexible middle column would move every column after it. */
-const EXPANSION_COLUMNS = [
-  { key: "sku", label: MW.expSku, width: 152 },
-  { key: "item", label: MW.expItem, width: 220 },
-  { key: "requestedQty", label: MW.expRequestedQty, width: 110 },
-  { key: "approvedQty", label: MW.expApprovedQty, width: 104 },
-  { key: "orderedQty", label: MW.expOrderedQty, width: 100 },
-  { key: "stillToOrder", label: MW.expStillToOrder, width: 100 },
-  { key: "supplier", label: MW.expSupplier, width: 150 },
-  { key: "deliverTo", label: MW.expDeliverTo, width: 150 },
-  { key: "poNo", label: MW.expPoNo, width: 144 },
-] as const;
-
-function RequestExpansion({ row }: { row: RequestRegisterRow }) {
+function RequestExpansion({
+  row,
+  navigate,
+}: {
+  row: RequestRegisterRow;
+  navigate: ReturnType<typeof useNavigate>;
+}) {
+  const lines: GoodsMiniLine[] = row.goods.map((g) => ({
+    key: g.key,
+    testId: `mp-goods-${g.key}`,
+    category: categoryWord(goodsCategoryOf({ sku: g.sku, category: g.category })),
+    /* The ruled Unit ID column is not drawn here, so these two are unread —
+       the shape still requires them, and an honest absence costs nothing. */
+    unitIds: [],
+    unitAbsence: "—",
+    deliverTo: g.deliverTo ? [g.deliverTo] : [],
+    deliverToAbsence: MW.notRecorded,
+    supplier: g.supplier || undefined,
+    supplierAbsence: MW.noSupplierYet,
+    poNos: g.poNos,
+    /* A row with no document is what is still to buy — not an omission. */
+    poNoAbsence: g.issuedWithoutDocument
+      ? MW.poNotRecorded
+      : g.cancelled
+        ? MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead
+        : MW.notOrderedYet,
+    poDeliveryDate: g.poDeliveryDate ? fmtDate(g.poDeliveryDate) : undefined,
+    poDeliveryDateAbsence: "—",
+    sku: g.sku,
+    qty: g.qty,
+    item: g.item,
+    itemDetail: g.cancelled
+      ? `${MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}${g.cancelReason ? ` — ${g.cancelReason}` : ""}`
+      : g.poNos.length === 0 && !g.cancelled
+        ? MW.goodsToPurchase
+        : undefined,
+    /* This register BUYS from its parent row, never from a goods row: the
+       tick is the request's, and the goods table selects nothing. */
+    selectable: false,
+  }));
   return (
-    <div
-      className="overflow-x-auto rounded-control border border-base-200 bg-white"
-      data-testid={`mp-expansion-${row.id}`}
-    >
-      <table className="w-full table-fixed text-left" style={{ minWidth: 1230 }}>
-        <colgroup>
-          {EXPANSION_COLUMNS.map((c) => (
-            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
-          ))}
-        </colgroup>
-        <thead className="border-b border-base-200 bg-base-50">
-          <tr className="divide-x divide-base-200">
-            {EXPANSION_COLUMNS.map((c) => (
-              <th
-                key={c.key}
-                scope="col"
-                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
-              >
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-base-200 text-body">
-          {row.lines.map((l) => (
-            <tr
-              key={l.id}
-              className={`divide-x divide-base-200 align-top${l.cancelled ? " text-base-400" : ""}`}
-            >
-              <td className="px-2 py-2 font-mono">{l.sku}</td>
-              <td className="px-2 py-2">
-                {l.item}
-                {l.cancelled ? (
-                  <span className="block text-label text-base-400">
-                    {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
-                    {l.cancelReason ? ` — ${l.cancelReason}` : ""}
-                  </span>
-                ) : null}
-              </td>
-              <td className="px-2 py-2 tabular-nums">{l.requestedQty}</td>
-              <td className="px-2 py-2 tabular-nums">
-                {l.approvedQty == null ? null : l.approvedQty}
-              </td>
-              <td className="px-2 py-2 tabular-nums">{l.orderedQty}</td>
-              <td className="px-2 py-2 tabular-nums">{l.cancelled ? null : l.stillToOrder}</td>
-              <td className="px-2 py-2">{l.supplier}</td>
-              <td className="px-2 py-2">{l.deliverTo}</td>
-              <td className="px-2 py-2 font-mono">
-                {l.poNos.length > 0 ? l.poNos.join(", ") : MW.notOrderedYet}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div data-testid={`mp-expansion-${row.id}`}>
+      <GoodsMiniTable
+        label={`Goods on this ${MW.page}`}
+        lines={lines}
+        showUnitId={false}
+        showSupplier
+        showPoNo
+        showPoDeliveryDate
+        /* The number is a door here, exactly as it is on the sibling: the
+           parent cell links only when there is ONE purchase order, and with
+           several it points the reader at this table. */
+        onPoClick={(poId) =>
+          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+        }
+      />
+      {/* ⭐ READY STOCK — an INDEPENDENTLY collapsible table directly below
+          the request's own goods. A sibling SECTION, not a column and not a
+          second goods table: the table above answers *what was asked for and
+          which purchase order carries it*, this one answers *what is already
+          on the shelf*. It writes nothing. */}
+      <ManualPurchaseReadyStock requestId={row.id} />
     </div>
   );
 }
@@ -2514,8 +2697,11 @@ function ManualPurchaseObject({
   position,
   onStep,
   onBack,
+  openSection,
 }: {
   id: string;
+  /** `approval` when a Work action asked for that section; null otherwise. */
+  openSection?: string | null;
   /** The Register row's own business heading (Card 08 §3.3 — `{Need for} ·
    *  {For}` plus the quieter `{Proceed Date} · {supplier}` context) — the
    *  header prints instantly while the object read is in flight. No number,
@@ -2528,6 +2714,23 @@ function ManualPurchaseObject({
   onBack: () => void;
 }) {
   const q = useManualPurchaseDetail(id);
+  /**
+   * ⭐ THE ASKED-FOR SECTION IS BROUGHT INTO VIEW ONCE THE OBJECT HAS LOADED
+   * (owner ruling 2026-09-11: "Work must open the exact request's Approval
+   * section").
+   *
+   * It runs after the read lands, because the section does not exist in the
+   * DOM while the object is still opening. `Block` already stamps
+   * `data-block={title}` on every section, so this needs no new markup and no
+   * anchor vocabulary — the governed section NAME is the address.
+   */
+  useEffect(() => {
+    if (!openSection || q.isPending) return;
+    const title = openSection === "approval" ? MW.secApproval : null;
+    if (!title) return;
+    const section = document.querySelector(`[data-block="${title}"]`);
+    section?.scrollIntoView({ block: "start" });
+  }, [openSection, q.isPending]);
   const pick = useQuery({
     queryKey: ["to-order", "pick-items"],
     queryFn: () =>

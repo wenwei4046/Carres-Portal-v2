@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { DELIVERY_PHOTO_MIMES, DELIVERY_PHOTO_MAX_BYTES } from "./ops-order-control";
+import {
+  DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_PROOF_MIMES,
+  DELIVERY_VIDEO_MAX_BYTES,
+  DELIVERY_VIDEO_MIMES,
+  isDeliveryVideoMime,
+} from "./ops-order-control";
 
 /**
  * The §4 warehouse→logistics handover chain — slice 1 (0363).
@@ -15,17 +21,15 @@ import { DELIVERY_PHOTO_MIMES, DELIVERY_PHOTO_MAX_BYTES } from "./ops-order-cont
 
 /** Evidence files per act (0440): several photos and videos, never one.
  *  Images stay the 0280 photo family; videos match the Service-Case family.
- *  The limits are DISPLAYED before the operator picks files. */
-export const HANDOVER_EVIDENCE_VIDEO_MIMES = [
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-] as const;
-export const HANDOVER_EVIDENCE_MIMES = [
-  ...DELIVERY_PHOTO_MIMES,
-  ...HANDOVER_EVIDENCE_VIDEO_MIMES,
-] as const;
-export const HANDOVER_EVIDENCE_VIDEO_MAX_BYTES = 25 * 1024 * 1024; // 25 MiB
+ *  The limits are DISPLAYED before the operator picks files.
+ *
+ *  ONE definition of the video family and its ceiling since the 2026-09-11
+ *  driver-submission ruling: the handover door and the delivery-proof door
+ *  accept the same files, and a second list would drift (Law D). The
+ *  long-standing handover names stay the handover's own vocabulary. */
+export const HANDOVER_EVIDENCE_VIDEO_MIMES = DELIVERY_VIDEO_MIMES;
+export const HANDOVER_EVIDENCE_MIMES = DELIVERY_PROOF_MIMES;
+export const HANDOVER_EVIDENCE_VIDEO_MAX_BYTES = DELIVERY_VIDEO_MAX_BYTES;
 export const HANDOVER_EVIDENCE_MAX_FILES = 20;
 
 /** One stored evidence file of one handover act. */
@@ -103,10 +107,7 @@ export const signHandoverProofUploadInput = z
   })
   .strict()
   .superRefine((v, c) => {
-    const isVideo = (HANDOVER_EVIDENCE_VIDEO_MIMES as readonly string[]).includes(
-      v.mimeType,
-    );
-    if (!isVideo && v.sizeBytes > DELIVERY_PHOTO_MAX_BYTES)
+    if (!isDeliveryVideoMime(v.mimeType) && v.sizeBytes > DELIVERY_PHOTO_MAX_BYTES)
       c.addIssue({
         code: "custom",
         path: ["sizeBytes"],

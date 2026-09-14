@@ -106,6 +106,15 @@ export type OpsStockReassignInput = z.infer<typeof opsStockReassignInputSchema>;
 export const opsStockReserveItemInputSchema = z.object({
   itemId: z.string().uuid(),
   ref: z.string().trim().min(1),
+  /**
+   * 0471 — the Sales Order ITEM LINE this Unit answers. OPTIONAL here on
+   * purpose: `Choose Ready Unit` always names it, while the order drawer's
+   * own picker never had the concept and sends none. What is NOT optional is
+   * the binding itself — for an `SO-` reference the draw door resolves the
+   * line and refuses by name when more than one could be meant, so a
+   * reservation against a Sales Order is never stored without one.
+   */
+  orderLineId: z.string().uuid().nullish(),
   // K4 (0292) — the same locked reason the oldest-unit door asks for. Both
   // doors draw from the same pool, so both must answer the same question.
   reason: opsStockReserveReasonSchema,

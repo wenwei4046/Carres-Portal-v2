@@ -121,7 +121,7 @@ export function useOpenWorkSet(): OpenWorkSet {
     items,
     staff,
     staffById,
-    loading: query.isLoading,
+    loading: !query.isError && (query.isLoading || !query.data),
     error: query.isError,
   };
 }

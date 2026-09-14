@@ -15,6 +15,12 @@ import {
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type DeliveryProofReviewRow,
+  type DeliveryAttemptEvidenceRow,
+  type ProofReviewInput,
+  type SignedDoAttachInput,
+  type LoanOfferRow,
+  type LoanOfferRecordInput,
   type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
@@ -144,10 +150,6 @@ import {
   type RawCreateOrderInput,
   type DealerSelf,
   type BankStatementCreateInput,
-  type FinanceInvoiceIssueInput,
-  type FinanceInvoiceVoidInput,
-  type FinancePoPayInput,
-  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
@@ -193,9 +195,7 @@ import {
   type TopUpOrderInput,
   type CreateStripeCheckoutInput,
   type StripeCheckoutSessionInfo,
-  type TransferReadyInput,
   type UpdateOrderInput,
-  type WarehousePickInput,
   type DeliveryStop,
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
@@ -293,6 +293,11 @@ import {
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
   type BookingBrief,
+  // DELIVERY MONITOR (2026-09-11) — the arrival + allocation facts the orders
+  // list now carries, defined ONCE in shared so the Worker and the browser
+  // cannot describe the same wire two different ways.
+  type PoArrival,
+  type AllocatedUnit,
   type SupplierClaimMove,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
@@ -307,9 +312,19 @@ import {
   type SupplierCreateInput,
   type PurchasingSupplierCollectionSetting,
   type OperationWorkResponse,
+  type DeliveryContactRow,
+  type DeliveryCannotDeliverRow,
+  type DeliveryContactInput,
+  type OperationCannotDeliverInput,
+  type PartnerCoverage,
+  type HandoverPoint,
+  type PartnerServices,
+  type ProofRules,
+  type DeliveryTemplateRow,
+  type DeliverySettingChangeRow,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
-import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
+import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -439,6 +454,11 @@ export const qk = {
      *  urls. Nested under the order id, same blunt-invalidate family. */
     deliveryPhotos: (id: string) =>
       ["operation", "orders", id, "delivery-photos"] as const,
+    /** The signed Delivery Order on file, signed for VIEWING on demand (owner
+     *  ruling 2026-09-11). Keyed by the DOCUMENT, because that is the door the
+     *  operator opened, even though the artefact is the order's. */
+    signedDeliveryDocument: (idOrNumber: string) =>
+      ["operation", "delivery-orders", idOrNumber, "signed-document"] as const,
     /** T9 (migration 0283) — what the order's carrier says about ONE candidate
      *  delivery date. Keyed by the date so picking another day is a fresh
      *  question, not a stale answer. */
@@ -460,6 +480,9 @@ export const qk = {
      * modules. The cache key stays under the order so every existing order
      * invalidation refreshes the projection without creating a new owner. */
     orderRoute: (id: string) => ["operation", "orders", id, "route"] as const,
+    /** 【DELIVERY】 CARD 19 — the document word resolved to the id, keyed by
+     *  the number the URL carried. */
+    orderByNumber: (so: number) => ["operation", "orders", "by-number", so] as const,
     partners:  () => ["operation", "partners"] as const,
     suppliers: () => ["operation", "suppliers"] as const,
     pos:       (filters?: operationPoFilters) =>
@@ -573,15 +596,11 @@ export const qk = {
     poReport: () => ["operation", "pos", "report"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
-  // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
-  // ripples to dashboard summary + payments list + AR aging) or a tighter
-  // sub-tree.
+  // and `operation` so mutations can blast `["finance"]` (e.g. a receipt
+  // ripples to the invoice and payment registers) or a tighter sub-tree.
   finance: {
-    dashboardSummary: () => ["finance", "dashboard-summary"] as const,
     arAging:          () => ["finance", "ar-aging"] as const,
     apAging:          () => ["finance", "ap-aging"] as const,
-    cashflow:         (weeks?: number) =>
-      ["finance", "cashflow", weeks ?? 12] as const,
     monthlyPl:        (months?: number) =>
       ["finance", "monthly-pl", months ?? 6] as const,
     topSkus:          (limit?: number) =>
@@ -594,6 +613,14 @@ export const qk = {
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
     invoiceRegister: () => ["finance", "invoice-register"] as const,
+    /** Every open storage case (the Monitor's Storage cell). */
+    storageCases: () => ["finance", "storage-cases", "all"] as const,
+    /** Every customer later-date request (the Monitor's pending free request). */
+    laterDeliveryRequests: () => ["finance", "later-delivery-requests", "all"] as const,
+    /** Settings → Payments (banks · methods · timing · storage · changes). */
+    paymentSettings: () => ["finance", "payment-settings"] as const,
+    /** 0489 — one order's collection owner (normal · cover · history). */
+    collectionOwner: (orderId: string) => ["finance", "collection-owner", orderId] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -722,6 +749,7 @@ export interface FinanceRefundsFilters {
 // payloads; no need for a domain layer for these aggregates since they're
 // read-only dashboard data, never round-tripped through adapters).
 // ---------------------------------------------------------------------------
+// No route reaches the AR aging read any more; FinancePayments/FinanceInvoices still import these types.
 export interface FinanceArAgingRow {
   order_id:      string;
   so:            number;
@@ -746,10 +774,10 @@ export interface FinanceArAgingResponse {
   buckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
 }
 
-// AP aging — finance_ap_aging() RPC payload (migration 0063). Single
-// round-trip returns per-PO rows + bucket aggregates so FinanceAP and the
-// dashboard ready-to-pay tile never disagree. pay_status_ui is a derived
-// 5-value bucket; the raw db enum (pay_status) only has 3 values.
+// AP aging — finance_ap_aging() RPC payload (migration 0063). pay_status_ui
+// is a derived 5-value bucket; the raw db enum (pay_status) only has 3 values.
+// No route reaches the AP aging read any more (/finance/ap redirects to
+// /finance/ap-outstanding); FinanceAP/APDrawer still import these types.
 export type FinanceApPayStatusUi =
   | "matched"
   | "scheduled"
@@ -775,7 +803,6 @@ export interface FinanceApAgingRow {
   supplier_id:         string | null;
   supplier_name:       string | null;
   warehouse_id:        string | null;
-  delivery_partner_id: string | null;
   placed_at:           string;
   expected_ready_date: string | null;
   eta_date:            string | null;
@@ -799,13 +826,6 @@ export interface FinanceApAgingBucket {
 export interface FinanceApAgingResponse {
   rows:        FinanceApAgingRow[];
   byPayStatus: Record<FinanceApPayStatusUi, FinanceApAgingBucket>;
-}
-
-// Cashflow series (Chunk B) — finance_cashflow_series RPC payload.
-export interface FinanceCashflowSeries {
-  labels:  string[];   // ["W18", "W19", ...]
-  inflow:  number[];   // positive numbers per week
-  outflow: number[];   // negative numbers per week (proto convention)
 }
 
 // Monthly P&L (Chunk B) — finance_monthly_pl RPC payload.
@@ -887,12 +907,6 @@ export interface FinanceReconSuggestResponse {
     reference:      string | null;
   };
   candidates: FinanceReconCandidate[];
-}
-export interface FinanceDashboardSummary {
-  ar:           { outstanding: number; count: number; overdueAmt: number; overdueCount: number };
-  ap:           { dueAmt: number; count: number };
-  cashflow12w:  { inflow: number; outflow: number; net: number };
-  agingBuckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
 }
 export interface FinancePaymentRow {
   id:           string;
@@ -2946,6 +2960,27 @@ export interface operationOrderListRow {
   po_skus?: string[];
   /** Purchase-order identities linked by purchase_orders.so / so_refs. */
   po_numbers?: string[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts, one entry per purchase
+   * order serving this order: its status, the SKUs it still owes, OUR
+   * production-plus-transit prediction (`eta_date`), the immutable
+   * supplier-facing original (`official_delivery_date`) and the latest recorded
+   * supplier reply. RECORDED DATES ONLY — the state and every word come from
+   * the ONE shared reader (`deliveryArrivalStateOf`).
+   *
+   * OPTIONAL, and `undefined` must behave as "we do not know", never as "there
+   * is no purchase order": a browser on this build against an older Worker
+   * prints the governed absence instead of accusing a supplier.
+   */
+  po_arrivals?: PoArrival[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the register rows physically reserved or
+   * sold to THIS order, batched once for the whole page. The counting is
+   * `deliveryStockReadinessOf`'s, matched under `normalizeSkuKey` — the same
+   * rule `resolveUnitAllocation` applies. Optional for the same
+   * degrade-do-not-crash reason as `po_arrivals`.
+   */
+  allocated_units?: AllocatedUnit[];
   delivery_partner_id: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey
@@ -3037,7 +3072,17 @@ export interface operationOrderListRow {
    *  older Worker that does not select them raises nothing (UNKNOWN never
    *  accuses). */
   order_finance_exceptions?: { status: "open" | "cleared" }[];
-  ops_sofa_loans?: { status: "on_loan" | "returned" }[];
+  /** 0362 — the delivery payment approvals; Monitor's `Payment` cell reads
+   *  `paymentApprovalOpensGate` over them for the authoritative COD line
+   *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
+  order_delivery_payment_approvals?: { status: string }[];
+  ops_sofa_loans?: {
+    status: "on_loan" | "returned";
+    /** 0492 (Card 15) — the loaned Unit, for `Loan {Unit ID} · collect back on delivery day`. */
+    item_id?: string | null;
+    loan_note_no?: string | null;
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
+  }[];
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */
   order_annotations: { content: string; tag: string | null; created_at: string }[];
@@ -3050,6 +3095,28 @@ export interface operationOrderListRow {
 }
 
 export interface SalesOrderExpansionResponse {
+  /** Exact stock Unit -> originating PO, resolved through its PO line. */
+  unitCoverage?: Record<string, string | null>;
+  /**
+   * ⭐ WHICH ITEM LINE A UNIT ANSWERS, AS STORED (0471; carried 2026-09-11).
+   *
+   * `ops_stock_items.reserved_order_line_id` for every Unit this order holds,
+   * and `null` for a Unit that carries no binding — a pre-0471 reservation
+   * whose line was never recorded. The two are DIFFERENT facts and a screen
+   * must be able to tell them apart: an exact association is evidence, an
+   * unrecorded one is an unresolved association, and neither is a guess to be
+   * printed as the other. Optional, so a browser on this build against an
+   * older Worker reads it as absent and says the association is unknown rather
+   * than inventing one.
+   */
+  unitLines?: Record<string, string | null>;
+  /**
+   * Unit -> `unit` | `quantity` (0453). A COUNTED row has no identity at all,
+   * and its technical `QTY-` key must never reach a `Unit ID` heading
+   * (`unit-identity.ts`). Optional: absent, the shared rule falls back to the
+   * stored code's own shape, which is the same backstop it has always used.
+   */
+  unitScopes?: Record<string, string>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has
@@ -3062,6 +3129,10 @@ export interface SalesOrderExpansionResponse {
     lineId: string;
     sku: string;
     unitIds: string[];
+    /** Order/SKU evidence without a proven link to this configured line. */
+    unverifiedUnitIds?: string[];
+    verifiedUnitIds?: string[];
+    unitQuantityMismatch?: boolean;
     deliverTo: Array<{ name: string; qty: number }>;
   }>;
 }
@@ -3076,6 +3147,23 @@ export function useSalesOrderExpansion(orderId: string | null) {
     staleTime: 30_000,
   });
 }
+/**
+ * ONE raw entry of `ops_order_control.delivery_photos` as PostgREST returns
+ * it — the ledger a driver's submission lands in (0280).
+ *
+ * `doNumber` and `kind` are ABSENT on every entry recorded before the
+ * 2026-09-11 driver-submission ruling, which is why both are optional here and
+ * why an absent `doNumber` is read as *names no delivery order* rather than
+ * *belongs to all of them* (`driverSubmissionOf`).
+ */
+export interface DeliveryLedgerEntry {
+  path: string;
+  at: string;
+  by: string | null;
+  doNumber?: string | null;
+  kind?: "photo" | "video" | null;
+}
+
 export interface opsRemarkEmbed {
   // Optional (C2): the list no longer renders these remark fields in-row, and
   // test fixtures build partial overlays (e.g. just `balance`), so they're not
@@ -3128,7 +3216,7 @@ export interface opsRemarkEmbed {
    *  older Worker that doesn't select the column, or no overlay row at all), and
    *  the queue stays silent; an explicit `[]` is the real "no photo yet". Only
    *  paths ride the list — a signed view URL is minted per click in the drawer. */
-  delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+  delivery_photos?: DeliveryLedgerEntry[] | null;
   /** T8 delivery groups (migration 0282) — what the LIVE booking covers.
    *  `null`/absent = the trip carries the whole order (T8's own definition, so
    *  there is nothing to backfill); T11's detail pane reads it to name the
@@ -3235,6 +3323,11 @@ export interface operationOrderDetailOrder {
    *  ready_to_dispatch / dispatched stages (operation records the customer's
    *  final balance payment at delivery). */
   paid: number;
+  /** Saved at-sale facts; never synthesized into a ledger transaction. */
+  payment_method?: string | null;
+  installment_months?: number | null;
+  approval_code?: string | null;
+  payment_slip_url?: string | null;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
   /** STAGE 1 — who sold it. The Sales Order workspace names the salesperson on
@@ -3379,7 +3472,7 @@ export interface operationOrderDetailResponse {
    *  needs. Deliberately NOT folded into `order`: the workspace EDIT form
    *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
   control?: {
-    delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+    delivery_photos?: DeliveryLedgerEntry[] | null;
   } | null;
 }
 
@@ -4938,6 +5031,23 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /**
+   * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
+   * THAT document's own quantity and destination (settled design, owner
+   * ruling 2026-09-11: "each quantity must correspond to its actual
+   * goods/source allocation… never repeat the entire request quantity on
+   * every PO allocation").
+   *
+   * `po_ids` above is the SET of documents and says nothing about how much
+   * went onto each — which is why the expansion used to print the whole
+   * request quantity beside a comma-joined list of numbers. Empty means
+   * nothing has been issued for this line yet. Absent on an older API.
+   */
+  allocations?: Array<{
+    poId: string;
+    qty: number;
+    destinationId: string | null;
+  }>;
   /** Card 06 — the SERVER date projection (the browser performs no
    *  working-day arithmetic): the line's effective Delivery Date, its
    *  derived Order By (null is a real answer, never a guessed one), and the
@@ -4954,7 +5064,14 @@ export interface ManualPurchaseRegisterPayload {
   /** Every PO the lines' lineage names — id → the actual po_no — plus the
    *  Card 06 issuance-completion fact: whether the CURRENT version has
    *  confirmed-sent evidence (`po_sends`, 0378). */
-  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  pos: Array<{
+    id: string;
+    po_no: string;
+    sent?: boolean;
+    /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
+    official_delivery_date?: string | null;
+    supplier_id?: string | null;
+  }>;
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
@@ -4968,7 +5085,8 @@ export interface ManualPurchaseRegisterPayload {
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
-   *  `ops_manager` duty holder(s), by name. */
+   *  `purchasing_approver` Duty holder(s) by name, falling back to
+   *  `ops_manager` only while that duty has no active holder (0474). */
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
@@ -5542,6 +5660,24 @@ export function useOperationOrders(
 }
 
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
+/**
+ * 【DELIVERY】 CARD 19 — the operator's document word (`SO-1362`) resolved to
+ * the order's id through the one by-number door. The object page calls this
+ * ONCE for a number URL and then re-enters by the id, so every other read
+ * still happens by the id (Law C — one door, never a second fan-in).
+ */
+export function useSalesOrderIdByNumber(so: number | null) {
+  return useQuery({
+    queryKey: so ? qk.operation.orderByNumber(so) : (["operation", "orders", "by-number", "null"] as const),
+    queryFn: () =>
+      apiFetch<{ id: string; so: number }>(`/api/operation/orders/by-number/${so}`),
+    enabled: so !== null,
+    /* A miss is a fact about the number, not a flake — no retry. */
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
 export function useOperationOrder(
   id: string | null,
   opts?: Partial<UseQueryOptions<operationOrderDetailResponse>>,
@@ -5677,7 +5813,12 @@ export interface SalesOrderRouteFactsResponse {
   claims: SalesOrderRouteClaim[];
   financeExceptions: SalesOrderRouteFinanceException[];
   paymentApprovals: DeliveryPaymentApprovalRow[];
+  /** 0492 (Card 15) — the loan offer conversation on the Sales Order. */
+  loanOffers: LoanOfferView[];
 }
+
+/** One loan-offer record as the API returns it, with the offered Unit's ID. */
+export type LoanOfferView = LoanOfferRow & { unit_id: string | null };
 
 /**
  * The Order Route's read fan-in. Every request goes to the existing owning
@@ -5700,7 +5841,7 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals] =
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals, loanOffers] =
         await Promise.all([
           apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
           apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
@@ -5714,6 +5855,7 @@ export function useSalesOrderRouteFacts(
           // reads, so the canvas and the refusal can never disagree (Law D).
           apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
           apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
+          apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
         ]);
       const receiving = await receivingPromise;
       return {
@@ -5727,6 +5869,7 @@ export function useSalesOrderRouteFacts(
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
         financeExceptions,
         paymentApprovals,
+        loanOffers: loanOffers.offers,
       };
     },
     enabled: !!orderId && open,
@@ -6855,6 +6998,8 @@ export interface DeliveryOrderRow {
   id: string;
   order_id?: string;
   do_number: string;
+  /** 0491 — 0 the whole-order trip; 1..n one leg of the order's Journey. */
+  leg?: number | null;
   issued_at: string;
   trip_groups: string[] | null;
   delivery_date: string | null;
@@ -6873,8 +7018,13 @@ export interface DeliveryOrderRow {
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
     /** The signed DO on file (0087) — the `Upload signed Delivery Order`
-     *  queue's canonical fact (register correction 2026-09-06). */
+     *  queue's canonical fact (register correction 2026-09-06) — and its
+     *  clock, one of the §6.1 files that can reopen the review question. */
+    do_number?: string | null;
     do_file_path?: string | null;
+    do_uploaded_at?: string | null;
+    /** 0156 — the order's Journey legs, when it travels in legs. */
+    delivery_stops?: DeliveryStop[] | null;
     /** The order's goods lines — the register expansion derives THIS TRIP's
      *  lines from them via `trip_groups` (one arithmetic with the DO page). */
     order_lines?: Array<{
@@ -6886,13 +7036,17 @@ export interface DeliveryOrderRow {
     /** T6 (0280) — the delivery-photo ledger; PostgREST may embed the overlay
      *  as an object or a one-row array. null/absent = UNKNOWN, never empty. */
     ops_order_control?:
-      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }
-      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }[]
+      | { delivery_photos?: DeliveryLedgerEntry[] | null }
+      | { delivery_photos?: DeliveryLedgerEntry[] | null }[]
       | null;
   };
 }
 export interface DeliveryOrderAttemptRow {
+  /** 0344's row id — the Delivery Visit a §6.1 evidence file binds to. */
+  id?: string;
   do_number: string | null;
+  /** 0491 — the scope the result belongs to. */
+  leg?: number | null;
   result: "delivered" | "partial" | "failed";
   reason_key: string | null;
   note?: string | null;
@@ -6900,16 +7054,22 @@ export interface DeliveryOrderAttemptRow {
   recorded_at: string;
   recorded_by?: string | null;
 }
-/** One §4 handover fact (0363) as the register needs it — the kind alone. */
+/** One §4 handover fact (0363) as the register needs it — the kind, and its
+ *  clock for Monitor's `Collected {date} {time}` line (§8.4). */
 export interface DeliveryHandoverKindRow {
   delivery_order_id: string;
   kind: DeliveryHandoverKind;
+  recorded_at?: string | null;
 }
 
 export interface DeliveryOrdersRegisterPayload {
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
+  /** §6.1 (0489) — Operation's reviews and the per-attempt evidence clocks.
+   *  Absent on an older Worker = unknown, read as no review recorded. */
+  proofReviews?: DeliveryProofReviewRow[];
+  attemptEvidence?: DeliveryAttemptEvidenceRow[];
 }
 /**
  * THE STOCK REGISTER — the one current listing of controlled Units
@@ -6958,9 +7118,17 @@ export function useStockUnit(unitCode: string | undefined) {
  * window, in one read. The workspace joins them by `${order_id}#${leg}`.
  */
 export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
+export type { DeliveryProofReviewRow, DeliveryAttemptEvidenceRow } from "@carres/shared";
+export type { DeliveryCannotDeliverRow } from "@carres/shared";
 
 export interface DeliveryArrangementsPayload {
   arrangements: DeliveryArrangementRow[];
+  /** Every customer-contact record (0487) — the status ladder reads the
+   *  latest per scope. Optional: an older Worker carries none. */
+  contacts?: DeliveryContactRow[];
+  /** Every recorded `Cannot Deliver` (0417) — Reports → Delivery's partner
+   *  measure. Absent = the read failed or an older Worker: `Not available`. */
+  cannotDeliver?: DeliveryCannotDeliverRow[];
 }
 
 export function useDeliveryArrangements() {
@@ -6998,6 +7166,8 @@ export interface DeliveryArrangementDetail {
   };
   arrangement: DeliveryArrangementRow | null;
   history: DeliveryArrangementEventRow[];
+  /** This scope's contact records, newest first (0487). */
+  contacts?: DeliveryContactRow[];
 }
 
 export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
@@ -7009,6 +7179,83 @@ export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
       ),
     enabled: Boolean(orderId),
     staleTime: 10_000,
+  });
+}
+
+/* ── DELIVERY SETTINGS (0488, Delivery MASTER §11) — one read, section doors ── */
+export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
+  active?: boolean;
+  address?: string | null;
+  customer_phone?: string | null;
+  office_contact?: string | null;
+  coverage?: PartnerCoverage | null;
+  kv_default?: boolean;
+  cutoff_time?: string | null;
+  handover_points?: HandoverPoint[] | null;
+  services?: PartnerServices | null;
+  customer_contact_by?: "partner" | "operation";
+  record_on_behalf_allowed?: boolean;
+  proof_rules?: ProofRules | null;
+  operating_party_id?: string | null;
+}
+export interface DeliverySettingsResponse {
+  partners: DeliverySettingsPartnerRow[];
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  vehicles: Array<{
+    id: string;
+    partner_id: string;
+    plate: string;
+    vehicle_type: string;
+    capacity: string | null;
+    driver_name: string | null;
+    driver_phone: string | null;
+    active: boolean;
+  }>;
+  templates: DeliveryTemplateRow[];
+  changes: DeliverySettingChangeRow[];
+  partnerAccounts: Array<{ id: string; name: string | null; email: string; partner_id: string | null; status: string }>;
+  canEdit: boolean;
+  contactLeadWorkingDays: number | null;
+}
+export const DELIVERY_SETTINGS_QUERY_KEY = ["operation", "delivery-settings"] as const;
+export function useDeliverySettings() {
+  return useQuery<DeliverySettingsResponse, ApiError>({
+    queryKey: DELIVERY_SETTINGS_QUERY_KEY,
+    queryFn: () => apiFetch<DeliverySettingsResponse>("/api/operation/delivery-settings"),
+    staleTime: 30_000,
+  });
+}
+
+/** The ONE customer-contact door (0487, Delivery MASTER §5.1). */
+export function useRecordDeliveryContact(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeliveryContactInput) =>
+      apiFetch<{ contact: DeliveryContactRow }>(
+        `/api/operation/delivery-arrangements/${orderId}/contacts?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+    },
+  });
+}
+
+/** Operation records the partner's Cannot Deliver on its behalf (§8.6). */
+export function useRecordCannotDeliver(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OperationCannotDeliverInput) =>
+      apiFetch<{ reported: boolean }>(
+        `/api/operation/delivery-arrangements/${orderId}/cannot-deliver?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
   });
 }
 
@@ -7076,11 +7323,54 @@ export interface DeliveryOrderDetailPayload {
       pod_signed_by: string | null;
       pod_signed_at: string | null;
       do_number: string | null;
+      /** 0156 — the order's Journey legs; a leg document names its own. */
+      delivery_stops?: DeliveryStop[] | null;
+      /** Card 16 — the site facts and the source warehouse, Sales' own columns. */
+      warehouse_id?: string | null;
+      warehouses?: { name: string | null } | { name: string | null }[] | null;
+      delivery_floor?: number | null;
+      delivery_has_lift?: boolean | null;
+      delivery_stair_items?: string | null;
+      building_type?: string | null;
+      ops_order_control?:
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }[]
+        | null;
       order_lines: Array<{ sku: string; qty: number }>;
     };
   };
+  /** 0424 — the document's recorded exact-Unit scope, resolved to Unit IDs. */
+  scopeUnits?: Array<{ item_id: string; unit_code: string | null; sku: string | null }>;
+  handoverEventUnits?: Array<{ event_id: string; item_id: string; recorded_side: string; unit_code: string | null }>;
   attempts: DeliveryOrderAttemptRow[];
   lineDescriptions: Record<string, string>;
+  /** Card 16 (Delivery MASTER §9) — the seven sections' owned facts. All
+   *  optional: an older Worker answers without them, and the page states the
+   *  absence rather than inventing a value. */
+  arrangement?: {
+    id: string;
+    leg: number;
+    partner_id: string | null;
+    confirmed_date: string | null;
+    confirmed_time: string | null;
+    expected_arrival: string | null;
+    logistics_note: string | null;
+    driver_name: string | null;
+    vehicle: string | null;
+    condo_registration: string | null;
+    delivery_partners?: { id: string; name: string } | { id: string; name: string }[] | null;
+  } | null;
+  financeExceptions?: Array<{ id: string; status: "open" | "cleared"; reason: string; opened_at: string | null; cleared_at: string | null }>;
+  paymentApprovals?: Array<{ id: string; status: "pending" | "approved" | "refused"; request_reason: string; requested_at: string | null; decided_at: string | null; decision_reason: string | null }>;
+  siblingDocuments?: Array<{ id: string; do_number: string; leg?: number | null; issued_at: string; voided_at: string | null; void_reason: string | null }>;
+  /** null = the Cases could not be read (another module's table), never "none". */
+  serviceCases?: Array<{ id: string; case_no: string; status_id: string | null; opened_at: string | null }> | null;
+  history?: Array<{ id: string; text: string; by_role: string | null; occurred_at: string }>;
+  /** §6.1 (0489) — the Evidence section's facts: every file bound to the
+   *  attempt it proves (signed for viewing) and every review with its
+   *  reviewer's name. */
+  proofReviews?: Array<DeliveryProofReviewRow & { reviewed_by_name: string | null }>;
+  attemptEvidence?: Array<DeliveryAttemptEvidenceRow & { url: string | null }>;
   loans: Array<{
     id: string;
     item_id: string | null;
@@ -7089,6 +7379,8 @@ export interface DeliveryOrderDetailPayload {
     loaned_at: string | null;
     returned_at: string | null;
     loan_note_no: string | null;
+    /** 0492 (Card 15) — the loaned Unit's identity. */
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
   }>;
   handoverEvents: DeliveryHandoverEventRow[];
 }
@@ -7111,6 +7403,28 @@ export interface DeliveryHandoverEventRow {
   recorded_by_name: string | null;
   recorded_at: string;
   proofUrl: string | null;
+}
+
+/**
+ * The signed Delivery Order, signed for VIEWING (owner ruling 2026-09-11).
+ *
+ * ON DEMAND, never with the list: a signed url lives one hour, so minting one
+ * per register row would hand out hundreds of expiring links nobody clicks.
+ * `{ url: null }` is a truthful answer — this document has no signed paper —
+ * and is NOT an error.
+ */
+export function useSignedDeliveryDocument(idOrNumber: string | null, enabled: boolean) {
+  return useQuery<{ url: string | null; uploadedAt: string | null }, ApiError>({
+    queryKey: qk.operation.signedDeliveryDocument(idOrNumber ?? ""),
+    queryFn: () =>
+      apiFetch<{ url: string | null; uploadedAt: string | null }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}/signed-document`,
+      ),
+    enabled: Boolean(idOrNumber) && enabled,
+    /* Signed urls live 1h; refresh well inside that. */
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
 }
 
 export function useDeliveryOrder(idOrNumber: string | null) {
@@ -7164,6 +7478,54 @@ export function useRecordDeliveryAttempt(
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (0489) — the three review acts, through the governed door. The DO
+ *  page, the register and Monitor all re-read: a review moves the row's
+ *  queue and its status colour. */
+export function useReviewDeliveryProof(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ review: unknown }, ApiError, ProofReviewInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ review: unknown }, ApiError, ProofReviewInput>({
+    mutationFn: (input) =>
+      apiFetch<{ review: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/proof-review`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (Card 13) — the signed Delivery Order filed against a delivered or
+ *  partially delivered document. Touches no status and no stock, so only the
+ *  document reads and the order tree are re-read. */
+export function useAttachSignedDeliveryOrder(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ attached: unknown }, ApiError, SignedDoAttachInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ attached: unknown }, ApiError, SignedDoAttachInput>({
+    mutationFn: (input) =>
+      apiFetch<{ attached: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/signed-document`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -7341,16 +7703,25 @@ export function useDeliveryPhotos(
  *  tree. */
 export function useUploadDeliveryPhoto(
   orderId: string,
-  opts?: Partial<UseMutationOptions<OpsOrderControl, Error, Blob>>,
+  opts?: Partial<UseMutationOptions<OpsOrderControl, Error, Blob>> & {
+    /** The Delivery Order the file came back from (owner ruling 2026-09-11).
+     *  The SERVER verifies it belongs to this order. Omitted = the submission
+     *  names no trip — an honest unknown, never a guess. */
+    doNumber?: string | null;
+  },
 ) {
   const qc = useQueryClient();
+  const doNumber = opts?.doNumber ?? null;
   return useMutation<OpsOrderControl, Error, Blob>({
-    mutationFn: (file) => uploadDeliveryPhoto(orderId, file),
+    mutationFn: (file) => uploadDeliveryProof(orderId, file, { doNumber }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: qk.operation.deliveryPhotos(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      /* The register's own read carries the ledger, so a new submission must
+         refresh it too or the count stays a version behind. */
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -7442,17 +7813,22 @@ export function useAssignOrderStaff(
 // ===========================================================================
 // Balance job (migration 0184) — payment ledger + storage collect / waiver.
 // ===========================================================================
+/** The ledger as the endpoint returns it. */
+export interface OrderPaymentsResponse {
+  payments: OrderPaymentRow[];
+}
+
 /** Read the order's payment ledger (newest first). `null` id disables. */
 export function useOrderPayments(
   orderId: string | null,
-  opts?: Partial<UseQueryOptions<{ payments: OrderPaymentRow[] }>>,
+  opts?: Partial<UseQueryOptions<OrderPaymentsResponse>>,
 ) {
   return useQuery({
     queryKey: orderId
       ? qk.operation.orderPayments(orderId)
       : (["operation", "orders", "null", "payments"] as const),
     queryFn: () =>
-      apiFetch<{ payments: OrderPaymentRow[] }>(
+      apiFetch<OrderPaymentsResponse>(
         `/api/operation/orders/${orderId}/payments`,
       ),
     enabled: !!orderId,
@@ -7751,30 +8127,6 @@ export function useRevertOrderDispatchMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 in_production). */
-export function useWarehousePickMutation(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<operationOrderMutationResponse, ApiError, WarehousePickInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationOrderMutationResponse, ApiError, WarehousePickInput>({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/warehouse`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 /** Pipeline v2 (C2 / migration 0024) — confirm a `confirmed` order.
  *  RPC `operation_confirm_proceed_request` decides in_production vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
@@ -7933,49 +8285,6 @@ export function usePartnerIncomingOrders() {
     queryKey: qk.partner.incoming(),
     queryFn: () => apiFetch<PartnerIncomingResponse>("/api/partner/orders/incoming"),
     refetchInterval: 15_000,
-  });
-}
-
-/** Pipeline v2 (C2 / migration 0024) — flip a `confirmed` or
- *  `in_production` order directly to `ready_to_dispatch`. Wraps
- *  `operation_warehouse_pick` whose source-stage guard widens to permit both
- *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
- *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
- *  RPC, do not conflate). Reserves stock; busts warehouse cache. */
-export function useTransferReady(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<
-      operationOrderMutationResponse,
-      ApiError,
-      TransferReadyInput
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    operationOrderMutationResponse,
-    ApiError,
-    TransferReadyInput
-  >({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/transfer-ready`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
   });
 }
 
@@ -8417,33 +8726,24 @@ export function useReassignPoWarehouseMutation(
 // Phase 5 — Finance hooks (queries + mutations)
 // ---------------------------------------------------------------------------
 // Server contract:
-//   GET   /api/finance/reports/dashboard-summary  -> FinanceDashboardSummary
-//   GET   /api/finance/reports/ar-aging           -> FinanceArAgingResponse
-//   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
+//   GET   /api/finance/invoices/register          -> InvoiceRegisterRow[] (paged, fail-closed)
+//   GET   /api/finance/payments/register          -> PaymentRegisterRow[] (paged, fail-closed)
+//   GET   /api/finance/reports/monthly-pl|top-skus
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
-//   POST  /api/finance/invoices/issue             mutation -> invoices row
-//   POST  /api/finance/invoices/:id/void          mutation -> invoices row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
 //   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
+//
+// Money owed has ONE arithmetic: customer Outstanding comes from the invoice
+// register through `soRemaining`, supplier Unpaid from
+// /api/finance/payables/outstanding — both read through
+// pages/finance/money-owed.ts. The old dashboard-summary and cashflow reads
+// (finance_dashboard_summary / finance_cashflow_series) are gone.
 //
 // Each mutation invalidates the relevant qk.finance.* keys + ripples to
 // related namespaces (e.g. topup-approve invalidates principal.approvals
 // since it mutates an approval row, plus dealer caches since deposit_balance
 // changes).
-
-function toFinancePaymentsSearch(f?: FinancePaymentsFilters): string {
-  if (!f) return "";
-  const p = new URLSearchParams();
-  if (f.orderId)   p.set("orderId",   f.orderId);
-  if (f.dealerId)  p.set("dealerId",  f.dealerId);
-  if (f.direction) p.set("direction", f.direction);
-  if (f.from)      p.set("from",      f.from);
-  if (f.to)        p.set("to",        f.to);
-  if (f.limit)     p.set("limit",     String(f.limit));
-  const qs = p.toString();
-  return qs ? `?${qs}` : "";
-}
 
 function toFinanceInvoicesSearch(f?: FinanceInvoicesFilters): string {
   if (!f) return "";
@@ -8469,17 +8769,7 @@ function toFinanceRefundsSearch(f?: FinanceRefundsFilters): string {
   return qs ? `?${qs}` : "";
 }
 
-export function useFinanceDashboardSummary(
-  opts?: Partial<UseQueryOptions<FinanceDashboardSummary>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.dashboardSummary(),
-    queryFn: () => apiFetch<FinanceDashboardSummary>("/api/finance/reports/dashboard-summary"),
-    staleTime: 30_000,
-    ...opts,
-  });
-}
-
+// No route reaches this any more (/finance/ar reads the invoice register); FinancePayments/FinanceInvoices still import it.
 export function useFinanceArAging(
   opts?: Partial<UseQueryOptions<FinanceArAgingResponse>>,
 ) {
@@ -8491,6 +8781,7 @@ export function useFinanceArAging(
   });
 }
 
+// No route reaches this any more (/finance/ap redirects to /finance/ap-outstanding); FinanceAP still imports it.
 export function useFinanceApAging(
   opts?: Partial<UseQueryOptions<FinanceApAgingResponse>>,
 ) {
@@ -8498,21 +8789,6 @@ export function useFinanceApAging(
     queryKey: qk.finance.apAging(),
     queryFn: () => apiFetch<FinanceApAgingResponse>("/api/finance/reports/ap-aging"),
     staleTime: 30_000,
-    ...opts,
-  });
-}
-
-export function useFinanceCashflow(
-  weeks?: number,
-  opts?: Partial<UseQueryOptions<FinanceCashflowSeries>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.cashflow(weeks),
-    queryFn: () =>
-      apiFetch<FinanceCashflowSeries>(
-        `/api/finance/reports/cashflow${weeks ? `?weeks=${weeks}` : ""}`,
-      ),
-    staleTime: 60_000,
     ...opts,
   });
 }
@@ -8631,17 +8907,101 @@ export function useInvoiceRegister() {
   });
 }
 
-export function useFinancePayments(
-  filters?: FinancePaymentsFilters,
-  opts?: Partial<UseQueryOptions<FinancePaymentRow[]>>,
-) {
+/**
+ * The Payment Monitor's three source reads beside the invoice register
+ * (owner ruling 2026-09-12). Each is the owning module's own wire, read
+ * whole: the Monitor derives its Storage cell from the same cases and
+ * requests the Invoice object's Storage section reads, and its clock from
+ * the same effective timing rules Settings shows — never a second store.
+ */
+export function usePaymentStorageCases() {
   return useQuery({
-    queryKey: qk.finance.payments(filters),
-    queryFn: () => apiFetch<FinancePaymentRow[]>(`/api/finance/payments${toFinancePaymentsSearch(filters)}`),
+    queryKey: qk.finance.storageCases(),
+    queryFn: () => apiFetch<{
+      cases: import("@carres/shared/payment-monitor").MonitorStorageCase[];
+    }>("/api/finance/payment-storage"),
     staleTime: 15_000,
-    ...opts,
   });
 }
+
+export function useLaterDeliveryRequests() {
+  return useQuery({
+    queryKey: qk.finance.laterDeliveryRequests(),
+    queryFn: () => apiFetch<{
+      requests: Array<import("@carres/shared/payment-monitor").MonitorFreeRequest & {
+        id: string; requested_date: string;
+      }>;
+    }>("/api/finance/payment-storage/later-delivery-requests"),
+    staleTime: 15_000,
+  });
+}
+
+export interface PaymentSettingsPayload {
+  bank_accounts: Array<{
+    route_source: "pj_showroom" | "dealer"; bank_name: string;
+    account_name: string | null; account_no: string | null;
+  }>;
+  storage_rules: Array<{
+    id: string; product_group: "mattress_bedframe" | "sofa"; free_days: number;
+    charge_amount: number; cycle_days: number; operation_limit_day: number | null;
+    waiver_limit_day: number | null; extra_free_allowed: boolean; inspection_days: number;
+    effective_from: string;
+  }>;
+  /** 0486 — newest effective first; the head is the current rule. */
+  collection_timing: Array<{
+    id: string; ask_days_before: number; deadline_days_before: number;
+    effective_from: string; reason: string | null; created_at: string;
+  }>;
+  setting_changes: Array<{
+    id: string; what: string; old_value: Record<string, unknown> | null;
+    new_value: Record<string, unknown> | null; reason: string | null;
+    effective_from: string | null; changed_at: string;
+    actor: { name: string | null } | { name: string | null }[] | null;
+  }>;
+  online_provider: { name: string; configured: boolean };
+}
+
+/**
+ * 0489 — the order's collection owner: the Responsible Delivery Operation,
+ * normal owner · today's cover · acting person · handover history, from the
+ * same `payment_collection_owner_context` the Work feed reads.
+ */
+export function useCollectionOwner(orderId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.finance.collectionOwner(orderId ?? "none"),
+    queryFn: () => apiFetch<{ owner: import("@carres/shared/payment-collection-owner").CollectionOwnerContextRow | null }>(
+      `/api/finance/collection-owner?orderId=${encodeURIComponent(orderId ?? "")}`,
+    ),
+    enabled: enabled && !!orderId,
+    staleTime: 15_000,
+  });
+}
+
+/** The order's recorded collection results (0446) — promises, disputes,
+ *  no-answers — read by Communication History so a cover or a new owner
+ *  sees every earlier conversation before contacting the customer. */
+export function useCollectionOutcomes(invoiceId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["finance", "collection-outcomes", invoiceId ?? "none"],
+    queryFn: () => apiFetch<{ outcomes: Array<import("@carres/shared/payment-collection-outcome").CollectionOutcomeRow & {
+      recorded_by_user?: { name: string | null } | null;
+    }> }>(`/api/finance/invoices/${encodeURIComponent(invoiceId ?? "")}/collection-outcomes`),
+    enabled: !!invoiceId,
+    staleTime: 15_000,
+  });
+}
+
+export function usePaymentSettings() {
+  return useQuery({
+    queryKey: qk.finance.paymentSettings(),
+    queryFn: () => apiFetch<PaymentSettingsPayload>("/api/finance/payment-settings"),
+  });
+}
+
+// useFinancePayments is gone: it read the legacy `payments` table, so a
+// receipt recorded from the AR drawer (which lands in `order_payments`) never
+// showed in the drawer's own history. The drawer reads the invoice register's
+// `order_payments` instead.
 
 // Invoice row shape (matches the `invoices` table in 0001:409-420).
 export interface FinanceInvoiceRow {
@@ -8714,7 +9074,7 @@ export function useRecordReceipt(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      // orders.paid bumped + new payment inserted. AR aging shifts.
+      // A new order_payments row: both registers and Outstanding move.
       await qc.invalidateQueries({ queryKey: ["finance"] });
       await qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -8722,45 +9082,10 @@ export function useRecordReceipt(
   });
 }
 
-export function useIssueInvoice(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceIssueInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceIssueInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/invoices/issue", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // orders.invoice_no + invoiced_at set; new invoices row.
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
-      await qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useVoidInvoice(
-  invoiceId: string,
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceVoidInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceVoidInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>(`/api/finance/invoices/${invoiceId}/void`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0476 — useIssueInvoice / useVoidInvoice are gone with their doors. POST
+// /api/finance/invoices/issue and /:id/void answer 410: a Sales Invoice is
+// issued from the order (Generate invoice) or at dispatch, and corrected by
+// void and replace (/api/finance/invoices/:id/void-replace).
 
 export function useCreateRefund(
   opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
@@ -8803,45 +9128,9 @@ export function useRefundPay(
   });
 }
 
-export function usePoPay(
-  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
-    mutationFn: (input) =>
-      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status='paid' + new outbound payments row. Ripples to
-      // ap-aging, dashboard summary, payments list.
-      await qc.invalidateQueries({ queryKey: ["finance"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function usePoSchedule(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/payments/po-schedule", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
-      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
-      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
+// routes answer 410 — a supplier is paid by a Payment Voucher
+// (lib/payables-queries.ts), the one door money leaves by.
 
 export function useCreateBankStatement(
   opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,
@@ -8897,9 +9186,10 @@ export function useApplyCreditNote(
       // The target order's outstanding balance is conceptually reduced
       // but Phase 5 V1 doesn't auto-deduct on the order side — that
       // happens on next checkout / dealer ack. Invalidate the refunds
-      // list + AR aging so finance sees the CN move to "applied".
+      // list + the invoice register (where Outstanding is read) so finance
+      // sees the CN move to "applied".
       await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
+      await qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -10023,6 +10313,38 @@ export function useMarkUrgentStockOrdered() {
 // ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
 const loansKey = (orderId: string | null) =>
   ["operation", "orders", orderId ?? "null", "loans"] as const;
+
+/** 0492 (Card 15) — the loan offer conversation, newest first. */
+export function useLoanOffers(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "loan-offers"] as const,
+    queryFn: () => apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${orderId}/loan-offers`),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Record the offer, or the customer's answer, through the one Orders door. */
+export function useRecordLoanOffer(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ offer: unknown }, ApiError, LoanOfferRecordInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ offer: unknown }, ApiError, LoanOfferRecordInput>({
+    mutationFn: (input) =>
+      apiFetch<{ offer: unknown }>(`/api/operation/orders/${orderId}/loan-offers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId, "loan-offers"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
 
 /** The order's sofa loans (active + returned). */
 export function useOrderLoans(orderId: string | null) {

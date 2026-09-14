@@ -71,20 +71,22 @@ describe("step 1 asks for the building type", () => {
     const d = validDraft();
     d.customer.buildingType = "";
     expect(step1Valid(d)).toBe(false);
-    expect(step1FirstIssue(d)).toBe("Address — Building type, or tick 'Unknown'");
+    expect(step1FirstIssue(d)).toBe("Address — Building type");
   });
 
   it("passes once it is picked", () => {
     expect(step1Valid(validDraft())).toBe(true);
   });
 
-  it("does NOT ask when the address is deferred", () => {
-    // An address nobody has yet cannot be asked what kind of building it is.
-    // The office door makes the same exception for address_not_given_yet.
+  it("an address can no longer be deferred — the gate asks for the address first (owner ruling 2026-09-13)", () => {
+    // The "Fill in address later" escape is retired: a deferred address is
+    // simply a missing one, named before the building type.
     const d = validDraft();
     d.customer.addressUnknown = true;
+    d.customer.addressLine1 = "";
     d.customer.buildingType = "";
-    expect(step1Valid(d)).toBe(true);
+    expect(step1Valid(d)).toBe(false);
+    expect(step1FirstIssue(d)).toBe("Address — Line 1 (≥5 chars)");
   });
 
   it("names the building type only AFTER the address parts", () => {
@@ -94,6 +96,6 @@ describe("step 1 asks for the building type", () => {
     const d = validDraft();
     d.customer.addressPostcode = "";
     d.customer.buildingType = "";
-    expect(step1FirstIssue(d)).toBe("Address — Postcode, or tick 'Unknown'");
+    expect(step1FirstIssue(d)).toBe("Address — Postcode");
   });
 });

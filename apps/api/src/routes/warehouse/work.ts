@@ -34,9 +34,10 @@ export async function loadWarehouseWork(c: Context<AppEnv>): Promise<OperationWo
   const internal = new Hono<AppEnv>();
   internal.use("*", async (child, next) => { child.set("auth", c.var.auth); await next(); });
   internal.route("/delivery-arrangements", deliveryArrangementsRouter);
-  const scheduleResponse = await internal.request("/delivery-arrangements/warehouse-schedule");
+  const scheduleResponse = await internal.request("/delivery-arrangements/warehouse-schedule", {}, c.env);
   if (!scheduleResponse.ok) throw new Error("Warehouse Outbound source could not be read");
   const schedule = await scheduleResponse.json() as { events: DeliveryWarehouseScheduleEvent[] };
+  if (!Array.isArray(schedule.events)) throw new Error("Warehouse Outbound source could not be read");
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("warehouse_my_outbound_assignments");

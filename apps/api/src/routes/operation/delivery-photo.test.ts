@@ -54,6 +54,9 @@ function tableMock(read: Result, write?: Result) {
   const b: any = {
     select: vi.fn(() => b),
     eq: vi.fn(() => b),
+    in: vi.fn(() => b),
+    order: vi.fn(() => b),
+    limit: vi.fn(() => b),
     upsert: vi.fn(() => b),
     maybeSingle: vi.fn().mockResolvedValue(read),
     single: vi.fn().mockResolvedValue(write ?? read),
@@ -62,6 +65,11 @@ function tableMock(read: Result, write?: Result) {
   };
   return b;
 }
+
+/** No recorded delivery result — the default for every gate test. */
+const NO_ATTEMPTS: Result = { data: [], error: null };
+/** A recorded result that REACHED the customer (delivered or partial). */
+const REACHED_ATTEMPT: Result = { data: [{ result: "partial" }], error: null };
 
 function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
   return {
@@ -151,10 +159,13 @@ describe("POST /delivery-photo/sign-upload", () => {
     expect(res.status).toBe(403);
   });
 
-  it("refuses a not-yet-delivered order (the photo proves a delivery that happened)", async () => {
+  it("refuses an order whose goods never reached the customer", async () => {
     vi.mocked(userClient).mockReturnValue(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      makeSb({ orders: tableMock(UNDELIVERED_ORDER) }) as any,
+      makeSb({
+        orders: tableMock(UNDELIVERED_ORDER),
+        delivery_attempts: tableMock(NO_ATTEMPTS),
+      }) as any,
     );
     const res = await post(`${BASE}/delivery-photo/sign-upload`, await makeJwt("operation"), {
       mimeType: "image/jpeg",
@@ -163,6 +174,56 @@ describe("POST /delivery-photo/sign-upload", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("not_delivered");
+  });
+
+  /**
+   * ⭐ THE DEFECT THIS TEST EXISTS TO KEEP DEAD (found 2026-09-11).
+   * `delivery_attempt_record` never touches `orders.operation_stage`, so a
+   * PARTIALLY DELIVERED trip sat in the register's own `Upload delivery photo`
+   * queue behind a door that refused every file. A queue nobody can empty is
+   * worse than no queue.
+   */
+  it("admits a partial delivery — the goods reached the customer even though the order is not closed", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeSb({
+        orders: tableMock(UNDELIVERED_ORDER),
+        delivery_attempts: tableMock(REACHED_ATTEMPT),
+      }) as any,
+    );
+    const { admin } = makeAdmin();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue(admin as any);
+    const res = await post(`${BASE}/delivery-photo/sign-upload`, await makeJwt("operation"), {
+      mimeType: "image/jpeg",
+      sizeBytes: 1000,
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("signs a VIDEO too, under the same prefix and its own ceiling", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      makeSb({ orders: tableMock(DELIVERED_ORDER) }) as any,
+    );
+    const { admin } = makeAdmin();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue(admin as any);
+    const res = await post(`${BASE}/delivery-photo/sign-upload`, await makeJwt("operation"), {
+      mimeType: "video/mp4",
+      sizeBytes: 20 * 1024 * 1024,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { path: string };
+    expect(body.path.endsWith("-delivery.mp4")).toBe(true);
+  });
+
+  it("a PHOTO over 10 MB is still refused, whatever the video ceiling is", async () => {
+    const res = await post(`${BASE}/delivery-photo/sign-upload`, await makeJwt("operation"), {
+      mimeType: "image/jpeg",
+      sizeBytes: 20 * 1024 * 1024,
+    });
+    expect(res.status).toBe(422);
   });
 
   it("signs a server-generated key under the order's own prefix", async () => {
@@ -186,7 +247,7 @@ describe("POST /delivery-photo/sign-upload", () => {
     expect(createSignedUploadUrl).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects a non-photo mime", async () => {
+  it("rejects a mime that is neither a photo nor a video", async () => {
     const res = await post(`${BASE}/delivery-photo/sign-upload`, await makeJwt("operation"), {
       mimeType: "application/pdf",
       sizeBytes: 1000,
@@ -205,10 +266,13 @@ describe("POST /delivery-photo/attach", () => {
     expect(res.status).toBe(422);
   });
 
-  it("refuses a not-yet-delivered order", async () => {
+  it("refuses an order whose goods never reached the customer", async () => {
     vi.mocked(userClient).mockReturnValue(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      makeSb({ orders: tableMock(UNDELIVERED_ORDER) }) as any,
+      makeSb({
+        orders: tableMock(UNDELIVERED_ORDER),
+        delivery_attempts: tableMock(NO_ATTEMPTS),
+      }) as any,
     );
     const res = await post(`${BASE}/delivery-photo/attach`, await makeJwt("operation"), {
       path: GOOD_PATH,
@@ -216,6 +280,68 @@ describe("POST /delivery-photo/attach", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("not_delivered");
+  });
+
+  /**
+   * ⭐ THE SUBMISSION NAMES ITS DOCUMENT, AND THE SERVER CHECKS THE NAME
+   * (owner ruling 2026-09-11). A client may ask; it may never assert.
+   */
+  it("stamps the verified DO number and the file's kind onto the ledger entry", async () => {
+    const control = tableMock(
+      { data: { delivery_photos: [] }, error: null },
+      { data: { order_id: ORDER_ID, delivery_photos: [] }, error: null },
+    );
+    const sb = makeSb({
+      orders: tableMock(DELIVERED_ORDER),
+      ops_delivery_orders: tableMock({ data: { do_number: "DO-1" }, error: null }),
+      ops_order_control: control,
+      /* §6.1 (0489) — the latest recorded attempt of the named document. */
+      delivery_attempts: tableMock({ data: { id: "attempt-1" }, error: null }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const res = await post(`${BASE}/delivery-photo/attach`, await makeJwt("operation"), {
+      path: GOOD_PATH,
+      doNumber: "DO-1",
+      kind: "video",
+    });
+    expect(res.status).toBe(201);
+    /* The SAME act binds the file to the Delivery Visit it proves (§6.1). */
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_attempt_evidence_record", {
+      p_attempt_id: "attempt-1",
+      p_path: GOOD_PATH,
+      p_kind: "video",
+    });
+    expect(((await res.json()) as { evidenceBound: boolean }).evidenceBound).toBe(true);
+    const upsertArg = control.upsert.mock.calls[0][0] as {
+      delivery_photos: { doNumber: string | null; kind: string }[];
+    };
+    expect(upsertArg.delivery_photos[0].doNumber).toBe("DO-1");
+    expect(upsertArg.delivery_photos[0].kind).toBe("video");
+    /* The activity line names the kind and the trip. */
+    expect(sb.rpc).toHaveBeenCalledWith("operation_add_annotation", {
+      p_order_id: ORDER_ID,
+      p_content: "Delivery video uploaded · DO-1",
+      p_tag: null,
+    });
+  });
+
+  it("refuses a DO number that is not one of THIS order's documents", async () => {
+    const sb = makeSb({
+      orders: tableMock(DELIVERED_ORDER),
+      ops_delivery_orders: tableMock({ data: null, error: null }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const res = await post(`${BASE}/delivery-photo/attach`, await makeJwt("operation"), {
+      path: GOOD_PATH,
+      doNumber: "DO-SOMEONE-ELSE",
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { field: string };
+    expect(body.field).toBe("doNumber");
   });
 
   it("appends to the ledger, returns the control, and writes the activity line", async () => {
@@ -241,12 +367,20 @@ describe("POST /delivery-photo/attach", () => {
 
     // The upsert carried the OLD entries + the new server-stamped one.
     const upsertArg = control.upsert.mock.calls[0][0] as {
-      delivery_photos: { path: string; at: string; by: string | null }[];
+      delivery_photos: {
+        path: string;
+        at: string;
+        by: string | null;
+        doNumber: string | null;
+      }[];
     };
     expect(upsertArg.delivery_photos).toHaveLength(2);
     expect(upsertArg.delivery_photos[0].path).toBe(existing[0].path);
     expect(upsertArg.delivery_photos[1].path).toBe(GOOD_PATH);
     expect(upsertArg.delivery_photos[1].by).toBe("u1");
+    /* No document named = no document stamped. An unstated fact stays
+       unstated; it is never filled in with a guess. */
+    expect(upsertArg.delivery_photos[1].doNumber).toBeNull();
 
     // Activity: the annotation door was called with the plain-English line.
     expect(sb.rpc).toHaveBeenCalledWith("operation_add_annotation", {

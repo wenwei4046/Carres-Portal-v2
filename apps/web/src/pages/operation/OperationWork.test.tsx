@@ -130,6 +130,32 @@ describe("Operation Work — one server feed", () => {
       .toBeInTheDocument();
   });
 
+  it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
+    workState.data!.items = [item({
+      id: "delivery:order-1:assign_logistics",
+      module: "delivery",
+      ruleKey: "assign_logistics",
+      action: "Assign logistics",
+      owner: {
+        rule: "delivery_duty",
+        dutyKey: "delivery_duty",
+        normal: null,
+        activeCover: null,
+        acting: null,
+        state: "not_assigned",
+      },
+    })];
+    show();
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const group = screen.getByTestId("work-owner-group-duty:delivery_duty");
+    expect(within(group).getByText("Delivery Duty")).toBeInTheDocument();
+    expect(group).not.toHaveTextContent("Shasha");
+    const failure = within(group).getByTestId("work-duty-unassigned-delivery_duty");
+    expect(failure).toHaveTextContent("Nobody holds Delivery Duty.");
+    expect(within(failure).getByRole("link", { name: "Set the holder in Workspace → Staff & Duties" }))
+      .toHaveAttribute("href", "/operation?tab=staff-duties");
+  });
+
   it("opens the exact destination supplied by the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));

@@ -73,7 +73,31 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ payments: data ?? [] });
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  /* WHO RECORDED IT, AS A NAME (Sales Order payment card, 2026-09-10). The
+     ledger stores `recorded_by` as a user id, and a uuid on screen tells an
+     operator nothing about who to ask. The SO PDF already resolves the same
+     column the same way (`routes/orders.ts` — "COLLECTED BY"), so this is that
+     lookup, not a second rule.
+     FAIL-SOFT: an unreadable or missing `app_users` row leaves the name null
+     and the screen prints `Not recorded`. A name is context; losing it must
+     never cost the operator the ledger itself. */
+  const recorderNames = new Map<string, string>();
+  const recorderIds = [...new Set(rows.map((r) => r.recorded_by).filter(Boolean).map(String))];
+  if (recorderIds.length > 0) {
+    const { data: users } = await sb.from("app_users").select("id, name").in("id", recorderIds);
+    for (const u of (users ?? []) as Array<{ id: unknown; name: unknown }>) {
+      if (u?.id != null && u?.name != null) recorderNames.set(String(u.id), String(u.name));
+    }
+  }
+
+  return c.json({
+    payments: rows.map((r) => ({
+      ...r,
+      recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
+    })),
+  });
 });
 
 // POST /:id/payments — record one payment through the ONE writer (CARD 4,

@@ -35,6 +35,8 @@ import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
 import PaymentSettings from "./PaymentSettings";
 import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
+import DeliverySettings from "./DeliverySettings";
+import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 
 /**
  * A GROUP MAY OWN MORE THAN ONE ROW (Warehouse, 2026-09-09).
@@ -55,6 +57,16 @@ const SECTIONS = [
     group: "Warehouse",
     items: WAREHOUSE_SETTINGS_SECTIONS.map((s) => ({
       slug: `warehouse/${s.slug}`,
+      label: s.label,
+    })),
+  },
+  /* 【DELIVERY】 CARD 12 — one `Delivery` group of four rows (Delivery MASTER
+     §11): `Logistics Partners` · `Delivery Rules` · `Message Templates` ·
+     `Access`, on the Warehouse Settings grammar. */
+  {
+    group: "Delivery",
+    items: DELIVERY_SETTINGS_SECTIONS.map((s) => ({
+      slug: `delivery/${s.slug}`,
       label: s.label,
     })),
   },
@@ -174,6 +186,9 @@ export default function SettingsWorkspace() {
           <Route path="issue-tracker" element={<IssueTrackerSettings />} />
           <Route path="warehouse" element={<Navigate to="details" replace />} />
           <Route path="warehouse/:section" element={<WarehouseSettings />} />
+          <Route path="delivery" element={<Navigate to="partners" replace />} />
+          <Route path="delivery/partners/:partnerId/:partnerSection?" element={<DeliverySettings />} />
+          <Route path="delivery/:section" element={<DeliverySettings />} />
         </Routes>
       </div>
     </div>

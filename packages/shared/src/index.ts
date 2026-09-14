@@ -401,6 +401,11 @@ export {
   supplierCreateInput,
   supplierSlug,
   type SupplierCreateInput,
+  // 0477 — an other creditor (landlord, advertiser) is Finance's row in
+  // `suppliers`; every Purchasing, Catalog and Operation list drops it.
+  OTHER_CREDITOR_KIND,
+  isOtherCreditor,
+  purchasingSuppliersOnly,
   // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
   // that quoted it; the supplier_id slot stays the routing truth.
   skuSupplierOfferSchema,
@@ -508,7 +513,6 @@ export {
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -520,7 +524,6 @@ export {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
@@ -541,7 +544,6 @@ export {
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
   type AbandonOrderInput,
-  type WarehousePickInput,
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
@@ -552,7 +554,6 @@ export {
   type ReselectPartnerInput,
   type LpAcceptOrderInput,
   type LpRejectOrderInput,
-  type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
@@ -602,6 +603,13 @@ export {
   type MonthlyPlQuery,
   type TopSkusQuery,
   type RefundApplyInput,
+} from "./schemas/finance";
+
+// The read-only Finance Ledger (Journal · Trial Balance · Self-check).
+export {
+  ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery,
+  type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
 export {
@@ -862,6 +870,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  planOpsAssignment,
+  type OpsAssignmentCandidate,
   seenTodayMYT,
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
@@ -881,6 +891,11 @@ export {
   deliveryPhotoSchema,
   DELIVERY_PHOTO_MIMES,
   DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_VIDEO_MIMES,
+  DELIVERY_VIDEO_MAX_BYTES,
+  DELIVERY_PROOF_MIMES,
+  DELIVERY_PROOF_EXTENSION,
+  isDeliveryVideoMime,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
   deliveryPhotoListResponseSchema,
@@ -941,6 +956,8 @@ export {
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
+  orderActionLines,
+  type OrderActionLines,
   orderActionQueue,
   purchasingActionButton,
   purchasingActionDone,
@@ -1591,6 +1608,14 @@ export * from "./order-activity";
 export {
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  // 0476 — a payment method is a key; the registry lives in Settings → Payment.
+  PAYMENT_METHOD_KEY_RE,
+  paymentMethodKeySchema,
+  paymentMethodSaveInput,
+  type PaymentMethodKey,
+  type PaymentMethodRegistryRow,
+  type PaymentMoneyAccount,
+  type PaymentMethodSaveInput,
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,
@@ -2053,11 +2078,24 @@ export {
 // `Created` belongs to the Register and may never appear on the workspace.
 export {
   deliveryWorkStatusOf,
-  DELIVERY_WORK_STATUS_LABEL,
+  deliveryWorkStatusLabelOf,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  LOGISTICS_ROLE_WORD,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
+  type DeliveryWorkStatusTone,
+  type DeliveryStatusSpell,
 } from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
 // nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
@@ -2085,6 +2123,10 @@ export {
   type DeliveryArrangementRow,
   type DeliveryArrangementEventRow,
   type ChangeLogisticsReasonKey,
+  operationCannotDeliverInput,
+  type OperationCannotDeliverInput,
+  type DeliveryCannotDeliverRow,
+  cannotDeliverReasonLabel,
 } from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
@@ -2345,6 +2387,9 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
+  soBatchToBuyState,
+  type SoBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,
@@ -2388,6 +2433,32 @@ export {
   type SoBatchSelectionSummary,
   type AllocationCheck,
 } from "./so-batch-purchase";
+export {
+  READY_STOCK_BLOCKED_WORDS,
+  READY_STOCK_CONDITION_ABSENT,
+  READY_STOCK_CONDITION_WORDS,
+  READY_STOCK_REFUSAL_WORDS,
+  manualPurchaseReadyStockGroupSchema,
+  manualPurchaseReadyStockResponseSchema,
+  readyStockConditionWord,
+  readyStockIdentityScopeSchema,
+  readyStockLineSchema,
+  readyStockOwnershipSchema,
+  readyStockPickSchema,
+  readyStockRefusalWord,
+  readyStockReserveInputSchema,
+  readyStockReserveResultSchema,
+  readyStockResponseSchema,
+  readyStockUnitSchema,
+  type ManualPurchaseReadyStockGroup,
+  type ManualPurchaseReadyStockResponse,
+  type ReadyStockLine,
+  type ReadyStockPick,
+  type ReadyStockReserveInput,
+  type ReadyStockReserveResult,
+  type ReadyStockResponse,
+  type ReadyStockUnit,
+} from "./so-batch-ready-stock";
 export {
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
@@ -3006,6 +3077,11 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
+// surface must read it: the recorded purchase-order dates, the latest supplier
+// reply, the exact per-line shortage, and ONE arrival state over them. It
+// computes no arrival date — `expectedArrivalOf` already did, once.
+export * from "./delivery-arrival";
 
 /**
  * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
@@ -3031,19 +3107,29 @@ export * from "./work-engine";
 // Workspace foundation — company-wide owner-Duty assignments, cover resolution,
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
+export * from "./workspace-duties-catalogue";
+export * from "./delivery-contact";
+export * from "./delivery-settings";
+export * from "./delivery-proof";
+export * from "./schemas/loan-offer";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./sales-order-work-source";
 export * from "./storage-obligation";
 export * from "./payment-collection-outcome";
+export * from "./payment-monitor";
+export * from "./payment-collection-owner";
 export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 
 export { recordSupplierReplyInput } from "./schemas/operation";
 
-export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+export {
+  purchaseOrderReplyWorkItems,
+  purchaseOrderArrivalCheckWorkItems,
+} from "./purchase-order-register";
 
 export * from "./warehouse-inbound";
 

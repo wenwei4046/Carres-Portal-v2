@@ -7,6 +7,7 @@ import {
   delayDecisionInput,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
+  DELIVERY_PROOF_EXTENSION,
   type DeliveryPhoto,
   deliveryAttemptRecordInputSchema,
   isSundayIso,
@@ -37,6 +38,8 @@ import {
   type StockEtaImportResult,
   type SofaLoanDto,
   type BalancePayStatus,
+  loanOfferRecordInput,
+  unitIdOf,
 } from "@carres/shared";
 import { loadBookingContext } from "../../lib/booking-context";
 import {
@@ -188,6 +191,34 @@ orderControlRouter.put("/:id/control", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+  // 0504 — ONLY A PERSON CARRIES A CUSTOMER (owner ruling 2026-09-13). The
+  // responsible Operation person is answerable for the follow-up, the balance
+  // and the storage collection, so the assignment must name an ACTIVE
+  // INDIVIDUAL — a People record with a `staff_code`. A shared login or a robot
+  // account may record evidence and never owns; the responsibility read ignores
+  // one, which would leave the order silently unowned.
+  if ("assigned_staff" in parsed.data && parsed.data.assigned_staff != null) {
+    const { data: person } = await sb
+      .from("app_users")
+      .select("status, role, staff_code")
+      .eq("id", parsed.data.assigned_staff)
+      .maybeSingle();
+    const owns =
+      !!person &&
+      (person.status ?? "active") === "active" &&
+      (person.role === "operation" || person.role === "principal") &&
+      person.staff_code != null;
+    if (!owns) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: "The order can only be assigned to an active Operation person",
+        },
+        422,
+      );
+    }
+  }
   // Staff owner (0232): assigned_by / assigned_at are SERVER-stamped whenever
   // the assigned_staff key rides the patch — never trusted from the client.
   const assignStamp =
@@ -728,8 +759,8 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
   const { data, error } = await sb.rpc("delivery_attempt_record", {
     p_order_id: idCheck.data,
     p_result: parsed.data.result,
-    p_reason_key: parsed.data.reasonKey,
-    p_where_goods: parsed.data.whereGoods,
+    p_reason_key: parsed.data.reasonKey ?? null,
+    p_where_goods: parsed.data.whereGoods ?? null,
     p_note: parsed.data.note ?? null,
     p_delivered_item_ids: parsed.data.deliveredItemIds,
     p_returned: parsed.data.returned.map((r) => ({
@@ -737,6 +768,8 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
       action: r.action,
       note: r.note ?? null,
     })),
+    // 0491 — the Delivery scope: a Journey leg records its own result.
+    p_leg: parsed.data.leg,
   });
   if (error) {
     const m = mapPgError(error);
@@ -1002,11 +1035,23 @@ orderControlRouter.get("/:id/booking/partner-check", async (c) => {
 // ops were never a working path for HQ here (same admin-signing pattern as
 // partner/pod.ts's 2026-05-13 path + the 0279 rental signature upload).
 
-/** The T6 gate: a delivery photo proves a delivery that HAPPENED — the order
- *  must read delivered before anything may be signed or attached. Same two
- *  signals the drawer's own delivered chip folds (orders.operation_stage /
- *  orders.status). Returns a Response to send, or null when the gate passes. */
-async function refuseUnlessDelivered(
+/**
+ * The T6 gate: a delivery photo proves a delivery that HAPPENED.
+ *
+ * ⭐ THE GATE FOLLOWS THE RECORDED RESULT, NOT ONLY THE ORDER STAGE (defect
+ * found while wiring the 2026-09-11 driver-submission ruling). It used to ask
+ * one question — is the ORDER delivered? — and `delivery_attempt_record`
+ * never touches `orders.operation_stage`, so a **Partially Delivered** trip
+ * sat in the register's own `Upload delivery photo` queue behind a door that
+ * refused every file. A queue nobody can empty is worse than no queue.
+ *
+ * The gate now asks what `missingDeliveryProofOf` asks: did goods REACH the
+ * customer? That is the order reading delivered, OR a recorded
+ * `delivered`/`partial` result. A failed trip still owes no delivery photo
+ * and is still refused here. Returns a Response to send, or null when the gate
+ * passes.
+ */
+async function refuseUnlessReachedCustomer(
   c: Context<AppEnv>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
@@ -1022,20 +1067,56 @@ async function refuseUnlessDelivered(
     return c.json(m.body, m.status);
   }
   if (!order) throw new HTTPException(404, { message: "Order not found" });
-  const delivered =
-    order.operation_stage === "delivered" || order.status === "delivered";
-  if (!delivered) {
-    return c.json(
-      {
-        error: "not_delivered",
-        code: "not_delivered",
-        message:
-          "A delivery photo can only be attached once the order is delivered",
-      },
-      422,
-    );
+  if (order.operation_stage === "delivered" || order.status === "delivered") {
+    return null;
   }
-  return null;
+  const attempts = await sb
+    .from("delivery_attempts")
+    .select("result")
+    .eq("order_id", orderId)
+    .in("result", ["delivered", "partial"])
+    .limit(1);
+  if (attempts.error) {
+    const m = mapPgError(attempts.error);
+    return c.json(m.body, m.status);
+  }
+  if ((attempts.data ?? []).length > 0) return null;
+  return c.json(
+    {
+      error: "not_delivered",
+      code: "not_delivered",
+      message:
+        "A delivery photo can only be attached once the goods have reached the customer",
+    },
+    422,
+  );
+}
+
+/**
+ * ⭐ THE SUBMISSION NAMES ITS DOCUMENT, AND THE SERVER CHECKS THE NAME
+ * (owner ruling 2026-09-11).
+ *
+ * A client may say which Delivery Order a file came back from; it may not
+ * INVENT one. The number must be a document of THIS order — so a photo can
+ * never be stamped onto another order's trip, and a register counting per
+ * document counts recorded facts only. `null` = the caller named no
+ * document, which stays a legal (and pre-ruling) state.
+ */
+async function verifiedDoNumberOf(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  doNumber: string | undefined,
+): Promise<{ value: string | null } | { refusal: "unknown_do" }> {
+  if (!doNumber) return { value: null };
+  const { data, error } = await sb
+    .from("ops_delivery_orders")
+    .select("do_number")
+    .eq("order_id", orderId)
+    .eq("do_number", doNumber)
+    .maybeSingle();
+  if (error || !data) return { refusal: "unknown_do" };
+  return { value: (data as { do_number: string }).do_number };
 }
 
 // POST /:id/delivery-photo/sign-upload — short-lived signed upload URL into
@@ -1069,15 +1150,11 @@ orderControlRouter.post("/:id/delivery-photo/sign-upload", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
 
-  const ext =
-    parsed.data.mimeType === "image/png"
-      ? "png"
-      : parsed.data.mimeType === "image/webp"
-        ? "webp"
-        : "jpg";
+  /* ONE mime → extension map, shared with the handover door (Law D). */
+  const ext = DELIVERY_PROOF_EXTENSION[parsed.data.mimeType] ?? "jpg";
   const path = `order/${idCheck.data}/${crypto.randomUUID()}-delivery.${ext}`;
   const admin = adminClient(c.env);
   const { data, error } = await admin.storage
@@ -1131,8 +1208,22 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
+
+  /* The named document must be one of THIS order's own (2026-09-11). */
+  const doCheck = await verifiedDoNumberOf(sb, idCheck.data, parsed.data.doNumber);
+  if ("refusal" in doCheck) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "That delivery order does not belong to this order",
+        field: "doNumber",
+      },
+      422,
+    );
+  }
 
   const { data: ctrl, error: ctrlErr } = await sb
     .from("ops_order_control")
@@ -1150,6 +1241,8 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     path: parsed.data.path,
     at: new Date().toISOString(),
     by: auth.id,
+    doNumber: doCheck.value,
+    kind: parsed.data.kind ?? "photo",
   };
 
   const { data, error } = await sb
@@ -1169,17 +1262,50 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     return c.json(m.body, m.status);
   }
 
+  // §6.1 (0489) — the SAME act binds the file to the Delivery Visit it proves:
+  // the latest recorded attempt of the named document. One door, two records
+  // (the ledger the register counts, the evidence the review judges). FAIL-
+  // SOFT for the same reason as the audit line below: the ledger write already
+  // happened, and the response says whether the binding did.
+  let evidenceBound = false;
+  if (doCheck.value) {
+    const latest = await sb
+      .from("delivery_attempts")
+      .select("id")
+      .eq("do_number", doCheck.value)
+      .in("result", ["delivered", "partial"])
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const attemptId = (latest.data as { id: string } | null)?.id ?? null;
+    if (attemptId) {
+      const bound = await sb.rpc("delivery_attempt_evidence_record", {
+        p_attempt_id: attemptId,
+        p_path: entry.path,
+        p_kind: entry.kind === "video" ? "video" : "photo",
+      });
+      evidenceBound = !bound.error;
+    }
+  }
+
   // T6 done-when: activity logs it. The 0211 trigger doesn't watch the overlay
   // ledger, so append through the existing SECURITY DEFINER annotation door —
   // FAIL-SOFT (supabase-js reports errors in the result; an audit hiccup must
   // never undo a recorded photo), same as the T4 postpone write.
   await sb.rpc("operation_add_annotation", {
     p_order_id: idCheck.data,
-    p_content: "Delivery photo uploaded",
+    /* The activity line names the file's kind and its trip — an audit reader
+       must be able to tell a video of DO-A from a photo of DO-B. */
+    p_content: [
+      entry.kind === "video" ? "Delivery video uploaded" : "Delivery photo uploaded",
+      doCheck.value ? `· ${doCheck.value}` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     p_tag: null,
   });
 
-  return c.json({ control: data }, 201);
+  return c.json({ control: data, evidenceBound }, 201);
 });
 
 // GET /:id/delivery-photos — the ledger + a short-lived signed VIEW url per
@@ -1649,6 +1775,84 @@ orderControlRouter.get("/:id/loans", async (c) => {
   }
   const loans: SofaLoanDto[] = (data ?? []).map((r) => mapLoanRow(r));
   return c.json({ loans });
+});
+
+/**
+ * 0492 (Delivery MASTER §14.2, Card 15) — the loan OFFER and the customer's
+ * answer, recorded on the Sales Order beside the loan itself. Orders owns the
+ * record; Logistics never makes the commercial offer.
+ *
+ *   GET  /:id/loan-offers   the whole history, newest first
+ *   POST /:id/loan-offers   one record through the governed door
+ */
+orderControlRouter.get("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_loan_offers")
+    .select("id, seq, order_id, event, item_id, label, reason, recorded_by, recorded_at, ops_stock_items(unit_code, identity_scope)")
+    .eq("order_id", idCheck.data)
+    .order("seq", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const offers = (data ?? []).map((r) => {
+    const row = r as Record<string, unknown> & {
+      ops_stock_items?: { unit_code?: string | null; identity_scope?: string | null } | null;
+    };
+    const unit = Array.isArray(row.ops_stock_items) ? row.ops_stock_items[0] : row.ops_stock_items;
+    return {
+      id: row.id,
+      seq: row.seq,
+      order_id: row.order_id,
+      event: row.event,
+      item_id: row.item_id ?? null,
+      label: row.label ?? null,
+      reason: row.reason ?? null,
+      recorded_by: row.recorded_by ?? null,
+      recorded_at: row.recorded_at,
+      unit_id: unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
+    };
+  });
+  return c.json({ offers });
+});
+
+orderControlRouter.post("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = loanOfferRecordInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_loan_offer_record", {
+    p_order_id: idCheck.data,
+    p_event: parsed.data.event,
+    p_item_id: parsed.data.itemId ?? null,
+    p_label: parsed.data.label ?? null,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ offer: data }, 201);
 });
 
 /** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */

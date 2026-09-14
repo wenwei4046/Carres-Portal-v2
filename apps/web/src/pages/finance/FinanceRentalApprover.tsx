@@ -210,7 +210,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
           <div className="text-meta text-muted-foreground mt-1">
             {r.customer.name}
             {r.customer.phone ? ` · ${r.customer.phone}` : ""}
-            {r.dealer ? ` · ${r.dealer.name}` : " · HQ direct"}
+            {r.dealer ? <> · <span className="uppercase">{r.dealer.name}</span></> : " · HQ direct"}
             {r.salesperson ? ` · ${r.salesperson.name}` : ""}
           </div>
         </div>

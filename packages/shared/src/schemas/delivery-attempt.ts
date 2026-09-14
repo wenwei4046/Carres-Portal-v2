@@ -31,14 +31,42 @@ export const deliveryAttemptReturnSchema = z.object({
 
 export const deliveryAttemptRecordInputSchema = z
   .object({
-    result: z.enum(["partial", "failed"]),
-    reasonKey: z.enum(DELIVERY_REASON_KEYS),
-    whereGoods: z.enum(DELIVERY_ATTEMPT_WHERE_GOODS),
+    /** 0491 — `delivered` is admitted only for an INTERMEDIATE Journey leg: the
+     *  goods reached the named warehouse. The customer leg's success still
+     *  walks the delivery door. */
+    result: z.enum(["partial", "failed", "delivered"]),
+    reasonKey: z.enum(DELIVERY_REASON_KEYS).nullish(),
+    whereGoods: z.enum(DELIVERY_ATTEMPT_WHERE_GOODS).nullish(),
     note: z.string().trim().max(1000).nullish(),
     deliveredItemIds: z.array(z.string().uuid()).max(100).default([]),
     returned: z.array(deliveryAttemptReturnSchema).max(100).default([]),
+    /** 0491 — the Delivery scope: 0 the whole order, 1..n a Journey leg. */
+    leg: z.number().int().min(0).max(20).default(0),
   })
   .superRefine((v, ctx) => {
+    if (v.result === "delivered") {
+      if (v.leg === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["result"],
+          message: "A full success walks the delivery door — only a Journey leg records its arrival here",
+        });
+      }
+      if (v.deliveredItemIds.length > 0 || v.returned.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deliveredItemIds"],
+          message: "A leg arrival moves no Unit",
+        });
+      }
+      return;
+    }
+    if (!v.reasonKey) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reasonKey"], message: "A non-completed attempt states its reason" });
+    }
+    if (!v.whereGoods) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["whereGoods"], message: "A non-completed attempt states where the goods are" });
+    }
     if (v.result === "partial" && v.deliveredItemIds.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -72,6 +100,8 @@ export interface DeliveryAttemptRow {
   scheduled_date: string | null;
   recorded_by: string | null;
   recorded_at: string;
+  /** 0491 — the scope the result belongs to (absent on older readers = 0). */
+  leg?: number;
 }
 
 export interface DeliveryAttemptUnitRow {

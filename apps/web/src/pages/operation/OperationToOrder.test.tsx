@@ -81,6 +81,10 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean; `false` — nothing of
+       this build sits on an open purchase order — is the ordinary case, and it
+       is what makes the row offerable. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -123,11 +127,11 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
   };
 }
 
-function renderPage() {
+function renderPage(initialEntry = "/operation?tab=purchase") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <OperationToOrder />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -154,6 +158,13 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
+  it("keeps the Sales Order scope when the direct to-order URL is reloaded", async () => {
+    apiFetch.mockResolvedValue(payload());
+    renderPage("/operation/to-order?so=1204");
+    await screen.findByTestId("so-batch-page");
+    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands?so=1204");
+  });
+
   it("opens straight onto the header, the order-timing rail and the Register", async () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
@@ -161,7 +172,9 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("SO Batch Purchase");
     const rail = screen.getByTestId("so-batch-rail");
     expect(rail).toBeInTheDocument();
-    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).not.toBeNull();
+    // ⛔ `TO ORDER / All not ordered` is retired (owner correction 2026-09-11):
+    // it named the page's own default, not a fact about a Sales Order.
+    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).toBeNull();
     // The five timing rows; `SETUP TO FIX` hides while its count is zero.
     expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
     expect(rail.textContent).not.toContain("SETUP TO FIX");
@@ -261,12 +274,14 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     });
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     // Confirmed → back to buying, and the Register re-reads the server. The
-    // ordered Sales Order REMAINS — one permanent row, now reading `Ordered`.
+    // ordered Sales Order REMAINS — one permanent row, now carrying its
+    // document. (`Status` was retired as a presentation on 2026-09-11: the
+    // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
     await waitFor(() =>
-      expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Ordered"),
+      expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );
-    expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041");
+    expect(screen.getByTestId("so-batch-select-o1")).toBeDisabled();
   });
 
   it("the confirmation declares the version the RENDERED document reported", async () => {

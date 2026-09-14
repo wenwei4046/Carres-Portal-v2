@@ -132,7 +132,23 @@ describe("the live definition of each Stage 3 request function", () => {
      * must stay untouched, so a test that scanned every migration would fail
      * forever and get deleted. It has to follow the definition that ships. */
     const live = liveDefinitionOf("sales_order_attribution_live");
-    expect(live.file).toMatch(/^0335_/);
+    /* 0500 re-creates the function to make its role gate refuse a caller with
+     * no role; it is 0335's body with only that gate changed. So the live file
+     * is 0500, and it must still carry every line 0335 wrote about
+     * requested_at — the fix this test exists for. */
+    expect(live.file).toMatch(/^0500_/);
+    const fix = readFileSync(
+      join(MIGRATIONS, readdirSync(MIGRATIONS).find((f) => f.startsWith("0335_"))!),
+      "utf8",
+    );
+    const fixBody = fix.slice(fix.indexOf("create or replace function public.sales_order_attribution_live("));
+    const fixLines = fixBody
+      .slice(0, fixBody.indexOf("$$;") > 0 ? fixBody.indexOf("$$;") : undefined)
+      .split("\n")
+      .filter((l) => l.includes("requested_at"))
+      .map((l) => l.trim());
+    expect(fixLines.length, "0335 names requested_at").toBeGreaterThan(0);
+    for (const l of fixLines) expect(live.body, `0500 keeps 0335's line: ${l}`).toContain(l);
     const zero = readFileSync(
       join(MIGRATIONS, "0330_the_approver_can_see_what_they_are_approving.sql"),
       "utf8",

@@ -1438,6 +1438,7 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
 
   const { data: doc, error } = await sb.rpc("purchasing_po_document", { p_po_id: poId });
   if (error) {
+    console.warn("PO document could not be prepared", { poId, code: error.code, message: error.message, details: error.details });
     // The RPC raises with a machine-readable `detail` (PostgREST → .details).
     const details = String((error as { details?: string }).details ?? "");
     if (details === "po_not_found" || error.code === "42P01") {

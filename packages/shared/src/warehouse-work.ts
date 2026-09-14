@@ -20,7 +20,7 @@ export function projectWarehouseOutboundWork(input: {
     input.assignments.map((a) => [`${a.deliveryOrderId}:${a.siteId}`, a]),
   );
   return input.cards.flatMap((card) => {
-    if (!card.deliveryOrderId || card.notHandedOver === 0) return [];
+    if (!card.deliveryOrderId || card.warehouseSiteId !== input.site.id || card.notHandedOver === 0) return [];
     const accepted = assignmentByScope.get(`${card.deliveryOrderId}:${input.site.id}`) ?? null;
     const recipient = card.driverName || card.logisticsPartner;
     const late = card.eventDate < input.today
@@ -30,7 +30,7 @@ export function projectWarehouseOutboundWork(input: {
       ? { userId: accepted.userId, name: accepted.name }
       : null;
     return [operationWorkItemSchema.parse({
-      id: operationWorkStableId("stock", card.deliveryOrderId, "warehouse.outbound_handover"),
+      id: operationWorkStableId("stock", `${card.deliveryOrderId}:${input.site.id}`, "warehouse.outbound_handover"),
       module: "stock",
       ruleKey: "warehouse.outbound_handover",
       object: { kind: "delivery_order", id: card.deliveryOrderId, label: card.doNumber },

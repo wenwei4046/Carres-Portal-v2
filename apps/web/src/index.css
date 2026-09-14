@@ -489,3 +489,15 @@
     .pos-fab:hover, .pos-fab:active { transform: none; }
   }
 }
+
+/* Finance only — figures carry a PLAIN zero. The slashed/dotted zero reads
+ * as an 8 in money columns, so inside Finance the mono surfaces switch to
+ * Inter tabular figures (oval 0) and the `zero` feature is turned off. */
+.finance-surface code,
+.finance-surface kbd,
+.finance-surface .font-mono,
+.finance-surface .t-num {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "zero" 0;
+  font-variant-numeric: lining-nums tabular-nums;
+}

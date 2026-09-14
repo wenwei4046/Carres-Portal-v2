@@ -212,6 +212,27 @@ export default {
       maxWidth: {
         modal: "512px", // a question, an answer, and two buttons
         "modal-wide": "600px", // a header and a LINE LIST — see above
+        /* ⭐ THE THIRD WIDTH IS A PICTURE, AND IT IS MEASURED (Delivery driver
+         * submission, 2026-09-11). The set stays CLOSED and the value stays
+         * here — a page still cannot type a number — but a modal that shows a
+         * PHOTO is not "a question and two buttons" and not "a line list": its
+         * binding constraint is the height cap above it.
+         *
+         * Measured at 1440×900 against this stylesheet. `max-h-dialog` is 85vh
+         * = 765px; the surface spends 56px on its header, 48px on the viewer's
+         * previous/next row and 32px on padding, leaving 629px of image. A
+         * phone photo is 4:3 (4032×3024 on the cameras Carres drivers carry),
+         * so 629px of height wants 839px of width:
+         *
+         *     width   image box   4:3 at 629px tall fits?
+         *      600       568       NO  — letterboxed, 61px of height wasted
+         *      800       768       NO  — 71px short
+         *      880       848       YES, 9px of headroom
+         *
+         * The algebraic minimum is 871; 880 is the round number above it, and
+         * the headroom is deliberate for the same reason P19's was — box
+         * widths round and text metrics are fractional. */
+        "modal-viewer": "880px", // a PHOTO, sized by the height cap — see above
         drawer: "560px", // a record read beside the list it came from
       },
       maxHeight: {

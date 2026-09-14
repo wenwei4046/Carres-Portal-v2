@@ -171,6 +171,9 @@ export function orderActionChecklist(
     // Finance decision).
     case "collect_loan_item":
       return [closes("collect_loan_item")];
+    // §6.1 (Card 13) — one act: the review itself closes it.
+    case "check_delivery_proof":
+      return [closes("check_delivery_proof")];
     case "resolve_payment_exception":
       return [closes("resolve_payment_exception")];
 

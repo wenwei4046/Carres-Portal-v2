@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { supplierCreateInput, supplierSlug } from "@carres/shared";
+import { purchasingSuppliersOnly, supplierCreateInput, supplierSlug } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -43,7 +43,10 @@ operationSuppliersRouter.get("/", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ suppliers: data ?? [] });
+  /* 0477 — Finance's other creditors (a landlord, an advertiser) share this
+     table. This list feeds the PO, catalog-slot and loan-return pickers, so
+     none of them may offer one. */
+  return c.json({ suppliers: purchasingSuppliersOnly(data ?? []) });
 });
 
 /**

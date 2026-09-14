@@ -76,6 +76,17 @@ const COLLISION_BASELINE = new Set([
      halves touch disjoint objects (Delivery Order units vs
      purchase_requests), so their relative order is immaterial. */
   "0424",
+  /* 0489 · two lanes merged seventeen minutes apart on 2026-09-13 (#1266, then
+     #1267) and both carried an 0489. Both halves are committed, so the rename
+     path is closed (immutability, red line 6) and the pair is baselined the
+     way 0417 and 0424 were. Measured state at baselining: BOTH halves are
+     APPLIED and the tracker defines their order —
+     `one_sales_order_keeps_one_collection_owner` at 07:30 UTC (Payment, a
+     rolled-back probe first) · `proof_is_reviewed_and_every_attempt_keeps_its_evidence`
+     at 08:24 UTC (Delivery). The two halves touch disjoint objects
+     (payment_collection_owners and its three doors vs Delivery proof/attempt
+     evidence), so their relative order is immaterial. */
+  "0489",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
@@ -99,7 +110,30 @@ try {
 } catch {
   console.log("No merge base available; filename validation only.");
 }
-const altered = changed.filter((line) => !line.startsWith("A\t"));
+/**
+ * CORRECTED BEFORE THEY EVER APPLIED (owner ruling 2026-09-10).
+ *
+ * Red line 6 protects APPLIED history. These two files were merged in #1200
+ * and could never apply anywhere: their sanity blocks compared
+ * `pg_get_function_identity_arguments()` — which includes argument NAMES
+ * (`p_order_id uuid, …`) — against a types-only string, so the check raised
+ * on every run and rolled the whole file back. Production was measured at
+ * 0462 with none of 0463's objects present when the correction was made.
+ *
+ * The exemption is pinned to the corrected content (the git blob id), not to
+ * the file name, so any further edit to either file is refused again.
+ */
+const UNAPPLIED_CORRECTIONS = new Map([
+  ["0463_customer_money_reaches_the_ledger.sql", "bed48b6452a27697ae137b526b2c932360b9fff6"],
+  ["0466_an_invoice_is_where_revenue_is_recognised.sql", "9550670bb2965b78ba9b01074c67204b9b677acd"],
+]);
+const isApprovedCorrection = (line) => {
+  const [status, path] = line.split("\t");
+  const approved = UNAPPLIED_CORRECTIONS.get(path?.split("/").pop());
+  if (status !== "M" || !approved) return false;
+  return execFileSync("git", ["rev-parse", `HEAD:${path}`], { encoding: "utf8" }).trim() === approved;
+};
+const altered = changed.filter((line) => !line.startsWith("A\t") && !isApprovedCorrection(line));
 if (altered.length) throw new Error(`Committed migrations are immutable; only new files are allowed:\n${altered.join("\n")}`);
 /**
  * A dollar-quoted body is CODE THIS MIGRATION DEFINES, not SQL it runs.

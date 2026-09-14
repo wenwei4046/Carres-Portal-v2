@@ -1,0 +1,387 @@
+import { Hono, type Context } from "hono";
+import { z } from "zod";
+import {
+  apFileAddInput,
+  apFileSignInput,
+  apReasonInput,
+  otherCreditorInput,
+  paymentVoucherDraftInput,
+  supplierBillDraftInput,
+  type PaymentVoucherDraftInput,
+  type SupplierBillDraftInput,
+} from "@carres/shared/schemas/finance-ap";
+import { requireFinance } from "../../lib/auth-guards";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { userClient } from "../../lib/supabase";
+import type { AppEnv } from "../../types";
+
+/**
+ * /api/finance/payables — what Carres owes, and the one door that pays it
+ * (migration 0477).
+ *
+ *   Suppliers and accounts
+ *     GET  /suppliers                   who can send a bill (suppliers + other creditors)
+ *     POST /other-creditors             supplier_other_creditor_create — a landlord, an advertiser
+ *     GET  /accounts                    ap_account_choices — which account fits which box
+ *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
+ *     GET  /bill-outstanding            ap_bill_outstanding — owed per confirmed bill
+ *
+ *   Bills (a supplier's invoice, entered)
+ *     GET  /bills                       supplier_bill_register
+ *     GET  /bills/grn-candidates        supplier_bill_grn_candidates — GRNs with something left to bill
+ *     GET  /bills/grn-lines/:receiptId  supplier_bill_grn_lines
+ *     GET  /bills/:id                   supplier_bill_document
+ *     POST /bills                       supplier_bill_save_draft (new draft)
+ *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
+ *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
+ *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
+ *
+ *   Payment vouchers (Draft → Prepared → Checked → Approved)
+ *     GET  /vouchers                    payment_voucher_register
+ *     GET  /vouchers/:id                payment_voucher_document
+ *     POST /vouchers                    payment_voucher_save_draft (new draft)
+ *     PUT  /vouchers/:id                payment_voucher_save_draft (rewrite a draft)
+ *     POST /vouchers/:id/prepare|check|approve
+ *     POST /vouchers/:id/reject         back to Draft, with a reason
+ *     POST /vouchers/:id/cancel         cancels; reverses the entry if approved
+ *
+ *   Files (supplier invoices, receipts, bank slips)
+ *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign    signed upload URL
+ *     POST /bills/:id/files       · POST /vouchers/:id/files         record the uploaded file
+ *     GET  /files/url?path=                                          short-lived read URL
+ *
+ * Every call runs as the SIGNED-IN USER (userClient). The database functions
+ * decide every rule, including who may prepare, check and approve; this
+ * router only shapes requests and maps refusals.
+ */
+const payablesRouter = new Hono<AppEnv>();
+
+const AP_BUCKET = "ap-documents";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER";
+
+/** mapPgError, but a 403 keeps the database's reason code (not_finance_approver,
+ *  voucher_cancelled …) so the page can say which rule refused. */
+function pgFail(c: Context<AppEnv>, error: { code?: string; message?: string; details?: string }) {
+  const m = mapPgError(error);
+  if (m.status === 403 && error.details) {
+    return c.json({ ...m.body, code: error.details }, 403);
+  }
+  return c.json(m.body, m.status);
+}
+
+function badId(c: Context<AppEnv>, what: string) {
+  return c.json({ error: "invalid_input", code: "invalid_param", message: `That ${what} id is not valid.` }, 422);
+}
+
+/** `?supplierId=` — absent means everyone; present must be a uuid. */
+function supplierFilter(c: Context<AppEnv>): { ok: true; value: string | null } | { ok: false } {
+  const raw = c.req.query("supplierId");
+  if (raw === undefined || raw === "") return { ok: true, value: null };
+  return UUID_RE.test(raw) ? { ok: true, value: raw } : { ok: false };
+}
+
+function sb(c: Context<AppEnv>) {
+  return userClient(c.env, c.var.auth.jwt);
+}
+
+function billLinesToJson(lines: SupplierBillDraftInput["lines"]) {
+  return lines.map((l) => ({
+    warehouse_receipt_id: l.warehouseReceiptId ?? null,
+    po_line_id: l.poLineId ?? null,
+    account_code: l.accountCode ?? null,
+    description: l.description ?? null,
+    sku: l.sku ?? null,
+    qty: l.qty ?? null,
+    unit_price: l.unitPrice ?? null,
+    amount: l.amount ?? null,
+  }));
+}
+
+function billArgs(billId: string | null, d: SupplierBillDraftInput) {
+  return {
+    p_bill_id: billId,
+    p_supplier_id: d.supplierId,
+    p_supplier_invoice_no: d.supplierInvoiceNo,
+    p_bill_date: d.billDate,
+    p_lines: billLinesToJson(d.lines),
+    p_due_date: d.dueDate ?? null,
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
+  return {
+    p_voucher_id: voucherId,
+    p_purpose: d.purpose,
+    p_supplier_id: d.supplierId ?? null,
+    p_payee_name: d.payeeName ?? null,
+    p_voucher_date: d.voucherDate,
+    p_pay_from_account_code: d.payFromAccountCode,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description ?? null,
+      amount: l.amount,
+    })),
+    p_allocations: d.allocations.map((a) => ({ bill_id: a.billId, amount: a.amount })),
+    p_pay_method: d.payMethod,
+    p_pay_reference: d.payReference ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+// ── suppliers, accounts, what is owed ───────────────────────────────────────
+
+payablesRouter.get("/suppliers", requireFinance, async (c) => {
+  const { data, error } = await sb(c)
+    .from("suppliers")
+    .select("id, name, kind")
+    .order("name", { ascending: true });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.post("/other-creditors", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, otherCreditorInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_other_creditor_create", {
+    p_name: body.data.name,
+    p_contact: body.data.contact ?? null,
+    p_contact_email: body.data.contactEmail ?? null,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.get("/accounts", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("ap_account_choices");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/outstanding", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("ap_outstanding", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("ap_bill_outstanding", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+// ── bills ───────────────────────────────────────────────────────────────────
+
+payablesRouter.get("/bills", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_bill_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("supplier_bill_grn_candidates", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
+  const receiptId = c.req.param("receiptId");
+  if (!UUID_RE.test(receiptId)) return badId(c, "goods received note");
+  const { data, error } = await sb(c).rpc("supplier_bill_grn_lines", { p_receipt_id: receiptId });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/bills/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const { data, error } = await sb(c).rpc("supplier_bill_document", { p_bill_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "bill_missing", message: "That bill does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/bills", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierBillDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_bill_save_draft", billArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/bills/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const body = await parseJsonBody(c, supplierBillDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_bill_save_draft", billArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/bills/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const { error } = await sb(c).rpc("supplier_bill_confirm", { p_bill_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/bills/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_bill_cancel", { p_bill_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+// ── payment vouchers ────────────────────────────────────────────────────────
+
+payablesRouter.get("/vouchers", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("payment_voucher_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/vouchers/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+  const { data, error } = await sb(c).rpc("payment_voucher_document", { p_voucher_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) {
+    return c.json({ error: "not_found", code: "voucher_missing", message: "That payment voucher does not exist." }, 404);
+  }
+  return c.json(data);
+});
+
+payablesRouter.post("/vouchers", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, paymentVoucherDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("payment_voucher_save_draft", voucherArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/vouchers/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+  const body = await parseJsonBody(c, paymentVoucherDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("payment_voucher_save_draft", voucherArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+const VOUCHER_STEPS = {
+  prepare: "payment_voucher_prepare",
+  check: "payment_voucher_check",
+  approve: "payment_voucher_approve",
+} as const;
+
+for (const [step, fn] of Object.entries(VOUCHER_STEPS)) {
+  payablesRouter.post(`/vouchers/:id/${step}`, requireFinance, async (c) => {
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+    const { error } = await sb(c).rpc(fn, { p_voucher_id: id });
+    if (error) return pgFail(c, error);
+    return c.json({ id });
+  });
+}
+
+for (const step of ["reject", "cancel"] as const) {
+  payablesRouter.post(`/vouchers/:id/${step}`, requireFinance, async (c) => {
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+    const body = await parseJsonBody(c, apReasonInput);
+    if (!body.ok) return c.json(body.body, body.status);
+    const { error } = await sb(c).rpc(`payment_voucher_${step}`, {
+      p_voucher_id: id,
+      p_reason: body.data.reason,
+    });
+    if (error) return pgFail(c, error);
+    return c.json({ id });
+  });
+}
+
+// ── files ───────────────────────────────────────────────────────────────────
+
+const EXT: Record<z.infer<typeof apFileSignInput>["mimeType"], string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const DOC_ROUTES: ReadonlyArray<{ prefix: string; type: DocType; what: string }> = [
+  { prefix: "/bills", type: "SUPPLIER_BILL", what: "bill" },
+  { prefix: "/vouchers", type: "PAYMENT_VOUCHER", what: "payment voucher" },
+];
+
+for (const { prefix, type, what } of DOC_ROUTES) {
+  // The Worker signs an upload for a path that names the document. The
+  // storage insert policy (gl_may_read) runs against the USER's token, so a
+  // signed-in dealer could not mint one even if this guard were missing.
+  payablesRouter.post(`${prefix}/:id/files/sign`, requireFinance, async (c) => {
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) return badId(c, what);
+    const body = await parseJsonBody(c, apFileSignInput);
+    if (!body.ok) return c.json(body.body, body.status);
+    const path = `${type}/${id}/${crypto.randomUUID()}.${EXT[body.data.mimeType]}`;
+    const { data, error } = await sb(c).storage.from(AP_BUCKET).createSignedUploadUrl(path);
+    if (error || !data) {
+      return c.json({ error: "storage_failed", code: "storage_failed", message: error?.message ?? "Could not start the upload." }, 500);
+    }
+    return c.json({ bucket: AP_BUCKET, token: data.token, path: data.path });
+  });
+
+  // After the browser uploaded: record it. The database checks the path
+  // belongs to this document and that the object is really in the bucket.
+  payablesRouter.post(`${prefix}/:id/files`, requireFinance, async (c) => {
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) return badId(c, what);
+    const body = await parseJsonBody(c, apFileAddInput);
+    if (!body.ok) return c.json(body.body, body.status);
+    const { data, error } = await sb(c).rpc("ap_document_file_add", {
+      p_document_type: type,
+      p_document_id: id,
+      p_storage_path: body.data.path,
+      p_file_name: body.data.fileName,
+      p_mime_type: body.data.mimeType,
+      p_size_bytes: body.data.sizeBytes,
+    });
+    if (error) return pgFail(c, error);
+    return c.json({ id: data as string }, 201);
+  });
+}
+
+const filePathQuery = z
+  .string()
+  .max(400)
+  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
+
+payablesRouter.get("/files/url", requireFinance, async (c) => {
+  const parsed = filePathQuery.safeParse(c.req.query("path") ?? "");
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "That file path is not valid." }, 422);
+  }
+  // Signed with the USER's token: the storage select policy (gl_may_read)
+  // decides, not the Worker.
+  const { data, error } = await sb(c).storage.from(AP_BUCKET).createSignedUrl(parsed.data, 300);
+  if (error || !data) {
+    return c.json({ error: "not_found", code: "file_missing", message: "That file could not be opened." }, 404);
+  }
+  return c.json({ url: data.signedUrl });
+});
+
+export default payablesRouter;

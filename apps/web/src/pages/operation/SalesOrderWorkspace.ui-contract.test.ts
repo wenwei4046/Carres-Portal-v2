@@ -96,7 +96,12 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="object-two-panes"');
     expect(workspace).toContain("flex h-full min-h-0 flex-col lg:flex-row");
     expect(workspace).toContain("lg:w-1/2 lg:overflow-hidden");
-    expect(workspace).toContain("lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto");
+    /* ⭐ THE DOCUMENT PANE SCROLLS AT EVERY WIDTH (2026-09-11). It was
+       `lg:overflow-auto`, so below the split breakpoint — where the panes
+       STACK and the document is at its narrowest — the pane clipped nothing
+       and a page wider than it pushed the PAGE sideways. The 50/50 split and
+       the stacking rule below 1024px are unchanged; only the clipping is. */
+    expect(workspace).toContain("overflow-auto border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0");
     /* The PAGE does not scroll at desktop widths; the panes do. */
     expect(workspace).toContain("min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden");
   });
@@ -218,15 +223,25 @@ describe("Sales Order object template contract", () => {
      merged card held two topics rather than one fuller one. `Delivery address`
      is untouched: it is the same party's fact as the customer above it, which
      is why that half of the merge still reads as one card. */
-  it("merges the address into Customer, and gives ownership its own card again", () => {
+  it("puts ownership inside Customer and gives Delivery a card of its own", () => {
+    /* ⭐ 2026-09-11. The two halves swapped homes, and each one moved TOWARD
+       the fact it belongs with: three salesperson names joined the customer
+       they sold to; the address joined the access conditions that decide
+       whether the lorry can reach it. Both keep their locked words — `Block`
+       and `SubHead` render the same string in a different rank. */
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).not.toContain('<Block title="Sales ownership">');
+    expect(workspace).toContain('<Block title="Delivery">');
     expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
-    expect(workspace).toContain('<Block title="Sales ownership">');
-    expect(workspace).not.toContain("<SubHead>Sales ownership</SubHead>");
     expect(workspace).not.toContain('<Block title="Delivery address">');
-    /* Every field of both merged sections still renders. */
+    /* Every field of both sections still renders. */
     expect(workspace).toContain('data-pos-field="address"');
     expect(workspace).toContain('data-pos-field="billing"');
     expect(workspace).toContain("<SalesOrderAttribution");
+    /* Emergency contact keeps its own heading AND gains the divider that makes
+       it read as a section rather than three more customer boxes. */
+    expect(workspace).toContain("<SubHead>Emergency contact</SubHead>");
+    expect(workspace).toMatch(/border-t border-kit-slate-5 pt-3">\s*\n\s*<SubHead>Emergency contact<\/SubHead>/);
   });
 
   /* ⭐ THE THIRD MERGE PASS — YH, 2026-08-27. Seven cards became FOUR (plus
@@ -244,12 +259,25 @@ describe("Sales Order object template contract", () => {
   it("keeps four cards, in the ruled order, with the two folds merged in", () => {
     const cards = [...workspace.matchAll(/<Block$\s+title="([^"]+)"|<Block title="([^"]+)"/gm)]
       .map((m) => m[1] ?? m[2]);
+    /* ⭐ RE-PINNED 2026-09-10 — the approved Sales Order detail composition.
+       `Money` moved from SECOND to below `Goods`. It is the same card with the
+       same locked word; what changed is that it now reads AFTER the thing it is
+       about. The order total is stated once, under the Goods table that
+       produces it, and this card answers the collections question underneath
+       it — so a reader goes value → what came in → what is still out in one
+       downward sweep instead of meeting the money before the goods. */
+    /* ⭐ RE-PINNED 2026-09-11 — the approved Sales Order detail organisation.
+       `Sales ownership` folded INTO `Customer` (who sold it is part of who
+       bought it) and `Delivery` came out as a card of its own, holding the
+       address, the billing relationship and the access conditions that were
+       split across two cards before. The page now reads as five questions:
+       who · when · where · what · money. */
     expect(cards).toEqual([
       "Customer",
-      "Money",
       "Order info",
-      "Sales ownership",
+      "Delivery",
       "Goods",
+      "Money",
       "What this change started elsewhere",
     ]);
     /* `Emergency contact` survives as a named subsection of CUSTOMER… */
@@ -288,15 +316,19 @@ describe("Sales Order object template contract", () => {
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038
-     rules it read-only on both surfaces. */
-  it("answers new-or-existing inside the Customer card, and still never lets it be typed", () => {
+     rules it read-only on both surfaces. It rides the header bar as a compact
+     pill (Jess, 2026-09-10 density pass) rather than matching the card
+     title's own shouting face — a badge reads as a fact, not a second title. */
+  it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
-    const start = workspace.indexOf('<Block title="Customer">');
+    // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
+    // checkout holds LF, and the same file must match on both.
+    const start = workspace.search(/<Block\s+title="Customer"/);
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
-    expect(customer).not.toContain("headerSlot=");
-    expect(customer).toContain('mb-2 flex justify-start');
+    expect(customer).toContain("headerSlot=");
     expect(customer).toContain('data-testid="customer-type-chip"');
+    expect(customer).toContain("rounded-full");
     expect(workspace).not.toContain('label="Customer type (auto)"');
     expect(workspace).toContain("customerTypeWord");
     /* The accent is spent once, on the tab underline — a chip may not take it. */
@@ -368,9 +400,16 @@ describe("Sales Order object template contract", () => {
      was a SPELLING of "only create offers the picker", and that sentence is no
      longer the rule. The invariant that survives is stated directly instead. */
   it("records a proceed date it HAS, and offers one it never recorded", () => {
+    /* ⚠️ THE END BOUNDARY MOVED WITH THE FIELDS, 2026-09-10. This span used to
+       end at `data-pos-field="stairCarry"`, which sat directly below the
+       proceed date on `Order info`. Floor / lift / stair carry are delivery
+       ACCESS facts and now sit with the address they qualify, ABOVE this card —
+       so that marker no longer bounds anything here and the slice came back
+       empty (a passing-looking assertion on ''). The card's own end is the
+       honest boundary. */
     const field = workspace.slice(
       workspace.indexOf('data-pos-field="proceedDate"'),
-      workspace.indexOf('data-pos-field="stairCarry"'),
+      workspace.indexOf('<Block title="Delivery">'),
     );
     /* A recorded date is a photograph, on every mode that is not create. */
     expect(field).toContain('<Fact label="Proceed date"');
@@ -609,7 +648,9 @@ describe("Sales Order object template contract", () => {
        merged subsection, and a card again. It is the SAME STRING through all
        three — `Block` uppercases every title, so becoming a card title moved
        the border and never the name. */
-    expect(workspace).toContain('<Block title="Sales ownership">');
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    /* ⛔ THE PERMISSION LANE IS UNTOUCHED BY THE MOVE. The component and its
+       gates are the same file; only the heading above it changed rank. */
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");
@@ -654,16 +695,28 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Report a customer, product, delivery or installation problem.");
   });
 
-  it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
-    expect(workspace).toContain("Open this order in Payment");
+  it("adds one READ-ONLY door to Payments, scoped to this order, riding the card's own header bar", () => {
+    /* COPY-STANDARD:1771 registers `Open this order in Payments` — plural, in
+       the "use exactly" column. The screen said `Payment`, which is the kind of
+       one-letter drift a dictionary exists to stop. */
+    expect(workspace).toContain("Open this order in Payments");
+    expect(workspace).not.toContain("Open this order in Payment\n");
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.indexOf('<Block title="Money">');
+    const start = workspace.search(/<Block\s+title="Money"/);
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
-    expect(money).not.toContain("headerSlot");
-    expect(money).toContain('mt-3 flex justify-end');
-    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeGreaterThan(
+    expect(start).toBeGreaterThan(-1);
+    expect(money).toContain("headerSlot=");
+    /* THE OLD SHAPE: a second, redundant door in the card BODY. The bar under
+       the amounts is now the Paid/Outstanding pair, which is not a door — so
+       the invariant is stated as what it always meant: exactly one door, and it
+       is the header's. */
+    expect(money.match(/data-testid="workspace-open-payments"/g) ?? []).toHaveLength(1);
+    expect(money).not.toContain("Record payment");
+    /* The door lives in the header now, so it renders BEFORE the three
+       amounts rather than in a row underneath them. */
+    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeLessThan(
       money.indexOf('data-testid="money-outstanding"'),
     );
   });
@@ -675,17 +728,28 @@ describe("Sales Order object template contract", () => {
      containers differed, which is exactly why the three numbers did not line
      up. The surviving invariant is what the block is FOR — three named money
      facts, one size, and red while any is owed. */
-  it("shows Total · Paid · Outstanding at ONE size, red while owed", () => {
-    expect(workspace).toContain('data-testid="money-total"');
+  it("states Paid + Outstanding under the ledger, one size, red while owed", () => {
+    /* ⭐ 2026-09-10 — `Total` LEFT THIS CARD. It is stated once, under the Goods
+       table that produces it (`data-testid="goods-total"`); repeating it beside
+       Paid would be the scattered summary the approved composition removes.
+       The two figures that remain are the collections facts. */
+    expect(workspace).toContain('data-testid="goods-total"');
+    expect(workspace).not.toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    expect(workspace).toContain('className="text-strong text-base-900" data-testid="money-total"');
-    expect(workspace).toContain('className="text-strong text-base-700" data-testid="money-paid"');
-    expect(workspace).toContain('`text-strong ${money.known && money.outstanding > 0');
-    // The retired sizes may not come back on any of the three.
-    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
+    /* One size on both, and red only while something is owed. */
+    expect(workspace).toContain('className="text-strong tabular-nums text-base-700" data-testid="money-paid"');
+    expect(workspace).toContain('`text-strong tabular-nums ${money.known && money.outstanding > 0');
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
+    // The retired sizes may not come back.
+    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
     expect(workspace).not.toContain('label="Balance"');
+    /* ⭐ EXACT AMOUNTS, TO THE CENT. `fmtMoney` is the governed spelling for
+       "what is owed, what was paid" (money-format.ts, Loo 2026-07-28); the
+       rounding `<Money>` recipe would print RM 2,500 against a ledger row of
+       RM 2,499.50 and the receipt would disagree with the screen. */
+    expect(workspace).toContain("fmtMoney(money.paid)");
+    expect(workspace).toContain("fmtMoney(money.outstanding)");
   });
 
   it("carries NO guidance banner — the amber field note and the owned Work action say it once (owner 2026-08-18)", () => {
@@ -838,13 +902,18 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain("Record payment");
   });
 
-  it("boxes the three money amounts without giving Money a door", () => {
-    /* The last bare label-over-value pair on the page. `Fact` is read-only by
-       construction, so this is a SHAPE change and Law B is untouched — the
-       Money card still summarises and still writes nothing. */
-    for (const amount of ["Total", "Paid", "Outstanding"]) {
-      expect(workspace).toContain(`label="${amount}"`);
+  it("states the money amounts without giving Money a door", () => {
+    /* ⭐ 2026-09-10 — the amounts are no longer three `Fact` boxes. `Total` is
+       under Goods; `Paid` and `Outstanding` are a right-aligned pair beneath
+       the ledger they summarise, on the same right edge its `Amount` column
+       already uses, so the eye reads one column of numerals.
+       LAW B IS UNTOUCHED, which is the invariant this test exists for: the
+       card still summarises and still writes nothing. */
+    expect(workspace).toContain("<PaymentLedger orderId=");
+    for (const amount of ["Paid", "Outstanding"]) {
+      expect(workspace).toContain(`>${amount}</span>`);
     }
+    expect(workspace).toContain('data-testid="goods-total"');
     /* Colour and size survive INSIDE the box: red while owed (owner ruling
        2026-08-15), one `text-strong` on all three (YH, 2026-08-28). */
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"');
@@ -859,7 +928,7 @@ describe("Sales Order object page — one form grammar", () => {
        registered answer is the count and then what is being waited on, and it
        is written ONCE in shared so the Goods table, the Order Route STOCK node
        and the register expansion cannot drift into three spellings. */
-    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    expect(workspace).toContain("unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty)");
     /* The rendered STRING is gone; the governance comment recording WHY it
        went stays, which is why this pins the quoted literal. */
     expect(workspace).not.toContain('"Not allocated"');
@@ -948,40 +1017,201 @@ describe("Sales Order object page — one form grammar", () => {
     expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
   });
 
-  it("gives every heading on the page one colour and one face", () => {
-    /* YH, 2026-09-01: "card headers should have the same color".
-       They did not. A card title was `text-base-900` in the mono face and a
-       subsection heading was `text-base-600` in the UI face, so on one card
-       the reader met two kinds of heading and had to read the SHADE to work
-       out whether the second was a section or a field label.
-       Same colour, same face, same tracking; the hierarchy moves to SIZE,
-       which is where it belongs — a subsection is a smaller instance of the
-       same thing rather than a different species. */
-    /* ⭐ AND THE COLOUR IS THE BRAND'S (YH, 2026-09-02 — "I asked for color on
-       the card titles"). One shade for every heading was the first half; this
-       is the second. `signature-700` is flame-dark, an EXISTING declared token
-       — no new value is invented, which §2 of the Constitution locks.
-       ⛔ WHY NOT ANY OTHER HUE. `index.css`:187 assigns every colour a job:
-       flame = action, blue = selection, green/amber/red = status, and §2.2
-       adds "decoration by hue is not a job". Every hue in the system is
-       spoken for, so a heading painted blue would read as selected and one
-       painted amber as a warning. Flame-dark is the one tone that carries the
-       brand without carrying a JOB — a heading is not an action, so it cannot
-       be mistaken for the one flame CTA the page is allowed. */
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE APPROVED SALES ORDER DETAIL COMPOSITION — 2026-09-10.
+     Four moves, each of which puts a fact beside the fact it belongs with.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  it("keeps delivery ACCESS in the Delivery card with the address it describes", () => {
+    /* Floor / lift / stair carry qualify ONE address. They sat on `Order info`,
+       a card away from it. The whole `stairCarry` group moved under the
+       `Delivery address` subsection — the clamps, the POS-parity tag and the
+       working line unchanged. */
+    expect(workspace).toContain("<SubHead>Delivery access</SubHead>");
+    const deliveryCard = workspace.slice(
+      workspace.indexOf('<Block title="Delivery">'),
+      workspace.indexOf('<Block title="Goods">'),
+    );
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"', 'id="so-building-type"']) {
+      expect(deliveryCard, `${id} sits with the address`).toContain(id);
+    }
+    /* The billing relationship and the billing address are the same card's
+       question — where the paperwork goes, beside where the goods go. */
+    expect(deliveryCard).toContain('data-pos-field="billing"');
+    /* …and the working line came with them, so the charge is explained where
+       the three fields that produce it are read. It is a WORKING, not a second
+       fee: the money is the stamped STAIR_CARRY addon, charged once in Goods. */
+    expect(deliveryCard).toContain('data-testid="so-stair-working"');
+    /* Order info is left with what the CUSTOMER asked for: dates. */
+    const orderInfo = workspace.slice(
+      workspace.indexOf('<Block title="Order info">'),
+      workspace.indexOf('<Block title="Delivery">'),
+    );
+    expect(orderInfo).not.toContain('id="so-floor"');
+  });
+
+  it("groups the customer's own reference under Order info, not in page chrome", () => {
+    /* `orders.source_ref` is a text[] — one customer legitimately carries
+       several spellings — and it is read-only: the importer is its only
+       writer. It was a grey meta line floating above the cards. */
+    const orderInfo = workspace.slice(
+      workspace.indexOf('<Block title="Order info">'),
+      workspace.indexOf('<Block title="Delivery">'),
+    );
+    expect(orderInfo).toContain('<Fact label="Customer reference"');
+    expect(orderInfo).toContain('(order?.source_ref ?? []).join(" · ")');
+    /* THE OLD SHAPE: the same fact as chrome. */
+    expect(workspace).not.toContain('<div className="px-1 text-meta text-base-500">');
+  });
+
+  it("states the agreed price and the line total on the goods rows, right-aligned", () => {
+    const goods = workspace.slice(
+      workspace.indexOf('<Block title="Goods">'),
+      workspace.indexOf('data-testid="goods-total"'),
+    );
+    for (const label of ["Unit price", "Line total"]) {
+      expect(goods).toContain(`>${label}</div>`);
+    }
+    /* Numerals right-aligned and tabular, so a column of money reads as one. */
+    expect(goods).toContain('text-right font-medium');
+    expect(goods).toContain('text-right tabular-nums whitespace-nowrap');
+    expect(goods).toContain("{fmtMoney(r.unitPrice)}");
+    expect(goods).toContain("{fmtMoney(r.total)}");
+    /* A SERVICE row carries the same two columns off `order_addons`, so the
+       table has one shape down its whole length. */
+    expect(goods).toContain("{fmtMoney(Number(a.unit_price ?? 0))}");
+    /* The six ruled columns are untouched and still present. */
+    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
+      expect(goods).toContain(`>${label}</th>`);
+    }
+  });
+
+  it("states ONE total, under the table that produces it, from the canonical rule", () => {
+    expect(workspace).toContain('data-testid="goods-total"');
+    /* ⛔ NEVER A RE-SUM OF THE PRINTED ROWS. `money` is `orderMoney`, the same
+       value the register and the document read (Law D). */
+    expect(workspace).toContain("money.known && money.total != null ? fmtMoney(money.total) : \"No price yet\"");
+    /* And it is stated ONCE — the Money card no longer repeats it. */
+    expect(workspace).not.toContain('data-testid="money-total"');
+  });
+
+  it("reads the payment ledger without ever gaining a form for it (Law B)", () => {
+    expect(workspace).toContain("<PaymentLedger orderId=");
+    const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
+    /* Every column the approved composition names. */
+    for (const label of ["Date", "Method", "Amount", "Reference", "Receipt", "Slip", "Recorded by"]) {
+      expect(ledger).toContain(`>${label}</th>`);
+    }
+    /* ⛔ A SUMMARY MAY NEVER GAIN A FORM. Recording, voiding and refunding are
+       Payment's acts; the only control here opens a slip somebody uploaded. */
+    for (const write of [
+      "useRecordPayment", "useVoidPayment", "useRefund", "<form", "Record payment", "Void payment",
+    ]) {
+      expect(ledger, `the ledger must not write (${write})`).not.toContain(write);
+    }
+    /* `Voided` IS allowed and is the point: it is the read-only stamp on a
+       reversed row, not a control. The banned list above is write AFFORDANCES,
+       and the distinction is the whole of Law B. */
+    expect(ledger).toContain("Voided");
+    /* A VOIDED ROW IS NOT MONEY, and no reader spells `voided_at` itself. */
+    expect(ledger).toContain("isLivePayment(p)");
+    expect(ledger).not.toContain("p.voided_at ==");
+    /* Amounts to the cent — the receipt may not disagree with the screen. */
+    expect(ledger).toContain("fmtMoney(Number(p.amount ?? 0))");
+    /* The method word and the slip door are the drawer's own, imported. */
+    expect(ledger).toContain('from "@/lib/payment-display"');
+  });
+
+  it("re-cuts the document when its pane changes width, and never clips it", () => {
+    /* ⭐ THE ORIGINAL CLIPPING HAD TWO CAUSES, and both are asserted here
+       because either one alone brings it back.
+       ① The pages were scaled to `pane.clientWidth`, which INCLUDES the pane's
+          own padding — so every page was drawn wider than the box it had to
+          sit in, at every width, not only narrow ones.
+       ② The render effect depended on `[data, paneEpoch]` only. Nothing
+          watched the pane, so a width change (drag the window, open a side
+          panel) left a bitmap cut for the old width hanging over the new one. */
+    expect(workspace).toContain("function contentWidthOf(");
+    expect(workspace).toContain("paddingLeft");
+    expect(workspace).toContain("new ResizeObserver(");
+    expect(workspace).toContain("}, [data, paneEpoch, paneWidth]);");
+    /* ⛔ COALESCED ON A TIMER, NOT A FRAME. `requestAnimationFrame` does not
+       run in a hidden or background tab (measured: in a hidden tab neither rAF
+       nor ResizeObserver delivery ran at all), so a width change that happened
+       while the tab was away would never be applied and the operator would
+       return to a page cut for the old width — the original bug through a
+       different door. */
+    expect(workspace).toContain("setTimeout(() => setPaneWidth(contentWidthOf(node)), 120)");
+    expect(workspace).not.toContain("requestAnimationFrame(() => setPaneWidth");
+    expect(workspace).toContain("clearTimeout(timer)");
+    /* ⛔ AND NO `max-width: 100%` ON THE PAGE. Below `MIN_PDF_WIDTH` the page
+       must stay readable and SCROLL inside the pane; capping it would squash
+       it back to a smear, and on a zero-width pane collapse it to nothing.
+       The pane scrolls at EVERY width, not only at `lg`. */
+    expect(workspace).not.toContain('canvas.style.maxWidth');
+    expect(workspace).toContain("min-h-0 min-w-0 overflow-auto border-t");
+    /* ⛔ THE SPLIT IS NOT REMOVED. Replacing the permanent 50/50 preview with
+       an on-demand comparison is NOT an approved layout change; the pane and
+       its Print path stay exactly where they are. */
+    expect(workspace).toContain('aria-label="Sales Order document"');
+    expect(workspace).toContain("Print ▾");
+  });
+
+  it("states a recorded instalment plan, and invents nothing when there is none", () => {
+    const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
+    /* `orders.installment_months` + `orders.payment_method` are the at-sale
+       capture — an ORDER fact, so it is stated above the ledger, never as a
+       column on rows that do not carry it. */
+    expect(ledger).toContain('data-testid="money-instalment"');
+    expect(workspace).toContain("installment_months");
+    expect(ledger).toContain("atSalePaymentWord(saved.method, saved.months)");
+    /* ⛔ NO DERIVED MONTHLY FIGURE. A number this screen computed would be
+       read as one Carres agreed to, and a month count plus a total does not
+       say what the customer's bank actually charges. */
+    expect(workspace).not.toMatch(/instalment[\s\S]{0,200}money\.total\s*\//);
+    expect(workspace).not.toContain("perMonth");
+  });
+
+  it("keeps the commercial table free of cost and margin", () => {
+    /* The 2990 reference prints REVENUE · COST · MARGIN · MARGIN % above its
+       payments block. That is a management view, and this is the page an
+       operator reads a customer's order from; a cost column here is a number
+       the customer must never be shown over the counter. */
+    const goods = workspace.slice(
+      workspace.indexOf('<Block title="Goods">'),
+      workspace.indexOf('data-testid="goods-total"'),
+    );
+    for (const word of ["Margin", "margin", "Cost", "cost", "Revenue"]) {
+      expect(goods, `no ${word} in the commercial table`).not.toContain(`>${word}<`);
+    }
+    /* …while the Unit and fulfilment links that DO belong stay. */
+    expect(goods).toContain(">Unit ID</th>");
+    expect(goods).toContain(">Deliver To</th>");
+  });
+
+  it("keeps the card title's mono/uppercase/flame treatment off ordinary subsection headings", () => {
+    /* A card TITLE (`CUSTOMER`, `MONEY`, …) is the one shouting heading per
+       card: mono face, uppercase, tracked, flame-dark (`signature-700`,
+       `01-design-tokens.md` §2 — an existing declared token, no new value).
+       `SubHead` (`Delivery address`, `Emergency contact`) sits INSIDE that
+       card and previously copied the same shouting treatment at a smaller
+       size — which made a reader read the SHADE/face to tell a section from
+       the card's own name. It now renders as the ordinary field-group
+       heading (`text-strong`, `01-design-tokens.md` §1): the ordinary face,
+       the ordinary case, one step down in size from the card title. */
     const title = "font-mono text-strong uppercase tracking-[0.08em] text-signature-700";
-    const sub = "font-mono text-label uppercase tracking-[0.08em] text-signature-700";
+    const sub = "text-strong text-base-900";
     expect(workspace, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
-    /* THE OLD SHAPE: a lighter, different-faced subsection. Pinned on the
-       heading's OWN class string — `text-label font-semibold text-base-600`
-       alone also matches the goods table's Category cell, which is a cell and
-       not a heading and is deliberately untouched. */
+    /* THE OLD SHAPE: the subsection heading copying the card title's own
+       shouting treatment. */
     expect(workspace).not.toContain(
-      "gap-x-2 text-label font-semibold text-base-600 first:mt-0",
+      "gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700",
     );
-    /* ⛔ AND NOT THE ACCENT. `01-design-tokens.md` §2.2 spends blue once per
-       screen and the tab underline already holds it; a blue heading would be
-       the second spend and the current thing would stop standing out. */
+    /* ⛔ AND NOT THE ACCENT ON A CARD TITLE. `01-design-tokens.md` §2.2 spends
+       blue once per screen and the tab underline already holds it; a blue
+       card title would be the second spend and the current thing would stop
+       standing out. */
     expect(workspace).not.toContain("uppercase tracking-[0.08em] text-kit-blue");
     /* Nor any status hue, for the same reason. */
     for (const job of ["text-kit-green", "text-kit-amber", "text-kit-red", "text-danger"]) {

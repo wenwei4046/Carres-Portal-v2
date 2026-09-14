@@ -68,7 +68,7 @@ describe("Payment MASTER — no blind collection Work", () => {
       openOrderActions({ ...waiting, stockEtaIso }), ctx, "2026-08-18", HOLS,
     );
     expect(itemsFor("2026-08-19").find((item) => item.ruleKey === "collect")).toMatchObject({
-      ownerRule: "payment_duty",
+      ownerRule: "collection_owner",
       dueIso: "2026-08-18",
     });
     expect(itemsFor(null).some((item) => item.ruleKey === "collect")).toBe(false);
@@ -93,7 +93,7 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
     expect(item.dueIso).toBe("2026-08-18"); // immediately
   });
 
-  it("a loan still out on the delivery day composes `Collect the loan item` — Delivery staff's duty", () => {
+  it("a loan still out on the delivery day composes `Collect the loan item` — Delivery Duty's work", () => {
     const items = workItemsForOrder(
       [],
       { ...ctx, loanOutstanding: true, confirmedDateIso: "2026-08-18" },
@@ -102,9 +102,79 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
     );
     const item = items.find((i) => i.ruleKey === "collect_loan_item")!;
     expect(item).toBeTruthy();
+    // No Delivery Duty holder supplied — the duty word stands with its KEY,
+    // never the PIC and never a superuser (Delivery MASTER §13.1).
     expect(item.ownerName).toBeNull();
-    expect(item.ownerDuty).toBe("Delivery staff");
+    expect(item.ownerDutyKey).toBe("delivery_duty");
+    expect(item.ownerDuty).toBe("Delivery Duty");
     expect(item.dueIso).toBe("2026-08-18"); // the delivery day itself
+  });
+
+  it("the Delivery Duty holder from Workspace owns the loan collection — cover and all", () => {
+    const items = workItemsForOrder(
+      [],
+      {
+        ...ctx,
+        loanOutstanding: true,
+        confirmedDateIso: "2026-08-18",
+        dutyResolutions: {
+          delivery_duty: {
+            dutyKey: "delivery_duty",
+            onDate: "2026-08-18",
+            normalOwner: { userId: "u-dd", name: "Li Ching" },
+            buddy: { userId: "u-cover", name: "Yu Jun" },
+            activeCover: { userId: "u-cover", name: "Yu Jun" },
+            actingPerson: { userId: "u-cover", name: "Yu Jun" },
+            state: "covered" as const,
+            assignmentId: "a-dd",
+          },
+        },
+      },
+      "2026-08-18",
+      HOLS,
+    );
+    const item = items.find((i) => i.ruleKey === "collect_loan_item")!;
+    expect(item.ownerRule).toBe("delivery_duty");
+    expect(item.normalOwner?.name).toBe("Li Ching");
+    expect(item.ownerName).toBe("Yu Jun");
+    expect(item.ownerUserId).toBe("u-cover");
+    expect(item.ownerDuty).toBeUndefined();
+  });
+
+  it("§6.1 — a delivered file awaiting review composes `Check delivery proof` for Delivery Duty, due the day after delivery", () => {
+    const delivered = { ...baseSignals, completed: true, photoOnFile: true };
+    const items = workItemsForOrder(
+      openOrderActions(delivered),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReviewPending: true },
+      "2026-08-21",
+      HOLS,
+    );
+    const review = items.find((item) => item.ruleKey === "check_delivery_proof");
+    expect(review).toMatchObject({ module: "delivery", ownerRule: "delivery_duty", ownerDuty: "Delivery Duty" });
+    expect(review?.dueIso).toBe("2026-08-21");
+    expect(review?.action).toBe("Check delivery proof");
+    expect(
+      workItemsForOrder(openOrderActions(delivered), { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z" }, "2026-08-21", HOLS)
+        .some((item) => item.ruleKey === "check_delivery_proof"),
+    ).toBe(false);
+  });
+
+  it("§6.1 — a rejection reopens `Upload delivery photo` although a file is on record, once", () => {
+    const delivered = { ...baseSignals, completed: true, photoOnFile: true };
+    const items = workItemsForOrder(
+      openOrderActions(delivered),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReopened: true },
+      "2026-08-21",
+      HOLS,
+    );
+    expect(items.filter((item) => item.ruleKey === "upload_delivery_photo")).toHaveLength(1);
+    const withoutFile = workItemsForOrder(
+      openOrderActions({ ...delivered, photoOnFile: false }),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReopened: true },
+      "2026-08-21",
+      HOLS,
+    );
+    expect(withoutFile.filter((item) => item.ruleKey === "upload_delivery_photo")).toHaveLength(1);
   });
 
   it("neither composes before its fact holds — a loan waits for the delivery day", () => {
@@ -142,10 +212,15 @@ describe("WORK_RULES — five parts, or no entry", () => {
     expect(byKey.get("issue_po")!.ownerRule).toBe("po_duty");
     expect(byKey.get("confirm_ready_date")!.ownerRule).toBe("po_duty");
     expect(byKey.get("ask_delivery_date")!.ownerRule).toBe("salesperson");
-    expect(byKey.get("collect")!.ownerRule).toBe("payment_duty");
+    expect(byKey.get("collect")!.ownerRule).toBe("collection_owner");
     expect(byKey.get("issue_delivery_order")!.ownerRule).toBe("system");
     expect(byKey.get("collect_loan_item")!.ownerRule).toBe("delivery_duty");
     expect(byKey.get("resolve_payment_exception")!.ownerRule).toBe("finance_duty");
+    // Delivery MASTER §13.1 (2026-09-13): every routine Delivery action is
+    // Delivery Duty's — the PIC no longer proxies the arrangement.
+    for (const key of ["assign_logistics", "confirm_delivery_date", "deliver_today", "upload_delivery_photo"]) {
+      expect(byKey.get(key)!.ownerRule).toBe("delivery_duty");
+    }
   });
 
   it("every action key the ORDER engine can raise has a registry entry", () => {
@@ -228,7 +303,7 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
     expect(po.ownerDuty).toBe("Purchasing");
   });
 
-  it("Payment Duty with no assignment fails closed and never borrows the PIC", () => {
+  it("the collection owner with nothing established fails closed under the Delivery Duty word and never borrows the PIC", () => {
     const open = openOrderActions({
       ...baseSignals,
       hasLogistics: true,
@@ -244,10 +319,11 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
       HOLS,
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
-    expect(collect.ownerRule).toBe("payment_duty");
+    expect(collect.ownerRule).toBe("collection_owner");
     expect(collect.normalOwner).toBeNull();
     expect(collect.actingPerson).toBeNull();
-    expect(collect.ownerDutyKey).toBe("payment_duty");
+    expect(collect.ownerDutyKey).toBe("delivery_duty");
+    expect(collect.ownerDuty).toBe("Delivery Duty");
   });
 
   it("the missing customer promise composes `Ask for the delivery date` — the salesperson's work, a name without an account", () => {
@@ -299,7 +375,11 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       HOLS,
     );
     const assign = items.find((i) => i.ruleKey === "assign_logistics")!;
-    expect(assign.ownerName).toBe("Shasha");
+    // Delivery Duty owns the arrangement (§13.1) — with no holder resolved the
+    // duty word stands; the PIC is never borrowed.
+    expect(assign.ownerName).toBeNull();
+    expect(assign.ownerDutyKey).toBe("delivery_duty");
+    expect(assign.ownerDuty).toBe("Delivery Duty");
     expect(assign.soRef).toBe("SO-1318");
     expect(assign.dueIso).toBe("2026-08-11"); // the PO's own issue day
     expect(assign.workingDaysLate).toBe(0);

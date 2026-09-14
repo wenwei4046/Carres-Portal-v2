@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { MemoryRouter } from "react-router-dom";
 import FinanceAP from "./FinanceAP";
 
 vi.mock("@/lib/api", () => ({
@@ -22,10 +23,12 @@ import { apiFetch } from "@/lib/api";
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
-    <QueryClientProvider client={qc}>
-      {ui}
-      <Toaster />
-    </QueryClientProvider>
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        {ui}
+        <Toaster />
+      </QueryClientProvider>
+    </MemoryRouter>
   );
 }
 
@@ -35,7 +38,6 @@ const ROW_MATCHED = {
   supplier_id:         "s1",
   supplier_name:       "Acme Bedworks",
   warehouse_id:        "w1",
-  delivery_partner_id: null,
   placed_at:           "2026-04-29T00:00:00Z",
   expected_ready_date: "2026-05-10",
   eta_date:            "2026-05-12",

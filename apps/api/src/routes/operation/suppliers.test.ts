@@ -102,6 +102,37 @@ describe("GET /api/operation/suppliers", () => {
     expect(body.suppliers[1].cat_covered).toEqual(["sofa"]);
   });
 
+  /* 0477 — Finance adds a landlord or an advertiser as suppliers.kind =
+     'other_creditor'. This list feeds the PO, catalog-slot and loan-return
+     pickers, so it must never offer one. */
+  it("leaves out Finance's other creditors", async () => {
+    const suppliers = [
+      { id: "00000000-0000-0000-0000-000000000c01", name: "Ohana", kind: "own_logistics", cat_covered: ["sofa"] },
+      { id: "00000000-0000-0000-0000-000000000c09", name: "Bayview Properties", kind: "other_creditor", cat_covered: [] },
+      { id: "00000000-0000-0000-0000-000000000c02", name: "Sofa Factory Co", kind: "factory_pickup", cat_covered: ["sofa"] },
+    ];
+    vi.mocked(userClient).mockReturnValue({
+      from: () => ({
+        select: () => ({
+          order: async () => ({ data: suppliers, error: null }),
+        }),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/suppliers", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { suppliers: typeof suppliers };
+    expect(body.suppliers.map((s) => s.name)).toEqual(["Ohana", "Sofa Factory Co"]);
+    expect(body.suppliers.some((s) => s.kind === "other_creditor")).toBe(false);
+  });
+
   it("returns 403 for non-operation role", async () => {
     const jwt = await makeJwt("dealer");
     const res = await app.fetch(

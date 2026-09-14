@@ -167,6 +167,18 @@ function mountOutbound(initialUrl = "/operation?tab=warehouse-outbound") {
 }
 
 describe("Warehouse Monitor — the only Calendar", () => {
+  it.each(["/api/operation/pos", "/api/operation/suppliers", "/api/operation/warehouse"])(
+    "shows a failed source instead of an empty desk: %s", async (failedUrl) => {
+      stubApi({ events: [], pos: [] });
+      const normal = apiFetchMock.getMockImplementation()!;
+      apiFetchMock.mockImplementation((url: string) =>
+        url === failedUrl ? Promise.reject(new Error("Source unavailable")) : normal(url),
+      );
+      mountMonitor();
+      expect(await screen.findByText(/The schedule could not be loaded/)).toBeInTheDocument();
+      expect(screen.queryByTestId("wm-empty-2026-09-05")).toBeNull();
+    },
+  );
   it("shows six operating dates full-width, with NO 240px filter rail", async () => {
     stubApi();
     mountMonitor();
@@ -350,6 +362,7 @@ describe("Warehouse Outbound — the unified Register", () => {
           unitInput({
             unitId: "U1-260-030",
             doNumber: "DO-2609-030",
+            deliveryOrderId: "do-30",
             orderId: "order-30",
             collectionDate: "2026-09-05",
             unitHandedOverAt: "2026-09-05T09:00:00+08:00",

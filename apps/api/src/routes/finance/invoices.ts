@@ -6,8 +6,6 @@ import { storageSkuCategories } from "../../lib/sku-categories";
 import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
-  financeInvoiceIssueInput,
-  financeInvoiceVoidInput,
   invoicesListQuery,
 } from "@carres/shared";
 import {
@@ -31,22 +29,12 @@ import type { AppEnv } from "../../types";
  *
  * Spec: docs/superpowers/specs/2026-05-08-phase-5-finance-spec.md §5.2.
  *
- * Mounted at `/api/finance/invoices`. Three routes:
- *   GET   /                  list invoices (filters: status, dealerId, from, to).
- *                            Status is derived in the route from voided_at +
- *                            order.paid vs invoice.amount.
- *   POST  /issue             gates on orders.status='delivered' (Q2=A locked
- *                            2026-05-08: manual click only). Calls existing
- *                            `invoice_issue(order_id, amount, tax_amount)` RPC
- *                            from migration 0003.
- *   POST  /:id/void          stamps invoices.voided_at=current_date + records
- *                            audit_log entry. Reason required (min 1 char).
- *
- * The issue route's "delivered" gate is at the route layer, not the RPC,
- * because invoice_issue (0003:289) only enforces role — adding a status
- * check would require a 0017 superseding migration. Route gate lets us
- * stay backward-compatible with dealer-side flows that may still call
- * invoice_issue directly through other paths.
+ * Mounted at `/api/finance/invoices`.
+ *   GET   /                  list invoices (filters: from, to).
+ *   POST  /issue · /:id/void 410 since 0476 — see INVOICE_DOORS below. The
+ *                            governed doors are /prepare, /:id/issue,
+ *                            /:id/void-replace and the order drawer's
+ *                            Generate invoice (POST /api/orders/:id/issue-invoice).
  *
  * Chunk C: GET /:id/pdf renders the tax-invoice PDF server-side via
  * @react-pdf/renderer (Q7=A locked). Gated on invoice issued + order
@@ -140,8 +128,38 @@ financeInvoicesRouter.get("/register", async (c) => {
   }
   const rows = data as unknown as Array<Record<string, unknown>>;
   await attachLegacyStorage(sb, rows);
+  await attachLatestPromise(sb, rows);
   return c.json({ rows, total: count });
 });
+
+/**
+ * The customer's latest standing promise (0446 `will_pay_on_date`), one per
+ * order, attached as a source fact so the Payment Monitor's `Customer promised
+ * to pay today` reads the SAME ledger the Work feed's missed-promise rule
+ * reads — never a second store. Batched over the page's order ids; a read
+ * failure refuses the page rather than presenting promises as absent.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachLatestPromise(sb: any, rows: Array<Record<string, unknown>>) {
+  const orderIds = [...new Set(rows.map((r) => String(r.order_id)))];
+  if (orderIds.length === 0) return;
+  const { data, error } = await sb
+    .from("payment_collection_outcomes")
+    .select("order_id,promised_date,recorded_at")
+    .eq("outcome", "will_pay_on_date")
+    .in("order_id", orderIds)
+    .order("recorded_at", { ascending: false });
+  if (error) throw new HTTPException(500, { message: "Invoices could not be loaded. Try again." });
+  const latest = new Map<string, { promised_date: string; recorded_at: string }>();
+  for (const o of (data ?? []) as Array<{ order_id: string; promised_date: string | null; recorded_at: string }>) {
+    if (!o.promised_date || latest.has(o.order_id)) continue;
+    latest.set(o.order_id, { promised_date: o.promised_date, recorded_at: o.recorded_at });
+  }
+  for (const r of rows) {
+    const o = r.orders as { latest_promise?: unknown } | null;
+    if (o) o.latest_promise = latest.get(String(r.order_id)) ?? null;
+  }
+}
 
 /**
  * The legacy C9 storage figure, derived server-side through the SAME shared
@@ -713,93 +731,35 @@ financeInvoicesRouter.get("/", requireFinance, async (c) => {
   return c.json(data ?? []);
 });
 
-financeInvoicesRouter.post("/issue", requireFinance, async (c) => {
-  const auth = c.var.auth;
-  const body = await parseJsonBody(c, financeInvoiceIssueInput);
-  if (!body.ok) return c.json(body.body, body.status);
+/*
+ * 0476 — ONE INVOICE DOOR PER ACT. The two Phase-5 doors below are closed.
+ *
+ *   POST /issue      called the legacy `invoice_issue` (0003): an INV-YYYY-dl
+ *                    number outside the governed series, and no journal entry.
+ *   POST /:id/void   was a bare UPDATE of `voided_at`: the invoice stayed
+ *                    "issued", the order kept its invoice number, nothing was
+ *                    reversed in the ledger and no replacement was drafted.
+ *
+ * 0476 revokes `invoice_issue` and the direct UPDATE on `invoices`, so both
+ * would fail in SQL anyway. They answer 410 Gone and name the door that does
+ * the act, so an old client learns where to go instead of reading a 403.
+ */
+const INVOICE_DOORS = {
+  issue:
+    "This way of issuing an invoice is closed. Issue the Sales Invoice from the order: "
+    + "open the order, Balance, then Generate invoice (POST /api/orders/:id/issue-invoice). "
+    + "A prepared invoice is issued with POST /api/finance/invoices/:id/issue.",
+  void:
+    "This way of voiding an invoice is closed. An issued invoice is corrected by void and replace: "
+    + "POST /api/finance/invoices/:id/void-replace with the reason. It reverses the ledger entry "
+    + "and drafts the replacement.",
+} as const;
 
-  const sb = userClient(c.env, auth.jwt);
+financeInvoicesRouter.post("/issue", (c) =>
+  c.json({ error: "gone", code: "door_closed", message: INVOICE_DOORS.issue }, 410));
 
-  // Q2=A: route-layer gate on order.status='delivered' before issuing.
-  const { data: order, error: ordErr } = await sb
-    .from("orders")
-    .select("status, paid")
-    .eq("id", body.data.orderId)
-    .single();
-  if (ordErr || !order) {
-    return c.json(
-      { error: "order_not_found", code: "not_found", message: ordErr?.message ?? "order not found" },
-      404,
-    );
-  }
-  if ((order as { status: string }).status !== "delivered") {
-    return c.json(
-      {
-        error: "order_not_delivered",
-        code: "order_not_delivered",
-        message: `order status is ${(order as { status: string }).status}; must be delivered before invoice can issue`,
-      },
-      422,
-    );
-  }
-
-  const { data, error } = await sb.rpc("invoice_issue", {
-    p_order_id:   body.data.orderId,
-    p_amount:     body.data.amount,
-    p_tax_amount: body.data.taxAmount ?? 0,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
-});
-
-financeInvoicesRouter.post("/:id/void", requireFinance, async (c) => {
-  const auth = c.var.auth;
-  const id = c.req.param("id");
-  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    return c.json(
-      { error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" },
-      422,
-    );
-  }
-  const body = await parseJsonBody(c, financeInvoiceVoidInput);
-  if (!body.ok) return c.json(body.body, body.status);
-
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
-    .from("invoices")
-    .update({ voided_at: new Date().toISOString().slice(0, 10) })
-    .eq("id", id)
-    .is("voided_at", null) // can't void an already-voided invoice
-    .select("*")
-    .single();
-  if (error) {
-    if (error.code === "PGRST116") {
-      return c.json(
-        {
-          error: "not_voidable",
-          code: "not_voidable",
-          message: "invoice not found or already voided",
-        },
-        422,
-      );
-    }
-    throw new HTTPException(500, { message: error.message });
-  }
-
-  // Audit-log the void (best-effort; failure here doesn't roll back the
-  // void since the invoice row update is the source of truth).
-  await sb.from("audit_log").insert({
-    role:       auth.role,
-    actor_text: auth.email ?? null,
-    action:     `Invoice voided · ${(data as { invoice_no: string }).invoice_no} · ${body.data.reason.slice(0, 200)}`,
-    ref:        (data as { invoice_no: string }).invoice_no,
-  });
-
-  return c.json(data);
-});
+financeInvoicesRouter.post("/:id/void", (c) =>
+  c.json({ error: "gone", code: "door_closed", message: INVOICE_DOORS.void }, 410));
 
 // ----- GET /:id/pdf -----
 // 2026-05-12 (Loo): renamed `/pdf` → `/pdf-data`. Now returns JSON shaped

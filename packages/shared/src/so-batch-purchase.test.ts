@@ -4,6 +4,9 @@ import {
   SO_BATCH_RAIL,
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
+  soBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchOrderRow,
@@ -77,6 +80,9 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean, and `false` — nothing
+       of this build sits on an open purchase order — is the ordinary case. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -100,7 +106,6 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
-      "toOrder",
       "timing",
       "product",
       "supplier",
@@ -108,8 +113,12 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "setup",
     ]);
     expect(SO_BATCH_RAIL).not.toHaveProperty("work");
-    expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
-    expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
+    /* ⛔ `TO ORDER / All not ordered` is RETIRED (owner correction
+       2026-09-11): the one row that named the page's own default rather than a
+       fact about a Sales Order. The heading may not return under any spelling,
+       and the section may not come back as a key. */
+    expect(SO_BATCH_RAIL).not.toHaveProperty("toOrder");
+    expect(JSON.stringify(SO_BATCH_RAIL)).not.toMatch(/not ordered/i);
     expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
     expect(SO_BATCH_RAIL.timing.states).toEqual([
       "can_order_early",
@@ -151,28 +160,26 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     expect(W.multiple).toBe("Multiple");
   });
 
-  it("Card 02-B — the ten business column heads, in the approved order exactly", () => {
+  it("the nine business column heads, in the approved reading order exactly", () => {
     expect([
-      W.colStatus,
-      W.colProceedDate,
-      W.colPoNo,
       W.colSoNo,
       W.colCustomer,
-      W.colDeliveryLocation,
+      W.colProceedDate,
       W.colRequestedDelivery,
+      W.colDeliveryLocation,
       W.colSupplier,
       W.deliverTo,
+      W.colPoNo,
       W.colPoDeliveryDate,
     ]).toEqual([
-      "Status",
-      "Proceed Date",
-      "PO No",
       "SO No",
       "Customer",
-      "Delivery Location",
+      "Proceed Date",
       "Requested Delivery Date",
+      "Delivery Location",
       "Supplier",
       "Deliver To",
+      "PO No",
       "PO Delivery Date",
     ]);
   });
@@ -196,8 +203,6 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
     const spelt = [
       ...Object.values(W),
-      SO_BATCH_RAIL.toOrder.heading,
-      SO_BATCH_RAIL.toOrder.all,
       SO_BATCH_RAIL.timing.heading,
       SO_BATCH_RAIL.product.heading,
       SO_BATCH_RAIL.product.all,
@@ -361,24 +366,154 @@ describe("the rail model — unique-SO counts that cross-update between sections
     /* oA has TWO leafs in the band and TWO mattress lines — one order. */
     expect(m.timingCounts.can_order_early).toBe(1);
     expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
-    expect(m.notOrderedCount).toBe(3); // oA · oB · oD — outstanding only
+    expect(m).not.toHaveProperty("notOrderedCount");
   });
 
-  it("counts an uncovered Register line even when the issue leaf is absent", () => {
-    const uncovered = railOrder({
-      orderId: "open-po-pool-mismatch",
-      lines: [line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] })],
-      outstandingSuppliers: ["Ohana"],
+  /**
+   * ⭐ TWO CALCULATIONS, TWO SCOPES — recorded 2026-09-11 after the owner's
+   * `Qty 1 · On PO 14 · To buy 1` report.
+   *
+   * These assertions pin what `On PO` COUNTS, so nobody later "fixes" it into
+   * agreeing with the engine's number by netting deliveries out of it. It is
+   * the HISTORICAL document quantity and it is meant to be.
+   */
+  describe("the historical document quantity is not the effective remainder", () => {
+    it("counts a DELIVERED document's units — history is not netted by what arrived", () => {
+      /* The engine's pool reads `purchase_orders.status = 'open'` lines net of
+         `received_qty`, so a delivered document supplies it nothing. This
+         number is a different question — *what did this line's documents ever
+         carry* — and a received document answers it in full. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "delivered", qty: 3, stockTaken: 0, pos: [{ poId: "PO-1", qty: 3 }] }),
+        ),
+      ).toBe(0);
     });
-    const m = soBatchRailModel(soBatchRailFacts([uncovered], []), SO_BATCH_RAIL_CLEAR);
 
-    expect(m.notOrderedCount).toBe(1);
+    it("never lets exact lineage go negative, however many documents name the line", () => {
+      /* Fourteen documents naming a one-unit line is over-coverage, and the
+         screen must print it as it stands. What it may not do is turn it into
+         a negative requirement that would read as demand. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({
+            orderLineId: "fourteen",
+            qty: 1,
+            stockTaken: 0,
+            pos: Array.from({ length: 14 }, (_, i) => ({ poId: `PO-${i}`, qty: 1 })),
+          }),
+        ),
+      ).toBe(0);
+    });
+
+    it("nets Ready Stock BEFORE lineage, and never below zero", () => {
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "mixed", qty: 4, stockTaken: 1, pos: [{ poId: "PO-1", qty: 1 }] }),
+        ),
+      ).toBe(2);
+    });
+  });
+
+  /**
+   * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY.
+   *
+   * It is what makes the two scopes legible on screen: fourteen `Completed`
+   * documents and fourteen `Not sent to supplier` ones are opposite
+   * situations wearing the same `On PO 14`.
+   */
+  /**
+   * ⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY.
+   *
+   * The engine prints the COVERING document's quantity under `To buy` when the
+   * open-PO pool covers every unit (T6), and the Register drew it on a row it
+   * does not offer — a covering quantity wearing a purchasing heading. These
+   * four cases are the only four, and three of them print no figure at all.
+   */
+  describe("soBatchToBuyState", () => {
+    const buyable = (over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow =>
+      row({ toBuy: 3, fullyOnPo: false, ...over });
+
+    it("states the remainder ONLY when the engine verified it is uncovered", () => {
+      expect(soBatchToBuyState(buyable(), "blank")).toEqual({ kind: "buy", qty: 3 });
+    });
+
+    it("states no purchasing quantity for a covered build", () => {
+      /* `issue-batch` refuses this by name (`already_on_po`), so the figure is
+         the coverage, not a remainder — and it is not this column's to print. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: true }), "blank")).toEqual({
+        kind: "covered",
+      });
+    });
+
+    it("states no purchasing quantity when it could not check", () => {
+      /* UNKNOWN IS NOT YES. An older Worker sends no flag; the page says so
+         rather than reading the gap as permission. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: undefined }), "blank")).toEqual({
+        kind: "unchecked",
+      });
+    });
+
+    it("says nothing at all on an order that has finished buying", () => {
+      expect(soBatchToBuyState(buyable(), "ordered")).toEqual({ kind: "none" });
+    });
+
+    it("says nothing at all on a line this page cannot buy", () => {
+      expect(soBatchToBuyState(buyable({ toBuy: 0 }), "blank")).toEqual({ kind: "none" });
+      expect(soBatchToBuyState(buyable({ issueRef: null }), "blank")).toEqual({ kind: "none" });
+    });
+
+    /* THE TICK AND THE FIGURE AGREE, ALWAYS. A row that states a purchasing
+       quantity is exactly a row the page offers, and the reverse. */
+    it("prints a figure on exactly the rows the register offers", () => {
+      for (const row of [
+        buyable(),
+        buyable({ fullyOnPo: true }),
+        buyable({ fullyOnPo: undefined }),
+        buyable({ toBuy: 0 }),
+      ]) {
+        for (const status of ["blank", "partial", "ordered"] as const) {
+          expect(soBatchToBuyState(row, status).kind === "buy").toBe(
+            isSelectableForOrder(row, status),
+          );
+        }
+      }
+    });
+  });
+
+  describe("soBatchPoDocumentState", () => {
+    it("speaks the governed words, and never the raw database value", () => {
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: true }))
+        .toBe("Completed");
+      /* Delivered goods with no send record stay honestly Completed — the
+         document is finished; missing send evidence is a different fact. */
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: false }))
+        .toBe("Completed");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: true }))
+        .toBe("Issued");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: false }))
+        .toBe("Not sent to supplier");
+    });
+
+    it("⛔ never says the raw word — COPY-STANDARD bans the bare word as a PO status", () => {
+      for (const status of ["open", "received"] as const) {
+        for (const sent of [true, false]) {
+          expect(soBatchPoDocumentState({ status, sentCurrentVersion: sent })).not.toMatch(/open/i);
+        }
+      }
+    });
+  });
+
+  /* THE ROW WENT; THE ARITHMETIC DID NOT. `All not ordered` was retired as a
+     rail row, and the exact-evidence remainder it counted still governs the
+     tick and the Ready Stock door — so it keeps its own test rather than
+     leaving with the control that used to print it. */
+  it("an uncovered Register line is outstanding even when the issue leaf is absent", () => {
     expect(
-      soBatchRailModel(soBatchRailFacts([uncovered], []), {
-        ...SO_BATCH_RAIL_CLEAR,
-        notOrderedOnly: true,
-      }).visibleOrderIds,
-    ).toEqual(new Set(["open-po-pool-mismatch"]));
+      soBatchOrderLineOutstandingQty(
+        line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] }),
+      ),
+    ).toBe(1);
   });
 
   it("every timing band is present, zero included — an empty band prints 0, not silence", () => {
@@ -440,7 +575,6 @@ describe("the rail model — unique-SO counts that cross-update between sections
     const m = model({ product: "sofa" });
     /* Only oC (ordered) and oD (setup) are sofas. */
     expect(m.timingCounts.can_order_early).toBe(0);
-    expect(m.notOrderedCount).toBe(1); // oD
     expect(m.suppliers).toEqual([
       { name: "Nice Future", count: 1 },
       { name: "Ohana", count: 1 },
@@ -458,8 +592,8 @@ describe("the rail model — unique-SO counts that cross-update between sections
     expect([...kept.visibleOrderIds]).toEqual([]);
   });
 
-  it("filters from different sections combine — All not ordered + Mattress + Hooka", () => {
-    const m = model({ notOrderedOnly: true, product: "mattress", supplier: "Hooka" });
+  it("filters from different sections combine — Mattress + Hooka + can order early", () => {
+    const m = model({ product: "mattress", supplier: "Hooka", timing: "can_order_early" });
     expect([...m.visibleOrderIds]).toEqual(["oA"]);
   });
 

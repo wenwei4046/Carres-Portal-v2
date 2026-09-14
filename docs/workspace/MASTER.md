@@ -69,9 +69,19 @@ hard-coded Jess/Manager identity or page-level cover calculation. People/HR supp
 employment and leave facts; Workspace owns Duty assignments; the Shared Duty Resolver combines
 them.
 
-Distinct Duties include Payment Duty, Storage Waiver Approver, Payment Approver, Purchasing
-Approver, Delivery Charge Approver, Stock Adjustment Approver and Service Case Approver. There is
-no fake `ERP Owner`.
+Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing
+Approver, Delivery Charge Approver, Stock Adjustment Approver, Service Case Approver and, since
+the owner ruling of 2026-09-13, **Delivery Duty** (`delivery_duty`). There is no fake `ERP Owner`.
+
+**`Delivery Duty` is the assignment key of an owner rule the Work Engine already carried**
+(`ownerRule: "delivery_duty"`), not a new Delivery-local duty system: routine Delivery
+arrangement, customer contact, proxy recording, result recording on behalf of a partner and proof
+review all resolve through it and the Shared Duty Resolver. Its Primary holder and Buddy cover are
+configured only here. When no active holder or cover resolves, the action stays visible under its
+duty word and the surface prints the governed configuration failure with its door, `Nobody holds
+Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`; the protected act refuses with
+the same sentence. No action is routed to an Operations Superuser by default and Delivery Settings
+never holds a roster or an owner list (`../delivery/MASTER.md` §13.1).
 
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
@@ -297,6 +307,14 @@ honest Work for admitted modules.
   invalid source data fails visibly instead of presenting a false clear desk.
 - My Work, Team Work and the Quick Rail My Work counts read that same cached response. The
   retired browser composition and Quick Rail Team/duty editor have been removed.
+- **One cache key per read (production-verified 2026-09-13, `ed76eb43`).** The legacy
+  `ops_tasks` read (header Bell, Orders Control) once cached under the SAME React Query key as the
+  shared Work feed, so whichever read landed second was served the other's shape: My Work, Team
+  Work, the Quick Rail counts and the Payment Monitor's owner cells went dark while the feed
+  carried 215 items. The legacy read now owns `["operation","legacy-tasks"]`;
+  `work-cache-isolation.test.tsx` proves both mounting orders, co-mounting, feed invalidation and
+  shape incompatibility against a real QueryClient, with a negative control on the old key. A key
+  collision is a silent wrong answer, never an error — every read owns exactly one key.
 - My Work is the default for everyone. It routes by acting person; Team Work groups by normal
   owner and shows dated cover evidence without rewriting ownership.
 - Stock/Warehouse admission was re-audited against the production-verified replacement Monitor,
@@ -307,7 +325,7 @@ honest Work for admitted modules.
   current central Work endpoint is Operation-only and has neither Site-queue routing nor personal
   acceptance facts. Naming Carres staff, `NETS` or a shared warehouse login would violate section 3.
 - **Outbound Work delivery branch, 2026-09-09 — built, not yet production-verified.** Physical
-  Outbound now projects one action per unfinished Delivery Order from the already-authoritative
+  Outbound now projects one action per unfinished Delivery Order + Warehouse Site from the authoritative
   exact-Unit schedule. Before work starts, Team Work groups it under the permission-scoped
   Warehouse Site queue; the first personally signed-in Warehouse operator who explicitly accepts
   or begins the governed scan becomes its resolved owner without rewriting the Site evidence.
@@ -315,8 +333,10 @@ honest Work for admitted modules.
   required Unit's accepted Warehouse handover with receiver and proof. Internal Work opens the
   exact filtered internal Outbound door; the Warehouse-scoped feed opens the external Site door.
   No Carres staff member, organisation avatar, Monitor event or manual Done control is introduced.
-  Migration, deploy and authenticated multi-account production proof remain required before this
-  paragraph may say production-verified.
+  The 2026-09-14 audit found 0459/0460 unapplied and zero Warehouse accounts. 0459's active role/Site
+  check still needs a personal-identity guard and governed offboarding/transfer history; the external
+  queue/acceptance UI remains outstanding. The branch fixes DO/Site identity, exact destinations and
+  failed reads, but migration, deploy and authenticated multi-account production proof remain required.
 - Delivery-owned arrangement, company assignment, customer booking, delivery-day result, proof and
   loan-return actions now retain Delivery as their module in the shared engine. Their stable object
   is the Delivery scope until a Delivery Order exists, then the exact DO where the result/proof act
@@ -324,10 +344,24 @@ honest Work for admitted modules.
   context and is no longer presented as the universal owner of those actions.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
-  goods are ready or have a real arrival date; Payment Duty/cover owns the action, the exact Invoice
-  is the object/door, and only an atomic allocated payment reducing outstanding to RM 0 completes it.
-  A sent message remains evidence and bank matching remains later evidence; neither is a second
-  settlement step nor closes Work.
+  goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
+  Delivery Operation, read through the one shared authority `delivery_responsible_operation`
+  (the order's responsibility ledger row, else the INDIVIDUAL the Sales Order was dealt to when it
+  entered Operations — `ops_order_control.assigned_staff`; contact history and the Delivery Duty
+  holder are no longer owner sources, and an account with no `staff_code` may record evidence but
+  never own), with today's acting person being the governed buddy cover, else an away person's
+  least-loaded stand-in for the day, and kept until the
+  balance is RM 0 (0489 · 0504, owner rulings 2026-09-13) — owns the action
+  with the shared buddy-cover law and a formal handover door; `Payment Duty` is retired; the exact Invoice
+  is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
+  Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes
+  it. The clock's ask/deadline pair is `Settings → Payments → Collection timing` (0486),
+  snapshotted on the invoice's issue day; the deadline is a company-calendar fact and the contact
+  action is scheduled on the resolved owner's governed working days (Operation: Mon–Fri). A live unpaid Storage Invoice raises `Send the invoice and collect payment`
+  (`payment.send_storage_invoice`) under the governed Delivery owner word. The Payment Monitor is
+  the full collection overview and reads these same items for its owner avatar — it creates no
+  second action, completion, owner or `Done`. A sent message remains evidence and bank matching
+  remains later evidence; neither is a second settlement step nor closes Work.
 - Service Case admission was re-audited against the approved Service MASTER and shipped case plan,
   deadline clock and case API on 2026-09-07. The one deadline action (`Call {customer} — say why it
   is taking longer`) already has an authoritative trigger, 14-working-day deadline, exact case door

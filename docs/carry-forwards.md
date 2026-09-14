@@ -1,3 +1,35 @@
+## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
+
+**🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
+meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
+`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
+and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
+`apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
+`apps/web/src/pages/operation/OperationWork.tsx`).
+
+After 0504 the Delivery Duty holder has nothing to do with this answer. The responsible person is
+the individual the Sales Order was dealt to, so an unresolved owner means **no individual is in the
+Operation assignment pool** — and Staff & Duties cannot fix it. The sentence sends the operator to
+the wrong door, and the owner explicitly forbade asking for a Delivery Duty holder as a workaround.
+
+**The fix, ready to apply on her word:** `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`.
+
+**Why it was reported and not shipped:** an approved on-screen word changes only when the owner
+says so (CLAUDE.md §10, and one of the four reasons to interrupt her). Nothing operational depends
+on it today — the state is unreachable while the pool holds an individual, and production's pool
+holds two (Shasha CR005 · Yu Jun CR004). **Closes when she rules on the words.**
+
+**Falsifier:** an authenticated load that renders `monitor-owner-unassigned` or
+`collection-owner-none` on a real order. That would mean the pool has emptied and the wrong door is
+in front of an operator.
+
+**Supersedes `delivery-duty-initial-holder` (opened 2026-09-13, closed 2026-09-14 without being
+done).** That carry-forward asked the owner to name an initial `delivery_duty` holder so automatic
+ownership could resolve. She rejected the premise on 2026-09-13: responsibility is not a duty
+holder, it is the person the order was dealt to. 0504 removed the Delivery-Duty source, so the
+holder is no longer owed and automatic ownership no longer waits on anybody.
+
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
 **Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
@@ -86,6 +118,37 @@ each owner should take the one-line change with a test.
   it collided with this card's `0454`, which was renumbered to `0456`/`0457` and whose two
   tracker rows were renamed to match. **Falsifier / next step:** the Issue Tracker lane applies it
   through the governed path, or confirms its objects are live and inserts the tracker row.
+- `0461-to-0469-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-10. NOT THIS
+  LANE'S.** Nine migrations are on `main` and **absent from `supabase_migrations.schema_migrations`**
+  (measured 2026-09-10 while applying the SO Batch Ready Stock work): `0461`–`0468`, the Finance
+  ledger set, plus `0469_a_reversal_and_its_contra_are_both_counted`. The tracker's numeric tail
+  is `0458` while the repository's is `0472`. This is the same shape as the `0454` scar above and
+  is nine times larger. Found because the Ready Stock lane had to establish which of its own
+  dependencies were live: `0442`/`0443`/`0444`/`0453` ARE applied, which is what `0471` stands on,
+  so nothing here was blocked and **nothing here was touched.** **Falsifier / next step:** the
+  Finance lane applies them through the governed path, or confirms their objects are live and
+  inserts the tracker rows. Until then any reader of the tracker tail will under-count by nine.
+- `kit-blue-9-is-used-as-a-css-variable-and-never-defined` — **OPEN, 2026-09-11, NOT THIS LANE'S,
+  found in passing while fixing the same mistake inside `ReadyStockPanel.tsx`.** The kit palette is
+  a TAILWIND colour scale (`tailwind.config.ts` → `theme.extend.colors.kit`), not a set of CSS
+  custom properties: **no stylesheet anywhere defines `--kit-blue-9`**, measured against the built
+  bundle (`apps/web/dist/assets/*.css` carries three uses and zero definitions). An invalid value
+  invalidates the whole declaration, so three rules in
+  `apps/web/src/pages/operation/PurchasingRegister.module.css` currently draw nothing: the 2px left
+  accent bar on an expanded parent row (`background: var(--kit-blue-9)`), the focus outline on the
+  SO Batch / Manual Purchase / PO register selects (`outline: 2px solid var(--kit-blue-9)`) and the
+  `--c-orange` alias built from it. **Fix:** the same one used here — read the token from the theme
+  (`theme(colors.kit.blue.9)`) or define the custom property once beside `--kit-blue-3`, which that
+  file already does define locally. It is left alone here because it changes how three registers
+  LOOK on surfaces this lane did not walk, and a repair that turns invisible chrome visible deserves
+  its own before/after. **Falsifier / next step:** a lane that owns those registers defines or
+  replaces the variable and walks the three surfaces.
+- ~~`so-batch-ready-stock-delegator-awaits-0472`~~ — **CLOSED 2026-09-11 WITH ITS PROOF.** All three
+  production surfaces reported the merge SHA `dd7b6a0b`
+  (`erp` · `pos` · the Worker's `/health`, measured 2026-09-11), so the deploy window `0471`'s
+  7-argument `ops_stock_pool_draw` delegator existed for was over. `0472` is applied (tracker
+  `20260910105452`) and `pg_proc` now carries exactly ONE `ops_stock_pool_draw`, the 8-argument
+  door that names `p_order_line_id`. Law C is satisfied: one act, one door.
 - ~~`receiving-grn-card-01-awaits-merge-apply-and-production-proof`~~ — **CLOSED 2026-09-04 WITH
   ITS PRODUCTION PROOF.** 0425/0426 APPLIED via the governed MCP path (tracker 20260904125205 /
   20260904125800), PR #1099 merged `7a897494`, deployed, production-smoked with committed test
@@ -578,3 +641,40 @@ primitive fixes it in the same move.
   row already applied keeps its own name; what must stop is a repository with two 0346s, which
   is how a future `ls`-based number gets picked (red line 7) and how the next chat silently
   skips a migration that was never checked in.
+
+---
+
+## `purchasing-approver-duty-has-no-holder` — OWNER ACTION OWED, opened 2026-09-11
+
+**🟡 The Purchasing Approver duty now REACHES the door, and nobody holds it.** Migration
+`0474` moves `purchasing_decide_request` onto `purchasing_approver_gate`, which resolves
+`purchasing_approver` through `workspace_resolve_duty` — the Shared Duty Resolver Staff &
+Duties actually writes. It closes a gap measured on production the same day: the key was
+offered in Staff & Duties and named by the Work Engine as `manual_purchase.approve`'s owner
+duty, but the door gated on `org_position_duties` (`ops_manager`), a DIFFERENT system — so
+`Approve purchase` had no owner in Work, and an assignment made on the Staff & Duties screen
+could never have reached the decision.
+
+**Nothing changed on the day it landed, and that is deliberate.** The gate's third rung lets the
+`ops_manager` holder (Jess, the one active holder) keep deciding **while `purchasing_approver`
+has no active holder**, so behaviour is identical until the duty is assigned. This file exists
+so the assignment is not forgotten.
+
+**What is owed, and by whom:** Jess (or whoever holds `account_creator`/HR) assigns
+**Purchasing Approver** to a position in `Workspace → Staff & Duties`. No migration, no deploy
+and no code change is involved — it is configuration, and CLAUDE.md §6 is explicit that
+configuration is what must survive go-live.
+
+**What happens the moment it is assigned:** the assigned holder becomes the approver in the SQL
+door, in `canApprove` (which draws the controls and the approver-only money) and in the Work
+row's owner — all three read the same three rungs in the same order. The `ops_manager` fallback
+disappears by itself, in the gate and in the reader, with no further migration.
+
+**Falsifier / how to close this:**
+```sql
+select public.workspace_resolve_duty('purchasing_approver');
+```
+`source = 'assignment'` with a non-null `actor_user_id` = closed. `not_assigned` = the
+`ops_manager` fallback is still carrying the approval.
+
+- `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.

@@ -219,6 +219,8 @@ function createBody(over: Record<string, unknown> = {}) {
       phone: "012-3456789",
       address: "123 Jalan Sample, 50000 KL",
       addressUnknown: false,
+      /* The required Sales facts (owner ruling 2026-09-13, Delivery Card 18). */
+      addressState: "Kuala Lumpur",
       billing: null,
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
@@ -226,6 +228,7 @@ function createBody(over: Record<string, unknown> = {}) {
     // A date far past the lead-time floor. It used to be TBD, which the
     // 2026-08-15 owner ruling retired: a new Sales Order is never dateless.
     delivery: { date: isoIn(400), proceedDate: isoIn(0), dateTbd: false, floor: 1, hasLift: false },
+    entryData: { fields: { building_type: "Condo" } },
     lines: [{ sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unitPrice: 1500 }],
     addons: [],
     paid: 750,

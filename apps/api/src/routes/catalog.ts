@@ -64,6 +64,7 @@ import {
   autoBedSkuDescription,
   skuImportInput,
   hasPricingIntent,
+  purchasingSuppliersOnly,
   type SkuImportRow,
   type SkuImportFailure,
 } from "@carres/shared";
@@ -1050,7 +1051,7 @@ catalogRouter.post("/import-skus", async (c) => {
   // suppliers ever cover the same category.
   const { data: suppliers, error: supErr } = await sb
     .from("suppliers")
-    .select("id, slug, name, cat_covered")
+    .select("id, slug, name, kind, cat_covered")
     .order("slug");
   if (supErr) {
     const m = mapPgError(supErr);
@@ -1059,7 +1060,9 @@ catalogRouter.post("/import-skus", async (c) => {
   const supBySlug = new Map<string, string>();
   const supByName = new Map<string, string>();
   const supByCategory = new Map<string, string>();
-  for (const row of suppliers ?? []) {
+  // 0477 — a file naming Finance's landlord or advertiser must not put it in a
+  // catalog slot; it resolves like any unknown supplier.
+  for (const row of purchasingSuppliersOnly(suppliers ?? [])) {
     const s = row as { id: string; slug: string | null; name: string | null; cat_covered: string[] | null };
     if (s.slug) supBySlug.set(s.slug.toLowerCase(), s.id);
     if (s.name) supByName.set(s.name.toLowerCase(), s.id);

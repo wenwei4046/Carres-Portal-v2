@@ -205,7 +205,6 @@ describe("GET /api/operation/workspace-duties", () => {
     expect(body.duties.map((d) => d.key)).toEqual([
       "po_duty",
       "grn_duty",
-      "payment_duty",
       "storage_waiver_approver",
       "purchasing_approver",
       "delivery_charge_approver",
@@ -214,6 +213,7 @@ describe("GET /api/operation/workspace-duties", () => {
       "service_case_approver",
       "issue_triage_duty",
       "issue_review_approver",
+      "delivery_duty",
     ]);
     const grnDuty = body.duties.find((d) => d.key === "grn_duty")!;
     expect(grnDuty).toMatchObject({ key: "grn_duty", label: "GRN Duty" });

@@ -16,6 +16,7 @@ import type {
 const STATUS_TONE: Record<DeliveryOrderStatusKind, OrderActionTone> = {
   created: "neutral",
   out_for_delivery: "info",
+  arrived: "success",
   delivered: "success",
   exception: "warning",
   cancelled: "neutral",

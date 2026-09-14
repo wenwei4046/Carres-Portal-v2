@@ -10,6 +10,7 @@
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "ci:migrations": "node scripts/check-migrations.mjs",
+    "migrations:replay": "node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json",
     "ci:stamp": "node scripts/write-deploy-proof.mjs",
     "ci:smoke": "node scripts/verify-production.mjs",
     "test:e2e": "playwright test",

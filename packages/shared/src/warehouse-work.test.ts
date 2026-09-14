@@ -4,6 +4,7 @@ import type { WarehouseOutboundCard } from "./warehouse-outbound";
 
 const card = {
   deliveryOrderId: "do-1",
+  warehouseSiteId: "site-1",
   doNumber: "DO-2609-019",
   eventDate: "2026-09-09",
   fromLocation: "Carres Klang Warehouse",
@@ -45,7 +46,7 @@ describe("Warehouse Outbound Work projection", () => {
 
   it("does not leak one Site's acceptance into another Site's queue for the same DO", () => {
     const [item] = projectWarehouseOutboundWork({
-      cards: [card],
+      cards: [{ ...card, warehouseSiteId: "site-2" }],
       site: { id: "site-2", label: "Carres Johor Warehouse" },
       assignments: [{ deliveryOrderId: "do-1", siteId: "site-1", userId: "operator-1", name: "Nadia" }],
       today: "2026-09-09",
@@ -53,6 +54,17 @@ describe("Warehouse Outbound Work projection", () => {
 
     expect(item.owner.state).toBe("site_queue");
     expect(item.owner.queue?.id).toBe("site-2");
+  });
+
+  it("keeps distinct Work identities and excludes another Site's Units", () => {
+    const project = (siteId: string) => projectWarehouseOutboundWork({
+      cards: [card, { ...card, warehouseSiteId: "site-2" }],
+      site: { id: siteId, label: siteId }, assignments: [], today: "2026-09-09",
+    });
+    expect(project("site-1")).toHaveLength(1);
+    expect(project("site-2")).toHaveLength(1);
+    expect(project("site-1")[0].id).not.toBe(project("site-2")[0].id);
+    expect(project("site-3")).toEqual([]);
   });
 
   it("closes only when every required Unit has an accepted handover", () => {

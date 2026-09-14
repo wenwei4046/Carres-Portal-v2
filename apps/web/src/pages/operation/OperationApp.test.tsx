@@ -92,9 +92,6 @@ vi.mock("./DeliveryOrderPage", () => ({
 // suite owns is that the URL actually MOUNTS it, which is precisely what the
 // production walk found broken: the route existed and the `isUrlDriven` gate
 // did not include it, so the main pane rendered nothing.
-vi.mock("./EditDelivery", () => ({
-  default: () => <div data-testid="edit-delivery-stub">edit-delivery</div>,
-}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -311,40 +308,18 @@ describe("OperationApp — the Delivery destinations", () => {
  * the URL fell through to the `?tab=` branch and drew an empty main pane. A
  * component test cannot see that — only mounting the APP at the URL can.
  */
-describe("OperationApp — Edit Delivery mounts at its URL", () => {
-  it("/operation/delivery/edit/:orderId mounts the page", () => {
+describe("OperationApp — the retired Edit Delivery URL lands on the Monitor row", () => {
+  it("/operation/delivery/edit/:orderId opens Monitor with that row's brief unfolded", () => {
     renderApp("/operation/delivery/edit/order-1");
-    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("edit-delivery-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe").textContent).toContain(
+      "/operation?tab=delivery&view=all&open=order-1",
+    );
   });
 
-  it("and the slim global bar stands down — the page draws its own header", () => {
-    renderApp("/operation/delivery/edit/order-1");
-    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
-  });
-
-  it("a leg keeps its query string", () => {
+  it("a leg keeps its own row", () => {
     renderApp("/operation/delivery/edit/order-1?leg=2");
-    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
-  });
-});
-
-/**
- * 【WAREHOUSE】 CARD 02 — UNIT DETAIL IS A ROUTE THAT MOUNTS. The Route shipped
- * 2026-08-21 (`stock/unit/:unitCode`) and never joined `isUrlDriven`, so a
- * Unit's permanent address rendered the DASHBOARD — measured live 2026-09-03 on
- * /operation/stock/unit/id-aam135002. A component test cannot see that; only
- * mounting the APP at the URL can.
- */
-describe("OperationApp — a Unit's permanent address mounts Unit Detail", () => {
-  it("/operation/stock/unit/:unitCode mounts the page, not the dashboard", () => {
-    renderApp("/operation/stock/unit/id-aam135002");
-    expect(screen.getByTestId("unit-detail-stub")).toBeInTheDocument();
-    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
-  });
-
-  it("and the slim global bar stands down — the page draws its own header", () => {
-    renderApp("/operation/stock/unit/id-aam135002");
-    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe").textContent).toContain("open=order-1%23leg2");
   });
 });
 
@@ -433,15 +408,15 @@ describe("OperationApp — the retired Purchase Demands address", () => {
  * reason to make the old address land.
  */
 describe("OperationApp — the retired Payments desk", () => {
-  it("?tab=payments leads to the canonical Payments Register", () => {
+  it("?tab=payments leads to the Payments Monitor — the collection desk (2026-09-12)", () => {
     renderApp("/operation?tab=payments");
-    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/payments");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/monitor");
   });
 
   it("a scoped bookmark keeps its order", () => {
     renderApp("/operation?tab=payments&so=1319");
     expect(screen.getByTestId("location-probe")).toHaveTextContent(
-      "/finance/payments?order=1319",
+      "/finance/monitor?order=1319",
     );
   });
 

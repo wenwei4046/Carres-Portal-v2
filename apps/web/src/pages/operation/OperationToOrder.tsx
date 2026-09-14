@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   groupSelectionsIntoDocuments,
   soBatchPurchaseResponseSchema,
@@ -38,6 +39,8 @@ const QUERY_KEY = ["so-batch-purchase"] as const;
 
 export default function OperationToOrder() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const scopeSo = searchParams.get("so");
   const [selections, setSelections] = useState<SoBatchSelection[] | null>(null);
 
   /**
@@ -50,11 +53,16 @@ export default function OperationToOrder() {
    * cannot support.
    */
   const q = useQuery<SoBatchPurchaseResponse>({
-    queryKey: QUERY_KEY,
-    queryFn: async () =>
-      soBatchPurchaseResponseSchema.parse(
-        await apiFetch<unknown>("/api/operation/purchase/demands"),
-      ) as SoBatchPurchaseResponse,
+    queryKey: [...QUERY_KEY, scopeSo] as const,
+    queryFn: async () => {
+      const path =
+        scopeSo && scopeSo.trim() !== ""
+          ? `/api/operation/purchase/demands?so=${encodeURIComponent(scopeSo)}`
+          : "/api/operation/purchase/demands";
+      return soBatchPurchaseResponseSchema.parse(
+        await apiFetch<unknown>(path),
+      ) as SoBatchPurchaseResponse;
+    },
   });
 
   const data = q.data;

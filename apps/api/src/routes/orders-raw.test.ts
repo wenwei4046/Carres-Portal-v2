@@ -97,8 +97,8 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
   const sb = {
     rpc: async (name: string, args: { payload?: Record<string, unknown> } & Record<string, unknown>) => {
-      // The create RPC nests its input under `payload`; flat-arg RPCs
-      // (payment_record, CARD 4) pass their args directly.
+      // The create RPC nests its input under `payload`; a flat-arg RPC
+      // would pass its args directly.
       rpcCalls.push({ name, payload: (args?.payload ?? args) as Record<string, unknown> });
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return {
@@ -156,9 +156,15 @@ async function post(jwt: string, body: unknown) {
   );
 }
 
+/** The smallest body the door accepts since 2026-09-13 (Delivery Card 18):
+ *  dealer, name, one line — and the required delivery facts. */
 const validBody = {
   dealerId: DEALER_A,
-  customer: { name: "Raw Customer" },
+  customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false, addressState: "Kuala Lumpur" },
+  deliveryDate: "2026-08-01",
+  deliveryFloor: 1,
+  deliveryHasLift: false,
+  entryData: { fields: { building_type: "Condo" } },
   lines: [
     { sku: "CLOUD-QUEEN", qty: 1, unitPrice: 2890 },
     { sku: "CUSTOM DELIVERY SURCHARGE", qty: 1, unitPrice: 150.5 },
@@ -192,12 +198,13 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(call.name).toBe("create_raw_order");
     const p = call.payload;
     expect(p.dealer_id).toBe(DEALER_A);
-    // No POS gates: no signature, no terms, no payment method, date TBD.
+    // No POS gates: no signature, no terms, no payment method. The requested
+    // date is a required fact since 2026-09-13 — never TBD on a new order.
     expect(p.signature_url).toBeNull();
     expect(p.terms_accepted).toBe(false);
     expect(p.payment_method).toBeNull();
-    expect(p.delivery_date).toBeNull();
-    expect(p.delivery_date_tbd).toBe(true);
+    expect(p.delivery_date).toBe("2026-08-01");
+    expect(p.delivery_date_tbd).toBe(false);
     // Lines persist EXACTLY as entered — custom text sku + operator price, attrs null.
     expect(p.lines).toEqual([
       { sku: "CLOUD-QUEEN", qty: 1, attrs: null, unit_price: 2890 },
@@ -224,7 +231,27 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.delivery_date_tbd).toBe(false);
   });
 
-  it("minimal body still maps to the historical nulls (backward-compatible wire shape)", async () => {
+  it("refuses a body without the required delivery facts — one wording, every door (Card 18)", async () => {
+    const sb = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb);
+    const cases: Array<[Record<string, unknown>, string]> = [
+      [{ customer: { name: "Raw Customer", addressUnknown: true } }, "Delivery address — ask the customer for the address before you save the order"],
+      [{ customer: { name: "Raw Customer", address: "12 Jalan A, KL", addressUnknown: false } }, "Delivery address — pick the State"],
+      [{ entryData: { fields: { referral: "Fair 2026" } } }, "Building type — pick the building the goods go to"],
+      [{ deliveryFloor: undefined }, "Floor — enter the floor the goods go to"],
+      [{ deliveryHasLift: undefined }, "Lift — say whether the building has a lift"],
+      [{ deliveryDate: null }, "Delivery date is required. Ask the customer for the date before you save the order."],
+    ];
+    for (const [over, word] of cases) {
+      const res = await post(await makeJwt("principal"), { ...validBody, ...over });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { message?: string; error?: string };
+      expect(JSON.stringify(body)).toContain(word);
+    }
+    expect(sb._rpcCalls.length).toBe(0);
+  });
+
+  it("minimal body still maps the untouched fields to the historical nulls (backward-compatible wire shape)", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), validBody);
@@ -239,8 +266,8 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.delivery_has_lift).toBe(false);
     expect(p.installment_months).toBeNull();
     expect(p.addons).toEqual([]);
-    // entry_data key must be ABSENT (jsonb 'null' would trip the RPC guard).
-    expect("entry_data" in p).toBe(false);
+    // entry_data carries the building type now (never jsonb 'null').
+    expect(p.entry_data).toEqual({ fields: { building_type: "Condo" } });
   });
 
   it("POS-parity extras pass through: customer block, delivery extras, payment, addons, entry_data", async () => {
@@ -279,7 +306,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       signaturePath: "orders-attachments/d1/w1/signature.png",
       paymentSlipPath: "orders-attachments/d1/w1/payment-slip.jpg",
       termsAccepted: true,
-      entryData: { payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } },
+      entryData: { payment: { bank: "Maybank" }, fields: { referral: "Fair 2026", building_type: "Condo" } },
     });
     expect(res.status).toBe(201);
     const p = sb._rpcCalls[0].payload;
@@ -307,7 +334,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     expect(p.signature_url).toBe("orders-attachments/d1/w1/signature.png");
     expect(p.payment_slip_url).toBe("orders-attachments/d1/w1/payment-slip.jpg");
     expect(p.terms_accepted).toBe(true);
-    expect(p.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { referral: "Fair 2026" } });
+    expect(p.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { referral: "Fair 2026", building_type: "Condo" } });
     expect(p.addons).toEqual([
       { addon_key: "dispose-mattress", qty: 1, unit_price: 50, attrs: { size: "Queen" } },
     ]);
@@ -347,12 +374,12 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     ]);
   });
 
-  it("client delivery addons are dropped (server-exclusive keys) and proceed date needs a delivery date", async () => {
+  it("client delivery addons are dropped (server-exclusive keys) and the proceed date rides with the delivery date", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), {
       ...validBody,
-      proceedDate: "2026-07-20", // no deliveryDate → must not persist
+      proceedDate: "2026-07-20",
       paymentMethod: "cash",
       installmentMonths: 6, // non-installment method → months must not persist
       addons: [
@@ -362,14 +389,14 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     });
     expect(res.status).toBe(201);
     const p = sb._rpcCalls[0].payload;
-    expect(p.proceed_date).toBeNull();
+    expect(p.proceed_date).toBe("2026-07-20");
     expect(p.installment_months).toBeNull();
     expect(p.addons).toEqual([
       { addon_key: "dispose-bedframe", qty: 1, unit_price: 80, attrs: { size: "King" } },
     ]);
   });
 
-  it("paid > 0 posts BACK into the order_payments ledger (deposit, mapped method, approval ref)", async () => {
+  it("paid > 0 rides INSIDE create_raw_order — the route writes no second payment (0476)", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), {
@@ -379,49 +406,37 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       approvalCode: "472019",
     });
     expect(res.status).toBe(201);
-    // CARD 4 (0343): the mirror rides the ONE writer — payment_record with
-    // p_counts_toward_paid=false (the create RPC already put the deposit in
-    // orders.paid, so counting it again would double the money).
+    // The create RPC receives the deposit facts and records them through the
+    // one customer-payment writer in its own transaction (0476 §12).
+    expect(sb._rpcCalls.map((r: { name: string }) => r.name)).toEqual(["create_raw_order"]);
+    expect(sb._rpcCalls[0].payload).toMatchObject({
+      paid: 2000,
+      payment_method: "credit",
+      approval_code: "472019",
+    });
+    // No best-effort mirror, no direct ledger insert.
     expect(
       sb._inserts.filter((i: { table: string }) => i.table === "order_payments").length,
     ).toBe(0);
-    const mirror = sb._rpcCalls.filter(
-      (r: { name: string }) => r.name === "payment_record",
-    );
-    expect(mirror.length).toBe(1);
-    expect(mirror[0].payload).toMatchObject({
-      p_order_id: "11111111-1111-1111-1111-111111111111",
-      p_amount: 2000,
-      p_method: "card", // credit → the ledger's card bucket
-      p_kind: "deposit",
-      p_reference: "472019",
-      p_counts_toward_paid: false,
-    });
-    expect(typeof mirror[0].payload.p_paid_on).toBe("string");
-    expect(String(mirror[0].payload.p_receipt_no)).toMatch(/^RC-\d{6}-\d{4}$/);
   });
 
-  it("paid = 0 (or absent) writes NO ledger row; unknown method maps to 'other'", async () => {
-    const sb = buildSb();
+  it("a deposit the ledger cannot place fails the create loudly (400 with the SQL sentence)", async () => {
+    const sb = buildSb({
+      rpcError: {
+        code: "22023",
+        message: 'payment method "my-custom-method" has no money account — add it in Settings → Payment → Payment methods, then record this payment',
+        details: "payment_account_unmapped",
+      },
+    });
     vi.mocked(userClient).mockReturnValue(sb);
-    const res = await post(await makeJwt("principal"), validBody); // no paid
-    expect(res.status).toBe(201);
-    expect(
-      sb._rpcCalls.filter((r: { name: string }) => r.name === "payment_record").length,
-    ).toBe(0);
-
-    const sb2 = buildSb();
-    vi.mocked(userClient).mockReturnValue(sb2);
-    await post(await makeJwt("operation"), {
+    const res = await post(await makeJwt("operation"), {
       ...validBody,
       paid: 100,
       paymentMethod: "my-custom-method",
     });
-    const ledger2 = sb2._rpcCalls.filter(
-      (r: { name: string }) => r.name === "payment_record",
-    );
-    expect(ledger2[0].payload.p_method).toBe("other");
-    expect(ledger2[0].payload.p_reference).toBeNull();
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("has no money account");
+    expect(sb._rpcCalls.filter((r: { name: string }) => r.name === "payment_record").length).toBe(0);
   });
 
   it("422 rule_violation when the RPC rejects a sofa + mattress/bed-frame mix", async () => {

@@ -50,12 +50,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
+
+import { ViewportExpansion } from "./ViewportExpansion";
 
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
 
@@ -91,6 +93,18 @@ export type DataGridColumn<T> = {
       value the operator sees in the cell. Falls back to groupValue, then the
       cell text — never to searchValue. */
   filterValue?: (row: T) => string;
+  /**
+   * ⭐ A DOOR IS NOT A FACT (walk finding, 2026-09-11).
+   *
+   * Every data column gets a funnel, which is right for a column that STATES
+   * something. A column that carries an ACTION states nothing, so its funnel
+   * opened on a single `(blank)` option — a control whose only possible
+   * effect was to hide the row the operator had come to act on. Setting this
+   * false removes the funnel and nothing else.
+   *
+   * Default (absent) is filterable, so no existing column changes.
+   */
+  filterable?: boolean;
   /** Per-column filter UX (Commander 2026-06-18 — one unified filter spec):
       - 'date'      → quick presets (Today/This week/This month/…) + a custom
                       from→to range. `dateValue` returns the row's RAW ISO date.
@@ -153,6 +167,12 @@ export type DataGridProps<T> = {
   columns: DataGridColumn<T>[];
   /** localStorage key for column layout persistence */
   storageKey: string;
+  /** The grouping a register opens with when this browser has no saved
+      layout for `storageKey` yet (Finance Ledger, 2026-09-10: the Trial
+      Balance opens grouped by account kind). A saved layout always wins, so
+      the operator's own grouping is never overridden. Omitted = no grouping,
+      exactly as before. */
+  initialGroupBy?: string[];
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
@@ -188,6 +208,8 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Keep frequent controls labelled while the container has room. */
+  labelledToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -255,7 +277,15 @@ export type DataGridProps<T> = {
    * intervening columns slide beneath it. `true` keeps the original
    * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean | { columnKey: string };
+  stickyIdentity?: boolean | { columnKey: string | readonly string[] };
+  /**
+   * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
+   * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
+   * every cell carries one primary fact and one supporting line. Omitted =
+   * the Register baseline (38px), byte-identical for every other caller. A
+   * page passes the governed number; the engine never invents a third.
+   */
+  rowHeight?: 38 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -278,6 +308,10 @@ export type DataGridProps<T> = {
   expandable?: {
     /** Render the sub-row body. Return null to render an empty row. */
     renderExpansion: (row: T) => ReactNode;
+    /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
+    flush?: boolean;
+    /** Keep the child within the visible width, retaining the data-column indent. */
+    fitExpansionToViewport?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -339,6 +373,22 @@ export type DataGridProps<T> = {
    * append in first-appearance order; omitted entirely = first-appearance.
    */
   chooserGroupOrder?: readonly string[];
+  /**
+   * ⭐ THE PAGE'S OWN LIVE CONDITIONS (owner ruling 2026-09-11).
+   *
+   * A register is narrowed from TWO places - the page's filter rail and this
+   * grid's per-column funnels - and neither used to say what the other had
+   * done, so an operator reading four rows could not see why there were four.
+   * A page hands its conditions in here and they appear in ONE strip with the
+   * column filters, each removable on its own, under one `Clear filters`.
+   *
+   * Absent = no strip at all: no existing register gains a band it did not ask
+   * for (every optional power stays optional).
+   */
+  activeConditions?: Array<{ key: string; label: string; onClear: () => void }>;
+  /** Called by `Clear filters` after the grid clears its own column filters,
+   *  so one click really does clear everything the strip listed. */
+  onClearConditions?: () => void;
   /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
@@ -454,6 +504,7 @@ function DataGridInner<T>({
   rows,
   columns,
   storageKey,
+  initialGroupBy,
   rowKey,
   searchPlaceholder = "Search…",
   exportName,
@@ -466,6 +517,7 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  labelledToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -479,6 +531,7 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -486,6 +539,8 @@ function DataGridInner<T>({
   expandable,
   selectable,
   chooserGroupOrder,
+  activeConditions,
+  onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
@@ -504,7 +559,13 @@ function DataGridInner<T>({
       return n;
     });
   }, []);
-  const [layout, setLayoutRaw] = useState<Layout>(() => readLayout(storageKey));
+  const [layout, setLayoutRaw] = useState<Layout>(() => {
+    const saved = readLayout(storageKey);
+    // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
+    return saved === DEFAULT_LAYOUT && initialGroupBy?.length
+      ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
+      : saved;
+  });
   const setLayout = useCallback(
     (updater: (l: Layout) => Layout) => {
       setLayoutRaw((prev) => {
@@ -875,9 +936,21 @@ function DataGridInner<T>({
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
-    const identityKey =
-      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
+    /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
+       2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
+       `Call NETS — confirm delivery date` with no customer attached to it, so
+       a page may now name the identity AND the column that says whose row it
+       is. The set stays a CONTIGUOUS RUN: pinning two columns with a third
+       between them would leave a gap the rows slide through, so the run stops
+       at the first column that is not named. */
+    const named =
+      typeof stickyIdentity === "object"
+        ? Array.isArray(stickyIdentity.columnKey)
+          ? stickyIdentity.columnKey
+          : [stickyIdentity.columnKey as string]
+        : null;
     let left = 0;
+    let pinned = 0;
     for (const col of visibleColumns) {
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
@@ -885,14 +958,26 @@ function DataGridInner<T>({
         left += Number(layout.widths[col.key] ?? col.width ?? 140);
         continue;
       }
-      if (identityKey == null || col.key === identityKey) {
-        // The identity: the first data column, or the NAMED one — pinned
-        // directly after the gutter, so a scrolled sheet slides the columns
-        // before it underneath. If the named column is hidden, only the
-        // gutter pins: a wrong identity is worse than none.
+      if (named == null) {
+        // No name: the identity is the first data column, pinned directly
+        // after the gutter, so a scrolled sheet slides the rest underneath.
         m.set(col.key, left);
         break;
       }
+      if (named.includes(col.key)) {
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        pinned += 1;
+        // Every named column found: the block is complete.
+        if (pinned === named.length) break;
+        continue;
+      }
+      // Not named. BEFORE the run starts this is an ordinary column the
+      // identity sits after — scan past it, exactly as the single-name form
+      // always did, and let it scroll under the block. ONCE the run has
+      // started, a gap would let rows slide through it, so the run ends here
+      // and whatever is already pinned stays correct.
+      if (pinned > 0) break;
     }
     return m;
   }, [stickyIdentity, visibleColumns, layout.widths]);
@@ -1673,9 +1758,13 @@ function DataGridInner<T>({
                  one — but HORIZONTAL padding is exactly what the gutter cells
                  replaced, so it stays at zero: the left edge is the first data
                  column's, the right edge is the parent table's. */
-              style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}
+              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
-              {expandable.renderExpansion(row)}
+              {expandable.fitExpansionToViewport ? (
+                <ViewportExpansion>
+                  {expandable.renderExpansion(row)}
+                </ViewportExpansion>
+              ) : expandable.renderExpansion(row)}
             </td>
           </tr>
         )}
@@ -1689,10 +1778,13 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        labelledToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
+      style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
+      data-row-height={rowHeight}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
@@ -1703,7 +1795,7 @@ function DataGridInner<T>({
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          isReference && !searchOpen && !search ? (
+          isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
               aria-label="Search"
@@ -1721,6 +1813,7 @@ function DataGridInner<T>({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="search"
+                aria-label="Search"
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -1773,7 +1866,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1787,7 +1880,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && (
+            {(!isReference || labelledToolbar) && (
               <>
                 <span>Export</span>
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
@@ -1849,7 +1942,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Columns"
             title="Columns"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1863,7 +1956,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Columns</span>}
+            {(!isReference || labelledToolbar) && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>
@@ -1987,6 +2080,95 @@ function DataGridInner<T>({
         </div>
       )}
 
+      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
+          narrowing in ONE line, whoever applied it, each removable on its own
+          and all of them under one `Clear filters`. Renders nothing when
+          nothing is narrowed, and nothing at all for a grid whose page hands
+          in no conditions and carries no column filter. */}
+      {(() => {
+        const columnChips = [
+          ...Object.entries(filters)
+            .filter(([, v]) => v.length > 0)
+            .map(([key, values]) => ({
+              key: `col:${key}`,
+              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
+              onClear: () =>
+                setFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                }),
+            })),
+          ...Object.keys(dateFilters).map((key) => ({
+            key: `date:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
+            onClear: () =>
+              setDateFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(dateRangeFilters).map((key) => ({
+            key: `range:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
+            onClear: () =>
+              setDateRangeFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(numberFilters).map((key) => ({
+            key: `num:${key}`,
+            label: columns.find((c) => c.key === key)?.label ?? key,
+            onClear: () =>
+              setNumberFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+        ];
+        const chips = [...(activeConditions ?? []), ...columnChips];
+        if (chips.length === 0) return null;
+        return (
+          <div className={styles.conditionBar} data-testid="active-conditions">
+            <span className={styles.conditionBarLabel}>Showing only:</span>
+            {chips.map((chip) => (
+              <span key={chip.key} className={styles.conditionChip}>
+                <span className={styles.conditionChipText} title={chip.label}>
+                  {chip.label}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conditionChipRemove}
+                  aria-label={`Remove ${chip.label}`}
+                  title={`Remove ${chip.label}`}
+                  onClick={chip.onClear}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              className={styles.conditionClear}
+              data-testid="clear-filters"
+              onClick={() => {
+                setFilters({});
+                setDateFilters({});
+                setNumberFilters({});
+                setDateRangeFilters({});
+                onClearConditions?.();
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        );
+      })()}
+
       {/* Group-by zone */}
       {groupBanner && (
         <div
@@ -2022,7 +2204,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
+        <table className={`${styles.table}${typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey) ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}
@@ -2096,7 +2278,7 @@ function DataGridInner<T>({
                       ) : (
                         col.label
                       )}
-                      {col.key !== "__expand__" && col.key !== "__select__" && (
+                      {col.key !== "__expand__" && col.key !== "__select__" && col.filterable !== false && (
                         <button
                           type="button"
                           title="Filter this column"

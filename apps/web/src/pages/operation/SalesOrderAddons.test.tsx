@@ -120,12 +120,13 @@ describe("SalesOrderAddons — the office may add a service, and take back a mis
     expect(screen.queryByTestId("so-addons-locked")).toBeNull();
   });
 
-  it("outside the place lane it offers NO control and names where the act moved", () => {
+  it("outside the place lane it offers no control", () => {
     draw({ status: "proceed_order" });
     // The API would refuse a write here, so the screen must not invite one.
     expect(screen.queryByTestId("so-addon-open")).toBeNull();
-    // …and the operator is told where it went, or they ring the shop anyway.
-    expect(screen.getByTestId("so-addons-locked")).toHaveTextContent("shop");
+    // The explanatory sentence is gone too (Jess, 2026-09-10) — the panel is
+    // simply quiet outside the place lane rather than naming where the act moved.
+    expect(screen.queryByTestId("so-addons-locked")).toBeNull();
     // The ROW's own doors are shut by the same lane, in their new home.
     drawRow(row(), { status: "proceed_order" });
     expect(screen.queryByTestId("so-addon-more-dispose-mattress")).toBeNull();

@@ -29,11 +29,15 @@ let expansionHookState: {
       lineId: string;
       sku: string;
       unitIds: string[];
+      unverifiedUnitIds?: string[];
+      verifiedUnitIds?: string[];
+      unitQuantityMismatch?: boolean;
       deliverTo: Array<{ name: string; qty: number }>;
     }>;
   } | undefined;
   isLoading: boolean;
   isError: boolean;
+  refetch?: () => void;
 };
 
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
@@ -130,6 +134,39 @@ beforeEach(() => {
 });
 
 describe("FIX 1 · the register asks the SERVER", () => {
+  it("distinguishes a server search with no matches from an empty system", async () => {
+    listHookState.data = { orders: [] };
+    mount();
+    expect(screen.getByText("No orders yet")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing-order" } });
+    await waitFor(() => expect(screen.getByText("No matching sales orders.")).toBeInTheDocument());
+    expect(screen.queryByText("No orders yet")).not.toBeInTheDocument();
+  });
+
+  it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
+    expansionHookState = { data: undefined, isLoading: state === "loading", isError: state === "error", refetch: vi.fn() };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.queryByText("Not allocated")).not.toBeInTheDocument();
+    if (state === "error") {
+      expect(screen.getByRole("alert")).toHaveTextContent("Could not load goods details");
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(expansionHookState.refetch).toHaveBeenCalledOnce();
+    } else expect(within(screen.getByTestId("row-expansion")).getByRole("status")).toHaveTextContent("Loading…");
+  });
+
+  it("keeps fourteen uncertain IDs inspectable without claiming they belong to the Qty 1 line", () => {
+    listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "H1401F-K", qty: 1, unit_price: 100 }] })] };
+    expansionHookState.data = { lines: [{ lineId: "l1", sku: "H1401F-K", unitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), verifiedUnitIds: [], unverifiedUnitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), deliverTo: [] }] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByText("Unit ID link not verified")).toBeInTheDocument();
+    expect(screen.queryByText("ID-13")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Unit ID (14)" }));
+    expect(screen.getByText("ID-0")).toBeInTheDocument();
+    expect(screen.getByText("ID-13")).toBeInTheDocument();
+  });
+
   it("mounts asking for the unfiltered population (no search key)", () => {
     mount();
     expect(useOperationOrdersSpy).toHaveBeenCalled();
@@ -139,7 +176,6 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("search-icon"));
     const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
@@ -156,7 +192,6 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    fireEvent.click(screen.getByTestId("search-icon"));
     const box = screen.getByPlaceholderText("Search sales orders…");
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
@@ -203,13 +238,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Carres Maluri Cheras")).not.toBeInTheDocument();
   });
 
-  it("renders exactly one work toolbar, and Search rests as an icon (§6.7)", () => {
+  it("keeps one work toolbar with discoverable Search, Export and Columns", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
-    /* §6.7 — Search rests as an icon and expands on click. At rest there is no
-     * searchbox at all; one click produces exactly one. */
-    expect(screen.queryAllByRole("searchbox")).toHaveLength(0);
-    fireEvent.click(screen.getByTestId("search-icon"));
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
@@ -231,12 +262,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
-  it("Export is icon-only and its menu offers Excel, PDF and Print (§6.7)", () => {
+  it("labels Export and its menu offers Excel, PDF and Print", () => {
     mount();
     const exportBtn = screen.getByRole("button", { name: "Export" });
-    /* Icon-only: the accessible name comes from aria-label, so the word must
-     * NOT also be rendered as text — otherwise it is not icon-only. */
-    expect(exportBtn).not.toHaveTextContent("Export");
+    expect(exportBtn).toHaveTextContent("Export");
     expect(exportBtn).toHaveAttribute("aria-haspopup", "menu");
     fireEvent.click(exportBtn);
     expect(screen.getByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
@@ -439,19 +468,8 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
-    /* ⛔ `Other goods` IS NO LONGER PRINTED — YH, 2026-08-27. This line used
-       to read `toHaveTextContent("Other goods 5")`.
-
-       What the 2026-08-15 ruling protected was that an unrecognised line is
-       never SILENTLY DROPPED BY THE CLASSIFIER into some other word, and that
-       survives untouched — see the negative control below, which is now the
-       load-bearing test of the pair. What changed is only whether the bucket is
-       PRINTED; `footerWord` still computes it.
-
-       🟡 The honest cost is asserted rather than hidden: those 5 legs are
-       counted and not shown, so the printed numbers no longer sum to the
-       order's item count. */
-    expect(footer).not.toHaveTextContent("Other goods");
+    // September 11 review: every counted quantity has a visible category.
+    expect(footer).toHaveTextContent("Other goods 5");
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -559,11 +577,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Footrest",
       "Accessory",
       "Service",
-      "Other goods",
     ]) {
       expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
     }
-    /* The order itself still counts — only its unnameable goods go unprinted. */
+    expect(footer).toHaveTextContent("Other goods 5");
     expect(footer).toHaveTextContent("1 order");
   });
 
@@ -667,7 +684,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
+  it("renders the five-column goods table with merged item details, Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
@@ -710,12 +727,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
+      "Category", "Item Details", "Qty", "Unit ID", "Deliver To",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
     expect(row).toHaveTextContent("Mattress");
-    expect(row).toHaveTextContent("id-001");
-    expect(row).toHaveTextContent("id-002");
+    expect(row).toHaveTextContent("Unit ID (2)");
+    expect(within(row).queryByText("id-001")).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Unit ID (2)" }));
+    expect(screen.getByText("id-001")).toBeInTheDocument();
+    expect(screen.getByText("id-002")).toBeInTheDocument();
     expect(row).toHaveTextContent("B1201S-K");
     expect(row).toHaveTextContent("11");
     expect(row).toHaveTextContent("B1201S · King");
@@ -762,33 +782,23 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  /**
-   * ⭐ THE CHILD BOX BEGINS AT `SO No` — owner ruling 2026-08-15.
-   *
-   * The indent is the parent-child link, and it is the TABLE's own column
-   * layout that draws it: one real EMPTY cell per gutter column, then the box
-   * spanning the data columns with no padding of its own. A computed
-   * `padding-left` was tried and measured wrong — `width` on a `<td>` is a
-   * hint, and this grid stretches its columns to fill the frame, so the 30px
-   * ☐ and 32px ▸ render 41 and 43 at 1440 and a 62px padding lands 22px short.
-   */
-  it("starts the expansion at the first data column, with the gutter left empty", () => {
+  it("starts under SO Number and fits the available viewport width", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    const gutter = screen.getAllByTestId(/^grid-expansion-gutter-/);
-    expect(gutter.map((c) => c.dataset.testid)).toEqual([
+    const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutters.map((cell) => cell.dataset.testid)).toEqual([
       "grid-expansion-gutter-__select__",
       "grid-expansion-gutter-__expand__",
     ]);
-    for (const cell of gutter) expect(cell).toBeEmptyDOMElement();
-    /* Eight default business columns; the gutter is not one of them, and the
-       box's right edge is therefore the parent table's. */
-    expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
-    /* Air above and below, NOTHING left or right — horizontal padding is the
-       very thing the gutter cells replaced (owner correction 2026-08-15). */
+    for (const gutter of gutters) expect(gutter).toBeEmptyDOMElement();
+    const cell = screen.getByTestId("grid-expansion-cell");
+    expect(cell).toHaveAttribute("colspan", "8");
+    expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
+    expect(within(cell).getByTestId("goods-mini-table")).toHaveClass("w-full");
+    /* Flush expansion: the child grid joins its parent without card spacing. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
-      paddingTop: "12px",
-      paddingBottom: "12px",
+      paddingTop: "0px",
+      paddingBottom: "0px",
       paddingLeft: "0px",
       paddingRight: "0px",
     });

@@ -171,42 +171,59 @@ describe("goodsCategoryOf — one answer, three sources in falling authority", (
 });
 
 /**
- * ⭐ `Covered by` IS A CAPABILITY, NOT A COPY (law ④, extended 2026-08-24).
+ * ⭐ `On PO` IS A QUANTITY AND A DOOR — owner correction 2026-09-11.
  *
- * A page that BUYS has to say what already covers a line. A truth register does
- * not, and must render exactly as it did before the column existed.
+ * It used to stack every covering purchase order inside the cell, so a line
+ * fourteen documents touch drew a fourteen-line-tall item row. A collection
+ * must never decide how tall an item row is: the cell states the quantity the
+ * arithmetic needs and points at the read-only details, where each document is
+ * its own row. A truth register still asks for none of it.
  */
-describe("the optional Covered by column", () => {
+describe("the optional Ordered Qty column", () => {
   it("is absent unless the page asks for it", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
-    expect(screen.queryByRole("columnheader", { name: "Covered by" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Ordered Qty" })).not.toBeInTheDocument();
   });
 
-  it("appears for a buying page, and prints every covering document", () => {
+  it("states HOW MANY units documents have ORDERED — never the documents themselves", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
-        lines={[
-          {
-            ...goodsLine(),
-            coveredBy: ["PO-20260820-4827", "PO-20260821-1190"],
-            coveredByAbsence: "Not ordered yet",
-          },
-        ]}
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 3, orderedQtyAbsence: "Not ordered yet" }]}
       />,
     );
-    expect(screen.getByRole("columnheader", { name: "Covered by" })).toBeInTheDocument();
-    expect(screen.getByText("PO-20260820-4827")).toBeInTheDocument();
-    expect(screen.getByText("PO-20260821-1190")).toBeInTheDocument();
+    /* ⭐ `Ordered Qty`, not `On PO`: this figure is the HISTORICAL lineage,
+       delivered documents included, while `On PO` is the dictionary's head for
+       the engine's still-outstanding coverage. */
+    expect(screen.getByRole("columnheader", { name: "Ordered Qty" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "On PO" })).toBeNull();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    /* THE ROW'S HEIGHT IS ITS OWN. No PO number reaches this table at all. */
+    expect(screen.queryByText(/PO-d/)).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Covered by" })).toBeNull();
   });
 
-  it("prints the governed absence, quietly, when nothing covers the line", () => {
+  it("opens the details when the page gives it somewhere to send the reader", () => {
+    const onOpenPoDetails = vi.fn();
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
-        lines={[{ ...goodsLine(), coveredBy: [], coveredByAbsence: "Not ordered yet" }]}
+        showOrderedQty
+        onOpenPoDetails={onOpenPoDetails}
+        lines={[{ ...goodsLine(), orderedQty: 14 }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "14" }));
+    expect(onOpenPoDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints the governed absence, quietly, when no document carries the line", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on SO-1303"
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 0, orderedQtyAbsence: "Not ordered yet" }]}
       />,
     );
     const absence = screen.getByText("Not ordered yet");
@@ -214,18 +231,17 @@ describe("the optional Covered by column", () => {
     expect(absence).toHaveAttribute("data-absence", "true");
   });
 
-  it("keeps Item last — the flexible column never moves (law ①)", () => {
+  it("keeps Item last for every sibling — the ruled order is untouched (law ①)", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
-        lines={[{ ...goodsLine(), coveredBy: ["PO-1"], coveredByAbsence: "—" }]}
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 1 }]}
       />,
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers[headers.length - 1]).toBe("Item");
-    /* And it sits beside `Unit ID`: both answer "what exists for this line". */
-    expect(headers).toEqual(["Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty", "Item"]);
+    expect(headers).toEqual(["Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty", "Item"]);
   });
 });
 
@@ -246,14 +262,14 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
+        showOrderedQty
         showSupplier
         showPoDeliveryDate
         lines={[
           {
             ...goodsLine(),
-            coveredBy: ["PO-20260820-1111"],
-            coveredByAbsence: "Not ordered yet",
+            orderedQty: 1,
+            orderedQtyAbsence: "Not ordered yet",
             supplier: "Nice Future",
             poDeliveryDate: "Fri, 18 Sep",
           },
@@ -261,8 +277,8 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
             ...goodsLine(),
             key: "second",
             sku: "B1201S-Q",
-            coveredBy: [],
-            coveredByAbsence: "Not ordered yet",
+            orderedQty: 0,
+            orderedQtyAbsence: "Not ordered yet",
             supplierAbsence: "—",
             poDeliveryDateAbsence: "—",
           },
@@ -271,7 +287,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
-      "Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty",
+      "Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty",
       "Supplier", "PO Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();

@@ -155,9 +155,10 @@ export function warehouseOutboundCards(
   const byDo = new Map<string, DeliveryWarehouseScheduleEvent[]>();
   for (const e of events) {
     if (e.kind !== "customer_delivery_pickup") continue;
-    const list = byDo.get(e.doNumber);
+    const scope = JSON.stringify([e.deliveryOrderId ?? e.doNumber, e.warehouseSiteId ?? e.fromLocation]);
+    const list = byDo.get(scope);
     if (list) list.push(e);
-    else byDo.set(e.doNumber, [e]);
+    else byDo.set(scope, [e]);
   }
   const cards: WarehouseOutboundCard[] = [];
   for (const units of byDo.values()) {
@@ -260,7 +261,7 @@ export function filterOutboundCards(
   return cards.filter((c) => {
     if (omit !== "view" && !outboundViewMatches(c, p.get("view")))
       return false;
-    if (omit !== "site" && p.get("site") && p.get("site") !== c.fromLocation)
+    if (omit !== "site" && p.get("site") && p.get("site") !== c.warehouseSiteId && p.get("site") !== c.fromLocation)
       return false;
     if (p.get("do") && p.get("do") !== c.doNumber) return false;
     if (start && c.eventDate < start) return false;

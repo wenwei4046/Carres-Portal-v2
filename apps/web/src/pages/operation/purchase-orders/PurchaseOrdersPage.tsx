@@ -4,7 +4,7 @@
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useState } from "react";
 import "./purchase-order-detail.css";
-import registerStyles from "../PurchasingRegister.module.css";
+import registerStyles from "./PurchaseOrdersRegister.module.css";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
 import {
@@ -1137,7 +1137,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                     : line.identity_mode === "quantity"
                       ? <Absence>—</Absence>
                     : unitsOf(line).length
-                      ? <ul className="m-0 list-none p-0">{unitsOf(line).map((unit) => <li key={unit.unit_code} className="whitespace-nowrap font-mono">{unit.unit_code}</li>)}</ul>
+                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
                       ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
@@ -1489,16 +1489,27 @@ function RouteProblem({ title, problem, action, onRetry }: { title: string; prob
 function OfficialPreview({ poId }: { poId: string }) {
   /* The same blob `Download PDF` saves, painted as pages. The header already
      names the PO, so the paper carries no caption strip of its own. */
+  const [refusal, setRefusal] = useState<{ wrong: string; todo: string } | null>(null);
   const render = useCallback(async () => {
-    const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
-    return renderPoPdf(data);
+    setRefusal(null);
+    try {
+      const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+      return await renderPoPdf(data);
+    } catch (error) {
+      const body = (error as { body?: { message?: string; action?: string; code?: string } } | null)?.body;
+      if (body?.message || body?.code) {
+        const fallback = purchasingRefusal(body.code, { po: poId });
+        setRefusal({ wrong: body.message ?? fallback.wrong, todo: body.action ?? fallback.todo });
+      }
+      throw error;
+    }
   }, [poId]);
   const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
   return (
     <div className="mx-auto w-full max-w-[700px]">
       {pdfError ? (
         <div className="mb-3">
-          <ReadProblem problem="The official PDF could not be opened" action="Try again. If it still fails, ask the system owner to check the PO document." onRetry={retry} />
+          <ReadProblem problem={refusal?.wrong ?? "The official PDF could not be opened"} action={refusal?.todo ?? "Try again. If it still fails, ask the system owner to check the PO document."} onRetry={retry} />
         </div>
       ) : null}
       <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />

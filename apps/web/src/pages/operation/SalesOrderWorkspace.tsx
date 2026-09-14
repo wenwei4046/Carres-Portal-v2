@@ -58,6 +58,7 @@ import {
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
   deliveryReasonLabel,
+  fmtMoney,
   EMERGENCY_RELATIONSHIPS,
   LIFT_OPTIONS,
   lineClass,
@@ -69,6 +70,8 @@ import {
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
+  salesOrderNumberWord,
+  salesOrderParamOf,
   supplierClaimStatusLabel,
   myHolidaySet,
   unitsShortWords,
@@ -85,6 +88,8 @@ import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import { UnitEvidence } from "./components/GoodsMiniTable";
+import PaymentLedger from "./components/SalesOrderPaymentLedger";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
@@ -112,6 +117,7 @@ import {
   useSalesOrderRevisions,
   useSalesOrderExpansion,
   useSalesOrderRouteFacts,
+  useSalesOrderIdByNumber,
   useSalespersons,
   useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
@@ -273,6 +279,18 @@ const billingString = (d: Draft, was: Draft): string => {
  * ONE PDF pipeline — data in, canvases + printable blob out. pdf.js is a
  * viewer only; Print opens the SAME blob the pane shows.
  * ──────────────────────────────────────────────────────────────────────────── */
+/** The width a pane can actually give a page: its box, less its own padding.
+ *  EXPORTED so the padding subtraction — which IS the clipping bug — can be
+ *  asserted without a browser. */
+export function contentWidthOf(node: HTMLElement): number {
+  const cs = getComputedStyle(node);
+  const pad = parseFloat(cs.paddingLeft || "0") + parseFloat(cs.paddingRight || "0");
+  return Math.max(0, Math.round(node.clientWidth - pad));
+}
+
+/** A sales order below this is unreadable; it scrolls in the pane instead. */
+const MIN_PDF_WIDTH = 320;
+
 function usePdfCanvases(data: SalesOrderTemplateData | null) {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -280,10 +298,51 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
      Route. Coming back, `data` has not changed — so without this the operator
      returned to an empty sheet of paper. */
   const [paneEpoch, setPaneEpoch] = useState(0);
+  /* ⭐ THE PAPER IS RE-CUT WHEN THE PANE CHANGES WIDTH (2026-09-11).
+     The canvases were sized ONCE, from `pane.clientWidth` at render time, and
+     the effect depended only on `[data, paneEpoch]`. So every later width
+     change left the old bitmap in place: drag the window narrower, or open a
+     side panel beside the document, and a page rendered for a wider pane hung
+     over its container and was CLIPPED. Nothing redrew it, because nothing was
+     watching. A `ResizeObserver` is what was missing — the width joins the
+     effect's dependencies, so the paper is re-cut exactly when the paper's
+     container changes and at no other time. */
+  const [paneWidth, setPaneWidth] = useState(0);
+  const roRef = useRef<(() => void) | null>(null);
   const setPane = useCallback((node: HTMLDivElement | null) => {
     paneRef.current = node;
-    if (node) setPaneEpoch((n) => n + 1);
+    roRef.current?.();
+    roRef.current = null;
+    if (!node) return;
+    setPaneEpoch((n) => n + 1);
+    setPaneWidth(contentWidthOf(node));
+    /* Coalesced on a TIMER, deliberately not `requestAnimationFrame`. A drag
+       fires this dozens of times a second and a PDF render per frame would
+       make the drag itself the slow thing — but rAF does not run in a hidden
+       or background tab, so a width change that happened while the tab was
+       away would never be applied, and the operator would come back to a page
+       cut for the old width. That is the original bug returning through a
+       different door. A timeout fires either way. (Measured: in a hidden tab
+       `requestAnimationFrame` never ran and `ResizeObserver` never delivered —
+       so the redraw must not depend on the frame loop to be CORRECT, only to
+       be smooth.) */
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    /* A renderer without `ResizeObserver` (jsdom, or any non-DOM host) still
+       gets a correctly sized first cut from the measurement above; it simply
+       does not get the re-cut. Degrade, never abort — a missing observer must
+       not take the document down with it. */
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setPaneWidth(contentWidthOf(node)), 120);
+    });
+    ro.observe(node);
+    roRef.current = () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
   }, []);
+  useEffect(() => () => roRef.current?.(), []);
   useEffect(() => {
     let cancelled = false;
     if (!data) {
@@ -300,12 +359,16 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
         const pane = paneRef.current;
         if (!pane) return;
         pane.replaceChildren();
-        const paneWidth = Math.max(pane.clientWidth, 320);
+        /* The CONTENT box, not the padding box. `clientWidth` includes the
+           pane's own horizontal padding, so scaling to it drew every page
+           wider than the space it had to sit in — the original clipping, and
+           it was there at every width, not only narrow ones. */
+        const width = Math.max(contentWidthOf(pane), MIN_PDF_WIDTH);
         for (let n = 1; n <= doc.numPages; n++) {
           const page = await doc.getPage(n);
           if (cancelled) return;
           const base = page.getViewport({ scale: 1 });
-          const scale = paneWidth / base.width;
+          const scale = width / base.width;
           const dpr = window.devicePixelRatio || 1;
           const viewport = page.getViewport({ scale: scale * dpr });
           const canvas = document.createElement("canvas");
@@ -315,6 +378,13 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
           canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
           canvas.style.display = "block";
           canvas.style.margin = "0 auto 16px";
+          /* ⛔ NO `max-width: 100%`. Below `MIN_PDF_WIDTH` the page stops
+             SHRINKING — a sales order scaled to 200px is a grey smear, not a
+             document — so it must be allowed to be wider than a very narrow
+             pane and SCROLL there, which is the same rule the tables follow.
+             Capping it at 100% instead would silently squash the page back to
+             unreadable, and on a zero-width (hidden) pane collapse it to
+             nothing. The pane owns the scrolling; the page owns its size. */
           canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";
           /* A PDF page is paper — white by definition; this canvas is
              imperative pdf.js output, not themed React markup. */
@@ -330,7 +400,7 @@ function usePdfCanvases(data: SalesOrderTemplateData | null) {
     return () => {
       cancelled = true;
     };
-  }, [data, paneEpoch]);
+  }, [data, paneEpoch, paneWidth]);
   /* No blob URL is minted here any more. The PANE paints bytes; PRINT owns its
      own blob, built from the SAVED data — one template, one call path, two
      purposes that must not share a handle. */
@@ -758,27 +828,15 @@ export function Block({
  * MASTER.md's block order names the section). So the section keeps its exact
  * word and loses only its border, its own 24px gap and its second heading rule.
  *
- * Deliberately quieter than a card title: `text-label` against the card's
- * `text-strong`, so one card still reads as one thing.
+ * Deliberately quieter than a card title: the ordinary field-group heading
+ * (`text-strong`, `01-design-tokens.md` §1) rather than the card title's own
+ * mono/uppercase treatment — one "shouting" heading per card, and this reads
+ * as a smaller instance of the same body text.
  */
 function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
-  /* ⭐ ONE COLOUR FOR EVERY HEADING ON THE PAGE (YH, 2026-09-01 — "card
-     headers should have the same color").
-     They did not. A card title was `text-base-900` in the mono face; a
-     subsection heading was `text-base-600` in the UI face — so on one card the
-     reader met two different kinds of heading and had to work out from the
-     shade whether the second one was a section or a field label. The `Services`
-     label that used to sit inside `Goods` was a third shade again.
-     THE COLOUR IS THE CARD TITLE'S OWN, and no new token is added. The accent
-     is deliberately NOT used: `01-design-tokens.md` §2.2 spends blue once per
-     screen and the tab underline already holds it, so a blue heading here would
-     be the second spend and the current thing would stop standing out.
-     THE HIERARCHY MOVES TO SIZE, which is where it belongs. Same face, same
-     tracking, same colour, one step down in size — a subsection reads as a
-     smaller instance of the same thing rather than as a different species. */
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-strong text-base-900 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
@@ -925,7 +983,66 @@ type Mode = "object" | "create" | "oldrev";
 const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
+/**
+ * 【DELIVERY】 CARD 19 — THE NUMBER DOOR. `/operation/orders/so/:orderId`
+ * carries either the order's id or the operator's own document word
+ * (`SO-1362`). The object page below reads TEN doors by the id; handing it a
+ * number reached the database as `invalid input syntax for type uuid` and the
+ * page printed an empty Order Route (measured on production 2026-09-13).
+ *
+ * A number is resolved ONCE through the by-number door and the page re-enters
+ * by the id with the same search (`?route=1` survives), so every fan-in read
+ * still happens by the canonical id — one resolver, no second fan-in (Law C).
+ * `new` stays the create door. Anything else is an absence, never a 500.
+ */
 export default function SalesOrderWorkspace() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
+  const isNew = location.pathname.endsWith("/so/new");
+  const ident = isNew ? null : salesOrderParamOf(orderId);
+  if (ident && ident.kind === "number") {
+    return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
+  }
+  if (ident && ident.kind === "invalid") {
+    return <SalesOrderAbsence />;
+  }
+  return <SalesOrderWorkspaceBody />;
+}
+
+function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
+  const navigate = useNavigate();
+  const resolved = useSalesOrderIdByNumber(so);
+  const id = resolved.data?.id ?? null;
+  useEffect(() => {
+    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true });
+  }, [id, navigate, search]);
+  if (resolved.isError) return <SalesOrderAbsence />;
+  return (
+    <div className="flex h-full items-center justify-center" data-testid="so-number-door">
+      <Loading label={`Opening ${salesOrderNumberWord(so)}`} />
+    </div>
+  );
+}
+
+/** The absence the object page prints for a number or param no order carries
+ *  (COPY-STANDARD: `Sales Order not found.`). */
+function SalesOrderAbsence() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2" data-testid="so-not-found">
+      <p className="text-body text-base-700">Sales Order not found.</p>
+      <button
+        type="button"
+        className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+        onClick={() => navigate("/operation/orders")}
+      >
+        Back to Sales Orders
+      </button>
+    </div>
+  );
+}
+
+function SalesOrderWorkspaceBody() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1755,6 +1872,17 @@ export default function SalesOrderWorkspace() {
         label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
         qty: 1,
         returned: loan.status === "returned",
+        unitId: loan.item_unit_code ?? null,
+      })),
+      /* 0492 (Card 15) — the offer conversation; the map prints the current
+         state, the drawer keeps the history. */
+      loanOffers: (facts.loanOffers ?? []).map((offer) => ({
+        id: offer.id,
+        seq: offer.seq,
+        event: offer.event,
+        label: offer.label,
+        reason: offer.reason,
+        recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */
@@ -1945,28 +2073,26 @@ export default function SalesOrderWorkspace() {
           </span>
         </div>
       )}
-      {!isNew && (order?.source_ref ?? []).length > 0 && (
-        <div className="px-1 text-meta text-base-500">
-          Customer reference {(order?.source_ref ?? []).join(" · ")}
-        </div>
-      )}
 
       {/* ① CUSTOMER — now the whole customer, address included (Jess,
           2026-08-26). `Delivery address` was its own card between `Emergency
           contact` and `Money`; a reader looking up "where does this go" had to
           pass two unrelated sections to find it. It is the same party's fact,
           so it is the same card, under its own locked name. */}
-      <Block title="Customer">
-          {customerBuiltins["customerType"]?.enabled !== false ? (
-            <div className="mb-2 flex justify-start" data-pos-field="customerType">
-              <span
-                className="so-customer-status font-mono text-label uppercase tracking-[0.08em]"
-                data-testid="customer-type-chip"
-              >
-                {customerTypeWord}
-              </span>
-            </div>
-          ) : null}
+      <Block
+        title="Customer"
+        headerSlot={
+          !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
+            <span
+              className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
+              data-pos-field="customerType"
+              data-testid="customer-type-chip"
+            >
+              {customerTypeWord}
+            </span>
+          ) : undefined
+        }
+      >
         {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
             per row, which made the card six rows tall for facts that are one
             line each. At three they land as exactly two rows: who they are,
@@ -2012,106 +2138,92 @@ export default function SalesOrderWorkspace() {
           )}
           <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} />
         </div>
-        {/* Merged from the retired `Delivery address` card (Jess,
-            2026-08-26). Same fields, same ids, same one-address fact — it
-            simply stopped being a separate card two sections away from the
-            customer it belongs to. */}
-        <SubHead>Delivery address</SubHead>
-        {/* ⭐ FOUR TRACKS (YH, 2026-08-27). The two address lines take two
-            tracks each, so they still read as full-width pairs — and STATE ·
-            CITY · POSTCODE · BUILDING TYPE then land on ONE row instead of
-            two-and-a-bit. Same fields, same cascade, three rows fewer. */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="address">
-          {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
-              2026-08-26). `Address not given yet` is the answer to a MISSING
-              address; on an order that already carries one it is a permanent
-              tickbox whose only power is to throw that address away. It shows
-              while the address is blank, and while it is already ticked (so it
-              can be unticked) — and disappears once there is an address to
-              read. The FIELD is untouched: `customer_address_unknown` still
-              round-trips, and the POS still asks the same question. */}
-          {(addressIsBlank || draft.customer_address_unknown) && (
-            <div className="sm:col-span-4">
-              <Checkbox id="so-address-unknown" label="Address not given yet"
-                checked={draft.customer_address_unknown}
-                onCheckedChange={(v) => setField("customer_address_unknown", v)} />
-            </div>
-          )}
-          <div className="sm:col-span-2">
-            <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
-              disabled={draft.customer_address_unknown}
-              onChange={(e) => setField("customer_address_line1", e.target.value)} />
-          </div>
-          <div className="sm:col-span-2">
-            <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
-              disabled={draft.customer_address_unknown}
-              onChange={(e) => setField("customer_address_line2", e.target.value)} />
-          </div>
-          {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
-              three questions in the same order the POS asks them.
-              (`@/data/malaysia-postcodes`, one dataset, no second copy.)
-
-              Before this, all three were free text here while the POS could
-              only ever write a listed value — so the office could produce an
-              address the shop floor was incapable of producing, and a postcode
-              that belongs to no city in its own state.
-
-              STRICT, and that is measured rather than assumed: NO importer
-              writes `customer_address_state` — the only writers are this door
-              and the POS create/update path, and AutoCount rows carry null in
-              all three columns (their address arrives as ONE composed string).
-              So a picker cannot orphan legacy data; there is nothing in the
-              column to preserve. An address the list cannot express still has
-              two homes — the free-text lines above, and `Address not given
-              yet` for the genuinely unknown. */}
-          <Select id="so-state" label="State"
-            value={draft.customer_address_state || undefined}
-            disabled={draft.customer_address_unknown}
-            onValueChange={(v) =>
-              setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
-            }
-            options={MY_STATES.map((st) => ({ value: st, label: st }))} />
-          <Select id="so-city" label="City"
-            value={draft.customer_address_city || undefined}
-            disabled={draft.customer_address_unknown || !draft.customer_address_state}
-            hint={!draft.customer_address_state ? "Pick a state first" : undefined}
-            onValueChange={(v) =>
-              setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
-            }
-            options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
-          <Select id="so-postcode" label="Postcode"
-            value={draft.customer_address_postcode || undefined}
-            disabled={draft.customer_address_unknown || !draft.customer_address_city}
-            hint={!draft.customer_address_city ? "Pick a city first" : undefined}
-            onValueChange={(v) => setField("customer_address_postcode", v)}
-            options={getPostcodes(
-              draft.customer_address_state || null,
-              draft.customer_address_city || null,
-            ).map((pc) => ({ value: pc, label: pc }))} />
-          <Select id="so-building-type" label="Building type" required
-            error={
-              !draft.customer_address_unknown && !draft.building_type
-                ? "Fill in the building type first — a condominium can only take a half-day delivery."
-                : undefined
-            }
-            value={draft.building_type || undefined}
-            onValueChange={(v) => setField("building_type", v)}
-            options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
+        {/* ⭐ WHO SOLD IT IS PART OF WHO BOUGHT IT (approved Sales Order
+            detail organisation, 2026-09-11). `Sales ownership` was its own
+            card. It carries three names — dealer, showroom, salesperson —
+            and a reader answering "whose customer is this?" had to leave
+            the customer card to find them. The locked WORD is unchanged
+            (COPY-STANDARD:1427); it reads as a subsection heading now, and
+            `SalesOrderAttribution` keeps its own permission checks and its
+            approve/reject lane exactly as they were. */}
+        <div className="mt-4 border-t border-kit-slate-5 pt-3">
+          <SubHead>Sales ownership</SubHead>
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
-          <div className="sm:col-span-4">
-            <Checkbox id="so-billing-same" label="Billing address same as delivery"
-              checked={draft.customer_billing_same}
-              onCheckedChange={(v) => setField("customer_billing_same", v)} />
-          </div>
-          {!draft.customer_billing_same && (
-            <div className="sm:col-span-4">
-              <Input id="so-billing" label="Billing address" value={draft.customer_billing}
-                onChange={(e) => setField("customer_billing", e.target.value)} />
+        {mode === "create" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Select id="so-dealer" label="Dealer"
+              value={draft.dealer_id ?? ""}
+              onValueChange={(v) => setField("dealer_id", v || null)}
+              options={dealerOptions} placeholder="Pick a dealer" />
+            <div data-pos-field="outlet">
+              <Select id="so-outlet" label="Showroom"
+                value={draft.outlet_id ?? "none"}
+                onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
+                options={outletOptions} />
             </div>
-          )}
-          <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
-        </div>
+            <div data-pos-field="salesperson">
+              <Select id="so-salesperson" label="Salesperson"
+                value={draft.salesperson_id ?? "none"}
+                onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
+                options={spOptions} />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
+              <div data-pos-field="outlet">
+                <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+              </div>
+              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
+                  `Change salesperson` had a rule and a right-aligned row of its
+                  own under this grid — a separator, 12px of padding and a full
+                  row, introducing ONE button. It reads as a section, so the eye
+                  stops at it, and it separated the verb from the fact the verb
+                  acts on.
+                  It is the same shape `Change delivery date` already uses under
+                  `Requested Delivery Date`: a quiet text door under the answer
+                  it changes, which is where somebody looking at the wrong
+                  salesperson already has their eye. `useCanChangeSalesOwnership`
+                  is GATE 3's rule, imported rather than re-typed. */}
+              <div data-pos-field="salesperson">
+                <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
+                  <button
+                    type="button"
+                    onClick={() => setAttributionSignal((n) => n + 1)}
+                    data-testid="attribution-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Change salesperson
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* An OLD revision is a photograph — it carries no lane. */}
+            {mode !== "oldrev" && orderId && order && (
+              <SalesOrderAttribution
+                orderId={orderId}
+                current={{
+                  salesperson_id: order.salesperson_id ?? null,
+                  outlet_id: order.outlet_id ?? null,
+                  dealer_id: order.dealer_id ?? null,
+                }}
+                salespersonOptions={realSpOptions}
+                outletOptions={realOutletOptions}
+                dealerOptions={dealerOptions}
+                inlineTrigger={false}
+                openSignal={attributionSignal}
+                onApplied={() => {
+                  void revisionsQ.refetch();
+                  void baseQ.refetch();
+                  void detailQ.refetch();
+                }}
+              />
+            )}
+          </>
+        )}
+
         {/* ⭐ Merged from the retired `Emergency contact` card (YH,
             2026-08-27). It is the same person's fact, so it is the same
             card — the customer, everywhere their goods go, and who to ring
@@ -2121,7 +2233,9 @@ export default function SalesOrderWorkspace() {
             existed only because it was collapsible. */}
         {emergencyEnabled && (
           <>
-            <SubHead>Emergency contact</SubHead>
+            <div className="mt-4 border-t border-kit-slate-5 pt-3">
+              <SubHead>Emergency contact</SubHead>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
               <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
                 onChange={(e) => setField("emergency_name", e.target.value)} />
@@ -2146,87 +2260,6 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
-          Payments` had a hairline and a row of its own at the foot of the
-          card — a separator introducing one link, on a card whose entire
-          content is three numbers. The word is locked (COPY-STANDARD:1595) and
-          unchanged; only the row is gone. It still writes nothing: it
-          navigates to the desk that owns collection, already scoped to this
-          order, which is the one thing Law C lets a summary add. */}
-      <Block title="Money">
-        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
-            2026-08-15 `Total large · Paid medium · Outstanding loudest`
-            weighting). The weighting never reached the numerals anyway:
-            `<Money>` renders every amount at its `row` tone, so all three
-            digits were ALREADY 13px and only the CONTAINERS differed. Three
-            different container sizes meant three different line-heights, so
-            under `items-end` the three amounts did not sit on one line —
-            which is what read as "alignment wrong". One size on all three
-            fixes the alignment and the fallback strings at the same time.
-            Colour still separates them: Outstanding is red while owed. */}
-        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
-            last bare label-over-value pair on the page — the shape the rest of
-            the card stopped using when `Fact` took the kit's control skin. A
-            reader scanning down met boxes, boxes, boxes and then three loose
-            numbers, which reads as a different kind of thing rather than as
-            three answers this surface may not change.
-            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
-            door, and nothing here writes. The three-across grid is the same one
-            `Order info` and `Customer` use, so the amounts line up with every
-            other answer instead of packing left on a flex row.
-            Colour survives INSIDE the box: Outstanding is still red while any
-            of it is owed (owner ruling 2026-08-15), and all three keep
-            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
-            untouched. */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact
-            label="Total"
-            value={
-              <span className="text-strong text-base-900" data-testid="money-total">
-                {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-              </span>
-            }
-          />
-          <Fact
-            label="Paid"
-            value={
-              <span className="text-strong text-base-700" data-testid="money-paid">
-                <Money value={money.paid} />
-              </span>
-            }
-          />
-          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ). It is the most-read number on the page
-              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
-              (owner ruling 2026-08-15) — the colour carries that on its own,
-              at the same size as its two neighbours. */}
-          <Fact
-            label="Outstanding"
-            value={
-              <span
-                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-                data-testid="money-outstanding"
-              >
-                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-              </span>
-            }
-          />
-        </div>
-        {!isNew && order ? (
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              /* The canonical Register, scoped to this order (payment
-                 MASTER §16; entry-point correction 2026-09-09). */
-              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
-            >
-              Open this order in Payment
-            </button>
-          </div>
-        ) : null}
-      </Block>
 
       {/* ② ORDER INFO */}
       {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
@@ -2330,142 +2363,17 @@ export default function SalesOrderWorkspace() {
               </span>
             )}
           </div>
-          {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
-              `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
-              registry field it stands for is "Delivery access (floor / lift /
-              stair carry)" — three questions — and the other two sat outside
-              the tag entirely.
-              That is not cosmetic. The POS-parity contract test walks
-              `POS_FORM_BUILTINS` and asserts each key's attribute appears in
-              this file; it cannot see WHAT the attribute wraps. So the test
-              reported "stair carry is covered" while checking one box of
-              three, and deleting `Lift available?` tomorrow would still pass.
-              THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
-              on a hidden `<span>` with no control behind it, and the page
-              passed a completeness test it did not meet while the office rang
-              the shop to add a disposal service. The lesson was written into
-              the comment above that door and the same defect was live twelve
-              lines away.
-              A NESTED GRID, not a wrapper div: the three fields still sit on
-              the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
-              so nothing moves on screen — and they now read as the one topic
-              they are. */}
-          <div
-            data-pos-field="stairCarry"
-            className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
-          >
-            {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
-                The POS has clamped this since the wizard was written; this door
-                accepted any number, so an office-keyed order could promise a
-                carry nobody performs. */}
-            {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
-                under the box, which reads as advice rather than as the limit
-                the input actually enforces. One statement, in the field's own
-                name, and the separate hint line goes with it. */}
-            <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
-              type="number" min={1} max={MAX_DELIVERY_FLOOR}
-              value={String(draft.delivery_floor)}
-              onChange={(e) =>
-                setField(
-                  "delivery_floor",
-                  /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
-                     "office follow POS"). The floor was 0 here while the POS
-                     stepper starts at 1; the form already shows a missing
-                     floor as 1 (`?? 1`, four places), so the zero was a value
-                     only this box could type and nothing could mean. */
-                  Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
-                )
-              } />
-          {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
-              then put a default value, rather than leaving it blank". The
-              STORED value stays null until somebody types; this shows the
-              derived default and never writes one.
-
-              ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
-              FIELD THAT NO LONGER EXISTED. They said an untouched box reads
-              `All 5 items` and that 0104's NULL means EVERY item, and warned
-              at length against defaulting to zero. Both were true when typed
-              on 2026-08-26/27 and were overturned HOURS later by YH's own
-              ruling that an unset count means NONE — which `stairCarryCount`
-              has implemented ever since, and which is why the box renders `0`.
-              A governance record that no longer describes its field is not
-              harmless: the next reader trusts it, and this one warned them off
-              the behaviour the code already had. Kept as a correction rather
-              than deleted, because the ruling it lost to is the point.
-
-              ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
-              The hint has said `0 to 5` since it was written and the box
-              accepted 99. The POS cannot produce that number — its stepper
-              stops at the item count — so an office-keyed order could hold a
-              count no shop floor could have quoted, while the working line
-              directly below priced the CLAMPED five. One card, two answers to
-              "how many items", and the saved one was the wrong one.
-              `stairCarryCount` is the same clamp the fee already runs and the
-              same one the server stamps with, imported rather than re-typed —
-              a second copy of a ceiling is how the two surfaces drifted in the
-              first place. `max` rides the input too, so the spinner and the
-              keyboard agree.
-              ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
-              is null and the item total is unknown — so the upper clamp is
-              simply not applied and the floor at zero still is. A guess at the
-              ceiling would be worse than no ceiling: it would silently cut a
-              number the operator typed correctly. Degrade, never abort. */}
-          <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            max={stair?.itemsTotal}
-            hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
-            value={String(draft.delivery_stair_items ?? 0)}
-            onChange={(e) =>
-              setField(
-                "delivery_stair_items",
-                e.target.value === ""
-                  ? null
-                  : stair
-                    ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
-                    : Math.max(0, Number(e.target.value) || 0),
-              )
-            } />
-          {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
-              2026-08-26). The POS asks `Lift available?` and offers two named
-              answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
-              Operations asked the same fact as a bare tickbox, so an unticked
-              box meant BOTH "no lift" and "nobody said", and the two surfaces
-              did not tally. Two named options, the POS's exact words, and a
-              blank that still reads as a blank. */}
-          <Select id="so-lift" label="Lift available?"
-            value={draft.delivery_has_lift ? "Has lift" : "No lift"}
-            onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
-            options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
-          </div>
+          {/* ⭐ THE CUSTOMER'S OWN REFERENCE IS ORDER INFO, NOT CHROME
+              (approved composition, 2026-09-10). It was a grey meta line
+              floating above the cards, which is where a reader looks for page
+              chrome, not for a fact they must quote back to a customer. It is
+              `orders.source_ref` — a text[], because one customer legitimately
+              carries several spellings — and it is read-only: the importer is
+              its only writer. */}
+          {!isNew && (order?.source_ref ?? []).length > 0 && (
+            <Fact label="Customer reference" value={(order?.source_ref ?? []).join(" · ")} />
+          )}
         </div>
-        {/* The three fields above, added up out loud — the POS's own sentence
-            (`pos/StairCarryFields.tsx`), so the office reads the number the
-            salesperson quoted instead of re-deriving it.
-            ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
-            the zero too — "No stair carry — floor 1 is within the free 2F" —
-            which is a sentence saying nothing happened, printed on the majority
-            of orders. The fields above already state the floor and the lift; a
-            line that only repeats them back is the noise Jess asked to cut. */}
-        {stairWorking && (
-          <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
-            {stairWorking.quoted ? (
-              <>
-                {stairWorking.items} of {stairWorking.itemsTotal} item
-                {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
-                {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
-                <Money value={stairWorking.perFloorPerItem} /> ={" "}
-              </>
-            ) : (
-              <>
-                {stairWorking.items} of {stairWorking.itemsTotal} item
-                {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
-                charged{" "}
-              </>
-            )}
-            <span className="font-semibold text-base-900">
-              <Money value={stairWorking.fee} />
-            </span>
-          </p>
-        )}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
         </div>
@@ -2497,95 +2405,266 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
-      {/* ⭐ SALES OWNERSHIP IS ITS OWN CARD AGAIN (YH, 2026-09-01).
-          It was merged into `Order info` on 2026-08-26 when Jess asked for
-          fewer, fuller cards, and it kept its locked word as a subsection
-          heading. It comes back out as a card because it is a different KIND
-          of fact from the rest of that card: `Order info` is what the customer
-          asked for — dates, floors, a lift — and this is who inside Carres
-          gets paid for it. One card, one topic, and the merge law is served by
-          the card being SMALL rather than by it being hidden inside a bigger
-          one.
-          The WORD is unchanged and still locked (COPY-STANDARD:1427). It reads
-          as a card title now, which is the same string in the same face —
-          `Block` uppercases every title, so nothing about the word moved. */}
-      <Block title="Sales ownership">
-        {mode === "create" ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Select id="so-dealer" label="Dealer"
-              value={draft.dealer_id ?? ""}
-              onValueChange={(v) => setField("dealer_id", v || null)}
-              options={dealerOptions} placeholder="Pick a dealer" />
-            <div data-pos-field="outlet">
-              <Select id="so-outlet" label="Showroom"
-                value={draft.outlet_id ?? "none"}
-                onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
-                options={outletOptions} />
-            </div>
-            <div data-pos-field="salesperson">
-              <Select id="so-salesperson" label="Salesperson"
-                value={draft.salesperson_id ?? "none"}
-                onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
-                options={spOptions} />
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
-              <div data-pos-field="outlet">
-                <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+      {/* ③ DELIVERY — where the goods go, and what the lorry meets there
+          (approved Sales Order detail organisation, 2026-09-11).
+          The address, the billing relationship and the access conditions were
+          spread across two cards: the address sat inside CUSTOMER and the
+          floor/lift/stair answers sat on ORDER INFO. They are ONE question —
+          "can we deliver this, and what will it cost to carry" — so they are
+          one card. Every field keeps its id, its clamp and its POS-parity
+          tag; nothing here is recomputed and no second fee is derived. The
+          stair charge is the STAMPED `STAIR_CARRY` addon, stated once here as
+          a working line and charged once in GOODS. */}
+      <Block title="Delivery">
+          {/* Merged from the retired `Delivery address` card (Jess,
+              2026-08-26). Same fields, same ids, same one-address fact — it
+              simply stopped being a separate card two sections away from the
+              customer it belongs to. */}
+          <SubHead>Delivery address</SubHead>
+          {/* ⭐ FOUR TRACKS (YH, 2026-08-27). The two address lines take two
+              tracks each, so they still read as full-width pairs — and STATE ·
+              CITY · POSTCODE · BUILDING TYPE then land on ONE row instead of
+              two-and-a-bit. Same fields, same cascade, three rows fewer. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="address">
+            {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
+                2026-08-26). `Address not given yet` is the answer to a MISSING
+                address; on an order that already carries one it is a permanent
+                tickbox whose only power is to throw that address away. It shows
+                while the address is blank, and while it is already ticked (so it
+                can be unticked) — and disappears once there is an address to
+                read. The FIELD is untouched: `customer_address_unknown` still
+                round-trips, and the POS still asks the same question. */}
+            {(addressIsBlank || draft.customer_address_unknown) && (
+              <div className="sm:col-span-4">
+                <Checkbox id="so-address-unknown" label="Address not given yet"
+                  checked={draft.customer_address_unknown}
+                  onCheckedChange={(v) => setField("customer_address_unknown", v)} />
               </div>
-              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
-                  `Change salesperson` had a rule and a right-aligned row of its
-                  own under this grid — a separator, 12px of padding and a full
-                  row, introducing ONE button. It reads as a section, so the eye
-                  stops at it, and it separated the verb from the fact the verb
-                  acts on.
-                  It is the same shape `Change delivery date` already uses under
-                  `Requested Delivery Date`: a quiet text door under the answer
-                  it changes, which is where somebody looking at the wrong
-                  salesperson already has their eye. `useCanChangeSalesOwnership`
-                  is GATE 3's rule, imported rather than re-typed. */}
-              <div data-pos-field="salesperson">
-                <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
-                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
-                  <button
-                    type="button"
-                    onClick={() => setAttributionSignal((n) => n + 1)}
-                    data-testid="attribution-open"
-                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                  >
-                    Change salesperson
-                  </button>
-                )}
-              </div>
-            </div>
-            {/* An OLD revision is a photograph — it carries no lane. */}
-            {mode !== "oldrev" && orderId && order && (
-              <SalesOrderAttribution
-                orderId={orderId}
-                current={{
-                  salesperson_id: order.salesperson_id ?? null,
-                  outlet_id: order.outlet_id ?? null,
-                  dealer_id: order.dealer_id ?? null,
-                }}
-                salespersonOptions={realSpOptions}
-                outletOptions={realOutletOptions}
-                dealerOptions={dealerOptions}
-                inlineTrigger={false}
-                openSignal={attributionSignal}
-                onApplied={() => {
-                  void revisionsQ.refetch();
-                  void baseQ.refetch();
-                  void detailQ.refetch();
-                }}
-              />
             )}
-          </>
-        )}
+            <div className="sm:col-span-2">
+              <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
+                disabled={draft.customer_address_unknown}
+                onChange={(e) => setField("customer_address_line1", e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
+                disabled={draft.customer_address_unknown}
+                onChange={(e) => setField("customer_address_line2", e.target.value)} />
+            </div>
+            {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
+                three questions in the same order the POS asks them.
+                (`@/data/malaysia-postcodes`, one dataset, no second copy.)
 
+                Before this, all three were free text here while the POS could
+                only ever write a listed value — so the office could produce an
+                address the shop floor was incapable of producing, and a postcode
+                that belongs to no city in its own state.
+
+                STRICT, and that is measured rather than assumed: NO importer
+                writes `customer_address_state` — the only writers are this door
+                and the POS create/update path, and AutoCount rows carry null in
+                all three columns (their address arrives as ONE composed string).
+                So a picker cannot orphan legacy data; there is nothing in the
+                column to preserve. An address the list cannot express still has
+                two homes — the free-text lines above, and `Address not given
+                yet` for the genuinely unknown. */}
+            <Select id="so-state" label="State"
+              value={draft.customer_address_state || undefined}
+              disabled={draft.customer_address_unknown}
+              onValueChange={(v) =>
+                setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
+              }
+              options={MY_STATES.map((st) => ({ value: st, label: st }))} />
+            <Select id="so-city" label="City"
+              value={draft.customer_address_city || undefined}
+              disabled={draft.customer_address_unknown || !draft.customer_address_state}
+              hint={!draft.customer_address_state ? "Pick a state first" : undefined}
+              onValueChange={(v) =>
+                setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
+              }
+              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
+            <Select id="so-postcode" label="Postcode"
+              value={draft.customer_address_postcode || undefined}
+              disabled={draft.customer_address_unknown || !draft.customer_address_city}
+              hint={!draft.customer_address_city ? "Pick a city first" : undefined}
+              onValueChange={(v) => setField("customer_address_postcode", v)}
+              options={getPostcodes(
+                draft.customer_address_state || null,
+                draft.customer_address_city || null,
+              ).map((pc) => ({ value: pc, label: pc }))} />
+            <Select id="so-building-type" label="Building type" required
+              error={
+                !draft.customer_address_unknown && !draft.building_type
+                  ? "Fill in the building type first — a condominium can only take a half-day delivery."
+                  : undefined
+              }
+              value={draft.building_type || undefined}
+              onValueChange={(v) => setField("building_type", v)}
+              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
+          </div>
+          {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
+              (approved Sales Order detail composition, 2026-09-10). Floor,
+              lift and stair carry answer "what happens when the lorry
+              reaches THIS address" — they stood on `Order info`, a card away
+              from the address they qualify, so a reader checking a
+              condominium delivery held the address in their head while they
+              went to find the floor. Nothing about the fields changed: the
+              same clamps, the same `stairCarry` POS-parity tag, the same
+              working line, moved whole. */}
+          <SubHead>Delivery access</SubHead>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+                  `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+                  registry field it stands for is "Delivery access (floor / lift /
+                  stair carry)" — three questions — and the other two sat outside
+                  the tag entirely.
+                  That is not cosmetic. The POS-parity contract test walks
+                  `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+                  this file; it cannot see WHAT the attribute wraps. So the test
+                  reported "stair carry is covered" while checking one box of
+                  three, and deleting `Lift available?` tomorrow would still pass.
+                  THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+                  on a hidden `<span>` with no control behind it, and the page
+                  passed a completeness test it did not meet while the office rang
+                  the shop to add a disposal service. The lesson was written into
+                  the comment above that door and the same defect was live twelve
+                  lines away.
+                  A NESTED GRID, not a wrapper div: the three fields still sit on
+                  the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
+                  so nothing moves on screen — and they now read as the one topic
+                  they are. */}
+              <div
+                data-pos-field="stairCarry"
+                className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+              >
+                {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
+                    The POS has clamped this since the wizard was written; this door
+                    accepted any number, so an office-keyed order could promise a
+                    carry nobody performs. */}
+                {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
+                    under the box, which reads as advice rather than as the limit
+                    the input actually enforces. One statement, in the field's own
+                    name, and the separate hint line goes with it. */}
+                <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+                  type="number" min={1} max={MAX_DELIVERY_FLOOR}
+                  value={String(draft.delivery_floor)}
+                  onChange={(e) =>
+                    setField(
+                      "delivery_floor",
+                      /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
+                         "office follow POS"). The floor was 0 here while the POS
+                         stepper starts at 1; the form already shows a missing
+                         floor as 1 (`?? 1`, four places), so the zero was a value
+                         only this box could type and nothing could mean. */
+                      Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
+                    )
+                  } />
+              {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
+                  then put a default value, rather than leaving it blank". The
+                  STORED value stays null until somebody types; this shows the
+                  derived default and never writes one.
+
+                  ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
+                  FIELD THAT NO LONGER EXISTED. They said an untouched box reads
+                  `All 5 items` and that 0104's NULL means EVERY item, and warned
+                  at length against defaulting to zero. Both were true when typed
+                  on 2026-08-26/27 and were overturned HOURS later by YH's own
+                  ruling that an unset count means NONE — which `stairCarryCount`
+                  has implemented ever since, and which is why the box renders `0`.
+                  A governance record that no longer describes its field is not
+                  harmless: the next reader trusts it, and this one warned them off
+                  the behaviour the code already had. Kept as a correction rather
+                  than deleted, because the ruling it lost to is the point.
+
+                  ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
+                  The hint has said `0 to 5` since it was written and the box
+                  accepted 99. The POS cannot produce that number — its stepper
+                  stops at the item count — so an office-keyed order could hold a
+                  count no shop floor could have quoted, while the working line
+                  directly below priced the CLAMPED five. One card, two answers to
+                  "how many items", and the saved one was the wrong one.
+                  `stairCarryCount` is the same clamp the fee already runs and the
+                  same one the server stamps with, imported rather than re-typed —
+                  a second copy of a ceiling is how the two surfaces drifted in the
+                  first place. `max` rides the input too, so the spinner and the
+                  keyboard agree.
+                  ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
+                  is null and the item total is unknown — so the upper clamp is
+                  simply not applied and the floor at zero still is. A guess at the
+                  ceiling would be worse than no ceiling: it would silently cut a
+                  number the operator typed correctly. Degrade, never abort. */}
+              <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+                max={stair?.itemsTotal}
+                hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+                value={String(draft.delivery_stair_items ?? 0)}
+                onChange={(e) =>
+                  setField(
+                    "delivery_stair_items",
+                    e.target.value === ""
+                      ? null
+                      : stair
+                        ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
+                        : Math.max(0, Number(e.target.value) || 0),
+                  )
+                } />
+              {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
+                  2026-08-26). The POS asks `Lift available?` and offers two named
+                  answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
+                  Operations asked the same fact as a bare tickbox, so an unticked
+                  box meant BOTH "no lift" and "nobody said", and the two surfaces
+                  did not tally. Two named options, the POS's exact words, and a
+                  blank that still reads as a blank. */}
+              <Select id="so-lift" label="Lift available?"
+                value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+                onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
+                options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+              </div>
+          </div>
+          {/* The three fields above, added up out loud — the POS's own sentence
+              (`pos/StairCarryFields.tsx`), so the office reads the number the
+              salesperson quoted instead of re-deriving it.
+              ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
+              the zero too — "No stair carry — floor 1 is within the free 2F" —
+              which is a sentence saying nothing happened, printed on the majority
+              of orders. The fields above already state the floor and the lift; a
+              line that only repeats them back is the noise Jess asked to cut. */}
+          {stairWorking && (
+            <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
+              {stairWorking.quoted ? (
+                <>
+                  {stairWorking.items} of {stairWorking.itemsTotal} item
+                  {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
+                  {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
+                  <Money value={stairWorking.perFloorPerItem} /> ={" "}
+                </>
+              ) : (
+                <>
+                  {stairWorking.items} of {stairWorking.itemsTotal} item
+                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                  charged{" "}
+                </>
+              )}
+              <span className="font-semibold text-base-900">
+                <Money value={stairWorking.fee} />
+              </span>
+            </p>
+          )}
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
+            <div className="sm:col-span-4">
+              <Checkbox id="so-billing-same" label="Billing address same as delivery"
+                checked={draft.customer_billing_same}
+                onCheckedChange={(v) => setField("customer_billing_same", v)} />
+            </div>
+            {!draft.customer_billing_same && (
+              <div className="sm:col-span-4">
+                <Input id="so-billing" label="Billing address" value={draft.customer_billing}
+                  onChange={(e) => setField("customer_billing", e.target.value)} />
+              </div>
+            )}
+            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
+          </div>
       </Block>
+
 
 
 
@@ -2680,13 +2759,23 @@ export default function SalesOrderWorkspace() {
                   <th className="py-1 pr-3 text-left font-medium">SKU</th>
                   <th className="py-1 pr-3 text-right font-medium">Qty</th>
                   <th className="py-1 pr-3 text-left font-medium">Item</th>
-                  <th className="py-1 text-left font-medium">Deliver To</th>
+                  <th className="py-1 pr-3 text-left font-medium">Deliver To</th>
+                  {/* ⭐ THE MONEY COLUMNS RIDE THE RIGHT EDGE (approved Sales
+                      Order detail composition, 2026-09-10). The six ruled
+                      columns keep their ruled order and alignment; what the
+                      customer AGREED to pay is appended, so an operator can
+                      read the commitment without opening the PDF beside it.
+                      A free gift is a line at RM 0.00: visible as goods,
+                      charged nothing, counted nowhere twice. */}
+                  <th className="py-1 text-right font-medium">
+                    <div>Unit price</div><div>Line total</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => {
-                  const liveLine = detailQ.data?.lines?.[i];
-                  const truth = (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
+                  const liveLine = mode === "oldrev" ? viewedRevision?.snapshot.lines[i] : detailQ.data?.lines?.[i];
+                  const truth = mode === "oldrev" ? undefined : (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
                   const destinations = truth?.deliverTo ?? [];
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
@@ -2705,19 +2794,26 @@ export default function SalesOrderWorkspace() {
                         is in flight; this one did not, so a slow read printed
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
-                    <td className="py-1.5 pr-3 font-mono text-meta">
-                      {goodsTruthQ.isLoading && !truth ? (
-                        "Loading…"
-                      ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
-                        truth.unitIds.join(" · ")
+                    <td className="py-1.5 pr-3">
+                      {mode === "oldrev" ? (
+                        <span className="text-meta">Not recorded in this revision</span>
+                      ) : goodsTruthQ.isError ? (
+                        <span className="text-meta">The goods could not be opened.</span>
+                      ) : goodsTruthQ.isLoading && !truth ? (
+                        <span className="font-mono text-meta">Loading…</span>
+                      ) : truth && ((truth.verifiedUnitIds ?? truth.unitIds).length > 0 || (truth.unverifiedUnitIds?.length ?? 0) > 0 || truth.unitQuantityMismatch) ? (
+                        <div className="font-mono text-meta">
+                          <UnitEvidence ids={truth.verifiedUnitIds ?? truth.unitIds} unverified={truth.unverifiedUnitIds ?? []} mismatch={truth.unitQuantityMismatch ?? false} />
+                          {(truth.verifiedUnitIds ?? truth.unitIds).length < r.qty && <div className="mt-1 text-base-600">{unitsShortWords((truth.verifiedUnitIds ?? truth.unitIds).length, r.qty).join(" · ")}</div>}
+                        </div>
                       ) : (
                         (() => {
-                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          const [count, waiting] = unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty);
                           return (
-                            <>
+                            <div className="font-mono text-meta">
                               <div>{count}</div>
                               <div className="mt-0.5 text-base-600">{waiting}</div>
-                            </>
+                            </div>
                           );
                         })()
                       )}
@@ -2730,7 +2826,11 @@ export default function SalesOrderWorkspace() {
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
-                    <td className="py-1.5">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 pr-3">{mode === "oldrev" ? "Not recorded in this revision" : goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(r.unitPrice)}</div>
+                      <div className="font-medium">{fmtMoney(r.total)}</div>
+                    </td>
                   </tr>
                   );
                 })}
@@ -2756,7 +2856,7 @@ export default function SalesOrderWorkspace() {
                     and off-dictionary. `Not recorded` is also what the goods
                     rows already print in `Deliver To`, so the column now reads
                     one way down its whole length. */}
-                {(detailQ.data?.addons ?? []).map((a, i) => {
+                {(mode === "oldrev" ? (viewedRevision?.snapshot.addons ?? []).map((a) => ({ ...a, id: a.addon_key, unit_price: Number(a.unit_price), attrs: null })) : (detailQ.data?.addons ?? [])).map((a, i) => {
                   const serviceName = addonNameByKey.get(a.addon_key) ?? a.addon_key;
                   const size = a.attrs?.size ?? null;
                   return (
@@ -2790,12 +2890,33 @@ export default function SalesOrderWorkspace() {
                         />
                       )}
                     </td>
-                    <td className="py-1.5">Not recorded</td>
+                    <td className="py-1.5 pr-3">Not recorded</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(Number(a.unit_price ?? 0))}</div>
+                      <div className="font-medium">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</div>
+                    </td>
                   </tr>
                   );
                 })}
               </tbody>
             </table>
+            {/* ⭐ ONE TOTAL, AND IT IS THE CANONICAL ONE (ownership Law D).
+                `money` is `orderMoney({lineSum, addonSum})` — the SAME value
+                the register, the document and the Payments card already read,
+                never a re-sum of the rows above. Goods and services are added
+                once BETWEEN them, so a service (stair carry included, which is
+                a stamped `STAIR_CARRY` addon row since 0393) is counted in the
+                total exactly once and is never charged again as a separate
+                summary. An old Revision totals its own photograph, because
+                `money` reads the snapshot in that mode. */}
+            <div className="mt-2 flex justify-end border-t border-kit-slate-5 pt-2">
+              <div className="flex items-baseline gap-3">
+                <span className="text-label uppercase tracking-wide text-base-500">Total</span>
+                <span className="text-strong tabular-nums text-base-900" data-testid="goods-total">
+                  {money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
+                </span>
+              </div>
+            </div>
           </div>
         )}
         {/* An OLD revision is a photograph and a draft has no order to write
@@ -2817,6 +2938,94 @@ export default function SalesOrderWorkspace() {
         )}
       </Block>
 
+      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
+          Payments` had a hairline and a row of its own at the foot of the
+          card — a separator introducing one link, on a card whose entire
+          content is three numbers, and it left the fields staring at empty
+          space where the row used to be. The door now sits in the header bar
+          itself, beside the card's own name. The word is locked
+          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
+          navigates to the desk that owns collection, already scoped to this
+          order, which is the one thing Law C lets a summary add. */}
+      <Block
+        title="Money"
+        headerSlot={
+          !isNew && order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              /* The canonical Register, scoped to this order (payment
+                 MASTER §16; entry-point correction 2026-09-09). */
+              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
+            >
+              Open this order in Payments
+            </button>
+          ) : undefined
+        }
+      >
+        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
+            2026-08-15 `Total large · Paid medium · Outstanding loudest`
+            weighting). The weighting never reached the numerals anyway:
+            `<Money>` renders every amount at its `row` tone, so all three
+            digits were ALREADY 13px and only the CONTAINERS differed. Three
+            different container sizes meant three different line-heights, so
+            under `items-end` the three amounts did not sit on one line —
+            which is what read as "alignment wrong". One size on all three
+            fixes the alignment and the fallback strings at the same time.
+            Colour still separates them: Outstanding is red while owed. */}
+        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
+            last bare label-over-value pair on the page — the shape the rest of
+            the card stopped using when `Fact` took the kit's control skin. A
+            reader scanning down met boxes, boxes, boxes and then three loose
+            numbers, which reads as a different kind of thing rather than as
+            three answers this surface may not change.
+            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
+            door, and nothing here writes. The three-across grid is the same one
+            `Order info` and `Customer` use, so the amounts line up with every
+            other answer instead of packing left on a flex row.
+            Colour survives INSIDE the box: Outstanding is still red while any
+            of it is owed (owner ruling 2026-08-15), and all three keep
+            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
+            untouched. */}
+        <PaymentLedger orderId={isNew ? null : (orderId ?? null)} saved={{
+          paid: Number(order?.paid ?? 0), method: order?.payment_method,
+          months: order?.installment_months, reference: order?.approval_code,
+          slip: order?.payment_slip_url,
+        }} />
+        {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
+            RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
+            2026-09-10). `Total` is NOT repeated here — it is stated once,
+            under the Goods table that produces it. What this card answers is
+            the collections question: how much came in, how much is still out.
+            ⭐ AND THEY ARE THE CANONICAL FIGURES, NOT A RE-SUM OF THE ROWS.
+            `money.paid` is `orders.paid` through `orderMoney` — the number
+            every gate reads. Adding the rows up here instead would be a SECOND
+            arithmetic for one fact (Law D), and it would disagree the moment a
+            row is a history mirror (`counted_in_paid: false`) or a storage
+            collection, neither of which is goods money. */}
+        <div className="mt-3 flex justify-end border-t border-kit-slate-5 pt-3">
+          <div className="grid gap-x-6 gap-y-1 text-right" style={{ gridTemplateColumns: "auto auto" }}>
+            <span className="text-label uppercase tracking-wide text-base-500">Paid</span>
+            <span className="text-strong tabular-nums text-base-700" data-testid="money-paid">
+              {fmtMoney(money.paid)}
+            </span>
+          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
+              CUSTOMER owes HQ). It is the most-read number on the page
+              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
+              (owner ruling 2026-08-15) — the colour carries that on its own,
+              at the same size as its two neighbours. */}
+            <span className="text-label uppercase tracking-wide text-base-500">Outstanding</span>
+            <span
+              className={`text-strong tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              data-testid="money-outstanding"
+            >
+              {!money.known ? "No price yet" : money.outstanding > 0 ? fmtMoney(money.outstanding) : "Paid in full"}
+            </span>
+          </div>
+        </div>
+      </Block>
+
 
 
       {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
@@ -2836,7 +3045,7 @@ export default function SalesOrderWorkspace() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-so-theme={mode !== "create" ? "trial" : undefined}>
+    <div className="flex h-full min-h-0 flex-col" data-so-theme="trial">
       <SalesOrderTabs
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the
@@ -3054,7 +3263,14 @@ export default function SalesOrderWorkspace() {
               </div>
 
               <aside
-                className="min-h-0 min-w-0 border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+                /* ⭐ THE PANE SCROLLS AT EVERY WIDTH, not only at `lg`. It
+                   carried `lg:overflow-auto`, so below the split breakpoint the
+                   pane clipped nothing and a page wider than it — which is
+                   exactly what `MIN_PDF_WIDTH` guarantees on a narrow screen —
+                   pushed the PAGE sideways instead of scrolling inside its own
+                   box. Same rule as the tables: the container scrolls, the page
+                   never does. */
+                className="min-h-0 min-w-0 overflow-auto border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0"
                 aria-label="Sales Order document"
               >
                 {/* A PENDING AMENDMENT IS A BANNER, NEVER THE DOCUMENT BODY. */}
@@ -3147,21 +3363,27 @@ function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orde
   return d ? fmtDate(d) : "No delivery date";
 }
 
-function itemRows(
+/** The goods rows a Sales Order prints, with the money each line carries.
+ *  EXPORTED so the arithmetic can be tested without a DOM: a gift is a line at
+ *  price 0 and an old Revision totals its OWN photograph, and neither is
+ *  observable through the six-column table alone. */
+export function itemRows(
   mode: Mode,
   rev: SalesOrderRevisionRow | null,
   detailLines: Array<{ sku: string; qty: number; unit_price: number; label?: string | null }>,
-): Array<{ name: string; qty: number; total: number }> {
+): Array<{ name: string; qty: number; unitPrice: number; total: number }> {
   if (mode === "oldrev" && rev) {
     return (rev.snapshot.lines ?? []).map((l) => ({
       name: l.description?.trim() || l.sku,
       qty: Number(l.qty),
+      unitPrice: Number(l.unit_price),
       total: Number(l.qty) * Number(l.unit_price),
     }));
   }
   return detailLines.map((l) => ({
     name: lineName(l),
     qty: l.qty,
+    unitPrice: Number(l.unit_price),
     total: Number(l.unit_price) * Number(l.qty),
   }));
 }

@@ -35,6 +35,48 @@ describe("deliveryOrderStatusOf — ONE arithmetic for the document status", () 
     });
     expect(s.kind).toBe("delivered");
     expect(s.label).toBe("Delivered");
+    expect(s.stop).toBeNull();
+  });
+
+  /* 【DELIVERY】 CARD 20 — an intermediate Journey leg's `delivered` result
+     (0491/0496 store the arrival that way, moving no Unit) is `Arrived` over
+     the named stop; `Delivered` stays the customer leg's word. */
+  it("the same delivered result on an intermediate Journey leg is Arrived over its stop", () => {
+    const s = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [attempt("delivered", null, "2026-09-13T12:23:00Z")],
+      handoverEvents: events("ready_for_handover", "handed_over", "received_by_logistics"),
+      intermediateLeg: true,
+      legStop: "JB transit warehouse",
+    });
+    expect(s.kind).toBe("arrived");
+    expect(s.label).toBe("Arrived");
+    expect(s.stop).toBe("JB transit warehouse");
+    expect(s.reasonLabel).toBeNull();
+    expect(DELIVERY_ORDER_STATUS_LABEL.arrived).toBe("Arrived");
+  });
+
+  it("an intermediate leg still out with logistics is Out for delivery, and a failed leg is the ONE exception", () => {
+    const out = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [],
+      handoverEvents: events("received_by_logistics"),
+      intermediateLeg: true,
+      legStop: "JB transit warehouse",
+    });
+    expect(out.kind).toBe("out_for_delivery");
+    const failed = deliveryOrderStatusOf({
+      voidedAt: null,
+      voidReason: null,
+      attempts: [attempt("failed", "vehicle_breakdown", "2026-09-13T12:23:00Z")],
+      handoverEvents: [],
+      intermediateLeg: true,
+      legStop: "JB transit warehouse",
+    });
+    expect(failed.kind).toBe("exception");
+    expect(failed.stop).toBeNull();
   });
 
   it("a failed attempt is ONE Delivery exception with its reason in library words", () => {

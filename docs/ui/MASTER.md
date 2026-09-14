@@ -365,6 +365,31 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Widths and radii that have no home in a standard live as named config keys**, never as
   numbers inside a component.
 
+**⭐ THE CENTRED SURFACE'S WIDTH TABLE — closed at three, and every value carries its
+measurement (2026-09-11, adding the third).**
+
+| `width` | Config key | Value | The measurement that produced it |
+|---|---|---|---|
+| *(omitted)* | `max-w-modal` | 512px | The default: a question, a short form, a confirmation |
+| `"wide"` | `max-w-modal-wide` | 600px | P19, 2026-08-05 — a surface carrying a LINE LIST rather than a question |
+| `"viewer"` | `max-w-modal-viewer` | 880px | 2026-09-11 — a surface whose binding constraint is a PICTURE's height, not a column of text. The dialog caps at `85vh`; its chrome (header, footer, the caption line) takes 136px, leaving 629px of image. A 4:3 delivery photo 629px tall is 839px wide, so 880px shows it whole with 9px of headroom either side. Below this the photo is letterboxed and the operator zooms to read a door number |
+
+**A FOURTH WIDTH IS A DECISION FOR THIS TABLE, NOT FOR A CALLER.** `width` stays a union of
+literals with no number and no `style`, so what a page can express is one of these three. A page
+that needs a surface this table does not describe brings the gap here — it does not draw its own
+overlay.
+
+**⭐ RETURNING FOCUS IS `DialogFrame`'s JOB, AND IT WAS NOT BEING DONE (defect found and fixed
+2026-09-11).** The kit documented *"focus returned to the trigger"* as Radix behaviour it
+inherited. It was not: Radix restores focus to `Dialog.Trigger`, and the kit deliberately has
+none, because `open` is CONTROLLED and what opens a surface is an ordinary page button, a row
+action or a keyboard shortcut. Radix's modal content therefore called `preventDefault()` on its
+own close-focus event and then focused a trigger that was `null` — so **every modal and drawer in
+the portal dropped a keyboard user onto `<body>`**, with no way back to the row they opened.
+`DialogFrame` now remembers the element that had focus when it opened and restores it on close,
+skipping an opener the close itself removed from the document. One fix, every surface — which is
+the whole reason the two components share a frame.
+
 # §4 · Shells and grids
 
 ### FROZEN RULES
@@ -441,6 +466,16 @@ EDIT      full screen          split           left composes · right shows what
 means staff must remember which one can do what, and that memory is the thing this portal exists
 to remove.**
 
+**THE ONE GOVERNED WRITE STATE INSIDE AN INSPECT SURFACE — owner ruling 2026-09-13, Delivery
+Monitor.** The Monitor row's expansion is the delivery brief: four kit `Panel`s (`Customer,
+Address & Access` · `Delivery Dates` · `Logistics Details` · `Items, Services & Stock`). Where a
+panel owns a Delivery write, the `Panel`'s one right-slot control (`Update date and time`,
+`Assign logistics` / `Change logistics`) flips that panel's own body into a focused edit state
+with its named Save (`Save confirmed delivery`); the operator stays on the same row, queue and
+narrowings. No overflow menu and no separate dialog is invented for these acts, and no other
+register may copy this without its own owner ruling. Sales facts inside the brief stay read-only
+behind `Open Sales Order to change`. The full law is `../delivery/MASTER.md` §8.5 and §8.6.
+
 ### THE FOUR REGIONS ARE `03-page-patterns.md`'s, UNCHANGED
 ```
 Header       which record · what state · ‹ 4 of 69 ›
@@ -513,8 +548,10 @@ shipped code, and stated the opposite.)*
 PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
 multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
 elbows. A destination with only one page is a direct icon + name row; it does not hide that page
-behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
-2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+behind a chevron that reveals the same name again. **Payments is a module of two destinations
+(owner ruling 2026-09-12): `Monitor` — the named landing — and `Payment Records`; no
+`Payments · Invoices` tabs, no standalone Invoices or Receipts row, and the same two rows for the
+finance role, which is never a second Payment information architecture.** The existing `PortalSidebar` is the only left navigation surface: 232px
 expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
@@ -687,7 +724,23 @@ directory only and said so.*
   A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
   instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
   avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
-  My Work, Team Work, the PO detail and Order Route.
+  My Work, Team Work, the PO detail and Order Route. **THE ONE RULED EXCEPTION — the Payment
+  Monitor's `Payment timing` cell (owner ruling 2026-09-12, `docs/payment/MASTER.md` §3):** the
+  Monitor is a CONTROL LISTING, not a document register, and the owner ruled its last column a
+  two-line fact/action surface — line 1 the fact, line 2 the governed action with the shared
+  Work feed's resolved owner as an avatar (hover/accessible name = full name, never a name in the
+  sentence). It reads the Work feed's items; it resolves no owner and creates no second action.
+  No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
+  the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, `../delivery/MASTER.md`
+  §8.4):** its status word names the actor and the fact in primary-school English
+  (`Operation must call the customer` · `Waiting for {partner} pickup` · `Goods collected by
+  {partner}`), one arithmetic, no owner avatar and no second action. It is a status word, not an
+  action sentence.
+- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner ruling 2026-09-13.** For Delivery
+  Work, line 1 is the act with its recipient (`Call NETS`) and line 2 the required result
+  (`Confirm the delivery date`); the row's status word carries the fact. Owner, source object and
+  the actual working date are structured metadata beside the sentence, never joined into it, and
+  no `—` appears in either line. The 13 / 11 sizes below apply unchanged.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -1057,6 +1110,26 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**LOCAL FILTER RAIL — COMPACT FACT DROPDOWN — APPROVED / LOCKED, owner ruling 2026-09-11.**
+A rail SECTION whose facts are a long, open-ended list collapses into ONE control —
+`FilterRailSelect` in the same `workspace-rail.tsx` — instead of printing every value as a row.
+
+- **WHICH SECTIONS, AND WHY.** A section stays a list of ROWS when it is the same few every day
+  and its counts are what the operator scans first thing in the morning — the daily worklist and
+  timing lenses (`WORK TO DO`, `TO ORDER`, `ORDER TIMING`, `REGION`, `SETUP TO FIX`). A section
+  becomes a dropdown when it is a FACT LIST that grows with the business: today
+  `PURCHASE PURPOSE` (Manual Purchase), `PRODUCT` and `SUPPLIER` (both purchasing Registers).
+  **Measured 2026-09-11** on the Manual Purchase rail at a 1024×768 window: the collapsed rail's
+  content is 718px and does not scroll; with those thirteen fact rows it is ~1132px, so the
+  timing rows — the ones that say what to do today — sat below the fold.
+- **IT IS THE SAME FILTER, NOT A SECOND MODEL.** The control writes the same single-slot section
+  value the rows wrote: sections still combine with AND, the section's own `All …` word is the
+  first option and its clear, and one section never holds two values. It is never a multi-select.
+- **NOTHING QUIET IS LOST.** The count rides in the option text (`Ohana · 4`), and a narrowed
+  control wears the rail's own ACTIVE treatment — the `kit-blue-3` field with the `kit-blue-9`
+  left-edge marker — so a narrowed section is exactly as visible as a selected row was.
+- **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
+
 **LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated
@@ -1090,7 +1163,10 @@ card; new designs and mockups show the approved destination, not the legacy red 
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
 table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
-`text-body` (13px / 18px). The remaining height is balanced vertical breathing room, with the
+`text-body` (13px / 18px). **THE ONE PAGE-SPECIFIC EXCEPTION — the Delivery Monitor work list
+(owner ruling 2026-09-12): its parent row is 72px because it deliberately carries one primary
+fact and one supporting line in every cell (`../delivery/MASTER.md` §8.3). The 38 versus 72
+decision is not reopened, and no other register inherits 72px without its own owner ruling.** The remaining height is balanced vertical breathing room, with the
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
@@ -1467,6 +1543,91 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 - **There is no create button.** A Unit is born when a purchase order or consignment order is
   confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
   than filled with an `Add stock` control the Unit authority removed.
+
+## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
+
+**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY. Sales Orders, Delivery and Manual Purchase
+render byte-identically to what they rendered before.**
+
+The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
+That law holds. What changed is that the buying page may now ask for a second READING ORDER and for
+READ-ONLY record rows, and every sibling that does not ask gets the ruled layout unchanged.
+
+- **`identityFirst`** puts `SKU` and the item's configuration ahead of `Category` and `Unit ID`. The
+  ruled order opened with the two least identifying facts, so a buying page read `Mattress` ·
+  `Not allocated` before it read what the goods were. Law ① is kept: exactly ONE column is flexible
+  and every other width is fixed, so two expansions opened together still line up column for
+  column. What moved is WHICH column is flexible and where it sits, not how many.
+- **⭐ ONE ROW PER DEMAND, AND THE RECORD IS A DIFFERENT TABLE — owner correction 2026-09-11
+  (second pass).** The component drew a line's Unit records as extra rows beneath it. The first
+  correction stopped them inheriting the line's key, tick and destination editor; this one removes
+  them from the component altogether, because a record of what was bought is not a quieter kind of
+  demand. The page composes its own read-only table (SO Batch's `PoDetailsTable`) and this box holds
+  ACTIONABLE rows only: one row per item line, at the height of its own item description.
+- **⭐ `Ordered Qty` IS A QUANTITY AND A DOOR, NEVER A LIST.** It printed every covering purchase
+  order stacked inside one cell, so a line fourteen documents touch drew a fourteen-line-tall item
+  row and filled the screen with one item. **A collection must never decide how tall an item row
+  is.** The cell states the units documents have ordered and `onOpenPoDetails` makes it open the
+  read-only details where each document is its own row. Nothing is truncated; the evidence moves to
+  the table that is about documents. The head is `Ordered Qty` and not `On PO` because the figure is
+  lineage HISTORY, delivered documents included — `On PO` is the dictionary's head for open-PO
+  coverage, a different number (`COPY-STANDARD.md`).
+- **`Covered by` is retired from the component.** It answered three questions in one heading. The
+  page now asks for `Ready Stock`, `On PO` and `To buy`, so the arithmetic adds up on screen
+  instead of hiding inside one word.
+- **`toBuyNote` / `toBuyNoteWhy` — a cell may say why it is stating no number.** SO Batch withholds
+  the figure on every row it does not offer for buying (the engine's covering quantity is not a
+  purchasing quantity), so the absence needs a reason beside it. The page supplies the words as an
+  ARRAY OF LINES, written at the width they are read at; **the box prints them in BOTH branches** —
+  beside the figure and beside the `—` — and carries the long governed explanation as the cell's
+  title. The absence branch used to return early, so a deliberately withheld figure printed a bare
+  dash with nothing saying why, which is the silence the whole card exists to remove. **A sentence
+  left to wrap under a one-digit number is the same row-height defect as a stack of documents,
+  spelt out in words** — measured at 91px on the rendered preview before the written lines replaced
+  it. Siblings pass neither and render byte-identically.
+- **A page may omit a column it cannot answer.** `showUnitId={false}` is how Manual Purchase and now
+  SO Batch's ACTIONABLE table decline a column that would print an absence on every row forever — an
+  absence in the width of a real answer states nothing.
+- **A number is a door only where the page can open one.** `onPoClick` makes every PO number
+  navigable; a truth register that passes nothing keeps the printed text.
+
+## §6.9 · The Carres connector — ONE drawing, and the sections of an expanded row
+
+**OWNER CORRECTION 2026-09-11.** The portal's left navigation has drawn a parent→child relationship
+since 2026-08-19: a trunk drops from the parent, and each child takes it in on a small curved elbow.
+The owner asked for **that** line — the same subtle curve, not a new one — between the sections
+inside an expanded SO Batch Purchase row. The drawing therefore moved into
+`components/tree-connector` and **both surfaces call it**; the sidebar's two hand-rolled copies are
+gone. `components/ConnectedSections` composes it into a stack of sections.
+
+```text
+▼ SO-1303
+  │
+  ├─ Goods on SO-1303            the ACTIONABLE demand
+  │
+  ├─ ▸ Ready Stock               what is on the shelf for it
+  │
+  ╰─ ▾ Purchase order details    the READ-ONLY record
+▸ SO-1302                        the line NEVER reaches this row
+```
+
+- **The line starts under the parent.** The first elbow reaches UP through the gap above the first
+  section, so it visibly comes from the row that was opened rather than beginning in mid-air.
+- **It ends in a curve at the last section.** Every section draws its own elbow, and its own trunk to
+  the NEXT one; the last section draws no trunk, so there is structurally nothing that could run on
+  into the next record. It cannot leak — there is no line there to leak.
+- **It lands on each section's HEADING**, not on the middle of a table whose height depends on how
+  much was bought. A section states its own `connectAt`: 13px for a ruled column header, 18px for
+  the 36px disclosure handle. Both are STATED, never measured at runtime — a line that re-measures
+  is a line that moves when a table loads.
+- **It is not a nested card.** The sections keep their own ordinary table borders and frames. The
+  hierarchy is a 1px `kit-slate-6` line and an indent, which is what a tree is. Nothing wraps the
+  sections in a second large box, and no section is tinted to look disabled.
+- **Geometry, stated once:** trunk at 10px inside the expansion cell · sections indented to
+  `10 + 11 + 4 = 25px` · 10px of air between sections · 8px above the first · 12px after the last.
+- **Available to every register that grows a second section.** Manual Purchase and Purchase Orders
+  may adopt the same stack without inheriting any SO-specific column: `ConnectedSections` takes
+  `{ key, connectAt, node }` and knows nothing about purchasing.
 
 # §7 · Approved Evolution
 

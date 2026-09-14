@@ -510,11 +510,11 @@ export default function WarehouseOutboundWork() {
           ) : (
             <DataGrid<WarehouseOutboundCard>
               stickyIdentity={{ columnKey: "document" }}
-              key={params.get("q") === null ? "clear" : "search"}
+              key={`${params.get("q") === null ? "clear" : "search"}:${selectedDo ?? ""}:${selectedDo ? view.rows.map((c) => c.warehouseSiteId ?? c.fromLocation).join(",") : ""}`}
               appearance="reference"
               rows={view.rows}
               columns={columns}
-              rowKey={(c) => c.doNumber}
+              rowKey={(c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`}
               rowTestId={(c) => `wo-row-${c.doNumber}`}
               storageKey="carres.outbound.register.v1"
               exportName="Outbound"
@@ -575,7 +575,7 @@ export default function WarehouseOutboundWork() {
               expandable={{
                 trigger: { columnKey: "products" },
                 testId: (c) => `wo-row-toggle-${c.doNumber}`,
-                defaultExpandedKeys: selectedDo ? [selectedDo] : [],
+                defaultExpandedKeys: selectedDo ? view.rows.filter((c) => c.doNumber === selectedDo).map((c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`) : [],
                 renderExpansion: (c) => <OutboundUnitWork card={c} />,
               }}
               statusSummary={(visible) => {

@@ -89,8 +89,15 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Condominium",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
-    delivery_date: null,
+    /* A requested delivery day is a required Sales fact (owner ruling
+       2026-09-13); the default fixture carries one so a test about a missing
+       day names it deliberately. */
+    delivery_date: "2026-09-25",
     delivery_date_tbd: false,
     source_system: null,
     source_ref: ["CR0854"],
@@ -158,7 +165,17 @@ function LocationProbe() {
   return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
 }
 
-function wrap(node: React.ReactNode, initialEntry = "/operation?tab=delivery") {
+/**
+ * ⭐ THE CALENDAR'S OWN URL (owner ruling 2026-09-10).
+ *
+ * `Work to do` is the LANDING now, so a bare `?tab=delivery` opens the work
+ * list. Every test below that is about the CALENDAR opens the calendar
+ * explicitly, which is also how the operator reaches it — one named tab. The
+ * landing itself is pinned by its own tests in `the two top-level views`.
+ */
+const CALENDAR_ENTRY = "/operation?tab=delivery&view=week";
+
+function wrap(node: React.ReactNode, initialEntry = CALENDAR_ENTRY) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -171,8 +188,21 @@ function wrap(node: React.ReactNode, initialEntry = "/operation?tab=delivery") {
 }
 
 let viewportWidth = 1440;
+/** The three rail groups are kit dropdowns since 2026-09-12 — a pick goes
+ *  through Radix's own listbox, exactly as the Delivery Orders register's
+ *  DOCUMENT STATUS does. */
+function pickRail(group: "region" | "logistics" | "status", optionName: RegExp) {
+  const box = screen.getByTestId(`delivery-monitor-${group}-select`);
+  fireEvent.click(within(box).getByRole("combobox"));
+  fireEvent.click(screen.getByRole("option", { name: optionName }));
+}
+
 beforeEach(() => {
   viewportWidth = 1440;
+  /* The local rail now starts collapsed under 1100px (owner ruling
+     2026-09-12), and jsdom reports 1024 unless it is told otherwise — so the
+     harness states the desk width it has always been simulating. */
+  Object.defineProperty(window, "innerWidth", { value: viewportWidth, configurable: true });
   window.matchMedia = ((query: string) => ({
     matches: (() => {
       const m = /max-width:\s*(\d+)px/.exec(query);
@@ -288,7 +318,10 @@ describe("the shape", () => {
   });
 
   it("draws the page-owned 240px FilterRail with the four ruled groups — never a Calendar row, never Proof Required", () => {
-    wrap(<OperationDelivery />);
+    /* WORK TO DO belongs to the Work to do tab (owner ruling 2026-09-10) — a
+       queue pick from the calendar would change the tab out from under the
+       operator, which is exactly the side effect the two tabs replaced. */
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
     const rail = screen.getByTestId("delivery-monitor-rail");
     expect(rail.className).toContain("w-[240px]");
     for (const heading of ["WORK TO DO", "STATE", "LOGISTICS PARTNER", "DELIVERY STATUS"]) {
@@ -309,20 +342,43 @@ describe("the shape", () => {
     for (const row of [
       "All delivery work",
       "No logistics picked",
-      "No confirmed date",
-      "Overdue",
+      /* The queue is named after the JOB (owner ruling 2026-09-10). */
+      "Call customer",
+      /* ⭐ NOT a bare `Overdue` (owner ruling 2026-09-11): the contact strip
+         counts a DIFFERENT overdue population, and two identical words on one
+         screen read as one number that disagrees with itself. */
+      "Overdue delivery",
       "Failed Delivery",
       "Upload delivery proof",
-      "Waiting for warehouse",
-      "Ready for handover",
-      "Out for delivery",
     ]) {
       expect(within(rail).getByText(row)).toBeTruthy();
+    }
+    /* ⭐ STATE · LOGISTICS PARTNER · DELIVERY STATUS ARE DROPDOWNS (owner
+       ruling 2026-09-12). The group titles and the values are unchanged; the
+       control is the kit's, so the values are read from the listbox. */
+    for (const group of ["region", "logistics", "status"] as const) {
+      expect(within(rail).getByTestId(`delivery-monitor-${group}-select`)).toBeTruthy();
+    }
+    fireEvent.click(
+      within(screen.getByTestId("delivery-monitor-status-select")).getByRole("combobox"),
+    );
+    /* The dropdown lists the shared actor-first dictionary (§8.4), never the
+       retired seven words. */
+    for (const value of [
+      "Operation must assign logistics",
+      "Waiting for logistics pickup",
+      "Logistics is delivering to the customer",
+      "Order details incomplete",
+    ]) {
+      expect(screen.getByRole("option", { name: new RegExp(`^${value}`) })).toBeTruthy();
+    }
+    for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery"]) {
+      expect(screen.queryByRole("option", { name: new RegExp(`^${retired}`) })).toBeNull();
     }
   });
 
   it("WORK TO DO keeps the ruled order, and Waiting for warehouse sits under DELIVERY STATUS only", () => {
-    wrap(<OperationDelivery />);
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
     const rail = screen.getByTestId("delivery-monitor-rail");
     const rows = [
       "delivery-monitor-work-all",
@@ -331,9 +387,10 @@ describe("the shape", () => {
       "delivery-monitor-work-overdue",
       "delivery-monitor-work-failed",
       "delivery-monitor-work-upload_proof",
-      "delivery-monitor-status-waiting_warehouse",
-      "delivery-monitor-status-ready_for_handover",
-      "delivery-monitor-status-out_for_delivery",
+      /* The three single-pick groups follow the six work rows, in order. */
+      "delivery-monitor-region-select",
+      "delivery-monitor-logistics-select",
+      "delivery-monitor-status-select",
     ].map((id) => within(rail).getByTestId(id));
     for (let i = 1; i < rows.length; i += 1) {
       expect(
@@ -341,52 +398,74 @@ describe("the shape", () => {
       ).toBeTruthy();
     }
     expect(within(rail).getAllByText("No logistics picked")).toHaveLength(1);
-    expect(within(rail).getAllByText("Waiting for warehouse")).toHaveLength(1);
+    /* `Waiting for warehouse` is a DELIVERY STATUS value and never a queue. */
     expect(within(rail).queryByTestId("delivery-monitor-work-waiting_warehouse")).toBeNull();
   });
 
   it("STATE lists direct state names from the real records — no sub-group headings", () => {
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-monitor-rail");
-    expect(within(rail).getByText("Selangor")).toBeTruthy();
+    fireEvent.click(
+      within(screen.getByTestId("delivery-monitor-region-select")).getByRole("combobox"),
+    );
+    expect(screen.getByRole("option", { name: /^Selangor/ })).toBeTruthy();
+    /* `All states` clears only THIS condition — it is an option, not a group. */
+    expect(screen.getByRole("option", { name: /^All states/ })).toBeTruthy();
     for (const heading of ["EAST MALAYSIA", "WEST MALAYSIA", "SINGAPORE", "KLANG VALLEY"]) {
       expect(within(rail).queryByText(heading)).toBeNull();
+      expect(screen.queryByRole("option", { name: heading })).toBeNull();
     }
   });
 
   it("LOGISTICS PARTNER lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
     wrap(<OperationDelivery />);
-    const rail = screen.getByTestId("delivery-monitor-rail");
-    expect(within(rail).getByText("NETS")).toBeTruthy();
-    expect(within(rail).queryByText("AL")).toBeNull();
-    expect(within(rail).queryByText("HOUZS")).toBeNull();
-    expect(within(rail).queryByTestId("delivery-monitor-logistics-none")).toBeNull();
+    fireEvent.click(
+      within(screen.getByTestId("delivery-monitor-logistics-select")).getByRole("combobox"),
+    );
+    expect(screen.getByRole("option", { name: /^NETS/ })).toBeTruthy();
+    /* A partner carrying nothing is not offered — the list is the data's. */
+    expect(screen.queryByRole("option", { name: /^AL/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /^HOUZS/ })).toBeNull();
   });
 
-  it("the rail carries the COMPLETE month calendar fixed above the scrolling filters", () => {
+  it("the rail carries TWO consecutive months fixed above the scrolling filters, one arrow pair moving both", () => {
     wrap(<OperationDelivery />);
     const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    /* Current month above next month — owner ruling 2026-09-10. */
     expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/October 2026/i)).toBeTruthy();
+    /* ONE pair of arrows, and it steps BOTH months by exactly one month. */
+    expect(within(calendar).getAllByRole("button", { name: "Previous month" })).toHaveLength(1);
     fireEvent.click(within(calendar).getByRole("button", { name: "Previous month" }));
     expect(within(calendar).getByText(/August 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).queryByText(/October 2026/i)).toBeNull();
     fireEvent.click(within(calendar).getByRole("button", { name: "Next month" }));
     expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/October 2026/i)).toBeTruthy();
     const rail = screen.getByTestId("delivery-monitor-rail");
     const scrollRegion = rail.querySelector(".overflow-y-auto");
     expect(scrollRegion).toBeTruthy();
     expect(scrollRegion!.contains(calendar)).toBe(false);
-    const sunday = within(calendar).getByText("6").closest("button");
+    /* Sunday stays visible and unclickable — scoped to the FIRST month, since
+       both months now carry a "6". */
+    const september = within(calendar).getAllByRole("grid")[0];
+    const sunday = within(september).getByText("6").closest("button");
     expect(sunday?.disabled).toBe(true);
   });
 
   it("clicking a rail date opens that date's DAY view and clears the picked queue", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
     const calendar = screen.getByTestId("delivery-monitor-month-calendar");
-    fireEvent.click(within(calendar).getByText("15"));
+    const september = within(calendar).getAllByRole("grid")[0];
+    fireEvent.click(within(september).getByText("15"));
     const probe = screen.getByTestId("location-probe").textContent ?? "";
     expect(probe).toContain("date=2026-09-15");
     expect(probe).toContain("view=day");
-    expect(probe).not.toContain("region=");
+    /* The STATE narrowing SURVIVES (owner ruling 2026-09-10): a pick applies
+       to whichever view is open, and dropping it silently would answer a
+       question the operator did not ask. */
+    expect(probe).toContain("region=Selangor");
     expect(within(screen.getByTestId("delivery-monitor-daily")).getByText("Tue, 15 Sep")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Day" }).getAttribute("aria-selected")).toBe("true");
   });
@@ -473,19 +552,19 @@ describe("Day · Week · Month (owner correction 2026-09-07)", () => {
     ).toBeTruthy();
   });
 
-  it("on the work list the control stays with nothing lit, and one click on Week returns the Calendar and clears every pick", () => {
+  it("Day · Week · Month belongs to the CALENDAR and is absent from the work list", () => {
+    /* Owner ruling 2026-09-10, narrowing the 2026-09-07 `on both projections`
+       spelling: on a work list the control lit nothing and changed the page
+       out from under the operator. The named tab is the way back. */
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor&status=waiting_warehouse");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
-    const control = screen.getByTestId("delivery-monitor-calendar-view");
-    for (const name of ["Day", "Week", "Month"]) {
-      expect(within(control).getByRole("tab", { name }).getAttribute("aria-selected")).toBe("false");
-    }
-    fireEvent.click(within(control).getByRole("tab", { name: "Week" }));
+    expect(screen.queryByTestId("delivery-monitor-calendar-view")).toBeNull();
+    fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));
     const probe = screen.getByTestId("location-probe").textContent ?? "";
-    expect(probe).not.toContain("view=");
-    expect(probe).not.toContain("region=");
-    expect(probe).not.toContain("status=");
-    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+    expect(probe).toContain("view=week");
+    /* The narrowings survive the tab — they describe the rows, not the view. */
+    expect(probe).toContain("region=Selangor");
+    expect(screen.getByTestId("delivery-monitor-calendar-view")).toBeTruthy();
   });
 });
 
@@ -498,13 +577,13 @@ describe("the spanning empty range", () => {
       within(empty).getByText("No deliveries are scheduled from Mon, 31 Aug to Sat, 5 Sep."),
     ).toBeTruthy();
     expect(within(empty).getByText("1 delivery needs a confirmed date.")).toBeTruthy();
-    fireEvent.click(within(empty).getByText("Open No confirmed date"));
+    fireEvent.click(within(empty).getByText("Open Call customer"));
     expect(screen.getByTestId("location-probe").textContent).toContain("view=no_confirmed_date");
   });
 
   it("a search that matches nothing is a FILTERED empty, not a false empty-range claim", () => {
     seedTwoScopes();
-    wrap(<OperationDelivery />, "/operation?tab=delivery&q=zzz-no-match");
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=week&q=zzz-no-match");
     expect(screen.getByTestId("delivery-monitor-empty-search")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-empty-range")).toBeNull();
   });
@@ -523,14 +602,17 @@ describe("one card", () => {
     expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
-  it("a card without a DO says so and opens Edit Delivery", () => {
+  it("a card without a DO says so and opens its Monitor row, brief unfolded", () => {
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-b");
     expect(within(card).getByText("No delivery order yet")).toBeTruthy();
     expect(within(card).getByText("Aida Rahim")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
-    expect(within(card).getByText("Delivery confirmed")).toBeTruthy();
-    expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery/edit/b");
+    /* A day AND a window: the pill names the day (§8.4), never the retired
+       `Delivery confirmed`. */
+    expect(within(card).getByText("Confirmed for Sat, 5 Sep")).toBeTruthy();
+    expect(within(card).queryByText("Delivery confirmed")).toBeNull();
+    expect(card.closest("a")?.getAttribute("href")).toBe("/operation?tab=delivery&view=all&open=b");
   });
 
   it("shows ONLY the approved fields — no expected arrival, phone, owner name or upload time", () => {
@@ -578,32 +660,166 @@ describe("one card", () => {
   });
 });
 
-describe("the projection rule — an operational pick renders the work list", () => {
+describe("the two top-level views (owner ruling 2026-09-10)", () => {
   beforeEach(seedTwoScopes);
 
-  it("a WORK TO DO pick replaces the calendar with the standard DataGrid", () => {
+  it("⭐ the DEFAULT LANDING is Work to do — the selectable work list, not a calendar", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    const tabs = screen.getByTestId("delivery-monitor-tabs");
+    expect(within(tabs).getByTestId("delivery-monitor-tab-work").getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(
+      within(tabs).getByTestId("delivery-monitor-tab-calendar").getAttribute("aria-selected"),
+    ).toBe("false");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    /* Both tabs are NAMED — the operator never has to discover the other view
+       by clearing a filter. */
+    expect(within(tabs).getByText("Work to do")).toBeTruthy();
+    expect(within(tabs).getByText("Confirmed deliveries")).toBeTruthy();
+  });
+
+  it("the landing offers nothing to CLEAR — its queue narrows nothing", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    expect(screen.queryByTestId("delivery-monitor-filter-summary")).toBeNull();
+    /* A real narrowing brings the bar back, naming only what it narrowed. */
+    pickRail("region", /^Selangor/);
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
+      "Selangor",
+    );
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).not.toContain(
+      "All delivery work",
+    );
+  });
+
+  it("switching to Confirmed deliveries opens the Mon–Sat week, and back again", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));
+    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=week");
+    expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toBe(
+      /* A day with no agreed window DOES enter the calendar — the operator
+         must see the day — and its card says `No time agreed` rather than
+         passing as a settled booking (owner ruling 2026-09-11). */
+      "Only deliveries with a confirmed date appear here.",
+    );
+    fireEvent.click(screen.getByTestId("delivery-monitor-tab-work"));
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=all");
+  });
+
+  it("⭐ a day with NO AGREED TIME is visibly incomplete in the row", () => {
+    /* The defect the 2026-09-11 render walk found: the cell printed the day
+       twice — `Mon, 14 Sep / Mon, 14 Sep` — so a half-answered booking was
+       distinguishable from a finished one only by a missing fragment an
+       operator reads as formatting. The absence is now STATED. */
+    /* The DAY is agreed on the document; the WINDOW never was. */
+    docsState.data = {
+      deliveryOrders: [
+        doc({
+          id: "do-row-1",
+          do_number: "DO-040926-0001",
+          delivery_date: "2026-09-04",
+          time_slot: null,
+        }),
+      ],
+      attempts: [],
+      handoverEvents: [],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    /* `Confirmed Delivery` states the half booking on its second line (§8.3):
+       `Fri, 4 Sep · No time agreed` under `Not confirmed`. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("Fri, 4 Sep · No time agreed")).toBeTruthy();
+    expect(within(list).getAllByText("Not confirmed").length).toBeGreaterThan(0);
+    /* And the row KEEPS ITS WORK: the conversation is not finished, so the
+       document still sits in the queue that finishes it. */
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
+    expect(screen.getByText("SO-1322")).toBeTruthy();
+  });
+
+  it("⭐ the calendar card keeps the DAY, names the missing time, and claims no confirmation", () => {
+    /* Owner ruling 2026-09-12. The day is a recorded fact: losing it to say
+       the time is missing trades one error for another, and a `Delivery
+       confirmed` pill on a half-answered booking is the error being fixed. */
+    docsState.data = {
+      deliveryOrders: [
+        doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: null }),
+      ],
+      attempts: [],
+      handoverEvents: [],
+    };
+    /* A partner already carries it — otherwise `Assign logistics` outranks the
+       chase, which is the correct precedence and a different test. */
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS" }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(within(card).getByText("Fri, 4 Sep")).toBeTruthy();
+    expect(within(card).getByText("No time agreed")).toBeTruthy();
+    expect(within(card).queryByText("Delivery confirmed")).toBeNull();
+    /* The footer carries the ACT as two structured lines (owner ruling
+       2026-09-13), and it is about the TIME. */
+    const act = within(card).getByTestId("delivery-monitor-card-act-a");
+    expect(within(act).getByText("Call NETS")).toBeTruthy();
+    expect(within(act).getByText("Confirm the delivery time")).toBeTruthy();
+    expect(act.textContent).not.toContain("—");
+  });
+
+  it("a fully booked card keeps its window and its confirmed pill", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=week");
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(within(card).queryByText("No time agreed")).toBeNull();
+    expect(within(card).queryByTestId("delivery-monitor-card-act-a")).toBeNull();
+  });
+
+  it("⭐ SO No AND Customer both stay pinned when the sheet scrolls sideways", () => {
+    /* Owner ruling 2026-09-12: at 949px the sheet shows under a third of its
+       1818px at a time, and one pin left `Actions` with no name beside it. */
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const head = screen.getByTestId("delivery-monitor-work-list").querySelectorAll("thead th");
+    const pinned = [...head].filter((th) => th.className.includes("stickyCell"));
+    const labels = pinned.map((th) => th.textContent?.trim()).filter(Boolean);
+    expect(labels).toContain("SO No");
+    expect(labels).toContain("Customer");
+    /* And nothing beyond the run joins it. */
+    expect(labels).not.toContain("State");
+  });
+
+  it("the work list prints the ruled columns, with the sheet's own selection and ▸", () => {
     ordersState.data!.orders.push(order({ id: "c", so: 1324, customer_name: "tan mei ling" }));
-    wrap(<OperationDelivery />);
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
     fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    /* The twelve ruled columns (Delivery MASTER §8.3): checkbox · expand ·
+       these ten headings, in order. `Actions` and `Edit Delivery` are retired. */
     for (const label of [
+      "Delivery Status",
       "SO No",
       "Customer",
-      "Requested Delivery Date",
       "Delivery Location",
-      "State",
-      "Logistics Partner",
+      "Requested Delivery Date",
       "Confirmed Delivery",
-      "Confirmed Time",
-      "Goods",
+      "Logistics",
+      "Items & Stock",
+      "Payment",
       "DO No",
-      "Delivery Status",
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
+    for (const retired of ["Actions", "Edit Delivery"]) {
+      expect(screen.queryByRole("columnheader", { name: retired })).toBeNull();
+    }
     expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(0);
-    expect(screen.getAllByTitle("Show delivery items").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Show delivery brief").length).toBeGreaterThan(0);
+    /* 72px rows — the one page-specific exception (ui MASTER §6.5). */
+    expect(screen.getByTestId("sales-orders-grid").getAttribute("data-row-height")).toBe("72");
   });
 
   it("`All delivery work` lists every open row — dated, DO-less and dateless — and its footer counts deliveries", () => {
@@ -614,48 +830,64 @@ describe("the projection rule — an operational pick renders the work list", ()
     expect(document.body.textContent).not.toMatch(/\bscopes?\b/i);
   });
 
-  it("a STATE pick also renders the work list — the card wall is calendar-only", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByTestId("delivery-monitor-region-Selangor"));
+  it("a STATE pick narrows the work list, and stays on the tab it was made on", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    pickRail("region", /^Selangor/);
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
   });
 
+  it("a STATE pick NARROWS the calendar instead of replacing it (2026-09-10)", () => {
+    /* The retired projection rule swapped the calendar for a sheet on any
+       pick, and the operator's only way back was to notice Clear filters. */
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=week&region=Selangor");
+    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-card-a")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Selangor");
+
+    /* A state nothing is going to empties the WEEK, not the view. */
+    cleanup();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=week&region=Johor");
+    expect(screen.getByTestId("delivery-monitor-empty-range")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-work-list")).toBeNull();
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Johor");
+  });
+
   it("a LOGISTICS PARTNER pick renders the work list narrowed to that partner", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByTestId("delivery-monitor-logistics-p-nets"));
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    pickRail("logistics", /^NETS/);
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.getByText("SO-1323")).toBeTruthy();
     expect(screen.queryByText("SO-1322")).toBeNull();
   });
 
-  it("a DELIVERY STATUS pick is a filter over recorded progress — Waiting for warehouse lists the arranged-but-not-ready rows", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByTestId("delivery-monitor-status-waiting_warehouse"));
-    expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_warehouse");
+  it("a DELIVERY STATUS pick is a filter over recorded progress — the pickup wait lists the arranged-but-not-collected rows", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    pickRail("status", /^Waiting for logistics pickup/);
+    expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_pickup");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
-    /* SO-1322 holds a live DO with no handover yet — Waiting for warehouse. */
+    /* SO-1322 holds a live DO with no handover yet — its partner's pickup. */
     expect(screen.getByText("SO-1322")).toBeTruthy();
     expect(screen.queryByText("SO-1323")).toBeNull();
-    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Waiting for warehouse");
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Waiting for logistics pickup");
   });
 
-  it("combined active filters print above the list, and Clear filters returns to the Week calendar", () => {
+  it("combined active filters print above the list, and Clear filters clears the NARROWINGS, not the tab", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
     const summary = screen.getByTestId("delivery-monitor-filter-summary");
-    expect(summary.textContent).toContain("No confirmed date · Selangor");
+    expect(summary.textContent).toContain("Call customer · Selangor");
     fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
     const probe = screen.getByTestId("location-probe").textContent ?? "";
-    expect(probe).not.toContain("view=");
+    /* An operator who clears a state pick is not asking to leave the view. */
+    expect(probe).toContain("view=all");
     expect(probe).not.toContain("region=");
-    expect(screen.queryByTestId("delivery-monitor-work-list")).toBeNull();
-    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
   });
 
   it("a legacy ?logistics=none URL still narrows and still prints its label", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&logistics=none");
     expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
-      "No confirmed date · No logistics picked",
+      "Call customer · No logistics picked",
     );
   });
 });
@@ -670,7 +902,15 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
         so: 1326,
         do_number: "DO-E",
         customer_name: "ng siew lan",
-        ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }] },
+        /* ⭐ The photo names the trip it came back from (owner ruling
+           2026-09-11). An unstamped file belongs to no document's evidence,
+           so this fixture states the document, exactly as the upload door
+           now does. */
+        ops_order_control: {
+          delivery_photos: [
+            { path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-E", kind: "photo" },
+          ],
+        },
       }),
     );
     docsState.data!.deliveryOrders.push(
@@ -684,7 +924,7 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
   });
 
   it("the queue counts the rows still owed evidence and each row names the EXACT missing action(s)", () => {
-    wrap(<OperationDelivery />);
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
     expect(screen.getByTestId("delivery-monitor-work-upload_proof").textContent).toContain("2");
     fireEvent.click(screen.getByTestId("delivery-monitor-work-upload_proof"));
     expect(screen.getByTestId("location-probe").textContent).toContain("view=upload_proof");
@@ -692,11 +932,19 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
     expect(within(list).getByText("SO-1325")).toBeTruthy();
     expect(within(list).getByText("SO-1326")).toBeTruthy();
     expect(within(list).queryByText("SO-1322")).toBeNull();
-    const lines = within(list).getAllByTestId("delivery-monitor-missing-proof").map((el) => el.textContent);
-    expect(lines).toContain("Upload delivery photo · Upload signed Delivery Order");
-    expect(lines).toContain("Upload signed Delivery Order");
-    /* The result word never changes. */
-    expect(within(list).getAllByText("Delivered").length).toBe(2);
+    /* The EXACT missing evidence is the row's next act (owner ruling
+       2026-09-10 moved it into `Actions`, where the row's one job lives) — and
+       a RECORDED result outranks an unassigned partner, so a delivered row
+       never asks for a carrier it no longer needs. */
+    /* The status's second line names the proof gap (§8.4): the photo first,
+       else the signed document; the queue row still counts both. */
+    const acts = within(list)
+      .getAllByTestId("delivery-monitor-missing-proof")
+      .map((el) => el.textContent);
+    expect(acts).toContain("Delivery photo not uploaded");
+    expect(acts).toContain("Upload signed Delivery Order");
+    /* The recorded result word never changes — it is still `Delivered`, in
+       the chooser's own Delivery Status column and in the row's search text. */
     expect(document.body.textContent).not.toContain("Proof Required");
   });
 
@@ -728,19 +976,22 @@ describe("bulk logistics assignment on the work list", () => {
   it("`No logistics picked` holds every eligible row across all dates — no DO and no confirmed date included", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
     for (const so of ["SO-1401", "SO-1402", "SO-1403"]) expect(screen.getByText(so)).toBeTruthy();
-    expect(screen.getAllByText("No delivery order yet").length).toBe(3);
+    /* Every one of them is unassigned and dateless — the population the bulk
+       journey exists for. `DO No` now answers from the Columns chooser. */
+    expect(screen.getAllByText(MONITOR_COPY.noLogistics).length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText(MONITOR_COPY.notConfirmed).length).toBe(3);
   });
 
-  it("one unassigned row offers Assign logistics AND Edit Delivery; many rows never offer Edit Delivery", () => {
+  it("a selection offers Assign logistics only — Edit Delivery is retired (owner ruling 2026-09-13)", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
     const rowBoxes = screen.getAllByRole("checkbox").slice(1);
     fireEvent.click(rowBoxes[0]!);
     expect(screen.getByText("1 selected")).toBeTruthy();
     expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
-    expect(screen.getByTestId("selection-action-edit-delivery")).toBeTruthy();
-    fireEvent.click(rowBoxes[1]!);
     expect(screen.queryByTestId("selection-action-edit-delivery")).toBeNull();
+    fireEvent.click(rowBoxes[1]!);
     expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
   });
 
   it("a selected row that already has a partner turns the act into the governed Change logistics — never a bulk replacement", () => {
@@ -785,7 +1036,7 @@ describe("the URL is the state", () => {
   });
 
   it("a rail pick and the search ride the URL", () => {
-    wrap(<OperationDelivery />);
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
     fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
     expect(screen.getByTestId("location-probe").textContent).toContain("view=no_confirmed_date");
   });
@@ -805,7 +1056,9 @@ describe("the URL is the state", () => {
   it("a retired ?view=waiting_warehouse (once a queue) resolves to the DELIVERY STATUS filter", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=waiting_warehouse");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
-    expect(screen.getByTestId("delivery-monitor-status-waiting_warehouse").getAttribute("aria-pressed")).toBe("true");
+    expect(
+      within(screen.getByTestId("delivery-monitor-status-select")).getByRole("combobox").textContent,
+    ).toContain("Waiting for logistics pickup");
     expect(screen.getByText("SO-1322")).toBeTruthy();
     expect(screen.queryByText("SO-1323")).toBeNull();
   });
@@ -974,39 +1227,47 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(headers().some((h) => h.includes("Requested Delivery Date"))).toBe(true);
   });
 
-  it("shows `Confirmed Delivery` as its OWN column — one date is never two names", () => {
+  it("answers the confirmed date ON the requested-date cell — never behind a chooser", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    /* The 2026-09-09 adjacency ruling, kept inside the 2026-09-10 column
+       order: the two dates are one cell's two lines, so *what did they ask
+       for, and has anybody agreed a day?* is still one glance. The sortable
+       columns stay in the chooser for the sheet's own filtering and export. */
+    const grid = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(grid).getAllByText("Not confirmed").length).toBeGreaterThan(0);
     const found = headers();
+    expect(found.some((h) => h.includes("Requested Delivery Date"))).toBe(true);
     expect(found.some((h) => h.includes("Confirmed Delivery"))).toBe(true);
-    expect(found.some((h) => h.includes("Confirmed Time"))).toBe(true);
-    /* The customer's date and the operational answer stay separate words. */
     for (const retired of ["Customer Delivery", "Promised Delivery", "Deliver By"]) {
       expect(found.some((h) => h.includes(retired))).toBe(false);
     }
   });
 
-  it("prints the ruled default column order, `Actions` last of the visible sheet", () => {
+  it("prints the ruled default column order (owner ruling 2026-09-12, Delivery MASTER §8.3)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     const ruled = [
+      "Delivery Status",
       "SO No",
       "Customer",
-      "State",
-      "Requested Delivery Date",
-      "Logistics Partner",
-      "Confirmed Delivery",
-      "Confirmed Time",
-      "DO No",
       "Delivery Location",
-      "Goods",
-      "Delivery Status",
-      "Actions",
+      "Requested Delivery Date",
+      "Confirmed Delivery",
+      "Logistics",
+      "Items & Stock",
+      "Payment",
+      "DO No",
     ];
     const found = headers();
-    const at = (label: string) => found.findIndex((h) => h.includes(label));
+    const at = (label: string) => found.findIndex((h) => h === label || h.startsWith(label));
     expect(ruled.every((label) => at(label) >= 0)).toBe(true);
     expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
+    /* The six chooser columns are OFF by default, not deleted — the sheet can
+       still sort, filter and export by them. */
+    for (const chooserOnly of ["State", "Expected arrival", "Accessories & services", "Confirmed Time", "Building", "Phone"]) {
+      expect(found.some((h) => h === chooserOnly)).toBe(false);
+    }
   });
 
   it("orders the rows by Requested Delivery Date, earliest first, absences last", () => {
@@ -1018,40 +1279,98 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(seen).toEqual([...seen].sort((a, b) => a - b));
   });
 
-  it("a row with NO Logistics Partner offers `Assign logistics`", () => {
+  it("a row with NO Logistics Partner offers `Assign logistics` inside its brief — the panel body is the edit surface (§8.6)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    const button = screen.getByTestId("delivery-monitor-action-assign_logistics-mid");
+    /* The rows sort by requested day: early · mid · late · none. Expand `mid`. */
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[1]!);
+    const button = screen.getByTestId("delivery-brief-logistics-act");
     expect(button.textContent).toBe("Assign logistics");
     fireEvent.click(button);
-    const dialog = screen.getByTestId("assign-logistics-dialog");
-    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
+    /* No dialog is invented: the panel flips into its edit state, and the
+       primary act carries the same governed word. */
+    expect(screen.queryByTestId("assign-logistics-dialog")).toBeNull();
+    const edit = screen.getByTestId("delivery-brief-logistics-edit");
+    expect(within(edit).getByTestId("delivery-brief-save-logistics").textContent).toBe("Assign logistics");
+    expect(within(edit).getByTestId("delivery-brief-chase-message").textContent).toContain("SO-1502");
+    fireEvent.click(within(edit).getByTestId("delivery-brief-cancel-logistics"));
+    expect(screen.queryByTestId("delivery-brief-logistics-edit")).toBeNull();
   });
 
-  it("a row WITH a Logistics Partner says `Call {partner} — confirm delivery date`", () => {
+  it("a row WITH a Logistics Partner names that partner as the actor — `NETS must contact the customer`", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    expect(screen.getByText("Call NETS — confirm delivery date")).toBeTruthy();
-    expect(screen.getByTestId("delivery-monitor-action-confirm_date-early").textContent).toBe(
-      "Edit Delivery",
-    );
+    /* The register carries no Actions column (owner ruling 2026-09-12); the
+       STATUS names who must act (§8.4), and the brief's Change logistics act
+       names the partner. Never `Call NETS — …`. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getAllByText("NETS must contact the customer").length).toBeGreaterThan(0);
+    expect(within(list).getAllByText(/^Call by /).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Call NETS — /)).toBeNull();
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByTestId("delivery-brief-logistics-act").textContent).toBe("Change logistics");
     /* No employee and no carrier is ever hard-coded into the sentence. */
     for (const name of ["Chan", "Tan Ah", "Khor Yee"]) {
       expect(screen.queryByText(new RegExp(`Call ${name}`))).toBeNull();
     }
   });
 
-  it("`Edit Delivery` opens THIS order and carries the queue back with it", () => {
-    seedChase();
-    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
-    fireEvent.click(screen.getByTestId("delivery-monitor-action-confirm_date-early"));
-    const url = screen.getByTestId("location-probe").textContent ?? "";
-    expect(url).toContain("/operation/delivery/edit/early");
-    expect(url).toContain("view%3Dno_confirmed_date");
-    expect(url).toContain("region%3DSelangor");
+  it("⭐ a later date than the customer asked for cannot be saved without the WhatsApp reply (§8.6)", () => {
+    ordersState.data = { orders: [order({ id: "later", so: 1505, delivery_date: "2026-09-10" })] };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "later", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-20" }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
+    const save = screen.getByTestId("delivery-brief-save-dates");
+    /* The button names its gap while disabled — the governed sentence. */
+    expect(save.textContent).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(save).toBeDisabled();
+    /* `Information received from` offers the partner, the customer, and
+       Operation on behalf of the partner — nothing else. */
+    expect(screen.getByText("Information received from")).toBeTruthy();
   });
 
-  it("a row whose date IS confirmed leaves the queue and joins the calendar", () => {
+  it("the Logistics Details edit state offers `Record Cannot Deliver on behalf of {partner}` for a carried row", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    fireEvent.click(screen.getByTestId("delivery-brief-logistics-act"));
+    const open = screen.getByTestId("delivery-brief-cannot-open");
+    expect(open.textContent).toBe("Record Cannot Deliver on behalf of NETS");
+    fireEvent.click(open);
+    const form = screen.getByTestId("delivery-brief-cannot-deliver");
+    expect(within(form).getByText("Reason")).toBeTruthy();
+    expect(within(form).getByTestId("delivery-brief-cannot-save")).toBeDisabled();
+    /* The chase block never claims a confirmation. */
+    expect(screen.getByText(/Sending is not confirmation/)).toBeTruthy();
+  });
+
+  it("`Update date and time` flips the Delivery Dates panel into its edit state and stays on the row (§8.6)", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByTestId("delivery-brief-update-dates").textContent).toBe("Update date and time");
+    fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
+    const edit = screen.getByTestId("delivery-brief-dates-edit");
+    /* Exactly the ruled fields: Confirmed date · Confirmed time · Information
+       received from · WhatsApp proof · Save confirmed delivery. */
+    for (const label of ["Confirmed date", "Confirmed time", "Information received from", "WhatsApp proof"]) {
+      expect(within(edit).getByText(label)).toBeTruthy();
+    }
+    expect(within(edit).getByTestId("delivery-brief-save-dates").textContent).toBe("Save confirmed delivery");
+    /* The workspace never left: same queue, same narrowing. */
+    const url = screen.getByTestId("location-probe").textContent ?? "";
+    expect(url).toContain("view=no_confirmed_date");
+    expect(url).toContain("region=Selangor");
+    fireEvent.click(within(edit).getByTestId("delivery-brief-cancel-dates"));
+    expect(screen.getByTestId("delivery-brief-dates")).toBeTruthy();
+  });
+
+  it("a row whose arrangement is FINISHED leaves the queue and joins the calendar", () => {
     ordersState.data = { orders: [order({ id: "early", so: 1501, delivery_date: "2026-09-10" })] };
     arrangementsState.data = {
       arrangements: [
@@ -1060,6 +1379,9 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
           partner_id: "p-nets",
           partner_name: "NETS",
           confirmed_date: "2026-09-04",
+          /* BOTH halves — a day AND a window. A day alone keeps the row in the
+             contact queue (owner ruling 2026-09-11). */
+          confirmed_time: "09:00–11:00",
         }),
       ],
     };
@@ -1082,24 +1404,22 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(document.body.textContent).not.toMatch(/\bleg\b/i);
   });
 
-  it("the act is also one right-click away — `Actions` is the twelfth column and a sheet scrolls", () => {
+  it("the assignment act is also one right-click away — and Edit Delivery is nowhere", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     const count = (name: string) => screen.queryAllByRole("button", { name }).length;
     const assignsOnSheet = count("Assign logistics");
-    const editsOnSheet = count("Edit Delivery");
 
-    /* A row nobody carries: the menu adds BOTH doors. */
+    /* A row nobody carries: the menu adds the governed assignment door. */
     fireEvent.contextMenu(screen.getByText("SO-1502"));
     expect(count("Assign logistics")).toBe(assignsOnSheet + 1);
-    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
 
-    /* A row a partner already carries: the editor only — a partner is never
-       silently swapped from a context menu (`Change logistics` is the
-       governed act, and it asks for its reason). */
+    /* A row a partner already carries: no silent swap from a menu —
+       `Change logistics` lives in the brief and asks for its reason. */
     fireEvent.contextMenu(screen.getByText("SO-1501"));
     expect(count("Assign logistics")).toBe(assignsOnSheet);
-    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
   });
 
   it("keeps selection, the ▸ expansion and the per-column filters", () => {
@@ -1109,8 +1429,11 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(screen.getAllByRole("checkbox").length).toBe(5);
     fireEvent.click(screen.getAllByRole("checkbox")[0]!);
     expect(screen.getByText("4 selected")).toBeTruthy();
+    /* `Clear filters` clears the NARROWINGS and stays on the work list (owner
+       ruling 2026-09-10); the tab is the only thing that changes the view. */
     fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
-    expect(screen.getByTestId("delivery-monitor-calendar-view")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=all");
   });
 });
 
@@ -1131,8 +1454,11 @@ describe("the phone's chase list", () => {
     expect(within(card).getByText("Thu, 10 Sep")).toBeTruthy();
     expect(within(card).getByText("Logistics Partner")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
-    expect(within(card).getByText("Call NETS — confirm delivery date")).toBeTruthy();
-    expect(within(card).getByText("Edit Delivery")).toBeTruthy();
+    expect(within(card).getByText("Call NETS")).toBeTruthy();
+    expect(within(card).getByText("Confirm the delivery date")).toBeTruthy();
+    /* The card unfolds the same brief the sheet's ▸ opens — no editor page. */
+    expect(within(card).getByText("Show delivery brief")).toBeTruthy();
+    expect(within(card).queryByText("Edit Delivery")).toBeNull();
     /* Not the desktop sheet squeezed: no grid, no Columns control. */
     expect(screen.queryByRole("columnheader")).toBeNull();
     expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
@@ -1168,8 +1494,315 @@ describe("the phone's chase list", () => {
     ordersState.data = { orders: [order({ id: "mid", so: 1502, delivery_date: "2026-09-20" })] };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     expect(screen.getByTestId("delivery-monitor-show-filters")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("delivery-monitor-action-assign_logistics-mid"));
-    const dialog = screen.getByTestId("assign-logistics-dialog");
-    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
+    /* The phone card unfolds the same brief the sheet's ▸ opens. */
+    fireEvent.click(screen.getByTestId("delivery-monitor-brief-toggle-mid"));
+    fireEvent.click(screen.getByTestId("delivery-brief-logistics-act"));
+    expect(screen.getByTestId("delivery-brief-logistics-edit")).toBeTruthy();
+  });
+});
+
+/* ── THE CONTACT WEEK, AND THE ROW'S FOUR NEW CELLS (2026-09-10) ────────── */
+
+describe("Call customer — the contact week", () => {
+  /** Three chases with three different contact deadlines, one already late. */
+  function seedContacts() {
+    ordersState.data = {
+      orders: [
+        /* T−3 (Mon–Sat, Malaysian holidays) from Fri 11 Sep = Tue 8 Sep. */
+        order({ id: "soon", so: 1601, customer_name: "aida rahim", delivery_date: "2026-09-11" }),
+        /* From Sat 12 Sep = Wed 9 Sep. */
+        order({ id: "later", so: 1602, customer_name: "tan mei ling", delivery_date: "2026-09-12" }),
+        /* From Fri 28 Aug = Mon 24 Aug — already behind TODAY (4 Sep). */
+        order({ id: "late", so: 1603, customer_name: "wong ah kaw", delivery_date: "2026-08-28" }),
+      ],
+    };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "soon", partner_id: "p-nets", partner_name: "NETS" }),
+        arrangement({ order_id: "later", partner_id: "p-al", partner_name: "AL" }),
+        arrangement({ order_id: "late", partner_id: "p-nets", partner_name: "NETS" }),
+      ],
+    };
+  }
+
+  it("appears under Call customer and NOWHERE else — these are contact dates", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
+    const strip = screen.getByTestId("delivery-monitor-contact-week");
+    expect(within(strip).getByText("Contact deadlines — not supplier or delivery dates")).toBeTruthy();
+
+    cleanup();
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    expect(screen.queryByTestId("delivery-monitor-contact-week")).toBeNull();
+  });
+
+  it("is Monday to Saturday with per-day COUNTS, and picking a day narrows the list", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
+    const strip = screen.getByTestId("delivery-monitor-contact-week");
+    for (const iso of [
+      "2026-09-07",
+      "2026-09-08",
+      "2026-09-09",
+      "2026-09-10",
+      "2026-09-11",
+      "2026-09-12",
+    ]) {
+      expect(within(strip).getByTestId(`delivery-monitor-contact-day-${iso}`)).toBeTruthy();
+    }
+    /* Sunday is never an operating day and never a contact deadline. */
+    expect(within(strip).queryByTestId("delivery-monitor-contact-day-2026-09-13")).toBeNull();
+    expect(
+      within(strip).getByTestId("delivery-monitor-contact-day-2026-09-08").textContent,
+    ).toContain("1");
+
+    fireEvent.click(within(strip).getByTestId("delivery-monitor-contact-day-2026-09-08"));
+    expect(screen.getByTestId("location-probe").textContent).toContain("due=2026-09-08");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("SO-1601")).toBeTruthy();
+    expect(within(list).queryByText("SO-1602")).toBeNull();
+  });
+
+  it("keeps OVERDUE contact work discoverable from every date", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&date=2026-09-08");
+    const chip = screen.getByTestId("delivery-monitor-contact-overdue");
+    /* The chip carries its own live count, so a quiet week never hides it. */
+    expect(chip.textContent).toContain("1");
+    fireEvent.click(chip);
+    expect(screen.getByTestId("location-probe").textContent).toContain("late=1");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("SO-1603")).toBeTruthy();
+    expect(within(list).queryByText("SO-1601")).toBeNull();
+  });
+
+  it("prints the deadline on the row, and the LATE one keeps the day it missed", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&late=1");
+    /* The deadline lives on `Confirmed Delivery`'s second line (§8.3):
+       `Call by {date}` — red once the day has passed, and the day it missed
+       is the day it keeps. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    /* Both the status's second line and `Confirmed Delivery`'s carry it. */
+    const late = within(list).getAllByText("Call by Mon, 24 Aug");
+    expect(late.length).toBe(2);
+    for (const el of late) expect(el.className).toContain("text-kit-red-11");
+    for (const el of within(list).getAllByText(/^Call by /)) {
+      if (el.textContent !== "Call by Mon, 24 Aug") expect(el.className).not.toContain("text-kit-red-11");
+    }
+  });
+
+  it("an order with NO confirmed delivery date stays in the queue", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    for (const so of ["SO-1601", "SO-1602", "SO-1603"]) {
+      expect(within(list).getByText(so)).toBeTruthy();
+    }
+  });
+
+  it("never infers a customer's answer from a missing date", () => {
+    seedContacts();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/Waiting for customer reply/i);
+    expect(text).not.toMatch(/Customer did not/i);
+  });
+});
+
+/** Reveal an off-by-default column through the sheet's own Columns chooser. */
+function showColumn(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  fireEvent.click(screen.getByLabelText(label));
+  fireEvent.keyDown(document.body, { key: "Escape" });
+}
+
+describe("the row's goods, arrival and stock cells", () => {
+  function seedGoods(over: Partial<operationOrderListRow> = {}) {
+    ordersState.data = {
+      orders: [
+        order({
+          id: "g",
+          so: 1701,
+          delivery_date: "2026-09-30",
+          delivery_floor: 3,
+          delivery_has_lift: false,
+          order_lines: [
+            { id: "l-1", sku: "mattress:M1401F-K", qty: 2, label: "Serena · King" },
+            { id: "l-2", sku: "Pillow soft", qty: 2 },
+          ],
+          order_addons: [{ addon_key: "dispose-mattress", qty: 1 }],
+          allocated_units: [{ sku: "mattress:M1401F-K", status: "reserved", qty: 1 }],
+          ...over,
+        }),
+      ],
+    };
+  }
+
+  it("Items and Accessories & services are TWO cells, with the exact shortage", () => {
+    seedGoods();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    /* The register's cell is `Items & Stock` (§8.3): the readiness word and
+       the exact count — 1 of 4 pieces held, 3 short across the shipment. */
+    expect(within(list).getByText("Not ready")).toBeTruthy();
+    expect(within(list).getByText("1 of 4 · 3 short")).toBeTruthy();
+    /* The goods themselves live in the brief's fourth panel, one line each. */
+    fireEvent.click(within(list).getAllByTitle("Show delivery brief")[0]!);
+    const items = screen.getByTestId("delivery-brief-items");
+    expect(within(items).getByText("Serena · King")).toBeTruthy();
+    expect(within(items).getByText(/Pillow/)).toBeTruthy();
+    expect(within(items).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
+    /* The site the crew meets is panel 1's own facts — floor and lift, each
+       its own line, never a joined sentence. */
+    const customer = screen.getByTestId("delivery-brief-customer");
+    expect(within(customer).getByText("No lift")).toBeTruthy();
+    expect(within(customer).getByText("3")).toBeTruthy();
+  });
+
+  it("Expected arrival keeps the DATE first and the original beside a revision", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: "2026-09-20",
+          originalIso: "2026-09-20",
+          reply: {
+            answer: "delayed",
+            aboutIso: "2026-09-20",
+            previousIso: null,
+            newIso: "2026-09-28",
+            recordedAt: "2026-09-05T00:00:00Z",
+          },
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
+    const cell = screen.getByTestId("delivery-monitor-arrival-moved");
+    /* ⭐ THE DATE IS THE CELL (owner ruling 2026-09-11). The NEW date leads,
+       the original sits under it as context, and `Delayed` no longer repeats
+       under every row — the icon and the tooltip carry the meaning. */
+    expect(cell.textContent).toBe("Mon, 28 SepSun, 20 Sep");
+    expect(cell.textContent).not.toContain("Delayed");
+    const sentence = "Expected arrival Mon, 28 Sep · Delayed · PO Delivery Date Sun, 20 Sep";
+    expect(cell.getAttribute("title")).toBe(sentence);
+    expect(cell.getAttribute("aria-label")).toBe(sentence);
+    /* A revision ALWAYS shows the new date — never a lone delay symbol. */
+    expect(cell.querySelector("svg")).toBeTruthy();
+  });
+
+  it("no revised date states the truthful unresolved gap and invents nothing", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: null,
+          originalIso: null,
+          reply: null,
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
+    /* ⭐ THREE DIFFERENT ABSENCES, NEVER ONE (owner ruling 2026-09-11). Nobody
+       asked and nobody could compute a date: the gap is OURS, and blaming a
+       factory nobody contacted is the lie the single old state used to tell. */
+    const cell = screen.getByTestId("delivery-monitor-arrival-no_calculation");
+    expect(cell.textContent).toBe("No expected arrival calculated");
+    expect(cell.textContent).not.toContain("The factory has not given a date");
+    /* Nothing that looks like a date is printed beside the absence. */
+    expect(cell.textContent).not.toMatch(/\d{1,2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/);
+  });
+
+  it("a supplier who ANSWERED with no new day is the factory's own absence", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: null,
+          originalIso: null,
+          reply: {
+            answer: "delayed",
+            aboutIso: null,
+            previousIso: null,
+            newIso: null,
+            recordedAt: "2026-09-05T00:00:00Z",
+          },
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
+    const cell = screen.getByTestId("delivery-monitor-arrival-late_no_date");
+    expect(cell.textContent).toBe("The factory has not given a date");
+  });
+
+  it("a supplier date behind us wears AMBER, and red stays on the late CALL", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: "2026-08-01",
+          originalIso: "2026-08-01",
+          reply: null,
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
+    const cell = screen.getByTestId("delivery-monitor-arrival-passed");
+    /* Compact: the amber icon and the date. The fact is in the sentence. */
+    expect(cell.textContent).toBe("Sat, 1 Aug");
+    expect(cell.getAttribute("title")).toBe(
+      "Expected arrival Sat, 1 Aug · Supplier delivery date passed",
+    );
+    expect(cell.innerHTML).toContain("kit-amber-11");
+    /* The supplier exception is LOCAL — it never paints the row or the page,
+       and RED belongs to the overdue customer call. */
+    expect(cell.innerHTML).not.toContain("kit-red-");
+  });
+
+  it("Stock is its own cell and stays separate from the arrival date", () => {
+    seedGoods();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("Not ready")).toBeTruthy();
+    /* The whole delivery is three pieces short — the shipment scope, never
+       the main goods alone, and never a service that moves no Unit. */
+    expect(within(list).getByText(/3 short/)).toBeTruthy();
+  });
+
+  it("the arrival icons carry real labels, so colour is never the only signal", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: "2026-08-01",
+          originalIso: "2026-08-01",
+          reply: null,
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
+    /* ⭐ ONE accessible name per cell, not one per glyph. The icon is
+       decorative; the CELL carries the sentence, so a screen reader reads the
+       meaning once instead of hearing it twice. */
+    const cell = screen.getByTestId("delivery-monitor-arrival-passed");
+    expect(cell.getAttribute("aria-label")).toContain("Supplier delivery date passed");
+    expect(cell.querySelectorAll("svg[aria-label]").length).toBe(0);
+    expect(cell.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 });

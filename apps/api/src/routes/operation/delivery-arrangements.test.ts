@@ -63,6 +63,10 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
+/** The one responsibility read (0499) the contact writer asks before it
+ *  writes — a test sets who is responsible and who is acting today. */
+const responsibility = { normal_user_id: null as string | null, acting_user_id: null as string | null, source: "not_assigned" };
+
 /** Records every insert so a test can assert what the history actually got. */
 function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
   const queue = [...results];
@@ -90,9 +94,13 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
       Promise.resolve({ data: res.data ?? null, error: res.error ?? null }).then(resolve, reject);
     return chain;
   });
-  vi.mocked(userClient).mockReturnValue({ from } as never);
-  vi.mocked(adminClient).mockReturnValue({ from } as never);
-  return { from, inserts, upserts };
+  const rpc = vi.fn().mockImplementation(async (name: string) =>
+    name === "delivery_responsible_operation"
+      ? { data: { ...responsibility }, error: null }
+      : { data: null, error: null });
+  vi.mocked(userClient).mockReturnValue({ from, rpc } as never);
+  vi.mocked(adminClient).mockReturnValue({ from, rpc } as never);
+  return { from, inserts, upserts, rpc };
 }
 
 async function call(path: string, role: string, init?: RequestInit, warehouseId?: string) {
@@ -258,6 +266,34 @@ describe("POST /assign — one partner onto one or many scopes", () => {
   });
 });
 
+describe("GET / — every arrangement, every contact, every Cannot Deliver (Card 17)", () => {
+  it("carries the Cannot Deliver records for the central Delivery report", async () => {
+    mockSb([
+      { data: [] }, // arrangements
+      { data: [] }, // contacts
+      { data: [{ id: "e1", order_id: ORDER_A, leg: 0, from_partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" }] },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cannotDeliver?: Array<Record<string, unknown>> };
+    expect(body.cannotDeliver).toEqual([
+      { id: "e1", order_id: ORDER_A, leg: 0, partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" },
+    ]);
+  });
+
+  it("leaves the field ABSENT when that read fails — the report says Not available, never 0", async () => {
+    mockSb([
+      { data: [] },
+      { data: [] },
+      { error: { code: "42P01", message: "relation does not exist" } },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect("cannotDeliver" in body).toBe(false);
+  });
+});
+
 describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
   /** The feed's fixed query order (0424): arrangements · orders ·
    *  delivery orders · SCOPE (delivery_order_units) · units · prep ·
@@ -295,6 +331,31 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
     trip_groups: null,
     voided_at: null,
   };
+
+  it("0491 — a Journey leg joins the feed once it carries its OWN document; a leg without one stays absent", async () => {
+    const LEG_ARRANGEMENT = { ...ARRANGEMENT_ROW, id: "arr-2", leg: 1 };
+    const LEG_DO = { ...DO_ROW, id: "do-2", do_number: "DO-010926-0002", leg: 1 };
+    mockSb([
+      { data: [LEG_ARRANGEMENT, { ...ARRANGEMENT_ROW, id: "arr-3", leg: 2 }] },
+      { data: [ORDER_ROW] },
+      { data: [LEG_DO] },
+      { data: [{ delivery_order_id: "do-2", item_id: "item-1" }] },
+      { data: [{ id: "item-1", unit_code: "CAR-000123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
+      { data: [] },
+      { data: [] },
+      { data: [] },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [{ sku: "SOFA-X", variant: "Sofa X (Grey)" }] },
+    ]);
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const { events } = (await res.json()) as { events: Array<{ leg: number; doNumber: string; deliveryHref: string }> };
+    /* leg 1 has its document → projected (pickup + handover events, one Unit);
+       leg 2 has none → absent. */
+    expect(events.length).toBe(2);
+    expect(new Set(events.map((e) => `${e.leg}:${e.doNumber}`))).toEqual(new Set(["1:DO-010926-0002"]));
+    expect(events[0]!.deliveryHref).toContain("open=");
+  });
 
   it("projects the DO's recorded exact-Unit scope onto the real Saturday pickup with Friday readiness", async () => {
     const { inserts, upserts } = mockSb([
@@ -575,6 +636,227 @@ describe("PUT /:orderId — Save Delivery", () => {
     mockSb([]);
     const res = await save({ confirmedDate: "2026-08-28" }, `/${ORDER_A}?leg=99`);
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PUT /:orderId — the in-panel writes (CARD 11, Delivery MASTER §8.6)", () => {
+  const save = (body: unknown, path = `/${ORDER_A}`) =>
+    call(path, "operation", { method: "PUT", body: JSON.stringify(body) });
+  const savedArrangement = {
+    id: "arr-1",
+    order_id: ORDER_A,
+    leg: 0,
+    partner_id: NETS,
+    confirmed_date: "2026-09-29",
+    confirmed_time: "Afternoon (12pm–3pm)",
+    expected_arrival: null,
+    logistics_note: null,
+    reply_proof_path: "proof/a.jpg",
+    driver_name: null,
+    vehicle: null,
+    updated_at: "2026-09-13T00:00:00Z",
+    updated_by: null,
+    delivery_partners: { id: NETS, name: "NETS" },
+  };
+
+  it("⭐ a day LATER than the requested day is refused without the WhatsApp reply", async () => {
+    const { upserts } = mockSb([{ data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-29", confirmedTime: "Afternoon (12pm–3pm)" });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("later_date_needs_reply_proof");
+    expect(body.error).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(upserts).toHaveLength(0);
+  });
+
+  it("a day later than the requested day saves WITH the reply, and records the contact", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: savedArrangement },
+      { data: { id: "c-1" } },
+    ]);
+    const res = await save({
+      partnerId: NETS,
+      confirmedDate: "2026-09-29",
+      confirmedTime: "Afternoon (12pm–3pm)",
+      replyProofPath: "proof/a.jpg",
+      informationReceivedFrom: "operation_on_behalf",
+    });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact).toBeTruthy();
+    expect(contact.purpose_key).toBe("confirm_new_delivery_date");
+    expect(contact.contacted_person).toBe("customer");
+    expect(contact.on_behalf_of_partner_id).toBe(NETS);
+    expect(contact.reply_evidence_path).toBe("proof/a.jpg");
+    expect(contact.result_key).toBe("confirmed");
+  });
+
+  it("a day that is NOT later needs no reply, and the partner's own answer is recorded as the partner's", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: "2026-09-25", delivery_date_tbd: false } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: { ...savedArrangement, confirmed_date: "2026-09-24", reply_proof_path: null } },
+      { data: { id: "c-2" } },
+    ]);
+    const res = await save({
+      partnerId: NETS,
+      confirmedDate: "2026-09-24",
+      confirmedTime: "Morning (9am–12pm)",
+      informationReceivedFrom: "partner",
+    });
+    expect(res.status).toBe(200);
+    const contact = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(contact.purpose_key).toBe("confirm_delivery_date");
+    expect(contact.contacted_person).toBe("partner");
+    expect(contact.channel).toBe("call");
+  });
+
+  it("no `Information received from` — no contact is invented", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: true } },
+      { data: [] },
+      { data: [{ id: ORDER_A, delivery_partner_id: NETS, ops_assigned_logistic: null }] },
+      { data: savedArrangement },
+    ]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-29" });
+    expect(res.status).toBe(200);
+    expect(inserts.some((i) => i.table === "ops_delivery_contacts")).toBe(false);
+  });
+
+  it("⭐ a Sunday is not a delivery day", async () => {
+    mockSb([{ data: { id: ORDER_A, delivery_date: null, delivery_date_tbd: false } }]);
+    const res = await save({ partnerId: NETS, confirmedDate: "2026-09-06" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("not_a_delivery_day");
+  });
+});
+
+describe("POST /:orderId/contacts — the one customer-contact door (0487)", () => {
+  it("records a contact with its purpose and result — silence is never a result", async () => {
+    const { inserts } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        purpose: "confirm_delivery_time",
+        channel: "whatsapp",
+        contactedPerson: "customer",
+        result: "waiting_for_customer_reply",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const row = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(row.result_key).toBe("waiting_for_customer_reply");
+    expect(row.purpose_key).toBe("confirm_delivery_time");
+  });
+
+  /** 0499 — four identities, separately. The signed-in subject in these tests
+   *  is 11111111-…-0001; the responsible person and today's acting person
+   *  come from the one responsibility read, never from who is typing. */
+  const SHASHA = "0cab8bcf-6ebb-454e-ba21-b916e18cc419";
+  const YUJUN = "aac9edf9-63ad-4d0a-ba91-e495a25f9896";
+  const RECORDER = "11111111-1111-1111-1111-000000000001";
+  async function contactRow() {
+    const { inserts, rpc } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "confirm_delivery_date", channel: "call", contactedPerson: "customer", result: "confirmed" }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_responsible_operation", { p_order_id: ORDER_A, p_on: null });
+    return inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+  }
+
+  it("the responsible person is the order's normal person from the one read — the recorder is evidence, never responsibility", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: SHASHA, source: "delivery_duty" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.acting_user_id).toBe(SHASHA);
+    expect(row.recorded_by).toBe(RECORDER);
+    expect(row.contact_owner_user_id).not.toBe(row.recorded_by);
+  });
+
+  it("a buddy cover recording during leave is today's acting person; the normal person is kept", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: YUJUN, source: "contact" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.acting_user_id).toBe(YUJUN);
+    expect(row.recorded_by).toBe(RECORDER);
+  });
+
+  it("nobody responsible yet → the contact records no owner and no acting person, keeps its recorder, and still lands", async () => {
+    Object.assign(responsibility, { normal_user_id: null, acting_user_id: null, source: "not_assigned" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBeNull();
+    expect(row.acting_user_id).toBeNull();
+    expect(row.recorded_by).toBe(RECORDER);
+  });
+
+  it("a partner's reply keeps its provenance beside the three people", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: SHASHA, source: "delivery_duty" });
+    const { inserts } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "confirm_delivery_date", channel: "whatsapp", contactedPerson: "partner", result: "confirmed", onBehalfOfPartnerId: NETS }),
+    });
+    expect(res.status).toBe(200);
+    const row = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(row.on_behalf_of_partner_id).toBe(NETS);
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.recorded_by).toBe(RECORDER);
+  });
+
+  it("refuses a purpose outside the governed list", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/contacts`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "follow_up", channel: "call", contactedPerson: "customer", result: "no_answer" }),
+    });
+    expect(res.status).toBe(422);
+  });
+});
+
+describe("POST /:orderId/cannot-deliver — Operation on behalf of the partner (§8.6)", () => {
+  it("records the 0417 event in the partner's name and a history line naming the proxy", async () => {
+    const { inserts } = mockSb([
+      { data: { id: ORDER_A } },
+      { data: { id: NETS, name: "NETS" } },
+      { data: null },
+      { data: null },
+    ]);
+    const res = await call(`/${ORDER_A}/cannot-deliver?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "no_capacity", note: "Lorry full that day" }),
+    });
+    expect(res.status).toBe(200);
+    const event = inserts.find((i) => i.table === "ops_delivery_arrangement_events")?.rows as Record<string, unknown>;
+    expect(event.event).toBe("cannot_deliver");
+    expect(event.from_partner_id).toBe(NETS);
+    expect(event.reason_key).toBe("no_capacity");
+    const history = inserts.find((i) => i.table === "order_history")?.rows as Record<string, unknown>;
+    expect(history.by_role).toBe("operation");
+    expect(history.text).toContain("on behalf of NETS");
+  });
+
+  it("`Another reason` needs the note, exactly as the partner's own door demands", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/cannot-deliver`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "other" }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("refuses a dealer", async () => {
+    mockSb([]);
+    const res = await call(`/${ORDER_A}/cannot-deliver`, "dealer", {
+      method: "POST",
+      body: JSON.stringify({ partnerId: NETS, reason: "no_capacity" }),
+    });
+    expect(res.status).toBe(403);
   });
 });
 

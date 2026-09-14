@@ -35,6 +35,8 @@ import {
   CircleAlert,
   Library,
   SlidersHorizontal,
+  Receipt,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -79,7 +81,7 @@ export type PortalSection =
   | "Purchasing"
   | "Delivery"
   | "Warehouse"
-  | "Finance"
+  | "Payments"
   | "Customer Care"
   | "Suppliers"
   | "Master Data"
@@ -92,7 +94,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Purchasing",
   "Delivery",
   "Warehouse",
-  "Finance",
+  "Payments",
   "Customer Care",
   "Suppliers",
   "Master Data",
@@ -105,13 +107,16 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
  * A section listed here draws a parent row: icon + name + chevron, its pages
  * hanging beneath it on rounded elbows. A section NOT listed here has no
  * parent row and its pages stay plain top-level rows — `Workspace`
- * (Dashboard · Work · Issue Tracker, ruled plain by the card) and `Finance`,
- * whose single `Payments` page would otherwise hide behind a chevron that
- * reveals one row of the same name. A control that opens nothing new is the
- * dead control `docs/03-page-patterns.md:149` bans. `Payments` stays ONE row
- * after the 2026-09-09 entry-point correction: Payment MASTER §16 puts the
- * `Payments · Invoices` switch in the Register's own toolbar, so a second
- * rail row for Invoices would be a second control for one act.
+ * (Dashboard · Work · Issue Tracker, ruled plain by the card). A control
+ * that opens nothing new is the dead control `docs/03-page-patterns.md:149`
+ * bans.
+ *
+ * ⭐ PAYMENTS IS A MODULE OF TWO DESTINATIONS (owner ruling 2026-09-12):
+ * `Monitor` — the full-width collection control listing — and `Payment
+ * Records` — the permanent incoming-money listing. No `Payments · Invoices`
+ * tabs, no standalone Invoices or Receipts page, no clickable parent. For an
+ * ordinary ERP user Payments is not a Finance Portal; the finance-only
+ * capabilities keep their own area below.
  *
  * The icon is the module's ONE face — the same law the Purchasing `ShoppingBag`
  * already followed (Loo, 2026-08-02). Children carry no icon at all now, so
@@ -130,6 +135,10 @@ export interface PortalModule {
  *  OPENS on it (Stock MASTER §7) — by name, never derived from row order. */
 export const WAREHOUSE_LANDING_KEY = "wh-monitor";
 
+/** The collapsed Payments icon lands on `Monitor` — the daily collection
+ *  desk — by name, never by row order (owner ruling 2026-09-12). */
+export const PAYMENTS_LANDING_KEY = "payments";
+
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
@@ -139,6 +148,7 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
   { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
+  { section: "Payments", label: "Payments", icon: Wallet },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
      PARTY the business deals with, not a reference list — the same kind of
@@ -432,35 +442,39 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
-      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER — the
-       * entry-point correction, 2026-09-09.
+      /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12).
        *
-       * This row used to link to `/operation?tab=payments`, the Master-Sheet
-       * "Balance" collections desk: its own Summary band, its own queue chips
-       * and its own EDITABLE balance / storage-fee fields. Payment MASTER §16
-       * approved a different destination — the read-only Payments Register,
-       * its `Payments · Invoices` toolbar, the Invoice object that owns the
-       * writing, and the §17 Calendar behind the Invoice date cells — and
-       * every one of those shipped at `/finance/*` while this row still
-       * pointed at the old desk. Two forms for one act make two records
-       * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is gone and
-       * this is the one door.
+       * `Monitor` is the full-width collection control listing keyed on the
+       * Sales Order — what money is still needed, whether the goods are ready,
+       * the storage fact, the customer's delivery day and the governed next
+       * action with its resolved owner. `Payment Records` is the permanent
+       * listing of money actually received, one row per Payment. The former
+       * `Payments · Invoices` toolbar switch and the standalone Invoices
+       * Register are retired: an Invoice belongs to its Sales Order, and the
+       * Monitor opens the collection workspace for the exact one.
        *
        * `path` (not `financePath`) on purpose: `navItemHref` reads `path` for
-       * every non-finance area, so the row links absolutely out of
-       * `/operation` and lights on the destination it actually opens. Both
-       * `operation` and `principal` may stand there — `/finance/*` admits
-       * operation staff to Payments and Invoices (§12), and `FinanceApp`
-       * bounces them off every finance-only page. */
+       * every non-finance area, so the rows link absolutely out of
+       * `/operation`. Both `operation` and `principal` may stand there —
+       * `/finance/*` admits operation staff to these two destinations (§12),
+       * and `FinanceApp` bounces them off every finance-only page. */
       {
         key: "payments",
-        label: "Payments",
+        label: "Monitor",
         icon: Wallet,
+        path: "/finance/monitor",
+        // The retired `/finance/invoices` address forwards here and must
+        // light the same row while it resolves.
+        activeFor: ["path:/finance/monitor", "path:/finance/invoices"],
+        section: "Payments",
+      },
+      {
+        key: "payment-records",
+        label: "Payment Records",
+        icon: Receipt,
         path: "/finance/payments",
-        // The Invoices Register is the same destination's second listing (its
-        // toolbar switches between the two), so the row stays lit there.
-        activeFor: ["path:/finance/payments", "path:/finance/invoices"],
-        section: "Finance",
+        activeFor: ["path:/finance/payments"],
+        section: "Payments",
       },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
@@ -506,31 +520,47 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
       },
+      // 0477 — a supplier's bill, the voucher that pays it, and what is still
+      // unpaid per supplier (also the third listing of the Bills toolbar switch).
       {
-        key: "ap",
-        label: "AP · Payables",
-        icon: ArrowUpRight,
-        financePath: "/finance/ap",
+        key: "bills",
+        label: "Bills",
+        icon: Receipt,
+        financePath: "/finance/bills",
       },
+      {
+        key: "payment-vouchers",
+        label: "Payment Vouchers",
+        icon: Banknote,
+        financePath: "/finance/payment-vouchers",
+      },
+      {
+        // The old `AP · Payables` row. Its page read PO cost and pay states
+        // nothing writes since 0477; /finance/ap now redirects here.
+        key: "ap",
+        label: "Unpaid by Supplier",
+        icon: ArrowUpRight,
+        financePath: "/finance/ap-outstanding",
+      },
+      /* The finance role sees the SAME two Payments destinations, as the same
+       * module — never a second Payment information architecture (owner
+       * ruling 2026-09-12). `Order Payments`, `Invoices` and `Refunds &
+       * Credits` are retired as employee doors: customer Money In has one
+       * home, and routine Refunds are a Payment MASTER §13 intentional reject
+       * (history stays readable on the payment object). */
       {
         key: "payments",
-        // Payment MASTER §16 — the destination word is `Payments`; the row
-        // opens the canonical receipt Register.
-        label: "Payments",
+        label: "Monitor",
         icon: Wallet,
+        financePath: "/finance/monitor",
+        section: "Payments",
+      },
+      {
+        key: "payment-records",
+        label: "Payment Records",
+        icon: Receipt,
         financePath: "/finance/payments",
-      },
-      {
-        key: "invoices",
-        label: "Invoices",
-        icon: FileText,
-        financePath: "/finance/invoices",
-      },
-      {
-        key: "refunds",
-        label: "Refunds & Credits",
-        icon: Undo2,
-        financePath: "/finance/refunds",
+        section: "Payments",
       },
       {
         // 0268 — the rent-to-own credit gate. Sits next to the money tabs
@@ -541,6 +571,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: UserCheck,
         financePath: "/finance/rental-approver",
       },
+      // 0478 — money in that is not a sale. A party that is not a customer
+      // (a sister company, a lender) is billed on Other debtors; a loan in,
+      // other income or money against those invoices is an Other receipt.
+      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
+      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
+      // The Finance Ledger — three rows, not one row with tabs: the Journal,
+      // the Trial Balance and the Self-check are three different objects
+      // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
+      // for views of ONE object.
+      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
+      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
+      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },
       {
         key: "reports",
         label: "Reports",

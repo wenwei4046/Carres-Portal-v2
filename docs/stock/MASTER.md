@@ -143,6 +143,22 @@ Sales Order owns choosing, binding, changing and releasing the exact promised Un
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.
 
+**A RESERVATION NAMES THE ITEM LINE, NOT JUST THE ORDER — BUILT AND PRODUCTION-VERIFIED
+2026-09-10, migration 0471.** `ops_stock_items.reserved_ref` says which Sales Order a Unit is
+committed to; `ops_stock_items.reserved_order_line_id` says which of that order's ITEM LINES it
+answers. Both are needed: a Sales Order may carry two item lines of one SKU, and three do today.
+The binding is a column on the Unit row rather than a second table, because the Unit row already is
+the reservation — so release and reassignment clear it in the same write and the customer's
+requirement returns to Purchasing by itself. It survives the sale, so a delivered requirement never
+returns as something to buy. Both register views expose it.
+
+`ops_stock_pool_draw` is still the one reserve door and now validates the binding in SQL on the
+locked row: the line belongs to that Sales Order, the goods match by `stock_match_key`, the Unit is
+an exact Unit and never a counted row (§3 · 0368), it is `available` by `unit_availability`, and the
+line still has a remaining requirement of ordered quantity less bound Ready Stock less
+non-cancelled purchase-order lineage. There is no override. A caller that names no line has one
+RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
+
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,
@@ -373,15 +389,19 @@ ARRIVAL card is one expected-arrival source scope. It shows, in this order: the 
 sentence · the event name with its direction · the source document identity · the party and
 what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
 shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
-or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
-return/collection work that requires a Warehouse physical act.
+or any Delivery arrangement action. Warehouse never shows or completes a Delivery arrangement
+action. A Failed Delivery appears only through the exact governed return/collection work that
+requires a Warehouse physical act.
 
 Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
 document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
 nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
-may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
-never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
-editor.
+may show a clickable `DO No`, and that DO opens as a read-only source document. Warehouse never
+enters Delivery's `Update date and time`, `Assign logistics`, `Change logistics`, driver/vehicle
+or ETA editors (the Monitor row's expanded panels, `../delivery/MASTER.md` §8.5 and §8.6).
+Delivery remains the only owner of the Logistics Partner, the confirmed operational date and
+time, the driver and vehicle and the ETA. Warehouse only reads the relevant Delivery facts and
+owns its own physical preparation and handover facts.
 
 For any selected date, the operator journey is always:
 
@@ -2053,33 +2073,41 @@ draft lands. Both routes now carry a `PRODUCTION SHAPE` regression test that rep
 deployed schema; the Inbound and Receiving suites fail if either read is made unconditional
 again.
 
-Still owed (not this card's build): land the arrival-sources draft
-(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered) — until it does, the
-Inbound rail's Transfer / Customer Return / Failed Delivery return / Return from repair /
-Supplier replacement rows honestly count zero. Migration **0437** (Khor Yee offboard /
+**Landed 2026-09-13 as migration `0490` (Delivery Card 14):** the arrival-sources draft is the
+numbered migration, guarded object by object, with one addition — a `failed-delivery-return`
+may be bound to the Delivery Visit that failed (`arrival_sources.attempt_id`) instead of a
+Service Case, so Delivery's result plans the return itself and Inbound names it by the DO the
+goods went out on (`DO No`). The Inbound rail's Transfer / Customer Return / Failed Delivery
+return / Return from repair / Supplier replacement rows now read real records. Migration **0437** (Khor Yee offboard /
 two-person duty) was found unapplied while 0438–0440 were — with nobody resolving `po_duty` or
 `grn_duty`, which blocked every GRN posting. It was applied on 2026-09-07 as
 `20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
 2026-10 → 2027-09 alternating rotation exists.
 
-### 13.10 · BUILT / REQUIRES PRODUCTION PROOF — Outbound joins shared Work (2026-09-09)
+### 13.10 · BUILD / NOT READY — Outbound joins shared Work (2026-09-14)
 
-The delivery branch implements §8 and §12.11 without changing the production-verified Outbound
-transaction. One unfinished Delivery Order projects one `warehouse.outbound_handover` action;
-Monitor still projects none. Its object is the DO, its due date is the scheduled Warehouse
-handover date, and its completion fact is every required exact Unit carrying an accepted Warehouse
-handover event with receiver and proof.
+**RULING:** §8 and §12.11 identify one obligation by Delivery Order + Warehouse Site. The first
+authorised personal operator accepts or begins scanning; exact-Unit handover with receiver and
+proof closes it. Monitor creates no Work. Carres staff and shared mailboxes cannot substitute for
+NETS individuals; offboarding and reassignment must retain actor evidence.
 
-Before work starts, ownership is the governed Warehouse Site queue. The first active, personally
-signed-in `warehouse` account bound to that Site who accepts or begins an exact-Unit prep scan is
-recorded as durable ownership evidence and becomes the resolved person. This never assigns
-Yu Jun, Shasha, an organisation name or a shared `NW` avatar. Team Work keeps the Site queue visible;
-accepted work groups under the person. The same contract opens the filtered internal Outbound door
-for Carres and the Site-scoped external Outbound door for Warehouse users.
+**FACT — branch implementation:** `warehouse-outbound.ts` groups exact Units by DO + Site;
+`warehouse-work.ts` uses that same pair in Work identity and rejects cards outside its Site.
+Monitor and Work links carry Site identity; both Outbound doors honour the DO/Site filter, and
+the internal door expands the selected scope after its data loads. `warehouse/work.ts` forwards
+Worker bindings to its schedule reader and refuses missing or failed sources. Monitor surfaces
+failures from its schedule, PO, Supplier and Site reads. Regression tests live beside these files.
 
-Migration `0459_outbound_work_starts_in_the_site_queue.sql`, authenticated cross-Site refusal,
-first-scan concurrency, personal-account fixtures, deployment and production closure evidence are
-still required. Until those pass, this section is BUILD evidence and not production verification.
+**FACT — production SQL, 2026-09-14 02:10 UTC:** zero `app_users` with role `warehouse`;
+0459/0460 absent from `supabase_migrations.schema_migrations`, assignment table and reader/accept
+functions absent. Yu Jun and Shasha are active `operation` accounts with no Warehouse Site.
+
+**NOT READY:** committed 0459 checks active role/Site but does not enforce the existing personal
+identity predicate or implement offboarding/transfer history. Preserve 0459/0460 unchanged;
+correct these guards through the governed new-migration path before applying and admitting Work.
+External personal Work/acceptance UI, physical later-leg origin, mobile floor execution, migration
+negative controls, real personal-operator closure and main-tip deployment proof remain outstanding.
+Local regression success is not production acceptance or a go-live declaration.
 
 ## 14 · Whole-domain completion gate
 
