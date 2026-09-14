@@ -14,7 +14,12 @@ import {
   type RuleTarget,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
-import { readActivePwpRules, resolveSkuInfo, type SkuInfo } from "../lib/rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "../lib/rule-line-input";
 import type { AppEnv } from "../types";
 
 /**
@@ -63,21 +68,6 @@ function genCode(): string {
   for (let i = 0; i < 4; i++) letters += LETTERS[buf[4 + i]! % 26];
   return `PWP-${digits}${letters}`;
 }
-
-/* ─── trigger-line → RuleLineInput (mirrors pwp-recompute's deriveRuleLine) ──── */
-
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
-
-const upper = (s: string): string => String(s ?? "").toUpperCase();
 
 /* ─── POST /reserve — reconcile ONE trigger line's RESERVED set ─────────────── */
 
