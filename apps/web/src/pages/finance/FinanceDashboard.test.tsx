@@ -90,7 +90,7 @@ function show(ui: React.ReactNode) {
 }
 
 describe("Finance Dashboard", () => {
-  it("Unpaid is the same figure the Unpaid by Supplier footer prints", async () => {
+  it("Unpaid is the same figure the AP · Payables page footer prints", async () => {
     const dash = show(<FinanceDashboard />);
     const amount = await screen.findByTestId("dashboard-unpaid-amount");
     const dashText = amount.textContent;
@@ -123,7 +123,7 @@ describe("Finance Dashboard", () => {
     api.fail.add(AP);
     show(<FinanceDashboard />);
     const card = screen.getByTestId("dashboard-unpaid");
-    expect(await within(card).findByText("Could not load Unpaid by Supplier")).toBeInTheDocument();
+    expect(await within(card).findByText("Could not load AP · Payables")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("RM 0.00");
     expect(within(card).getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(await screen.findByTestId("dashboard-outstanding-amount")).toHaveTextContent("RM 2,758.00");
@@ -139,6 +139,31 @@ describe("Finance Dashboard", () => {
   it("each figure opens the page that adds it up", async () => {
     show(<FinanceDashboard />);
     expect(screen.getByRole("link", { name: "Open AR · Receivables" })).toHaveAttribute("href", "/finance/ar");
-    expect(screen.getByRole("link", { name: "Open Unpaid by Supplier" })).toHaveAttribute("href", "/finance/ap-outstanding");
+    expect(screen.getByRole("link", { name: "Open AP · Payables" })).toHaveAttribute("href", "/finance/ap-outstanding");
+  });
+
+  it("keeps the old layout: Outstanding and Unpaid tiles in the top row, then the Payables card", async () => {
+    show(<FinanceDashboard />);
+    const outstanding = screen.getByTestId("dashboard-outstanding");
+    const unpaid = screen.getByTestId("dashboard-unpaid");
+    const payables = screen.getByTestId("dashboard-payables");
+    expect(outstanding.parentElement).toBe(unpaid.parentElement);
+    expect(outstanding.compareDocumentPosition(unpaid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(unpaid.compareDocumentPosition(payables) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The Payables card prints the same Unpaid figure as its tile — one arithmetic.
+    expect(await within(payables).findByTestId("dashboard-payables-amount")).toHaveTextContent("RM 1,535.50");
+    expect(payables).toHaveTextContent("2 suppliers");
+    // Blocks with no correct source yet stay off the page.
+    for (const word of [/overdue/i, /aging/i, /activity/i, /net cash/i]) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+  });
+
+  it("a failed AP read says Could not load in the Payables card too", async () => {
+    api.fail.add(AP);
+    show(<FinanceDashboard />);
+    const card = screen.getByTestId("dashboard-payables");
+    expect(await within(card).findByText("Could not load AP · Payables")).toBeInTheDocument();
+    expect(card).not.toHaveTextContent("RM 0.00");
   });
 });
