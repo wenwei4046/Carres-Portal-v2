@@ -2330,7 +2330,61 @@ earlier event context and revalidate current authorisation before the next physi
 coordination metadata; it neither grants account access nor makes Chan the owner of every DO.
 Do not auto-fill it or assign all Work merely because the user described Chan as NETS owner.
 
-**NEXT DESIGN EVIDENCE:** reconcile the missing external-person qualification with HR Team/People
-ownership, then specify the exact auditable registration/disable/organisation-change door. The
-blueprint must name this extension explicitly before SQL is numbered or applied; a boolean inferred
-from a personal-looking mailbox is not an acceptable substitute.
+**ACCOUNT LIFECYCLE / RECOMMENDATION — NOT LAW.** Retain HR Team as the account creation door
+and the shared account-status writer as the access switch. Add external-person registration and
+its audited organisation/Site relationship to the shared identity domain; do not add a Warehouse
+Settings account creator, Carres employment row or separate active/disabled flag.
+
+The operator journeys below complete the proposed contract. UI labels are descriptions for review,
+not additions to the Copy Standard. Exact schema and production application require the governed
+migration review; no production access is changed by this document.
+
+| Situation | Authorised journey and resulting fact | Consequence for Work and history |
+|---|---|---|
+| First external person | Existing HR Team creator selects existing organisation and Site, registers the named individual against one login, and records creator/time and effective scope | No automatic DO assignment; valid personal operator can accept authorised Site work |
+| Another NETS staff member | Same creator registers a distinct person/login and authorised Site; Chan's ownership of NETS alone grants no account-creation capability | Existing accepted Work stays with its current person; the new person sees eligible queue work |
+| Existing named login, missing qualification | Creator links the existing login to the registered person after checking it is an individual; preserve login ID and existing evidence | No staff-code workaround, guessed qualification or cloned login; unresolved eligibility remains explicit |
+| Disable immediately | Governed identity/account door uses the existing shared status writer, records reason/actor/time, attempts session revocation and exposes failure | Fresh writes recheck stored eligibility; unstarted work returns queue; started work requires governed transfer; history remains readable to authorised users |
+| End access on a future date | Shared identity domain records effective access end in the Site's timezone; the write guard and Work resolver consume the same boundary | Nothing expires early from a browser timezone calculation; at the boundary new writes refuse and unresolved work follows the started/unstarted rule |
+| Re-enable | Authorised account administrator records the change and rechecks current personal, organisation and Site eligibility | Reactivation cannot resurrect an expired membership or silently reclaim Work transferred while disabled |
+| Move to another Site | Identity owner closes the former authorisation and establishes the new authorised scope with actor/reason/time | Old Site Work is recovered under its original identity; old events retain their Site; new Site does not inherit the old DO assignment |
+| Site changes operating company | Settings records the Site operator change; identity owner separately checks each person's effective membership/access | A changed company field cannot silently enrol the old company's people; preserve prior organisation snapshots on events |
+| Rename/contact correction | Update the existing identity through its owner; record the correction without replacing the login or physical events | Current display follows the current name; historical event evidence retains the identity/context recorded at the act |
+| No replacement available | Preserve started Work and the explicit eligibility/coverage problem for authorised supervision, linked to the identity/Work recovery door | Never substitute Yu Jun, Shasha, a company mailbox or the administrator as the NETS person; no false closure |
+
+**CODE EVIDENCE / FACT:** `apps/api/src/lib/account-status.ts` is already shared by Principal
+Accounts and HR People. The HR `/:id/access` door in `routes/hr-people.ts` resolves a Carres employee
+through `hr_employee_detail` before obtaining its login ID. It is therefore not an existing external
+account-management door. Principal `routes/principal/accounts.ts` has a login-ID status door. Reuse
+the status writer behind a properly scoped external-person entry; do not widen the employee lookup
+or require an external employee record. Session-revocation behaviour still needs a real negative
+control; a comment or a successful status update is not proof that every old-token write is denied.
+
+**TRANSFER DETAIL / RECOMMENDATION — NOT LAW.** One transfer names the DO + Site obligation,
+previous accepted owner, eligible replacement, authorising actor, reason, effective time and
+reference to the ownership version being replaced. The Work/identity recovery door coordinates
+ownership only; it does not submit a Warehouse handover or alter Units. The owning physical module
+records subsequent scans/handover under the actual replacement, linked to the transfer context.
+
+Before committing, recheck that the obligation is still open, the previous assignment is still
+current and the replacement remains personally authorised for that physical Site. A simultaneous
+completion or transfer must make the stale request re-read the current result, not overwrite it.
+A transfer does not convert earlier scans into the replacement's work, release SO reservations,
+change due date, move Unit holder or edit receiver/proof. Changing the resolved owner never changes
+what evidence completes the obligation. A deliberate new scope issued by Delivery must retain its
+own source/version lineage rather than overwrite a completed occurrence.
+
+**READ AND RECOVERY CONTRACT.** The external person sees current Site authority, their accepted
+Work, eligible unaccepted work, their actual event history and the exact owning physical doors.
+Internal supervision sees the same permitted obligation facts with the missing-person/access
+problem and recovery link. Neither view receives private Carres HR fields. An administrator acting
+on access is recorded as access administrator, not as the person who physically counted or loaded.
+Interrupted submission reconciles the original request result; a retry cannot create another
+qualification, transfer or physical batch. An unavailable identity source refuses new protected
+writes and reports the missing source; it does not invent a default eligible person.
+
+**REVIEW BOUNDARY:** the approved business requirement is personal, Site-authorised physical work
+with preserved history. The registration/effective-membership/transfer model above is the complete
+recommended mechanism for that requirement, pending shared identity architecture approval before
+implementation. It is no longer deferred as an unnamed design task. Production SQL numbering,
+application, UI copy admission and end-to-end execution proof remain separate delivery gates.
