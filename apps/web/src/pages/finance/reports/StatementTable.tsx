@@ -14,6 +14,31 @@ import DataTable, { type Column, type GroupRowCell } from "@/components/kit/Data
 import { rm } from "@/lib/format-currency";
 import type { StatementSection } from "./report-queries";
 
+// The line under a section where every account is at RM 0.00 (YH, 14 Sep
+// 2026). Reports and the month-end pack print the same words.
+const NOTHING_IN_PERIOD: Record<string, string> = {
+  INCOME: "No income in this period.",
+  EXPENSE: "No expenses in this period.",
+};
+const NOTHING_ON_DAY: Record<string, string> = {
+  ASSET: "No assets on this day.",
+  LIABILITY: "No liabilities on this day.",
+  EQUITY: "No equity on this day.",
+};
+/** Profit and Loss: `No income in this period.` · `No expenses in this period.` */
+export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
+/** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
+export const nothingOnDay = (section: string): string => NOTHING_ON_DAY[section] ?? NOTHING_ON_DAY.ASSET!;
+
+/** Balance Sheet, under Customer deposits held: the part that is customers'
+ *  money paid before their invoice, which the ledger books on receivables
+ *  (0506). The database moved it; this only says so. Null for any other line,
+ *  and before 0506 is applied. */
+export const paidBeforeInvoiceNote = (line: { reclassified: number | null }): string | null =>
+  line.reclassified !== null && line.reclassified > 0 && !isZeroMoney(line.reclassified)
+    ? `Includes ${rm(line.reclassified)} from customers who paid before their invoice.`
+    : null;
+
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number }
   | {

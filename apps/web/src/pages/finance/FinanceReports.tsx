@@ -18,7 +18,7 @@
  *    a monthly series.
  */
 import { Link, useSearchParams } from "react-router-dom";
-import { isZeroMoney, ledgerAccountHref } from "@carres/shared/finance-ledger";
+import { ledgerAccountHref } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Panel from "@/components/kit/Panel";
@@ -26,7 +26,7 @@ import Select from "@/components/kit/Select";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import StatementTable from "./reports/StatementTable";
+import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
 import { useBalanceSheet, useProfitAndLoss } from "./reports/report-queries";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -80,26 +80,6 @@ function readPeriod(params: URLSearchParams, today: string): { from: string; to:
 
 const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
 
-// The line under a section where every account is at RM 0.00 (YH, 14 Sep 2026).
-const PL_NOTHING: Record<string, string> = {
-  INCOME: "No income in this period.",
-  EXPENSE: "No expenses in this period.",
-};
-const BS_NOTHING: Record<string, string> = {
-  ASSET: "No assets on this day.",
-  LIABILITY: "No liabilities on this day.",
-  EQUITY: "No equity on this day.",
-};
-const plNothing = (section: string) => PL_NOTHING[section] ?? PL_NOTHING.INCOME!;
-const bsNothing = (section: string) => BS_NOTHING[section] ?? BS_NOTHING.ASSET!;
-
-/** Under Customer deposits held: the part that is customers' money paid before
- *  their invoice, which the ledger books on receivables (0506). The move is
- *  the database's; this only says it. */
-const bsLineNote = (line: { reclassified: number | null }) =>
-  line.reclassified !== null && line.reclassified > 0 && !isZeroMoney(line.reclassified)
-    ? `Includes ${rm(line.reclassified)} from customers who paid before their invoice.`
-    : null;
 
 const beforeGoLive =(goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
 
@@ -208,8 +188,8 @@ export default function FinanceReports() {
                 : <StatementTable label="Profit and Loss" testId="profit-and-loss"
                   sections={plReport?.status === "ok" ? plReport.sections : []}
                   loading={pl.isPending}
-                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : plNothing("INCOME")}
-                  nothing={plNothing}
+                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
+                  nothing={nothingInPeriod}
                   accountHref={(code) => ledgerAccountHref(code, from, to)}
                   bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
               </div>
@@ -233,10 +213,10 @@ export default function FinanceReports() {
                 : <StatementTable label="Balance Sheet" testId="balance-sheet"
                   sections={bsReport?.status === "ok" ? bsReport.sections : []}
                   loading={bs.isPending}
-                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : bsNothing("ASSET")}
-                  nothing={bsNothing}
+                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : nothingOnDay("ASSET")}
+                  nothing={nothingOnDay}
                   accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
-                  lineNote={bsLineNote}
+                  lineNote={paidBeforeInvoiceNote}
                   bottomLine={null} />}
               </div>
             </Panel>

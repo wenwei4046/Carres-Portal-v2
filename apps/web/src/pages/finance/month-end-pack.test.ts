@@ -125,9 +125,37 @@ describe("Export month-end pack", () => {
     expect(pl!.rows).toContainEqual(["4100 Furniture sales", 1250]);
     expect(pl!.rows.at(-1)).toEqual(["Net result", 1250]);
     expect(bs!.rows).toContainEqual(["1120 Bank — current account", 1250]);
+    // A section at RM 0.00 says what it has none of, in the page's words.
+    expect(pl!.rows).toContainEqual(["No expenses in this period."]);
+    expect(bs!.rows).toContainEqual(["No liabilities on this day."]);
+    expect(bs!.rows.some((r) => /paid before their invoice/.test(String(r[0])))).toBe(false);
     for (const s of api.book) expect(s.rows[1]).toEqual(["Since Thu, 10 Sep 26 · No opening balances"]);
     // A filed workbook always carries the year, even this year's.
     expect(tb!.rows[0]).toEqual(["Trial Balance", "As of Sat, 31 Oct 26"]);
+  });
+
+  it("the Balance Sheet sheet says, under Customer deposits held, what customers paid before their invoice (0506)", async () => {
+    const ok = api.fetch.getMockImplementation()!;
+    api.fetch.mockImplementation(async (url: string) => {
+      if (!url.includes("balance-sheet")) return ok(url);
+      const asOf = new URL(url, "http://portal.test").searchParams.get("asOf")!;
+      return {
+        rows: [
+          acc("ASSET", "1100", "1120", "Bank — current account", 4065), sub("ASSET", "1100", 4065), tot("ASSET", 4065),
+          { ...acc("LIABILITY", "2200", "2210", "Customer deposits held", 2815), reclassified: 2815 },
+          sub("LIABILITY", "2200", 2815), tot("LIABILITY", 2815),
+          acc("EQUITY", "3000", "3100", "Share capital", 0), sub("EQUITY", "3000", 0),
+          { section: "EQUITY", row_kind: "DERIVED", amount: 1250 }, tot("EQUITY", 1250),
+          { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+        ].map((r, i) => ({ report_status: "OK", go_live_on: GO_LIVE, as_of: asOf, ordinal: i + 1, ...BLANK,
+          equation_balances: true, equation_difference: 0, ...r })),
+      };
+    });
+    await exportMonthEndPack(client(), "2026-10", "2026-11-03");
+    const bs = api.book[2]!;
+    const at = bs.rows.findIndex((r) => r[0] === "2210 Customer deposits held");
+    expect(bs.rows[at]).toEqual(["2210 Customer deposits held", 2815]);
+    expect(bs.rows[at + 1]).toEqual(["Includes RM 2,815.00 from customers who paid before their invoice."]);
   });
 
   it("writes nothing when any of the three reads fails", async () => {
