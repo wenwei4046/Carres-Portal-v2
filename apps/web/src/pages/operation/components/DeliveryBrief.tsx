@@ -32,6 +32,7 @@ import {
   isSundayIso,
   laterThanRequested,
   myHolidaySet,
+  parseEmergencyContact,
   unitIdOf,
   type DeliveryWorkStatusTone,
   type InformationReceivedFrom,
@@ -48,6 +49,7 @@ import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import {
   useDeliveryPartners,
+  useDeliveryArrangements,
   useRecordCannotDeliver,
   useSalesOrderExpansion,
   useSaveDeliveryArrangement,
@@ -556,6 +558,8 @@ export default function DeliveryBrief({
   const o = row.o;
   const arrangement = row.arrangement;
   const expansion = useSalesOrderExpansion(row.orderId);
+  const allArrangements = useDeliveryArrangements();
+  const emergency = parseEmergencyContact(o.customer_emergency);
   const missing = new Set(row.missingFacts);
   const [editingDates, setEditingDates] = useState(false);
   const [editingLogistics, setEditingLogistics] = useState(false);
@@ -600,8 +604,10 @@ export default function DeliveryBrief({
           <Fact label={MONITOR_COPY.phone} value={trim(o.customer_phone) || absentWord(DW.notRecorded)} />
           <Fact
             label={MONITOR_COPY.emergencyContact}
-            value={trim(o.customer_emergency) || absentWord(DW.notRecorded)}
+            value={emergency.name || absentWord(DW.notRecorded)}
           />
+          <Fact label={MONITOR_COPY.emergencyPhone} value={emergency.phone || absentWord(DW.notRecorded)} />
+          <Fact label={MONITOR_COPY.emergencyRelationship} value={emergency.relationship || absentWord(DW.notRecorded)} />
         </div>
         <div>
           <Fact label={MONITOR_COPY.address} value={address ?? absentWord(DW.notRecorded)} />
@@ -629,7 +635,8 @@ export default function DeliveryBrief({
           />
           <Fact
             label={MONITOR_COPY.access}
-            value={accessParts.length > 0 ? accessParts.join(" · ") : absentWord(DW.notRecorded)}
+            problem={accessParts.length === 0}
+            value={accessParts.length > 0 ? accessParts.join(" · ") : MONITOR_COPY.accessNotRecorded}
           />
           {missing.has(DW.stateNotRecorded) ? (
             <Fact label={MONITOR_COLUMN.state} value={required(DW.stateNotRecorded, null)} />
@@ -702,6 +709,8 @@ export default function DeliveryBrief({
         <LogisticsDetailsEdit card={card} onDone={() => setEditingLogistics(false)} />
       ) : (
         <div data-testid="delivery-brief-logistics">
+          {card.confirmedDate && (!trim(arrangement?.driver_name) || !trim(arrangement?.vehicle) || !pickup.length || !trim(arrangement?.expected_arrival)) ?
+            <p className="mb-2 text-body text-kit-amber-11">{MONITOR_COPY.logisticsIncomplete}</p> : null}
           <Fact
             label={MONITOR_COPY.partner}
             value={partner ?? <span className="text-kit-amber-11">{MONITOR_COPY.noLogistics}</span>}
@@ -791,19 +800,6 @@ export default function DeliveryBrief({
           location: null,
         }),
       ),
-    ...((o.delivery_stair_items ?? 0) > 0
-      ? [
-          {
-            key: "stair-carry",
-            item: MONITOR_COPY.stairCarry(o.delivery_stair_items ?? 0, o.delivery_floor ?? null),
-            qty: o.delivery_stair_items ?? 0,
-            units: null,
-            status: null,
-            statusTone: "none" as const,
-            location: null,
-          },
-        ]
-      : []),
     /* 0492 (Card 15) — one line per loan Unit out, naming the exact Unit ID
        the crew must bring back: `Loan {Unit ID} · collect back on delivery day`. */
     ...(o.ops_sofa_loans ?? [])
@@ -823,20 +819,21 @@ export default function DeliveryBrief({
         };
       }),
   ];
-  const dash = <span className="text-kit-slate-9">—</span>;
+  const physicalLines = briefLines.filter(line => line.units !== null);
+  const serviceLines = briefLines.filter(line => line.units === null);
   const panelItems = (
     <Panel title={MONITOR_COPY.panelItems} padding="none">
       {briefLines.length === 0 ? (
         <div className="px-4 py-3 text-body text-kit-slate-11">{DW.noGoods}</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left" aria-label={MONITOR_COPY.panelItems} data-testid="delivery-brief-items">
-            <colgroup>
+      ) : physicalLines.length > 0 ? (
+        <div className="min-w-0">
+          <table className="block w-full text-left xl:table xl:table-fixed" aria-label={MONITOR_COPY.panelItems} data-testid="delivery-brief-items">
+            <colgroup className="hidden xl:table-column-group">
               {BRIEF_COLUMNS.map((c) => (
                 <col key={c.key} style={c.width ? { width: c.width } : undefined} />
               ))}
             </colgroup>
-            <thead className="border-b border-base-200 bg-base-50">
+            <thead className="sr-only border-b border-base-200 bg-base-50 xl:not-sr-only xl:table-header-group">
               <tr className="divide-x divide-base-200">
                 {BRIEF_COLUMNS.map((c) => (
                   <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
@@ -845,15 +842,14 @@ export default function DeliveryBrief({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-base-200 text-body">
-              {briefLines.map((line) => (
-                <tr key={line.key} className="divide-x divide-base-200 align-top" data-testid={`delivery-brief-line-${line.key}`}>
-                  <td className="px-2 py-1.5">{line.item}</td>
+            <tbody className="block divide-y divide-base-200 text-body xl:table-row-group">
+              {physicalLines.map((line) => (
+                <tr key={line.key} className="grid grid-cols-[minmax(0,1fr)_auto] align-top xl:table-row xl:divide-x xl:divide-base-200" data-testid={`delivery-brief-line-${line.key}`}>
+                  <td className="min-w-0 break-words px-2 py-1.5">{line.item}</td>
                   <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
-                  <td className="px-2 py-1.5">
-                    {line.units === null ? (
-                      dash
-                    ) : line.units.length === 0 ? (
+                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
+                    {!line.units?.length ? (
                       absentWord(DW.notAllocated)
                     ) : (
                       line.units.map((u) => (
@@ -876,21 +872,47 @@ export default function DeliveryBrief({
                       ))
                     )}
                   </td>
-                  <td className={`px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>{line.status ?? dash}</td>
-                  <td className="px-2 py-1.5">
-                    {line.units === null ? dash : line.location ?? absentWord(DW.notRecorded)}
+                  <td className={`col-span-2 min-w-0 break-words px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
+                    {line.status ?? absentWord(DW.notRecorded)}
+                  </td>
+                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
+                    {line.location ?? absentWord(DW.notRecorded)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
+      {serviceLines.length ? <div className="border-t border-kit-slate-5 px-4 py-3" data-testid="delivery-brief-services">
+        <h3 className="mb-2 text-body font-medium">{MONITOR_COPY.services}</h3>
+        {serviceLines.map(line => <div key={line.key} className="flex items-start justify-between gap-3 py-1 text-body">
+          <span className="min-w-0 break-words">{line.item}</span>
+          <span className="shrink-0 tabular-nums">×{line.qty}</span>
+        </div>)}
+      </div> : null}
     </Panel>
   );
 
   return (
     <div data-testid="delivery-scope-expansion">
+      {card.leg != null ? <div className="mb-2 flex flex-wrap gap-2" data-testid="delivery-brief-route">
+        {[...(o.delivery_stops ?? [])].sort((a, b) => a.leg - b.leg).map((stop, index, stops) => {
+          const booking = allArrangements.data?.arrangements.find(a => a.order_id === card.orderId && a.leg === stop.leg);
+          const date = stop.leg === card.leg ? card.confirmedDate : booking?.confirmed_date ?? stop.scheduled_at?.slice(0, 10);
+          const time = stop.leg === card.leg ? card.confirmedTime : booking?.confirmed_time;
+          return <div key={stop.leg} aria-current={stop.leg === card.leg ? "step" : undefined}
+            className={`min-w-0 flex-1 basis-52 border-l-2 px-3 py-2 text-body ${stop.leg === card.leg ? "border-kit-blue-9 bg-kit-blue-3" : "border-kit-slate-5"}`}>
+            <div className="font-medium">{MONITOR_COPY.legOf(index + 1, stops.length)}</div>
+            <div className="break-words">{stop.from_loc || DW.notRecorded} → {stop.to_loc || DW.notRecorded}</div>
+            <div>{booking?.partner_name ?? stop.partner_name ?? MONITOR_COPY.noLogistics}</div>
+            <div>{date ? fmtDate(date) : MONITOR_COPY.notConfirmed}</div>
+            <div>{time || MONITOR_COPY.noTimeAgreed}</div>
+          </div>;
+        })}
+      </div> : null}
       <ConnectedSections
         testId="delivery-brief"
         sections={[

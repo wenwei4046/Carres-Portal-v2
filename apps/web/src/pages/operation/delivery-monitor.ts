@@ -50,6 +50,7 @@ import {
   goodsCategoryWordOf,
   receivedForBoundLine,
   lineKind,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
   lineShortagesOf,
   myHolidaySet,
   orderActionLines,
@@ -167,6 +168,10 @@ export const MONITOR_COPY = {
   customer: "Customer",
   phone: "Phone",
   emergencyContact: "Emergency contact",
+  emergencyPhone: "Emergency phone",
+  emergencyRelationship: "Emergency relationship",
+  accessNotRecorded: "Access not recorded",
+  legOf: (n: number, total: number) => `Leg ${n} of ${total}`,
   address: "Address",
   buildingType: "Building type",
   lift: "Lift",
@@ -873,6 +878,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     const items: MonitorGoodsLine[] = [];
     const extras: MonitorExtraLine[] = [];
     lines.forEach((line, index) => {
+      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(line.sku.trim().toUpperCase())) return;
       const kind = lineKind(line.sku);
       const entry: MonitorGoodsLine = {
         key: line.id ?? `${line.sku}-${index}`,
@@ -893,6 +899,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     });
     for (const [index, addon] of (row.o.order_addons ?? []).entries()) {
       const key = addon.addon_key ?? "";
+      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(key.toUpperCase())) continue;
       extras.push({
         key: `addon-${index}-${key}`,
         lineId: null,
@@ -904,6 +911,11 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         kind: "service",
       });
     }
+    if ((row.o.delivery_stair_items ?? 0) > 0) extras.push({
+      key: "stair-carry", lineId: null, sku: "STAIR_CARRY", category: "Service", kind: "service",
+      name: MONITOR_COPY.stairCarry(row.o.delivery_stair_items!, row.o.delivery_floor ?? null),
+      qty: row.o.delivery_stair_items!, shortQty: 0,
+    });
     const contactDueIso = row.contactDueIso;
     /* The arrangement is COMPLETE only with a day AND a window on it. */
     const booked = row.confirmedIso !== null && row.confirmedTime !== null;

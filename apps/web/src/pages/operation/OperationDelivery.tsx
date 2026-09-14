@@ -2242,6 +2242,7 @@ export default function OperationDelivery() {
                   rowHeight={72}
                   expandTitle={DW.showItems}
                   expandable={{
+                    fitExpansionToViewport: true,
                     renderExpansion: (r) => <DeliveryBrief card={r} onOpenOrder={openOrder} />,
                     /* A retired Edit Delivery link, or a calendar card without
                        a document, lands here with `?open=` naming the row —

@@ -965,11 +965,12 @@ describe("the work list's own words — never `scope` (owner correction 2026-09-
     expect(selectedSentence(3)).toBe("3 selected");
   });
 
-  it("no visible word says scope or leg", () => {
+  it("work-list copy excludes scope and leg; only the approved expanded route names legs", () => {
     /* Two entries are sentence BUILDERS (`Call by {date}` · `Late — was due
        {date}`); they are checked on a real date so the rule covers the words
        they produce, not just the plain strings beside them. */
-    const words = Object.values(MONITOR_COPY).map((w) =>
+    expect(MONITOR_COPY.legOf(1, 2)).toBe("Leg 1 of 2");
+    const words = Object.entries(MONITOR_COPY).filter(([key]) => key !== "legOf").map(([, w]) =>
       typeof w === "function"
         ? (w as (...args: never[]) => string)("Tue, 15 Sep" as never, "NETS" as never)
         : w,

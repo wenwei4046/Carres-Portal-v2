@@ -1226,6 +1226,46 @@ describe("a Journey row on the work list", () => {
     expect(within(list).getByText("2 deliveries")).toBeTruthy();
     expect(list.textContent).not.toMatch(/\bLeg\b/);
     expect(list.textContent).not.toMatch(/\bscopes?\b/i);
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    const route = screen.getByTestId("delivery-brief-route");
+    expect(within(route).getByText("Leg 1 of 2")).toBeTruthy();
+    expect(within(route).getByText("Leg 2 of 2")).toBeTruthy();
+    expect(within(route).getByText("Klang WH → JB transit")).toBeTruthy();
+    expect(within(route).getByText("JB transit → Singapore customer")).toBeTruthy();
+    expect(route.querySelector('[aria-current="step"]')?.textContent).toContain("Leg 1 of 2");
+  });
+});
+
+describe("the expanded brief names operational facts without stock placeholders for services", () => {
+  it("separates services, excludes delivery charges and splits the emergency contact", () => {
+    ordersState.data = { orders: [order({ id: "brief", so: 1600,
+      customer_emergency: "Alice · 0123456789 · Spouse",
+      delivery_stair_items: 2, delivery_floor: 3,
+      order_addons: [{ addon_key: "DELIVERY", qty: 1 }, { addon_key: "STAIR_CARRY", qty: 2 }],
+      order_lines: [{ id: "goods", sku: "mattress:M1401F-K", qty: 1 },
+        { id: "service", sku: "Disposal old mattress", qty: 1 }],
+    })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    const services = screen.getByTestId("delivery-brief-services");
+    expect(services.textContent).toContain("Disposal old mattress");
+    expect(services.textContent).toContain("floor 3");
+    expect(services.textContent).not.toContain("—");
+    expect(services.textContent).not.toContain("Delivery fee");
+    expect(screen.getByTestId("delivery-brief-items").textContent).not.toContain("Disposal");
+    const customer = screen.getByTestId("delivery-brief-customer");
+    for (const word of ["Alice", "0123456789", "Spouse", "Emergency phone", "Emergency relationship"]) {
+      expect(within(customer).getByText(word)).toBeTruthy();
+    }
+  });
+
+  it("calls out missing access and confirmed-trip logistics once", () => {
+    ordersState.data = { orders: [order({ id: "brief", so: 1601 })] };
+    arrangementsState.data = { arrangements: [arrangement({ order_id: "brief", confirmed_date: "2026-09-05" })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByText("Access not recorded").className).toContain("text-kit-amber-11");
+    expect(within(screen.getByTestId("delivery-brief-logistics")).getAllByText("Logistics details incomplete")).toHaveLength(1);
   });
 });
 
@@ -1836,7 +1876,7 @@ describe("the row's goods, arrival and stock cells", () => {
     const items = screen.getByTestId("delivery-brief-items");
     expect(within(items).getByText("Serena · King")).toBeTruthy();
     expect(within(items).getByText(/Pillow/)).toBeTruthy();
-    expect(within(items).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
+    expect(within(screen.getByTestId("delivery-brief-services")).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
     /* The site the crew meets is panel 1's own facts — floor and lift, each
        its own line, never a joined sentence. */
     const customer = screen.getByTestId("delivery-brief-customer");

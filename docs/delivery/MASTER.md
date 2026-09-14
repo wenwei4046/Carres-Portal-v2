@@ -1171,6 +1171,17 @@ The four panels and their inline doors are unchanged. Six corrections bind:
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
 
+**Implementation evidence, not production closure.** The Monitor enables the Register's
+viewport-fitted expansion; its shared wrapper stays visible during horizontal scrolling.
+At 949px physical items use wrapped labelled facts; at 1440px they retain the five-column
+table. Services carry only their description and quantity, server-generated delivery fees
+are excluded, and stair carry is derived once from the recorded Sales facts. Journey strips
+show every recorded leg with the selected leg marked. Access gaps, the single Logistics
+completeness alert and the three emergency-contact facts are rendered in the four panels.
+Local browser inspection at 949px and 1440px verified the brief and its item facts after
+horizontal scrolling. The 227 focused Monitor/model/viewport tests pass. These are fixture
+and test results; deployment and production verification remain outstanding.
+
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 
 The approved journey is: expand the row → act inside the panel → save → remain on the same
