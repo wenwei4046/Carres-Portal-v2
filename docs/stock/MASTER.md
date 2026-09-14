@@ -2188,8 +2188,8 @@ below the small-screen breakpoint so the floor operator can reach the controls w
 horizontal page overflow. Each card prints the DO and its Site queue label once in the object
 header, keeping the immutable `Delivery Order + Warehouse Site` identity visible to the operator.
 
-The branch test covers Site-queue rendering, the acceptance request and the explicit empty
-state. This proves the client composition and route contract only; it does not prove that the
+The branch tests cover Site-queue rendering, the acceptance request, the personal acceptance
+RPC door and the explicit empty state. This proves the client composition and route contract only; it does not prove that the
 committed branch is deployed, that the 0459/0460 schema exists in production, or that Chan has
 completed an authenticated mobile acceptance and exact-Unit handover.
 
