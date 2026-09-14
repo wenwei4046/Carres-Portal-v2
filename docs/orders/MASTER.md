@@ -234,6 +234,25 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
+**Table spacing — owner approved 2026-09-14; implementation in [PR #1305](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305).**
+[Sales Orders Card 11](../cards/CARD-2026-09-14-sales-orders-11-table-spacing.md) owns this
+presentation correction. The [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695)
+records CI, the exact merged/deployed SHA and authenticated read-only production closure; the
+implementation and fixture measurements alone do not claim deployment.
+Expanded goods has exactly the six columns above: SKU stays separate;
+Item is always last and takes remaining space. All other child tracks have consistent fixed,
+content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
+Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
+The child begins at the actual SO No column edge, ends at the parent table edge, retains its own
+four-sided border and has 12px space above and below. Sales Orders never selects child items.
+Requested Delivery Date keeps its exact label but renders on two deliberate header lines:
+`Requested` / `Delivery Date`, with accessible sort and filter controls. Dates and SO numbers stay
+on one line; Customer and Delivery Location receive usable content widths. Narrow screens use
+the grid's own horizontal scroll and keep normal typography and all main columns/functions.
+Optional and saved layouts remain under the existing key; no silent preference reset. Purchasing's
+approved details layout and all data provenance/loading/error/missing states are preserved.
+
+
 **Register correction — owner approved 2026-09-11; implemented in [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227).**
 The delivery PR carries the exact release SHA, check results and authenticated read-only closure;
 implementation or a sample browser walk alone is not deployment proof.

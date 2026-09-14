@@ -931,3 +931,14 @@ div:first-child > .columnsMenuGroup {
 .conditionClear:hover {
   text-decoration: underline;
 }
+
+/* Opt-in two-line heading; keep the 36px register header and controls beside it. */
+.thTwoLine .sortBtn {
+  display: inline-flex;
+  align-items: center;
+  text-align: left;
+}
+.headerLines {
+  white-space: nowrap;
+  line-height: inherit;
+}
