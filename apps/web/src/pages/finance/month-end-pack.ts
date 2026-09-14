@@ -16,7 +16,7 @@ import type { TrialBalanceAccountRow, TrialBalanceReport } from "@carres/shared/
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { trialBalanceQuery } from "./ledger/ledger-queries";
-import { statementRows } from "./reports/StatementTable";
+import { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, statementRows } from "./reports/StatementTable";
 import {
   balanceSheetQuery,
   profitAndLossQuery,
@@ -110,7 +110,11 @@ export function trialBalanceSheet(tb: TrialBalanceReport): PackSheet {
   };
 }
 
-function statementBody(sections: readonly StatementSection[], nothing: string): Cell[][] {
+function statementBody(
+  sections: readonly StatementSection[],
+  nothing: (section: string) => string,
+  lineNote: (line: { reclassified: number | null }) => string | null = () => null,
+): Cell[][] {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const out: Cell[][] = [["Account", "Amount"]];
   let section: string | null = null;
@@ -121,9 +125,15 @@ function statementBody(sections: readonly StatementSection[], nothing: string): 
     }
     switch (r.kind) {
       case "group": out.push([r.name, r.amount]); break;
-      case "line": out.push([`${r.code} ${r.name ?? "Account name not available"}`, r.amount]); break;
+      case "line": {
+        out.push([`${r.code} ${r.name ?? "Account name not available"}`, r.amount]);
+        // The page's second line, as a row of its own under the account.
+        const note = lineNote(r);
+        if (note) out.push([note]);
+        break;
+      }
       case "unclosed": out.push(["Net result not yet closed", r.amount]); break;
-      case "nothing": out.push([nothing]); break;
+      case "nothing": out.push([nothing(r.section)]); break;
     }
   }
   return out;
@@ -134,14 +144,14 @@ export function profitAndLossSheet(pl: ProfitAndLoss): PackSheet {
   if (pl.status === "before_go_live") return { name: "Profit and Loss", rows: [...head, [beforeGoLive(pl.goLiveOn)]] };
   return {
     name: "Profit and Loss",
-    rows: [...head, ...statementBody(pl.sections, "Every account is at RM 0.00 in this period."), ["Net result", pl.net]],
+    rows: [...head, ...statementBody(pl.sections, nothingInPeriod), ["Net result", pl.net]],
   };
 }
 
 export function balanceSheetSheet(bs: BalanceSheet): PackSheet {
   const head: Cell[][] = [["Balance Sheet", `As of ${day(bs.asOf)}`], [noOpening(bs.goLiveOn)], []];
   if (bs.status === "before_go_live") return { name: "Balance Sheet", rows: [...head, [beforeGoLive(bs.goLiveOn)]] };
-  const rows = [...head, ...statementBody(bs.sections, "Every account is at RM 0.00 on this day.")];
+  const rows = [...head, ...statementBody(bs.sections, nothingOnDay, paidBeforeInvoiceNote)];
   if (!bs.balances) rows.push([`Assets differ from liabilities plus equity by`, Math.abs(bs.difference)]);
   return { name: "Balance Sheet", rows };
 }
