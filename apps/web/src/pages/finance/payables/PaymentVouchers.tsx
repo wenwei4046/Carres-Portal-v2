@@ -40,6 +40,7 @@ import {
   word,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
+import { VoucherAdvanceCard } from "./VoucherAdvance";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -53,6 +54,10 @@ import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, Rea
  * direct line's account · Cr the account the money left from, dated the
  * voucher date. Cancelling an approved voucher reverses that entry on the same
  * date. Who may do each step is the database's answer (`can`), never this page's.
+ *
+ * Advance (0484–0485): a supplier voucher may also carry money paid before
+ * the bill. Approving posts it Dr the payables account like a bill payment;
+ * it is applied to a bill later, or sent back, from the voucher's Advance card.
  */
 export default function PaymentVouchers() {
   return (
@@ -90,6 +95,8 @@ function VoucherRegister() {
       filterValue: (r) => word(PAY_METHOD_WORD, r.pay_method), filterType: "enum" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
       filterValue: (r) => word(VOUCHER_STATUS_WORD, r.status), filterType: "enum" },
+    { key: "advance", label: "Advance", width: 190, accessor: (r) => advanceCell(r),
+      exportValue: (r) => num(r.advance_amount) ?? "" },
     { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => money(r.amount),
       numberValue: (r) => num(r.amount), filterType: "number", exportValue: (r) => num(r.amount) ?? "" },
     { key: "prepared", label: "Prepared By", width: 150, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
@@ -151,6 +158,13 @@ function VoucherRegister() {
       )}
     </div>
   );
+}
+
+/** "No advance", or the advance and — once approved — what is left of it. */
+function advanceCell(r: PaymentVoucherRegisterRow): string {
+  const amount = num(r.advance_amount) ?? 0;
+  if (amount <= 0) return "No advance";
+  return r.advance_open === null ? money(amount) : `${money(amount)} · ${money(r.advance_open)} left`;
 }
 
 // ── detail ──────────────────────────────────────────────────────────────────
@@ -251,6 +265,7 @@ function VoucherDetail() {
             <FactRow label="Method">{word(PAY_METHOD_WORD, v.pay_method)}</FactRow>
             <FactRow label="Reference">{v.pay_reference ?? "No reference"}</FactRow>
             <FactRow label="Amount"><span data-testid="voucher-amount">{money(v.amount)}</span></FactRow>
+            {(num(v.advance_amount) ?? 0) > 0 && <FactRow label="Advance">{money(v.advance_amount)}</FactRow>}
             {v.narration && <FactRow label="Note">{v.narration}</FactRow>}
             <FactRow label="Prepared">{stepWho(v.prepared_at, v.prepared_by_name, "Not prepared yet")}</FactRow>
             <FactRow label="Checked">{stepWho(v.checked_at, v.checked_by_name, "Not checked yet")}</FactRow>
@@ -266,6 +281,7 @@ function VoucherDetail() {
             )}
           </Facts>
           <VoucherBillsCard doc={doc} />
+          <VoucherAdvanceCard doc={doc} />
           <VoucherLinesCard doc={doc} />
           <FilesCard kind="vouchers" id={id} files={doc.files} canAdd={doc.can.add_file} />
           <HistoryCard events={doc.events} />
@@ -294,6 +310,9 @@ function VoucherDetail() {
         description={reasonFor === "cancel"
           ? v.status === "approved"
             ? `The ledger entry is reversed on ${fmtDate(v.voucher_date)}, and the bills it paid are unpaid again.`
+              + ((num(v.advance_amount) ?? 0) > 0
+                ? " An advance applied to a bill or sent back must be taken off or cancelled first."
+                : "")
             : "The voucher is kept, marked cancelled. Its bills are free to pay on another voucher."
           : "The person who prepared it can change it and prepare it again."}
         action={reasonFor === "cancel" ? "Cancel voucher" : "Return to draft"}
@@ -372,18 +391,21 @@ type DirectLine = { key: string; accountCode: string; description: string; amoun
 let seq = 0;
 const newLine = (): DirectLine => { seq += 1; return { key: `d${seq}`, accountCode: "", description: "", amount: "" }; };
 
-/** The voucher total is never typed: it is what the ticked bills and the
- *  direct lines add up to, and the database recomputes it the same way. */
+/** The voucher total is never typed: it is what the ticked bills, the
+ *  advance and the direct lines add up to, and the database recomputes it the
+ *  same way. An advance counts only on a supplier voucher. */
 export function voucherTotal(
   purpose: Purpose,
   picks: Record<string, BillPick>,
   lines: Array<{ amount: string }>,
+  advance = "",
 ): number {
   const billPart = purpose === "SUPPLIER_BILLS"
     ? Object.values(picks).filter((p) => p.on).reduce((s, p) => s + (num(p.amount) ?? 0), 0)
     : 0;
+  const advancePart = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
   const linePart = lines.reduce((s, l) => s + (num(l.amount) ?? 0), 0);
-  return cents(billPart + linePart);
+  return cents(billPart + advancePart + linePart);
 }
 
 function VoucherForm() {
@@ -408,6 +430,7 @@ function VoucherForm() {
     return bill ? { [bill]: { on: true, amount: "" } } : {};
   });
   const [lines, setLines] = useState<DirectLine[]>([]);
+  const [advance, setAdvance] = useState("");
   const [loaded, setLoaded] = useState(!id);
 
   // Editing a draft: the form starts from the voucher as saved.
@@ -425,6 +448,7 @@ function VoucherForm() {
     setNarration(d.voucher.narration ?? "");
     setPicks(Object.fromEntries(d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }])));
     setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount) })));
+    setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
     setLoaded(true);
   }, [id, loaded, existing.data]);
 
@@ -463,7 +487,8 @@ function VoucherForm() {
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
   const payFromChoices = (accounts.data ?? []).filter((a) => a.for_pay_from);
   const lineChoices = (accounts.data ?? []).filter((a) => a.for_voucher_line);
-  const total = voucherTotal(purpose, picks, lines);
+  const total = voucherTotal(purpose, picks, lines, advance);
+  const advanceN = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
   const pickedCount = Object.values(picks).filter((p) => p.on).length;
 
   const submit = () => {
@@ -484,6 +509,7 @@ function VoucherForm() {
       allocations: purpose === "SUPPLIER_BILLS"
         ? Object.entries(picks).filter(([, p]) => p.on).map(([billId, p]) => ({ billId, amount: Number(p.amount) }))
         : [],
+      advanceAmount: advanceN,
     };
     save.mutate({ id, input }, {
       onSuccess: (out) => {
@@ -506,8 +532,10 @@ function VoucherForm() {
 
   const linesOk = lines.every((l) => l.accountCode !== "" && (num(l.amount) ?? 0) > 0);
   const picksOk = Object.values(picks).filter((p) => p.on).every((p) => (num(p.amount) ?? 0) > 0);
-  const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && total > 0
-    && (purpose === "SUPPLIER_BILLS" ? supplierId !== "" && pickedCount > 0 : lines.length > 0)
+  const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
+  const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && advanceOk
+    && total > 0
+    && (purpose === "SUPPLIER_BILLS" ? supplierId !== "" && (pickedCount > 0 || advanceN > 0) : lines.length > 0)
     && (supplierId !== "" || payee.trim() !== "");
 
   return (
@@ -538,7 +566,7 @@ function VoucherForm() {
                 </select>
                 <span className="text-meta text-base-500">
                   {purpose === "SUPPLIER_BILLS"
-                    ? "Pays confirmed bills. Extra lines (a bank charge) can be added below."
+                    ? "Pays confirmed bills, or an advance before the bill. Extra lines (a bank charge) can be added below."
                     : "An expense, a loan or money out that has no bill. Add a line for each account."}
                 </span>
               </label>
@@ -602,6 +630,19 @@ function VoucherForm() {
                     : billRows.length === 0
                       ? <p>This supplier has no confirmed bill left to pay.</p>
                       : <BillPicks rows={billRows} picks={picks} onChange={setPicks} />}
+            </Facts>
+          )}
+          {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
+            <Facts title="Advance">
+              <label className="block">
+                Advance
+                <input aria-label="Advance" className={`${fieldCls} mt-1 w-40`} inputMode="decimal" value={advance}
+                  placeholder="0.00" onChange={(e) => setAdvance(e.target.value)} />
+                <span className="block text-meta text-base-500">
+                  Money paid before the bill. It is applied to a bill later, or the supplier sends it back.
+                </span>
+                {!advanceOk && <span className="block text-meta text-kit-red-11">An advance cannot be less than RM 0.00</span>}
+              </label>
             </Facts>
           )}
           <Facts title={purpose === "SUPPLIER_BILLS" ? "Other lines" : "Lines"}>

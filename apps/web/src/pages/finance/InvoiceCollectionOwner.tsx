@@ -14,11 +14,13 @@ import { toast } from "sonner";
 
 /**
  * COLLECTION OWNER — one Sales Order keeps one collection owner (owner
- * ruling 2026-09-13; 0489). The section prints the three facts every surface
- * agrees on — normal owner · today's cover · acting person — from the SAME
- * read the Work feed uses, then the append-only history, and (for a
+ * ruling 2026-09-13; 0489 · 0504). The section prints the three facts every
+ * surface agrees on — normal owner · today's cover · acting person — from the
+ * SAME read the Work feed uses, then the append-only history, and (for a
  * principal or manager) the one formal `Hand over collection` door. Cover is
- * never written here: leave and buddy cover live in Staff & Duties.
+ * never written here: leave and buddy cover live in Staff & Duties. The owner
+ * itself is the individual the Sales Order was dealt to (0504), so the
+ * unresolved case points at the assignment, not at a duty holder.
  */
 function todayIso(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
@@ -44,6 +46,9 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
       : !owner ? <>
           <p className="text-kit-red-11" data-testid="collection-owner-none">{NO_DELIVERY_DUTY_HOLDER}</p>
           <p className="text-label font-normal">
+            {/* 🔴 0504 — these words are now wrong and wait on the owner; see
+                NO_DELIVERY_DUTY_HOLDER. The owner is the Operation person this
+                order was dealt to, not a Delivery Duty holder. */}
             The owner is set from the Delivery Duty holder when collection first becomes actionable.{" "}
             <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">{SET_HOLDER_DOOR}</Link>
           </p>

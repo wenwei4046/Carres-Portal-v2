@@ -465,6 +465,10 @@ describe("INVOICE_REGISTER_SELECT is a well-formed select", () => {
     }
   });
 
+  it("carries the order's placed_at, the date the Dashboard's A/R Aging ages an order by", () => {
+    expect(INVOICE_REGISTER_SELECT_FOR_TEST).toMatch(/orders\([^()]*\bplaced_at\b/);
+  });
+
   it("catches the exact truncation that shipped, and the shapes beside it", () => {
     // The production string, byte for byte.
     expect(selectIsWellFormed(

@@ -130,8 +130,8 @@ export default function WarehouseWorkspace() {
     [arrivalEvents, pickupEvents],
   );
 
-  const isLoading = sched.isLoading || posQ.isLoading;
-  const error = sched.error;
+  const error = sched.error || posQ.error || suppliersQ.error || warehouseQ.error;
+  const isLoading = !error && [sched, posQ, suppliersQ, warehouseQ].some((source) => source.isLoading || !source.data);
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -309,7 +309,7 @@ function DayEvents({
   return (
     <div className="space-y-2 p-2">
       {day.map((e) => (
-        <MonitorCard key={`${e.kind}-${e.sourceLabel}`} event={e} onOpen={onOpen} />
+        <MonitorCard key={`${e.kind}-${e.sourceLabel}-${e.open.site}`} event={e} onOpen={onOpen} />
       ))}
     </div>
   );

@@ -1,13 +1,30 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useInvoiceRegister } from "@/lib/queries";
+import { appTodayIso } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ARDrawer, { type OrderPaymentRow } from "./ARDrawer";
-import { customerOwingRows, outstandingTotal, type CustomerOwingRow } from "./money-owed";
+import {
+  customerOwingRows,
+  isAgeScope,
+  orderAgeDays,
+  outstandingTotal,
+  rowsInAgeScope,
+  type AgeScope,
+  type CustomerOwingRow,
+} from "./money-owed";
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
+const ageWord = (days: number | null) =>
+  days === null ? "Order date not available" : `${days} ${days === 1 ? "day" : "days"}`;
+
+/** The words for an age scope — the same words the Dashboard's tile and A/R Aging rows print. */
+export function ageScopeWord(scope: AgeScope): string {
+  return scope === "over-30" ? "Overdue (>30d)" : `${scope} days`;
+}
 
 /**
  * Finance → AR · Receivables. Every order a customer still owes money on, and
@@ -18,11 +35,28 @@ const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not 
  * Dashboard's Outstanding and Reports → Payment's Customer balances are one
  * arithmetic. (It used to read `finance_ar_aging` from migration 0062, which
  * counted money owed its own way.) Orders with no price yet are left out.
+ *
+ * `?age=0-30` · `31-60` · `61-90` · `90+` · `over-30` narrows the list to one
+ * age scope — the door from the Dashboard's A/R Aging rows and Overdue tile,
+ * so the footer then prints the same figure the Dashboard printed. The scope
+ * shows as a removable condition beside the column filters.
  */
 export default function FinanceAR() {
   const query = useInvoiceRegister();
   const invoiceRows = query.data;
-  const rows = useMemo(() => customerOwingRows(invoiceRows ?? []), [invoiceRows]);
+  const [params, setParams] = useSearchParams();
+  const askedAge = params.get("age");
+  const ageScope = isAgeScope(askedAge) ? askedAge : null;
+  const today = appTodayIso();
+  const rows = useMemo(() => {
+    const owing = customerOwingRows(invoiceRows ?? []);
+    return ageScope ? rowsInAgeScope(owing, ageScope, today) : owing;
+  }, [invoiceRows, ageScope, today]);
+  const clearAge = () => setParams((before) => {
+    const next = new URLSearchParams(before);
+    next.delete("age");
+    return next;
+  });
   const [openId, setOpenId] = useState<string | null>(null);
   // The row's Record receipt button opens the form; a double-click only opens the order.
   const [recording, setRecording] = useState(false);
@@ -36,6 +70,13 @@ export default function FinanceAR() {
     { key: "so", label: "SO No", width: 120, accessor: soWord, searchValue: soWord },
     { key: "customer", label: "Customer", width: 240, accessor: (r) => r.customer,
       searchValue: (r) => r.customer },
+    // Days since the order was placed, Malaysia time — the age the Dashboard's A/R Aging buckets by.
+    { key: "age", label: "Age", width: 110, align: "right",
+      accessor: (r) => ageWord(orderAgeDays(r.placedAt, today)),
+      numberValue: (r) => orderAgeDays(r.placedAt, today), filterType: "number",
+      // By the number of days, never the words: "120 days" sorts after "45 days". No date sorts first.
+      sortFn: (a, b) => (orderAgeDays(a.placedAt, today) ?? -1) - (orderAgeDays(b.placedAt, today) ?? -1),
+      exportValue: (r) => orderAgeDays(r.placedAt, today) ?? "", searchValue: () => "" },
     { key: "outstanding", label: "Outstanding", width: 180, align: "right",
       accessor: (r) => (
         <span className="flex flex-col items-end">
@@ -53,7 +94,7 @@ export default function FinanceAR() {
       ),
       /* A door is not a fact: it never joins the search or the export. */
       searchValue: () => "", exportValue: () => "" },
-  ], []);
+  ], [today]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -77,7 +118,11 @@ export default function FinanceAR() {
             stickyIdentity
             isLoading={!query.isSuccess}
             searchPlaceholder="Search orders…"
-            emptyMessage="No customer owes money."
+            emptyMessage={ageScope ? "No order owing money is this old." : "No customer owes money."}
+            activeConditions={ageScope
+              ? [{ key: "age", label: ageScopeWord(ageScope), onClear: clearAge }]
+              : undefined}
+            onClearConditions={ageScope ? clearAge : undefined}
             onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
             statusSummary={(visible) => {
               const t = outstandingTotal(visible);

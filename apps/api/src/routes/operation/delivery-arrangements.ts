@@ -103,13 +103,23 @@ const shape = (r: ArrangementRecord) => ({
 });
 
 const CONTACT_SELECT =
-  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, contacted_at, " +
+  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, acting_user_id, contacted_at, " +
   "result_key, reply_evidence_path, next_action, note, on_behalf_of_partner_id, recorded_by, recorded_at";
 
 /**
  * THE ONE CONTACT WRITER (0487, Delivery MASTER §5.1). Both the standalone
  * contact door and the arrangement save that carries a contact land here, so
  * a record can never be written two ways.
+ *
+ * FOUR IDENTITIES, SEPARATELY (0499, owner ruling 2026-09-13): the NORMAL
+ * responsible Operation person for this order and today's ACTING person
+ * (buddy cover) come from the one responsibility read
+ * (`delivery_responsible_operation` — the order's collection-owner ledger,
+ * else the individual on its earliest contact, else the configured normal
+ * Delivery Duty holder); the actual RECORDER is the signed-in account, which
+ * may be a shared login or a cover and is evidence, never responsibility;
+ * PARTNER provenance is the caller's `onBehalfOfPartnerId`. A recorder is
+ * never written as the responsible person merely because they recorded.
  */
 async function recordContact(
   sb: ReturnType<typeof adminClient>,
@@ -117,6 +127,11 @@ async function recordContact(
   input: DeliveryContactInput,
   userId: string | null,
 ) {
+  const responsibility = await sb.rpc("delivery_responsible_operation", {
+    p_order_id: scope.orderId, p_on: null,
+  });
+  if (responsibility.error) return { data: null, error: responsibility.error };
+  const who = (responsibility.data ?? {}) as { normal_user_id?: string | null; acting_user_id?: string | null };
   return sb
     .from("ops_delivery_contacts")
     .insert({
@@ -125,7 +140,8 @@ async function recordContact(
       purpose_key: input.purpose,
       channel: input.channel,
       contacted_person: input.contactedPerson,
-      contact_owner_user_id: userId,
+      contact_owner_user_id: who.normal_user_id ?? null,
+      acting_user_id: who.acting_user_id ?? null,
       contacted_at: new Date().toISOString(),
       result_key: input.result,
       reply_evidence_path: input.replyEvidencePath ?? null,
@@ -149,9 +165,18 @@ function refusedDeliveryDay(dateIso: string): string | null {
  *  all in one round trip; the status ladder reads the latest contact. */
 deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [{ data, error }, contactsRes] = await Promise.all([
+  const [{ data, error }, contactsRes, cannotRes] = await Promise.all([
     sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT),
     sb.from("ops_delivery_contacts").select(CONTACT_SELECT).order("contacted_at", { ascending: false }),
+    /* Card 17 — every recorded `Cannot Deliver` (0417), for the central
+       Delivery report's partner measures. Its own read; a failure here leaves
+       the field ABSENT (the report prints `Not available`, never 0) and the
+       workspace still opens. */
+    sb
+      .from("ops_delivery_arrangement_events")
+      .select("id, order_id, leg, from_partner_id, reason_key, note, recorded_at")
+      .eq("event", "cannot_deliver")
+      .order("recorded_at", { ascending: false }),
   ]);
   if (error) {
     const m = mapPgError(error);
@@ -161,9 +186,21 @@ deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     const m = mapPgError(contactsRes.error);
     return c.json(m.body, m.status);
   }
+  const cannotDeliver = cannotRes.error
+    ? undefined
+    : ((cannotRes.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+        id: e.id as string,
+        order_id: e.order_id as string,
+        leg: Number(e.leg ?? 0),
+        partner_id: (e.from_partner_id as string | null) ?? null,
+        reason_key: (e.reason_key as string | null) ?? null,
+        note: (e.note as string | null) ?? null,
+        recorded_at: e.recorded_at as string,
+      }));
   return c.json({
     arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape),
     contacts: contactsRes.data ?? [],
+    ...(cannotDeliver ? { cannotDeliver } : {}),
   });
 });
 
@@ -454,6 +491,7 @@ deliveryArrangementsRouter.get(
           fromLocation: unit.warehouse_id
             ? warehouseName.get(unit.warehouse_id) ?? "Not recorded"
             : "Not recorded",
+          warehouseSiteId: unit.warehouse_id,
           toCustomer: order.customer_address ?? "Not recorded",
           logisticsPartner: arrangement.partner_name as string,
           driverName: arrangement.driver_name,

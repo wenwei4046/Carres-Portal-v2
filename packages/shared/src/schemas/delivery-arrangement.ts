@@ -258,6 +258,22 @@ export const partnerCannotDeliverInput = z
   });
 export type PartnerCannotDeliverInput = z.infer<typeof partnerCannotDeliverInput>;
 
+/** One recorded `Cannot Deliver` (0417) as the central Delivery report reads
+ *  it — the partner that said so, its governed reason and the clock. Read-only
+ *  everywhere; the two doors (partner portal, Operation proxy) are the writers. */
+export interface DeliveryCannotDeliverRow {
+  id: string;
+  order_id: string;
+  leg: number;
+  partner_id: string | null;
+  reason_key: CannotDeliverReasonKey | string | null;
+  note: string | null;
+  recorded_at: string;
+}
+export function cannotDeliverReasonLabel(key: string | null | undefined): string | null {
+  return CANNOT_DELIVER_REASONS.find((r) => r.key === key)?.label ?? null;
+}
+
 /** One card on the partner's arrange screen — the ruled minimum facts only. */
 export interface PartnerDeliveryCard {
   orderId: string;

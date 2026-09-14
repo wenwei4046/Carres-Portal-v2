@@ -279,6 +279,25 @@ describe("payment vouchers", () => {
       p_pay_reference: "TT-1",
       p_narration: null,
     });
+    // No advance, no advance argument: this call also works on a database without 0484.
+    expect(sb.rpc.mock.calls[0]?.[1]).not.toHaveProperty("p_advance_amount");
+  });
+
+  it("POST /vouchers carries an advance with no bill (pay before the bill)", async () => {
+    const sb = mockRpc({ data: VOUCHER_ID, error: null });
+    const res = await call("/vouchers", {
+      method: "POST",
+      body: { ...goodVoucher, allocations: [], lines: [], advanceAmount: 1500 },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls[0]?.[1]).toMatchObject({ p_allocations: [], p_lines: [], p_advance_amount: 1500 });
+  });
+
+  it.each([-1, 10.005])("POST /vouchers refuses an advance of %s before the database", async (advanceAmount) => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call("/vouchers", { method: "POST", body: { ...goodVoucher, advanceAmount } });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("POST /vouchers refuses an amount field (the total is computed)", async () => {
@@ -327,6 +346,130 @@ describe("payment vouchers", () => {
     const res = await call(`/vouchers/${VOUCHER_ID}/reject`, { method: "POST", body: {} });
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("supplier advances", () => {
+  const APPLICATION_ID = "abababab-0000-4000-8000-000000000007";
+  const MONEY_BACK_ID = "cdcdcdcd-0000-4000-8000-000000000008";
+  const KEY = "efefefef-0000-4000-8000-000000000009";
+
+  it("GET /advances passes the supplier filter", async () => {
+    const sb = mockRpc({ data: [{ voucher_id: VOUCHER_ID, advance_open: 900 }], error: null });
+    const res = await call(`/advances?supplierId=${SUPPLIER_ID}`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advances", { p_supplier_id: SUPPLIER_ID });
+    expect(await res.json()).toEqual({ rows: [{ voucher_id: VOUCHER_ID, advance_open: 900 }] });
+  });
+
+  it("apply: knocks the advance off one bill", async () => {
+    const sb = mockRpc({ data: APPLICATION_ID, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount: 600 },
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: APPLICATION_ID });
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_apply", {
+      p_voucher_id: VOUCHER_ID,
+      p_bill_id: BILL_ID,
+      p_amount: 600,
+    });
+  });
+
+  it.each([0, -5, 1.005])("apply refuses an amount of %s before the database", async (amount) => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount },
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("apply: more than the advance has left reaches the page as 422 with its code", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "P0001", message: "Only RM 900.00 of the advance on PV-1 is left.", details: "advance_over_applied" },
+    });
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      body: { billId: BILL_ID, amount: 901 },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "advance_over_applied" });
+  });
+
+  it("take off: needs a reason and names the knock-off", async () => {
+    const sb = mockRpc({ data: APPLICATION_ID, error: null });
+    const bad = await call(`/advance-applications/${APPLICATION_ID}/cancel`, { method: "POST", body: { reason: "" } });
+    expect(bad.status).toBe(422);
+    const ok = await call(`/advance-applications/${APPLICATION_ID}/cancel`, {
+      method: "POST",
+      body: { reason: "Wrong bill" },
+    });
+    expect(ok.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_application_cancel", {
+      p_application_id: APPLICATION_ID,
+      p_reason: "Wrong bill",
+    });
+  });
+
+  it("money back: records it with its double-press key", async () => {
+    const sb = mockRpc({ data: MONEY_BACK_ID, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/money-back`, {
+      method: "POST",
+      body: { moneyBackDate: "2026-09-15", moneyAccountCode: "1120", amount: 300, reference: "TT-BACK", idempotencyKey: KEY },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_money_back_record", {
+      p_voucher_id: VOUCHER_ID,
+      p_money_back_date: "2026-09-15",
+      p_money_account_code: "1120",
+      p_amount: 300,
+      p_reference: "TT-BACK",
+      p_narration: null,
+      p_idempotency_key: KEY,
+    });
+  });
+
+  it("money back refuses a missing account before the database", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/vouchers/${VOUCHER_ID}/money-back`, {
+      method: "POST",
+      body: { moneyBackDate: "2026-09-15", moneyAccountCode: "", amount: 300 },
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("cancel money back: someone without the approver duty gets 403 with the reason code", async () => {
+    mockRpc({
+      data: null,
+      error: { code: "42501", message: "Cancelling money back takes the finance approver.", details: "not_finance_approver" },
+    });
+    const res = await call(`/money-back/${MONEY_BACK_ID}/cancel`, { method: "POST", body: { reason: "Bank returned it" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_finance_approver" });
+  });
+
+  it("cancel money back passes the reason", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const res = await call(`/money-back/${MONEY_BACK_ID}/cancel`, { method: "POST", body: { reason: "Bank returned it" } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_advance_money_back_cancel", {
+      p_money_back_id: MONEY_BACK_ID,
+      p_reason: "Bank returned it",
+    });
+  });
+
+  it("the advance doors refuse a dealer", async () => {
+    const res = await call(`/vouchers/${VOUCHER_ID}/advance-applications`, {
+      method: "POST",
+      role: "dealer",
+      body: { billId: BILL_ID, amount: 1 },
+    });
+    expect(res.status).toBe(403);
   });
 });
 

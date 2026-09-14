@@ -130,8 +130,8 @@ describe("one day, ordered by actual time", () => {
   it("timed events lead in clock order; untimed follow, arrivals first", () => {
     const pickups = warehouseMonitorPickupEvents(
       cardsOf([
-        unitInput({ unitId: "U1", doNumber: "DO-A", collectionWindow: "15:00" }),
-        unitInput({ unitId: "U2", doNumber: "DO-B" }),
+        unitInput({ unitId: "U1", deliveryOrderId: "do-a", doNumber: "DO-A", collectionWindow: "15:00" }),
+        unitInput({ unitId: "U2", deliveryOrderId: "do-b", doNumber: "DO-B" }),
       ]),
     );
     const arrivals = warehouseMonitorArrivalEvents([

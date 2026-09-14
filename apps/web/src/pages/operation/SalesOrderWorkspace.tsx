@@ -70,6 +70,8 @@ import {
   receivingRecordNo,
   resolveFormTab,
   resolveSalesOrderRoute,
+  salesOrderNumberWord,
+  salesOrderParamOf,
   supplierClaimStatusLabel,
   myHolidaySet,
   unitsShortWords,
@@ -115,6 +117,7 @@ import {
   useSalesOrderRevisions,
   useSalesOrderExpansion,
   useSalesOrderRouteFacts,
+  useSalesOrderIdByNumber,
   useSalespersons,
   useSaveSalesOrderRevision,
   type SalesOrderRevisionRow,
@@ -980,7 +983,66 @@ type Mode = "object" | "create" | "oldrev";
 const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
+/**
+ * 【DELIVERY】 CARD 19 — THE NUMBER DOOR. `/operation/orders/so/:orderId`
+ * carries either the order's id or the operator's own document word
+ * (`SO-1362`). The object page below reads TEN doors by the id; handing it a
+ * number reached the database as `invalid input syntax for type uuid` and the
+ * page printed an empty Order Route (measured on production 2026-09-13).
+ *
+ * A number is resolved ONCE through the by-number door and the page re-enters
+ * by the id with the same search (`?route=1` survives), so every fan-in read
+ * still happens by the canonical id — one resolver, no second fan-in (Law C).
+ * `new` stays the create door. Anything else is an absence, never a 500.
+ */
 export default function SalesOrderWorkspace() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
+  const isNew = location.pathname.endsWith("/so/new");
+  const ident = isNew ? null : salesOrderParamOf(orderId);
+  if (ident && ident.kind === "number") {
+    return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
+  }
+  if (ident && ident.kind === "invalid") {
+    return <SalesOrderAbsence />;
+  }
+  return <SalesOrderWorkspaceBody />;
+}
+
+function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
+  const navigate = useNavigate();
+  const resolved = useSalesOrderIdByNumber(so);
+  const id = resolved.data?.id ?? null;
+  useEffect(() => {
+    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true });
+  }, [id, navigate, search]);
+  if (resolved.isError) return <SalesOrderAbsence />;
+  return (
+    <div className="flex h-full items-center justify-center" data-testid="so-number-door">
+      <Loading label={`Opening ${salesOrderNumberWord(so)}`} />
+    </div>
+  );
+}
+
+/** The absence the object page prints for a number or param no order carries
+ *  (COPY-STANDARD: `Sales Order not found.`). */
+function SalesOrderAbsence() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2" data-testid="so-not-found">
+      <p className="text-body text-base-700">Sales Order not found.</p>
+      <button
+        type="button"
+        className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
+        onClick={() => navigate("/operation/orders")}
+      >
+        Back to Sales Orders
+      </button>
+    </div>
+  );
+}
+
+function SalesOrderWorkspaceBody() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1810,6 +1872,17 @@ export default function SalesOrderWorkspace() {
         label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
         qty: 1,
         returned: loan.status === "returned",
+        unitId: loan.item_unit_code ?? null,
+      })),
+      /* 0492 (Card 15) — the offer conversation; the map prints the current
+         state, the drawer keeps the history. */
+      loanOffers: (facts.loanOffers ?? []).map((offer) => ({
+        id: offer.id,
+        seq: offer.seq,
+        event: offer.event,
+        label: offer.label,
+        reason: offer.reason,
+        recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */

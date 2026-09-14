@@ -72,27 +72,38 @@ export type DeliveryWorkStatusKind =
   | "assign_logistics"
   | "partner_must_contact"
   | "operation_must_call"
+  /* The DAY is agreed and the WINDOW is not: a different call with a
+     different question, and the row says which one (owner ruling
+     2026-09-14). */
+  | "confirm_time"
   | "waiting_customer_reply"
   | "confirmed"
   | "waiting_pickup"
   | "collected"
   | "delivering"
   | "overdue"
+  | "arrived"
   | "delivered"
   | "failed"
   | "details_incomplete";
 
-/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is. */
+/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is.
+ *  `arrived` (【DELIVERY】 CARD 20): an intermediate Journey leg whose goods
+ *  reached the named partner warehouse — never the customer's `Delivered`. */
 export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
   "assign_logistics",
   "partner_must_contact",
   "operation_must_call",
   "waiting_customer_reply",
+  /* AFTER the wait, because a window is asked for only once a day is
+     agreed — the ladder is the order the work actually happens in. */
+  "confirm_time",
   "confirmed",
   "waiting_pickup",
   "collected",
   "delivering",
   "overdue",
+  "arrived",
   "delivered",
   "failed",
   "details_incomplete",
@@ -109,12 +120,14 @@ export const DELIVERY_WORK_STATUS_TONE: Record<DeliveryWorkStatusKind, DeliveryW
   assign_logistics: "orange",
   partner_must_contact: "orange",
   operation_must_call: "orange",
+  confirm_time: "orange",
   waiting_customer_reply: "orange",
   confirmed: "green",
   waiting_pickup: "none",
   collected: "none",
   delivering: "none",
   overdue: "red",
+  arrived: "green",
   delivered: "green",
   failed: "red",
   details_incomplete: "orange",
@@ -139,10 +152,19 @@ export function deliveryWorkStatusLabelOf(
   switch (kind) {
     case "assign_logistics":
       return "Operation must assign logistics";
+    /* ⭐ THE ACT, NOT THE ACTOR (owner ruling 2026-09-14). `NETS must contact
+       the customer` spent the whole column naming a party the `Logistics`
+       column already carries, and buried the one word that says what to do.
+       Who calls is a Delivery Settings fact and stays in its own field; the
+       status says the JOB. Both contact rungs print the same act because the
+       operator's job is the same act — the rungs differ only in who owns it. */
     case "partner_must_contact":
-      return `${cap} must contact the customer`;
     case "operation_must_call":
-      return "Operation must call the customer";
+      return "Call customer";
+    /* The day is agreed; only the window is missing. Sending the operator to
+       `Call customer` re-opens a question the customer already answered. */
+    case "confirm_time":
+      return "Confirm delivery time";
     case "waiting_customer_reply":
       return "Waiting for customer reply";
     case "confirmed":
@@ -155,6 +177,8 @@ export function deliveryWorkStatusLabelOf(
       return `${cap} is delivering to the customer`;
     case "overdue":
       return "Overdue";
+    case "arrived":
+      return "Arrived";
     case "delivered":
       return "Delivered";
     case "failed":
@@ -199,8 +223,6 @@ export interface DeliveryWorkStatusInput {
   /** The latest customer-contact record on the scope (Card 11); null until one
    *  exists. */
   latestContact?: { result: "waiting_customer_reply" | "answered"; recordedOn: string } | null;
-  /** The contact deadline — the chase step's own due day. */
-  callByDate?: string | null;
   /** Delivery's own agreed operational date for this scope. */
   confirmedDate: string | null;
   /** The agreed window. A day without one is still contact work. */
@@ -229,6 +251,13 @@ export interface DeliveryWorkStatusInput {
   } | null;
   /** Required Sales facts this row lacks, in the operator's words. */
   missingFacts?: ReadonlyArray<string>;
+  /** 0491 — this scope is a Journey leg BEFORE the last one: its `delivered`
+   *  result is an ARRIVAL at the named partner warehouse (`Arrived`), the
+   *  customer leg still owes its own result, and no delivery proof is owed
+   *  here. Absent = a whole-order scope or the customer leg. */
+  intermediateLeg?: boolean;
+  /** The intermediate leg's named stop — line two of `Arrived`. */
+  legStop?: string | null;
 }
 
 /**
@@ -267,6 +296,10 @@ export function deliveryWorkStatusOf(
   ];
   if (latest) {
     if (latest.result === "delivered") {
+      /* An intermediate leg's success is the goods reaching the named partner
+         warehouse — `Arrived` over the stop, green, no proof owed here; the
+         customer leg carries `Delivered` and its proof (Card 20). */
+      if (input.intermediateLeg) return say("arrived", input.legStop?.trim() || null);
       const proof = input.proof;
       const review = proof?.review ?? null;
       /* `Proof Accepted` is the fact that turns `Delivered` green everywhere
@@ -336,11 +369,15 @@ export function deliveryWorkStatusOf(
     return say("waiting_customer_reply", `Asked ${spell.date(input.latestContact.recordedOn)}`);
   }
 
-  const callBy = input.callByDate ? `Call by ${spell.date(input.callByDate)}` : null;
-  /* A contact deadline behind us is red (§8.3 colour law) — and it keeps the
-     day it missed; the deadline never moves. */
-  const late = Boolean(input.callByDate && input.todayIso && input.callByDate < input.todayIso);
-  const tone = { secondTone: late ? ("red" as const) : null };
-  if (input.contactBy === "operation") return say("operation_must_call", callBy, tone);
-  return say("partner_must_contact", callBy, tone);
+  /* ⭐ THE CONTACT DEADLINE IS NO LONGER A SENTENCE ON LINE TWO (owner ruling
+     2026-09-14). `Call by {date}` repeated the verb the status word above it
+     has just said. The DAY is the fact; the surface draws it with the kit's
+     phone glyph, or the kit's late glyph in red once it has passed, and the
+     whole sentence lives in the tooltip and the accessible name. The status
+     therefore returns NO second line here: `contactDueIso` on the row is the
+     one place the deadline is read from, and it is read ONCE. */
+  /* The day is agreed and the window is not — a different question. */
+  if (input.confirmedDate) return say("confirm_time");
+  if (input.contactBy === "operation") return say("operation_must_call");
+  return say("partner_must_contact");
 }

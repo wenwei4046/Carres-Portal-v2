@@ -437,19 +437,77 @@ name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Addre
 borrow the other's words.
 
 ```
-Delivery Order document — the DOCUMENT's own life (unchanged)
-  Created · Out for delivery · Delivered · Delivery exception · Cancelled
+Delivery Order document — the DOCUMENT's own life
+  Created · Out for delivery · Arrived · Delivered · Delivery exception · Cancelled
+  (`Arrived` only on an intermediate Journey leg's document — the goods reached the
+   named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
-  Operation must assign logistics · {partner} must contact the customer ·
-  Operation must call the customer · Waiting for customer reply ·
-  Confirmed for {weekday, date} · Waiting for {partner} pickup ·
-  Goods collected by {partner} · {partner} is delivering to the customer ·
-  Overdue · Delivered · Failed Delivery · Order details incomplete
+  before the arrangement is agreed — the ACTOR rungs, unchanged:
+    Operation must assign logistics · Call customer · Waiting for customer reply ·
+    Confirm delivery time
+  once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
+    customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
+                   On the way to customer · Delivered to customer · Failed Delivery
+    transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
+                   Arrived at {stop} · Transfer failed
+  across both      Overdue · Order details incomplete
 ```
+
+**Re-ruled 2026-09-14, replacing the 2026-09-13 spellings one-for-one** (one fact, one word — the
+column, the `DELIVERY STATUS` dropdown, the schedule card and every report read the SAME
+arithmetic): `Confirmed for {weekday, date}` → **`Confirmed`** (the day and window are column 8's
+job, and on a card the date column already names the day) · `Goods collected by {partner}` →
+**`Collected by {partner}`** · `{partner} is delivering to the customer` → **`On the way to
+customer`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
+`Waiting for {partner} pickup` is KEPT: it is a recorded fact (the document exists, the partner
+has not collected) that the new ladder does not otherwise express.
+
+**`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
+intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
+reached on line two (`JB transit warehouse`) — on Monitor, the Delivery Orders register, the DO
+object header, Delivery history and every report — through the same two arithmetics. A warehouse
+arrival owes no delivery photo, signed paper or proof review; the customer leg's document carries
+them. `Logistics Partner Performance` counts customer-leg results only.
 
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
+
+**THE DELIVERY SCHEDULE CARD — TWO FACTS, TWO LINES (owner ruling 2026-09-14).** The Monitor tab
+is **`Delivery schedule`**; `Confirmed deliveries` is retired and survives only in dated historical
+walk records. The schedule carries both kinds of logistics work under a type label that is never
+mixed and never summed:
+
+```
+DELIVERY   the final customer leg          TRANSFER   an intermediate warehouse leg
+
+tab count and split, following the SELECTED RANGE and every active filter:
+  Delivery schedule {n}
+  {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
+
+LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
+  customer leg        transfer leg           Ready · Stock risk · Payment blocked ·
+  Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
+  Collected by {p}    Collected for transfer
+  On the way to       In transit to {stop}
+    customer
+  Delivered to        Arrived at {stop}
+    customer
+  Failed Delivery     Transfer failed
+```
+
+Progress and readiness never merge into one status. The two ladders share no word. A transfer is
+never counted as a customer delivery and never produces a `Delivered to customer` result. A
+transfer card prints its own `{from} → {to}` route, never the customer's town.
+
+**`Arrived at customer` is not a Carres word** — no arrival-at-customer fact is recorded, and it
+may never be inferred from a time, an ETA or a location.
+
+**Schedule view words:** `Day` · **`3 days`** (768–1279px) · **`Work week`** (≥1280px, Mon–Sat) ·
+`Month`. **A three-day layout is never labelled `Week`.**
+
+**Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
+**`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
 
 ⛔ **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
 `Waiting for warehouse` · `Ready for handover` · `Out for delivery` · `Created` · any bare
@@ -459,6 +517,10 @@ may not appear in the Delivery Orders register, which describes documents.
 
 Banned as status words on either surface, because each names a mood rather than a fact:
 `Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
+**This ban was tested and upheld on 2026-09-14:** a proposed schedule ladder opened with
+`Scheduled` / `Transfer scheduled`, and the owner ruled the governed **`Confirmed`** /
+**`Transfer confirmed`** instead. `Delivery failed` is likewise not a second spelling of
+**`Failed Delivery`**.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -501,7 +563,7 @@ in-panel writes are `delivery/MASTER.md` §8.3 to §8.6. These are their words:
 | Where | The words |
 |---|---|
 | Column headings, in order | `Delivery Status` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Confirmed Delivery` · `Logistics` · `Items & Stock` · `Payment` · `DO No` (after the checkbox and expand columns) |
-| `Confirmed Delivery` | `Confirmed` · `Not confirmed` on line one; the day, then the window (`Thu, 22 Oct` · `2 PM to 5 PM`), `Mon, 14 Sep · No time agreed`, or `Call by {date}` on line two |
+| `Confirmed Delivery` | `Confirmed` · `Not confirmed` on line one; the day, then the window (`Thu, 22 Oct` · `2 PM to 5 PM`) or `Mon, 14 Sep · No time agreed` on line two — and NOTHING on line two while unconfirmed (owner ruling 2026-09-14: the contact deadline is stated once, in `Delivery Status`) |
 | `Items & Stock` | `Ready` · `Not ready` on line one; `2 of 2` · `1 of 2 · 1 short` · `Arriving after the requested date` on line two |
 | `Payment`, paid | **`Paid`** |
 | `Payment`, unpaid | **`Do not deliver`** over **`RM {amount} still to collect`**, or over `Finance is holding this delivery` |
@@ -538,6 +600,52 @@ date`, `Call NETS` over `Confirm the delivery time`, `Call the customer` over `C
 delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delivery photo` over
 `Attach the photo from NETS`, `Check the delivery proof` over `Accept it, ask for more, or reject
 it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
+
+**THE MONITOR `Delivery Status` CELL — owner ruling 2026-09-14.** The same law, applied to the
+register column that used to name a party: line one is the ACT — **`Call customer`**, or
+**`Confirm delivery time`** when the day is agreed and only the window is missing — and line two
+is the CONTACT DEADLINE, drawn as a kit glyph and a day (`call` while there is time, `late` in red
+once there is not). **`{partner} must contact the customer` and `Operation must call the customer`
+are retired on Monitor**: the party is the `Logistics` column's own fact and may not re-enter the
+action sentence. **`Call by {date}` is retired from every visible line** — it printed the verb the
+status word above it had just said, and it printed the same day twice on one row. The words move
+to the tooltip, the accessible name, Search and the Excel export: `Contact deadline {date}`, and
+`Contact deadline {date} · overdue, the deadline does not move` once it has passed. No `—`
+appears in either, and no glyph replaces the action text. `Call by {date}` survives ONLY on the
+order detail's `Before you call` panel, whose entry below is unchanged. The complete cell law is
+`delivery/MASTER.md` §8.3.
+
+### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
+
+The central Delivery report lives at `Reports → Delivery` (`/operation?tab=delivery-report`,
+reachable by direct URL like the Receiving report). It draws the Delivery destination header, the
+eyebrow `Reports · Delivery`, the `Month` filter, `Export Excel`, and the §12 catalogue as ten
+sections, each opening with one sentence that names its **source fact, its date basis and its
+coverage** — the exclusion is always stated, never silent:
+
+| The ten listings | The words inside them |
+|---|---|
+| `Delivery Commitment Performance` | `Kept the requested date` · `After the requested date` · `No requested date` · `{n} deliveries · Kept the requested date {rate}` |
+| `First Delivery Success` | `Delivered on the first visit` · `Partly delivered on the first visit` · `Failed on the first visit` |
+| `Failed Delivery Analysis` | the reason library's own words with the category in brackets, e.g. `Customer unreachable (Customer)` |
+| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named`; customer-leg results only — `Journey legs before the last are warehouse trips and are excluded.` (Card 20) |
+| `Warehouse Performance` | `Ready {date} · Handed over {date} · Received by logistics {date}` · `Handed over by the delivery day` · `Handed over after the delivery day` |
+| `Delivery Proof Control` | `No proof yet` · `Not reviewed yet` · `Proof Accepted` · `More Proof Required` · `Proof Rejected` · `Delivery photo missing` · `Signed Delivery Order missing` |
+| `Schedule and Capacity` | `{n} deliveries confirmed across {n} days · busiest {day} with {n}` · `{n} deliveries · {n} booked` |
+| `Customer Contact Performance` | `{n} contacts · {n} confirmed · {n} recorded on behalf of a partner` · `Recorded on behalf of {partner}` · `Contact deadline passed today` |
+| `Return-to-Warehouse Control` | `Returned to Warehouse` · `Still with Logistics` · `Waiting at Inbound · {n} of {m} received` · `Received at Inbound · {site}` · `No Inbound arrival recorded` · `Inbound not available` |
+| `Exception Ageing` | `Overdue` · `Failed Delivery` · `Proof missing` · `{kind} since {date}` · `Today` · `1 to 2 days` · `3 to 7 days` · `Over 7 days` |
+
+**A rate with too few records is not printed (§12):** every rate reads `{hits} of {total} · {pct}%`
+from five records, and `Rate withheld · fewer than 5 records` below that. **An unreadable read is
+`Not available`, never 0** — the Cannot Deliver count and the Inbound join each say so. Empty
+listings say `No delivery reached a customer this month.` · `No first delivery visit was recorded
+this month.` · `No delivery failed this month.` · `No partner recorded a result this month.` · `No
+handover was recorded this month.` · `No delivery proof is on record for this month.` · `No
+delivery was confirmed for this month.` · `No customer contact was recorded this month.` · `No
+goods came back this month.` · `No open exception today.` The page failure is `This report could
+not be opened` over `Try again`. Every row is a door: the Delivery Order object, the Monitor row
+with its brief unfolded, the Monitor day, or the Inbound arrival.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -1832,6 +1940,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Register column of what the customer still owes | **Outstanding** | Balance — re-ruled 2026-08-15; `balance` is the goods word, two rows above |
 | A money cell on an order that is fully settled | **`Paid in full`** | Settled · Cleared · Fully paid · Nil outstanding — registered 2026-09-02 (D7): it has been on the SO register and the workspace MONEY card since they were written and was in no dictionary, so the rule it was breaking was this one. Registered rather than reverted, on the `SO Date` precedent (2026-09-01). ⚠️ **The DELIVERY GATE says `Money in full` for the same arithmetic** (outstanding = 0, ruled 2026-09-01, two tables below). Two words, one fact, two surfaces — left as it is deliberately, because unifying them is an owner's call and not a tidy-up. Do not swap one for the other without one. |
 | A money cell on an order nobody has priced | **`No price yet`** | RM 0 · Unpriced · — · Free. The DELIVERY GATE says the longer `No price yet — money does not hold this delivery` because a gate must name the consequence; a register column has no room for one and states only the fact |
+| Money Carres pays a SUPPLIER before its bill, later knocked off that bill (or sent back) | **`Advance`** — **APPROVED, owner ruling YH 11 Sep 2026**, for exactly three places: the payment voucher's advance box, the advance knocked off a bill (the bill's Payments), and the column on `Unpaid by Supplier` showing advance not yet used. Migrations 0484–0485 | Deposit · Prepayment · Down payment · Supplier credit · Refund (`Refund` still has no entry — see the Claims ruling). The phrases built on it (`Advance left`, `Apply advance`, `Money back` …) are PROPOSAL until ruled — § Finance ledger words, *Supplier advances* |
 | Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
 | Direct customer-order document identity | **SO No** | Doc. No. · Current |
@@ -1885,7 +1994,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 |---|---|---|
 | The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
 | Monitor columns, in order | **`SO No · Customer · Amount needed · Goods · Storage · Customer delivery · Payment timing`** | Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
-| Goods cell | **`Goods ready`** · **`2 of 3 items ready · Last item arriving Monday, 21 Sep`** · **`Arriving Monday, 21 Sep`** · **`Arrival not confirmed`** | Stock received Yes/No · ETA · In stock |
+| Goods cell | **`Goods ready`** · **`2 of 3 items ready · Last item arriving Mon, 21 Sep`** · **`Arriving Mon, 21 Sep`** · **`Arrival not confirmed`** | Stock received Yes/No · ETA · In stock |
 | The item disclosure and its heads | **`Show items`** · **`Item · Qty · Goods`** — a line says `Ready` · `Arriving {day}` · `Arrival not confirmed` | Expand · Details · SKU (as a head) |
 | Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** | Storage fee · Accrued · Pending waiver |
 | Customer delivery cell | **`{Weekday}, {d} {Mon}`** with the second line **`Not confirmed yet`** when only requested · **`No delivery date`** | Logistics ETA · TBD · Delivery date |
@@ -1948,6 +2057,12 @@ new Sales Order always carries a real `Requested Delivery Date`.
 | The create door refuses a dateless order | **`Delivery date is required. Ask the customer for the date before you save the order.`** | `delivery date is required unless marked TBD` |
 | The cart refuses a service-only order | **`This order has no product — add the product this service belongs to`** | Invalid cart · Nothing to sell · Add an item |
 | The create door refuses a service-only order | **`A Sales Order must contain a product. Add the product this service belongs to, or open a Service Case instead.`** | Bad request · Service not allowed |
+| **Any door** refuses an order without a delivery address (owner ruling 2026-09-13, Delivery Card 18 — the `Fill in address later` tick is RETIRED at every create door) | **`Delivery address — ask the customer for the address before you save the order`** | Fill in address later · Address unknown · `Address — Line 1 (≥5 chars), or tick 'Unknown'` |
+| **Any door** refuses a missing State | **`Delivery address — pick the State`** | `Address — State, or tick 'Unknown'` |
+| **Any door** refuses a missing building type | **`Building type — pick the building the goods go to`** | `Address — Building type, or tick 'Unknown'` · Building type required |
+| The office door refuses a missing floor or lift answer (the POS shape carries both) | **`Floor — enter the floor the goods go to`** · **`Lift — say whether the building has a lift`** | Floor required · Lift required |
+| The wizard's address sub-step names the empty field | **`Address — Line 1 (≥5 chars)`** · **`Address — State`** · **`Address — City`** · **`Address — Postcode`** · **`Address — Building type`** | any of them followed by `, or tick 'Unknown'` |
+| The office door's date field hint | **`Ask the customer for the date before you save the order. No lead-time floor.`** | `Any date — leave empty = TBD. No lead-time floor.` |
 
 ### The Sales Order object page words (owner ruling 2026-08-15)
 
@@ -2610,10 +2725,22 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Arrived` · `Record arrival` · `Arrival recorded` | an INTERMEDIATE Journey leg's result chooser word, its one save word and its toast — the goods reached the named warehouse, the customer leg still owes its result | **RULED 2026-09-13** (Card 14) |
 | `Return to Warehouse for checking` · `Release the reservation` | the two actions for a Unit that did not reach the customer (the retired `Hold for Inspection` / `Return to Available`); the first plans the Inbound arrival, the second is the commercial release | **RULED 2026-09-13** (Card 14) |
 | `Failed Delivery return` · `DO No` | the Inbound arrival kind of goods coming back from a failed visit, and its Document word when the source is the Delivery Order the goods went out on | **RULED 2026-09-13** (Card 14) |
+| `Loan offer` · `No loan offered` · `Offer a loan` · `Record the offer` · `Customer accepted` · `Customer declined` · `Record the answer` | the Sales Order drawer's loan-offer block (0492, Delivery MASTER §14.2): its heading, its absence, the offer door, its save word, the two answer doors, the decline's save word | **RULED 2026-09-13** (Card 15) |
+| `Loan offered` · `Customer accepted the loan` · `Customer declined the loan` | the three record words — the block's state line, its history and the order's History line | **RULED 2026-09-13** (Card 15) |
+| `Waiting for the customer's answer` · `Prepare the loan Unit` · `Record the customer's answer` · `Lend out the loan Unit` | the Order Route LOAN node's second line and action while an offer is open or accepted and no item is out yet | **RULED 2026-09-13** (Card 15) |
+| `Loan {Unit ID} · collect back on delivery day` | printed with the EXACT Unit ID on Monitor panel 4 (one line per loan Unit out) and on the DO object's Loan collection | **RULED 2026-09-12**, Unit ID **BUILT 2026-09-13** (Card 15) |
+| `Delivery Order` · `Delivery history` · `Warehouse handover` · `Evidence` · `Exceptions` · `History` · `Related records` | the DO object's seven governed sections (`delivery/MASTER.md` §9), one scroll of kit `Panel`s, no tab strip; `Loan collection` renders between Evidence and Exceptions only while a loan exists | **RULED 2026-09-13** (Card 16) |
+| `Goods on this trip` · `The document` · `Rendering the document…` · `The document could not be rendered here — Print opens the same document.` | inside section one: the trip's lines, and the live document rendered by the governed DO renderer (the same bytes `Print` opens), its loading word and its failure | **RULED 2026-09-13** (Card 16) |
+| `Warehouse` · `ETA` · `Building type` · `Floor` · `Lift` · `No lift` · `Stairs` · `Access` · `Customer request` · `Instruction for logistics` · `No warehouse recorded` · `None recorded` | section one's site and arrangement facts and their absences (`Not recorded` remains the plain absence) | **RULED 2026-09-13** (Card 16) |
+| `Delivery on {day} · {result}` · `Goods: {location}` | the Delivery history entry and its second line | **RULED 2026-09-13** (Card 16) |
+| `No open problems` · `Finance is holding this delivery — {reason}` · `Payment approval requested — {reason}` | the Exceptions section's absence and its two money problems (a failed or partial visit prints its result and reason; the Work action lines follow with their owner) | **RULED 2026-09-13** (Card 16) |
+| `Open Payments →` · `Open Unit {Unit ID} →` · `Open Case {Case No} →` · `Open {DO No} →` · `No exact Units recorded on this document` · `Service Cases could not be read` · `No Service Case on this order` · `No other delivery order on this Sales Order` | Related records' doors (beside `Open SO-{n} →` and `Open Order Route →`) and their absences | **RULED 2026-09-13** (Card 16) |
+| `Opening SO-{n}` · `Sales Order not found.` · `Back to Sales Orders` | the Sales Order object page opened by its NUMBER (`/operation/orders/so/SO-1362`): the one-moment loading word while the number resolves to the id, the absence when no order carries that number (the existing Unknown-SO word, reused), and its door | **REGISTERED 2026-09-13** (Delivery Card 19 — a number and an id open the same page; the owner may re-word) |
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
 | `DELIVERY STATUS` | Monitor's operational-status filter group, a kit dropdown over the §8.4 status words of `delivery/MASTER.md` | **RULED 2026-09-07**, words re-ruled **2026-09-13** |
-| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's five words, each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's words (`Arrived` joined 2026-09-13, Card 20), each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `Arrived` over `{partner warehouse}` · `This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.` | an intermediate Journey leg's document: its pill word and line two on the register, Monitor and the DO header; and the Evidence section's one sentence on such a document | **BUILT 2026-09-13** (Card 20 — the word is Card 14's ruled `Arrived`) |
 | `Driver submission` | the Delivery Orders register's column for what came back from THIS delivery order's trip. It replaces the default `Proof Status` column (retired 2026-09-11) | **RULED 2026-09-11** |
 | `Photos {n}` · `Videos {n}` | the two count buttons inside `Driver submission`. The number is the ledger's own count of files stamped with THIS document; a count is NEVER printed when the answer is unknown, and no button is offered for a kind with no files. **No video is not a shortage** — video is not required, so an absent video prints nothing at all | **RULED 2026-09-11** |
 | `Signed Delivery Order` | the viewing link to the signed paper on file, on the second line of `Driver submission`. Already the governed proof name; here it is a door | **REUSED 2026-09-11** |
@@ -2625,11 +2752,11 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 
 **ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
 Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own pill word
-(`Created` · `Out for delivery` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
+(`Created` · `Out for delivery` · `Arrived` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
 `Delivery exception` carries the RESULT that was actually recorded and its reason —
 `Partially Delivered · {reason}` or `Failed Delivery · {reason}` — which is what the retired
 default `Delivery Result` column used to print three columns away. `Cancelled` keeps its void
-reason on line 2. **The search, the per-column filter and the Excel export print the same
+reason on line 2; `Arrived` carries the partner warehouse the goods reached (Card 20). **The search, the per-column filter and the Excel export print the same
 spelling as the cell**, so a reader looking for `Partially Delivered` finds the row that recorded
 it even though its pill spells `Delivery exception`. Combining a DISPLAY never changes the status
 arithmetic and never removes a recorded result: the Delivery Order's own page still holds every
@@ -2943,6 +3070,33 @@ meaning: `Account` · `Amount` · the kind words · `As of` · `Since {date} · 
 | | **`The ledger started on {date}. Pick a day from then on.`** | The chosen day or period ends before go-live. | A user picks a later day and still sees it. |
 | | **`The profit and loss could not be loaded. Try again.`** · **`The balance sheet could not be loaded. Try again.`** | The read failed; no figure is shown. Same sentence as the API sends. | A user retries and gets the same sentence every time, so `Try again` promises nothing. |
 
+### Manual journal (principal only)
+
+**PROPOSAL / NOT LAW.** The words of the principal's manual journal door on the Journal
+(`?entry=new`, `ManualJournalForm.tsx`, `routes/finance/manual-journals.ts`). They may appear only
+there. Falsifier: the principal reads one of these and cannot say what happens next, or records
+a second entry because a sentence told her to try again after the first one stood.
+
+| Group | Word | Meaning |
+|---|---|---|
+| Door | **`New journal entry`** | The Journal's one create action (Row 2), principal only; also the form's heading. Same pattern as `New receipt`. |
+| Form | **`Entry`** · **`Lines`** · **`Date`** · **`Narration`** · **`Account`** · **`Debit`** · **`Credit`** · **`Memo`** · **`Add line`** · **`Remove`** · **`Back to Journal`** | Reused from the Journal block and the line-list controls; nothing new. |
+| | **`Choose an account`** · **`Loading accounts…`** | The account picker empty, and while the chart loads. |
+| | **`The ledger started on {date}. Opening balances take that date.`** | The date hint. |
+| | **`Customer, supplier and other party accounts are not listed. They move only through their own documents.`** | Why control accounts are missing from the picker. |
+| | **`Total · Debit {money} · Credit {money} · Difference {money}`** | The live totals; the difference is red until it is RM 0.00. |
+| Button | **`Record journal entry`** | Records the entry; it gets its JE number at once. Asks first. Same verb as `Record receipt`. |
+| | **`Record journal entry — {gap}`**, gaps: `choose the date` · `choose a day from {date} on` · `type the narration` · `check line {n}` · `choose an account on line {n}` · `type a debit or a credit on line {n}` · `add a second line` · `the total is larger than the ledger can hold` · `make debits equal credits` | The disabled button names the first thing missing (the `Save method — type a name` pattern). |
+| Dialog | **`Record this journal entry?`** · **`{money} debit and credit, dated {date}. A recorded entry cannot be changed. To correct it, record another entry.`** · **`It gets its entry number now.`** · **`Cancel`** · **`Record journal entry`** | The ask-first dialog. |
+| Done | **`Journal entry recorded.`** | The toast; the new entry then opens. |
+| Unknown outcome | **`The connection dropped. Check the Journal for this entry before you record it again.`** · **`The answer did not come back. Check the Journal for this entry before you record it again.`** | No answer came back, so the entry may stand, and the API cannot vouch that the request key (0502) is honoured. Never `Try again`: a second press could be a second entry. |
+| | **`The answer did not come back. Press Record journal entry again. This entry is never recorded twice.`** | No answer came back, and the API has seen the keyed `gl_manual_journal` answer (0502 applied). The form keeps one request key per entry, so a second press returns the first entry or records it once. Shown only on a 503 with `retry_safe: true`. |
+| Resend refused | **`This entry was already recorded as {entry no} before it was changed. Open it in the Journal. To record another, start a New journal entry.`** (without a number: `This entry was already recorded before it was changed. …`) | The same request key came back with other details (`idempotency_mismatch`): the first press stood, then the form was edited. Nothing new is recorded. |
+| Field refusals | `Type the amount in numbers, like 1500.00.` · `The amount must be more than RM 0.00.` · `An amount has at most two decimals.` · `The amount is larger than the ledger can hold.` · `A line takes a debit or a credit, not both.` | Under the field as it is typed. |
+| Entry refusals | `Choose the entry date.` · `Type the narration.` · `The narration is at most 500 characters.` · `A memo is at most 500 characters.` · `Choose an account on every line.` · `Type a debit or a credit on every line.` · `A journal entry needs at least two lines.` · `A journal entry takes at most 100 lines.` · `Debits and credits must be equal.` · `The total is larger than the ledger can hold.` · `The entry adds up to RM 0.00.` · `The ledger started on {date}. Pick a day from then on.` · `The entry date is before the ledger started.` · `The ledger has no start date yet.` · `The lines could not be read. Check them and try again.` | The whole entry is refused; the form stays as typed. |
+| Line refusals | `Line {n} ` + `uses a customer, supplier or other party account. Those accounts move only through their own documents.` · `has no account. Choose one.` · `names an account that is not in the chart.` · `names an account that is no longer in use.` · `names a heading account. Choose an account under it.` · `needs its amount in numbers.` · `has an amount below RM 0.00. Put it on the other side instead.` · `has a debit and a credit. A line takes one of them, not both.` · `has no debit and no credit.` · `could not be read. Check it and try again.` | The ledger refused one line and names it (`A line …` when it gives no number). |
+| Other refusals | `Only the principal may record a journal entry.` · `The journal entry could not be recorded. Try again.` (the database answered and rolled back) · `The journal entry was refused. Check it and try again.` · `The chart of accounts could not be loaded. Try again.` | Who may, and the fallbacks. |
+
 
 ### Supplier bills and payment vouchers (migration 0477)
 
@@ -2950,7 +3104,7 @@ Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP dra
 
 | Where | Word on screen | Stored value it replaces | Note |
 |---|---|---|---|
-| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch |
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch; the Finance sidebar names the third **AP · Payables** (RULING below) |
 | Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
 | Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
 | Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
@@ -3030,19 +3184,69 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
 | `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
 
+### Supplier advances (migrations 0484–0485)
+
+`Advance` itself is **APPROVED** — YH ruled it on 11 Sep 2026 for money paid to a supplier before
+its bill: the voucher's advance box, the knock-off on the bill, and the unused-advance column on
+Unpaid by Supplier (see the Vocabulary row). The money back number's prefix `SMB` is **APPROVED**
+— YH ruled it on 14 Sep 2026. Every other word below is **PROPOSAL — PENDING APPROVAL**, listed
+with where it appears.
+
+| Word | Where · meaning |
+|---|---|
+| `Advance` (field) · `Money paid before the bill. It is applied to a bill later, or the supplier sends it back.` | Payment voucher form, the Advance card under Bills to pay. |
+| `Pays confirmed bills, or an advance before the bill.` | The Purpose help on the voucher form (replaces the 0477 sentence's first clause). |
+| `An advance cannot be less than RM 0.00` | Form and API refusal. |
+| `No advance` · `{RM} · {RM} left` | The Advance column of the Payment Vouchers register. |
+| `Advance on this voucher` · `Applied to bills` · `Money back` · `Advance left` | The voucher's Advance card and its facts. |
+| `Not paid yet — approving the payment pays it` | Advance left before the voucher is approved. |
+| `Apply advance` · `Apply advance to a bill?` · `Apply advance to this bill?` | Action on the voucher's Advance card and the bill's Payments card, and its modal. |
+| `Take advance off` · `Take this advance off the bill?` | Undo one knock-off; needs a reason. |
+| `Record money back` · `Cancel money back` · `Cancel this money back?` | The supplier sent part of an advance back (money back); the approver reverses it. |
+| `Advance applied` · `Advance taken off` · `Money back recorded` · `Money back cancelled` | History lines (event words) and toasts. |
+| `Applied` · `Taken off` | A knock-off's status (database `applied` / `cancelled`). |
+| `Recorded` · `Cancelled` | A money back's status (database `posted` / `voided`) — same pair as Other receipts. |
+| `Money back No` · `SMB-YYYYMMDD-NNNN` | The money back number. Prefix SMB = supplier money back, **APPROVED** (YH, 14 Sep 2026); it is one line, `supplier_money_back_prefix()` in 0485. |
+| `This money back was already recorded as {No} with different details. Open the form again to record another.` | Refusal (`idempotency_mismatch`) when a key is re-sent with a different voucher, amount, account or date. |
+| `Received into` | Reused from 0478: the bank or cash account the money back came into. |
+| `Advance from {PV No}` | A knock-off row on a bill's Payments card. |
+| `This supplier has no advance left.` · `Choose the advance` · `Choose the bill` · `Loading advances…` · `The advances could not be loaded. Try again.` | The Apply advance modal. |
+| `More than can be applied` · `More than the advance left` | Amount warnings in the modals. |
+| `Nothing is entered in the ledger: the advance is already on the supplier's account. The bill shows it as paid by this amount.` | Apply advance modal. |
+| `Nothing is entered in the ledger. The bill is unpaid again by this amount, and the advance is left to use.` | Take advance off modal. |
+| `The supplier sent part of the advance on {PV No} back. It is entered in the ledger on the date below.` | Record money back modal. |
+| `The ledger entry is reversed on its own date, and the amount is left on the advance again.` | Cancel money back modal. |
+| `An advance applied to a bill or sent back must be taken off or cancelled first.` | Added to the cancel-voucher sentence when the voucher carries an advance. |
+| `A bill already on a payment voucher, or with an advance applied, cannot be cancelled.` | Cancel bill sentence (extends 0477's). |
+| `Advance Left` · `Unpaid After Advance` | Columns on Unpaid by Supplier (`advance_open`, `net_owing`). |
+| `Supplier money back` · `Supplier money back reversal` | The Journal's Source for `SUPPLIER_MONEY_BACK` and its reversal (finance-ledger.ts). |
+| `{Bill No} · {Supplier invoice} · {RM} left to pay` | An option in the Bill picker of Apply advance (from the voucher). |
+| `{PV No} · {date} · {RM} left` | An option in the Advance picker of Apply advance (from the bill). |
+| `Taken off — {reason}` · `Cancelled — {reason}` | Status cell of a knock-off taken off, and of a money back cancelled, with the reason. |
+| `This voucher is cancelled, so its advance was never paid or has been reversed.` | The Advance card of a cancelled voucher, in place of Applied / Money back / Advance left. |
+| `Loading accounts…` · `The accounts could not be loaded. Try again.` | Record money back, in place of the Received into list while it loads or fails. |
+| `Advance` (picker label) · `Bill` · `Date` · `Amount` · `Reference` | Field labels in the Apply advance and Record money back modals. |
+| `Bill No` · `Supplier invoice` · `Draft bill` · `Loading bills…` · `The bills could not be loaded. Try again.` · `This supplier has no confirmed bill left to pay.` · `Choose the bank or cash account` · `Bank reference or cheque No` | Reused from 0477 — the Apply advance and Record money back modals and the knock-off table. |
+
 ### Finance Dashboard · AR · Receivables (build/finance-old-reads)
 
-**PROPOSAL / NOT LAW.** Pages: Finance → `Dashboard` and `AR · Receivables`, and the AR drawer.
-Both figures add up the same per-row numbers as the page they open (`money-owed.ts`). The words
-may appear only on these pages until the owner rules.
+**RULING — YH, 2026-09-14.** The Finance sidebar row that opens `/finance/ap-outstanding` is
+**`AP · Payables`** again (PR #1248 had renamed it `Unpaid by Supplier`), and it sits above
+`AR · Receivables`: `Dashboard` · `AP · Payables` · `AR · Receivables`, then the rest. The page
+it opens is unchanged; its header and the Bills toolbar switch keep `Unpaid by Supplier`. The
+Dashboard keeps its pre-#1248 layout (figure tiles, then the Payables card) with every number
+read through `money-owed.ts`.
+
+**PROPOSAL / NOT LAW** for the rest of this block. Pages: Finance → `Dashboard` and
+`AR · Receivables`, and the AR drawer. Both figures add up the same per-row numbers as the page
+they open (`money-owed.ts`). The words may appear only on these pages until the owner rules.
 
 | Word on screen | Meaning | Falsifier |
 |---|---|---|
+| `AP · Payables` | RULING: the Finance sidebar row and the Dashboard card for what Carres still owes suppliers and other creditors on confirmed bills. | — (owner ruling) |
 | `AR · Receivables` | Destination: every order a customer still owes money on, where Finance records a receipt. | The owner rules one global Dashboard with no Finance AR page (COPY 1690), or recording moves to the Invoices register. |
-| `Material exposure` | Dashboard section heading over the money-owed figures (Workspace MASTER §8). | A finance user cannot say what the section holds. |
-| `Open AR · Receivables` · `Open Unpaid by Supplier` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
-| `What customers still owe HQ, storage included. Orders with no price yet are left out.` | Meaning line under the Dashboard's Outstanding figure. | The figure includes an unpriced order, or leaves out storage owed. |
-| `What Carres still owes suppliers and other creditors on confirmed bills.` | Meaning line under the Dashboard's Unpaid figure. | The figure counts a draft bill, or differs from the Unpaid by Supplier footer. |
+| `Outstanding` · `Unpaid` · `{n} orders` · `{n} suppliers` | Dashboard figure tiles: what customers still owe HQ (storage included, unpriced orders left out), and what Carres still owes on confirmed bills; the count under each. | A tile differs from the footer of the page its door opens. |
+| `Open AR · Receivables` · `Open AP · Payables` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
 | `includes storage {RM}` | Second line under Outstanding: the storage part of what the customer owes (Payment MASTER). | Storage owed shows as a separate total that the Outstanding figure leaves out. |
 | `Could not load {source}` · `Last available {date and time} · {RM}` · `Try again` | A figure whose read failed: said in words, never RM 0.00, with the last figure it had. | A failed read shows a zero or a blank. |
 | `Invoices could not be loaded. Try again.` | The AR register's failed read (Error pattern). | The page shows an empty list when the read failed. |
@@ -3051,6 +3255,15 @@ may appear only on these pages until the owner rules.
 | `SO not available` | The SO No cell when the order has no SO number (absent value in words). | A raw id or blank shows instead. |
 | `Record payment received` · `Amount must be positive` · `Receipt failed: {reason}` · `Recorded {RM} for SO-{n}` | Heading, validation, failure and success of the drawer's Record receipt form. | The form records a zero or negative amount, or fails silently. |
 | `No receipts recorded yet.` · `Receipt number missing` · `Method not recorded` · `VOIDED` | Payment history: none yet · a receipt without its RC number · a receipt without its method · a cancelled receipt. | A stored method key or a blank reaches the screen. |
+| `Overdue (>30d)` | Dashboard tile, and the AR register's removable condition, for what customers still owe on orders placed more than 30 days ago (Malaysia days, the same age the old `finance_ar_aging` used — not a due date). Kept in the pre-#1248 spelling by the owner's 2026-09-14 layout ruling; it breaks "No abbreviations" and is flagged for a ruling. | The tile differs from the AR register's footer at `?age=over-30`, or an order placed exactly 30 days ago is counted. |
+| `A/R Aging · Outstanding by age` · `{bucket} days` (`0-30 days` · `31-60 days` · `61-90 days` · `90+ days`) · `{RM} · {n} orders` | The Dashboard's aging card: what customers owe, split by how many days ago the order was placed; each row opens AR · Receivables narrowed to that age. Pre-#1248 heading kept by the owner ruling; `A/R` flagged as above. | A bucket differs from the AR register's footer at that `?age=`, or the four buckets do not add up to Outstanding. |
+| `Age` · `{n} days` · `1 day` · `Order date not available` | The AR register's Age column: days since the order was placed; an order without a placing date says so. | An order with no placing date shows 0 days or lands in 0-30. |
+| `No order owing money is this old.` | The AR register's empty state while an age condition is on. | It shows while an order of that age still owes money. |
+| `Net cash · 12 wks` · `In {RM} · Out {RM}` · `Since {date} · {n} of 12 weeks` · `Since {date}` | Dashboard tile: money in less money out on the cash and bank accounts (under 1100 in the chart) over the last twelve weeks, never before the ledger's go-live; the second line shows while fewer than twelve whole weeks exist — with the count while fewer than twelve week columns exist, and as `Since {date}` alone when twelve columns show but the first starts mid-week on go-live (never `12 of 12 weeks`). It is a movement, never a balance: the ledger has no opening balances. Pre-#1248 spelling kept by the owner ruling; `wks` flagged as above. | The tile differs from the sum of the Cashflow weeks, or from the cash and bank rows of the Trial Balance over the same days. |
+| `Cashflow · Last 12 weeks` · `Money in less money out on cash and bank accounts · No opening balances` · `Inflow` · `Outflow` · `Inflow total` · `Outflow total` · `Net` · `The ledger started on {date}. {n} of 12 weeks so far.` · `The ledger started on {date}.` | The Dashboard's weekly chart of the same movement: one column per week, the week's net under it, and the totals. The notice carries the count only while fewer than twelve week columns exist; with twelve columns whose first starts mid-week on go-live it names the date alone. | A week's column counts an entry dated outside that week, or a move between two cash accounts shows as In or Out. |
+| `Could not load Cash and bank` · `Could not load Journal` · `The ledger has no start date yet.` · `The ledger starts on {date}.` | A Dashboard ledger read that failed, a ledger with no go-live date, and a go-live date still ahead of today (no week has begun): said in words in place of the Net cash figure and the Cashflow chart, never RM 0.00. | A failed read or a go-live still ahead shows a zero, a blank or an empty chart. |
+| `Activity · Recent transactions` · `Open Journal` | The Dashboard's card of the newest posted ledger entries (Date · Entry No · Source · Amount); each Entry No opens that entry in the Journal. | An entry number opens a different entry, or the card lists an entry the Journal does not. |
+| `Month` · `Export month-end pack` · `The month-end pack could not be exported. Try again.` | The Dashboard's one export: a workbook `Month-end pack {Mon YYYY}.xlsx` with three sheets — `Trial Balance`, `Profit and Loss`, `Balance Sheet` — for the chosen month (last complete month by default; this month when last month ended before go-live). The sheets reuse the report pages' own words (`As of {date}` · `Since {date} · No opening balances` · `Account` · `Kind` · `Debit` · `Credit` · `Total` · `Amount` · `Net result` · `Net result not yet closed` · `Assets differ from liabilities plus equity by`). | A sheet's figure differs from the page of the same name on the same days, or a sheet is written after a failed read. |
 
 ---
 
@@ -3074,3 +3287,8 @@ Before merging a UI change:
 - [ ] Zero jargon (rule 9).
 - [ ] Tooltips do not repeat the label.
 - [ ] Dates go through `fmtDate()`.
+
+
+### Delivery legacy warehouse pick refusal · Card 21 · 2026-09-13
+
+`This action is no longer available. Use Ready Stock in SO Batch Purchase.` — HTTP 410 refusal for the retired `warehouse` and `transfer-ready` doors. The drawer no longer offers `Transfer to ready`. The destination uses the existing governed Ready Stock journey, never a replacement stock writer.

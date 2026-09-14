@@ -27,8 +27,8 @@ import {
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
-  transferReadyInputSchema,
-  warehousePickInput,
+  salesOrderNumberWord,
+  salesOrderParamOf,
   type AllocationUnit,
   type PoArrival as OrderPoArrival,
   type PoArrivalReply as OrderPoArrivalReply,
@@ -284,7 +284,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // of. Voided DOs are NOT filtered here - the delivery register does not
       // filter them either, and this column must not start counting differently
       // from the surface it links to.
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, do_file_path, do_uploaded_at, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), order_delivery_payment_approvals(status), ops_sofa_loans(status, item_id, loan_note_no, ops_stock_items(unit_code, identity_scope)), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -621,6 +621,44 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
     })),
   });
+});
+
+// ----- GET /by-number/:so — 【DELIVERY】 CARD 19 -----
+// The operator's document word (`SO-1362`) resolved to the order's id, so a
+// link carrying the number lands on the SAME object page as a link carrying
+// the id. A read door only: it answers `{ id, so }` and nothing else; every
+// fact is then read by the id through the existing doors (Law C — one door,
+// never a second fan-in).
+operationOrdersRouter.get("/by-number/:so", requireOperation, async (c) => {
+  const ident = salesOrderParamOf(c.req.param("so"));
+  if (ident.kind !== "number") {
+    return c.json(
+      { error: "invalid_so_number", code: "invalid_so_number", message: "Sales Order not found." },
+      400,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("so", ident.so)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json(
+      {
+        error: "not_found",
+        code: "not_found",
+        message: "Sales Order not found.",
+        so: salesOrderNumberWord(ident.so),
+      },
+      404,
+    );
+  }
+  return c.json({ id: (data as { id: string }).id, so: ident.so });
 });
 
 // ----- GET /:id detail -----
@@ -2534,21 +2572,12 @@ operationOrdersRouter.post("/:id/abandon", requireOperation, async (c) => {
   return c.json({ order: data });
 });
 
-// ----- POST /:id/warehouse -----
-operationOrdersRouter.post("/:id/warehouse", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, warehousePickInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_warehouse_pick", {
-    p_order_id: c.req.param("id"),
-    p_warehouse_id: parsed.data.warehouseId,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ order: data });
-});
+// ----- POST /:id/warehouse — retired (Delivery Card 21) -----
+// Exact Unit reservation belongs to SO Batch Purchase → Ready Stock.
+// Never call the legacy quantity writer, including for stale clients.
+operationOrdersRouter.post("/:id/warehouse", requireOperation, (c) =>
+  c.json({ error: "This action is no longer available. Use Ready Stock in SO Batch Purchase.", code: "warehouse_pick_retired" }, 410),
+);
 
 // ----- POST /:id/confirm-proceed -----
 // Migration 0147 (item h, 2026-05-23) — v3 RPC now requires the LP at the
@@ -2606,26 +2635,12 @@ operationOrdersRouter.post("/:id/reselect-partner", requireOperation, async (c) 
   return c.json(data);
 });
 
-// ----- POST /:id/transfer-ready -----
-// Pipeline v2 (C2 / migration 0024). Wraps `operation_warehouse_pick` whose
-// source-stage guard now permits IN ('confirmed', 'in_production').
-// Same error contract as /confirm-proceed. Note: warehouseId is REQUIRED here
-// (the RPC raises 22023 `warehouse_required` on NULL). confirm-proceed
-// accepts NULL via a different RPC; do not conflate.
-operationOrdersRouter.post("/:id/transfer-ready", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, transferReadyInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_warehouse_pick", {
-    p_order_id: c.req.param("id"),
-    p_warehouse_id: parsed.data.warehouseId,
-  });
-  if (error) {
-    const m = mapPipelineV2Error(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ order: data });
-});
+// ----- POST /:id/transfer-ready — retired (Delivery Card 21) -----
+// Exact Unit reservation belongs to SO Batch Purchase → Ready Stock.
+// Never call the legacy quantity writer, including for stale clients.
+operationOrdersRouter.post("/:id/transfer-ready", requireOperation, (c) =>
+  c.json({ error: "This action is no longer available. Use Ready Stock in SO Batch Purchase.", code: "warehouse_pick_retired" }, 410),
+);
 
 // ----- POST /:id/recheck-stock -----
 operationOrdersRouter.post("/:id/recheck-stock", requireOperation, async (c) => {

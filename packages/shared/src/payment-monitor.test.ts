@@ -75,18 +75,18 @@ describe("Goods — Primary School English, and the exact item disclosure", () =
     expect(monitorGoodsWord(g)).toBe("Goods ready");
     expect(g.lines.map((l) => l.word)).toEqual(["Ready", "Ready"]);
   });
-  it("some ready, the rest dated → `2 of 3 items ready · Last item arriving Monday, 21 Sep`", () => {
+  it("some ready, the rest dated → `2 of 3 items ready · Last item arriving Mon, 21 Sep`", () => {
     const g = monitorGoods(row({
       lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }, { sku: "C", qty: 1, unit_price: 1 }],
       control: { line_stock_status: { A: "ready", B: "ready", C: "waiting" }, line_etas: { C: "2026-09-21" } },
     }));
-    expect(monitorGoodsWord(g)).toBe("2 of 3 items ready · Last item arriving Monday, 21 Sep");
-    expect(g.lines[2]).toMatchObject({ sku: "C", qty: 1, word: "Arriving Monday, 21 Sep", ready: false });
+    expect(monitorGoodsWord(g)).toBe("2 of 3 items ready · Last item arriving Mon, 21 Sep");
+    expect(g.lines[2]).toMatchObject({ sku: "C", qty: 1, word: "Arriving Mon, 21 Sep", ready: false });
   });
   it("nothing ready but every line dated → Arriving {last date}", () => {
     const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
       control: { line_etas: { A: "2026-09-15", B: "2026-09-21" } } }));
-    expect(monitorGoodsWord(g)).toBe("Arriving Monday, 21 Sep");
+    expect(monitorGoodsWord(g)).toBe("Arriving Mon, 21 Sep");
   });
   it("a waiting line without a date → Arrival not confirmed, even when others are dated", () => {
     const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
@@ -120,7 +120,7 @@ describe("Storage — the six ruled states", () => {
   });
   it("inside the automatic free week → Free until {day 7}", () => {
     const s = monitorStorage({ ...base, cases: [caseOf({ storage_start: "2026-09-08" })] });
-    expect(monitorStorageWord(s, rm)).toBe("Free until Monday, 14 Sep");
+    expect(monitorStorageWord(s, rm)).toBe("Free until Mon, 14 Sep");
   });
   it("Day 15 of a mattress case with 7 free days → `Mattress / Bedframe · Day 15 · RM 150.00 so far` — accrued, NOT in Amount needed", () => {
     const s = monitorStorage({ ...base, cases: [caseOf({ storage_start: "2026-08-28" })] });
@@ -133,7 +133,7 @@ describe("Storage — the six ruled states", () => {
   });
   it("an approved extension → Free storage approved until {approved day}", () => {
     const s = monitorStorage({ ...base, cases: [caseOf({ approved_free_until: "2026-09-21", approved_at: "2026-09-05T00:00:00Z" })] });
-    expect(monitorStorageWord(s, rm)).toBe("Free storage approved until Monday, 21 Sep");
+    expect(monitorStorageWord(s, rm)).toBe("Free storage approved until Mon, 21 Sep");
   });
   it("a live unpaid Storage Invoice outranks everything → issued · not paid", () => {
     const s = monitorStorage({ ...base, cases: [caseOf({ storage_start: "2026-08-01" })], storageOwing: 200 });
@@ -150,14 +150,21 @@ describe("Storage — the six ruled states", () => {
 describe("Customer delivery — the confirmed date, else the request, else none", () => {
   it("confirmed → the day word, no note", () => {
     expect(monitorDelivery(row({ control: { confirmed_date: "2026-09-18" } })))
-      .toEqual({ dateIso: "2026-09-18", confirmed: true, word: "Friday, 18 Sep", note: null });
+      .toEqual({ dateIso: "2026-09-18", confirmed: true, status: "confirmed", word: "Fri, 18 Sep", note: null });
   });
   it("requested only → the day word with `Not confirmed yet`", () => {
     expect(monitorDelivery(row({ delivery_date: "2026-09-18" })).note).toBe("Not confirmed yet");
   });
-  it("no date, or customer not sure → No delivery date, never a Logistics ETA", () => {
+  it("no date → No delivery date, never a Logistics ETA", () => {
     expect(monitorDelivery(row()).word).toBe("No delivery date");
-    expect(monitorDelivery(row({ delivery_date: "2026-09-18", delivery_date_tbd: true })).word).toBe("No delivery date");
+  });
+  /* ⭐ ONE READ, ONE ANSWER (Law D, 2026-09-14). The Monitor used to flatten
+     `delivery_date_tbd` into `No delivery date` while the collection workspace
+     the row opens called the same order `Customer not sure`. Both now read
+     `invoiceCustomerDelivery`, so the row and the page cannot disagree. */
+  it("customer not sure is its own state, and it is the SAME word the workspace prints", () => {
+    const r = monitorDelivery(row({ delivery_date: "2026-09-18", delivery_date_tbd: true }));
+    expect(r).toMatchObject({ status: "customer_not_sure", word: "Customer not sure", dateIso: null });
   });
 });
 
@@ -175,7 +182,7 @@ describe("Payment timing — two lines: the fact and the governed action", () =>
   it("a Saturday deadline: Operation acts Friday, the fact still names Saturday; a Saturday worker acts Saturday", () => {
     // Tue 15 Sep delivery: Mon 14 T−1, Sat 12 T−2 — today is Friday 11.
     const op = build({ control: { ...ready, confirmed_date: "2026-09-15" } });
-    expect(op.timing).toMatchObject({ kind: "due_today", fact: "Payment due Saturday, 12 Sep", action: "ask", actionDueIso: "2026-09-11", dueIso: "2026-09-12" });
+    expect(op.timing).toMatchObject({ kind: "due_today", fact: "Payment due Sat, 12 Sep", action: "ask", actionDueIso: "2026-09-11", dueIso: "2026-09-12" });
     const sat = build({ control: { ...ready, confirmed_date: "2026-09-15" } }, { owner: { offDays: [0] } });
     expect(sat.timing).toMatchObject({ kind: "ask_today", actionDueIso: "2026-09-12" });
   });
@@ -208,7 +215,7 @@ describe("Payment timing — two lines: the fact and the governed action", () =>
   });
   it("before the ask day → `Payment due {day}` / Wait", () => {
     const r = build({ control: { ...ready, confirmed_date: "2026-09-30" } });
-    expect(r.timing).toMatchObject({ kind: "due_later", fact: "Payment due Monday, 28 Sep", action: "wait" });
+    expect(r.timing).toMatchObject({ kind: "due_later", fact: "Payment due Mon, 28 Sep", action: "wait" });
   });
   it("a live unpaid Storage Invoice → `Storage Invoice not paid` / Send the invoice and collect payment", () => {
     const rows = [

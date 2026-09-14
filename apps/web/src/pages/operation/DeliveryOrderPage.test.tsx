@@ -23,7 +23,7 @@ let detailState: {
 };
 
 const useDeliveryOrderSpy = vi.fn((..._args: unknown[]) => detailState);
-const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] }, isLoading: false }));
+const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] as Array<{ path: string; at: string; doNumber: string; url: string }> }, isLoading: false }));
 const recordHandoverMutate = vi.fn();
 const reviewMutate = vi.fn();
 const attachSignedMutate = vi.fn();
@@ -138,6 +138,7 @@ function mount(data: DeliveryOrderDetailPayload) {
 
 beforeEach(() => {
   useDeliveryOrderSpy.mockClear();
+  useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [] }, isLoading: false });
   recordHandoverMutate.mockClear();
   reviewMutate.mockClear();
   attachSignedMutate.mockClear();
@@ -157,11 +158,11 @@ const attempt = (
 });
 
 describe("DeliveryOrderPage", () => {
-  it("returns to the one Delivery workspace", () => {
+  it("returns to the Delivery Orders register — the Object Header's `← Delivery Orders` (§9)", () => {
     mount(payload());
-    expect(screen.getByRole("link", { name: /Delivery$/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Delivery Orders$/ })).toHaveAttribute(
       "href",
-      "/operation?tab=delivery",
+      "/operation/delivery-orders",
     );
   });
 
@@ -169,17 +170,19 @@ describe("DeliveryOrderPage", () => {
     const { container } = { container: undefined } as { container?: unknown };
     void container;
     mount(payload());
-    for (const block of [
-      "Customer",
-      "Goods on this trip",
-      "Delivery details",
-      "Source Sales Order",
-      "Delivery status",
+    /* The seven governed sections, in the MASTER's order (§9, Card 16) — one
+       scroll of kit Panels, no tab strip. */
+    const titles = [...document.querySelectorAll('[data-kit="panel"] h2')].map((h) => h.textContent);
+    expect(titles).toEqual([
+      "Delivery Order",
+      "Delivery history",
+      "Warehouse handover",
       "Evidence",
+      "Exceptions",
       "History",
-    ]) {
-      expect(screen.getByText(block)).toBeTruthy();
-    }
+      "Related records",
+    ]);
+    expect(screen.queryByRole("tablist")).toBeNull();
     expect(document.querySelectorAll("input, textarea, select").length).toBe(0);
     for (const banned of [/void/i, /delete/i, /save/i, /issue delivery order/i, /release/i, /approve/i]) {
       expect(screen.queryByRole("button", { name: banned })).toBeNull();
@@ -467,7 +470,8 @@ describe("DeliveryOrderPage", () => {
 
     it("a delivered result lists its bound files under `Delivery on {day}` and offers the three governed review acts", () => {
       mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
-      expect(screen.getByText(/^Delivery on .* · Delivered$/)).toBeTruthy();
+      /* Delivery history and Evidence both name the visit — one entry each. */
+      expect(screen.getAllByText(/^Delivery on .* · Delivered$/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://signed/p.jpg");
       /* The file is there, nobody has judged it: the pill is AMBER, the state says so. */
       expect(screen.getByTestId("do-proof-review-state")).toHaveTextContent("Check delivery proof");
@@ -569,6 +573,12 @@ describe("DeliveryOrderPage", () => {
     });
   });
 
+  it("does not show the final DO’s signature as this document’s paper", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } }));
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByTestId("signed-do-link")).toBeNull();
+  });
+
   it("0491 — a Journey leg's document prints its route and records an ARRIVAL, never a delivery", () => {
     const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
     mount(
@@ -593,6 +603,75 @@ describe("DeliveryOrderPage", () => {
     expect(screen.queryByRole("button", { name: "Delivered" })).toBeNull();
   });
 
+  it("section one prints the site facts and the arrangement, and renders the live document (Card 16)", () => {
+    mount(
+      payload(
+        {
+          orders: {
+            ...payload().deliveryOrder.orders,
+            warehouses: { name: "Carres Klang" },
+            delivery_floor: 12,
+            delivery_has_lift: true,
+            delivery_stair_items: null,
+            building_type: "Condo",
+            ops_order_control: { customer_request: "Call before arriving", action_for_logistic: null },
+          },
+        },
+        {
+          arrangement: {
+            id: "arr-1", leg: 0, partner_id: "p-nets", confirmed_date: "2026-08-20", confirmed_time: "Morning (9am–12pm)",
+            expected_arrival: "10:30", logistics_note: null, driver_name: "Ahmad", vehicle: "WXY 1234", condo_registration: "Registered at guardhouse",
+            delivery_partners: { id: "p-nets", name: "NETS" },
+          },
+        },
+      ),
+    );
+    const one = screen.getByTestId("do-section-order");
+    expect(one).toHaveTextContent("Carres Klang");
+    expect(one).toHaveTextContent("Ahmad");
+    expect(one).toHaveTextContent("WXY 1234");
+    expect(one).toHaveTextContent("Condo");
+    expect(one).toHaveTextContent("Lift");
+    expect(one).toHaveTextContent("Registered at guardhouse");
+    expect(one).toHaveTextContent("Call before arriving");
+    expect(screen.getByTestId("do-document")).toHaveTextContent(/Rendering the document…|could not be rendered/);
+  });
+
+  it("Exceptions says `No open problems` on a clean document, and names the money holds when they exist", () => {
+    mount(payload());
+    expect(screen.getByTestId("do-no-problems")).toHaveTextContent("No open problems");
+    mount(
+      payload({}, {
+        financeExceptions: [{ id: "fe1", status: "open", reason: "Cheque bounced", opened_at: "2026-08-19T01:00:00Z", cleared_at: null }],
+        paymentApprovals: [{ id: "pa1", status: "pending", request_reason: "COD by transfer", requested_at: "2026-08-19T02:00:00Z", decided_at: null, decision_reason: null }],
+      }),
+    );
+    const exceptions = screen.getAllByTestId("do-exceptions").at(-1)!;
+    expect(exceptions).toHaveTextContent("Finance is holding this delivery — Cheque bounced");
+    expect(exceptions).toHaveTextContent("Payment approval requested — COD by transfer");
+  });
+
+  it("Related records doors to the Sales Order, the Order Route, Payments, each Unit, each Case and each sibling document; an unreadable Case read is stated", () => {
+    mount(
+      payload({}, {
+        scopeUnits: [{ item_id: "i1", unit_code: "U1-000-082", sku: "mattress:JAGER-SS" }],
+        serviceCases: null,
+        siblingDocuments: [
+          { id: "d0001", do_number: "DO-180826-3035", issued_at: "2026-08-18T01:47:00Z", voided_at: null, void_reason: null },
+          { id: "d0002", do_number: "DO-170826-5050", issued_at: "2026-08-17T01:47:00Z", voided_at: "2026-08-18T00:00:00Z", void_reason: "rescheduled" },
+        ],
+      }),
+    );
+    const related = screen.getByTestId("do-related-records");
+    expect(related).toHaveTextContent("Open SO-1322 →");
+    expect(related).toHaveTextContent("Open Order Route →");
+    expect(screen.getByTestId("do-open-payments")).toHaveAttribute("href", "/finance/payments?order=1322");
+    expect(screen.getByRole("link", { name: "Open Unit U1-000-082 →" })).toHaveAttribute("href", "/operation/stock/unit/U1-000-082");
+    expect(related).toHaveTextContent("Service Cases could not be read");
+    expect(screen.getByRole("link", { name: /Open DO-170826-5050 →/ })).toHaveTextContent("cancelled");
+    expect(screen.queryByRole("link", { name: /Open DO-180826-3035/ })).toBeNull();
+  });
+
   it("the loan block renders only when a loan exists", () => {
     mount(payload());
     expect(screen.queryByText("Loan collection")).toBeNull();
@@ -609,6 +688,7 @@ describe("DeliveryOrderPage", () => {
               loaned_at: "2026-08-18T02:00:00Z",
               returned_at: null,
               loan_note_no: "LN-180826-3035",
+              ops_stock_items: { unit_code: "U1-000-082", identity_scope: "unit" },
             },
           ],
         },
@@ -616,5 +696,62 @@ describe("DeliveryOrderPage", () => {
     );
     expect(screen.getByText("Loan collection")).toBeTruthy();
     expect(screen.getByText(/Collect back on delivery day/)).toBeTruthy();
+    /* 0492 (Card 15) — the EXACT Unit the crew brings back. */
+    expect(screen.getByTestId("do-loan-lines")).toHaveTextContent("Loan U1-000-082 · collect back on delivery day");
+  });
+});
+
+/* ── 【DELIVERY】 CARD 20 — an intermediate leg ARRIVES; each leg names its
+   own source. `Delivered` is the customer's word; a leg before the last whose
+   goods reached the partner warehouse reads `Arrived`, leaves from its own
+   `from_loc`, and owes no delivery proof on its document. */
+describe("a Journey leg's document — Arrived, its own Warehouse, no proof owed (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" as const },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" as const },
+  ];
+  const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
+  const legDoc = (leg: number) =>
+    payload(
+      { leg, orders: { ...payload().deliveryOrder.orders, warehouse_id: null, delivery_stops: stops } },
+      { attempts: [attempt("delivered")], handoverEvents: received },
+    );
+
+  it("an arrival keeps its own ledger files and never borrows the final signature or asks for one", () => {
+    const data = legDoc(1);
+    data.deliveryOrder.orders.do_number = "DO-FINAL";
+    data.deliveryOrder.orders.do_file_path = "order/final.pdf";
+    useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [{ path: "arrival.jpg", url: "https://example.test/arrival.jpg", doNumber: data.deliveryOrder.do_number, at: "2026-09-13T10:00:00Z" }] }, isLoading: false });
+    mount(data);
+    expect(screen.getByTestId("do-evidence-document-files")).toBeTruthy();
+    expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://example.test/arrival.jpg");
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+  });
+
+  it("leg 1 of 2: the pill reads Arrived, the Warehouse is the leg's own source, history says Arrived, no proof is owed", () => {
+    mount(legDoc(1));
+    expect(screen.getAllByText("Arrived").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Delivered")).toBeNull();
+    expect(screen.getByText("Carres Klang Warehouse")).toBeTruthy();
+    expect(screen.queryByText("No warehouse recorded")).toBeNull();
+    expect(screen.getAllByText(/^Delivery on .* · Arrived$/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("do-evidence-arrival-only")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-photo")).toBeNull();
+  });
+
+  it("leg 2 of 2: the customer leg keeps Delivered and leaves from the previous partner's warehouse", () => {
+    mount(legDoc(2));
+    expect(screen.getAllByText("Delivered").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Arrived")).toBeNull();
+    expect(screen.getByText("JB transit warehouse")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-arrival-only")).toBeNull();
+  });
+
+  it("a whole-order document still reads the order's own warehouse", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, warehouses: { name: "Carres Klang" } } }));
+    expect(screen.getByText("Carres Klang")).toBeTruthy();
   });
 });

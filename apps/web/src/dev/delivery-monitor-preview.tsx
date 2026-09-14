@@ -123,6 +123,11 @@ const ORDERS = [
     customer_address_city: "Kuala Lumpur",
     customer_address_state: "Kuala Lumpur",
     building_type: "Condominium",
+    /* THE ONE ORDER WITH NO CUSTOMER REFERENCE (2026-09-14). Every other
+       fixture carries `CR0854`, so nothing in the walk showed what COLUMN 4
+       does when there is nothing to put under the number: the answer is
+       nothing — no second line, no placeholder, no dash. */
+    source_ref: null,
   }),
   order({
     id: "c",
@@ -286,6 +291,41 @@ const ORDERS = [
       { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: "2026-09-08T04:00:00.000Z", status: "pending" },
       { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: "2026-09-09T04:00:00.000Z", status: "pending" },
     ],
+  }),
+  /* ⭐ THE ADDRESS CORRECTION'S OWN ROW (2026-09-14) — production SO-1217 /
+     TCF0541 exactly as the database holds it: a written AutoCount address,
+     every structured column empty, no building type, floor 1, no lift. It is
+     the shape 46 of the 89 addressed open scopes are in, and the shape that
+     printed `Not recorded`, `Selangor` and `State not recorded` at once. */
+  order({
+    id: "tcf0541",
+    so: 1217,
+    customer_name: "lim wei sheng",
+    source_system: "autocount",
+    source_ref: ["TCF0541"],
+    customer_address:
+      "31,JALAN BK8/2B,ANGGUN, RESIDENCE,BANDAR KINRARA,, 43300 PUCHONG,SELANGOR, Puchong, Selangor",
+    customer_address_line1: null,
+    customer_address_city: null,
+    customer_address_state: null,
+    customer_address_postcode: null,
+    building_type: null,
+    delivery_floor: 1,
+    delivery_has_lift: false,
+    delivery_date: "2026-09-16",
+  }),
+  /* Its counterpart: an address nothing can be read out of. The warning has
+     to survive, and the cell still may not call the address absent. */
+  order({
+    id: "ambiguous",
+    so: 1246,
+    customer_name: "tan mei ling",
+    source_system: "autocount",
+    customer_address: "Tuai Timur, Setia Alam",
+    customer_address_line1: null,
+    customer_address_city: null,
+    customer_address_state: null,
+    delivery_date: "2026-09-17",
   }),
 ];
 

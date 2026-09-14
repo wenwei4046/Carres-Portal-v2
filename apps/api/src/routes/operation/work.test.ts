@@ -282,7 +282,7 @@ describe("operation Work response composition", () => {
     expect(arrangement).toMatchObject({
       module: "delivery",
       object: { kind: "delivery_scope", id: "order-2041", label: "SO-2041" },
-      destination: "/operation/delivery/edit/order-2041",
+      destination: "/operation?tab=delivery&view=all&open=order-2041",
     });
 
     const [run] = projectSalesOrderWork({

@@ -122,6 +122,19 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
+  it.each([false, true])("an intermediate arrival owes no customer proof and preserves recorded photos (%s)", (hasPhoto) => {
+    const row = doRow({ leg: 1, orders: { ...doRow().orders,
+      do_number: "DO-FINAL", do_file_path: "final-signed.pdf",
+      delivery_stops: [{ leg: 1, from_loc: "Klang", to_loc: "JB transit", partner_id: "NETS", partner_name: "NETS", status: "handed_off" }, { leg: 2, from_loc: "JB transit", to_loc: "Customer", partner_id: "AL", partner_name: "AL", status: "delivered" }],
+      ops_order_control: { delivery_photos: hasPhoto ? [{ path: "arrival.jpg", by: "operation", doNumber: "DO-180826-3035", kind: "photo", at: "2026-08-20T02:00:00Z" }] : [] },
+    } });
+    mount([row], [{ do_number: row.do_number, result: "delivered", reason_key: null, recorded_at: "2026-08-20T02:00:00Z" }]);
+    expect(Boolean(screen.queryByTestId("do-submission-photos"))).toBe(hasPhoto);
+    expect(screen.queryByText("No delivery photo yet")).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Signed Delivery Order" })).toBeNull();
+  });
+
   it("asks Delivery for only the source Sales Order named by the URL", () => {
     mount([], [], [], "/operation/delivery-orders?order=order-1");
     expect(useDeliveryOrdersRegisterSpy).toHaveBeenCalledWith({ orderId: "order-1" });
@@ -577,6 +590,7 @@ describe("DeliveryOrdersRegister", () => {
         doRow({
           orders: {
             ...doRow().orders,
+            do_number: "DO-180826-3035",
             do_file_path: "order-x/do.pdf",
             do_uploaded_at: "2026-08-20T11:00:00Z",
             ops_order_control: {

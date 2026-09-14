@@ -1,3 +1,35 @@
+## `collection-owner-unassigned-copy` — THE WORDS FOR AN UNOWNED ORDER, opened 2026-09-14
+
+**🔴 An approved sentence is now factually wrong, and only Jess may change it.** Every surface that
+meets an order with no responsible person still prints `Nobody holds Delivery Duty.` with
+`Set the holder in Workspace → Staff & Duties` (`docs/COPY-STANDARD.md`; `NO_DELIVERY_DUTY_HOLDER`
+and `SET_HOLDER_DOOR` in `packages/shared/src/payment-collection-owner.ts`, rendered by
+`apps/web/src/pages/finance/PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx` and
+`apps/web/src/pages/operation/OperationWork.tsx`).
+
+After 0504 the Delivery Duty holder has nothing to do with this answer. The responsible person is
+the individual the Sales Order was dealt to, so an unresolved owner means **no individual is in the
+Operation assignment pool** — and Staff & Duties cannot fix it. The sentence sends the operator to
+the wrong door, and the owner explicitly forbade asking for a Delivery Duty holder as a workaround.
+
+**The fix, ready to apply on her word:** `Nobody is assigned to this order.` with the door
+`Assign it in Sales Orders → Team`.
+
+**Why it was reported and not shipped:** an approved on-screen word changes only when the owner
+says so (CLAUDE.md §10, and one of the four reasons to interrupt her). Nothing operational depends
+on it today — the state is unreachable while the pool holds an individual, and production's pool
+holds two (Shasha CR005 · Yu Jun CR004). **Closes when she rules on the words.**
+
+**Falsifier:** an authenticated load that renders `monitor-owner-unassigned` or
+`collection-owner-none` on a real order. That would mean the pool has emptied and the wrong door is
+in front of an operator.
+
+**Supersedes `delivery-duty-initial-holder` (opened 2026-09-13, closed 2026-09-14 without being
+done).** That carry-forward asked the owner to name an initial `delivery_duty` holder so automatic
+ownership could resolve. She rejected the premise on 2026-09-13: responsibility is not a duty
+holder, it is the person the order was dealt to. 0504 removed the Delivery-Duty source, so the
+holder is no longer owed and automatic ownership no longer waits on anybody.
+
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
 **Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.

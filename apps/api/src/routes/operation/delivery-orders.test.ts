@@ -43,6 +43,7 @@ beforeAll(async () => {
 beforeEach(() => {
   _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
   vi.mocked(userClient).mockReset();
+  vi.mocked(adminClient).mockClear();
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -607,7 +608,7 @@ describe("GET /:id/signed-document — the paper the customer signed", () => {
         data: {
           id: DO_ID,
           do_number: "DO-180826-3035",
-          orders: { id: "a", do_file_path: "order-a/signed.pdf", do_uploaded_at: "2026-08-20T10:00:00Z" },
+          orders: { id: "a", do_number: "DO-180826-3035", do_file_path: "order-a/signed.pdf", do_uploaded_at: "2026-08-20T10:00:00Z" },
         },
       },
     ]);
@@ -635,6 +636,30 @@ describe("GET /:id/signed-document — the paper the customer signed", () => {
     const res = await call(`/${DO_ID}/signed-document`, "operation");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ url: null, uploadedAt: null });
+  });
+
+  it("does not sign the final DO’s mirror when the requested DO is intermediate", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: { do_number: "DO-2", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } } }, { data: [] }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(await res.json()).toEqual({ url: null, uploadedAt: null });
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("opens this trip’s bound paper after the order mirror moves to the next trip", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: { do_number: "DO-2", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } } }, { data: [{ do_number: "DO-1", kind: "document", path: "order/first.pdf", recorded_at: "2026-09-13T10:00:00Z" }] }]);
+    const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed/first.pdf" }, error: null });
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: () => ({ createSignedUrl }) } } as never);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(200);
+    expect(createSignedUrl).toHaveBeenCalledWith("order/first.pdf", 3600);
+    expect(await res.json()).toEqual({ url: "https://signed/first.pdf", uploadedAt: "2026-09-13T10:00:00Z" });
+  });
+
+  it("reports an evidence read failure instead of inventing an absence", async () => {
+    mockSb([{ data: { id: DO_ID, do_number: "DO-1", orders: null } }, { error: { message: "read failed" } }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(500);
+    expect(adminClient).not.toHaveBeenCalled();
   });
 
   it("404s a document that does not exist", async () => {

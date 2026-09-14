@@ -551,3 +551,60 @@ describe("POST /:id/delivery-attempt — a Journey leg records its own result (0
   });
 });
 
+describe("the loan offer record (0492, Delivery MASTER §14.2)", () => {
+  const ORDER = "00000000-0000-0000-0000-00000000020a";
+  it("records the offer through the one Orders door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { event: "offered" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "offered", label: "Display sofa · HK55-3S", reason: "Supplier date misses the customer commitment" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_loan_offer_record", {
+      p_order_id: ORDER, p_event: "offered", p_item_id: null, p_label: "Display sofa · HK55-3S", p_reason: "Supplier date misses the customer commitment",
+    });
+  });
+
+  it("a decline without its reason is refused before any call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "declined" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reads the history newest first with the offered Unit's ID", async () => {
+    const sb = makeSb({ data: null, error: null });
+    const order = vi.fn().mockResolvedValue({
+      data: [
+        { id: "o2", seq: 2, order_id: ORDER, event: "accepted", item_id: "u1", label: "Display sofa", reason: null, recorded_by: null, recorded_at: "2026-09-13T01:00:00Z", ops_stock_items: { unit_code: "U1-000-082", identity_scope: "unit" } },
+      ],
+      error: null,
+    });
+    sb.builder.order = order;
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { offers: Array<{ event: string; unit_id: string | null }> };
+    expect(body.offers[0]).toMatchObject({ event: "accepted", unit_id: "U1-000-082" });
+  });
+});
+

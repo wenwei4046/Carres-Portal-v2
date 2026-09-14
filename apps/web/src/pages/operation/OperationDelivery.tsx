@@ -64,7 +64,6 @@ import {
   ChevronRight,
   HelpCircle,
   PanelLeftOpen,
-  Phone,
 } from "lucide-react";
 import type { DeliveryWorkStatusTone, OrderActionTone } from "@carres/shared";
 import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
@@ -95,6 +94,9 @@ import {
 } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
 import DeliveryBrief, { STATUS_TONE_TEXT } from "./components/DeliveryBrief";
+/* The kit's own glyph registry — a business meaning, never a Lucide name
+   (`components/kit/Icon`). The contact deadline draws `call` and `late`. */
+import Icon from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
 import { requestedDeliveryText } from "./sales-order-columns";
@@ -370,10 +372,17 @@ function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
     );
   }
   const date = fmtDate(card.contactDueIso);
-  /* ⭐ THE COMPACT CELL IS A PHONE AND A DATE (owner ruling 2026-09-11). The
-     full sentence — including that the deadline is overdue and does NOT move —
-     is the cell's accessible name and its tooltip; the icon is decorative, so
-     a screen reader reads the sentence once, not twice. */
+  /* ⭐ THE COMPACT CELL IS A GLYPH AND A DATE (owner ruling 2026-09-11,
+     re-ruled 2026-09-14). The full sentence — including that the deadline is
+     overdue and does NOT move — is the cell's accessible name and its
+     tooltip; the glyph is decorative, so a screen reader reads the sentence
+     once, not twice.
+
+     BOTH GLYPHS COME FROM THE KIT REGISTRY (`components/kit/Icon`): `call`
+     while there is still time, `late` once there is not. A hand-rolled
+     `<Phone size={12}>` used to sit here — 12px is not a kit size, and the
+     overdue row carried no glyph of its own at all, so red was doing the work
+     a word and a mark should do. */
   const sentence = card.contactOverdue
     ? MONITOR_COPY.contactLateSentence(date)
     : MONITOR_COPY.contactDueSentence(date);
@@ -386,7 +395,9 @@ function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
       aria-label={sentence}
       title={sentence}
     >
-      <Phone size={12} strokeWidth={2} aria-hidden className="shrink-0" />
+      <span className="shrink-0">
+        <Icon name={card.contactOverdue ? "late" : "call"} size={14} />
+      </span>
       <span className="truncate">{date}</span>
     </span>
   );
@@ -675,12 +686,75 @@ function joinLines(a: string, b: string | null | undefined): string {
   return b ? `${a} · ${b}` : a;
 }
 
+/**
+ * ⭐ WHICH ROWS OWE A CONTACT DEADLINE — the ONE predicate, asked in one place.
+ *
+ * Exactly `ContactDeadline`'s own guard: a row that is booked (a day AND a
+ * window) or settled (a result recorded) has no call left to be late for, and
+ * a row whose customer named no day has nothing to measure from. Asking it
+ * here as well as inside the component is deliberate — the cell must know
+ * whether the component will draw anything BEFORE it chooses a layout, or an
+ * ordinary status would lose its supporting line to an empty deadline.
+ */
+function contactDeadlineApplies(r: DeliveryMonitorCard): boolean {
+  return !r.booked && !r.settled && r.contactDueIso !== null;
+}
+
+/** The same cell as WORDS — what Search reads and what Excel prints, so the
+ *  sheet and the screen never say two different things (§8.3). */
+function statusSecondText(r: DeliveryMonitorCard): string | null {
+  if (!contactDeadlineApplies(r)) return r.statusSecond;
+  const date = fmtDate(r.contactDueIso!);
+  return r.contactOverdue
+    ? MONITOR_COPY.contactLateSentence(date)
+    : MONITOR_COPY.contactDueSentence(date);
+}
+
+/**
+ * COLUMN 4's supporting line: the customer's OWN REFERENCE, and nothing else
+ * (owner ruling 2026-09-14).
+ *
+ * An order imported with two references still prints both — they are the same
+ * KIND of fact, and the sheet's `·` is how it has always spelt a list of one
+ * kind. A Journey leg's ROUTE is a different kind of fact and does not belong
+ * here: it is a place, so it rides the `Delivery Location` cell, which is
+ * also where the shared region arithmetic already reads a leg's destination
+ * from (`regionBucketOf`). The Delivery Orders register made the same move
+ * first, retiring its own inline route from this exact cell.
+ */
+function soSecondLine(r: DeliveryMonitorCard): string | null {
+  return r.scope.refs.length > 0 ? r.scope.refs.join(" · ") : null;
+}
+
+/**
+ * COLUMN 6's supporting line: the ROUTE on a Journey leg, the building facts
+ * on every other row (owner ruling 2026-09-14). One supporting line, chosen by
+ * what the row actually is — never both stacked, never both joined.
+ */
+function locationSecondLine(r: DeliveryMonitorCard): string | null {
+  return r.scope.legRoute ?? buildingLine(r);
+}
+
 /** `Condominium · Floor 12` — the crew's building facts under the locality. */
+/**
+ * COLUMN 6's second line — what the crew is walking into, in the governed
+ * words. The LIFT joined it with the address correction (2026-09-14): a floor
+ * with no lift is the single fact that decides how many people and how long a
+ * delivery takes, it is already recorded on the order, and reading it off the
+ * row costs nothing. A fact nobody recorded prints nothing here; its own
+ * `Lift not recorded` warning lives in panel 1, where it can be fixed.
+ */
 function buildingLine(r: DeliveryMonitorCard): string | null {
   const building = r.scope.building !== DW.notGiven ? r.scope.building : null;
   const floor =
     r.scope.o.delivery_floor != null ? `${MONITOR_COPY.floor} ${r.scope.o.delivery_floor}` : null;
-  const parts = [building, floor].filter((p): p is string => Boolean(p));
+  const lift =
+    r.scope.o.delivery_has_lift == null
+      ? null
+      : r.scope.o.delivery_has_lift
+        ? MONITOR_COPY.hasLift
+        : MONITOR_COPY.noLift;
+  const parts = [building, floor, lift].filter((p): p is string => Boolean(p));
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
@@ -707,11 +781,16 @@ function confirmedLines(r: DeliveryMonitorCard): {
       line2Tone: "none",
     };
   }
+  /* ⭐ THE DEADLINE IS SHOWN ONCE, AND IT IS SHOWN IN WORK (owner ruling
+     2026-09-14). This cell used to repeat `Call by {date}` beside the
+     `Delivery Status` cell that already carried it — the same day printed
+     twice on one row, in two different spellings. `Confirmed Delivery` owns
+     the BOOKING; when there is no booking it says so and stops. */
   return {
     line1: MONITOR_COPY.notConfirmed,
     tone: "orange",
-    line2: r.contactDueIso && !r.settled ? MONITOR_COPY.callBy(fmtDate(r.contactDueIso)) : null,
-    line2Tone: r.contactOverdue ? "red" : "none",
+    line2: null,
+    line2Tone: "none",
   };
 }
 
@@ -1186,55 +1265,81 @@ export default function OperationDelivery() {
         sortable: true,
         filterType: "enum",
         chooserGroup: "Delivery",
-        accessor: (r) => (
-          <TwoLines
-            line1={r.statusLabel}
-            tone={r.statusTone}
-            line2={r.statusSecond}
-            line2Tone={r.statusSecondTone ?? "none"}
-            line2TestId={missingProofLabels(r).length ? "delivery-monitor-missing-proof" : undefined}
-          />
-        ),
-        searchValue: (r) => [r.statusLabel, r.statusSecond ?? "", ...missingProofLabels(r)].join(" "),
-        exportValue: (r) => joinLines(r.statusLabel, r.statusSecond),
+        /* ⭐ LINE TWO IS THE DEADLINE ITSELF WHEN ONE IS OWED (owner ruling
+           2026-09-14). A chase row reads `Call customer` over the kit's
+           phone glyph and the day — no `Call by`, because line one has
+           already said what to do and the verb printed twice is the noise the
+           ruling names. Every other status keeps its supporting sentence. */
+        accessor: (r) =>
+          contactDeadlineApplies(r) ? (
+            <span className="block min-w-0">
+              <span className={`block truncate ${STATUS_TONE_TEXT[r.statusTone]}`} title={r.statusLabel}>
+                {r.statusLabel}
+              </span>
+              <ContactDeadline card={r} />
+            </span>
+          ) : (
+            <TwoLines
+              line1={r.statusLabel}
+              tone={r.statusTone}
+              line2={r.statusSecond}
+              line2Tone={r.statusSecondTone ?? "none"}
+              line2TestId={missingProofLabels(r).length ? "delivery-monitor-missing-proof" : undefined}
+            />
+          ),
+        /* Search and Export keep the WORDS: the sheet a manager opens in Excel
+           must still say what the deadline is, and a search for the word
+           `deadline` must still find the rows that owe one. */
+        searchValue: (r) =>
+          [r.statusLabel, statusSecondText(r) ?? "", ...missingProofLabels(r)].join(" "),
+        exportValue: (r) => joinLines(r.statusLabel, statusSecondText(r)),
         filterValue: (r) => r.statusLabel,
       },
       {
-        /* COLUMN 4 — THE IDENTITY, pinned while the sheet scrolls. The
-           customer's own reference rides the cell; a Journey leg prints its
-           route (`leg` never reaches the screen). */
+        /* ⭐ COLUMN 4 — THE IDENTITY, pinned while the sheet scrolls, in the
+           SAME two-line grammar as every other cell (§8.3, owner correction
+           2026-09-14). The customer's own reference used to ride the FIRST
+           line as an inline span: `SO-1217 TCF0541` read as one mangled
+           number, and an operator matching a reference off WhatsApp had to
+           work out where the document number ended. It is now the SUPPORTING
+           line — smaller, muted, beneath the number, and it is the ONLY thing
+           on that line. The cell is identity: a number and the customer's own
+           name for it. */
         key: "so",
         label: MONITOR_COLUMN.so,
         width: 150,
         sortable: true,
         filterType: "numbering",
         chooserGroup: "Document",
-        accessor: (r) => (
-          <span className="block min-w-0">
-            <button
-              type="button"
-              className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-              onClick={(event) => {
-                event.stopPropagation();
-                openOrder(r);
-              }}
-            >
-              SO-{r.scope.so}
-            </button>
-            {r.scope.refs.length > 0 ? (
-              <span className="ml-1.5 text-kit-slate-11">{r.scope.refs.join(" · ")}</span>
-            ) : null}
-            {r.scope.legRoute ? (
-              <span className="block truncate text-label text-kit-slate-11" title={r.scope.legRoute}>
-                {r.scope.legRoute}
+        accessor: (r) => {
+          const second = soSecondLine(r);
+          return (
+            <span className="block min-w-0">
+              <span className="block truncate">
+                <button
+                  type="button"
+                  className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openOrder(r);
+                  }}
+                >
+                  SO-{r.scope.so}
+                </button>
               </span>
-            ) : null}
-          </span>
-        ),
+              {/* No reference and no route: NO empty second line — the number
+                  sits alone rather than above a placeholder. */}
+              {second ? (
+                <span className="block truncate text-label text-kit-slate-11" title={second}>
+                  {second}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
         searchValue: (r) => `SO-${r.scope.so} ${r.scope.so} ${r.scope.refs.join(" ")}`,
         filterValue: (r) => `SO-${r.scope.so}`,
-        exportValue: (r) =>
-          `SO-${r.scope.so}${r.scope.refs.length ? ` ${r.scope.refs.join(" ")}` : ""}`,
+        exportValue: (r) => joinLines(`SO-${r.scope.so}`, soSecondLine(r)),
         sortFn: (a, b) => a.scope.so - b.scope.so || (a.leg ?? 0) - (b.leg ?? 0),
       },
       {
@@ -1252,7 +1357,19 @@ export default function OperationDelivery() {
         exportValue: (r) => joinLines(r.customerName, r.scope.o.customer_phone ?? null),
       },
       {
-        /* COLUMN 6 — city and state; the building type and floor beneath. */
+        /* ⭐ COLUMN 6 — city and state; beneath it, the building type and
+           floor — or, on a JOURNEY LEG, the route this leg actually runs
+           (owner ruling 2026-09-14).
+
+           A leg is a PLACE fact, which is why the shared region arithmetic
+           already classifies a leg by its destination (`regionBucketOf`), and
+           why the route belongs in the location cell rather than bolted onto
+           the document number. It replaces the building line on that row and
+           only that row, because an intermediate leg never reaches the
+           customer's door: printing `Condominium · Floor 12` against a
+           `Klang WH → JB transit` run describes a building these goods are
+           not going to. The customer leg keeps its building facts, because it
+           does arrive there. */
         key: "location",
         label: MONITOR_COLUMN.location,
         width: 170,
@@ -1262,12 +1379,12 @@ export default function OperationDelivery() {
           <TwoLines
             line1={r.scope.location || DW.notRecorded}
             tone={r.scope.location ? "none" : "orange"}
-            line2={buildingLine(r)}
+            line2={locationSecondLine(r)}
           />
         ),
-        searchValue: (r) => `${r.scope.location} ${buildingLine(r) ?? ""}`,
+        searchValue: (r) => `${r.scope.location} ${locationSecondLine(r) ?? ""}`,
         filterValue: (r) => r.scope.location || DW.notRecorded,
-        exportValue: (r) => joinLines(r.scope.location || DW.notRecorded, buildingLine(r)),
+        exportValue: (r) => joinLines(r.scope.location || DW.notRecorded, locationSecondLine(r)),
       },
       {
         /* COLUMN 7 — Sales Orders' promise, in the governed word. Delivery
@@ -1523,6 +1640,15 @@ export default function OperationDelivery() {
         : []),
       { divider: true },
       { label: `Open SO-${r.scope.so}`, onClick: () => openOrder(r) },
+      /* The WHOLE journey — every leg, every place, every recorded result —
+         lives on Order Route. The register next door offers the same door
+         from the same menu; a row that carries one leg of a journey must be
+         able to reach the other legs without the operator guessing the URL. */
+      {
+        label: "Open Order Route",
+        onClick: () =>
+          navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+      },
       ...(r.doNumber
         ? [
             {
@@ -1669,7 +1795,7 @@ export default function OperationDelivery() {
                 type="button"
                 aria-pressed={active}
                 data-testid={`delivery-monitor-contact-day-${day.iso}`}
-                aria-label={`${MONITOR_COPY.callBy(fmtDate(day.iso))} · ${day.count}`}
+                aria-label={MONITOR_COPY.contactDayLabel(fmtDate(day.iso), day.count)}
                 /* A MINIMUM width, then the row scrolls: six days squeezed to
                    nothing on a phone is a date picker nobody can hit. */
                 className={`my-1.5 flex min-w-[86px] flex-1 flex-col items-center justify-center rounded-control border px-1 ${

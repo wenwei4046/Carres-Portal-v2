@@ -684,7 +684,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("renders the five-column goods table with merged item details, Stock Unit IDs and Purchasing Deliver To", () => {
+  it("renders six goods columns with separate SKU, Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
@@ -727,7 +727,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Item Details", "Qty", "Unit ID", "Deliver To",
+      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
     expect(row).toHaveTextContent("Mattress");
@@ -782,7 +782,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  it("starts under SO Number and fits the available viewport width", () => {
+  it("starts under SO No with a separate bordered child and 12px vertical gaps", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
@@ -794,11 +794,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const cell = screen.getByTestId("grid-expansion-cell");
     expect(cell).toHaveAttribute("colspan", "8");
     expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
-    expect(within(cell).getByTestId("goods-mini-table")).toHaveClass("w-full");
-    /* Flush expansion: the child grid joins its parent without card spacing. */
+    expect(within(cell).getByRole("table")).toHaveStyle({ minWidth: "908px" });
+    /* The child owns its border; only vertical padding separates it. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
-      paddingTop: "0px",
-      paddingBottom: "0px",
+      paddingTop: "12px",
+      paddingBottom: "12px",
       paddingLeft: "0px",
       paddingRight: "0px",
     });
@@ -956,5 +956,36 @@ describe("Cancel SO", () => {
       .map((b) => b.textContent?.trim());
     expect(labels).toContain("Print PDF");
     expect(labels).not.toContain("Preview PDF");
+  });
+});
+
+
+describe("Sales Orders table correction", () => {
+  it("keeps the full date label on its sort and filter doors", () => {
+    mount();
+    const sort = screen.getByRole("button", { name: "Requested Delivery Date" });
+    expect(sort.querySelector("br")).not.toBeNull();
+    fireEvent.click(sort);
+    expect(screen.getByRole("button", { name: "Requested Delivery Date" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Requested Delivery Date" }));
+    expect(screen.getByText("Today")).toBeInTheDocument();
+  });
+
+  it("preserves saved widths and optional/reordered columns while aligning to SO No", () => {
+    const saved = {
+      order: ["customer", "so", "ordered", "customer_delivery", "delivery_location", "showroom", "po_number", "do_number", "phone"],
+      widths: { customer: 288, customer_delivery: 240 },
+      hidden: [], groupBy: [], sort: null,
+    };
+    localStorage.setItem("carres.salesOrders.register.v4.anon", JSON.stringify(saved));
+    mount();
+    expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
+    expect(screen.getByRole("button", { name: "Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
+      "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__", "grid-expansion-gutter-customer",
+    ]);
+    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v4.anon")!).widths).toEqual(saved.widths);
   });
 });

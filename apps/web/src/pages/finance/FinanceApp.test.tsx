@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import FinanceApp from "./FinanceApp";
 
@@ -43,6 +44,10 @@ vi.mock("./ledger/ledger-queries", () => {
     JOURNAL_PAGE_SIZE: 1000, JOURNAL_MAX_PAGES: 10,
     useLedgerEntries: () => waiting, useLedgerEntry: () => waiting, useLedgerChart: () => waiting,
     useTrialBalance: () => waiting, useLedgerSelfCheck: () => waiting,
+    // The Dashboard's cash, Activity and month-end pack reads (2026-09-14).
+    useLatestLedgerEntries: () => waiting,
+    ledgerKeys: { all: () => ["finance", "ledger"] },
+    trialBalanceQuery: (asOf: string) => ({ queryKey: ["finance", "ledger", "trial-balance", asOf], queryFn: vi.fn() }),
   };
 });
 vi.mock("@/lib/payables-queries", async (importOriginal) => {
@@ -60,13 +65,16 @@ vi.mock("@/lib/auth", () => ({
     selector({ role: auth.role, user: null }),
 }));
 
+// The Dashboard's cash read and month-end pack need a query client; every other read here is mocked.
 function show(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/finance/*" element={<FinanceApp />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/finance/*" element={<FinanceApp />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

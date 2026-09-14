@@ -804,19 +804,24 @@ export default function DeliveryBrief({
           },
         ]
       : []),
-    ...((o.ops_sofa_loans ?? []).some((l) => l.status === "on_loan")
-      ? [
-          {
-            key: "loan",
-            item: MONITOR_COPY.loanLine(null),
-            qty: 1,
-            units: null,
-            status: null,
-            statusTone: "none" as const,
-            location: null,
-          },
-        ]
-      : []),
+    /* 0492 (Card 15) — one line per loan Unit out, naming the exact Unit ID
+       the crew must bring back: `Loan {Unit ID} · collect back on delivery day`. */
+    ...(o.ops_sofa_loans ?? [])
+      .filter((l) => l.status === "on_loan")
+      .map((l, index) => {
+        const unit = Array.isArray(l.ops_stock_items) ? l.ops_stock_items[0] : l.ops_stock_items;
+        return {
+          key: `loan-${index}`,
+          item: MONITOR_COPY.loanLine(
+            unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
+          ),
+          qty: 1,
+          units: null,
+          status: null,
+          statusTone: "none" as const,
+          location: null,
+        };
+      }),
   ];
   const dash = <span className="text-kit-slate-9">—</span>;
   const panelItems = (

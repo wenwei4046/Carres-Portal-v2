@@ -245,6 +245,10 @@ export const MONITOR_COPY = {
    *  the count) so the operator reads what the rail already taught. */
   cellDeliveries: "Deliveries",
   cellExceptions: "Exceptions",
+  /** The eighth WORK TO DO queue (owner ruling 2026-09-14) — the SAME words
+   *  the status column already prints for these rows, so the rail and the row
+   *  cannot read as two different facts. */
+  detailsIncomplete: "Order details incomplete",
   /* ── THE TWO TOP-LEVEL VIEWS (owner ruling 2026-09-10) ─────────────────── */
   /** The landing: what an operator must DO today. */
   tabWork: "Work to do",
@@ -270,19 +274,24 @@ export const MONITOR_COPY = {
    *  "a step with no anchor is never late"). */
   noContactDeadline: "No contact deadline",
   /**
-   * ⭐ THE COMPACT DEADLINE IS A PHONE AND A DATE (owner ruling 2026-09-11).
-   * `Call by` and `Late — was due` repeated the same two phrases down an
-   * entire column, and the icon plus its colour already carry both. The WORDS
-   * do not disappear: they move into the tooltip and the accessible name,
-   * where a hover and a screen reader both find them.
+   * ⭐ THE COMPACT DEADLINE IS A GLYPH AND A DATE (owner ruling 2026-09-11,
+   * re-ruled 2026-09-14). `Call by` and `Late — was due` repeated the same
+   * two phrases down an entire column — and once the status word above the
+   * date became `Call customer`, `Call by` was the verb printed twice on one
+   * row. The kit's glyph and its colour carry the state; the WORDS do not
+   * disappear, they move into the tooltip, the accessible name, Search and
+   * the Excel export, where a hover, a screen reader and a manager all find
+   * them.
+   *
+   * NO DASH JOINS AN ACT TO ITS EXPLANATION (owner ruling 2026-09-14): the
+   * late sentence separates its clauses with the sheet's own `·`.
    */
-  lateWasDue: (date: string) => `Late — was due ${date}`,
-  callBy: (date: string) => `Call by ${date}`,
-  /** The compact cell's own accessible sentence — who to call, by when, and
-   *  whether that day has already gone. */
   contactDueSentence: (date: string) => `Contact deadline ${date}`,
   contactLateSentence: (date: string) =>
-    `Contact deadline ${date} — overdue, the deadline does not move`,
+    `Contact deadline ${date} · overdue, the deadline does not move`,
+  /** The contact strip's day button, for a screen reader: the day, then how
+   *  many conversations are due on it. */
+  contactDayLabel: (date: string, count: number) => `Contact deadline ${date} · ${count}`,
   /* ── THE GOODS COLUMNS (owner ruling 2026-09-10) ───────────────────────── */
   items: "Items",
   extras: "Accessories & services",
@@ -459,7 +468,8 @@ export type MonitorWorkView =
   | "overdue"
   | "failed"
   | "upload_proof"
-  | "check_proof";
+  | "check_proof"
+  | "details_incomplete";
 
 export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "all",
@@ -469,6 +479,16 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "failed",
   "upload_proof",
   "check_proof",
+  /* ⭐ THE EIGHTH QUEUE (owner ruling 2026-09-14, Card 23) — a DOOR, not a
+     backlog. A row missing a required Sales fact gets somewhere deliberate to
+     be worked, which is what stops it competing for the top of
+     `All delivery work`: measured on production, 50 of 91 rows read
+     `Order details incomplete`, and that verdict outranks `Overdue` in the
+     status ladder, so more than half the workspace was answering a question
+     about a postcode. It licenses NO cleanup, repair list or backfill —
+     Constitution §6 rules every such row today is imported test data that
+     go-live discards. */
+  "details_incomplete",
 ];
 
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
@@ -481,6 +501,7 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   failed: MONITOR_COPY.failed,
   upload_proof: MONITOR_COPY.uploadProof,
   check_proof: MONITOR_COPY.checkProof,
+  details_incomplete: MONITOR_COPY.detailsIncomplete,
 };
 
 /**
@@ -520,10 +541,26 @@ export const DEFAULT_WORK_VIEW: MonitorWorkView = "all";
  * role word where the column would carry the partner's name.
  */
 export type MonitorDeliveryStatus = DeliveryWorkStatusKind;
-export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] = DELIVERY_WORK_STATUS_KINDS;
 export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = Object.fromEntries(
   DELIVERY_WORK_STATUS_KINDS.map((kind) => [kind, deliveryWorkStatusLabelOf(kind, null)]),
 ) as Record<MonitorDeliveryStatus, string>;
+/**
+ * ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14).
+ *
+ * The dropdown filters what the column SAYS, so two rungs that now say the
+ * same thing are one option: since the status word became `Call customer`,
+ * `partner_must_contact` and `operation_must_call` are the same sentence to
+ * the operator and differ only in which Delivery Settings rule owns the call.
+ * Two identically-worded options would be a menu asking the reader to pick
+ * between two spellings of one word. The FIRST kind in the ladder wins the
+ * option, and `matchesMonitorFilters` narrows by the LABEL rather than the
+ * key, so picking it keeps every row that prints it.
+ */
+export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] =
+  DELIVERY_WORK_STATUS_KINDS.filter(
+    (kind, i, all) =>
+      all.findIndex((other) => MONITOR_STATUS_LABEL[other] === MONITOR_STATUS_LABEL[kind]) === i,
+  );
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
@@ -1142,18 +1179,22 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
       return !card.booked && !card.settled;
     case "overdue":
       /* A confirmed date behind us with no delivered result. A recorded
-         delivery is never overdue — its remaining work is proof, below. */
-      return (
-        card.confirmedDate !== null &&
-        card.confirmedDate < todayIso &&
-        card.statusKey !== "delivered"
-      );
+         delivery is never overdue — its remaining work is proof, below.
+         The predicate lives in ONE place so the rail queue, the Month view's
+         exception count and the work order cannot disagree (Law D). */
+      return isOverdueDelivery(card, todayIso);
     case "failed":
       return card.statusKey === "failed";
     case "upload_proof":
       return needsProof(card);
     case "check_proof":
       return needsProofReview(card);
+    case "details_incomplete":
+      /* The status ladder already decided this: a row whose FIRST fact is the
+         missing Sales fact. Reading `statusKey` rather than re-testing the
+         fields is what keeps the rail row, the column and the sort agreeing
+         (Law D). */
+      return card.statusKey === "details_incomplete";
   }
 }
 
@@ -1178,8 +1219,12 @@ function matchesLogisticsPartner(
   return card.logisticsPartnerId === picked;
 }
 
+/* The pick narrows by the PRINTED WORD, not the internal key: the dropdown
+   carries one option per word (MONITOR_STATUS_FILTERS above), so picking
+   `Call customer` must keep every row that prints `Call customer` whichever
+   rung produced it. */
 function matchesStatus(card: DeliveryMonitorCard, picked: MonitorDeliveryStatus | null): boolean {
-  return picked === null || card.statusKey === picked;
+  return picked === null || MONITOR_STATUS_LABEL[card.statusKey] === MONITOR_STATUS_LABEL[picked];
 }
 
 /**
@@ -1261,7 +1306,12 @@ export function filterMonitorListRows(
         c.contactDueIso === filters.contactDue) &&
       matchesSearch(c, filters.search),
   );
-  return chase ? sortByRequestedDeliveryDate(rows) : rows;
+  /* `Call customer` keeps its own governed order (earliest requested date
+     first). Every other queue — `All delivery work` above all — answers the
+     morning question, so it leads with what is late (owner ruling
+     2026-09-14). Before this, no queue applied any sort and the list fell out
+     in roughly descending document number. */
+  return chase ? sortByRequestedDeliveryDate(rows) : sortByWorkUrgency(rows, filters.todayIso);
 }
 
 /** The stable tie-break every Delivery listing uses: the customer name
@@ -1286,6 +1336,88 @@ function tieBreak(a: DeliveryMonitorCard, b: DeliveryMonitorCard): number {
  * spellings of *no date to be early for*. The tie-break is the customer name
  * then the stable row id, so the list never reshuffles between renders.
  */
+/**
+ * ⭐ AN OVERDUE DELIVERY — the ONE predicate (Law D). A confirmed day is
+ * behind us and no delivered result was ever recorded. Read by the
+ * `Overdue delivery` rail queue, the Month view's `Exceptions` count and the
+ * work order below; three readings of one fact were three chances to disagree.
+ */
+export function isOverdueDelivery(card: DeliveryMonitorCard, todayIso: string): boolean {
+  return (
+    card.confirmedDate !== null &&
+    card.confirmedDate < todayIso &&
+    card.statusKey !== "delivered"
+  );
+}
+
+/**
+ * ⭐ THE ROW'S NEXT ACTION DEADLINE — the day something must happen, or null
+ * when nothing is owed.
+ *
+ * A trip with an agreed day is owed ON that day. A trip with no agreed day is
+ * owed by its CONTACT deadline, because the next act is the conversation. A
+ * settled row — delivered, failed or cancelled — owes no further act, and its
+ * remaining work (proof) is its own queue's job, so it ranks with the rest.
+ */
+export function actionDeadlineIso(card: DeliveryMonitorCard): string | null {
+  if (card.settled) return null;
+  return card.confirmedDate ?? card.contactDueIso;
+}
+
+/**
+ * ⭐ THE WORK ORDER (owner ruling 2026-09-14, Delivery MASTER §8.3).
+ *
+ * `All delivery work` ordered by what is actually most urgent, never by
+ * document number. Measured on production the day this shipped: the ONE
+ * overdue row sat NINTH, under eight rows that were not yet due, because the
+ * view applied no sort at all.
+ *
+ * ```
+ * 0  late            a confirmed day has passed with no result, OR a contact
+ *                    deadline has passed. Both are late work; MASTER §8.2
+ *                    keeps them apart for COUNTING because they are two
+ *                    populations, and counting separately while sorting
+ *                    together is consistent — they answer two questions and
+ *                    share one urgency.
+ * 1  due today       the next action deadline is today
+ * 2  has a deadline  soonest first
+ * 3  no deadline     nothing is owed on a day
+ * 4  incomplete      `Order details incomplete` sinks BENEATH live work, so a
+ *                    missing postcode can never hide an overdue delivery
+ *                    (owner ruling 2026-09-14). It keeps its §8.4 status rung;
+ *                    only its ORDER changes.
+ * ```
+ */
+function urgencyBand(card: DeliveryMonitorCard, todayIso: string): number {
+  if (card.statusKey === "details_incomplete") return 4;
+  if (isOverdueDelivery(card, todayIso) || card.contactOverdue) return 0;
+  const due = actionDeadlineIso(card);
+  if (due === null) return 3;
+  if (due === todayIso) return 1;
+  return 2;
+}
+
+export function sortByWorkUrgency(
+  rows: readonly DeliveryMonitorCard[],
+  todayIso: string,
+): DeliveryMonitorCard[] {
+  return [...rows].sort((a, b) => {
+    const ba = urgencyBand(a, todayIso);
+    const bb = urgencyBand(b, todayIso);
+    if (ba !== bb) return ba - bb;
+    /* Inside a band the nearer deadline leads; an absence is ranked
+       EXPLICITLY rather than by a sentinel, the same rule
+       `sortByRequestedDeliveryDate` states. */
+    const x = actionDeadlineIso(a);
+    const y = actionDeadlineIso(b);
+    if (x === null || y === null) {
+      if (x === y) return tieBreak(a, b);
+      return x === null ? 1 : -1;
+    }
+    return x < y ? -1 : x > y ? 1 : tieBreak(a, b);
+  });
+}
+
 export function sortByRequestedDeliveryDate(
   rows: readonly DeliveryMonitorCard[],
 ): DeliveryMonitorCard[] {
@@ -1559,7 +1691,10 @@ export function buildMonitorRails(
   });
 
   const status = Object.fromEntries(
-    MONITOR_STATUS_FILTERS.map((s) => [s, forStatus.filter((c) => c.statusKey === s).length]),
+    MONITOR_STATUS_FILTERS.map((s) => [
+      s,
+      forStatus.filter((c) => MONITOR_STATUS_LABEL[c.statusKey] === MONITOR_STATUS_LABEL[s]).length,
+    ]),
   ) as Record<MonitorDeliveryStatus, number>;
 
   return { work, regions, logistics, status, regionTotal, logisticsTotal, statusTotal };

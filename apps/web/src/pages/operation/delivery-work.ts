@@ -33,6 +33,7 @@
 
 import {
   deliveryOrderStatusOf,
+  signedDeliveryDocumentOf,
   deliveryStepDueIso,
   deliveryWorkStatusLabelOf,
   deliveryWorkStatusOf,
@@ -53,6 +54,7 @@ import {
 import { displayCustomerName } from "@/lib/customer-name";
 import { fmtDate } from "@/lib/fmt-date";
 import { orderBookingDay } from "@/lib/order-booking";
+import { resolveDeliveryLocality } from "@/lib/locality";
 import { detectState } from "@/lib/region";
 import type {
   DeliveryOrderAttemptRow,
@@ -62,7 +64,7 @@ import type {
   DeliveryHandoverKindRow,
   operationOrderListRow,
 } from "@/lib/queries";
-import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
+import { requestedDeliveryOf } from "./sales-order-columns";
 import { itemsSummary } from "./sales-order-facts";
 import {
   driverSubmissionOf,
@@ -202,6 +204,12 @@ export interface DeliveryScopeRow {
   customerDeliveryIso: string | null;
   /** The customer WAS asked and answered "not yet" — a different fact. */
   customerDateTbd: boolean;
+  /**
+   * The customer's locality as ONE reading of ONE address
+   * (`resolveDeliveryLocality`) — the same reading the `State` column, the
+   * STATE rail and the `State not recorded` warning run, so a row can no
+   * longer print the state it also says was never recorded.
+   */
   location: string;
   building: string;
   logisticsId: string | null;
@@ -262,7 +270,7 @@ export interface DeliveryScopeRow {
  * order cannot be read on two different scales.
  */
 export function legWorkStatusOf(
-  stop: Pick<DeliveryStop, "status">,
+  stop: Pick<DeliveryStop, "status"> & Partial<Pick<DeliveryStop, "to_loc">>,
   confirmedIso: string | null,
   partnerName: string | null = null,
   confirmedTime: string | null = null,
@@ -281,12 +289,12 @@ export function legWorkStatusOf(
   });
   switch (stop.status) {
     case "delivered":
-    case "handed_off":
-      /* `handed_off` reads Delivered on purpose: leg 1 completing means the
-         goods were accepted at the named JB warehouse, which IS that leg's
-         delivery. It never claims the Singapore customer received them —
-         their leg is its own row with its own status. */
       return say("delivered");
+    case "handed_off":
+      /* A leg handed off at the named partner warehouse has ARRIVED there —
+         the goods reached the stop, never the customer (Delivery MASTER
+         §14.1; Card 20). The customer leg is its own row with its own word. */
+      return say("arrived", stop.to_loc?.trim() || null);
     case "picked_up":
       return say("collected");
     case "issue":
@@ -296,7 +304,11 @@ export function legWorkStatusOf(
          uses: a day and a window agreed, a partner still to contact the
          customer, or no partner at all. */
       if (confirmedIso && confirmedTime) return say("confirmed", confirmedTime);
-      return say(partnerName ? "partner_must_contact" : "assign_logistics");
+      if (!partnerName) return say("assign_logistics");
+      /* ONE vocabulary across the workspace (owner ruling 2026-09-14): a leg
+         whose day is agreed and whose window is not asks for the TIME, in
+         the same words the whole-order scope uses. */
+      return say(confirmedIso ? "confirm_time" : "partner_must_contact");
   }
 }
 
@@ -455,10 +467,25 @@ export function entersDeliveryWork(o: operationOrderListRow): boolean {
   return f.isTravelling && f.hasLocation && f.hasGoods;
 }
 
-/** The required Sales facts this row lacks, in the operator's words. */
+/**
+ * The required Sales facts this row lacks, in the operator's words.
+ *
+ * ⭐ THE STATE IS READ THE WAY IT IS PRINTED (owner correction 2026-09-14).
+ * This check used to test the structured `customer_address_state` column
+ * alone, while the `State` column, the STATE rail and the `Delivery
+ * Location` cell each read the address their own way. On SO-1217 / TCF0541
+ * that made one row say `Selangor` and `State not recorded` at the same
+ * time, over an address Operations could read in the brief below it.
+ * Measured 2026-09-14: 46 of the 89 addressed open scopes were in exactly
+ * that state. All four now run `resolveDeliveryLocality`, so the warning
+ * fires when — and only when — nothing on the record names a state.
+ *
+ * It stays a WARNING, not a repair: a state read out of a written address is
+ * never written back, and every other missing fact keeps its own sentence.
+ */
 export function requiredSalesFactsMissing(o: operationOrderListRow): string[] {
   const out: string[] = [];
-  if (!o.customer_address_state?.trim()) out.push(DW.stateNotRecorded);
+  if (!resolveDeliveryLocality(o).state) out.push(DW.stateNotRecorded);
   if (!o.building_type?.trim()) out.push(DW.buildingNotRecorded);
   if (o.delivery_floor == null) out.push(DW.floorNotRecorded);
   if (o.delivery_has_lift == null) out.push(DW.liftNotRecorded);
@@ -474,9 +501,19 @@ export function requiredSalesFactsMissing(o: operationOrderListRow): string[] {
  * travel. A delivered order is HISTORY — the Delivery Orders register and
  * Delivery History hold it — and leaving it here would make every count on the
  * rail answer a question nobody asked.
+ *
+ * ⭐ A CANCELLED ORDER IS NOT DELIVERY WORK (owner ruling 2026-09-14, Card 23).
+ * The ENTRY RULE has named cancelled orders since 2026-08-24 — "Cancelled
+ * orders, orders that need no delivery and delivered scopes are not on
+ * Monitor" — but this predicate only ever tested `delivered`, so every
+ * cancelled order carrying an address and goods walked straight in. Measured
+ * on production the day this shipped: THREE of them, one a two-leg Journey
+ * contributing two rows, and one of those rows was telling the operator to
+ * chase a customer about goods nobody is sending. The rule was never missing;
+ * its enforcement was.
  */
 export function isOpenDeliveryScope(o: operationOrderListRow): boolean {
-  return o.status !== "delivered" && !o.delivered_at;
+  return o.status !== "delivered" && o.status !== "cancelled" && !o.delivered_at;
 }
 
 export interface ScopeInputs {
@@ -568,7 +605,14 @@ export function buildDeliveryScopeRows({
   /* The proof a delivered trip still lacks is the Delivery Orders register's
      arithmetic over the SAME document row (Law D): the latest recorded result,
      the driver's photos scoped to THIS document, the signed file. */
-  const proofOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): MissingDeliveryProof => {
+  const signedDocumentOf = (doc: DeliveryOrderRow | null) => doc
+    ? signedDeliveryDocumentOf({ documentNumber: doc.do_number, order: doc.orders, evidence: attemptEvidence })
+    : null;
+  const proofOf = (
+    doc: DeliveryOrderRow | null,
+    o: operationOrderListRow,
+    intermediateLeg = false,
+  ): MissingDeliveryProof => {
     const latest = doc
       ? [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
           a.recorded_at.localeCompare(b.recorded_at),
@@ -582,7 +626,8 @@ export function buildDeliveryScopeRows({
     return missingDeliveryProofOf({
       latestResult: latest?.result ?? null,
       photosPresent: submission.known ? submission.photos > 0 : null,
-      signedDoPresent: Boolean(doc?.orders.do_file_path),
+      signedDoPresent: Boolean(signedDocumentOf(doc)),
+      intermediateLeg,
     });
   };
   const docByNumber = new Map<string, DeliveryOrderRow>();
@@ -594,8 +639,13 @@ export function buildDeliveryScopeRows({
     ) ?? null;
   /* §6.1 — the review state over the SAME document row (Law D). */
   const proofRecords = groupProofRecords(proofReviews, attemptEvidence);
-  const reviewOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): DoProofReview => {
-    if (!doc) return NO_PROOF_REVIEW;
+  const reviewOf = (
+    doc: DeliveryOrderRow | null,
+    o: operationOrderListRow,
+    intermediateLeg = false,
+  ): DoProofReview => {
+    /* A warehouse arrival owes no delivery proof — nothing to review (Card 20). */
+    if (!doc || intermediateLeg) return NO_PROOF_REVIEW;
     const latest = [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
       a.recorded_at.localeCompare(b.recorded_at),
     ).at(-1) ?? null;
@@ -605,7 +655,7 @@ export function buildDeliveryScopeRows({
     return proofReviewOf({
       doNumber: doc.do_number,
       ledger: control?.delivery_photos,
-      signedDoUploadedAt: doc.orders.do_file_path ? doc.orders.do_uploaded_at ?? null : null,
+      signedDoUploadedAt: signedDocumentOf(doc)?.uploadedAt ?? null,
       reviews: proofRecords.reviewsByDo.get(doc.do_number) ?? [],
       attemptEvidence: proofRecords.evidenceByDo.get(doc.do_number) ?? [],
     });
@@ -662,7 +712,7 @@ export function buildDeliveryScopeRows({
       customerDateTbd: requestedDeliveryOf(o).tbd,
       contactDueIso,
       missingFacts: requiredSalesFactsMissing(o),
-      location: conciseLocality(o.customer_address_city, o.customer_address_state),
+      location: resolveDeliveryLocality(o).label,
       building: o.building_type?.trim() || DW.notGiven,
       goods: itemsSummary(o) || DW.noGoods,
       o,
@@ -707,7 +757,6 @@ export function buildDeliveryScopeRows({
           {
             partnerName: logisticsName,
             latestContact: latestContactOf(`${o.id}#0`),
-            callByDate: contactDueIso,
             confirmedDate: confirmed.iso,
             confirmedTime: confirmed.time,
             /* A VOIDED document is not a live one: its scope is waiting to be
@@ -735,10 +784,14 @@ export function buildDeliveryScopeRows({
        result. It does not carry the order's document: `delivery_stops` holds no
        DO link, and printing the order's number on both legs would say one
        document authorised two different handovers. */
+    /* The Journey's last leg is the customer's; every leg before it is a
+       warehouse trip whose success is an ARRIVAL, not a delivery (Card 20). */
+    const lastLeg = legs.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
     for (const stop of legs) {
       /* Each leg has its OWN arrangement — two carriers, two dates, two rows.
          That is the whole reason the arrangement is keyed by (order, leg). */
       const arrangement = arrangements?.get(`${o.id}#${stop.leg}`) ?? null;
+      const intermediateLeg = stop.leg > 0 && stop.leg < lastLeg;
       const confirmedIso =
         arrangement?.confirmed_date ??
         (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
@@ -750,8 +803,8 @@ export function buildDeliveryScopeRows({
          status words. */
       const legDoc = legDocOf(o.id, stop.leg);
       const legFacts = factsOf(legDoc);
-      const legMissingProof = proofOf(legDoc, o);
-      const legReview = reviewOf(legDoc, o);
+      const legMissingProof = proofOf(legDoc, o, intermediateLeg);
+      const legReview = reviewOf(legDoc, o, intermediateLeg);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
@@ -776,7 +829,6 @@ export function buildDeliveryScopeRows({
               {
                 partnerName: legPartner,
                 latestContact: latestContactOf(`${o.id}#${stop.leg}`),
-                callByDate: contactDueIso,
                 confirmedDate: confirmedIso,
                 confirmedTime: legTime,
                 hasDeliveryOrder: true,
@@ -789,6 +841,8 @@ export function buildDeliveryScopeRows({
                   acceptedOn: legReview.state === "accepted" ? legReview.reviewedAt : null,
                   review: { state: legReview.state, reason: legReview.reason },
                 },
+                intermediateLeg,
+                legStop: stop.to_loc ?? null,
                 ...legFacts,
               },
               DELIVERY_STATUS_SPELL,
@@ -813,23 +867,21 @@ export function buildDeliveryScopeRows({
  */
 export const SINGAPORE_KEY = "Singapore";
 
-/** The customer's own state — the STRUCTURED column first (a native order
- *  records it directly), then the free-text classifier over the address. */
+/**
+ * The customer's own state, for the rail row and the `State` filter — the
+ * SAME reading `Delivery Location` prints and the SAME one the `State not
+ * recorded` warning tests (`resolveDeliveryLocality`, owner correction
+ * 2026-09-14). One address, one answer: the structured column when a
+ * salesperson chose one, otherwise the state the written address names.
+ *
+ * `stateKey` rather than `state` because a rail row is a BUCKET — an alias
+ * (`KL`, `Malacca`) has to land on the one canonical spelling instead of
+ * minting a second row beside the real one.
+ */
 function customerRegionOf(o: DeliveryScopeRow["o"]): string | null {
-  const stated = o.customer_address_state?.trim();
-  if (stated) {
-    if (/singapore/i.test(stated)) return SINGAPORE_KEY;
-    /* Through the classifier so an alias (`KL`, `Malacca`) lands on the one
-       canonical spelling instead of minting a second rail row. */
-    const canon = detectState(stated);
-    if (canon) return canon;
-  }
-  const text =
-    o.customer_address ??
-    [o.customer_address_line1, o.customer_address_city, stated].filter(Boolean).join(", ");
-  if (!text) return null;
-  if (/singapore/i.test(text)) return SINGAPORE_KEY;
-  return detectState(text);
+  const key = resolveDeliveryLocality(o).stateKey;
+  if (!key) return null;
+  return /singapore/i.test(key) ? SINGAPORE_KEY : key;
 }
 
 /** The region row this scope counts under, or null when nothing resolves. */

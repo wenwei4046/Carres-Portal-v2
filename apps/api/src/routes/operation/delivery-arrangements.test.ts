@@ -63,6 +63,10 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
+/** The one responsibility read (0499) the contact writer asks before it
+ *  writes — a test sets who is responsible and who is acting today. */
+const responsibility = { normal_user_id: null as string | null, acting_user_id: null as string | null, source: "not_assigned" };
+
 /** Records every insert so a test can assert what the history actually got. */
 function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
   const queue = [...results];
@@ -90,9 +94,13 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
       Promise.resolve({ data: res.data ?? null, error: res.error ?? null }).then(resolve, reject);
     return chain;
   });
-  vi.mocked(userClient).mockReturnValue({ from } as never);
-  vi.mocked(adminClient).mockReturnValue({ from } as never);
-  return { from, inserts, upserts };
+  const rpc = vi.fn().mockImplementation(async (name: string) =>
+    name === "delivery_responsible_operation"
+      ? { data: { ...responsibility }, error: null }
+      : { data: null, error: null });
+  vi.mocked(userClient).mockReturnValue({ from, rpc } as never);
+  vi.mocked(adminClient).mockReturnValue({ from, rpc } as never);
+  return { from, inserts, upserts, rpc };
 }
 
 async function call(path: string, role: string, init?: RequestInit, warehouseId?: string) {
@@ -255,6 +263,34 @@ describe("POST /assign — one partner onto one or many scopes", () => {
     mockSb([]);
     const res = await assign({ scopes: [{ orderId: ORDER_A, leg: 0 }], partnerId: NETS }, "supplier");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("GET / — every arrangement, every contact, every Cannot Deliver (Card 17)", () => {
+  it("carries the Cannot Deliver records for the central Delivery report", async () => {
+    mockSb([
+      { data: [] }, // arrangements
+      { data: [] }, // contacts
+      { data: [{ id: "e1", order_id: ORDER_A, leg: 0, from_partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" }] },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cannotDeliver?: Array<Record<string, unknown>> };
+    expect(body.cannotDeliver).toEqual([
+      { id: "e1", order_id: ORDER_A, leg: 0, partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" },
+    ]);
+  });
+
+  it("leaves the field ABSENT when that read fails — the report says Not available, never 0", async () => {
+    mockSb([
+      { data: [] },
+      { data: [] },
+      { error: { code: "42P01", message: "relation does not exist" } },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect("cannotDeliver" in body).toBe(false);
   });
 });
 
@@ -715,6 +751,62 @@ describe("POST /:orderId/contacts — the one customer-contact door (0487)", () 
     const row = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
     expect(row.result_key).toBe("waiting_for_customer_reply");
     expect(row.purpose_key).toBe("confirm_delivery_time");
+  });
+
+  /** 0499 — four identities, separately. The signed-in subject in these tests
+   *  is 11111111-…-0001; the responsible person and today's acting person
+   *  come from the one responsibility read, never from who is typing. */
+  const SHASHA = "0cab8bcf-6ebb-454e-ba21-b916e18cc419";
+  const YUJUN = "aac9edf9-63ad-4d0a-ba91-e495a25f9896";
+  const RECORDER = "11111111-1111-1111-1111-000000000001";
+  async function contactRow() {
+    const { inserts, rpc } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "confirm_delivery_date", channel: "call", contactedPerson: "customer", result: "confirmed" }),
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_responsible_operation", { p_order_id: ORDER_A, p_on: null });
+    return inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+  }
+
+  it("the responsible person is the order's normal person from the one read — the recorder is evidence, never responsibility", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: SHASHA, source: "delivery_duty" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.acting_user_id).toBe(SHASHA);
+    expect(row.recorded_by).toBe(RECORDER);
+    expect(row.contact_owner_user_id).not.toBe(row.recorded_by);
+  });
+
+  it("a buddy cover recording during leave is today's acting person; the normal person is kept", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: YUJUN, source: "contact" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.acting_user_id).toBe(YUJUN);
+    expect(row.recorded_by).toBe(RECORDER);
+  });
+
+  it("nobody responsible yet → the contact records no owner and no acting person, keeps its recorder, and still lands", async () => {
+    Object.assign(responsibility, { normal_user_id: null, acting_user_id: null, source: "not_assigned" });
+    const row = await contactRow();
+    expect(row.contact_owner_user_id).toBeNull();
+    expect(row.acting_user_id).toBeNull();
+    expect(row.recorded_by).toBe(RECORDER);
+  });
+
+  it("a partner's reply keeps its provenance beside the three people", async () => {
+    Object.assign(responsibility, { normal_user_id: SHASHA, acting_user_id: SHASHA, source: "delivery_duty" });
+    const { inserts } = mockSb([{ data: { id: ORDER_A } }, { data: { id: "c-9" } }]);
+    const res = await call(`/${ORDER_A}/contacts?leg=0`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "confirm_delivery_date", channel: "whatsapp", contactedPerson: "partner", result: "confirmed", onBehalfOfPartnerId: NETS }),
+    });
+    expect(res.status).toBe(200);
+    const row = inserts.find((i) => i.table === "ops_delivery_contacts")?.rows as Record<string, unknown>;
+    expect(row.on_behalf_of_partner_id).toBe(NETS);
+    expect(row.contact_owner_user_id).toBe(SHASHA);
+    expect(row.recorded_by).toBe(RECORDER);
   });
 
   it("refuses a purpose outside the governed list", async () => {

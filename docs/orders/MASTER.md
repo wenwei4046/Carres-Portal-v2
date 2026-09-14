@@ -234,6 +234,25 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
+**Table spacing — owner approved 2026-09-14; implementation in [PR #1305](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305).**
+[Sales Orders Card 11](../cards/CARD-2026-09-14-sales-orders-11-table-spacing.md) owns this
+presentation correction. The [release receipt](https://github.com/wenwei4046/Carres-Portal-v2/pull/1305#issuecomment-5658640695)
+records CI, the exact merged/deployed SHA and authenticated read-only production closure; the
+implementation and fixture measurements alone do not claim deployment.
+Expanded goods has exactly the six columns above: SKU stays separate;
+Item is always last and takes remaining space. All other child tracks have consistent fixed,
+content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
+Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
+The child begins at the actual SO No column edge, ends at the parent table edge, retains its own
+four-sided border and has 12px space above and below. Sales Orders never selects child items.
+Requested Delivery Date keeps its exact label but renders on two deliberate header lines:
+`Requested` / `Delivery Date`, with accessible sort and filter controls. Dates and SO numbers stay
+on one line; Customer and Delivery Location receive usable content widths. Narrow screens use
+the grid's own horizontal scroll and keep normal typography and all main columns/functions.
+Optional and saved layouts remain under the existing key; no silent preference reset. Purchasing's
+approved details layout and all data provenance/loading/error/missing states are preserved.
+
+
 **Register correction — owner approved 2026-09-11; implemented in [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227).**
 The delivery PR carries the exact release SHA, check results and authenticated read-only closure;
 implementation or a sample browser walk alone is not deployment proof.
@@ -907,7 +926,11 @@ trip carries.
 
 ### LOAN — conditional, and it blocks nothing
 
-Rendered ONLY while a loan item is out; there is no empty box on a clean order. Amber, with a
+Rendered while a loan item is out — and, since 2026-09-13 (Delivery Card 15, `ops_loan_offers`),
+while a loan OFFER is open or accepted and no item is out yet (`Loan offered · {what}` / `Waiting
+for the customer's answer`, `Customer accepted the loan · {what}` / `Prepare the loan Unit`); a
+declined offer renders nothing and stays in the drawer's history. There is no empty box on a
+clean order. Amber, with a
 **dashed edge into DELIVER labelled `collect back`**. It **never joins the gate**: a loan may not
 hold a delivery, and it never blocks delivery completion (Card 6 — an independent obligation; an
 open `ops_sofa_loans` row on a delivered order keeps the Loan obligation open, and Card 8's
@@ -3235,13 +3258,34 @@ what the shared Workspace Duty resolver already applies is not re-derived here.
   **Nothing in code changes; this freezes what already ships.**
 - **Only a manager may assign by hand** (`ops_manager`; the web hides the control, the API
   answers 403).
-- **The sweep only re-spreads what the SYSTEM handed out.** Unowned orders and orders with
-  `assigned_by` NULL are re-split evenly; **an order a human assigned never moves.** The split
-  is deterministic, so two operators triggering it at once produce the same plan.
-- **Absence needs no click.** A heartbeat is stamped while an operator has the portal open.
-  **Before 10:00 MYT everybody keeps their share** — late is not absent. From 10:00 a member
-  with no heartbeat counts as out and their system-assigned orders flow to whoever is in; they
-  log in later and the share flows straight back.
+- **THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13; migration 0504).** The sweep
+  deals only orders **nobody carries** — never assigned, or the SYSTEM put it on an account that
+  may not own one. An order already resting with an active individual is never touched again: not
+  by a later login, not by an absence, not by a re-run. An order a human assigned never moves at
+  all. The plan is deterministic, so two operators triggering it at once produce the same plan,
+  and it levels the REAL workload — the loads count every open order a person already carries.
+  **This replaces the sentence that used to sit here**: *"orders with `assigned_by` NULL are
+  re-split evenly on every sweep"*. That contradicted *"one order, one owner, decided when the
+  order arrives"* two lines above, and the redistribution won in code — which is why
+  `assigned_staff` had become an actor of the day rather than an owner, and why 100 production
+  orders sat on a test account nobody was answerable for.
+- **ONLY A PERSON CARRIES A CUSTOMER.** An account may be dealt an order only if it is an active
+  INDIVIDUAL — a People record with a `staff_code`. A shared login or a robot account records
+  evidence and never owns; the manual assignment door answers 422 and the sweep skips it. The
+  old guard was an email list (`isOpsGenericAccount`), which `operation-test@x.com` walked
+  straight past.
+- **Absence needs no click, and absence is COVER — never a reassignment.** A heartbeat is stamped
+  while an operator has the portal open. **Before 10:00 MYT everybody counts as in** — late is not
+  absent. From 10:00 a member with no heartbeat counts as out for the day, and so does anyone on
+  planned leave (`ops_staff_settings.available`). Their orders **do not move**: for that day the
+  work is acted on by their governed buddy cover, or — when none is named — by the least-loaded
+  individual who is in. The normal owner is preserved and the work returns when they are back.
+  **The one read that answers all of this is `delivery_responsible_operation(order, day)`** (0504),
+  which Delivery's contact writer and Payment's collection owner both use.
+- **A permanent change is a formal handover.** Management reassigning the order, and the
+  `Hand over collection` door, write the same two facts — the assignment and the append-only
+  responsibility ledger (`payment_collection_owners`: previous owner · new owner · reason ·
+  changed by · changed on · effective from). Neither can move one without the other.
 
 ## 2.3 · Row order
 
@@ -4735,12 +4779,14 @@ only the current loan line. The offer record is not built yet.
 
 **THE REQUIRED SALES FACTS FOR A DELIVERY (Delivery Blueprint, owner ruling 2026-09-13).**
 Delivery address, state, building type, floor, lift, access and the requested delivery information
-are required Sales Portal facts of a valid new order. Measured 2026-09-12: the POS schema requires
-`floor`, `hasLift` and the requested date; `address` is nullable behind `addressUnknown`;
-`addressState` is optional; building type lives in `entry_data.fields` with no schema requirement.
-Closing that gate is Sales Orders' build and a named dependency of the Delivery Blueprint; until it
-lands, Monitor prints each gap as `Order details incomplete` with the door `Open Sales Order to
-change`, never as a normal empty delivery.
+are required Sales Portal facts of a valid new order. **BUILT 2026-09-13 (Delivery Card 18):**
+`createOrderInputSchema` and `rawCreateOrderInputSchema` refuse a missing address (the
+`addressUnknown` escape is retired at entry), state, building type (`entry_data.fields.building_type`),
+floor, lift and requested date with ONE wording per fact (`DELIVERY_FACT_REFUSALS`,
+`docs/COPY-STANDARD.md` entry-gate words); the POS wizard's address sub-step and the office create
+door (`PrincipalNewOrder`, now with its own Building type field) refuse the same facts before the
+round trip. Legacy rows keep `addressUnknown`/`Address not given yet` as read-only history; Monitor's
+`Order details incomplete` line therefore applies to legacy rows only.
 
 **`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
 exception holds the delivery (0355) · owner: the resolved `Payment Approver` Duty holder, with

@@ -100,11 +100,37 @@ export function useLedgerChart() {
   });
 }
 
-export function useTrialBalance(asOf: string) {
-  return useQuery({
+/** The Trial Balance read, as options — the page's hook and the Dashboard's month-end pack share it. */
+export function trialBalanceQuery(asOf: string) {
+  return {
     queryKey: ledgerKeys.trialBalance(asOf),
     queryFn: () => apiFetch<TrialBalanceReport>(`/api/finance/ledger/trial-balance?asOf=${encodeURIComponent(asOf)}`),
-    retry: (count, error) => (error as { status?: number }).status !== 409 && count < 2,
+    retry: (count: number, error: unknown) => (error as { status?: number }).status !== 409 && count < 2,
+  };
+}
+
+export function useTrialBalance(asOf: string) {
+  return useQuery(trialBalanceQuery(asOf));
+}
+
+/** How many entries the Dashboard's Activity card lists. */
+export const LATEST_ENTRIES = 8;
+
+/**
+ * The newest posted entries from `from` (the ledger's go-live) on — the same
+ * `/entries` read and row shape the Journal uses, one short page instead of
+ * the whole Journal. A malformed answer is an error, never an empty list.
+ */
+export function useLatestLedgerEntries(from: string | null) {
+  return useQuery({
+    queryKey: [...ledgerKeys.all(), "latest", from ?? "", LATEST_ENTRIES] as const,
+    queryFn: async () => {
+      const q = new URLSearchParams({ offset: "0", limit: String(LATEST_ENTRIES), from: from ?? "" });
+      const res = await apiFetch<LedgerEntriesPage>(`/api/finance/ledger/entries?${q.toString()}`);
+      if (!Array.isArray(res?.rows) || !Number.isInteger(res.total)) throw new Error(JOURNAL_FAILED);
+      return res.rows;
+    },
+    enabled: Boolean(from),
   });
 }
 
