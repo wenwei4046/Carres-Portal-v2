@@ -362,17 +362,15 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
-actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
-`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
-Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
-it into a misleading current-day bucket.
+Monitor owns the six-working-day Calendar described in §2. Inbound and Outbound are dated
+Registers: date is a filter over their source arrangements, and an exact Monitor link carries
+that date together with Site and source identity. Inventory is the current Unit Register; it
+has neither a Calendar summary nor a six-day strip. Its Count and Month-end obligations are
+found through shared Work/Calendar and open their owning control view.
 
-The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
-For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
-5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
-later working date come from the Warehouse calendar rather than staff memory.
-
+The Warehouse calendar supplies operating days and closures; a client must not calculate a
+second Sunday-only calendar. An unfinished obligation retains its governed source date unless
+the owning module records a formal change. Selecting another date does not complete it.
 **MONITOR CALENDAR COMPOSITION — OWNER RULING 2026-09-06 (replaces the 2026-09-04
 composition law).** Monitor is the read-only date overview; it does not replace Outbound's
 exact-Unit work listing. On desktop the six operating dates remain one chronological
@@ -403,62 +401,24 @@ Delivery remains the only owner of the Logistics Partner, the confirmed operatio
 time, the driver and vehicle and the ETA. Warehouse only reads the relevant Delivery facts and
 owns its own physical preparation and handover facts.
 
-For any selected date, the operator journey is always:
+The morning-to-close journey uses separate surfaces over one set of facts:
 
-1. **Open Monitor:** read everything that must happen on that actual date across Inbound,
-   Inventory, `Needs checking`, Outbound and Month-end.
-2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
-   Units through Receiving; unresolved arrivals remain under their promised date.
-3. **Complete Inventory work:** Count or Count again, inspect reported damage, look for an exact
-   Unit not found and confirm an observed holder/Site mismatch. Inventory does not invent a NETS
-   Zone, Rack or Bin.
-4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
-   the accepted event transfers holder authority to the individually identified next person.
-5. **Close the date:** Monitor separates `Completed on {date}`, `{n} not done`, `Evidence not
-   submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
-   Units.
+1. Open My Work for personally resolved obligations and the authorised Site queue for unaccepted
+   physical work. Unread sources remain visibly unavailable, never an empty desk.
+2. Read Monitor for incoming and outgoing appointments. Open a card to the exact Inbound or
+   Outbound arrangement; its document number opens the source document separately.
+3. Receive through the Receiving Session. Inspect/count through Inventory's owning controls.
+   Prepare and hand over through Outbound. Each act records its actual person and exact scope.
+4. Return to Work for remaining obligations. A partial result leaves the remainder under the
+   same DO + Site identity; an accepted task is not a completed task.
+5. Read source History for completed evidence and Dashboard for management risks. Work closes
+   only when its owning source proves completion. A missing proof or source failure cannot be
+   converted into zero remaining work.
 
-The sequence changes presentation only, never ownership. Receiving completes receipt facts;
-Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
-re-resolves the responsible person. Monitor and the date strip store none of them.
-
-Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
-done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
-Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
-opens another date.
-
-Monitor is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
-from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
-an actual date, the page groups the one work set in business order:
-
-```
-INBOUND         expected arrival and receiving work
-INVENTORY       governed Count and Unit-control work
-NEEDS CHECKING  exact damage, missing Unit, mismatch and unresolved-difference work
-OUTBOUND        check, pack and handover work
-MONTH-END       count-window and Stock Confirmation work when applicable
-```
-
-Every row shows its source document/Unit identity, concrete fact, resolved owner avatar and plain
-action. Examples are `PO-2041 · 5 Units expected` / `Receive and check 5 Units`, `U-1005 was not
-found in the stock count` / `Find out why U-1005 did not match the count`, and `DO-1048 · SO-1318 ·
-2 Units` / `Check, pack and hand over 2 Units`. The source identity is clickable:
-
-- PO/Consignment arrival → its Receiving Session;
-- Unit or Count difference → Unit Detail or `Counts & Adjustments`;
-- DO handover → the Outbound work with linked Delivery Order;
-- Month-end requirement → the Month-end Stock Confirmation.
-
-Monitor stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
-or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
-work. Completion occurs only when the authoritative source fact exists, after which the shared row
-updates everywhere.
-
-The management view adds exception summaries over the same drillable facts: unresolved Stock differences,
-Adjustments awaiting Stock Adjustment Approver decision, damaged Units requiring a decision and Month-end submissions not
-done. Every number expands to exact Units/documents, actual dates and resolved owners; a KPI with no
-drill-down is invalid.
-
+Monitor contains arrival and pickup events, not a second five-section action queue. Count,
+inspection, Adjustment and Month-end obligations remain in shared Work/Calendar and their owning
+Inventory/control views. Management risk summaries belong to Dashboard or governed Reports;
+Warehouse Monitor does not gain a KPI band, Duty editor or action-completion control.
 An individually signed-in NETS operator sees only permitted physical work: receive and check, Count
 or Count again, check and pack, hand over, Report a problem and upload evidence. NETS cannot see
 purchase cost, Supplier Invoice, customer payment, Adjustment approval or unrelated staff work.
@@ -751,8 +711,40 @@ person is disabled before work starts, it returns to the authorised queue. If wo
 governed handover to an authorised replacement preserves the first person's scans/evidence and
 names the replacement. A shared `NW` identity may never stand in for multiple people.
 
+**Outbound state contract — resolved from the approved queue and evidence rules above.**
+These are contract states, not additional on-screen status words:
+
+| Source situation | Owner resolution and permitted consequence | What must remain unchanged |
+|---|---|---|
+| Unfinished DO + Site, no acceptance | Authorised Site queue; first eligible personal acceptance or scan resolves the individual | Another Site's scope and every earlier physical event |
+| Accepted, no physical work yet | Accepted eligible person; disable before start returns current routing to the Site queue | Original acceptance person/time remain in history |
+| Scanning/preparation started | Personal owner remains until governed transfer; a replacement must be authorised for the same Site | Original scans, observations and actor evidence |
+| Partial handover | Same obligation remains for exact Units not yet handed over | Accepted Unit batches, receiver and proof; no duplicate handover on retry |
+| All required exact Units handed over with receiver and proof | Work closes from Warehouse evidence | Delivery collection, arrival and customer outcome remain separate obligations |
+| Source cannot be read | Health failure, with no authoritative empty count or inferred completion | Last known facts cannot be treated as a newly verified result |
+| Completed, then operator leaves | No current routing is needed for that completed occurrence | Historical person, role, Site and event times remain immutable |
+
+Acceptance must recheck active personal eligibility, authorised Site and the current unfinished
+source inside the write transaction. Two people accepting concurrently cannot both become the
+resolved owner. A repeated request from the successful person must not create another acceptance.
+First scan must obey the same rule as explicit acceptance, including retries against an existing
+prep record; a UI-only check is insufficient. UI and Work refresh from the committed result.
+
+The identity is DO + physical Warehouse Site, not customer order, Site display name or the Unit's
+original warehouse alone. A later journey leg leaving a carrier's stop does not reopen work for
+the original Warehouse simply because the permanent Unit record still names that Warehouse.
+Delivery supplies the actual leg/source scope; Warehouse must prove the authorised physical act.
+
+**UNKNOWN — implementation evidence, not a new owner question:** the governed external-person
+identity source and transfer evidence are not yet complete in PR #1198. HR Team currently creates
+external Warehouse logins without Carres staff codes; 0458's `warehouse_is_person` requires such a
+code. Do not infer personhood from an email shape/name or issue a Carres employment code to NETS.
+The shared identity/access owner must supply external personal eligibility. Before admission,
+prove shared-account refusal, disable-before-start, transfer-after-start and immutable completion
+through the same database doors used by production. A named account alone proves none of these.
+
 Warehouse does not create another rota. It consumes the one approved PO Duty / GRN Duty rotation
-through the shared Duty Resolver and Work Engine governed by `../ERP-ARCHITECTURE.md` Law F. Team is
+through the shared Duty Resolver and Work Engine governed by `../ERP-ARCHITECTURE.md` Law F. Workspace → Staff & Duties is
 the one duty edit door; People supplies active/access and last-working-date facts; Warehouse pages
 may only render the returned resolved owner/avatar. The duty model itself remains in
 `../purchasing/MASTER.md` §2.2:
@@ -1450,8 +1442,8 @@ or requests Adjustment. COO reviews remaining material/unexplained Units. Financ
 actual Count, submission, version and difference/approval evidence, then acknowledges the chosen
 version without changing physical truth.
 
-**UI / PAGE / OBJECT PLACEMENT →** Monitor shows the month, Count window and concrete submission
-date under `MONTH-END`. Month-end Detail shows `Stock month · Stock date · Count window · actual
+**UI / PAGE / OBJECT PLACEMENT →** Shared Work/Calendar shows the month, Count window and concrete submission
+date; Warehouse Monitor remains the arrival/pickup Calendar. Month-end Detail shows `Stock month · Stock date · Count window · actual
 Count date · submitted date · version · confirmed Units · unresolved differences · approved
 Adjustments · movement reconciliation · Finance acknowledgement · History`. Reports provides
 `Month-end Stock Confirmations`; every export prints Stock date/version/generation person/date/
@@ -1560,7 +1552,7 @@ person, role, Site, active dates and evidence; API/offline submissions are attri
 idempotent and validated. Reject broad warehouse administrator access, Carres maintenance of NETS
 internal Rack/Bin/labour, shared login, direct external overwrite and future-only WMS complexity.
 
-**RULING → ADAPT + RESTRICT + FUTURE-PROOF + REJECT.** Warehouse has one Settings entry; Team has
+**RULING → ADAPT + RESTRICT + FUTURE-PROOF + REJECT.** Warehouse has one Settings entry; Workspace → Staff & Duties has
 the only duty rota; People has employment/access truth. External people may submit only personally
 observed, authorised physical facts. Carres Portal validates and owns the Unit result. Partner,
 3PL or future Carres-operated warehouse changes organisation/people/Sites/permissions, not the
@@ -2093,7 +2085,7 @@ schedule, PO, Supplier and Site sources; unread Work/Outbound stays loading, and
 cannot report an authoritative empty desk. Regression tests accompany the shared projection and
 both Outbound/Monitor surfaces. These reader fixes add no schema or ownership-write dependency.
 
-This is not personal Warehouse go-live. Production SQL at 2026-09-14 02:47 UTC still reports zero
+This is not personal Warehouse go-live. Production SQL at 2026-09-14 02:47 UTC reported zero
 Warehouse-role accounts and no 0459/0460 tracker entries. PR #1198 separately owns the unfinished
 Site queue/acceptance integration; personal identity, offboarding/transfer evidence, external Work
 UI, later-leg physical origin and mobile execution still require completion and production proof.
@@ -2115,8 +2107,8 @@ offboarding/transfer history. Preserve 0459/0460 unchanged; correct these guards
 governed new-migration path before applying and admitting Work. Do not reuse `warehouse_is_person`
 unchanged for external operators: `hr-team.ts` provisions Warehouse accounts without Carres staff
 codes, which that predicate requires. External-person eligibility must have a governed identity
-source separate from Carres employment. The 02:47 UTC account/tracker
-measurement in §13.10 remains the production gate. Yu Jun and Shasha are Carres Operation staff,
+source separate from Carres employment. Chan account creation supersedes the earlier zero-account
+observation; §14.4 names the remaining identity, stored Site and production gates. Yu Jun and Shasha are Carres Operation staff,
 not Warehouse substitutes. Real-person acceptance, concurrency, cross-Site refusal and closure
 must be proven; passing branch CI is not personal Warehouse go-live.
 
@@ -2152,8 +2144,8 @@ offline/API boundaries; history/audit; cancellation/partial/concurrency conseque
 Carres-operated warehouse compatibility.
 
 The former 11-task roadmap is research history, not current Blueprint authority and not a substitute
-for this coverage. No lifecycle or cross-module seam remains an unknown deferred blind spot;
-implementation may later be dependency-sliced only after a separate BUILD/DELIVERY takeover.
+for this coverage. Coverage of a topic is not proof that its detailed contract is complete or implemented.
+The evidence gates below remain open until their exact source and counterexample are verified.
 
 ### 14.3 Resolution classification
 
@@ -2173,7 +2165,7 @@ measured need, and assumed external cutover.
 upstream/downstream owners.
 
 **APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
-remaining destinations in §2 (Ready stock as eligible Units, Transfers, Counts), the journeys in §5,
+remaining capabilities within the four destinations in §2 (Ready Stock, Transfers, Counts), the journeys in §5,
 Issues/Counts/correction in §6, month-end in §9 and the reports in §11.
 
 **BUILT / VERIFIED:** the Unit-authority foundation and the exact-Unit Stock Register that
@@ -2190,5 +2182,50 @@ scope, without exact-Unit binding.
 
 **OWNER DECISIONS:** none unresolved.
 
-**PLAN MISSION COMPLETE.** The complete Warehouse operating model is approved and persisted. PLAN
-does not author Cards or choose implementation mechanics.
+**COMPLETION NOT PROVEN.** Approved operating rules remain binding. The detailed contract and
+production gates in §14.4 must be checked individually; an account, passing CI or a working
+Register cannot establish whole-domain completion.
+
+### 14.4 Detailed blueprint and production evidence gates
+
+This is a completion contract, not a build queue or a claim that the named capability exists.
+Each row requires both a coherent operator journey in this MASTER and direct evidence from its
+owning write/read path. A successful neighbouring capability does not close the row.
+
+| Required capability | Authoritative target | Evidence that proves completion; required counterexample |
+|---|---|---|
+| Four destinations and shared Shell | §2, §7; UI MASTER | Authenticated Monitor/Inbound/Inventory/Outbound at 1440, 1024 and 390; Inventory has no date strip, Monitor has no action queue, and mobile controls remain usable |
+| Unit birth and quantity goods | §3; Catalog and Purchasing | Issued source creates governed exact identities atomically; quantity goods have no printable/scannable Unit ID; retry cannot allocate duplicate IDs |
+| Inbound and Receiving | §5, §7; Receiving owner | Every supported arrival source opens its exact session; accepted, issue and absent Units reconcile to the same source; failed read cannot say no arrivals |
+| Inventory and Ready Stock | §3–§6; Sales Order reservation owner | Exact Unit drilldown, eligibility and SO binding agree; damaged, reserved and quantity goods cannot enter an incompatible exact-Unit act |
+| Physical outbound scope | §5, §8; Delivery leg source | DO + Site grouping, current leg origin and exact Unit list agree; later carrier leg cannot claim the origin Warehouse's queue |
+| External person and access | §8, §12.13; HR Team/People | Stored person/Site binding and real login; another Site, inactive user and shared identity are refused at the write door |
+| Acceptance and first scan | §8 state contract | Two-person race yields one owner; same-person retry is idempotent; existing prep update cannot bypass acceptance |
+| Partial and complete handover | §5, §8; Delivery handover evidence | Exact Unit batches with receiver/proof; partial retains remainder, complete closes the same Work identity, and duplicate/foreign Units are refused |
+| Cover, transfer and offboarding | §8; Workspace §3–§4 | Disable before start returns queue with acceptance history; after start preserves scans and names replacement; completed actors never change |
+| Transfers, returns and repair | §5; Purchasing/Delivery/Service | Outward and return events retain source lineage and actual holder; return is inspected before availability; planned travel cannot fabricate arrival |
+| Problems, Counts and Adjustments | §6 | Blind count, repeat, investigation and approval each retain evidence; mismatch alone cannot reduce stock, proposer cannot approve material adjustment |
+| Month-end and Finance | §9; Finance owner | Stock date, observation dates, movement reconciliation, immutable versions and Finance acknowledgement agree; correction cannot replace an acknowledged version |
+| Work, Calendar, Rail and Bell | §8; Workspace §2–§7 | Same obligation/owner/date on each authorised surface; notification dismissal and read-only calendar clicks cannot close Work; source failure stays visible |
+| Reports, export and Settings | §10–§12 | Permission-filtered exact-row drilldown and dated export; settings preserve audit; export and summary cannot write stock, finance or assignment truth |
+| Recovery and concurrency | §5–§8 | Retry after uncertain response reconciles the committed result; changed source scope is revalidated; cancellation or a formal date change preserves earlier events |
+| Release and real-person acceptance | ENGINEERING §5–§6 | Exact committed migration/source/tracker reconciliation, rollback negative controls, green exact-head CI, newest-main convergence on both web surfaces and Worker, authenticated Chan walkthrough |
+
+**FACT — account prerequisite changed:** production HR Team now lists Chan as Active Warehouse
+under External & Store Accounts, following the owner's submission of the prepared account form.
+The selected form Site was Carres Klang Warehouse. This supersedes §13's earlier zero-account
+observation; persisted Site binding and an authenticated Warehouse walkthrough remain unverified.
+The account must not be represented as a Carres staff member or an automatically verified personal
+eligibility mechanism. User-provided contact details stay in the account system, not source code.
+
+**REAL DOCUMENT CONTRADICTIONS — resolution boundary:** §7's older four-date-strip and
+five-section Monitor composition have been replaced by §2's newer four-destination ruling.
+Month-end belongs in shared Work/Calendar, not a second Monitor action section. Workspace → Staff
+& Duties is the assignment door. The UI MASTER's older Team-panel editing exception and preview
+wording conflict with Workspace §4/§7; shared Rail composition needs authority reconciliation
+before a Warehouse-specific Rail implementation is frozen. Warehouse must not invent a local fix.
+
+**NOT YET PROVEN:** every gate above requires recorded source-specific evidence. §13 contains
+bounded implementation evidence, not a blanket completion certificate. Detailed blueprint review
+continues across the full domain; no unknown is converted into an approved business rule merely
+to declare the plan or tomorrow's release finished.
