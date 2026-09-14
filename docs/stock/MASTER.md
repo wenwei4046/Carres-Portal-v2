@@ -2185,7 +2185,8 @@ work`; after the governed acceptance RPC succeeds, the same row links to the exi
 prep, receiver and proof still use the shared delivery handover doors, and the Work cache is
 invalidated after acceptance. The sidebar and content margin collapse to a narrow icon rail
 below the small-screen breakpoint so the floor operator can reach the controls without a
-horizontal page overflow.
+horizontal page overflow. Each card prints the DO and its Site queue label once in the object
+header, keeping the immutable `Delivery Order + Warehouse Site` identity visible to the operator.
 
 The branch test covers Site-queue rendering, the acceptance request and the explicit empty
 state. This proves the client composition and route contract only; it does not prove that the
