@@ -813,15 +813,11 @@ never paired with a state it is not in:** SO-1225 carries `43500` (Semenyih, Sel
 `Sentul, Kuala Lumpur`; the two disagree, so the town resolves to nothing and the label is
 `Kuala Lumpur` alone rather than the false pair `Semenyih, Kuala Lumpur`.
 
-**⭐ THE ONE READING IS THE CUSTOMER'S ADDRESS — A JOURNEY LEG IS NOT AN EXCEPTION TO IT, IT IS A
-DIFFERENT QUESTION.** On a Journey-leg row the `State` column deliberately does NOT read the
-customer's address: a leg is classified by its own DESTINATION, so leg 1 of a Singapore journey is
-a Klang → JB run and counts under Johor (the rule below, unchanged since 2026-09-06 and untouched
-by this correction). `Delivery Location` on that row still prints the CUSTOMER's locality on line 1
-and the leg's own recorded route on line 2 — the route is never replaced by the customer address,
-and the customer address is never replaced by a transit destination. A leg row can therefore show
-`Sungai Buloh, Selangor` under `State` = `Johor` without contradiction: they answer *where the
-goods end up* and *where this leg goes*.
+**A JOURNEY LEG READS ITS OWN DESTINATION.** Its State filter is classified by that destination,
+and `Delivery Location` prints the same recorded destination on line 1 with the leg's full route
+on line 2. A Klang → JB transfer therefore shows the JB destination, not the customer's town.
+An unnamed intermediate destination stays unrecorded; it never falls back to the customer's
+address. The customer address remains unchanged in the read-only Customer panel of the brief.
 
 **AN EXISTING ADDRESS IS NEVER CALLED ABSENT.** When no locality resolves but an address is
 recorded, `Delivery Location` prints that address; `Not recorded` is reserved for a record that
@@ -944,18 +940,10 @@ SELANGOR — and its text ends `Sentul, Kuala Lumpur`. The row prints `Kuala Lum
 in the `Kuala Lumpur` bucket, NOT Selangor: the postcode did not win, and no false `Semenyih,
 Kuala Lumpur` pair was printed.
 
-**A MULTI-LEG DELIVERY PRINTS ITS OWN ROUTE — SO-1209, both legs, live.** The customer address is
-never substituted for a transit destination, and the route is never replaced by the customer
-address:
-
-| leg | `Delivery Location` line 1 | `Delivery Location` line 2 | `Logistics` |
-|---|---|---|---|
-| 1 | `Sungai Buloh, Selangor` | `Carres Klang Warehouse → JB transit warehouse` | NETS |
-| 2 | `Sungai Buloh, Selangor` | `JB transit warehouse → Customer (Singapore)` | AL |
-
-Both routes match `orders.delivery_stops` exactly. Line 1 is the customer's locality on both rows
-because that is what it means; the leg's own destination governs the `State` bucket, per the
-Journey rule above.
+**A MULTI-LEG DELIVERY PRINTS ITS OWN ROUTE.** Each row reads its own recorded destination and
+route. For a recorded Klang → JB → Singapore journey, the transfer row names JB and the final
+row names Singapore. These are examples of the reading rule, not inferred stops or evidence
+that an operator has booked either leg. Production examples do not override the scope rule.
 
 **THE DELIVERY ORDERS REGISTER, WALKED ON THE SAME SESSION.** All 4 issued documents render, and
 `Not recorded` appears exactly where it is TRUE:
@@ -1186,6 +1174,13 @@ and test results; deployment and production verification remain outstanding.
 
 The approved journey is: expand the row → act inside the panel → save → remain on the same
 Monitor row, in the same queue, with the same narrowings; the row moves queues by itself.
+
+A calendar card's arrangement link opens and reveals its exact scope row, including when the
+rows arrive asynchronously. The row sits below the sticky table header and its disclosure
+receives keyboard focus. A later data refresh must not undo the operator's subsequent scroll.
+Only a register that supplies an explicit reveal target performs this positioning; ordinary
+registers retain their existing behavior. Non-virtualized lists disable the unused virtualizer
+so it cannot reset this position on mount.
 
 **Delivery Dates edit state.** `Update date and time` is the panel's one right-slot control. It
 flips the panel body into a focused edit state showing exactly: `Confirmed date` (Sunday and
