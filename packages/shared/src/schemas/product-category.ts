@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PRODUCT_CATEGORIES } from "../constants";
 
 /**
  * The product category enum, in its own module so BOTH `schemas/catalog.ts` and
@@ -12,12 +13,5 @@ import { z } from "zod";
  * liability sold against ONE covered unit. Like accessory/service it has no
  * supplier and never enters a PO.
  */
-export const productCategorySchema = z.enum([
-  "mattress",
-  "bedframe",
-  "sofa",
-  "accessory",
-  "service",
-  "guarantee",
-]);
+export const productCategorySchema = z.enum(PRODUCT_CATEGORIES);
 export type ProductCategory = z.infer<typeof productCategorySchema>;

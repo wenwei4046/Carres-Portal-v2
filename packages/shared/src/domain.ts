@@ -3,7 +3,7 @@
  * convert from snake_case DB rows to these.
  */
 
-import type { CostSource, OperationStage } from "./db-types";
+import type { CostSource, OperationStage, Role } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
 import type { DefaultFreeGift } from "./free-gift";
 import type { FreeItemCampaign } from "./free-item-campaign";
@@ -28,10 +28,7 @@ export type { FreeItemCampaign };
 // partner: the third-party warehouse files its own receiving instead of
 // reporting it by WhatsApp. Like them it is scoped by an entity id
 // (`app_users.warehouse_id`) and reaches nothing except its own RPCs.
-export type Role =
-  | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr"
-  | "warehouse";
+export type { Role };
 
 export interface Dealer {
   id: string;

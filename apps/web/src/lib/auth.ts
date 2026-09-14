@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
+import { APP_ROLES } from "@carres/shared";
 import type { Role } from "@carres/shared/domain";
 import { queryClient } from "./query-client";
 import { supabase } from "./supabase";
@@ -25,13 +26,6 @@ type AuthActions = {
   signOut: () => Promise<void>;
 };
 
-const VALID_ROLES = [
-  "principal", "dealer", "salesperson", "showroom",
-  "operation", "supplier", "partner", "finance", "bd", "hr",
-  // R6 (0301) — the third external role: the warehouse files its own receiving.
-  "warehouse",
-] as const;
-
 // Supabase Auth Hook (custom_access_token_hook) injects role/entity ids into
 // JWT app_metadata at sign-in. The User object's app_metadata only carries
 // provider info — the enriched claims live in the JWT itself, so we decode
@@ -50,7 +44,7 @@ function decodeJwtClaims(jwt: string): Record<string, unknown> | null {
 function pickRole(appMeta: Record<string, unknown>): Role | null {
   const r = appMeta.role;
   if (typeof r !== "string") return null;
-  return (VALID_ROLES as readonly string[]).includes(r) ? (r as Role) : null;
+  return (APP_ROLES as readonly string[]).includes(r) ? (r as Role) : null;
 }
 
 function pickEntity(appMeta: Record<string, unknown>, key: string): string | null {
