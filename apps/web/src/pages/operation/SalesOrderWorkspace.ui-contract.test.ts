@@ -49,37 +49,36 @@ describe("Sales Order object template contract", () => {
 
   /* ── ONE PAGE, ONE STATE — owner ruling 2026-08-15 ─────────────────────── */
 
-  it("has retired the whole-page edit mode and strips a stale `?edit=1`", () => {
-    /* There is no Edit button, no edit mode and no edit-only notice — the
-       fields are simply editable. What remains is the redirect for a bookmark
-       that still carries the retired param. */
-    expect(workspace).not.toContain('data-testid="workspace-edit"');
-    expect(workspace).not.toContain('next.set("edit", "1")');
-    expect(workspace).not.toContain(
-      "Editing operational details only. Commercial changes require an amendment.",
-    );
-    expect(workspace).not.toContain('"Edit operational details"');
-    expect(workspace).toContain('if (!params.get("edit")) return');
+  it("starts read-only and requires Edit before enabling the existing field controls", () => {
+    expect(workspace).toContain("useState(false)");
+    expect(workspace).toContain('const fieldsEditable = mode === "create" || (mode === "object" && isAmending)');
+    expect(workspace).toContain('onClick={() => setIsAmending(true)}>Edit</Button>');
+    expect(workspace).toContain('onClick={submitAmendment}>Submit Amendment</Button>');
+    expect(workspace).toContain('onClick={cancelAmendment}>Cancel</Button>');
+    expect(workspace).toContain('readOnly={!fieldsEditable}');
+    expect(workspace).not.toContain("Request Amendment");
     expect(workspace).toContain('next.delete("edit")');
-    expect(workspace).toContain('type Mode = "object" | "create" | "oldrev"');
   });
 
-  it("shows the save bar only when something changed, and counts the fields", () => {
-    expect(workspace).toContain('data-testid="save-bar"');
-    expect(workspace).toContain("mode === \"object\" && dirty &&");
-    expect(workspace).toContain('⚠ {changedFields.length}');
-    expect(workspace).toContain("Discard");
-    /* Dirty navigation still refuses safely — a half-typed address must not
-       leave by a tab click or a browser close. */
+  it("does not persist an amendment or replace the approved document", () => {
+    const submit = workspace.slice(workspace.indexOf("  const submitAmendment ="), workspace.indexOf("  const onCreate ="));
+    expect(submit).toContain("console.log('Amendment Submitted')");
+    expect(submit).toContain('toast.info("Amendment approval workflow is not configured yet.")');
+    expect(submit).toContain("Approval owner and amendment routing must be confirmed by the business owner.");
+    expect(submit).not.toMatch(/mutate|fetch|setDraft|setBaseline|navigate/);
+    expect(workspace).not.toContain("useSaveSalesOrderRevision");
+    expect(workspace).not.toContain('data-testid="save-bar"');
+    expect(workspace).toContain('return mode === "object" ? base : debouncedDraftData');
+  });
+
+  it("discards the local draft on Cancel and protects unsaved changes during navigation", () => {
+    const cancel = workspace.slice(workspace.indexOf("  const cancelAmendment ="), workspace.indexOf("  const submitAmendment ="));
+    expect(cancel).toContain("setDraft(baseline)");
+    expect(cancel).toContain("setIsAmending(false)");
+    expect(cancel).not.toMatch(/mutate|fetch|confirm/);
     expect(workspace).toContain('addEventListener("beforeunload"');
-    expect(workspace).toContain("Discard unsaved changes?");
-    expect(workspace).toContain("if (!confirmDiscard()) return");
-    /* ⛔ A REFETCH MAY NEVER CLOBBER AN OPEN EDIT (ui/MASTER.md §6.4 C3). */
     expect(workspace).toContain("if (dirtyRef.current) return;");
-    expect(workspace).toContain("const seed = `${orderId}:${detailQ.dataUpdatedAt}`");
-    /* A save makes what was saved the new baseline, so the bar clears without
-       waiting for the round trip and the refetch lands on a clean form. */
-    expect(workspace).toContain("setBaseline(draftRef.current)");
+    expect(workspace).toContain("Discard unsaved changes?");
   });
 
   /* `01-design-tokens.md` §2.2 is frozen: blue appears ONCE on a screen. Eight
@@ -277,7 +276,7 @@ describe("Sales Order object template contract", () => {
       "Order info",
       "Delivery",
       "Goods",
-      "Money",
+      "Payments",
       "What this change started elsewhere",
     ]);
     /* `Emergency contact` survives as a named subsection of CUSTOMER… */
@@ -704,7 +703,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.search(/<Block\s+title="Money"/);
+    const start = workspace.search(/<Block\s+title="Payments"/);
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(money).toContain("headerSlot=");
@@ -1117,7 +1116,7 @@ describe("Sales Order object page — one form grammar", () => {
     expect(ledger).toContain("isLivePayment(p)");
     expect(ledger).not.toContain("p.voided_at ==");
     /* Amounts to the cent — the receipt may not disagree with the screen. */
-    expect(ledger).toContain("fmtMoney(Number(p.amount ?? 0))");
+    expect(ledger).toContain("fmtMoney(Number(p?.amount ?? summary?.amount ?? 0))");
     /* The method word and the slip door are the drawer's own, imported. */
     expect(ledger).toContain('from "@/lib/payment-display"');
   });

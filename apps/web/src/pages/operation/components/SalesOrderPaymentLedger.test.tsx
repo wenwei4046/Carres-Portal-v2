@@ -47,7 +47,46 @@ const ROWS = [
 
 beforeEach(() => useOrderPayments.mockReset());
 
+const SAVED_PAYMENTS = [{ label: "Online", amount: 1365, reference: "7486357130975", date: "2026-08-06", collected_by: "Khoo Aik Yean" }];
+
 describe("the Sales Order payment ledger", () => {
+  it("shows the saved order payment when an older order has no ledger rows", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" savedPayments={SAVED_PAYMENTS} />);
+    const row = screen.getByTestId("so-payment-summary-row");
+    expect(within(row).getByText("RM 1,365.00")).toBeTruthy();
+    expect(within(row).getByText("Online")).toBeTruthy();
+    expect(within(row).getByText("7486357130975")).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    // No receipt, slip or ledger recorder can be inferred from the at-sale summary.
+    expect(within(row).getAllByText("Not recorded")).toHaveLength(3);
+    expect(screen.queryByText("Khoo Aik Yean")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it.each([{ rows: ROWS }, { rows: [ROWS[2]] }])("never adds the document summary to an existing ledger, including voided rows", ({ rows }) => {
+    useOrderPayments.mockReturnValue({ data: { payments: rows }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" savedPayments={SAVED_PAYMENTS} />);
+    expect(screen.queryByTestId("so-payment-summary-row")).toBeNull();
+    expect(screen.getByTestId("so-payment-row-voided")).toBeTruthy();
+  });
+
+  it("does not disguise a ledger permission error with the saved payment summary", () => {
+    useOrderPayments.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: { status: 403 } });
+    render(<PaymentLedger orderId="o1" savedPayments={SAVED_PAYMENTS} />);
+    expect(screen.getByTestId("so-payments-unreadable")).toBeTruthy();
+    expect(screen.queryByTestId("so-payment-summary-row")).toBeNull();
+  });
+
+  it("waits for the saved payment projection and reports a failed read instead of claiming no payment", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    const { rerender } = render(<PaymentLedger orderId="o1" summaryLoading />);
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    rerender(<PaymentLedger orderId="o1" summaryError />);
+    expect(screen.getByTestId("so-payments-unreadable")).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+  });
+
   it("prints every recorded transaction, to the cent", () => {
     useOrderPayments.mockReturnValue({ data: { payments: ROWS }, isLoading: false, isError: false });
     render(<PaymentLedger orderId="o1" />);
