@@ -562,8 +562,8 @@ expected arrival or upload time. An unconfirmed delivery never enters a date cel
 range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
 `{n} deliveries need a confirmed date.` count and its door.
 
-**Compact calendar correction — implementation evidence, not release completion (2026-09-14).**
-The owner-approved compact composition is being implemented in the shared `ScheduleCard`:
+**Compact calendar — deployed and observed (2026-09-14).**
+The owner-approved compact composition is implemented in the shared `ScheduleCard`:
 DO number when present, SO number on its own line, no legacy reference or customer name on
 the face; every physical product line has its own category icon and quantity, with its full
 name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
@@ -583,8 +583,17 @@ exclusive-source rule, including the complete-owner-read check, is used by the o
 Incoming evidence is read in page-wide
 batches and never counted as reserved stock or permission to dispatch. The zero-received mark
 is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
-Whole-workspace conformance and production verification remain open. Local fixtures and passing
-tests do not close them.
+Production release PR #1316, `e8456cb8365503e5a73af9710d94d30bbadf4aea`, passed the
+required CI and deployment checks; all five public deployment probes matched that revision.
+An authenticated Principal browser walk measured 1440px and 949px. The September 14–19
+window showed zero customer deliveries and two transfers, with every physical line on
+SO-1209 separate and the actual Klang Warehouse → JB transit route. Its product Popover
+showed the full name, quantity and receipt uncertainty; Escape returned focus to the trigger.
+The 949px view used three days, retained both calendars and reopened its dropdown filters
+after collapse. These trial rows prove rendering, not business volume or carrier coverage.
+The walk did not exercise Operation-role RLS, every receipt state, or any production write.
+The card-to-row reveal defect found during that walk is corrected in §8.6; that follow-up
+still requires its own deployment and authenticated verification.
 
 Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
 overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
@@ -599,7 +608,7 @@ Validation for this correction: 4,765 web tests, 30 shared status tests and work
 pass. Local Chrome at 1440px, 949px and 390px preserves product detail focus/viewport bounds and
 shows progress separately from the missing-fact or proof line. This is local evidence only.
 
-The local schedule now classifies each intermediate leg as `TRANSFER`, and only the final leg
+The schedule classifies each intermediate leg as `TRANSFER`, and only the final leg
 as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or
 remain overdue. The tab total and customer/transfer split use the same visible date window and
 active filters. Month summaries and the two-month rail keep the two event counts separate;
@@ -1159,7 +1168,7 @@ The four panels and their inline doors are unchanged. Six corrections bind:
    having to notice five absences. The emergency contact prints **name, relationship and phone**
    as three distinct facts.
 
-**Implementation evidence, not production closure.** The Monitor enables the Register's
+**Deployed brief; verified boundary.** The Monitor enables the Register's
 viewport-fitted expansion; its shared wrapper stays visible during horizontal scrolling.
 At 949px physical items use wrapped labelled facts; at 1440px they retain the five-column
 table. Services carry only their description and quantity, server-generated delivery fees
@@ -1168,7 +1177,12 @@ show every recorded leg with the selected leg marked. Access gaps, the single Lo
 completeness alert and the three emergency-contact facts are rendered in the four panels.
 Local browser inspection at 949px and 1440px verified the brief and its item facts after
 horizontal scrolling. The 227 focused Monitor/model/viewport tests pass. These are fixture
-and test results; deployment and production verification remain outstanding.
+and test results. On deployed `e8456cb8365503e5a73af9710d94d30bbadf4aea`, the
+authenticated Principal walk at 949px additionally verified SO-1209's expanded brief after
+horizontal scrolling: pinned SO/Customer identity, both recorded route legs, wrapped address,
+and separate emergency-contact facts remained readable. Its calendar link expanded the correct
+row but left it below the viewport; §8.6 owns the positioning correction. No production
+arrangement was saved during this read-only walk.
 
 ### 8.6 · Inline arrangement writes — owner ruling 2026-09-13, APPROVED / LOCKED
 
