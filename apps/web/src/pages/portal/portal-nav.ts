@@ -529,8 +529,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
       },
-      // 0477 — a supplier's bill, the voucher that pays it, and what is still
-      // unpaid per supplier (also the third listing of the Bills toolbar switch).
+      // 0477 — a supplier's bill and the voucher that pays it. What is still
+      // unpaid per supplier is the `ap` row above (and the third listing of the
+      // Bills toolbar switch).
       {
         key: "bills",
         label: "Bills",
