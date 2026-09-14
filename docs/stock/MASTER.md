@@ -2084,6 +2084,20 @@ two-person duty) was found unapplied while 0438–0440 were — with nobody reso
 `20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
 2026-10 → 2027-09 alternating rotation exists.
 
+### 13.10 · FACT — Warehouse scope and source readiness (2026-09-14)
+
+The shared Outbound projection groups exact Units by Delivery Order + Warehouse Site. Monitor
+links carry Site IDs; both Outbound doors consume DO/Site context, and the internal selected scope
+expands after data arrives. Display names remain compatible with existing links. Monitor checks
+schedule, PO, Supplier and Site sources; unread Work/Outbound stays loading, and a failed source
+cannot report an authoritative empty desk. Regression tests accompany the shared projection and
+both Outbound/Monitor surfaces. These reader fixes add no schema or ownership-write dependency.
+
+This is not personal Warehouse go-live. Production SQL at 2026-09-14 02:47 UTC still reports zero
+Warehouse-role accounts and no 0459/0460 tracker entries. PR #1198 separately owns the unfinished
+Site queue/acceptance integration; personal identity, offboarding/transfer evidence, external Work
+UI, later-leg physical origin and mobile execution still require completion and production proof.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
