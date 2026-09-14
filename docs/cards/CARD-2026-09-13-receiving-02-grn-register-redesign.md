@@ -428,9 +428,14 @@ nothing here touched it, but it is a live security gap somebody owns.
 
 1. **CI green on PR #1274** at the reconciled head (this push is what makes CI run against current
    `main`). The replay in CI is the re-run the machine here could not do.
-2. **Apply `0493` to production** through the governed MCP path, BEFORE the merge — the Worker
-   routes this card ships read `receiving_line_evidence`, and a deploy that lands first would call
-   a table that does not exist. `0493` creates a new table and two new doors, revokes execute from
+2. **Apply `0493` to production** through the governed MCP path, BEFORE the merge. **Not because a
+   deploy-first would crash — it would not:** the evidence route detects the missing relation and
+   answers `verified: false` with an empty list, and the page says the counts are not verified
+   (`warehouse-receipts.ts` `isMissingRelationError`, asserted by the test *answers `verified: false`
+   — not an empty list — while 0493 is not applied*). The real reason is the WRITE path: the
+   Session this card ships offers damaged/wrong-item VIDEO pickers and extra-line evidence pickers,
+   and until `0493` replaces `warehouse_receipt_validate_lines` the old validator refuses them. A
+   deploy-first window would hand operators controls their database rejects. `0493` creates a new table and two new doors, revokes execute from
    `public`/`anon`, and replaces two validators nothing later touches; the backfill is
    `INSERT…SELECT` and never bumps `updated_at`. Re-measure the number at the moment of apply.
 3. **Merge PR #1274 to `main`.** That merge deploys both Pages projects and the production Worker.
