@@ -18,6 +18,10 @@ import {
   undatedCards,
 } from "./warehouse-schedule-view";
 import { appTodayIso } from "@/lib/fmt-date";
+/* §4.4 — the z ladder is reachable only through the kit, never by typing a
+   number into a page. A sticky date heading is layer 1: chrome floating over
+   its own rows, which is exactly what `Z_TABLE_HEADER` names. */
+import { Z_TABLE_HEADER } from "@/components/kit/overlay-layer";
 
 /**
  * WAREHOUSE — ARRIVAL SCHEDULE · PICKUP SCHEDULE (owner ruling 2026-09-14).
@@ -129,8 +133,29 @@ export default function WarehouseWorkspace({
       }
       return;
     }
-    const anchor = delta === 1 ? dates[dates.length - 1] : dates[0];
-    if (anchor) setParam("from", shiftIso(anchor, delta));
+    /* A BOARD MOVES A PAGE, NOT A DAY — and the two directions are not
+       symmetric, because the projection only builds a window FORWARD from
+       `from`.
+
+       Forward is easy: start the day after the last date shown and the
+       governed resolver returns the next six operating dates.
+
+       Backward has to jump a whole window in one go. Anchoring on
+       `first − 1 day` looked right and was the bug: the resolver would return
+       six dates starting there, FIVE of which are already on screen, so
+       `Previous` crawled one day at a time and an operator paging back a week
+       would press it thirty times. Stepping back by the window's own calendar
+       SPAN lands a full page earlier, and because the span already contains
+       whatever closures the Site has, it neither overlaps nor skips. */
+    if (delta === 1) {
+      const last = dates[dates.length - 1];
+      if (last) setParam("from", shiftIso(last, 1));
+      return;
+    }
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    if (!first) return;
+    setParam("from", addDays(first, -spanDays(first, last ?? first)));
   }
 
   const word = SCHEDULE_PAGE_WORD[direction];
@@ -288,7 +313,7 @@ function DateHeading({ date, first }: { date: string; first: boolean }) {
   const { weekday, day, month } = dateHeadingPartsOf(date);
   return (
     <div
-      className={`sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-4 py-3 ${
+      className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3 ${
         first ? "" : "border-l border-l-kit-slate-5"
       }`}
       data-testid={`ws-head-${date}`}
@@ -316,7 +341,7 @@ function AgendaDay({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-agenda">
       <div
-        className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-4 py-3"
+        className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3`}
         data-testid={`ws-head-${date}`}
       >
         <div className="text-label text-kit-slate-11">{weekday}</div>
@@ -367,10 +392,27 @@ function DayCards({
  * governed window that starts at or after it.
  */
 function shiftIso(iso: string, delta: -1 | 1): string {
+  return addDays(iso, delta);
+}
+
+/** Calendar-day arithmetic on an ISO date, in LOCAL time — `new Date(iso)`
+ *  would read a bare `YYYY-MM-DD` as UTC and land a day early in +08. */
+function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
-  const at = new Date(y!, m! - 1, d! + delta);
+  const at = new Date(y!, m! - 1, d! + days);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}`;
+}
+
+/** How many CALENDAR days the shown window covers — six operating dates across
+ *  a closed Sunday span seven. Minimum 1, so a one-date window still moves. */
+function spanDays(first: string, last: string): number {
+  const toUtc = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y!, m! - 1, d!);
+  };
+  const days = Math.round((toUtc(last) - toUtc(first)) / 86_400_000) + 1;
+  return Math.max(1, days);
 }
 
 function headingSentence(iso: string): string {

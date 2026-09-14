@@ -493,6 +493,33 @@ describe("long values and the narrow viewport", () => {
     expect(screen.getByTestId("ws-card-open")).toBeInTheDocument();
   });
 
+  it("the board pages a WHOLE window, never one day at a time", () => {
+    /* Six operating dates across a closed Sunday — the window SPANS seven
+       calendar days, so Previous must jump seven, not one. */
+    setSchedule({
+      operatingDates: [
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-19",
+      ],
+    });
+    mount();
+    fireEvent.click(screen.getByTestId("ws-prev"));
+    /* 2026-09-14 minus the window's own 6-day span. Anything closer would put
+       five already-visible dates back on the board. */
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-08");
+  });
+
+  it("Next starts the day AFTER the last date shown — never a repeated column", () => {
+    setSchedule();
+    mount();
+    fireEvent.click(screen.getByTestId("ws-next"));
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-20");
+  });
+
   it("narrow previous/next walks ONE governed operating date, not a raw calendar day", () => {
     wide = false;
     setSchedule();
