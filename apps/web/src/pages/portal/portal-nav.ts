@@ -406,14 +406,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
-      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner replacement Card,
-       * 2026-09-06 — Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor ·
-       * Inbound · Inventory · Outbound`. The ERP keeps ONE global Dashboard;
-       * the Warehouse Calendar-summary page is `Monitor` (the same word
-       * Delivery's calendar page already speaks). `Inventory` is the one
-       * current Unit Register — the `?tab=stock-onhand` address is unchanged,
-       * so no bookmark moves, and `?tab=warehouse-dashboard` still lands on
-       * Monitor for the same reason.
+      /* THE WAREHOUSE MAP IS FIVE DESTINATIONS (owner ruling 2026-09-14):
+       * `Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound`.
+       *
+       * The single combined `Monitor` is SUPERSEDED. It carried both
+       * directions on one board, and receiving goods and loading a lorry are
+       * two jobs, done by two people, on two sides of the building — one board
+       * meant every operator read past half of it all day. The two Schedules
+       * are independent destinations for that reason, which is also why
+       * neither page carries an internal direction tab.
+       *
+       * `?tab=warehouse-monitor` and `?tab=warehouse-dashboard` both still
+       * land — on Arrival Schedule, carrying their `date` and `site` — so no
+       * bookmark breaks (the `stock-onhand` precedent). `Inventory` is the one
+       * current Unit Register and its address is unchanged.
        * Reports and Settings stay central: NO Report row, NO Settings row.
        *
        * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
@@ -421,10 +427,27 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * points/urgent restock and the event history are named next scopes in
        * Stock MASTER §13; a direct URL still lands. */
       {
-        key: "wh-monitor",
-        label: "Monitor",
+        key: "wh-arrival-schedule",
+        label: "Arrival Schedule",
         icon: CalendarDays,
-        tab: "warehouse-monitor",
+        tab: "warehouse-arrival-schedule",
+        /* `activeFor` REPLACES the default tab match (PortalSidebar), so this
+         * row's OWN tab has to be listed beside the two retired addresses —
+         * otherwise the page lights nothing while it is the page you are on.
+         * The retired addresses light it while they resolve, so the sidebar
+         * never shows "nowhere" on a working bookmark. */
+        activeFor: [
+          "tab:warehouse-arrival-schedule",
+          "tab:warehouse-monitor",
+          "tab:warehouse-dashboard",
+        ],
+        section: "Warehouse",
+      },
+      {
+        key: "wh-pickup-schedule",
+        label: "Pickup Schedule",
+        icon: CalendarDays,
+        tab: "warehouse-pickup-schedule",
         section: "Warehouse",
       },
       {

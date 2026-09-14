@@ -127,11 +127,19 @@ export default {
           blue: {
             2: blue.blue2, // row HOVER — one step under selected (Jess, 2026-08-01)
             3: blue.blue3, // selected row · info fill
+            /* The EDGE of a tinted surface (Warehouse Schedule, owner-approved
+             * design 2026-09-14). A tinted card needs a border one step up from
+             * its own fill or it dissolves into the column, and slate-5 over an
+             * amber or blue fill reads as a mistake. Radix step 6 is each ramp's
+             * own "subtle border" step, so this is the palette's answer rather
+             * than a hex someone matched by eye. ADDITIVE — no existing step
+             * moves, so no shipped page changes colour. */
+            6: blue.blue6, // border of a blue-3 surface
             9: blue.blue9, // the one action fill · focus ring
             11: blue.blue11, // action ink
           },
           green: { 3: green.green3, 11: green.green11 }, // done · received · in stock
-          amber: { 3: amber.amber3, 11: amber.amber11 }, // needs attention · waiting
+          amber: { 3: amber.amber3, 6: amber.amber6, 11: amber.amber11 }, // needs attention · waiting
           red: { 3: red.red3, 9: red.red9, 11: red.red11 }, // late · act now
         },
       },

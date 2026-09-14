@@ -82,6 +82,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseWorkspace from "./WarehouseWorkspace";
+import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
@@ -243,10 +244,12 @@ export default function OperationApp() {
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
-    /* 2026-09-06 replacement Card renamed the Warehouse Calendar page to
-       Monitor; the old `?tab=warehouse-dashboard` address still lands there
-       so no bookmark breaks (the stock-onhand precedent). */
-    setTab(urlTab === "warehouse-dashboard" ? "warehouse-monitor" : urlTab);
+    /* WAREHOUSE SCHEDULE (owner ruling 2026-09-14) — the combined Monitor is
+       replaced by two pages. Both retired addresses resolve to Arrival
+       Schedule and keep every other parameter they arrived with, so a
+       bookmarked `date`/`site` still opens the day it was bookmarked for
+       (the stock-onhand precedent). */
+    setTab(LEGACY_SCHEDULE_TABS.has(urlTab) ? "warehouse-arrival-schedule" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
@@ -384,7 +387,8 @@ export default function OperationApp() {
           tab !== "movements" &&
           /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
              Destination Header; the slim bar would be a second top row. */
-          tab !== "warehouse-monitor" &&
+          tab !== "warehouse-arrival-schedule" &&
+          tab !== "warehouse-pickup-schedule" &&
           tab !== "warehouse-inbound" &&
           tab !== "warehouse-outbound" &&
           !isStockUnitUrl && <GlobalTopBar />}
@@ -590,10 +594,15 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
-            {/* WAREHOUSE (2026-09-06 replacement Card) — Monitor is the one
-                Calendar-summary page; Inbound and Outbound are their own
-                rail + Register work pages. */}
-            {tab === "warehouse-monitor" && <WarehouseWorkspace />}
+            {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
+                Pickup Schedule are two independent dated boards; Inbound and
+                Outbound are their own rail + Register work pages. */}
+            {tab === "warehouse-arrival-schedule" && (
+              <WarehouseWorkspace direction="arrival" />
+            )}
+            {tab === "warehouse-pickup-schedule" && (
+              <WarehouseWorkspace direction="pickup" />
+            )}
             {tab === "warehouse-inbound" && <WarehouseInbound />}
             {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
             {/* Non-PO inbound source object. Inbound owns the register; this
