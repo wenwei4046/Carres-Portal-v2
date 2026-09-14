@@ -240,7 +240,7 @@ function projectProducts(
     (input.skuNames ?? []).map((row) => [row.sku, row.name]),
   );
   const bySku = new Map<string, InboundProduct>();
-  const keyOf = (sku: string | null) => sku ?? " no-sku";
+  const keyOf = (sku: string | null) => sku ?? " no-sku";
   for (const line of lines) {
     const sku = line.sku ?? null;
     const entry = bySku.get(keyOf(sku)) ?? {

@@ -78,7 +78,7 @@ operationWarehouseRouter.get("/inbound", async (c) => {
   const optional = (table: string, fields: string) =>
     readOptionalRelation(() => read(table, fields), [] as Record<string, unknown>[]);
   try {
-    const [pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, productSkus] = await Promise.all([
+    const [pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, productSkus, productModels] = await Promise.all([
       read("purchase_orders", "id,version,supplier_id,warehouse_id,destination_id,status,official_delivery_date,eta_date,placed_at,so"),
       read("warehouses", "id,name"),
       read("suppliers", "id,name"),
@@ -100,11 +100,35 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
       optional("stock_operating_parties", "id,name"),
       optional("arrival_source_events", "id,source_id,kind,unit_ids"),
-      read("product_skus", "id,sku,variant"),
+      read("product_skus", "id,sku,variant,model_id"),
+      read("product_models", "id,name"),
     ]);
-    const skuNames = (productSkus as Array<{ sku: string; variant: string | null }>).map(
-      (row) => ({ sku: row.sku, name: row.variant ?? null }),
+    /* PRODUCT IDENTITY IS MODEL + VARIANT, NEVER THE VARIANT ALONE.
+       Measured on production 2026-09-14: a ten-line PO rendered as ten rows
+       reading only `King` or `Queen`, because this mapping took `variant` as
+       the product name. `King` does not identify a product — the warehouse
+       operator holding the delivery note cannot tell `B1201S King` from
+       `H1401S King` from `S1601F King`, and that PO carried all three.
+       The model name is the authoritative half and it was simply never read.
+       Nothing is inferred here: no supplier rule, no SKU-text parsing, no
+       invented name. Where a model is missing the SKU itself is the identity. */
+    const modelName = new Map(
+      (productModels as Array<{ id: string; name: string | null }>).map((row) => [
+        row.id,
+        row.name,
+      ]),
     );
+    const skuNames = (
+      productSkus as Array<{
+        sku: string;
+        variant: string | null;
+        model_id: string | null;
+      }>
+    ).map((row) => {
+      const model = row.model_id ? modelName.get(row.model_id) ?? null : null;
+      const name = [model, row.variant].filter(Boolean).join(" ").trim();
+      return { sku: row.sku, name: name || null };
+    });
     const input = { pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, skuNames } as unknown as InboundInput;
     const all = inboundArrivals(input);
     const filters = new URLSearchParams();

@@ -1,7 +1,7 @@
 // design-standard: not-a-list-page — a dated Warehouse Schedule board
 // (read-only projection of one direction's work), not a Register list.
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ModuleHeader from "./components/ModuleHeader";
 import WarehouseScheduleCard from "./WarehouseScheduleCard";
@@ -16,6 +16,7 @@ import {
   dateHeadingPartsOf,
   emptyDayWordOf,
   undatedCards,
+  undatedSummaryWordOf,
 } from "./warehouse-schedule-view";
 import { appTodayIso } from "@/lib/fmt-date";
 /* §4.4 — the z ladder is reachable only through the kit, never by typing a
@@ -236,14 +237,40 @@ export default function WarehouseWorkspace({
       </div>
 
       {/* A card the board cannot PLACE is reported, never dropped: an
-          arrangement with no date is not secretly today's work. */}
+          arrangement with no date is not secretly today's work — and a count
+          the operator cannot open is a dead end. It OPENS IN PLACE rather than
+          linking to a filtered register, because the register cannot ask for
+          "undated" without inventing a filter word, while these exact records
+          are already in this page's own result. */}
       {stranded.length > 0 && (
-        <p
-          className="border-t border-kit-slate-5 bg-white px-3 py-2 text-meta text-kit-slate-11"
+        <details
+          className="border-t border-kit-slate-5 bg-white px-3 py-2"
           data-testid="ws-undated"
         >
-          {stranded.length} with no date yet — not shown on any column.
-        </p>
+          <summary className="cursor-pointer text-meta text-kit-slate-11 marker:text-kit-slate-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9">
+            {undatedSummaryWordOf(stranded.length)}
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1" data-testid="ws-undated-list">
+            {stranded.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-meta text-kit-slate-12">
+                  {c.partyName ?? "Party not recorded"}
+                </span>
+                {c.openHref ? (
+                  <Link
+                    to={c.openHref}
+                    className="text-meta text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+                    data-testid="ws-undated-open"
+                  >
+                    {c.sourceRef}
+                  </Link>
+                ) : (
+                  <span className="text-meta text-kit-slate-11">{c.sourceRef}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   cardReferencesOf,
   cardTintClassOf,
+  extraRelatedRecordsOf,
+  undatedSummaryWordOf,
   cardsOnDate,
   categoryVisualOf,
   dateStatusPillOf,
@@ -152,7 +154,7 @@ describe("date agreement — the tint means ONE thing", () => {
 describe("source references", () => {
   it("an arrival leads with its owning source record", () => {
     expect(cardReferencesOf(card({ sourceRef: "PO-2609-0001" }))).toEqual({
-      primary: "PO-2609-0001",
+      primary: { ref: "PO-2609-0001", href: null },
       secondary: null,
     });
   });
@@ -162,13 +164,16 @@ describe("source references", () => {
       cardReferencesOf(
         card({ direction: "pickup", soRef: "SO-1362", doRef: "DO-2609-019" }),
       ),
-    ).toEqual({ primary: "SO-1362", secondary: "DO-2609-019" });
+    ).toEqual({
+      primary: { ref: "SO-1362", href: null },
+      secondary: { ref: "DO-2609-019", href: null },
+    });
   });
 
   it("a pickup with only a DO still names it", () => {
     expect(
       cardReferencesOf(card({ direction: "pickup", soRef: null, doRef: "DO-2609-019" })),
-    ).toEqual({ primary: "DO-2609-019", secondary: null });
+    ).toEqual({ primary: { ref: "DO-2609-019", href: null }, secondary: null });
   });
 });
 
@@ -227,5 +232,61 @@ describe("the board", () => {
     const failed = emptyDayWordOf("arrival", true);
     expect(failed).toBe("The schedule could not be read for this date.");
     expect(failed.toLowerCase()).not.toContain("nothing");
+  });
+});
+
+
+/**
+ * PRODUCTION ACCEPTANCE, 2026-09-14 — the SO printed twice.
+ *
+ * A pickup card named the Sales Order at the top AND again in the related
+ * records at the bottom, because the reference line was plain text and the
+ * link had nowhere else to live.
+ */
+describe("each reference appears exactly once, and keeps its link", () => {
+  const pickup = () =>
+    card({
+      direction: "pickup",
+      soRef: "SO-1362",
+      doRef: "DO-2609-019",
+      relatedRecords: [
+        { id: "so", ref: "SO-1362", href: "/operation/orders/so/order-19" },
+        { id: "grn", ref: "GRN-2609-004", href: "/operation?tab=receiving" },
+      ],
+    });
+
+  it("the reference line CARRIES the link the related record used to hold", () => {
+    const refs = cardReferencesOf(pickup());
+    expect(refs.primary).toEqual({
+      ref: "SO-1362",
+      href: "/operation/orders/so/order-19",
+    });
+    expect(refs.secondary?.ref).toBe("DO-2609-019");
+  });
+
+  it("a reference already printed above is REMOVED from the bottom row", () => {
+    const extra = extraRelatedRecordsOf(pickup());
+    expect(extra.map((r) => r.ref)).toEqual(["GRN-2609-004"]);
+  });
+
+  it("a record the card does not otherwise name still shows", () => {
+    const extra = extraRelatedRecordsOf(
+      card({
+        relatedRecords: [{ id: "g", ref: "GRN-2609-004", href: "/x" }],
+      }),
+    );
+    expect(extra).toHaveLength(1);
+  });
+});
+
+describe("work the board cannot place", () => {
+  it("says how many, in words that never imply lateness", () => {
+    expect(undatedSummaryWordOf(20)).toBe(
+      "20 with no date yet — not shown on any column",
+    );
+    expect(undatedSummaryWordOf(1)).toBe(
+      "1 with no date yet — not shown on any column",
+    );
+    expect(undatedSummaryWordOf(20)).not.toMatch(/overdue|late/i);
   });
 });

@@ -552,3 +552,106 @@ describe("context survives the walk", () => {
     expect(screen.getByTestId("ws-col-2026-09-17")).toBeInTheDocument();
   });
 });
+
+
+/**
+ * PRODUCTION ACCEPTANCE, 2026-09-14.
+ */
+describe("the findings the production walk raised", () => {
+  it("undated work OPENS IN PLACE, each record reaching its own source", () => {
+    setSchedule({
+      cards: [
+        card({
+          id: "u1",
+          date: null,
+          partyName: "Ohana",
+          sourceRef: "PO-2609-0009",
+          openHref: "/operation?tab=warehouse-inbound&site=wh-1&source=po-9",
+        }),
+      ],
+    });
+    mount("arrival", "/operation?tab=warehouse-arrival-schedule&site=wh-1");
+    expect(screen.getByTestId("ws-undated")).toHaveTextContent(
+      "1 with no date yet",
+    );
+    const open = screen.getByTestId("ws-undated-open");
+    expect(open).toHaveTextContent("PO-2609-0009");
+    /* The record's OWN door — and it carries no date, because a date filter
+       would exclude the very record the link is for. */
+    expect(open).toHaveAttribute(
+      "href",
+      "/operation?tab=warehouse-inbound&site=wh-1&source=po-9",
+    );
+    expect(open.getAttribute("href")).not.toContain("date=");
+  });
+
+  it("lists every undated record, and never calls one overdue", () => {
+    setSchedule({
+      cards: [
+        card({ id: "a", date: null, sourceRef: "PO-A", overdue: false }),
+        card({ id: "b", date: null, sourceRef: "PO-B", overdue: false }),
+      ],
+    });
+    mount();
+    expect(
+      screen.getByTestId("ws-undated-list").querySelectorAll("li"),
+    ).toHaveLength(2);
+    expect(screen.getByTestId("ws-undated")).not.toHaveTextContent(/overdue/i);
+  });
+
+  it("the SO appears ONCE, as a link, and not again at the foot of the card", () => {
+    setSchedule({
+      cards: [
+        card({
+          direction: "pickup",
+          soRef: "SO-1362",
+          doRef: "DO-2609-019",
+          relatedRecords: [
+            { id: "so", ref: "SO-1362", href: "/operation/orders/so/order-19" },
+          ],
+        }),
+      ],
+    });
+    mount("pickup");
+    expect(screen.getAllByText("SO-1362")).toHaveLength(1);
+    expect(screen.getByText("SO-1362")).toHaveAttribute(
+      "href",
+      "/operation/orders/so/order-19",
+    );
+    expect(screen.queryByTestId("ws-card-related")).toBeNull();
+    /* The DO still stands on its own line. */
+    expect(screen.getByTestId("ws-card-ref-secondary")).toHaveTextContent(
+      "DO-2609-019",
+    );
+  });
+
+  it("ten lines render as ten distinguishable products", () => {
+    /* The projection supplies model + variant; the card must not collapse
+       them. `King` alone identified nothing on the production walk. */
+    const models = [
+      "B1201S King",
+      "B1201S Queen",
+      "H1401S King",
+      "H1401S Queen",
+      "L1201S King",
+      "M1401F Queen",
+      "N1001S Queen",
+      "S1601F King",
+      "S1601S Queen",
+      "TEst Rental King",
+    ];
+    setSchedule({
+      cards: [
+        card({
+          lines: models.map((m, i) =>
+            line({ id: `l${i}`, modelLabel: m, plannedQty: 1 }),
+          ),
+        }),
+      ],
+    });
+    mount();
+    expect(screen.getAllByTestId("ws-line")).toHaveLength(10);
+    for (const m of models) expect(screen.getByText(m)).toBeInTheDocument();
+    expect(screen.queryByText(/\+\d+ more/)).toBeNull();
+  });
+});

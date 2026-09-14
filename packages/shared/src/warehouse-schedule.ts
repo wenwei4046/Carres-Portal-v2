@@ -233,7 +233,7 @@ export function warehouseArrivalSourceFacts(
 
 // ── ARRIVAL cards ────────────────────────────────────────────────────────────
 
-const NO_SKU_KEY = " no-sku";
+const NO_SKU_KEY = " no-sku";
 
 /** The Units of one arrangement, counted at one line's SKU scope. */
 function unitCountsForSku(

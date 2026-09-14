@@ -226,9 +226,15 @@ export function cardTintClassOf(status: WarehouseScheduleDateStatus | null): str
  * §2 · The source references.
  * ──────────────────────────────────────────────────────────────────────── */
 
+export interface CardReference {
+  ref: string;
+  /** The record's own page, when the projection supplied one for that ref. */
+  href: string | null;
+}
+
 export interface CardReferences {
-  primary: string;
-  secondary: string | null;
+  primary: CardReference;
+  secondary: CardReference | null;
 }
 
 /**
@@ -241,12 +247,40 @@ export interface CardReferences {
  * No TCF legacy reference appears on either page (card rule).
  */
 export function cardReferencesOf(card: WarehouseScheduleCard): CardReferences {
+  /* A reference carries its own link when the projection listed one for it.
+     That is what lets the SO and the DO each appear EXACTLY ONCE and still be
+     openable: before this, the SO was printed here as text and AGAIN at the
+     bottom as a related record, purely so the link had somewhere to live. */
+  const linkOf = (ref: string): string | null =>
+    card.relatedRecords.find((r) => r.ref === ref)?.href ?? null;
+  const at = (ref: string): CardReference => ({ ref, href: linkOf(ref) });
+
   if (card.direction === "pickup") {
-    if (card.soRef && card.doRef) return { primary: card.soRef, secondary: card.doRef };
-    if (card.soRef) return { primary: card.soRef, secondary: null };
-    if (card.doRef) return { primary: card.doRef, secondary: null };
+    if (card.soRef && card.doRef)
+      return { primary: at(card.soRef), secondary: at(card.doRef) };
+    if (card.soRef) return { primary: at(card.soRef), secondary: null };
+    if (card.doRef) return { primary: at(card.doRef), secondary: null };
   }
-  return { primary: card.sourceRef, secondary: null };
+  return { primary: at(card.sourceRef), secondary: null };
+}
+
+/**
+ * The related records that are NOT already printed as a reference above.
+ *
+ * The bottom row exists for records the card does not otherwise name — a
+ * posted GRN, a return's source document. Repeating the SO there, when the SO
+ * is the first thing the card says, is the duplicate measured on production
+ * 2026-09-14.
+ */
+export function extraRelatedRecordsOf(
+  card: WarehouseScheduleCard,
+): WarehouseScheduleCard["relatedRecords"] {
+  const shown = new Set(
+    [cardReferencesOf(card).primary.ref, cardReferencesOf(card).secondary?.ref].filter(
+      (r): r is string => Boolean(r),
+    ),
+  );
+  return card.relatedRecords.filter((r) => !shown.has(r.ref));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -364,4 +398,34 @@ export function dateHeadingPartsOf(iso: string): DateHeadingParts {
     day: String(d),
     month: local.toLocaleDateString("en-GB", { month: "short" }),
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Work the board cannot place.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Why the undated count is a DISCLOSURE and not a link to the register.
+ *
+ * The obvious move was to send the operator to Inbound filtered to "no date".
+ * BUILD B tested that against the real `filterInbound` (2026-09-14) and it
+ * cannot be done honestly: a date range DROPS every undated row, so a dated
+ * link can never reach them; a link with no date param lands on all 62
+ * arrangements rather than the 20 that need a date; and no undated-only filter
+ * word exists. Inventing one would change a Register to answer a Schedule's
+ * question.
+ *
+ * The records are already here. `undatedCards` IS exactly that set, already
+ * scoped to this direction and this Site by the projection — so warehouse and
+ * direction are preserved by construction rather than rebuilt into a query
+ * string. Each row then uses its OWN `openHref`, which carries tab + site +
+ * source and deliberately carries no date, because a date filter would exclude
+ * the very record the link is for.
+ *
+ * Nothing here dates anything, and nothing undated is ever overdue.
+ */
+export function undatedSummaryWordOf(count: number): string {
+  return count === 1
+    ? "1 with no date yet — not shown on any column"
+    : `${count} with no date yet — not shown on any column`;
 }

@@ -249,3 +249,95 @@ describe("GET warehouse/inbound — arrival source facts", () => {
     expect(body.sourceFacts).toEqual([]);
   });
 });
+
+/**
+ * PRODUCTION ACCEPTANCE, 2026-09-14 — ten lines that all read "King".
+ *
+ * `PO-20260903-7907` rendered ten rows saying only `King` or `Queen`, because
+ * this handler mapped the product name to `product_skus.variant` and never
+ * read the model. A size is not a product: that PO carried `B1201S King`,
+ * `H1401S King` and `S1601F King`, and on the board they were three identical
+ * rows. The model name is the authoritative half and it was simply not read.
+ */
+function dbWithModels() {
+  const rows: Record<string, unknown[]> = {
+    purchase_orders: [
+      {
+        id: "PO-1",
+        version: 1,
+        supplier_id: "sup-1",
+        warehouse_id: "site-1",
+        destination_id: null,
+        status: "open",
+        official_delivery_date: null,
+        eta_date: "2026-09-21",
+        placed_at: "2026-09-01",
+        so: 1362,
+      },
+    ],
+    warehouses: [{ id: "site-1", name: "Carres Klang" }],
+    suppliers: [{ id: "sup-1", name: "Ohana" }],
+    purchase_order_lines: [
+      { id: "l1", po_id: "PO-1", qty: 1, destination_id: null, sku: "B1201S-K" },
+      { id: "l2", po_id: "PO-1", qty: 2, destination_id: null, sku: "H1401S-K" },
+      { id: "l3", po_id: "PO-1", qty: 1, destination_id: null, sku: "NO-MODEL-K" },
+    ],
+    product_skus: [
+      { id: "s1", sku: "B1201S-K", variant: "King", model_id: "m1" },
+      { id: "s2", sku: "H1401S-K", variant: "King", model_id: "m2" },
+      { id: "s3", sku: "NO-MODEL-K", variant: "King", model_id: null },
+    ],
+    product_models: [
+      { id: "m1", name: "B1201S" },
+      { id: "m2", name: "H1401S" },
+    ],
+  };
+  vi.mocked(userClient).mockReturnValue({
+    from: (table: string) => {
+      const q: any = {
+        select: () => q,
+        order: () => q,
+        range: async (start: number) => ({
+          data: start === 0 ? rows[table] ?? [] : [],
+          error: null,
+        }),
+      };
+      return q;
+    },
+  } as never);
+}
+
+describe("GET warehouse/inbound — product identity", () => {
+  it("names a product MODEL + VARIANT, never the size on its own", async () => {
+    dbWithModels();
+    const body = (await (await app().request("/inbound")).json()) as {
+      arrivals: Array<{
+        products: Array<{ sku: string | null; name: string | null }>;
+      }>;
+    };
+    const named = new Map(
+      body.arrivals.flatMap((r) =>
+        r.products.map((p) => [p.sku, p.name] as const),
+      ),
+    );
+    expect(named.get("B1201S-K")).toBe("B1201S King");
+    expect(named.get("H1401S-K")).toBe("H1401S King");
+    /* Two DIFFERENT products that both used to read `King`. */
+    expect(named.get("B1201S-K")).not.toBe(named.get("H1401S-K"));
+  });
+
+  it("falls back to the variant when a SKU carries no model — never invents one", async () => {
+    dbWithModels();
+    const body = (await (await app().request("/inbound")).json()) as {
+      arrivals: Array<{
+        products: Array<{ sku: string | null; name: string | null }>;
+      }>;
+    };
+    const named = new Map(
+      body.arrivals.flatMap((r) =>
+        r.products.map((p) => [p.sku, p.name] as const),
+      ),
+    );
+    expect(named.get("NO-MODEL-K")).toBe("King");
+  });
+});
