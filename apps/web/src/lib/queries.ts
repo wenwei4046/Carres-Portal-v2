@@ -7554,6 +7554,7 @@ export function useRecordHandoverEvent(
       await qc.invalidateQueries({
         queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
       });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -7578,6 +7579,7 @@ export function useRecordOutboundPrep(doId: string) {
         queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
       });
       await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
     },
   });
 }

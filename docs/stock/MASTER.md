@@ -2106,6 +2106,9 @@ Work uses that same stable identity for rendered rows, retains Site beside the D
 assignment, and displays the separate recipient and required-result fields without repeating them
 inside the stored action sentence. `OperationWork.test.tsx` exercises two Sites under one person.
 Acceptance remains separate from exact-Unit handover completion. Monitor creates no Work.
+Successful prep and handover now invalidate the shared Work read, so first-scan ownership and
+remaining obligations refresh from server facts. The cache regression test also keeps open Work
+unchanged after a refused handover; these checks do not substitute for real-person production proof.
 
 Committed 0459 checks active role/Site but does not enforce personal identity or implement
 offboarding/transfer history. Preserve 0459/0460 unchanged; correct these guards through the
