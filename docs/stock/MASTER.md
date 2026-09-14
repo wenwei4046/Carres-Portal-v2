@@ -2109,7 +2109,10 @@ Acceptance remains separate from exact-Unit handover completion. Monitor creates
 
 Committed 0459 checks active role/Site but does not enforce personal identity or implement
 offboarding/transfer history. Preserve 0459/0460 unchanged; correct these guards through the
-governed new-migration path before applying and admitting Work. The 02:47 UTC account/tracker
+governed new-migration path before applying and admitting Work. Do not reuse `warehouse_is_person`
+unchanged for external operators: `hr-team.ts` provisions Warehouse accounts without Carres staff
+codes, which that predicate requires. External-person eligibility must have a governed identity
+source separate from Carres employment. The 02:47 UTC account/tracker
 measurement in §13.10 remains the production gate. Yu Jun and Shasha are Carres Operation staff,
 not Warehouse substitutes. Real-person acceptance, concurrency, cross-Site refusal and closure
 must be proven; passing branch CI is not personal Warehouse go-live.
