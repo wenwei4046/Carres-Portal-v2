@@ -731,11 +731,18 @@ directory only and said so.*
   Work feed's resolved owner as an avatar (hover/accessible name = full name, never a name in the
   sentence). It reads the Work feed's items; it resolves no owner and creates no second action.
   No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
-  the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, `../delivery/MASTER.md`
-  §8.4):** its status word names the actor and the fact in primary-school English
-  (`Operation must call the customer` · `Waiting for {partner} pickup` · `Goods collected by
-  {partner}`), one arithmetic, no owner avatar and no second action. It is a status word, not an
-  action sentence.
+  the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, journey rungs re-ruled
+  2026-09-14, `../delivery/MASTER.md` §8.4):** its status word names the actor and the fact in
+  primary-school English (`Operation must call the customer` · `Waiting for {partner} pickup` ·
+  `Collected by {partner}` · `On the way to customer`), one arithmetic, no owner avatar and no
+  second action. It is a status word, not an action sentence.
+  **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
+  (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
+  blocker (`Ready` · `Stock risk` · `Payment blocked` · `Logistics details incomplete` ·
+  `DO not released`). The two never merge into one status, because a progress rung and a
+  readiness fact answer different questions and come from different arithmetics. Every card also
+  wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one
+  total. No other surface adopts this grammar without its own owner ruling.
 - **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner ruling 2026-09-13.** For Delivery
   Work, line 1 is the act with its recipient (`Call NETS`) and line 2 the required result
   (`Confirm the delivery date`); the row's status word carries the fact. Owner, source object and
@@ -1144,7 +1151,11 @@ Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the k
 DatePicker skin and dot markers) predates the kit component by hours and migrates onto it in its
 own card — §6.1's second-occurrence rule; nobody draws a third month grid. On Monitor, the month
 calendar is the persistent date picker: choosing a date opens that date's `Day` view. The page
-toolbar owns `Day · Week · Month`; `Calendar` is never repeated as a `WORK TO DO` rail row.
+toolbar owns `Day · 3 days · Work week · Month` (owner ruling 2026-09-14 — a layout never wears a
+word it does not honour, so a three-day half-week is never labelled `Week`); `Calendar` is never
+repeated as a `WORK TO DO` rail row. **Today is a ring and the selected date is the blue FILL, so
+the two never compete, and the current work week carries a subtle band** — a marker that marks a
+day by shape and position, never by colour alone.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
