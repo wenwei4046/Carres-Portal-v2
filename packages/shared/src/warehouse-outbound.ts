@@ -89,7 +89,7 @@ export function warehouseEmptyDaySentence(dateLabel: string): string {
 }
 
 /**
- * ONE Calendar card = ONE active customer Delivery Order scope (never one
+ * ONE Calendar card = ONE active customer Delivery Order + Warehouse Site scope (never one
  * Sales Order, never one Unit). Aggregation is display-only: every count
  * carries the exact Unit rows it was counted from.
  */
@@ -144,7 +144,7 @@ export interface OutboundProduct {
 }
 
 /**
- * Group the schedule feed's per-Unit pickup events into DO cards — the ONE
+ * Group the schedule feed's per-Unit pickup events into DO + Site cards — the ONE
  * arithmetic the Dashboard, Outbound and their tests all read (Law D).
  * Only `customer_delivery_pickup` events participate; `customer_handover`
  * is the Delivery calendar's projection, not Warehouse work.

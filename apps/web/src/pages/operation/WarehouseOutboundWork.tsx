@@ -521,7 +521,7 @@ export default function WarehouseOutboundWork() {
               searchPlaceholder="DO, SO, product, customer, driver or Unit ID…"
               initialSearch={params.get("q") ?? ""}
               onSearchChange={onSearch}
-              isLoading={isLoading}
+              isLoading={isLoading || !data}
               groupBanner={false}
               emptyMessage={empty}
               rowStyle={(c) =>
