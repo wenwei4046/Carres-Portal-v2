@@ -321,3 +321,74 @@ describe("the CATALOG reaches categoryKey", () => {
     expect(result.current.cards).toHaveLength(1);
   });
 });
+
+/**
+ * PICKUP SIDE — the same SKU must not get two answers.
+ *
+ * Delivery's feed carried neither the model name nor the catalog category, so
+ * a 5539 sofa read `Sofa` on Arrival and `Other goods` on Pickup. The hook now
+ * asks for the catalog on this side too, and SAYS SO when the server cannot
+ * supply it rather than classifying in silence.
+ */
+describe("pickup product category", () => {
+  const EVENT = {
+    orderId: "order-19",
+    deliveryOrderId: "do-19",
+    doNumber: "DO-2609-019",
+    leg: 0,
+    kind: "customer_delivery_pickup",
+    unitId: "unit-1",
+    unitCode: "U-1",
+    sku: "5539-CNR",
+    product: "5539 Corner",
+    warehouseSiteId: "site-1",
+    fromLocation: "Carres Klang",
+    toCustomer: "Ms Tan",
+    eventDate: "2026-09-21",
+    logisticsPartner: "NETS",
+  };
+
+  it("passes the CATALOG categories through to the pickup cards", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/delivery-arrangements/warehouse-schedule"))
+        return Promise.resolve({
+          events: [EVENT],
+          skuCategories: [{ sku: "5539-CNR", category: "sofa" }],
+        });
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(
+      result.current.errors.some((e) => /catalog/i.test(e.message)),
+    ).toBe(false);
+  });
+
+  it("REPORTS a missing catalog instead of classifying in silence", async () => {
+    h.fetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/operation/delivery-arrangements/warehouse-schedule"))
+        return Promise.resolve({ events: [EVENT] });
+      return route(url);
+    });
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(
+      result.current.errors.some((e) => /catalog is not available/i.test(e.message)),
+    ).toBe(true);
+  });
+
+  it("stays quiet on an empty feed — there is nothing to classify", async () => {
+    const { result } = renderHook(
+      () => useWarehouseSchedule({ direction: "pickup", from: "2026-09-14" }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.errors).toEqual([]);
+  });
+});
