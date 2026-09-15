@@ -88,17 +88,12 @@ describe("GET warehouse/inbound", () => {
       sites: [],
       sourceFacts: [],
       skuCategories: [],
+      unmappedDestinations: [],
       unresolvedSources: [],
       page: { offset: 0, limit: 50, total: 0 },
+      /* Three filters, not five (owner ruling 2026-09-15). */
       facets: {
-        status: {
-          all: 0,
-          open: 0,
-          expected: 0,
-          "part-received": 0,
-          received: 0,
-          "with-issue": 0,
-        },
+        status: { open: 0, received: 0, all: 0 },
         sourceType: {},
         site: {},
       },
