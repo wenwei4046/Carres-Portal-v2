@@ -10,6 +10,7 @@ import {
 } from "@carres/shared";
 import { mapPgError } from "./route-helpers";
 import { storageSkuCategories } from "./sku-categories";
+import { todayIsoMYT } from "./today";
 
 /**
  * The order's booking facts + the ONE goods/money reading of it.
@@ -124,7 +125,7 @@ export async function loadBookingContext(
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => l.sku),
     categories: storageCats,
-    asOf: new Date().toISOString().slice(0, 10),
+    asOf: todayIsoMYT(),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });

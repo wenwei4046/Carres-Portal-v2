@@ -16,6 +16,7 @@ import {
 } from "@carres/shared";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 import { storageSkuCategories } from "../../lib/sku-categories";
 
@@ -455,7 +456,7 @@ async function storageFeeOf(
       importedSof: ctrl.storage_fee_sof ?? null,
       skus: storageSkus,
       categories: storageCats,
-      asOf: new Date().toISOString().slice(0, 10),
+      asOf: todayIsoMYT(),
       collectedAt: ctrl.storage_collected_at ?? null,
       waiverStatus: ctrl.storage_waiver_status ?? null,
     }).fee;

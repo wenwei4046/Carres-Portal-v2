@@ -16,6 +16,7 @@ import {
 import { loadPurchasingSettings } from "./purchasing-settings";
 import { mapPgError } from "./route-helpers";
 import { userClient } from "./supabase";
+import { todayIsoMYT } from "./today";
 
 /**
  * THE CUSTOMER-DEMAND READ — one recomputation, two Purchasing surfaces.
@@ -47,7 +48,7 @@ import { userClient } from "./supabase";
  */
 
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoMYT();
 }
 
 /**

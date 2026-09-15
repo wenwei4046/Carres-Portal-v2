@@ -21,6 +21,7 @@ import { requireFinance } from "../../lib/auth-guards";
 // renderInvoicePdf removed — see file header note re: Workers WASM limit.
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { InvoiceTemplateData } from "../../lib/pdf/types";
 import type { AppEnv } from "../../types";
 
@@ -181,7 +182,7 @@ async function attachLegacyStorage(sb: any, rows: Array<Record<string, unknown>>
     for (const l of o?.order_lines ?? []) if (l.sku) allSkus.add(String(l.sku));
   }
   const categories = await storageSkuCategories(sb, [...allSkus]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoMYT();
   const legacyByOrder = new Map<string, number>();
   for (const r of rows) {
     const o = r.orders as {
