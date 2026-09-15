@@ -14,6 +14,7 @@ import {
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import type { AppEnv } from "../../types";
 
@@ -66,21 +67,11 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
       return c.json(m.body, m.status);
     }
   }
-  /* The change list names its actors from People — read once, never joined
-     in the client. */
-  const actorIds = [
-    ...new Set(
-      ((changesR.data ?? []) as Array<{ actor_id: string | null }>)
-        .map((r) => r.actor_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const actorsR =
-    actorIds.length > 0
-      ? await sb.from("app_users").select("id, name").in("id", actorIds)
-      : { data: [] as Array<{ id: string; name: string | null }>, error: null };
-  const actorName = new Map(
-    ((actorsR.data ?? []) as Array<{ id: string; name: string | null }>).map((a) => [a.id, a.name]),
+  /* The change list names its actors through the one actor lookup — read
+     once, never joined in the client. */
+  const actorName = await resolveActorNames(
+    sb,
+    ((changesR.data ?? []) as Array<{ actor_id: string | null }>).map((r) => r.actor_id),
   );
   return c.json({
     partners: partnersR.data ?? [],

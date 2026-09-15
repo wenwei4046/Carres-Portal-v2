@@ -7,6 +7,7 @@ import {
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -99,14 +100,7 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
       ].filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
-  const names = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", ids);
-    for (const u of users ?? []) names.set(u.id as string, u.name as string);
-  }
+  const names = await resolveActorNames(sb, ids);
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (names.get(v) ?? null) : null;
 

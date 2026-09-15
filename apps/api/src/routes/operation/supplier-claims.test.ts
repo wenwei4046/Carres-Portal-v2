@@ -89,6 +89,15 @@ function listBuilder(rows: unknown[], eqCalls: Array<[string, unknown]>): any {
   return b;
 }
 
+/** The actor lookup's staff door (`actor_display_names`) — it names u1. */
+function namesDoor() {
+  return vi.fn(async (name: string) =>
+    name === "actor_display_names"
+      ? { data: [{ id: "u1", name: "Shasha" }], error: null }
+      : { data: null, error: null },
+  );
+}
+
 beforeAll(async () => {
   const kp = await generateKeyPair("ES256", { extractable: true });
   signKey = kp.privateKey;
@@ -110,6 +119,7 @@ describe("GET /api/operation/supplier-claims", () => {
   it("defaults to the OPEN queue — a worklist does not open on closed rows", async () => {
     const eqCalls: Array<[string, unknown]> = [];
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
         if (t === "product_skus") {
           const builder = listBuilder([{ sku: "MS01-K", variant: "King", product_models: { name: "Mattress Classic" } }], eqCalls);
@@ -119,8 +129,7 @@ describe("GET /api/operation/supplier-claims", () => {
         if (t === "supplier_claims") return listBuilder([CLAIM], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
-        if (t === "app_users")
-          return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        if (t === "salespersons") return listBuilder([], eqCalls);
         // R4 — the two units this claim quarantined.
         if (t === "ops_stock_items")
           return listBuilder(
@@ -267,10 +276,10 @@ describe("GET /api/operation/supplier-claims", () => {
       error: { code: "XX000", message: "held-unit read failed", details: "" },
     });
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((table: string) => {
         if (table === "supplier_claims") return listBuilder([CLAIM], eqCalls);
         if (table === "suppliers") return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
-        if (table === "app_users") return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
         if (table === "ops_stock_items") return held;
         return listBuilder([], eqCalls);
       }),
@@ -331,14 +340,14 @@ describe("GET /api/operation/supplier-claims", () => {
       requested_at: "2026-07-27T00:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
         tables.push(t);
         if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([CLAIM, LATE], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
-        if (t === "app_users")
-          return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        if (t === "salespersons") return listBuilder([], eqCalls);
         // The line still owes 1 unit → the supplier still owes the move.
         if (t === "purchase_order_lines")
           return listBuilder([{ id: "l2", qty: 3, received_qty: 2 }], eqCalls);
@@ -384,6 +393,7 @@ describe("GET /api/operation/supplier-claims", () => {
       requested_at: "2026-07-27T00:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
         if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([LATE], eqCalls);
@@ -968,6 +978,7 @@ describe("GET / carries the customer resolution", () => {
       customer_resolution_at: "2026-08-05T09:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => (t === "supplier_claims" ? builder([resolved]) : builder([]))),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1178,6 +1189,7 @@ describe("GET / carries the Carres execution", () => {
       carres_execution_at: "2026-09-01T09:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => (t === "supplier_claims" ? builder([executed]) : builder([]))),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

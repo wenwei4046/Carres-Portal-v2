@@ -3,6 +3,7 @@ import { z } from "zod";
 import { mapPgError } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -94,22 +95,14 @@ escalationsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   }
 
   // created_by FK points to auth.users (not public.app_users) so PostgREST
-  // can't traverse it. Fetch names from app_users manually in one round-trip.
+  // can't traverse it. Names come from the one actor lookup.
   const rows = data ?? [];
-  const authorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))];
-  const nameMap: Record<string, string> = {};
-  if (authorIds.length) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", authorIds);
-    (users ?? []).forEach((u) => { nameMap[u.id] = u.name; });
-  }
+  const names = await resolveActorNames(sb, rows.map((r) => r.created_by));
 
   return c.json(
     rows.map((r) => ({
       ...r,
-      app_users: r.created_by ? { name: nameMap[r.created_by] ?? null } : null,
+      app_users: r.created_by ? { name: names.get(r.created_by) ?? null } : null,
     })),
   );
 });
