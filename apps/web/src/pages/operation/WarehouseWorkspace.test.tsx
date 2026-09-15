@@ -725,3 +725,62 @@ describe("finding today", () => {
     expect(at).not.toContain("2026-09-14");
   });
 });
+
+
+/**
+ * NARROW SCREENS — owner refinement 2026-09-15.
+ *
+ * The shell already collapses its own rail to 60px below 1280 and offers
+ * `Show menu` to reopen it (`PortalSidebar`, its own test). What nothing
+ * covered was the other half of that width: that the Schedule standing beside
+ * the collapsed rail keeps the single-day view, its date navigation and its
+ * card actions. No Schedule-specific navigation exists, and none should.
+ */
+describe("the narrow width keeps the work, not just the layout", () => {
+  it("shows ONE day with date navigation, Today, and the card's own door", () => {
+    wide = false;
+    setSchedule({
+      cards: [
+        card({
+          date: "2026-09-14",
+          openHref: "/operation?tab=warehouse-inbound&source=po-1",
+        }),
+      ],
+    });
+    mount();
+
+    /* single-day view, not the six-column board */
+    expect(screen.getByTestId("ws-agenda")).toBeInTheDocument();
+    expect(screen.queryByTestId("ws-board")).toBeNull();
+
+    /* date navigation survives */
+    expect(screen.getByTestId("ws-prev")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-next")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-today")).toBeInTheDocument();
+
+    /* and so does the work itself */
+    expect(screen.getByTestId("ws-card-c1")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-card-open")).toHaveAttribute(
+      "href",
+      "/operation?tab=warehouse-inbound&source=po-1",
+    );
+  });
+
+  it("Today still works at narrow width", () => {
+    wide = false;
+    setSchedule();
+    mount("arrival", "/operation?tab=warehouse-arrival-schedule&date=2026-11-03");
+    fireEvent.click(screen.getByTestId("ws-today"));
+    expect(screen.getByTestId("location").textContent ?? "").not.toContain("date=");
+  });
+
+  it("undated work is still reachable when the board is one day wide", () => {
+    wide = false;
+    setSchedule({
+      cards: [card({ date: null, openHref: "/operation?tab=warehouse-inbound&source=po-9" })],
+    });
+    mount();
+    expect(screen.getByTestId("ws-undated")).toBeInTheDocument();
+    expect(screen.getByTestId("ws-undated-open")).toBeInTheDocument();
+  });
+});
