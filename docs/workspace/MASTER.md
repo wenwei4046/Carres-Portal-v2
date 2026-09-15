@@ -83,6 +83,13 @@ Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`; the protec
 the same sentence. No action is routed to an Operations Superuser by default and Delivery Settings
 never holds a roster or an owner list (`../delivery/MASTER.md` §13.1).
 
+**`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
+list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
+because an operation login cannot read Finance accounts under RLS. The database refuses a
+non-Finance holder or cover with `the Finance Approver must be an active Finance user` (migration
+0514, `workspace_duty_holder_roles`). While nobody holds the duty, the HR position tick still
+answers (0508). The principal can always approve.
+
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
 
