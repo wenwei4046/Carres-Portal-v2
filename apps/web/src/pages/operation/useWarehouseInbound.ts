@@ -13,6 +13,13 @@ export function useWarehouseInbound(params = new URLSearchParams(), offset = 0) 
       arrivals: InboundArrival[];
       unresolvedSources?: string[];
       sites: Array<{ id: string; name: string }>;
+      /** Purchasing destinations with goods coming and no governed Site.
+       *  Additive — absent on a Worker built before 2026-09-15. */
+      unmappedDestinations?: Array<{
+        id: string | null;
+        name: string | null;
+        arrivals: number;
+      }>;
       page: { offset: number; limit: number; total: number };
       facets: {
         status: Record<string, number>;
