@@ -40,6 +40,8 @@ import {
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
 import { VoucherAdvanceCard } from "./VoucherAdvance";
+import { paysOut } from "@carres/shared/money-accounts";
+import { useMoneyAccounts } from "../settings/api";
 
 /**
  * Finance → Payment Vouchers (migration 0477). The ONE door money leaves
@@ -414,6 +416,7 @@ function VoucherForm() {
   const existing = usePaymentVoucher(id);
   const suppliers = useApSuppliers();
   const accounts = useApAccounts();
+  const moneyAccounts = useMoneyAccounts();
   const save = useSaveVoucher();
 
   const [purpose, setPurpose] = useState<Purpose>("SUPPLIER_BILLS");
@@ -484,7 +487,8 @@ function VoucherForm() {
   }, [bills.data, mine]);
 
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
-  const payFromChoices = (accounts.data ?? []).filter((a) => a.for_pay_from);
+  // 0512: Paid from reads the one money-account list — cash and banks only.
+  const payFromChoices = (moneyAccounts.data ?? []).filter(paysOut);
   const lineChoices = (accounts.data ?? []).filter((a) => a.for_voucher_line);
   const total = voucherTotal(purpose, picks, lines, advance);
   const advanceN = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
@@ -555,7 +559,7 @@ function VoucherForm() {
       <div className="flex-1 overflow-auto p-4" data-testid="voucher-form">
         <div className="flex max-w-[1100px] flex-col gap-4">
           <Facts title="Who is paid, and from where">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
                 Purpose
                 <select aria-label="Purpose" className={`${fieldCls} mt-1`} value={purpose}

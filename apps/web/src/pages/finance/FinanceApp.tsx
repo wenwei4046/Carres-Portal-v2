@@ -19,6 +19,7 @@ import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
 import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
+import FinanceSettings from "./settings/FinanceSettings";
 import ApOutstanding from "./payables/ApOutstanding";
 
 /**
@@ -100,6 +101,8 @@ export default function FinanceApp() {
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
           <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
+          {/* 0512 — the one list of money accounts. */}
+          <Route path="settings" element={financeOnly(<FinanceSettings />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>

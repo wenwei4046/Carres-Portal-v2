@@ -35,6 +35,7 @@ import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
+import financeMoneyAccountsRouter from "./money-accounts";
 
 /**
  * FINANCE LEDGER — the read-only Journal, Trial Balance and Self-check.
@@ -55,10 +56,14 @@ import { todayIsoMYT } from "../../lib/delivery-order-issue";
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
  *   GET /balance-sheet      gl_balance_sheet, passed through
  *
+ *   /money-accounts         the one list of cash, bank and holding accounts
+ *                           (0512) — the only writer mounted here; see money-accounts.ts
+ *
  * A read that fails is an error, never an empty answer: an empty Journal and
  * a Journal that could not be read must not look the same.
  */
 const financeLedgerRouter = new Hono<AppEnv>();
+financeLedgerRouter.route("/money-accounts", financeMoneyAccountsRouter);
 
 type Sb = ReturnType<typeof userClient>;
 type PgError = { code?: string; message?: string; details?: string };
