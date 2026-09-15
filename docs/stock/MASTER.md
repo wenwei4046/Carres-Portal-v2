@@ -2213,6 +2213,13 @@ two-person duty) was found unapplied while 0438–0440 were — with nobody reso
 
 ### 13.10 · FACT — Warehouse scope and source readiness (2026-09-14)
 
+**Receiving navigation correctness (2026-09-15).** Inbound waits for its requested
+PO query before mounting the receiving view; a pending read must not flash a
+missing-PO error. A source-scoped list limits destination-conflict warnings to
+that source. The Transfer / Return / Repair workspace owns its header and the
+shell suppresses its second global bar. These corrections do not change receipt
+authority, inventory dates, quantities or final UI acceptance.
+
 The shared Outbound projection groups exact Units by Delivery Order + Warehouse Site. Monitor
 links carry Site IDs; both Outbound doors consume DO/Site context, and the internal selected scope
 expands after data arrives. Display names remain compatible with existing links. Monitor checks
