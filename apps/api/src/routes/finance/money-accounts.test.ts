@@ -143,7 +143,7 @@ describe("rename and take out of use", () => {
 
   it("an account a payment method points at stays in use, in the database's words", async () => {
     const sentence =
-      "1121 Public Bank is the account for the Bank transfer payment method. It stays in use until that payment method uses another account.";
+      "Bank transfer still uses 1121 Public Bank. Move Bank transfer to another account first.";
     stubRpc({ data: null, error: { code: "P0001", message: sentence, details: "money_account_used_by_method" } });
     const res = await call("PATCH", "/1121", { name: "Public Bank", is_active: false });
     expect(res.status).toBe(422);
@@ -157,7 +157,7 @@ describe("rename and take out of use", () => {
     const door = mig.slice(mig.indexOf("function public.gl_money_account_update"), mig.indexOf("comment on function public.gl_money_account_update"));
     expect(door).toContain("from public.gl_payment_account_map g");
     expect(door).toContain("m.active");
-    expect(door).toContain("It stays in use until that payment method uses another account.");
+    expect(door).toContain("Move % to another account first.");
     expect(door).toContain("detail = 'money_account_used_by_method'");
   });
 

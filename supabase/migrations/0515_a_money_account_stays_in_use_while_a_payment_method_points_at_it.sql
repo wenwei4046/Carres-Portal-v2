@@ -66,8 +66,8 @@ begin
      order by m.sort, m.label
      limit 1;
     if v_method is not null then
-      raise exception '% % is the account for the % payment method. It stays in use until that payment method uses another account.',
-        p_code, v_old, v_method
+      raise exception '% still uses % %. Move % to another account first.',
+        v_method, p_code, v_old, v_method
         using errcode = 'P0001', detail = 'money_account_used_by_method';
     end if;
   end if;
@@ -118,7 +118,7 @@ begin
   if not v_old.active and p_active then
     v_acct := public.gl_account_for_payment_method(p_method, null);
     if not public.gl_money_account_ok(v_acct) then
-      raise exception '% % is out of use. Choose another account for the % payment method first.',
+      raise exception '% % is out of use. Move % to another account first.',
         coalesce(v_acct, ''), coalesce((select a.name from gl_accounts a where a.code = v_acct), ''), v_old.label
         using errcode = 'P0001', detail = 'money_account_out_of_use';
     end if;
