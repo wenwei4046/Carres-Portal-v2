@@ -24,7 +24,7 @@ import {
   type RegisterFacts,
   type RegisterOrderFact,
 } from "../../lib/purchase-demand-read";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -466,10 +466,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
         .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
       sb.from("delivery_partners").select("id, name"),
     ]);
-    if (configured.error || partners.error) {
-      const m = mapPgError(configured.error ?? partners.error!);
-      return c.json(m.body, m.status);
-    }
+    if (configured.error || partners.error) return fail(c, configured.error ?? partners.error!);
     const partnerNames = new Map(
       ((partners.data ?? []) as Record<string, unknown>[]).map((p) => [
         p.id as string,

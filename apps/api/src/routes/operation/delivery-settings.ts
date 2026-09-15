@@ -12,7 +12,7 @@ import {
   partnerVehicleInput,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
@@ -62,10 +62,7 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
       loadPurchasingSettings(sb).catch(() => null),
     ]);
   for (const r of [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR]) {
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
+    if (r.error) return fail(c, r.error);
   }
   /* The change list names its actors through the one actor lookup — read
      once, never joined in the client. */

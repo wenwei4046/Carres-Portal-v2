@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, type InboundInput } from "@carres/shared";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -208,8 +208,7 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       facets: view.facets,
     });
   } catch (error) {
-    const mapped = mapPgError(error as Parameters<typeof mapPgError>[0]);
-    return c.json(mapped.body, mapped.status);
+    return fail(c, error as Parameters<typeof fail>[1]);
   }
 });
 
@@ -259,18 +258,9 @@ operationWarehouseRouter.get("/", async (c) => {
       .select("sku, warehouse_id, on_hand, available, reserved"),
     sb.from("stock_balances").select("sku, warehouse_id, low_threshold, high_threshold"),
   ]);
-  if (whRes.error) {
-    const m = mapPgError(whRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (sbRes.error) {
-    const m = mapPgError(sbRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (thrRes.error) {
-    const m = mapPgError(thrRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (whRes.error) return fail(c, whRes.error);
+  if (sbRes.error) return fail(c, sbRes.error);
+  if (thrRes.error) return fail(c, thrRes.error);
 
   const warehouses = (whRes.data ?? []) as DB.WarehouseRow[];
   const balances = (sbRes.data ?? []) as Array<{

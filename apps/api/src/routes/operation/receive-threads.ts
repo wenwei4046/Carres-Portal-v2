@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { OperationReceiveThreadsInput } from "@carres/shared";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -79,10 +79,7 @@ operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
       .from("order_lines")
       .select("order_id, sku, qty")
       .in("order_id", orderIds);
-    if (e2) {
-      const m = mapPgError(e2);
-      return c.json(m.body, m.status);
-    }
+    if (e2) return fail(c, e2);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const l of ((lines ?? []) as any[])) {
       const list = linesByOrder.get(l.order_id) ?? [];

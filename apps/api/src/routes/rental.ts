@@ -39,7 +39,7 @@ import {
   PRODUCT_MODELS,
   PRODUCT_SKUS,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
 import { stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
@@ -1967,8 +1967,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   if (insErr) {
     // Money safety: a link we can't track must not stay payable.
     await stripe.checkout.sessions.expire(session.id).catch(() => {});
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
+    return fail(c, insErr);
   }
 
   return c.json({ session: shapeRentalSession(row as RentalSessionRow) }, 201);

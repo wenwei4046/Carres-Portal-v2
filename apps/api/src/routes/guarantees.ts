@@ -22,7 +22,7 @@ import {
   type GuaranteeRemedy,
   type GuaranteeStatus,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -386,10 +386,7 @@ guaranteesRouter.post("/products", async (c) => {
     })
     .select("id")
     .maybeSingle();
-  if (modelErr) {
-    const m = mapPgError(modelErr);
-    return c.json(m.body, m.status);
-  }
+  if (modelErr) return fail(c, modelErr);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const modelId = String((createdModel as any).id);
 
@@ -407,8 +404,7 @@ guaranteesRouter.post("/products", async (c) => {
   });
   if (skuErr) {
     await sb.from(PRODUCT_MODELS).delete().eq("id", modelId); // unwind
-    const m = mapPgError(skuErr);
-    return c.json(m.body, m.status);
+    return fail(c, skuErr);
   }
 
   // 3. the terms — what it actually promises.
@@ -431,8 +427,7 @@ guaranteesRouter.post("/products", async (c) => {
   if (termErr) {
     await sb.from(PRODUCT_SKUS).delete().eq("sku", sku); // unwind both
     await sb.from(PRODUCT_MODELS).delete().eq("id", modelId);
-    const m = mapPgError(termErr);
-    return c.json(m.body, m.status);
+    return fail(c, termErr);
   }
 
   return c.json({ ok: true, sku, label, modelId, covers: scopeLabel }, 201);

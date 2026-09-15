@@ -4,7 +4,7 @@ import {
   setPartnerDeliveryRulesInput,
   setPartnerJourneyCalendarInput,
 } from "@carres/shared";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -121,10 +121,7 @@ operationPartnersRouter.put("/:id/delivery-rules", async (c) => {
     )
     .eq("id", id)
     .maybeSingle();
-  if (readErr) {
-    const m = mapPgError(readErr);
-    return c.json(m.body, m.status);
-  }
+  if (readErr) return fail(c, readErr);
   if (!data) throw new HTTPException(404, { message: "Logistic partner not found" });
   return c.json({ partner: data });
 });
@@ -186,10 +183,7 @@ operationPartnersRouter.put("/:id/journey-calendar", async (c) => {
     )
     .eq("id", id)
     .maybeSingle();
-  if (readErr) {
-    const m = mapPgError(readErr);
-    return c.json(m.body, m.status);
-  }
+  if (readErr) return fail(c, readErr);
   if (!data) throw new HTTPException(404, { message: "Logistic partner not found" });
   return c.json({ partner: data });
 });

@@ -5,7 +5,7 @@ import {
   supplierPosListQuery,
 } from "@carres/shared";
 import { requireSupplier } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -133,10 +133,7 @@ supplierPosRouter.get("/", requireSupplier, async (c) => {
     const { data: oRows, error: oErr } = await sb.rpc("supplier_orders_for_threads", {
       p_order_ids: orderIds,
     });
-    if (oErr) {
-      const m = mapPgError(oErr);
-      return c.json(m.body, m.status);
-    }
+    if (oErr) return fail(c, oErr);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
@@ -351,10 +348,7 @@ supplierPosRouter.get("/:poId/pickup-events", requireSupplier, async (c) => {
       .from("order_supplier_threads")
       .select("pickup_event_id")
       .in("pickup_event_id", eventIds);
-    if (e2) {
-      const m = mapPgError(e2);
-      return c.json(m.body, m.status);
-    }
+    if (e2) return fail(c, e2);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const t of ((tcRows ?? []) as any[])) {
       const eid = t.pickup_event_id as string | null;

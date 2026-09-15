@@ -14,7 +14,7 @@ import {
   docNumber,
   storageHold,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { storageSkuCategories } from "../../lib/sku-categories";
@@ -284,20 +284,14 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     idempotencyKey: parsed.data.idempotencyKey,
     duplicateAck: parsed.data.duplicateAck,
   });
-  if (payErr) {
-    const m = mapPgError(payErr);
-    return c.json(m.body, m.status);
-  }
+  if (payErr) return fail(c, payErr);
 
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")
     .select(CONTROL_GATE_COLS)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
+  if (ctrlErr) return fail(c, ctrlErr);
 
   const out = data as { payment: unknown };
   return c.json({ payment: out.payment, control }, 201);
@@ -503,10 +497,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     .select("id, delivery_date, ops_order_control(extension_count, extension_original_date)")
     .eq("id", orderId)
     .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   const ctrl = Array.isArray(order.ops_order_control)

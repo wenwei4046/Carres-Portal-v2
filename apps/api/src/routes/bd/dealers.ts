@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { userClient } from "../../lib/supabase";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import type { AppEnv } from "../../types";
 
 /**
@@ -40,10 +40,7 @@ bdDealersRouter.get("/", async (c) => {
   // alongside and DROP showroom rows. Fail closed: a broken channel read
   // must not silently leak showrooms in (or reclassify them as dealers).
   const chan = await sb.from("dealers").select("id, channel");
-  if (chan.error) {
-    const m = mapPgError(chan.error);
-    return c.json(m.body, m.status);
-  }
+  if (chan.error) return fail(c, chan.error);
   const channelById = new Map<string, string>(
     (chan.data ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
   );
@@ -82,10 +79,7 @@ bdDealersRouter.get("/activity", async (c) => {
     .not("dealer_id", "is", null)
     .order("occurred_at", { ascending: false })
     .limit(limit);
-  if (auditRes.error) {
-    const m = mapPgError(auditRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (auditRes.error) return fail(c, auditRes.error);
 
   const dealerIds = Array.from(
     new Set((auditRes.data ?? []).map((a) => a.dealer_id).filter(Boolean) as string[]),
@@ -95,10 +89,7 @@ bdDealersRouter.get("/activity", async (c) => {
     // Channel rides along so showroom-touching events stay off the BD feed
     // (Loo 2026-07-25: BD sees dealers only). Fail closed on a broken read.
     const dRes = await sb.from("dealers").select("id, name, channel").in("id", dealerIds);
-    if (dRes.error) {
-      const m = mapPgError(dRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (dRes.error) return fail(c, dRes.error);
     (dRes.data ?? []).forEach((d) =>
       dealerMap.set(d.id, { name: d.name, channel: (d.channel as string) ?? "dealer" }),
     );
@@ -127,10 +118,7 @@ bdDealersRouter.get("/:id", async (c) => {
   // A showroom id reads as not-found for BD (Loo 2026-07-25: BD sees dealers
   // only — the list never offers one, but the drill-down must not leak either).
   const chanRes = await sb.from("dealers").select("channel").eq("id", id).maybeSingle();
-  if (chanRes.error) {
-    const m = mapPgError(chanRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (chanRes.error) return fail(c, chanRes.error);
   if ((chanRes.data?.channel ?? "dealer") === "showroom") {
     return c.json(
       { error: "not_found", code: "not_found", message: "Dealer not found" },
@@ -139,10 +127,7 @@ bdDealersRouter.get("/:id", async (c) => {
   }
 
   const dealerRes = await sb.rpc("dealer_with_stats", { p_id: id });
-  if (dealerRes.error) {
-    const m = mapPgError(dealerRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (dealerRes.error) return fail(c, dealerRes.error);
   if (
     !dealerRes.data ||
     (Array.isArray(dealerRes.data) && dealerRes.data.length === 0)
@@ -165,10 +150,7 @@ bdDealersRouter.get("/:id", async (c) => {
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false, nullsFirst: false })
     .limit(50);
-  if (ordersRes.error) {
-    const m = mapPgError(ordersRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (ordersRes.error) return fail(c, ordersRes.error);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orders = (ordersRes.data ?? []).map((o: any) => {
