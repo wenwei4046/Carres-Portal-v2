@@ -158,6 +158,9 @@ export default function WarehouseWorkspace({
   const word = SCHEDULE_PAGE_WORD[direction];
   const feedFailed = schedule.errors.length > 0;
   const stranded = useMemo(() => undatedCards(schedule.cards), [schedule.cards]);
+  const earlier = schedule.cards.filter((card) => card.overdue && card.date && card.date < (dates[0] ?? selectedDate));
+  const offDays = schedule.cards.filter((card) => card.date && dates.length > 0 &&
+    card.date >= dates[0] && card.date <= dates[dates.length - 1] && !dates.includes(card.date));
 
   return (
     <div
@@ -258,6 +261,8 @@ export default function WarehouseWorkspace({
           linking to a filtered register, because the register cannot ask for
           "undated" without inventing a filter word, while these exact records
           are already in this page's own result. */}
+      <UnplacedWork cards={earlier} label="Earlier work still overdue" testId="ws-earlier" />
+      <UnplacedWork cards={offDays} label="Scheduled on other dates in this period" testId="ws-off-days" />
       {stranded.length > 0 && (
         <details
           className="border-t border-kit-slate-5 bg-white px-3 py-2"
@@ -266,7 +271,7 @@ export default function WarehouseWorkspace({
           <summary className="cursor-pointer text-meta text-kit-slate-11 marker:text-kit-slate-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9">
             {undatedSummaryWordOf(stranded.length)}
           </summary>
-          <ul className="mt-2 flex flex-col gap-1" data-testid="ws-undated-list">
+          <ul className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto" data-testid="ws-undated-list">
             {stranded.map((c) => (
               <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-meta text-kit-slate-12">
@@ -290,6 +295,21 @@ export default function WarehouseWorkspace({
       )}
     </div>
   );
+}
+
+/** Preserve the recorded date even when the operating-date board cannot place it. */
+function UnplacedWork({ cards, label, testId }: { cards: ScheduleCard[]; label: string; testId: string }) {
+  if (cards.length === 0) return null;
+  return <details className="border-t border-kit-slate-5 bg-white px-3 py-2" data-testid={testId}>
+    <summary className="cursor-pointer text-meta text-kit-slate-11">{label} · {cards.length}</summary>
+    <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+      {cards.map((card) => <li key={card.id} className="flex flex-wrap items-baseline gap-x-2 text-meta">
+        <span className={card.overdue ? "text-kit-amber-11" : "text-kit-slate-11"}>{card.date ? headingSentence(card.date) : "Date not recorded"}</span>
+        <span>{card.partyName ?? "Party not recorded"}</span>
+        {card.openHref ? <Link className="text-kit-blue-11 hover:underline" to={card.openHref}>{card.sourceRef}</Link> : <span>{card.sourceRef}</span>}
+      </li>)}
+    </ul>
+  </details>;
 }
 
 /**
