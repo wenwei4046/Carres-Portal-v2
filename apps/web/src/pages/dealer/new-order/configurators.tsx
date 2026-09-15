@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { Minus, Plus, LayoutGrid } from "lucide-react";
+import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 import type {
   ProductCategory,
   ProductModelDto,
@@ -8,17 +7,11 @@ import type {
   SofaFabricDto,
   FabricTierGlobalConfig,
   ModelFabricTierOverrideDto,
-  SofaCompartmentDto,
-  ModelSofaCompartmentDto,
-  SofaComboDto,
-  FabricTierConfigDto,
   SpecialAddonDto,
 } from "@carres/shared";
 import { resolveFabricDelta } from "@carres/shared";
 import type { DraftLine } from "./draft";
 import { SpecialAddonsPicker, useSpecials } from "./special-addons-picker";
-import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
-import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
 
 /**
  * Per-category product configurators + the sofa-mutex helper, extracted from
@@ -29,7 +22,7 @@ import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
  * Each configurator owns its own transient state and only commits a DraftLine
  * via `onAdd` when the user clicks Add. The CALLER is responsible for forcing
  * a remount (`key={model.id}`) when the selected model changes — see the
- * SO-1006 note in `SofaConfigurator` / `BedframeConfigurator` below.
+ * SO-1006 note in `SofaConfigurator` below.
  */
 
 /** The three configurable product families (accessory/service have no
@@ -128,110 +121,6 @@ export function MattressConfigurator({
           ))}
         </select>
       </FieldLabel>
-
-      <SpecialAddonsPicker defs={sp.offered} value={sp.picks} onChange={sp.setPicks} />
-
-      <div className="flex items-end justify-between gap-4">
-        <QtyPill qty={qty} onChange={setQty} />
-        <button
-          onClick={add}
-          disabled={!sku || !sp.complete}
-          className="btn-primary whitespace-nowrap"
-        >
-          + Add
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function BedframeConfigurator({
-  model,
-  skus,
-  specialAddons,
-  onAdd,
-}: {
-  model: ProductModelDto;
-  skus: ProductSkuDto[];
-  specialAddons?: SpecialAddonDto[] | null;
-  onAdd: (line: DraftLine) => void;
-}) {
-  // 2026-05-18 (Loo screenshot — SO-1006 saved no fabric / no color). The
-  // CALLER must remount this with `key={model.id}` on model switch so
-  // useState(model.colors?.[0]) + useState(model.gaps?.[0]) re-init with the
-  // new model's defaults. Without the remount, dropdown state leaks across
-  // models — a stale color/gap id matches nothing in the new model's options,
-  // the dropdown silently renders blank, and the line is added with attrs that
-  // don't reflect a real selection.
-  const [skuId, setSkuId] = useState<string>("");
-  const [color, setColor] = useState<string>(model.colors?.[0] ?? "");
-  const [gap, setGap] = useState<string>(model.gaps?.[0] ?? "");
-  const [qty, setQty] = useState(1);
-  const sku = skus.find((s) => s.id === skuId);
-  const sp = useSpecials(model, specialAddons);
-
-  function add() {
-    if (!sku || !sp.complete) return;
-    onAdd({
-      localId: newLocalId(),
-      sku: sku.sku,
-      qty,
-      attrs: { color, gap, ...sp.attrsPatch },
-      unitPrice: sku.price + sp.surcharge,
-      label: `${model.name} · ${sku.variant} · ${color}${gap ? ` · gap ${gap}` : ""}`,
-    });
-    setSkuId("");
-    setQty(1);
-    sp.reset();
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-3 gap-3">
-        <FieldLabel label="Size">
-          <select
-            value={skuId}
-            onChange={(e) => setSkuId(e.target.value)}
-            className={selectClass()}
-          >
-            <option value="">— pick size —</option>
-            {skus.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.variant} · RM {s.price.toLocaleString()}
-              </option>
-            ))}
-          </select>
-        </FieldLabel>
-        <FieldLabel label="Color">
-          <select
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            disabled={!model.colors?.length}
-            className={selectClass({ disabled: !model.colors?.length })}
-          >
-            {(model.colors ?? []).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </FieldLabel>
-        <FieldLabel label="Gap">
-          <select
-            value={gap}
-            onChange={(e) => setGap(e.target.value)}
-            disabled={!model.gaps?.length}
-            className={selectClass({ disabled: !model.gaps?.length })}
-          >
-            <option value="">— none —</option>
-            {(model.gaps ?? []).map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </FieldLabel>
-      </div>
 
       <SpecialAddonsPicker defs={sp.offered} value={sp.picks} onChange={sp.setPicks} />
 
@@ -441,10 +330,12 @@ export function SofaConfigurator({
 }
 
 /**
- * Render the configurator that matches a model's category. Returns null for
- * accessory/service (no variant axis). The CALLER must key this by model.id
- * (a fresh mount per model) so the per-category useState defaults re-init —
- * see the SO-1006 notes above.
+ * The configurator the ConfigureDrawer shows. Every caller sends mattress and
+ * bed frame to PosConfigurePage and a sofa with offered compartments to
+ * SofaConfigurePage before the drawer opens, so only accessory and dropdown
+ * sofa reach here. Returns null for anything else. The CALLER must key this by
+ * model.id (a fresh mount per model) so the useState defaults re-init — see
+ * the SO-1006 note in SofaConfigurator.
  */
 export function ConfiguratorForModel({
   model,
@@ -452,9 +343,6 @@ export function ConfiguratorForModel({
   fabrics,
   fabricTierConfig,
   modelFabricTierOverrides,
-  sofaCompartments,
-  modelSofaCompartments,
-  sofaCombos,
   specialAddons,
   onAdd,
 }: {
@@ -463,22 +351,11 @@ export function ConfiguratorForModel({
   fabrics: SofaFabricDto[];
   fabricTierConfig?: FabricTierGlobalConfig | null;
   modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
-  /** Sofa engine (0178/0179) — the global compartment pool. ADDITIVE: only
-   *  used to open the visual builder for a sofa model that offers compartments;
-   *  mattress/bedframe/no-offer-sofa paths ignore these entirely. */
-  sofaCompartments?: SofaCompartmentDto[] | null;
-  /** Per-model offered compartments (UNfiltered — filtered to model.id here). */
-  modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
-  /** Sofa combos (0179) — passed through to the builder for combo pricing. */
-  sofaCombos?: SofaComboDto[] | null;
   /** Special add-ons (0181) — the full catalog set; each configurator filters to
    *  the codes this model offers (allowed_options.specials). */
   specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
-  if (model.category === "mattress") {
-    return <MattressConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
-  }
   if (model.category === "accessory") {
     // Accessories are POS cards too (2990s parity) — the generic pick-variant
     // + qty configurator fits them as-is; only the caption changes.
@@ -492,77 +369,7 @@ export function ConfiguratorForModel({
       />
     );
   }
-  if (model.category === "bedframe") {
-    return <BedframeConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
-  }
   if (model.category === "sofa") {
-    return (
-      <SofaConfiguratorOrBuilder
-        model={model}
-        skus={skus}
-        fabrics={fabrics}
-        fabricTierConfig={fabricTierConfig}
-        modelFabricTierOverrides={modelFabricTierOverrides}
-        sofaCompartments={sofaCompartments}
-        modelSofaCompartments={modelSofaCompartments}
-        sofaCombos={sofaCombos}
-        specialAddons={specialAddons}
-        onAdd={onAdd}
-      />
-    );
-  }
-  return null;
-}
-
-/**
- * Sofa branch dispatcher (Phase 3, sofa engine). A sofa model that OFFERS
- * compartments (`model_sofa_compartments` rows for this model, 0178) gets the
- * visual drag plan-view builder; every other sofa model keeps the existing
- * preset/part dropdown `SofaConfigurator` UNCHANGED. The builder opens as a
- * full-screen portal overlay ON TOP of the 460px ConfigureDrawer.
- *
- * Dormant-in-prod by construction: prod has 0 offered compartments → the
- * builder never appears (the plan's safety gate).
- */
-function SofaConfiguratorOrBuilder({
-  model,
-  skus,
-  fabrics,
-  fabricTierConfig,
-  modelFabricTierOverrides,
-  sofaCompartments,
-  modelSofaCompartments,
-  sofaCombos,
-  specialAddons,
-  onAdd,
-}: {
-  model: ProductModelDto;
-  skus: ProductSkuDto[];
-  fabrics: SofaFabricDto[];
-  fabricTierConfig?: FabricTierGlobalConfig | null;
-  modelFabricTierOverrides?: ModelFabricTierOverrideDto[] | null;
-  sofaCompartments?: SofaCompartmentDto[] | null;
-  modelSofaCompartments?: ModelSofaCompartmentDto[] | null;
-  sofaCombos?: SofaComboDto[] | null;
-  specialAddons?: SpecialAddonDto[] | null;
-  onAdd: (line: DraftLine) => void;
-}) {
-  const [builderOpen, setBuilderOpen] = useState(false);
-
-  // This model's offered compartments (filter the UNfiltered prop to model.id).
-  const offered = useMemo(
-    () => (modelSofaCompartments ?? []).filter((mc) => mc.modelId === model.id),
-    [modelSofaCompartments, model.id],
-  );
-  const hasOffered = offered.length > 0;
-
-  // The model's representative sofa sku (deterministic): first preset, else
-  // first sku. When the model has NO sku the builder can't emit a contract-safe
-  // DraftLine, so we disable "Add" with a note (the canvas itself stays usable).
-  const hasRepSku = skus.length > 0;
-
-  // No offered compartments → unchanged dropdown configurator.
-  if (!hasOffered) {
     return (
       <SofaConfigurator
         model={model}
@@ -575,54 +382,7 @@ function SofaConfiguratorOrBuilder({
       />
     );
   }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-xl border border-base-200 bg-base-50 p-4">
-        <p className="t-small text-base-600 mb-3">
-          This sofa is built from modules — design it on the room canvas and we price it live.
-        </p>
-        <button
-          type="button"
-          onClick={() => setBuilderOpen(true)}
-          disabled={!hasRepSku}
-          className="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-          data-testid="sofa-open-builder"
-        >
-          <LayoutGrid size={15} strokeWidth={1.75} />
-          Build your sofa
-        </button>
-        {!hasRepSku && (
-          <p className="t-tiny text-danger mt-2" data-testid="sofa-builder-no-sku">
-            This model has no SKU yet — a build can't be added to the cart until one exists.
-          </p>
-        )}
-      </div>
-
-      {builderOpen &&
-        createPortal(
-          <SofaBuildCanvas
-            model={model}
-            skus={skus}
-            compartmentPool={sofaCompartments ?? []}
-            modelCompartments={offered}
-            sofaCombos={sofaCombos ?? []}
-            fabricTierConfig={fabricTierConfig as FabricTierConfigDto | null | undefined}
-            fabricTierOverride={
-              (modelFabricTierOverrides ?? []).find((o) => o.modelId === model.id) ?? null
-            }
-            sofaFabrics={fabrics}
-            onAddBuild={(payload) => {
-              const line = buildToDraftLine(payload, model, skus);
-              if (line) onAdd(line);
-              setBuilderOpen(false);
-            }}
-            onClose={() => setBuilderOpen(false)}
-          />,
-          document.body,
-        )}
-    </div>
-  );
+  return null;
 }
 
 // -----------------------------------------------------------------------------
