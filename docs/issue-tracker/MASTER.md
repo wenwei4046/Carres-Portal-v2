@@ -1,12 +1,9 @@
 # ISSUE TRACKER — MASTER
 
 > **The only Issue Tracker document.** Overwritten when re-ruled; never versioned.
-> **APPROVED / LOCKED — Jess, 2026-08-14.**
+> **APPROVED / LOCKED business architecture — Jess, 2026-08-14; complete page Blueprint ready for
+> owner review, 2026-09-15.**
 > Read `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, this file and the affected module MASTERs.
->
-> **2026-09-15 PAGE COMPLETION ADDENDUM — READY FOR OWNER REVIEW.** Sections 11.1–11.5 complete
-> the Workspace destination, Register, object-detail, intake/result, source-state, responsive and
-> current-to-proposed contracts. They do not claim the measured current UI already satisfies them.
 
 | I am working on | Read |
 |---|---|
@@ -487,6 +484,27 @@ transition records result, actual actor, normal owner, cover, time and evidence,
 replaces the occurrence. There is no generic `Save result`, free-text-only completion or manual
 `Done`. Optional detail supplements a structured result and never determines status.
 
+### Intake and result validation copy
+
+| Condition | Exact sentence |
+|---|---|
+| Problem object missing | `Choose what has a problem.` |
+| Observed problem missing | `Choose what you saw.` |
+| Finder missing | `Choose who found the issue.` |
+| Observed date missing | `Choose when the issue was found.` |
+| Required typed source missing | `Find and choose the linked record.` |
+| Required proof branch has no evidence | `Add the required proof.` |
+| Generated facts not confirmed | `Check the facts before recording this issue.` |
+| No governed action rule can be derived | `The next action could not be worked out. Ask an Issue Tracker reviewer to check the rules.` |
+| Result choice missing | `Choose what happened.` |
+| Result evidence missing | `Add the evidence needed for this result.` |
+| Action already changed/completed | `This action has changed. Read the current action before recording a result.` |
+| Create/result uncertain | `The result is being checked. Do not record it again.` |
+| Unknown save failure | `The issue could not be recorded. Check the answers and try again.` |
+
+The page focuses the first invalid governed answer and preserves all valid answers/files. A raw
+database, validation-library or status-code sentence never reaches the operator.
+
 ## §11.4 · Register and detail states
 
 | State | Required presentation and behaviour |
@@ -524,6 +542,50 @@ single-column, touch-safe and resumable. Hover evidence is also accessible by fo
 | Current proof choice can save without actual evidence attachment | Require governed file/evidence record where the chosen branch says proof exists |
 | Current result flow uses generic choices plus free-text evidence and `Save result` | Show action-specific result/evidence choices and one atomic transition with actual actor/cover |
 | Current tests prove only basic register/intake/action opening | Add source-state, URL, permission, identity, atomic retry, action derivation and 1440/1024/390 responsive evidence |
+
+## §11.6 · Permission matrix
+
+| Capability | Authorised actor | Everyone else |
+|---|---|---|
+| Read Issue/Register | Permissioned Operations/Principal and specifically authorised reviewers | No row, count, identity, evidence or money leak |
+| Record Issue | Any authorised observer/reviewer, including about another person | No intake door |
+| Add involved-staff response | That staff member or authorised recorder acting with attributed evidence | Cannot overwrite observed facts/finding |
+| Perform Current Action | Shared Work's resolved acting person with the action's required capability | Read-only action facts or no access |
+| Record Current Action result | Same authorised actor/proxy law checked at submit | Refused without changing occurrence |
+| Confirm Fault Owner/finding | Review-authorised Operations/Principal, not automatically the involved person | May add response only where authorised |
+| Record/link money | Finance through Finance's source doors | Issue Tracker reads links only |
+| Waive recovery / close critical or restricted Issue | Principal or governed authority | No control; never a disabled imitation |
+| Merge, split, void or reopen | Restricted governed authority with reason/evidence | Read-only lifecycle history |
+| Approve/send Related Party report | Authorised business owner; external transmission separately confirmed | Preview only within permission scope |
+
+Permission is checked again by each write door. Visibility of an Issue or Work item never implies
+authority to decide fault, post money, waive recovery, send externally or close it.
+
+## §11.7 · Issue Tracker acceptance contract
+
+The page is ready for owner acceptance only when all are demonstrable:
+
+- routine, significant and critical Issues enter one Register with one permanent searchable number;
+- source-object entry prefills a typed link and preserves authoritative source facts;
+- the guided intake reaches a generated official-English preview without a required blank narrative;
+- source module, materiality/review rule, owner rule, action choices, required result and due law are
+  system-derived; staff cannot type an arbitrary action/date to create a valid Issue;
+- evidence branches that say proof exists retain an actual governed file/evidence record;
+- exactly one open versioned action exists, projects once into Work and completes/replaces atomically
+  with normal owner, cover, actual actor, result, evidence and time;
+- all accountability identities and all three money tracks remain separate and reconcile to their
+  owning sources;
+- saved views are reproducible filters; URL search/view/filter/Issue selection survives detail and
+  cross-module navigation;
+- permissions in §11.6 pass positive and negative authenticated tests without leaked counts/details;
+- loading, true-empty, no-match, partial/detail failure, not-assigned, late, uncertain-save,
+  closed and voided states match §11.4;
+- duplicate create/result retries, concurrent result attempts, merge/split/reopen/void and correction
+  preserve one incident/action history without deletion;
+- Register, object detail, intake, result and monthly-report paths remain readable and keyboard/touch
+  operable at 1440, 1024 and 390px;
+- Wednesday review and Related Party report totals trace back to distinct Issues and Finance links,
+  never duplicated action/task rows.
 
 # §12 · Legacy Service Notes
 
