@@ -469,39 +469,96 @@ it is not a second Receiving form. It covers Purchase Order, Consignment Order, 
 Site-transfer arrival, supplier replacement and a Unit returning from repair while preserving each
 source object's own authority.
 
-**UNIFIED REGISTER ROW — owner card 2026-09-07.** One row = one dated arrival arrangement
-with its own goods scope — never automatically the whole PO, never one row per Unit. A formal
-split makes its own arrangement counting only its own scope; a part-received arrangement keeps
-its remainder; a formal date change preserves history and overdue work stays under its
-original date. The Register defaults are:
+**THE RECEIVING WORKSPACE — owner card 2026-09-15. This OVERWRITES the 2026-09-07 unified
+register card; that version is in Git history and is not a second authority.**
+
+One row = one dated arrival arrangement with its own goods scope — never automatically the whole
+PO, never one row per Unit. A formal split makes its own arrangement counting only its own scope;
+a part-received arrangement keeps its remainder; a formal date change preserves history and overdue
+work stays under its original date.
+
+**SITE IS A TAB.** Inbound answers *what is arriving HERE*, so the place is the first question and
+not a rail row. The strip is built from the governed Sites the operator may see and opens on
+`Carres Klang Warehouse`; a partner Site appears because it is a governed Site with receiving
+access, never because its name was written into the page. Where a purchasing destination has goods
+coming and NO governed Site linked, those arrangements get their own final tab, named and counted,
+carrying the destinations' own recorded names — **an unlinked destination is a MAPPING GAP and may
+never be rendered as "no incoming goods"**. Those rows carry NO receiving door: goods that never
+reach a Carres Site must not mint a warehouse receipt.
+
+**PHYSICAL ARRIVAL AND ACCEPTED FULFILMENT ARE DIFFERENT FACTS.** The Register prints the five
+governed receiving quantities (`COPY-STANDARD`), each its own number:
 
 ```
-Document · Product · From · To · Expected arrival · Received on ·
-Units (Expected · Received · Not yet received · With issue) · Status · Exceptions
+Order Qty · Received Qty · Damaged Qty · Wrong Item Qty · Pending Delivery Qty
 ```
 
-`Document` is the fixed header; the cell prints the record's own name and number (`PO No PO-…`
-· `Transfer No TR-…` · `Repair Order No RO-…` · `Claim No` / `Case No` for authorised
-replacement and return arrangements) and the number opens that document. `Product` prints EVERY
-product of the arrangement with its arranged quantity — names wrap and the row grows; `+N more`
-and silent truncation are forbidden. `From`/`To` are places (or the customer); a carrier or
-driver never substitutes for a location and a missing origin reads `Origin not recorded`.
-`With issue` counts INSIDE received — 4 received with 1 damaged never reads 5. `Status` speaks
-one physical-progress word; `Exceptions` lists each named difference beside it — the two never
-merge. `SO No · SO date · PO date` remain as optional columns.
+`Received Qty` is the CORRECT goods accepted. `Damaged` and `Wrong Item` are present, unavailable
+and reported separately; **they never reduce `Pending Delivery Qty`**, because the supplier still
+owes a replacement. Order Qty 10 with six correct, two damaged and two never sent reads
+`Received Qty 6 · Damaged Qty 2 · Pending Delivery Qty 4`, and eight pieces are physically in
+custody. **FULLY ARRIVED IS NOT FULLY FULFILLED.** Every figure is read from the one receiving/PO
+arithmetic (`receivingSummaryOf`); Inbound owns no second subtraction engine. An unreadable receipt
+reports the absence — **an unknown quantity is never printed as a zero**. The exact Unit counts
+remain the separate PHYSICAL answer the Schedule reads, and the two never merge into one number.
 
-Clicks are explicit: the Document number opens the document; the Product cell (its arrow and
-its content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens
-that Unit's record; the row itself navigates nowhere. The expansion shows the complete
-products with per-product received counts, the exact Units with per-Unit results, every posted
-Receiving record (`GRN-…`, viewable per receipt), and the ONE action door
-`Open Receiving Session`; Inbound cannot submit or post a receipt and carries no Work column
-or duty avatar. From the menu the Register defaults to every UNFINISHED arrangement under its
-original date (`Not finished`); completed arrangements stay queryable through `Received`; an
-exact Monitor deep link inherits date, Site ID and document scope and shows its arrangement
-even when finished. The rail counts, the listed rows, the footer summary (counted in
-arrangements, labelled so) and the export always describe one shared scope, and a status pick
-composes with the date filter instead of cancelling it.
+The Register defaults are:
+
+```
+Document · Product · Supplier · To · PO Delivery Date · Supplier Delivery Date ·
+Goods received on · Order Qty · Received Qty · Pending Delivery Qty ·
+Damaged / Wrong · Status · Exceptions · Receiving
+```
+
+`Document` is the fixed header; the cell prints the record's own number with `PO Issued {date}`
+beneath, and a non-PO arrangement keeps its OWN document word (`Transfer No` · `Repair Order No` ·
+`Claim No` / `Case No`) — **`PO / Source No` is forbidden**. `Product` lists EVERY product of the
+arrangement with its quantity; `+N more` and dropping a product stay forbidden. One product's NAME
+may be clamped to two lines with the full identity in the expansion, and **the quantity is pinned
+and never clipped**. `Supplier`/`To` are parties and places; a carrier never substitutes for a
+location and a missing origin reads `Origin not recorded`. **Three dates, three questions:**
+`PO Delivery Date` is the official date on the PO, `Supplier Delivery Date` is the supplier's own
+evidenced answer (`Not confirmed` · `Same as PO` · the different date — absence is tested BEFORE
+equality), and `Goods received on` lists each supplier delivery note by its own DO number, linking
+to its own receipt and its own actual date. `Status` speaks one progress word; `Exceptions` lists
+each named difference beside it — the two never merge. `SO No` remains an optional column.
+
+**THREE ARRIVAL FILTERS, NOT FIVE.**
+
+```
+Not finished    correct goods are still owed     (the menu default)
+Received        the required correct goods are accepted
+All arrivals    both
+```
+
+`Expected`, `Part received` and `With issue` are retired as filters: they overlapped each other and
+every other word, and they are FACTS ON THE ROW. A retired deep link falls back to `Not finished` —
+an old link shows the work, never an empty page.
+
+**RECEIVING HAPPENS ON THIS PAGE.** The row's own `Receive` control opens the authoritative
+Receiving Workspace FULL-WIDTH on Inbound. It is the SAME component and the SAME write path
+Receiving uses — one receiving engine, two hosts — and a Goods Receipt is never squeezed into a
+side panel. The Register stays MOUNTED beneath it, so Site, filters, search and list position are
+exactly as they were on return. The resolved receiving permission is passed in explicitly: while
+the authority is still answering the row says so and offers nothing, and a refusal names the duty
+rather than hiding the row. After a successful save the affected row, its quantities, the rail
+counts and the receipt records are re-read; a failed save preserves what the operator typed.
+Inbound still owns no write path and carries no Work column or duty avatar.
+
+Clicks are explicit: the Document number opens the document; the Product cell (its arrow and its
+content are ONE expansion entry) expands the row; a Unit ID inside the expansion opens that Unit's
+record; the row itself navigates nowhere. **The expansion has ONE job: the full product detail** —
+the complete products with their own quantities, the exact Units with per-Unit results, and every
+posted receipt with its supplier DO number and actual date. From the menu the Register defaults to
+every UNFINISHED arrangement under its original date; an exact Monitor deep link inherits date,
+Site ID and document scope and shows its arrangement even when finished. The rail counts, the
+listed rows, the footer summary (counted in arrangements, labelled so) and the export always
+describe one shared scope, and a status pick composes with the date filter instead of cancelling it.
+
+**COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
+mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
+a gap that does not exist. Only an `exact_unit` scope missing its minted identities is incomplete,
+and damage on counted stock is reported by QUANTITY because there is no Unit ID to name.
 
 An individually signed-in NETS operator uses Receiving to scan each actual Unit and record Received,
 Received with issue, rejected/not delivered or another governed receipt outcome. After the GRN is
@@ -665,8 +722,9 @@ Service Case owns the repair need and resolution. Outbound stores no duplicate b
 Inbound, Inventory and Outbound use the shared cross-module reconciliation contract in
 `../ERP-ARCHITECTURE.md` §3.5.1. They do not ask an operator to tally Receiving or Delivery again:
 
-- Inbound reads `Expected · Received · Not yet received · With issue` from the PO/Consignment and
-  Receiving Session/GRN; only posted arrival facts enter Inventory.
+- Inbound reads `Order Qty · Received Qty · Damaged Qty · Wrong Item Qty · Pending Delivery Qty`
+  from the PO/Consignment and Receiving Session/GRN through the ONE receiving arithmetic; damaged
+  and wrong goods never reduce `Pending Delivery Qty`. Only posted arrival facts enter Inventory.
 - Inventory derives the current Unit and `Who has it` from the append-only arrival and handover
   facts; each Unit has only one current answer.
 - Outbound reads the exact Units required by the source DO, Transfer, Supplier Return or Repair
@@ -1087,16 +1145,17 @@ received Units show actual Site/holder and are tested for eligibility; issue Uni
 checking`; rejected/not-delivered Units do not enter physical Stock; partial receipt preserves both
 the accepted Units and outstanding expected Units; unknown or wrong-Site Units enter investigation.
 
-**OPERATOR JOURNEY →** open Inbound on the actual date; read source and exact expected Units; choose
-`Open Receiving Session`; scan each Unit and record only the observed result/evidence; submit the
-session; read the resulting Received/Not yet received/With issue tally. No operator repeats the
+**OPERATOR JOURNEY →** open Inbound on the Site's tab; read source and exact expected Units; choose
+`Receive` ON THE ROW; scan each Unit and record only the observed result/evidence; save the
+session; read the resulting `Received Qty` / `Pending Delivery Qty` / `Damaged Qty` beside the same
+row, without having left the list. No operator repeats the
 receipt through Inventory.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inbound defaults are `Document · Product · From · To ·
-Expected arrival · Received on · Expected · Received · Not yet received · With issue · Status ·
-Exceptions` (unified card 2026-09-07; `SO No · SO date · PO date` optional). Inbound is the dated
-work/progress Register; Receiving Session is the only submit door; Inventory has no Add Stock
-action; the Register carries no Work column or duty avatar. Unit Detail links Receiving Session,
+**UI / PAGE / OBJECT PLACEMENT →** Inbound's Register defaults, Site tabs, three filters and the
+five governed receiving quantities are the receiving-workspace card above (owner card 2026-09-15).
+Inbound is the dated work/progress Register and now HOSTS the one Receiving Workspace full-width;
+the Receiving Session remains the only submit door and the only write path; Inventory has no Add
+Stock action; the Register carries no Work column or duty avatar. Unit Detail links Receiving Session,
 GRN, individual receiver, actual date and evidence. No NETS internal Rack, Bin, Zone or placement
 task appears.
 

@@ -274,8 +274,11 @@ export default function WarehouseInbound() {
       },
       {
         key: "products",
+        /* CONTENT DECIDES THE WIDTH. A furniture identity is model + variant
+           (`Booqit CNR Sectional Sofa Left-Hand Facing · Charcoal Weave`), and
+           230px folded every one of them over three lines. */
         label: "Product",
-        width: 230,
+        width: 300,
         wrap: true,
         searchValue: (r) =>
           r.products
@@ -286,14 +289,25 @@ export default function WarehouseInbound() {
           r.products.length === 0 ? (
             <span>Products not recorded</span>
           ) : (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
+            /* EVERY PRODUCT IS LISTED — `+N more` stays forbidden. What is
+               capped is how many lines ONE name may take: a ten-line PO of
+               long furniture names built a 743px row, so the Register showed
+               one arrangement per screen (measured 2026-09-15). Each entry
+               gets at most two lines and the expansion — whose one job is the
+               full product detail — carries the untruncated identity. */
+            <div className="space-y-1 py-0.5 leading-[18px]">
               {r.products.map((p) => (
-                <div key={p.sku ?? "no-sku"}>
-                  {p.name ?? p.sku ?? "Product not recorded"}
-                  {p.name && p.sku ? (
-                    <span className="text-base-500"> · {p.sku}</span>
-                  ) : null}
-                  <span className="tabular-nums"> × {p.qty}</span>
+                <div key={p.sku ?? "no-sku"} className="flex gap-2">
+                  {/* THE QUANTITY IS PINNED AND NEVER CLIPPED. Clamping the
+                      whole line ate the `× 1` first — the one fact on the
+                      entry an operator counting a pallet cannot do without. */}
+                  <span className="line-clamp-2 min-w-0 flex-1">
+                    {p.name ?? p.sku ?? "Product not recorded"}
+                    {p.name && p.sku ? (
+                      <span className="text-base-500"> · {p.sku}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 tabular-nums">× {p.qty}</span>
                 </div>
               ))}
             </div>
@@ -319,6 +333,11 @@ export default function WarehouseInbound() {
         key: "poDeliveryDate",
         label: "PO Delivery Date",
         width: 130,
+        /* TOP-ALIGNED, LIKE EVERY OTHER CELL ON THE ROW. A column without
+           `wrap` is `vertical-align: middle`, so on a ten-product row the
+           date sat ~350px below the PO number it belongs to. Measured in the
+           local walk 2026-09-15: row 742px, date centred at 360px. */
+        wrap: true,
         filterType: "date",
         dateValue: (r) => r.poDeliveryDate,
         searchValue: (r) => r.poDeliveryDate ?? "",
@@ -335,6 +354,7 @@ export default function WarehouseInbound() {
         key: "supplierDeliveryDate",
         label: "Supplier Delivery Date",
         width: 145,
+        wrap: true,
         filterType: "date",
         dateValue: (r) => r.supplierDeliveryDate,
         searchValue: supplierDeliveryWord,
@@ -386,6 +406,7 @@ export default function WarehouseInbound() {
         label,
         width: key === "pendingDeliveryQty" ? 120 : 95,
         align: "right" as const,
+        wrap: true,
         filterType: "number" as const,
         numberValue: (r: InboundArrival) =>
           r.quantities.known ? r.quantities[key] : null,
@@ -419,6 +440,7 @@ export default function WarehouseInbound() {
         key: "status",
         label: "Status",
         width: 130,
+        wrap: true,
         searchValue: (r) => inboundStatusWordOf(r),
         accessor: (r) => inboundStatusWordOf(r),
       },
@@ -445,6 +467,7 @@ export default function WarehouseInbound() {
         key: "receive",
         label: "Receiving",
         width: 120,
+        wrap: true,
         /* A DOOR IS NOT A FACT — no funnel on an action column. */
         filterable: false,
         exportLabel: "Receiving",
