@@ -555,6 +555,23 @@ Site ID and document scope and shows its arrangement even when finished. The rai
 listed rows, the footer summary (counted in arrangements, labelled so) and the export always
 describe one shared scope, and a status pick composes with the date filter instead of cancelling it.
 
+**THE GOVERNED RECEIVING SITES — owner ruling, Jess 2026-09-15 (migration 0509).**
+`Carres Klang Warehouse` (own) · `AL Sungai Buloh` · `HOUZS Balakong` (both
+`operation_partner`, owned by the AL and HOUZS delivery partners, each operated by its own
+`warehouse_operator` party — one organisation, two roles, exactly as NETS already is). AL and
+HOUZS physically accept goods, so that arrival is that Site's Inbound work; their later handover
+to the customer is a SEPARATE outbound/delivery event for the same goods and creates no second
+receipt. `Ohana` and `Hookka Industries` remain destinations with NO Site: Ohana delivers straight
+to the final customer, and goods that never reach a Carres Site must not mint a warehouse receipt.
+
+🔴 **OPEN GAP — RECEIVING AUTHORITY IS NOT SITE-SCOPED.** `grn_duty` resolves globally
+(`workspace_resolve_duty('grn_duty', null)`) and `warehouse_capability_grants` carries no site
+column, so `Confirm inbound receipt` is held for the company rather than for a Site. With one Site
+that distinction was invisible; with three it is real — today a Carres GRN duty holder is offered
+the receipt door on a partner Site's rows. Neither new Site has hours or a duty holder configured,
+so nothing can be received at either until the governed Warehouse Settings door is used. **Whether
+receiving authority becomes per-Site is an owner decision and is not assumed here.**
+
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of
 a gap that does not exist. Only an `exact_unit` scope missing its minted identities is incomplete,
