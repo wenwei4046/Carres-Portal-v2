@@ -103,11 +103,6 @@ function supplierDeliveryWord(r: InboundArrival): string {
   return fmtDate(r.supplierDeliveryDate);
 }
 
-/** An unknown number is an absence, never a zero. */
-function qty(r: InboundArrival, key: "orderQty" | "receivedQty" | "pendingDeliveryQty") {
-  return r.quantities.known ? String(r.quantities[key]) : "Not recorded";
-}
-
 export default function WarehouseInbound() {
   const [params, setParams] = useSearchParams();
   const [offset, setOffset] = useState(0);
@@ -242,12 +237,30 @@ export default function WarehouseInbound() {
   const today = appTodayIso();
   const dutyAllowed = dutyQ.data?.allowed ?? false;
   const dutyKnown = !dutyQ.isLoading;
+  /**
+   * THE DEFAULT COLUMN SET IS WHAT FITS THE SCREEN (2026-09-15 correction).
+   *
+   * The first cut of this Register declared FOURTEEN default columns —
+   * 2,130px of them — inside roughly 1,010px of grid at 1280px with the rail
+   * open. Every date, every quantity and the Receive button itself sat past
+   * the right edge. `No page-level horizontal scroll` was true and proved
+   * nothing: the GRID scrolls, and an operator does not find an action they
+   * cannot see.
+   *
+   * Four numeric columns became one `Receiving progress` cell, `Supplier` and
+   * the delivery notes became one, the repeated Site name left the row, and
+   * `Receiving` now sits AHEAD of `Status` so the action is inside the
+   * visible width by construction. Nothing was deleted: every retired column
+   * is one click away in the Columns chooser and keeps its own sort and
+   * filter. No font was reduced and no column was squeezed below its content.
+   */
   const columns = useMemo<DataGridColumn<InboundArrival>[]>(
     () => [
       {
         key: "document",
         label: "Document",
-        width: 165,
+        width: 150,
+        wrap: true,
         searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
         accessor: (r) => (
           <div className="py-0.5 leading-[18px]">
@@ -270,15 +283,11 @@ export default function WarehouseInbound() {
             </div>
           </div>
         ),
-        wrap: true,
       },
       {
         key: "products",
-        /* CONTENT DECIDES THE WIDTH. A furniture identity is model + variant
-           (`Booqit CNR Sectional Sofa Left-Hand Facing · Charcoal Weave`), and
-           230px folded every one of them over three lines. */
         label: "Product",
-        width: 300,
+        width: 200,
         wrap: true,
         searchValue: (r) =>
           r.products
@@ -289,24 +298,19 @@ export default function WarehouseInbound() {
           r.products.length === 0 ? (
             <span>Products not recorded</span>
           ) : (
-            /* EVERY PRODUCT IS LISTED — `+N more` stays forbidden. What is
-               capped is how many lines ONE name may take: a ten-line PO of
-               long furniture names built a 743px row, so the Register showed
-               one arrangement per screen (measured 2026-09-15). Each entry
-               gets at most two lines and the expansion — whose one job is the
-               full product detail — carries the untruncated identity. */
+            /* EVERY product is listed — `+N more` stays forbidden. Only how
+               many lines ONE name may take is capped, and the expansion (whose
+               one job is product detail) carries the untruncated identity. */
             <div className="space-y-1 py-0.5 leading-[18px]">
               {r.products.map((p) => (
                 <div key={p.sku ?? "no-sku"} className="flex gap-2">
-                  {/* THE QUANTITY IS PINNED AND NEVER CLIPPED. Clamping the
-                      whole line ate the `× 1` first — the one fact on the
-                      entry an operator counting a pallet cannot do without. */}
                   <span className="line-clamp-2 min-w-0 flex-1">
                     {p.name ?? p.sku ?? "Product not recorded"}
                     {p.name && p.sku ? (
                       <span className="text-base-500"> · {p.sku}</span>
                     ) : null}
                   </span>
+                  {/* Pinned — clamping ate the `× 1` first. */}
                   <span className="shrink-0 tabular-nums">× {p.qty}</span>
                 </div>
               ))}
@@ -314,29 +318,49 @@ export default function WarehouseInbound() {
           ),
       },
       {
-        key: "from",
-        label: "Supplier",
-        width: 140,
+        key: "supplier",
+        /* ONE CELL FOR THE PARTY AND ITS PAPER. A delivery note belongs to the
+           supplier that wrote it, so the association is read in one place
+           instead of across two columns a screen apart. */
+        label: "Supplier & DO No",
+        headerLines: ["Supplier &", "DO No"] as const,
+        width: 145,
         wrap: true,
-        searchValue: (r) => r.from,
-        accessor: (r) => r.from,
-      },
-      {
-        key: "site",
-        label: "To",
-        width: 130,
-        wrap: true,
-        searchValue: (r) => r.site,
-        accessor: (r) => r.site,
+        searchValue: (r) =>
+          [r.from, ...r.sessions.map((s) => s.doNumber ?? s.grnNo ?? "")].join(" "),
+        filterValue: (r) => r.from,
+        accessor: (r) => (
+          <div className="space-y-0.5 py-0.5 leading-[18px]">
+            <div>{r.from}</div>
+            {r.sessions.map((s) => (
+              <div key={s.id}>
+                <Link
+                  className="font-mono text-kit-blue-11 hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                  to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
+                  data-testid={`inbound-receipt-${s.id}`}
+                >
+                  {s.doNumber ?? s.grnNo ?? "Receipt"}
+                </Link>
+                <span className="text-base-600">
+                  {" · "}
+                  {s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}
+                </span>
+              </div>
+            ))}
+          </div>
+        ),
       },
       {
         key: "poDeliveryDate",
         label: "PO Delivery Date",
-        width: 130,
-        /* TOP-ALIGNED, LIKE EVERY OTHER CELL ON THE ROW. A column without
-           `wrap` is `vertical-align: middle`, so on a ten-product row the
-           date sat ~350px below the PO number it belongs to. Measured in the
-           local walk 2026-09-15: row 742px, date centred at 360px. */
+        /* THE HEADER WAS SETTING THE WIDTH. Declared 95px, it rendered 143 —
+           a single-line governed header plus its sort and filter controls
+           cannot be narrower than its own text, and those 48 stolen pixels
+           are part of why the Receive button sat off the right edge. The
+           grid's own two-line header keeps the governed words exactly. */
+        headerLines: ["PO", "Delivery Date"] as const,
+        width: 95,
         wrap: true,
         filterType: "date",
         dateValue: (r) => r.poDeliveryDate,
@@ -353,7 +377,8 @@ export default function WarehouseInbound() {
       {
         key: "supplierDeliveryDate",
         label: "Supplier Delivery Date",
-        width: 145,
+        headerLines: ["Supplier", "Delivery Date"] as const,
+        width: 110,
         wrap: true,
         filterType: "date",
         dateValue: (r) => r.supplierDeliveryDate,
@@ -362,103 +387,37 @@ export default function WarehouseInbound() {
         accessor: supplierDeliveryWord,
       },
       {
-        key: "receivedOn",
-        label: "Goods received on",
-        width: 190,
+        key: "progress",
+        /* THE FOUR GOVERNED QUANTITIES, EACH PRINTING ITS OWN NUMBER. They
+           were four columns at 450px, which is how the Receive button ended
+           up offscreen. The operator still never subtracts, and each figure
+           keeps its own sortable/filterable column in the chooser. */
+        label: "Receiving progress",
+        headerLines: ["Receiving", "progress"] as const,
+        width: 165,
         wrap: true,
+        filterable: false,
         searchValue: (r) =>
-          r.sessions.map((s) => `${s.doNumber ?? ""} ${s.receivedAt ?? ""}`).join(" "),
+          r.quantities.known
+            ? `Order Qty ${r.quantities.orderQty} Received Qty ${r.quantities.receivedQty} Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
+            : "Not recorded",
+        exportValue: (r) =>
+          r.quantities.known
+            ? `Order Qty ${r.quantities.orderQty} · Received Qty ${r.quantities.receivedQty} · Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
+            : "Not recorded",
         accessor: (r) => {
-          if (r.sessions.length === 0) return "";
-          /* EACH DELIVERY NOTE IS ITS OWN ARRIVAL. One supplier DO, one
-             receipt, one actual date — collapsing several into a single
-             "latest" date hid the earlier trucks entirely. */
-          return (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
-              {r.sessions.map((s) => (
-                <div key={s.id}>
-                  <Link
-                    className="font-mono text-kit-blue-11 hover:underline"
-                    onClick={(event) => event.stopPropagation()}
-                    to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
-                    data-testid={`inbound-receipt-${s.id}`}
-                  >
-                    {s.doNumber ?? s.grnNo ?? "Receipt"}
-                  </Link>
-                  <span className="text-base-600">
-                    {" · "}
-                    {s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          );
-        },
-      },
-      ...(
-        [
-          ["orderQty", "Order Qty"],
-          ["receivedQty", "Received Qty"],
-          ["pendingDeliveryQty", "Pending Delivery Qty"],
-        ] as const
-      ).map(([key, label]) => ({
-        key,
-        label,
-        width: key === "pendingDeliveryQty" ? 120 : 95,
-        align: "right" as const,
-        wrap: true,
-        filterType: "number" as const,
-        numberValue: (r: InboundArrival) =>
-          r.quantities.known ? r.quantities[key] : null,
-        searchValue: (r: InboundArrival) => qty(r, key),
-        accessor: (r: InboundArrival) => (
-          <span className="tabular-nums">{qty(r, key)}</span>
-        ),
-      })),
-      {
-        key: "issueQty",
-        label: "Damaged / Wrong",
-        width: 140,
-        wrap: true,
-        searchValue: (r) =>
-          `${r.quantities.damagedQty} ${r.quantities.wrongItemQty}`,
-        accessor: (r) => {
-          /* DAMAGED GOODS ARE PRESENT AND UNAVAILABLE, and they never reduce
-             Pending Delivery Qty — the supplier still owes a replacement. */
-          if (!r.quantities.known) return "";
-          const { damagedQty, wrongItemQty } = r.quantities;
-          if (damagedQty === 0 && wrongItemQty === 0) return "";
+          if (!r.quantities.known)
+            return <span className="text-base-600">Not recorded</span>;
+          const q = r.quantities;
           return (
             <div className="space-y-0.5 py-0.5 tabular-nums leading-[18px]">
-              {damagedQty > 0 && <div>Damaged Qty {damagedQty}</div>}
-              {wrongItemQty > 0 && <div>Wrong Item Qty {wrongItemQty}</div>}
-            </div>
-          );
-        },
-      },
-      {
-        key: "status",
-        label: "Status",
-        width: 130,
-        wrap: true,
-        searchValue: (r) => inboundStatusWordOf(r),
-        accessor: (r) => inboundStatusWordOf(r),
-      },
-      {
-        key: "exceptions",
-        label: "Exceptions",
-        width: 230,
-        wrap: true,
-        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
-        accessor: (r) => {
-          const lines = inboundExceptionLines(r, today, fmtDate);
-          return lines.length === 0 ? (
-            ""
-          ) : (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
-              {lines.map((line) => (
-                <div key={line}>{line}</div>
-              ))}
+              <div>Order Qty {q.orderQty}</div>
+              <div>Received Qty {q.receivedQty}</div>
+              <div>Pending Delivery Qty {q.pendingDeliveryQty}</div>
+              {/* Damaged and wrong goods are present, unavailable, and never
+                  reduce Pending Delivery Qty. */}
+              {q.damagedQty > 0 && <div>Damaged Qty {q.damagedQty}</div>}
+              {q.wrongItemQty > 0 && <div>Wrong Item Qty {q.wrongItemQty}</div>}
             </div>
           );
         },
@@ -466,22 +425,17 @@ export default function WarehouseInbound() {
       {
         key: "receive",
         label: "Receiving",
-        width: 120,
+        width: 85,
         wrap: true,
         /* A DOOR IS NOT A FACT — no funnel on an action column. */
         filterable: false,
         exportLabel: "Receiving",
         exportValue: () => "",
         accessor: (r) => {
-          /* GOODS THAT NEVER REACH A CARRES SITE GET NO RECEIPT DOOR. An
-             arrangement whose destination has no Site is not received by
-             Carres at all; offering the button would mint a warehouse receipt
-             for goods that went straight to a customer. */
+          /* GOODS THAT NEVER REACH A CARRES SITE GET NO RECEIPT DOOR. */
           if (!r.siteMapped)
             return (
-              <span className="text-meta text-base-500">
-                No Site linked
-              </span>
+              <span className="text-meta text-base-500">No Site linked</span>
             );
           if (!dutyKnown) return <span className="text-meta">Checking…</span>;
           if (!dutyAllowed)
@@ -509,6 +463,96 @@ export default function WarehouseInbound() {
         },
       },
       {
+        key: "status",
+        label: "Status",
+        width: 95,
+        wrap: true,
+        searchValue: (r) => inboundStatusWordOf(r),
+        accessor: (r) => inboundStatusWordOf(r),
+      },
+      {
+        key: "exceptions",
+        label: "Exceptions",
+        width: 200,
+        wrap: true,
+        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
+        accessor: (r) => {
+          const lines = inboundExceptionLines(r, today, fmtDate);
+          return lines.length === 0 ? (
+            ""
+          ) : (
+            <div className="space-y-0.5 py-0.5 leading-[18px]">
+              {lines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        key: "site",
+        /* THE DESTINATION DOES NOT REPEAT INSIDE ITS OWN TAB. Forty-eight rows
+           reading `Carres Klang Warehouse` under the Carres Klang tab told the
+           operator nothing and cost 130px. On the `Destinations without a
+           Site` tab every row differs, so it comes back automatically. */
+        label: "To",
+        width: 130,
+        wrap: true,
+        defaultHidden: activeSite !== INBOUND_UNMAPPED_SITE,
+        searchValue: (r) => r.site,
+        accessor: (r) => r.site,
+      },
+      {
+        key: "receivedOn",
+        label: "Goods received on",
+        defaultHidden: true,
+        width: 130,
+        wrap: true,
+        filterType: "date",
+        dateValue: (r) => r.sessions.at(-1)?.receivedAt ?? null,
+        searchValue: (r) => r.sessions.map((s) => s.receivedAt ?? "").join(" "),
+        accessor: (r) => {
+          const last = r.sessions.at(-1)?.receivedAt;
+          return last ? fmtDate(last) : "";
+        },
+      },
+      /* Each governed quantity keeps its OWN column for sorting and
+         number-range filtering — hidden by default, never removed. */
+      ...(
+        [
+          ["orderQty", "Order Qty"],
+          ["receivedQty", "Received Qty"],
+          ["pendingDeliveryQty", "Pending Delivery Qty"],
+          ["damagedQty", "Damaged Qty"],
+          ["wrongItemQty", "Wrong Item Qty"],
+        ] as const
+      ).map(([key, label]) => ({
+        key,
+        label,
+        defaultHidden: true,
+        width: key === "pendingDeliveryQty" ? 120 : 95,
+        align: "right" as const,
+        filterType: "number" as const,
+        numberValue: (r: InboundArrival) =>
+          r.quantities.known ? r.quantities[key] : null,
+        searchValue: (r: InboundArrival) =>
+          r.quantities.known ? String(r.quantities[key]) : "Not recorded",
+        accessor: (r: InboundArrival) => (
+          <span className="tabular-nums">
+            {r.quantities.known ? r.quantities[key] : "Not recorded"}
+          </span>
+        ),
+      })),
+      {
+        key: "poIssued",
+        label: "PO Issued",
+        defaultHidden: true,
+        width: 110,
+        filterType: "date",
+        dateValue: (r) => r.poIssued,
+        accessor: (r) => (r.poIssued ? fmtDate(r.poIssued) : ""),
+      },
+      {
         key: "so",
         label: "SO No",
         defaultHidden: true,
@@ -516,7 +560,7 @@ export default function WarehouseInbound() {
         accessor: (r) => r.so ?? "",
       },
     ],
-    [today, dutyAllowed, dutyKnown, openReceiving],
+    [today, dutyAllowed, dutyKnown, openReceiving, activeSite],
   );
   const context = params.get("date") || params.get("from");
   const dateContext = context
@@ -531,12 +575,17 @@ export default function WarehouseInbound() {
   const activeSource = params.get("source") || params.get("po");
   const dateControls = (
     <>
+      {/* WHICH DATE? The pair filters the arrival date in force — the
+          supplier's evidenced answer where one exists, else the PO's own
+          date. It said only `From`/`To`, so the operator had to guess which
+          of the three dates on the row it meant. */}
+      <span className="text-meta text-base-600">Arrival date</span>
       <label className="text-meta">
-        From{" "}
+        from{" "}
         <input
           className="h-7 rounded-control border border-kit-slate-5 px-2"
           type="date"
-          aria-label="Arrival from"
+          aria-label="Arrival date from"
           value={params.get("date") || params.get("from") || ""}
           onChange={(e) => {
             setParams(
@@ -553,11 +602,11 @@ export default function WarehouseInbound() {
         />
       </label>
       <label className="text-meta">
-        To{" "}
+        to{" "}
         <input
           className="h-7 rounded-control border border-kit-slate-5 px-2"
           type="date"
-          aria-label="Arrival to"
+          aria-label="Arrival date to"
           min={params.get("date") || params.get("from") || undefined}
           value={params.get("to") || ""}
           onChange={(e) => setFilter("to", e.target.value)}
@@ -808,7 +857,7 @@ export default function WarehouseInbound() {
               columns={columns}
               rowKey={(r) => r.id}
               rowTestId={(r) => `inbound-row-${r.id}`}
-              storageKey="carres.inbound.register.v3"
+              storageKey="carres.inbound.register.v4"
               exportName="Inbound"
               searchPlaceholder="Document, product, supplier or Unit ID…"
               initialSearch={params.get("q") ?? ""}

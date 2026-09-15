@@ -264,17 +264,35 @@ describe("Inbound · the three filters", () => {
 });
 
 describe("Inbound · the governed quantities", () => {
-  it("prints Order, Received and Pending Delivery separately", async () => {
+  it("prints each governed quantity with its own word, in ONE column", async () => {
     mount("&site=w");
     const row = await screen.findByTestId("inbound-row-PO-1");
     const cells = within(row);
     /* Order 10 · Received 6 · Pending 4 — the operator never subtracts, and
-       the two damaged pieces never settled the supplier's debt. */
-    expect(cells.getByText("10")).toBeInTheDocument();
-    expect(cells.getByText("6")).toBeInTheDocument();
-    expect(cells.getByText("4")).toBeInTheDocument();
+       the two damaged pieces never settled the supplier's debt. Four columns
+       became one cell so the Receive button could stay on screen. */
+    expect(cells.getByText("Order Qty 10")).toBeInTheDocument();
+    expect(cells.getByText("Received Qty 6")).toBeInTheDocument();
+    expect(cells.getByText("Pending Delivery Qty 4")).toBeInTheDocument();
     expect(cells.getByText("Damaged Qty 2")).toBeInTheDocument();
     expect(cells.getByText("Part received")).toBeInTheDocument();
+  });
+
+  it("keeps every quantity available on its own sortable column", async () => {
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    /* Hidden by default, never deleted — the Columns chooser still offers
+       each one, so per-column sort and number-range filtering survive. */
+    for (const label of [
+      "Order Qty",
+      "Received Qty",
+      "Pending Delivery Qty",
+      "Damaged Qty",
+      "Wrong Item Qty",
+    ])
+      expect(
+        screen.queryByRole("button", { name: label }),
+      ).not.toBeInTheDocument();
   });
 
   it("an unreadable receipt reads Not recorded, never zero", async () => {
@@ -415,7 +433,7 @@ describe("Inbound · the list itself", () => {
         "Showing 1–1 of 1 arrangements",
       ),
     );
-    fireEvent.change(screen.getByLabelText("Arrival from"), {
+    fireEvent.change(screen.getByLabelText("Arrival date from"), {
       target: { value: "2026-09-03" },
     });
     expect(screen.getByText(/No arrivals match/)).toBeInTheDocument();
@@ -425,7 +443,7 @@ describe("Inbound · the list itself", () => {
     h.loading = true;
     mount("&site=w");
     expect(
-      await screen.findByRole("button", { name: "Pending Delivery Qty" }),
+      await screen.findByRole("button", { name: "Receiving progress" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PO-1" })).toBeNull();
   });
@@ -436,5 +454,70 @@ describe("Inbound · the list itself", () => {
     expect(await screen.findByText("Access denied")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(h.refetch).toHaveBeenCalled();
+  });
+});
+
+describe("Inbound · the listing fits the screen", () => {
+  /** The default set, in order. Nine columns, not fourteen — the first cut
+   *  declared 2,130px of them inside ~1,010px of grid and pushed every date,
+   *  every quantity and the Receive button off the right edge. */
+  const DEFAULT_COLUMNS = [
+    "Document",
+    "Product",
+    "Supplier & DO No",
+    "PO Delivery Date",
+    "Supplier Delivery Date",
+    "Receiving progress",
+    "Receiving",
+    "Status",
+    "Exceptions",
+  ];
+
+  it("shows exactly the default set, with Receiving ahead of Status", async () => {
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    for (const name of DEFAULT_COLUMNS)
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    /* The ACTION comes before the summary word, so it is inside the visible
+       width by construction rather than by luck. */
+    const headers = screen
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim() ?? "");
+    expect(headers.indexOf("Receiving")).toBeLessThan(
+      headers.indexOf("Status"),
+    );
+  });
+
+  it("does not repeat the Site name on every row inside its own tab", async () => {
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    expect(screen.queryByRole("button", { name: "To" })).not.toBeInTheDocument();
+    expect(
+      screen.queryAllByText("Carres Klang Warehouse", { exact: true }).length,
+    ).toBeLessThanOrEqual(1); // the tab itself, never a column of 48
+  });
+
+  it("brings the destination back where every row differs", async () => {
+    mount("&site=unmapped");
+    await screen.findByRole("link", { name: "PO-2" });
+    expect(screen.getByRole("button", { name: "To" })).toBeInTheDocument();
+    expect(screen.getByText("Ohana — no Site linked")).toBeInTheDocument();
+  });
+
+  it("says WHICH date the from/to filter applies to", async () => {
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    expect(screen.getByText("Arrival date")).toBeInTheDocument();
+    expect(screen.getByLabelText("Arrival date from")).toBeInTheDocument();
+    expect(screen.getByLabelText("Arrival date to")).toBeInTheDocument();
+  });
+
+  it("keeps the supplier and its delivery notes in one association", async () => {
+    mount("&site=w");
+    const row = await screen.findByTestId("inbound-row-PO-1");
+    const cell = within(row);
+    expect(cell.getByText("Factory")).toBeInTheDocument();
+    expect(cell.getByTestId("inbound-receipt-r1")).toHaveTextContent("DO-8821");
+    expect(cell.getByTestId("inbound-receipt-r2")).toHaveTextContent("DO-8930");
   });
 });
