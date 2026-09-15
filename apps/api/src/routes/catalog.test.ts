@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../test/jwt";
 import type {
@@ -6652,5 +6654,19 @@ describe("0202 — fabric master batch save + history", () => {
       supplierCode: "PC151-01",
       sofaTier: "PRICE_2",
     });
+  });
+});
+
+describe("catalog snapshots are dated with KL today (0520)", () => {
+  it("both batch-save doors no longer stamp the history row with the UTC clock", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../supabase/migrations/0520_catalog_snapshots_are_dated_kl_today.sql"),
+      "utf-8",
+    );
+    const bodies = mig.slice(mig.indexOf("-- 1. Option pools"));
+    expect(bodies).not.toContain("current_date");
+    expect(bodies).toContain("FUNCTION public.catalog_pool_batch_save(");
+    expect(bodies).toContain("FUNCTION public.catalog_fabrics_batch_save(");
+    expect(bodies.match(/\(timezone\('Asia\/Kuala_Lumpur', now\(\)\)\)::date/g)?.length).toBe(2);
   });
 });
