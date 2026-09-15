@@ -31,6 +31,11 @@ import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
+// ⭐ HEADER PALETTE MATCHES THE PURCHASING REGISTERS (owner request 2026-09-15)
+// — the same approved light slate blue-grey table header as SO Batch
+// Purchase / Manual Purchase / Purchase Orders, so one colour means
+// "section header" everywhere in Operations (manual-purchase-create.css).
+import styles from "./PurchasingRegister.module.css";
 
 /**
  * OperationReceiving — the ONE Receiving destination
@@ -520,7 +525,10 @@ export default function OperationReceiving() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="receiving-page">
+    <div
+      className={`${styles.page} flex min-h-0 flex-1 flex-col`}
+      data-testid="receiving-page"
+    >
       <PurchasingTabs />
 
       {/* ── The open object takes the stage; the Register stays MOUNTED
