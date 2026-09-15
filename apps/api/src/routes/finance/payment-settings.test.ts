@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
@@ -345,5 +347,17 @@ describe("Collection timing (0486)", () => {
       askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "x",
     });
     expect(res.status).toBe(403);
+  });
+  it("both effective-date doors compare with today in Kuala Lumpur, not the UTC clock (0517)", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0517_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql"),
+      "utf-8",
+    );
+    for (const door of ["payment_set_collection_timing", "payment_set_storage_rule"]) {
+      const body = mig.slice(mig.indexOf(`function public.${door}`), mig.indexOf(`grant execute on function public.${door}`));
+      expect(body).toContain("p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date");
+      expect(body).not.toContain("< current_date");
+      expect(body).toContain("detail = 'bad_effective_from'");
+    }
   });
 });
