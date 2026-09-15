@@ -20,7 +20,7 @@
 --    catalog_config_history (0201), staff_commission_rates (0245),
 --    bd_commission_rates (0250) and rental_agreement_templates (0267):
 --    a row inserted before 08:00 KL without a date was dated yesterday.
---    Same default 0314 already uses. Existing rows are not touched.
+--    Same day 0314 already defaults to (spelled at time zone there). Existing rows are not touched.
 --
 -- Each function is its latest body replayed with only the date comparisons
 -- changed; create or replace keeps the grants 0482 set. Nothing else
