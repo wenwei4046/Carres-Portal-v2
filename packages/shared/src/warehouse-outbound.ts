@@ -237,13 +237,15 @@ export function warehouseOutboundCards(
  *  exceptions are never mutually exclusive. `not-loaded` is the legacy
  *  spelling of `open` and stays honoured. */
 export function outboundViewMatches(
-  c: Pick<WarehouseOutboundCard, "notHandedOver" | "evidenceNotSubmitted">,
+  c: Pick<WarehouseOutboundCard, "notHandedOver" | "evidenceNotSubmitted"> & Partial<Pick<WarehouseOutboundCard, "driverConfirmed" | "unitsRequired">>,
   view: string | null,
 ): boolean {
   return (
     !view ||
     view === "all" ||
-    ((view === "open" || view === "not-loaded") && c.notHandedOver > 0) ||
+    (view === "open" && (c.notHandedOver > 0 || (c.driverConfirmed ?? 0) < (c.unitsRequired ?? 0) || c.evidenceNotSubmitted)) ||
+    (view === "not-loaded" && c.notHandedOver > 0) ||
+    (view === "awaiting-driver" && (c.driverConfirmed ?? 0) < (c.unitsRequired ?? 0)) ||
     (view === "loaded" && c.notHandedOver === 0) ||
     (view === "no-evidence" && c.evidenceNotSubmitted)
   );
@@ -303,7 +305,7 @@ export function buildOutboundRegisterView(
   const siteRows = filterOutboundCards(cards, p, "site");
   const facets: OutboundRegisterFacets = {
     view: Object.fromEntries(
-      ["all", "open", "loaded", "no-evidence"].map((word) => [
+      ["all", "open", "not-loaded", "awaiting-driver", "loaded", "no-evidence"].map((word) => [
         word,
         viewRows.filter((row) => outboundViewMatches(row, word)).length,
       ]),
@@ -352,7 +354,7 @@ export function outboundExceptionLines(
   if (card.evidenceNotSubmitted)
     lines.push("Loading evidence not submitted");
   for (const u of card.units) {
-    if (u.unitHandedOverAt && card.driverConfirmed > 0 && !u.unitDriverConfirmedAt)
+    if (u.unitHandedOverAt && !u.unitDriverConfirmedAt)
       lines.push(`${u.unitId} · Loaded, not confirmed by ${receiver}`);
     if (!u.unitHandedOverAt && u.unitDriverConfirmedAt)
       lines.push(

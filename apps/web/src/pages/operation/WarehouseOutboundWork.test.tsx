@@ -146,6 +146,57 @@ function mountOutbound(initialUrl = "/operation?tab=warehouse-outbound") {
 }
 
 describe("Warehouse Outbound — the unified Register", () => {
+  it("product expansion is read-only; Loading opens the owning work and Back preserves filters and scroll", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&view=all&q=Jager");
+    await screen.findByTestId("wo-row-DO-2609-019");
+    fireEvent.click(screen.getByTestId("wo-row-toggle-DO-2609-019"));
+    expect(screen.getByTestId("wo-product-detail-DO-2609-019")).toHaveTextContent("U1-260-019");
+    expect(screen.queryByTestId("wo-scan-input")).toBeNull();
+    const scroll = screen.getByTestId("grid-scroll");
+    scroll.scrollTop = 120;
+    fireEvent.scroll(scroll);
+    fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
+    expect(screen.getByTestId("outbound-loading-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("wo-scan-input")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "← Back to Outbound" }));
+    expect(screen.queryByTestId("outbound-loading-workspace")).toBeNull();
+    expect(screen.getByTestId("location")).toHaveTextContent("view=all&q=Jager");
+    expect(screen.getByTestId("grid-scroll").scrollTop).toBe(120);
+  });
+
+  it("preserves a failed scan for retry through the same owning action", async () => {
+    stubApi();
+    const original = apiFetchMock.getMockImplementation()!;
+    let attempts = 0;
+    apiFetchMock.mockImplementation((url, ...args) => {
+      if (String(url).includes("outbound-prep")) {
+        attempts++;
+        return attempts === 1 ? Promise.reject(new Error("Connection failed")) : Promise.resolve({});
+      }
+      return original(url, ...args);
+    });
+    mountOutbound("/operation?tab=warehouse-outbound&loading=do-19:Carres%20Klang%20Warehouse");
+    const input = await screen.findByTestId("wo-scan-input");
+    fireEvent.change(input, { target: { value: "U1-260-019" } });
+    fireEvent.click(screen.getByTestId("wo-scan-btn"));
+    await waitFor(() => expect(screen.getByTestId("wo-scan-btn")).not.toBeDisabled());
+    expect(input).toHaveValue("U1-260-019");
+    fireEvent.click(screen.getByTestId("wo-scan-btn"));
+    await waitFor(() => expect(input).toHaveValue(""));
+    expect(attempts).toBe(2);
+  });
+
+  it("keeps a fully loaded but unconfirmed pickup visible without calling it Done", async () => {
+    stubApi({ events: deliveryWarehouseScheduleEvents(unitInput({unitId: "U1-260-019", unitHandedOverAt: "2026-09-04T10:00:00Z", unitHasEvidence: true})) });
+    mountOutbound();
+    const row = await screen.findByTestId("wo-row-DO-2609-019");
+    expect(row).toHaveTextContent("Driver confirmed 0");
+    expect(row).toHaveTextContent("Loaded, not confirmed by NETS Delivery");
+    fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
+    expect(screen.getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent("Loaded · Awaiting driver confirmation");
+    expect(screen.queryByRole("button", { name: /confirm.*driver/i })).toBeNull();
+  });
   it("has the pickup-status rail and separate carrier/driver facts, and keeps the two evidence records apart", async () => {
     stubApi();
     mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
@@ -159,9 +210,9 @@ describe("Warehouse Outbound — the unified Register", () => {
     // One Site today — the group never renders as a dead one-option control.
     expect(within(rail).queryByText("SITE")).toBeNull();
     // The column headers speak the shared row grammar.
-    expect(screen.getByText("Scheduled handover")).toBeInTheDocument();
+    expect(screen.getByText(/Scheduled handover Fri/)).toBeInTheDocument();
     expect(screen.getByText("Document")).toBeInTheDocument();
-    expect(screen.getByText("Exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("wo-open-loading-DO-2609-019")).toBeInTheDocument();
     const row = screen.getByTestId("wo-row-DO-2609-019");
     expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
       "Waiting for NETS Delivery to assign a driver",
@@ -174,7 +225,7 @@ describe("Warehouse Outbound — the unified Register", () => {
       "Driver confirmed 0",
     );
     // The two evidence records live in the arrangement's own detail.
-    fireEvent.click(screen.getByTestId("wo-row-toggle-DO-2609-019"));
+    fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
     expect(screen.getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
       "Warehouse loaded — nothing yet",
     );
@@ -195,7 +246,7 @@ describe("Warehouse Outbound — the unified Register", () => {
         ),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
     const row = await screen.findByTestId("wo-row-DO-2609-019");
     expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
     expect(screen.getByText("Vehicle VBM 1234")).toBeInTheDocument();
@@ -203,7 +254,7 @@ describe("Warehouse Outbound — the unified Register", () => {
 
   it("a Schedule deep link opens its exact arrangement already unfolded, with derived per-Unit reasons", async () => {
     stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
     await waitFor(() =>
       expect(screen.getByTestId("wo-units-DO-2609-019")).toBeInTheDocument(),
     );
@@ -244,7 +295,7 @@ describe("Warehouse Outbound — the unified Register", () => {
       expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
     );
     // Finished work is not in the default scope…
-    expect(screen.queryByTestId("wo-row-DO-2609-030")).toBeNull();
+    expect(screen.getByTestId("wo-row-DO-2609-030")).toBeInTheDocument();
     // …but its count is honest in the SAME scope, and one click shows it.
     expect(screen.getByTestId("wo-view-loaded")).toHaveTextContent("Loaded1");
     fireEvent.click(screen.getByTestId("wo-view-loaded"));
@@ -269,7 +320,7 @@ describe("Warehouse Outbound — the unified Register", () => {
 
   it("scanning a Unit outside this DO's scope is refused in words; a valid scan calls the governed door", async () => {
     stubApi();
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
     await screen.findByTestId("wo-units-DO-2609-019");
     const input = screen.getByTestId("wo-scan-input");
     const prepCalls = () =>
@@ -304,7 +355,7 @@ describe("Warehouse Outbound — the unified Register", () => {
         ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
     const open = await screen.findByTestId("wo-record-loaded");
     expect(open).toHaveTextContent("Record 1 Unit loaded to Ahmad Rahman");
     expect(screen.getByTestId("wo-receiver-consequence")).toHaveTextContent("NETS Delivery");
@@ -347,7 +398,7 @@ describe("Warehouse Outbound — the unified Register", () => {
         ),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
     const block = await screen.findByTestId("wo-not-collected");
     expect(block).toHaveTextContent(
       "U1-260-020 was not confirmed by Ahmad Rahman. It remains with Carres Klang Warehouse.",

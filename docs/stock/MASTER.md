@@ -29,51 +29,35 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**
-(owner replacement Card, 2026-09-06). The ERP keeps ONE global Dashboard; no Warehouse-local
-`Dashboard` label exists, and Calendar, Transfer, Ready Stock and Dashboard are not
-additional Warehouse destinations. The navigation rail contains page names only.
+Warehouse has five operator destinations: **Arrival Schedule · Pickup Schedule · Inbound · Inventory · Outbound**.
+The two schedules are separate read-only projections. They use large working-day dates, white cards,
+quiet Expected/Scheduled badges and warning colour only for actual overdue work. They keep distinct
+orders identifiable, retain delayed and undated work, and never reschedule goods automatically.
 
-- Monitor: the module's ONLY Calendar-summary page — a dated read-only projection of both
-  incoming and outgoing Warehouse work; never a second truth.
-- Inbound: physical goods expected at a governed Site — a 240px filter rail + Inbound
-  Register in the shared row grammar (unified card 2026-09-07) that routes actual receipt
-  work to the governed Receiving Session.
-- Inventory: the one current Unit authority (240px rail + Register), including Ready Stock
-  and Counts & Adjustments views. No Calendar summary and no six-day date strip.
-- Outbound: dated physical work for Units that must leave a governed Site — a 240px filter
-  rail + Outbound Register in the SAME row grammar as Inbound; the governed acts live in
-  each arrangement's expanded detail.
+Inbound uses actual governed Receiving Site tabs. Its default register keeps Document and its dates,
+Receive, Product/quantity and receiving progress visible together. Supplier DOs link to their actual
+receipts; multiple receipts remain distinct. Expected arrival, PO Delivery Date, Supplier Delivery
+Date and Goods received on are different facts. The date filter uses expected arrival (the evidenced
+supplier date where present, otherwise the PO/source date). Awaiting receipt / Fully received / All
+arrivals are the three filters. Physical arrival never substitutes for accepted correct quantity.
+Receive opens the existing ReceivingWorkspace full width in Inbound; returning preserves the list.
 
-Ready Stock is one shared eligible-Unit view of Inventory. Operations reaches it through Warehouse
-Inventory; Sales reaches the same authority through `Sales → Ready Stock`. It is not another stock
-table or a fifth Warehouse destination. Counts, differences and Adjustment requests remain one
-`Counts & Adjustments` control view within Inventory, not three separate pages.
+Outbound keeps DO/SO, pickup date, product quantity, the Loading entry and separate Required / Loaded /
+Driver confirmed counts visible. The default includes outstanding loading, missing loading evidence
+and outstanding driver confirmation. Warehouse loading does not impersonate driver acceptance.
+Loading opens the existing exact-Unit work surface full width; product expansion has only product
+and Unit identity details. Dates and actions must be measured inside the actual shell and filter rails.
 
-Reports, Settings, Work, Quick Rail and Calendar keep their shared Shell homes. Receiving,
-Purchasing, Delivery, Payments and Service Cases keep their own doors.
+Inventory is the one current Unit authority. Exact goods show Unit ID separately; quantity goods
+show SKU/quantity without an invented Unit ID. Actual in/out dates must describe the same Site visit
+using owning receipt/handover evidence, never a PO-issued date_in value. Returns start another visit.
+Ready Stock is a shared eligible-Unit view; Counts & Adjustments belongs within Inventory.
+Reports, Settings, Work and Calendar keep their shared Shell homes. There is no Warehouse-local
+Dashboard, Monitor, Transfer, Ready Stock or Counts top-level destination.
 
-Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
-Report issue · Count again**.
-
-**WAREHOUSE MONITOR CALENDAR — OWNER RULING 2026-09-06 (replaces the 2026-09-04 Dashboard
-Calendar law).** Monitor renders the full-width six-working-day Calendar and carries NO 240px
-page filter rail — filtering belongs to the destination pages its cards open. Each date shows
-the actual weekday and date; inside a date, work is arranged by actual time. Both directions
-render: ARRIVAL (`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` ·
-`Return from repair`) and PICKUP (`Customer-delivery pickup` · `Transfer pickup` ·
-`Supplier-return pickup` · `Repair pickup`). Every event says what its time means —
-`Supplier arrival 09:00–10:00` · `Driver pickup 14:30` — or exactly `Time not provided`;
-an unexplained bare time may not render. A valid empty day says
-`No arrivals or pickups on {date}. Choose another date.` The Calendar card uses the owning
-source's actual words and never invents a shorter Warehouse status vocabulary. On mobile the
-same projection is one selected day as a vertical time-ordered list with previous/next
-working-date controls.
-
-Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
-Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
-Next Action, Priority, Edit, Delete, Add stock, Remove stock or Mark done. Shared copy remains
-governed by the Copy Standard.
+Approved words include Where · Who has it · Carres Owned · Supplier Consignment · Report issue ·
+Count again. Generic status editing, Add stock, Remove stock and Mark done remain forbidden.
+UI Kit acceptance remains pending the owner's visual review; implementation is not a design freeze.
 
 ## 3 · Unit operating model
 
@@ -362,102 +346,17 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
-actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
-`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
-Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
-it into a misleading current-day bucket.
+Arrival Schedule and Pickup Schedule are separate full-width six-working-day projections. Registers
+have date filters instead of calendar strips. Cards preserve the owning document and Site, use
+quiet Expected/Scheduled badges, and show real loading separately from driver acceptance. Delayed
+and undated work stays reachable under its real dates; no automatic rescheduling occurs.
 
-The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
-For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
-5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
-later working date come from the Warehouse calendar rather than staff memory.
-
-**MONITOR CALENDAR COMPOSITION — OWNER RULING 2026-09-06 (replaces the 2026-09-04
-composition law).** Monitor is the read-only date overview; it does not replace Outbound's
-exact-Unit work listing. On desktop the six operating dates remain one chronological
-horizontal sequence at full page width — no page filter rail beside them. Date columns have a
-readable minimum width and the Monitor work area owns horizontal overflow; the dates may not
-wrap into a `3 × 2` grid whose tall first row pushes later days below the fold. There is one
-shared vertical scroll, not an independent scroll inside every day column. At narrow width the
-same projection becomes a single-day agenda with previous/next date controls; data,
-permissions and destinations do not change.
-
-One Calendar card is one dated piece of physical work from its owning module — a PICKUP card
-is one governed outbound source scope (never one whole customer order, never a second DO); an
-ARRIVAL card is one expected-arrival source scope. It shows, in this order: the governed time
-sentence · the event name with its direction · the source document identity · the party and
-what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
-shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
-or any Delivery arrangement action. Warehouse never shows or completes a Delivery arrangement
-action. A Failed Delivery appears only through the exact governed return/collection work that
-requires a Warehouse physical act.
-
-Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
-document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
-nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
-may show a clickable `DO No`, and that DO opens as a read-only source document. Warehouse never
-enters Delivery's `Update date and time`, `Assign logistics`, `Change logistics`, driver/vehicle
-or ETA editors (the Monitor row's expanded panels, `../delivery/MASTER.md` §8.5 and §8.6).
-Delivery remains the only owner of the Logistics Partner, the confirmed operational date and
-time, the driver and vehicle and the ETA. Warehouse only reads the relevant Delivery facts and
-owns its own physical preparation and handover facts.
-
-For any selected date, the operator journey is always:
-
-1. **Open Monitor:** read everything that must happen on that actual date across Inbound,
-   Inventory, `Needs checking`, Outbound and Month-end.
-2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
-   Units through Receiving; unresolved arrivals remain under their promised date.
-3. **Complete Inventory work:** Count or Count again, inspect reported damage, look for an exact
-   Unit not found and confirm an observed holder/Site mismatch. Inventory does not invent a NETS
-   Zone, Rack or Bin.
-4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
-   the accepted event transfers holder authority to the individually identified next person.
-5. **Close the date:** Monitor separates `Completed on {date}`, `{n} not done`, `Evidence not
-   submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
-   Units.
-
-The sequence changes presentation only, never ownership. Receiving completes receipt facts;
-Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
-re-resolves the responsible person. Monitor and the date strip store none of them.
-
-Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
-done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
-Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
-opens another date.
-
-Monitor is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
-from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
-an actual date, the page groups the one work set in business order:
-
-```
-INBOUND         expected arrival and receiving work
-INVENTORY       governed Count and Unit-control work
-NEEDS CHECKING  exact damage, missing Unit, mismatch and unresolved-difference work
-OUTBOUND        check, pack and handover work
-MONTH-END       count-window and Stock Confirmation work when applicable
-```
-
-Every row shows its source document/Unit identity, concrete fact, resolved owner avatar and plain
-action. Examples are `PO-2041 · 5 Units expected` / `Receive and check 5 Units`, `U-1005 was not
-found in the stock count` / `Find out why U-1005 did not match the count`, and `DO-1048 · SO-1318 ·
-2 Units` / `Check, pack and hand over 2 Units`. The source identity is clickable:
-
-- PO/Consignment arrival → its Receiving Session;
-- Unit or Count difference → Unit Detail or `Counts & Adjustments`;
-- DO handover → the Outbound work with linked Delivery Order;
-- Month-end requirement → the Month-end Stock Confirmation.
-
-Monitor stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
-or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
-work. Completion occurs only when the authoritative source fact exists, after which the shared row
-updates everywhere.
-
-The management view adds exception summaries over the same drillable facts: unresolved Stock differences,
-Adjustments awaiting Stock Adjustment Approver decision, damaged Units requiring a decision and Month-end submissions not
-done. Every number expands to exact Units/documents, actual dates and resolved owners; a KPI with no
-drill-down is invalid.
+The daily journey is: open the appropriate schedule, follow its exact Inbound or Outbound entry,
+complete the owning receipt or loading action, and read the resulting Inventory and evidence.
+Counts, differences and month-end work belong to their Inventory/control objects and shared Work,
+not a second Warehouse Monitor. These capabilities remain approved targets where unbuilt.
+Delivery alone owns logistics assignment, driver/vehicle facts and customer delivery dates.
+Receiving owns receipt; Warehouse owns preparation/loading; the driver owns independent acceptance.
 
 An individually signed-in NETS operator sees only permitted physical work: receive and check, Count
 or Count again, check and pack, hand over, Report a problem and upload evidence. NETS cannot see
@@ -556,24 +455,17 @@ the set above renders **1,286px**, and a governed header is not allowed to set a
                        the leading columns are reachable without scrolling
 ```
 
-**THE REMAINING CONSTRAINT IS THE RAIL, AND IT IS AN OWNER DECISION.** At 1280px the portal
-navigation and the 240px filter rail leave the grid ~740px, to show three arrival-status rows and
-six document-type rows — five of which read 0 while no `arrival_sources` exist. Whether Inbound's
-rail should default to collapsed, narrow to the 200px used elsewhere in this portal, or move its
-filters into the toolbar is a design change for the owner, not something to assume here.
-
-The narrow case is a **known limitation, not a pass**: a nine-column register does not fit 744px,
-and a different narrow composition is a design change for the owner rather than something to
-invent here. **Product column width is sized to the CATALOG, not to invented strings** — measured
-across every SKU a purchase order line names: 34 SKUs, name length average 12, p90 14, longest 18
-(`Jager Super Single`), SKU codes to 13 (`LYYAR-1A(RHF)`). A fixture of 60-character names is four
-times the real worst case and is evidence about the fixture, not about this page.
+The default Register uses four columns: Document (supplier, dates and linked Supplier DO receipts),
+Receiving, Product, and Receiving progress. Independent sortable/filterable fact columns remain
+available in Columns. Composition must be verified with both shell rails present; dates, quantities
+and the owning action must be visible without shrinking typography. Narrow devices retain the
+document/action first and expose filters in their drawer.
 
 `Document` is the fixed header; the cell prints the record's own number with `PO Issued {date}`
 beneath, and a non-PO arrangement keeps its OWN document word (`Transfer No` · `Repair Order No` ·
 `Claim No` / `Case No`) — **`PO / Source No` is forbidden**. `Product` lists EVERY product of the
 arrangement with its quantity; `+N more` and dropping a product stay forbidden. One product's NAME
-may be clamped to two lines with the full identity in the expansion, and **the quantity is pinned
+wraps in full, and **the quantity is pinned
 and never clipped**. `Supplier`/`To` are parties and places; a carrier never substitutes for a
 location and a missing origin reads `Origin not recorded`. **Three dates, three questions:**
 `PO Delivery Date` is the official date on the PO, `Supplier Delivery Date` is the supplier's own
@@ -585,13 +477,13 @@ each named difference beside it — the two never merge. `SO No` remains an opti
 **THREE ARRIVAL FILTERS, NOT FIVE.**
 
 ```
-Not finished    correct goods are still owed     (the menu default)
+Awaiting receipt    correct goods are still owed     (the menu default)
 Received        the required correct goods are accepted
 All arrivals    both
 ```
 
 `Expected`, `Part received` and `With issue` are retired as filters: they overlapped each other and
-every other word, and they are FACTS ON THE ROW. A retired deep link falls back to `Not finished` —
+every other word, and they are FACTS ON THE ROW. A retired deep link falls back to `Awaiting receipt` —
 an old link shows the work, never an empty page.
 
 **RECEIVING HAPPENS ON THIS PAGE.** The row's own `Receive` control opens the authoritative
@@ -769,28 +661,14 @@ Supplier Return, send for repair, Internal Staff Purchase and Subsidiary Purchas
 continues to own why the movement exists; Outbound tells the assigned NETS Warehouse operator what
 must physically be checked, packed and handed over on each actual date.
 
-**UNIFIED REGISTER ROW — owner card 2026-09-07.** One row = one dated pickup arrangement (one
-DO scope today), in the SAME grammar as Inbound. The Register defaults are:
-
-```
-Scheduled handover · Document · Product · From · To · Logistics · Assigned Driver ·
-Units (Required · Loaded · Not loaded · Driver confirmed) · Status · Exceptions
-```
-
-`Scheduled handover` is the warehouse→transporter handover date with `Driver pickup {time}` or
-exactly `Time not provided` — never the customer's delivery time. Required, warehouse-loaded
-and driver-confirmed are THREE separate facts, per arrangement, per product and per exact Unit:
-`Loaded 2 of 3 with 1 driver-confirmed` must show one Unit not loaded AND one loaded Unit the
-driver has not matched. Loading, handing over, driver confirmation and customer receipt are
-four different facts and no screen may merge them. `SO No · SO date · Vehicle · Loaded at ·
-Driver collected at` remain as optional columns. The Document number opens the DO; the Product
-cell is the one expansion entry; the expansion carries the two evidence lines
-(`Warehouse loaded …` · `Driver collected …`), the per-Unit scan/check/pack/load/driver-confirm
-table, and the governed acts (scan, check, pack, `Record {n} Units loaded to {person}`) — the
-row itself acts nowhere and carries no Work column or duty avatar. From the menu the Register
-defaults to every unfinished arrangement (`Not finished`) under its original date; `Loaded` is
-the completed query; the rail counts, rows, footer Units summary and export share one scope —
-a `Loaded 1` beside an empty day cannot happen.
+One Outbound row is one DO + Site scope. Defaults are Document (DO/SO, scheduled handover,
+origin/destination, logistics/driver), Loading, Product, and Units (Required / Loaded / Not loaded /
+Driver confirmed, with named differences). Optional fact columns preserve sorting and filtering.
+Product expansion only exposes product and exact Unit identity. Loading opens the existing work
+surface full width with scans, checks, packing, loading evidence and separate driver confirmation.
+The default includes outstanding loading, missing evidence and unmatched driver acceptance;
+Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
+filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
 The NETS operator journey is:
 
@@ -1417,14 +1295,10 @@ reservation, issue/control and prior handover; operator checks/packs; actual NET
 signs in and scans acceptance; both identities/evidence are retained. NETS Delivery then completes
 journey arrivals through Delivery, not Outbound.
 
-**UI / PAGE / OBJECT PLACEMENT →** Outbound Register defaults are `Scheduled handover · Document
-· Product · From · To · Logistics · Assigned Driver · Required · Loaded · Not loaded ·
-Driver confirmed · Status · Exceptions` (unified card 2026-09-07; `SO No · SO date · Vehicle ·
-Loaded at · Driver collected at` optional; no Work column, no duty avatars on rows). The expanded
-detail shows exact Unit, product, reservation, check, pack, both sides' scans, evidence and
-not-loaded reason, and carries the governed acts. It cannot edit customer date, route, partner,
-SO, DO or price; the loading act appears only when the physical checkpoint is valid. No
-Zone/Rack/staging/wave page exists.
+**UI / PAGE / OBJECT PLACEMENT →** Outbound follows §7: visible document/date, Loading entry,
+product and separate quantities. Product expansion is read-only. The full-width owning work shows
+exact Unit, product, reservation, check/pack dates, both sides' evidence and remaining responsibility.
+It cannot edit the customer date, route, partner, SO, DO or price.
 
 **CROSS-MODULE CONNECTION →** Sales Order owns customer promise and exact reservation; Delivery
 owns DO/Journey/partners/dates and customer outcome; Stock owns Unit eligibility and holder; NETS
@@ -2026,7 +1900,7 @@ that is the next Warehouse scope.**
 own confirmation copy, permission surface and evidence rule; wiring them half-way would put five
 buttons on screen whose refusals nobody had designed. They are the scope after the relocation.
 
-### 13.5 · BUILT — the four destinations in the rail (CARD 01, PR #1045)
+### 13.5 · BUILT — the five destinations in the rail (CARD 01, PR #1045)
 
 `CARD-2026-09-01-warehouse-01-sidebar` shipped the §2 map: the Warehouse module rows are
 **Dashboard · Inbound · Inventory · Outbound**, complete from day one. `Inventory` is the one
@@ -2195,7 +2069,7 @@ The Jess-approved unification card shipped as PR #1153, squash-merged to `main` 
 **Production proof (2026-09-07):** `Deploy production` for `819d6764` succeeded;
 `erp.carresofficial.com/__carres_deploy.json` reports exactly `819d6764`, and the served bundle
 (`/assets/index-CsU7sDQh.js`) greps positive for `Scheduled handover`, `DOCUMENT TYPE`,
-`Not finished`, `Driver confirmed`, `Repair Order No`, `Loaded, not confirmed by`,
+`Awaiting receipt`, `Driver confirmed`, `Repair Order No`, `Loaded, not confirmed by`,
 `no Warehouse loading record`, `Show every product and Unit`,
 `photos and videos of the loaded goods` and the evidence-picker copy. The Worker and the
 Inbound endpoint answer 401 unauthenticated — alive behind their role gates. CI `verify`
@@ -2262,7 +2136,7 @@ UI, later-leg physical origin and mobile execution still require completion and 
 | G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | approved cross-module target / not built |
 | G10 | return state without return receipt/inspection leaves false holder and availability; Return/Repair uses new out-and-back events and check required. | approved lifecycle target / not built |
 | G11 | unknown import cannot become new/sellable/reserved truth; reject to review and never allocate through migration. | data-governance/engineering gap |
-| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and four destinations consolidate presentation. | UI/engineering consolidation gap |
+| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and five destinations consolidate presentation. | UI/engineering consolidation gap |
 | G13 | legacy Stock/Receiving/partner/PO write paths cannot coexist as authorities; each physical act has one owning door and forbidden external overwrite. | engineering/authority consolidation gap |
 | G14 | appointment/customer-date ownership was once contradictory. It is now resolved: Sales Order owns the customer promise; Delivery derives DO/Journey dates; Warehouse consumes dated Inbound/Outbound work and never owns the promise. | resolved cross-module authority; no Warehouse owner decision |
 

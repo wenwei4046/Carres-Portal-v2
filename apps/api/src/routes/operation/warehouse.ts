@@ -142,7 +142,7 @@ operationWarehouseRouter.get("/inbound", async (c) => {
     const skuNames = productRows.map((row) => {
       const model = row.model_id ? modelName.get(row.model_id) ?? null : null;
       const name = [model, row.variant].filter(Boolean).join(" ").trim();
-      return { sku: row.sku, name: name || null };
+      return { sku: row.sku, name: name || null, category: row.model_id ? modelCategory.get(row.model_id) ?? null : null };
     });
     const input = { pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, skuNames } as unknown as InboundInput;
     const all = inboundArrivals(input);

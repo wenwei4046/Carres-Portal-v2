@@ -1521,6 +1521,16 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [emptyViewportWidth, setEmptyViewportWidth] = useState<number>();
+  useEffect(() => {
+    const viewport = scrollRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+    const measure = () => setEmptyViewportWidth(viewport.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
   const revealedKey = useRef<string | null>(null);
   const revealKey = expandable?.revealExpandedKey;
   useEffect(() => {
@@ -2353,8 +2363,8 @@ function DataGridInner<T>({
             {isLoading && <SkeletonRows cols={totalCols || 1} rows={12} />}
             {!isLoading && renderList.length === 0 && (
               <tr>
-                <td className={styles.empty} colSpan={totalCols || 1}>
-                  {emptyMessage}
+                <td colSpan={totalCols || 1} style={{ padding: 0 }}>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{emptyMessage}</div>
                 </td>
               </tr>
             )}

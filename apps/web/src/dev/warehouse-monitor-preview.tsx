@@ -321,7 +321,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <Routes>
-          <Route path="*" element={<TabSwitch />} />
+          <Route path="*" element={<div className="flex h-screen"><div className="hidden w-[240px] shrink-0 border-r border-kit-slate-5 md:block">Portal sidebar</div><div className="min-w-0 flex-1"><TabSwitch /></div><div className="hidden w-[52px] shrink-0 border-l border-kit-slate-5 md:block" /></div>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

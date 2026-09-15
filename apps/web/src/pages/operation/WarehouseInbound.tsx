@@ -259,7 +259,7 @@ export default function WarehouseInbound() {
       {
         key: "document",
         label: "Document",
-        width: 150,
+        width: 245,
         wrap: true,
         searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
         accessor: (r) => (
@@ -281,6 +281,14 @@ export default function WarehouseInbound() {
                   : "PO Issued date not recorded"
                 : r.documentWord}
             </div>
+            <div>{r.from}</div>
+            <div>Expected arrival {r.date ? fmtDate(r.date) : "Date not recorded"}</div>
+            {r.sourceType === "supplier-delivery" && <div className="text-meta text-base-600">PO Delivery Date: {r.poDeliveryDate ? fmtDate(r.poDeliveryDate) : "Date not recorded"}</div>}
+            {r.sourceType === "supplier-delivery" && <div className="text-meta text-base-600">Supplier Delivery Date: {supplierDeliveryWord(r)}</div>}
+            {r.sessions.map((s) => <div key={s.id} className="text-meta">
+              <Link data-testid={`inbound-receipt-${s.id}`} className="font-mono text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}>{s.doNumber ?? s.grnNo ?? "Receipt"}</Link>
+              {" · Goods received on "}{s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}
+            </div>)}
           </div>
         ),
       },
@@ -361,8 +369,9 @@ export default function WarehouseInbound() {
             <div className="space-y-1 py-0.5 leading-[18px]">
               {r.products.map((p) => (
                 <div key={p.sku ?? "no-sku"} className="flex gap-2">
-                  <span className="line-clamp-2 min-w-0 flex-1">
+                  <span className="min-w-0 flex-1">
                     {p.name ?? p.sku ?? "Product not recorded"}
+                    {p.category && <span className="block text-meta text-base-500">{p.category}</span>}
                     {p.name && p.sku ? (
                       <span className="text-base-500"> · {p.sku}</span>
                     ) : null}
@@ -395,23 +404,27 @@ export default function WarehouseInbound() {
             : "Not recorded",
         accessor: (r) => {
           if (!r.quantities.known)
-            return <span className="text-base-600">Not recorded</span>;
+            return <div className="text-base-600"><div>Not recorded</div><div>{inboundStatusWordOf(r)}</div></div>;
           const q = r.quantities;
           return (
             <div className="space-y-0.5 py-0.5 tabular-nums leading-[18px]">
+              <div>{inboundStatusWordOf(r)}</div>
               <div>Order Qty {q.orderQty}</div>
               <div>Received Qty {q.receivedQty}</div>
+              <div>Physical arrived Qty {q.arrivedQty}</div>
               <div>Pending Delivery Qty {q.pendingDeliveryQty}</div>
               {/* Damaged and wrong goods are present, unavailable, and never
                   reduce Pending Delivery Qty. */}
               {q.damagedQty > 0 && <div>Damaged Qty {q.damagedQty}</div>}
               {q.wrongItemQty > 0 && <div>Wrong Item Qty {q.wrongItemQty}</div>}
+              {inboundExceptionLines(r, today, fmtDate).map((line) => <div key={line} className="text-meta text-base-600">{line}</div>)}
             </div>
           );
         },
       },
       {
         key: "supplier",
+        defaultHidden: true,
         /* ONE CELL FOR THE PARTY AND ITS PAPER. A delivery note belongs to the
            supplier that wrote it, so the association is read in one place
            instead of across two columns a screen apart. */
@@ -446,6 +459,7 @@ export default function WarehouseInbound() {
       },
       {
         key: "poDeliveryDate",
+        defaultHidden: true,
         label: "PO Delivery Date",
         /* THE HEADER WAS SETTING THE WIDTH. Declared 95px, it rendered 143 —
            a single-line governed header plus its sort and filter controls
@@ -469,6 +483,7 @@ export default function WarehouseInbound() {
       },
       {
         key: "supplierDeliveryDate",
+        defaultHidden: true,
         label: "Supplier Delivery Date",
         headerLines: ["Supplier", "Delivery Date"] as const,
         width: 110,
@@ -481,6 +496,7 @@ export default function WarehouseInbound() {
       },
       {
         key: "status",
+        defaultHidden: true,
         label: "Status",
         width: 95,
         wrap: true,
@@ -489,6 +505,7 @@ export default function WarehouseInbound() {
       },
       {
         key: "exceptions",
+        defaultHidden: true,
         label: "Exceptions",
         width: 200,
         wrap: true,
@@ -587,7 +604,7 @@ export default function WarehouseInbound() {
       : "";
   const empty =
     effectiveStatus === "open" && !context && !params.get("q")
-      ? "No unfinished arrivals. Every arranged arrival is received."
+      ? "No arrivals awaiting receipt match these filters."
       : `No arrivals match these filters${dateContext}.`;
   const activeSource = params.get("source") || params.get("po");
   const dateControls = (
@@ -694,6 +711,7 @@ export default function WarehouseInbound() {
       {receivePoId ? (
         <PoReceivingView
           poId={receivePoId}
+          products={rows.find((row) => row.sourceId === receivePoId)?.products}
           pos={posQ.data?.pos ?? []}
           suppliers={supplierById}
           warehouses={warehouseQ.data?.warehouses ?? []}
@@ -874,7 +892,7 @@ export default function WarehouseInbound() {
               columns={columns}
               rowKey={(r) => r.id}
               rowTestId={(r) => `inbound-row-${r.id}`}
-              storageKey="carres.inbound.register.v4"
+              storageKey="carres.inbound.register.v5"
               exportName="Inbound"
               searchPlaceholder="Document, product, supplier or Unit ID…"
               initialSearch={params.get("q") ?? ""}
@@ -978,6 +996,7 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
           {r.products.map((p) => (
             <div key={p.sku ?? "no-sku"} className="flex flex-wrap gap-3">
               <span>{p.name ?? p.sku ?? "Product not recorded"}</span>
+              {p.category && <span>{p.category}</span>}
               {p.sku && <span className="font-mono text-base-500">{p.sku}</span>}
               <span className="tabular-nums">
                 Order Qty {p.qty} · Received Qty {p.received}

@@ -89,6 +89,7 @@ interface UnitState {
 
 export default function ReceivingWorkspace({
   po,
+  products = [],
   supplier,
   warehouseName,
   warehouses = [],
@@ -99,6 +100,7 @@ export default function ReceivingWorkspace({
   onPosted,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplier: SupplierRow | undefined;
   warehouseName: string;
   /** Actual Site choices — the governed warehouses. */
@@ -125,6 +127,7 @@ export default function ReceivingWorkspace({
       {receiving ? (
         <ReceivingMode
           po={po}
+          products={products}
           supplierName={supplierName}
           warehouseName={warehouseName}
           warehouses={warehouses}
@@ -135,6 +138,7 @@ export default function ReceivingWorkspace({
       ) : (
         <ReadMode
           po={po}
+          products={products}
           supplierName={supplierName}
           warehouseName={warehouseName}
           dutyAllowed={dutyAllowed}
@@ -154,6 +158,7 @@ export default function ReceivingWorkspace({
 
 function ReadMode({
   po,
+  products = [],
   supplierName,
   warehouseName,
   dutyAllowed,
@@ -165,6 +170,7 @@ function ReadMode({
   summary,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplierName: string;
   warehouseName: string;
   dutyAllowed: boolean;
@@ -284,8 +290,9 @@ function ReadMode({
             data-testid={`receiving-item-${i + 1}`}
           >
             <span className="w-4 text-kit-slate-9 tabular-nums">{i + 1}</span>
-            <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
-              {l.sku}
+            <span className="flex-1 min-w-0 text-kit-slate-12">
+              {products.find((p) => p.sku === l.sku)?.name ?? l.sku}
+              <span className="block font-mono text-meta text-kit-slate-9">{l.sku}{products.find((p) => p.sku === l.sku)?.category ? ` · ${products.find((p) => p.sku === l.sku)?.category}` : ""}</span>
             </span>
             <span className="w-14 text-right tabular-nums text-kit-slate-12">
               {l.qty}
@@ -430,6 +437,7 @@ export function eventSentence(e: ReceivingEvent): string {
 
 function ReceivingMode({
   po,
+  products = [],
   supplierName,
   warehouseName,
   warehouses,
@@ -438,6 +446,7 @@ function ReceivingMode({
   onPosted,
 }: {
   po: operationPoListRow;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   supplierName: string;
   warehouseName: string;
   warehouses: Array<{ id: string; name: string }>;
@@ -772,8 +781,9 @@ function ReceivingMode({
           return (
             <div key={l.id} className="border-b border-kit-slate-4 py-1.5">
               <div className="flex items-center gap-2 text-body">
-                <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
-                  {l.sku}
+                <span className="flex-1 min-w-0 text-kit-slate-12">
+                  {products.find((p) => p.sku === l.sku)?.name ?? l.sku}
+              <span className="block font-mono text-meta text-kit-slate-9">{l.sku}{products.find((p) => p.sku === l.sku)?.category ? ` · ${products.find((p) => p.sku === l.sku)?.category}` : ""}</span>
                 </span>
                 <span className="w-14 text-right tabular-nums text-kit-slate-12">
                   {l.qty}

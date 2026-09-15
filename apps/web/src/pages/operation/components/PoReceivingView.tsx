@@ -17,6 +17,7 @@ import ReceivingWorkspace from "./ReceivingWorkspace";
  */
 export default function PoReceivingView({
   poId,
+  products = [],
   pos,
   suppliers,
   warehouses,
@@ -30,6 +31,7 @@ export default function PoReceivingView({
   testId = "receiving-po-view",
 }: {
   poId: string;
+  products?: Array<{sku: string | null; name: string | null; category?: string | null}>;
   pos: operationPoListRow[];
   suppliers: Map<string, SupplierRow>;
   warehouses: Array<{ id: string; name: string }>;
@@ -83,9 +85,10 @@ export default function PoReceivingView({
           ‹ {backLabel}
         </button>
       </div>
-      <div className="mx-auto w-full max-w-4xl">
+      <div className="w-full">
         <ReceivingWorkspace
           po={po}
+          products={products}
           supplier={supplier}
           warehouseName={warehouseName}
           warehouses={warehouses}
