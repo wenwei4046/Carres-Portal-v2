@@ -400,7 +400,26 @@ createRoot(document.getElementById("root")!).render(
         <div className="bg-kit-amber-3 px-3 py-1 text-meta">
           Local verification · Sample data
         </div>
-        <PreviewPage />
+        {/* ⭐ THE PORTAL SIDEBAR THIS HARNESS USED TO OMIT (2026-09-15).
+            Without it the preview reported a 1,024px grid at a 1,280px
+            viewport while PRODUCTION, at a LARGER 1,366px viewport, had 826px
+            — because the real page carries the portal nav before the filter
+            rail. Every width this harness reported was therefore ~240px too
+            generous, and a column set was tuned against it twice. This is a
+            WIDTH STAND-IN, not the real navigation: it holds the same space
+            so a measurement taken here means something. */}
+        <div className="flex min-h-0 flex-1">
+          <div
+            className="hidden w-[240px] shrink-0 border-r border-kit-slate-5 bg-kit-slate-3 p-3 text-meta text-kit-slate-9 md:block"
+            data-testid="preview-portal-sidebar"
+          >
+            Portal sidebar
+            <div className="mt-1">(width stand-in — the real nav is 240px)</div>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <PreviewPage />
+          </div>
+        </div>
       </div>
     </BrowserRouter>
   </QueryClientProvider>,

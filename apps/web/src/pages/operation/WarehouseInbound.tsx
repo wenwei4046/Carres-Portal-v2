@@ -285,6 +285,63 @@ export default function WarehouseInbound() {
         ),
       },
       {
+        key: "receive",
+        /**
+         * THE ACTION SITS SECOND, BESIDE THE IDENTITY — measured on
+         * PRODUCTION 2026-09-15, not in a harness.
+         *
+         * The preview this page was tuned against renders Inbound WITHOUT the
+         * portal sidebar, so it reported a 1,024px grid at a 1,280px viewport.
+         * The real page carries the portal nav (240px) AND the filter rail
+         * (240px) before the grid begins: at a LARGER 1,366px viewport the
+         * grid is 826px, and `Receive` was still off the right edge. A
+         * register cannot be sized against a harness that is missing 240px of
+         * the application.
+         *
+         * Ordering by operational priority is the only thing that survives a
+         * grid whose width is not ours to choose: the operator sees WHICH
+         * document, WHAT to do, WHAT is in it and HOW MUCH is still owed
+         * before anything scrolls.
+         */
+        label: "Receiving",
+        width: 85,
+        wrap: true,
+        /* A DOOR IS NOT A FACT — no funnel on an action column. */
+        filterable: false,
+        exportLabel: "Receiving",
+        exportValue: () => "",
+        accessor: (r) => {
+          /* GOODS THAT NEVER REACH A CARRES SITE GET NO RECEIPT DOOR. */
+          if (!r.siteMapped)
+            return (
+              <span className="text-meta text-base-500">No Site linked</span>
+            );
+          if (!dutyKnown) return <span className="text-meta">Checking…</span>;
+          if (!dutyAllowed)
+            return (
+              <span
+                className="text-meta text-base-500"
+                data-testid={`inbound-receive-denied-${r.id}`}
+              >
+                Not your duty today
+              </span>
+            );
+          return (
+            <button
+              type="button"
+              data-testid={`inbound-receive-${r.id}`}
+              className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint"
+              onClick={(event) => {
+                event.stopPropagation();
+                openReceiving(r);
+              }}
+            >
+              Receive
+            </button>
+          );
+        },
+      },
+      {
         key: "products",
         label: "Product",
         width: 200,
@@ -316,6 +373,42 @@ export default function WarehouseInbound() {
               ))}
             </div>
           ),
+      },
+      {
+        key: "progress",
+        /* THE FOUR GOVERNED QUANTITIES, EACH PRINTING ITS OWN NUMBER. They
+           were four columns at 450px, which is how the Receive button ended
+           up offscreen. The operator still never subtracts, and each figure
+           keeps its own sortable/filterable column in the chooser. */
+        label: "Receiving progress",
+        headerLines: ["Receiving", "progress"] as const,
+        width: 165,
+        wrap: true,
+        filterable: false,
+        searchValue: (r) =>
+          r.quantities.known
+            ? `Order Qty ${r.quantities.orderQty} Received Qty ${r.quantities.receivedQty} Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
+            : "Not recorded",
+        exportValue: (r) =>
+          r.quantities.known
+            ? `Order Qty ${r.quantities.orderQty} · Received Qty ${r.quantities.receivedQty} · Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
+            : "Not recorded",
+        accessor: (r) => {
+          if (!r.quantities.known)
+            return <span className="text-base-600">Not recorded</span>;
+          const q = r.quantities;
+          return (
+            <div className="space-y-0.5 py-0.5 tabular-nums leading-[18px]">
+              <div>Order Qty {q.orderQty}</div>
+              <div>Received Qty {q.receivedQty}</div>
+              <div>Pending Delivery Qty {q.pendingDeliveryQty}</div>
+              {/* Damaged and wrong goods are present, unavailable, and never
+                  reduce Pending Delivery Qty. */}
+              {q.damagedQty > 0 && <div>Damaged Qty {q.damagedQty}</div>}
+              {q.wrongItemQty > 0 && <div>Wrong Item Qty {q.wrongItemQty}</div>}
+            </div>
+          );
+        },
       },
       {
         key: "supplier",
@@ -385,82 +478,6 @@ export default function WarehouseInbound() {
         searchValue: supplierDeliveryWord,
         filterValue: supplierDeliveryWord,
         accessor: supplierDeliveryWord,
-      },
-      {
-        key: "progress",
-        /* THE FOUR GOVERNED QUANTITIES, EACH PRINTING ITS OWN NUMBER. They
-           were four columns at 450px, which is how the Receive button ended
-           up offscreen. The operator still never subtracts, and each figure
-           keeps its own sortable/filterable column in the chooser. */
-        label: "Receiving progress",
-        headerLines: ["Receiving", "progress"] as const,
-        width: 165,
-        wrap: true,
-        filterable: false,
-        searchValue: (r) =>
-          r.quantities.known
-            ? `Order Qty ${r.quantities.orderQty} Received Qty ${r.quantities.receivedQty} Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
-            : "Not recorded",
-        exportValue: (r) =>
-          r.quantities.known
-            ? `Order Qty ${r.quantities.orderQty} · Received Qty ${r.quantities.receivedQty} · Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
-            : "Not recorded",
-        accessor: (r) => {
-          if (!r.quantities.known)
-            return <span className="text-base-600">Not recorded</span>;
-          const q = r.quantities;
-          return (
-            <div className="space-y-0.5 py-0.5 tabular-nums leading-[18px]">
-              <div>Order Qty {q.orderQty}</div>
-              <div>Received Qty {q.receivedQty}</div>
-              <div>Pending Delivery Qty {q.pendingDeliveryQty}</div>
-              {/* Damaged and wrong goods are present, unavailable, and never
-                  reduce Pending Delivery Qty. */}
-              {q.damagedQty > 0 && <div>Damaged Qty {q.damagedQty}</div>}
-              {q.wrongItemQty > 0 && <div>Wrong Item Qty {q.wrongItemQty}</div>}
-            </div>
-          );
-        },
-      },
-      {
-        key: "receive",
-        label: "Receiving",
-        width: 85,
-        wrap: true,
-        /* A DOOR IS NOT A FACT — no funnel on an action column. */
-        filterable: false,
-        exportLabel: "Receiving",
-        exportValue: () => "",
-        accessor: (r) => {
-          /* GOODS THAT NEVER REACH A CARRES SITE GET NO RECEIPT DOOR. */
-          if (!r.siteMapped)
-            return (
-              <span className="text-meta text-base-500">No Site linked</span>
-            );
-          if (!dutyKnown) return <span className="text-meta">Checking…</span>;
-          if (!dutyAllowed)
-            return (
-              <span
-                className="text-meta text-base-500"
-                data-testid={`inbound-receive-denied-${r.id}`}
-              >
-                Not your duty today
-              </span>
-            );
-          return (
-            <button
-              type="button"
-              data-testid={`inbound-receive-${r.id}`}
-              className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint"
-              onClick={(event) => {
-                event.stopPropagation();
-                openReceiving(r);
-              }}
-            >
-              Receive
-            </button>
-          );
-        },
       },
       {
         key: "status",

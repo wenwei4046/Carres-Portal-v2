@@ -509,13 +509,24 @@ right edge. **`No page-level horizontal scroll` is not a usability measurement**
 and an operator does not find an action they cannot see. A default set is judged by what is
 readable together at 1280px, measured, not by how many facts it can name.
 
-The Register defaults are:
+**THE GRID'S WIDTH IS NOT THIS PAGE'S TO CHOOSE, so ORDER is what keeps the important things on
+screen.** Measured on PRODUCTION 2026-09-15: at a 1,366px viewport the grid is **826px**, because
+the portal navigation (240px) and the filter rail (240px) take 480px before it begins. A local
+harness that omits the portal navigation reports ~240px more than exists and must never be used to
+size a register — the first two attempts at this card were both tuned against exactly that.
+
+The Register defaults, in OPERATIONAL PRIORITY order:
 
 ```
-Document · Product · Supplier & DO No · PO Delivery Date · Supplier Delivery Date ·
-Receiving progress · Receiving        ← all inside the visible width at 1280px
-Status · Exceptions                   ← follow, reachable by scrolling
+Document · Receiving · Product · Receiving progress · Supplier & DO No
+      ↑ all inside the visible width at 1280px WITH the portal nav and rail open
+PO Delivery Date · Supplier Delivery Date · Status · Exceptions
+      ↑ follow, reachable by scrolling
 ```
+
+**`Receiving` sits SECOND, beside the identity.** The operator sees which document, what to do,
+what is in it and how much is still owed before anything scrolls. An action placed after the facts
+it belongs to is an action that disappears on the first narrow screen.
 
 `Receiving progress` prints the governed quantities, each with its own number —
 `Order Qty` · `Received Qty` · `Pending Delivery Qty`, and `Damaged Qty` / `Wrong Item Qty` when
@@ -536,11 +547,20 @@ the set above renders **1,286px**, and a governed header is not allowed to set a
 (`headerLines`) let the governed words stand over two rows. Measured at the preview:
 
 ```
-1280px   grid 1024px   Receive fully visible      Status · Exceptions trail
-1366px   grid 1110px   everything except Exceptions fully visible
- 760px   grid  744px   rail collapses to Filters; the grid scrolls and the
-                       Receive control is NOT reachable without scrolling
+               grid    fully visible
+1366px  prod    826    Document · Receiving · Product · Receiving progress ·
+                       Supplier & DO No · PO Delivery Date
+1280px          784    Document · Receiving · Product · Receiving progress ·
+                       Supplier & DO No
+ 760px          744    rail collapses to Filters; the grid scrolls, and only
+                       the leading columns are reachable without scrolling
 ```
+
+**THE REMAINING CONSTRAINT IS THE RAIL, AND IT IS AN OWNER DECISION.** At 1280px the portal
+navigation and the 240px filter rail leave the grid ~740px, to show three arrival-status rows and
+six document-type rows — five of which read 0 while no `arrival_sources` exist. Whether Inbound's
+rail should default to collapsed, narrow to the 200px used elsewhere in this portal, or move its
+filters into the toolbar is a design change for the owner, not something to assume here.
 
 The narrow case is a **known limitation, not a pass**: a nine-column register does not fit 744px,
 and a different narrow composition is a design change for the owner rather than something to
