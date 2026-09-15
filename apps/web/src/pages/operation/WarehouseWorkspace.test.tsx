@@ -401,7 +401,30 @@ describe("the card's own anatomy", () => {
     mount();
     expect(screen.queryByTestId("ws-card-date-status")).toBeNull();
     expect(screen.getByTestId("ws-card-c1").className).not.toContain("amber");
-    expect(screen.getByTestId("ws-card-c1").className).not.toContain("blue");
+  });
+
+  it("the card is WHITE whatever the date agreement says", () => {
+    for (const dateStatus of ["expected", "scheduled", null] as const) {
+      setSchedule({ cards: [card({ dateStatus })] });
+      const view = mount();
+      expect(screen.getByTestId("ws-card-c1").className).toContain("bg-white");
+      expect(screen.getByTestId("ws-card-c1").className).not.toContain("amber");
+      view.unmount();
+    }
+  });
+
+  it("only an OVERDUE card wears the warning surface, and still says the word", () => {
+    setSchedule({ cards: [card({ dateStatus: "expected", overdue: true })] });
+    mount();
+    expect(screen.getByTestId("ws-card-c1").className).toContain("kit-amber-6");
+    expect(screen.getByTestId("ws-card-exception-overdue")).toHaveTextContent("Overdue");
+  });
+
+  it("the header is separated from the body by a divider", () => {
+    setSchedule({ cards: [card()] });
+    mount();
+    const header = screen.getByTestId("ws-card-c1").querySelector("header")!;
+    expect(header.className).toContain("border-b");
   });
 });
 
@@ -659,5 +682,46 @@ describe("the findings the production walk raised", () => {
     expect(screen.getAllByTestId("ws-line")).toHaveLength(10);
     for (const m of models) expect(screen.getByText(m)).toBeInTheDocument();
     expect(screen.queryByText(/\+\d+ more/)).toBeNull();
+  });
+});
+
+
+/**
+ * TODAY — owner refinement 2026-09-15.
+ */
+describe("finding today", () => {
+  it("marks today's column when it is in the window, and marks no other", () => {
+    setSchedule();
+    mount();
+    const marked = document.querySelectorAll('[data-today="yes"]');
+    expect(marked).toHaveLength(1);
+    expect(screen.getByTestId("ws-head-2026-09-14")).toHaveAttribute("data-today", "yes");
+    expect(screen.getByTestId("ws-head-2026-09-14")).toHaveTextContent("Today");
+  });
+
+  it("marks nothing when today is outside the window", () => {
+    setSchedule({
+      operatingDates: [
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-10",
+      ],
+    });
+    mount();
+    expect(document.querySelectorAll('[data-today="yes"]')).toHaveLength(0);
+  });
+
+  it("Today clears the window so the projection recomputes from today", () => {
+    setSchedule();
+    mount("arrival", "/operation?tab=warehouse-arrival-schedule&from=2026-11-02&date=2026-11-03");
+    fireEvent.click(screen.getByTestId("ws-today"));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("from=");
+    expect(at).not.toContain("date=");
+    /* It holds no date of its own — it removes, never sets. */
+    expect(at).not.toContain("2026-09-14");
   });
 });

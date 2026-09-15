@@ -26,7 +26,7 @@ import Tooltip from "@/components/kit/Tooltip";
 import type { WarehouseScheduleCard as ScheduleCard } from "@carres/shared";
 import {
   cardReferencesOf,
-  cardTintClassOf,
+  cardSurfaceClassOf,
   categoryVisualOf,
   dateStatusPillOf,
   exceptionLinesOf,
@@ -58,16 +58,19 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
     <article
       data-testid={`ws-card-${card.id}`}
       data-direction={card.direction}
-      /* 1px border · 10px corner · NO decorative shadow. The tint says one
-         thing only: whether this date is agreed (`cardTintClassOf`). */
-      className={`min-w-0 rounded-card border ${cardTintClassOf(card.dateStatus)}`}
+      /* 1px border · 10px corner · NO decorative shadow. The surface says one
+         thing only, and it is not date agreement: `overdue`. */
+      className={`min-w-0 rounded-card border ${cardSurfaceClassOf(card)}`}
       aria-label={`${party} · ${refs.primary.ref}`}
     >
       {/* ── 1 · HEADER — 8px/12px padding, 4px gaps, and it WRAPS.
              A long party name or a long reference must push the door onto the
              next line, never be clipped: the operator identifies the work by
              exactly the characters a truncation would eat. */}
-      <header className="flex flex-wrap items-center gap-1 px-3 py-2">
+      {/* The hairline under the header is what gives the card a head and a
+          body once the surface is white — without a tint doing that job, the
+          party and the references ran together as one block. */}
+      <header className="flex flex-wrap items-center gap-1 border-b border-kit-slate-5 px-3 py-2">
         {/* `flex-[1_1_6rem]` rather than `flex-1`: the name keeps a readable
             floor, so in a narrow date column the PILL AND DOOR wrap to the
             next line as a unit instead of the party name being squeezed into
@@ -76,14 +79,14 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
         {card.detailHref ? (
           <Link
             to={card.detailHref}
-            className="min-w-0 flex-[1_1_6rem] break-words text-body font-semibold text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            className="min-w-0 flex-[1_1_6rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
             data-testid="ws-card-party"
           >
             {party}
           </Link>
         ) : (
           <span
-            className="min-w-0 flex-[1_1_6rem] break-words text-body font-semibold text-kit-slate-12"
+            className="min-w-0 flex-[1_1_6rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12"
             data-testid="ws-card-party"
           >
             {party}
@@ -102,20 +105,23 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
         </span>
       </header>
 
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 pt-2">
         {/* ── 2 · SOURCE REFERENCES — each on its own line, each ONCE, each
                still openable. The link rides on the reference itself rather
                than on a repeat of it further down the card. */}
         <div className="min-w-0">
+          {/* `anywhere` rather than `break-word`: a PO number is one long
+              unbroken token, so plain wrapping leaves it overflowing its own
+              column at six-column width. Size and weight are untouched. */}
           <div
-            className="break-words text-body font-semibold text-kit-slate-12"
+            className="break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12"
             data-testid="ws-card-ref-primary"
           >
             <ReferenceText reference={refs.primary} />
           </div>
           {refs.secondary && (
             <div
-              className="break-words text-label leading-4 text-kit-slate-11"
+              className="break-words [overflow-wrap:anywhere] text-label leading-4 text-kit-slate-11"
               data-testid="ws-card-ref-secondary"
             >
               <ReferenceText reference={refs.secondary} />
@@ -260,7 +266,11 @@ function ProductRow({
       <span className="flex h-6 w-6 shrink-0 items-center justify-center text-kit-slate-11">
         <Icon name={visual.glyph} size={18} title={visual.word ?? undefined} />
       </span>
-      <span className="min-w-0 flex-1 break-words text-meta text-kit-slate-12" data-testid="ws-line-model">
+      {/* A wrapped model name gets its lines apart; the 12px size stays. */}
+      <span
+        className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-meta leading-[17px] text-kit-slate-12"
+        data-testid="ws-line-model"
+      >
         {line.modelLabel ?? "Model not recorded"}
       </span>
       <ProgressFigure progress={progress} />

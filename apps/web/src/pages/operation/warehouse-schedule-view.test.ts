@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cardReferencesOf,
-  cardTintClassOf,
+  cardSurfaceClassOf,
   extraRelatedRecordsOf,
   undatedSummaryWordOf,
   cardsOnDate,
@@ -135,19 +135,35 @@ describe("the category slot", () => {
   });
 });
 
-describe("date agreement — the tint means ONE thing", () => {
-  it("expected is amber, scheduled is blue", () => {
-    expect(dateStatusPillOf("expected")).toEqual({ word: "Expected", tone: "warning" });
+describe("date agreement is a QUIET badge, never the card's surface", () => {
+  it("expected is quiet slate, scheduled is quiet blue", () => {
+    expect(dateStatusPillOf("expected")).toEqual({ word: "Expected", tone: "neutral" });
     expect(dateStatusPillOf("scheduled")).toEqual({ word: "Scheduled", tone: "info" });
-    expect(cardTintClassOf("expected")).toContain("kit-amber-3");
-    expect(cardTintClassOf("scheduled")).toContain("kit-blue-3");
   });
 
-  it("an unknown agreement stays NEUTRAL — a date alone never means Scheduled", () => {
+  it("an unknown agreement prints NO badge — a date alone never means Scheduled", () => {
     expect(dateStatusPillOf(null)).toBeNull();
-    const neutral = cardTintClassOf(null);
-    expect(neutral).not.toContain("amber");
-    expect(neutral).not.toContain("blue");
+  });
+
+  it("EVERY card is white; date agreement never paints the surface", () => {
+    for (const status of ["expected", "scheduled", null] as const) {
+      const surface = cardSurfaceClassOf({ overdue: false });
+      expect(surface).toContain("bg-white");
+      expect(surface).not.toContain("amber");
+      expect(dateStatusPillOf(status)?.tone).not.toBe("warning");
+    }
+  });
+
+  it("WARNING is reserved for work that is actually overdue", () => {
+    const overdue = cardSurfaceClassOf({ overdue: true });
+    expect(overdue).toContain("kit-amber-6");
+    expect(overdue).not.toContain("bg-white");
+    /* and the word survives the colour change */
+    expect(exceptionLinesOf(card({ overdue: true }))[0]).toEqual({
+      key: "overdue",
+      text: "Overdue",
+      tone: "warning",
+    });
   });
 });
 
@@ -207,7 +223,7 @@ describe("exception lines", () => {
     expect(exceptionLinesOf(card({ overdue: true }))[0]).toEqual({
       key: "overdue",
       text: "Overdue",
-      tone: "danger",
+      tone: "warning",
     });
     expect(exceptionLinesOf(card({ overdue: false }))).toEqual([]);
   });

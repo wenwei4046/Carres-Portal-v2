@@ -254,7 +254,7 @@ deliveryArrangementsRouter.get(
       sb
         .from("orders")
         .select(
-          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
+          "id, so, customer_name, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
         )
         .in("id", orderIds),
       sb
@@ -271,6 +271,7 @@ deliveryArrangementsRouter.get(
     type OrderFact = {
       id: string;
       so: number;
+      customer_name: string | null;
       customer_address: string | null;
       delivered_at: string | null;
       do_file_path: string | null;
@@ -540,6 +541,12 @@ deliveryArrangementsRouter.get(
             : "Not recorded",
           warehouseSiteId: unit.warehouse_id,
           toCustomer: order.customer_address ?? "Not recorded",
+          /* The PARTY, beside the place. `toCustomer` has always carried the
+             ADDRESS despite its name — correct for the Register's `To`
+             column, which COPY-STANDARD defines as a place, and wrong for the
+             Schedule card's header, which the approved card defines as the
+             party. Both facts now travel; neither is guessed from the other. */
+          toCustomerName: order.customer_name ?? null,
           logisticsPartner: arrangement.partner_name as string,
           driverName: arrangement.driver_name,
           vehicle: arrangement.vehicle,
