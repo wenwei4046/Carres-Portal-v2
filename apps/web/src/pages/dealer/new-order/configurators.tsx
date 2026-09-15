@@ -332,10 +332,10 @@ export function SofaConfigurator({
 /**
  * The configurator the ConfigureDrawer shows. Every caller sends mattress and
  * bed frame to PosConfigurePage and a sofa with offered compartments to
- * SofaConfigurePage before the drawer opens, so only accessory and dropdown
- * sofa reach here. Returns null for anything else. The CALLER must key this by
- * model.id (a fresh mount per model) so the useState defaults re-init — see
- * the SO-1006 note in SofaConfigurator.
+ * SofaConfigurePage before the drawer opens, so only accessory, service and
+ * dropdown sofa reach here. Returns null for anything else. The CALLER must key
+ * this by model.id (a fresh mount per model) so the useState defaults re-init —
+ * see the SO-1006 note in SofaConfigurator.
  */
 export function ConfiguratorForModel({
   model,
@@ -356,9 +356,11 @@ export function ConfiguratorForModel({
   specialAddons?: SpecialAddonDto[] | null;
   onAdd: (line: DraftLine) => void;
 }) {
-  if (model.category === "accessory") {
+  if (model.category === "accessory" || model.category === "service") {
     // Accessories are POS cards too (2990s parity) — the generic pick-variant
-    // + qty configurator fits them as-is; only the caption changes.
+    // + qty configurator fits them as-is; only the caption changes. A service
+    // has no card, but a bundle slot can hold one with 2+ skus or specials and
+    // opens the drawer for it — same picker, or the drawer renders empty.
     return (
       <MattressConfigurator
         model={model}
