@@ -90,6 +90,8 @@ export interface WarehouseScheduleLine {
    *  carries no SKU to ask about. Never a supplier-name rule. */
   categoryKey: GoodsCategoryWord | null;
   modelLabel: string | null;
+  /** Exact source SKU; category and model labels never replace identity. */
+  sku?: string | null;
   /** Units this line ordered, or this line's scope requires. */
   plannedQty: number;
   /** Units received at THIS line's scope; `null` when unattributable. */
@@ -319,6 +321,7 @@ function arrivalLines(
         id: line.id,
         categoryKey: categoryKeyOf(line.sku, categories),
         modelLabel: modelLabelOf(arrival, line.sku),
+        sku: line.sku,
         plannedQty: line.qty,
         receivedQty: counts ? counts.received : null,
         loadedQty: null,
@@ -339,6 +342,7 @@ function arrivalLines(
       id: unit.id,
       categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.product ?? unit.sku ?? null,
+      sku: unit.sku,
       plannedQty: 1,
       receivedQty: unmapped ? null : received ? 1 : 0,
       loadedQty: null,
@@ -500,6 +504,7 @@ export function warehousePickupScheduleCards(
       id: unit.unitId,
       categoryKey: categoryKeyOf(unit.sku, categories),
       modelLabel: unit.productName ?? unit.sku ?? null,
+      sku: unit.sku,
       plannedQty: 1,
       receivedQty: null,
       loadedQty: unit.unitHandedOverAt ? 1 : 0,

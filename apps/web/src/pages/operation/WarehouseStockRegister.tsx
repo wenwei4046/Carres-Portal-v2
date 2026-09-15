@@ -213,7 +213,7 @@ export default function WarehouseStockRegister() {
         wrap: true,
         sortable: true,
         searchValue: (u) => `${u.productName ?? ""} ${u.sku}`,
-        exportValue: (u) => u.productName ?? u.sku,
+        exportValue: (u) => [u.productName, u.sku, `Qty ${u.qty}`].filter(Boolean).join(" · "),
         chooserGroup: "Unit",
         accessor: (u) => (
           <div className="min-w-0 whitespace-normal break-words">

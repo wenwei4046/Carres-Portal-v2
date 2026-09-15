@@ -47,6 +47,10 @@ const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
  *  all `stock_unit_events` records (0366). */
 const EVENT_LABEL: Record<string, string> = {
   unit_created: "Unit created",
+  unit_born: "Unit created",
+  status_changed: "Status changed",
+  protection_changed: "Protection changed",
+  verified: "Verified",
   availability_changed: "Availability changed",
   site_changed: "Moved site",
   holder_changed: "Handed over",
