@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -31,10 +31,7 @@ operationDashboardRouter.get("/", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("operation_dashboard_summary");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // Pipeline v2 extra counts. PostgREST's `head: true, count: 'exact'` returns
   // the count via response metadata without fetching rows.

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -49,10 +49,7 @@ bulkCompleteRouter.post("/bulk-complete", async (c) => {
   const { data, error } = await sb.rpc("ops_bulk_complete_orders", {
     p_order_ids: parsed.data.orderIds,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? { completed: 0, skipped: 0 });
 });
 

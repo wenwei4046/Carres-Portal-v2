@@ -5,7 +5,7 @@ import {
   setDealerStatusInput,
   updateDealerInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -42,10 +42,7 @@ principalDealersRouter.use("*", async (c, next) => {
 principalDealersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealers_with_stats_list");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // 2026-07-19 (Loo) — a showroom is Carres' OWN store, a dealer is an external
   // reseller, and HQ lists them on two separate pages. `dealers_with_stats_list`
@@ -193,10 +190,7 @@ principalDealersRouter.post("/invite", async (c) => {
     p_region: parsed.data.region,
     p_contact: parsed.data.contact,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data); // { dealer, approval, idempotent }
 });
 
@@ -248,10 +242,7 @@ principalDealersRouter.patch("/:id", async (c) => {
     .eq("id", id)
     .select("id, name, region, contact, address, ssm_code, contact_name, contact_phone")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, dealer: data });
 });
 
@@ -265,10 +256,7 @@ principalDealersRouter.post("/:id/status", async (c) => {
     p_new_status: parsed.data.status,
     p_reason: parsed.data.reason ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ dealer: data });
 });
 

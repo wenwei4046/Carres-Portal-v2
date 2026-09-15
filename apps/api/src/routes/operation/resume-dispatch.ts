@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { resumeDispatchInput } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -52,10 +52,7 @@ resumeDispatchRouter.post("/resume-dispatch", async (c) => {
   const { data, error } = await sb.rpc("operation_resume_dispatch_from_waiting", {
     p_thread_id: parsed.data.threadId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

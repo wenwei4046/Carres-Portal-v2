@@ -5,7 +5,7 @@ import {
   partnerRejectRfdInput,
   receivePoWithDoInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -186,10 +186,7 @@ partnerPickupsRouter.post("/:id/accept", async (c) => {
   const { data, error } = await sb.rpc("partner_accept_pickup", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -202,10 +199,7 @@ partnerPickupsRouter.post("/:id/mark-picked-up", async (c) => {
   const { data, error } = await sb.rpc("partner_mark_picked_up", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -226,10 +220,7 @@ partnerPickupsRouter.post("/:id/confirm-receive", async (c) => {
   const { data, error } = await sb.rpc("partner_confirm_receive", {
     p_po_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -245,10 +236,7 @@ partnerPickupsRouter.post("/:id/reject-receive", async (c) => {
     p_po_id: c.req.param("id"),
     p_reason: reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -272,10 +260,7 @@ partnerPickupsRouter.post("/events/:eventId/collect", async (c) => {
   const { data, error } = await sb.rpc("partner_mark_pickup_collected", {
     p_event_id: c.req.param("eventId"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -318,10 +303,7 @@ partnerPickupsRouter.post("/:id/receive", async (c) => {
       received_qty: l.receivedQty,
     })),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -432,10 +414,7 @@ partnerPickupsRouter.post("/accept-rfd", async (c) => {
   const { data, error } = await sb.rpc("operation_partner_accept_rfd", {
     p_thread_id: parsed.data.threadId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -470,10 +449,7 @@ partnerPickupsRouter.post("/reject-rfd", async (c) => {
     p_thread_id: parsed.data.threadId,
     p_reason: parsed.data.reason ?? "",
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

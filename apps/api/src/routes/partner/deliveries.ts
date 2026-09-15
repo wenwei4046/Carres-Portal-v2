@@ -5,7 +5,7 @@ import {
   partnerSaveArrangementInput,
   type PartnerDeliveryCard,
 } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -286,10 +286,7 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
     },
     { onConflict: "order_id,leg" },
   );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,
@@ -345,10 +342,7 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
     note: parsed.data.note ?? null,
     recorded_by: c.var.auth.id ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const { error: histErr } = await sb.from("order_history").insert({
     order_id: orderId,

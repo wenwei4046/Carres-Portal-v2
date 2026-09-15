@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { OperationReceiveThreadsInput } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -67,10 +67,7 @@ operationReceiveThreadsRouter.get("/:poId/threads", async (c) => {
       "id, order_id, supplier_ready_at, pickup_event_id, orders(so, customer_name, delivery_date)",
     )
     .eq("po_id", poId);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rows = (data ?? []) as any[];
   const orderIds = rows
@@ -135,10 +132,7 @@ operationReceiveThreadsRouter.post("/:poId/receive-threads", async (c) => {
     p_do_file_path: parsed.data.doFilePath,
     p_do_note:      parsed.data.doNote ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

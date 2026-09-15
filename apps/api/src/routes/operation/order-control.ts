@@ -47,7 +47,7 @@ import {
   todayIsoMYT,
 } from "../../lib/delivery-order-issue";
 import { requireDuty } from "../../lib/duties";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -134,10 +134,7 @@ orderControlRouter.get("/:id/control", async (c) => {
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ control: data ?? null });
 });
@@ -235,10 +232,7 @@ orderControlRouter.put("/:id/control", async (c) => {
       CONTROL_COLUMNS,
     )
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ control: data });
 });
@@ -428,10 +422,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // T8 — a split is the fact an operator must be able to find later ("why did
   // only the bed set go?"). The 0282 trigger logs the scope CHANGE; this adds
@@ -665,10 +656,7 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // The decision is the one thing about this order a human will want to find
   // again months later ("why was the customer never told?"). The 0211 trigger
@@ -739,10 +727,7 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
     // 0491 — the Delivery scope: a Journey leg records its own result.
     p_leg: parsed.data.leg,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data, 201);
 });
 
@@ -762,10 +747,7 @@ orderControlRouter.get("/:id/delivery-attempts", async (c) => {
     )
     .eq("order_id", idCheck.data)
     .order("attempt_no", { ascending: true });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ attempts: data ?? [] });
 });
 
@@ -990,10 +972,7 @@ async function refuseUnlessReachedCustomer(
     .select("id, status, operation_stage")
     .eq("id", orderId)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
   if (order.operation_stage === "delivered" || order.status === "delivered") {
     return null;
@@ -1185,10 +1164,7 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // §6.1 (0489) — the SAME act binds the file to the Delivery Visit it proves:
   // the latest recorded attempt of the named document. One door, two records
@@ -1251,10 +1227,7 @@ orderControlRouter.get("/:id/delivery-photos", async (c) => {
     .select("delivery_photos")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const entries: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
     ? (ctrl.delivery_photos as DeliveryPhoto[])
     : [];
@@ -1653,10 +1626,7 @@ orderControlRouter.post("/append-missing-lines", async (c) => {
         attrs: cand.itemGroup ? { item_group: cand.itemGroup } : {},
       })),
     });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     result.appended += Number((data as { appended?: number } | null)?.appended ?? 0);
     result.orders += 1;
   }
@@ -1697,10 +1667,7 @@ orderControlRouter.get("/:id/loans", async (c) => {
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const loans: SofaLoanDto[] = (data ?? []).map((r) => mapLoanRow(r));
   return c.json({ loans });
 });
@@ -1724,10 +1691,7 @@ orderControlRouter.get("/:id/loan-offers", async (c) => {
     .select("id, seq, order_id, event, item_id, label, reason, recorded_by, recorded_at, ops_stock_items(unit_code, identity_scope)")
     .eq("order_id", idCheck.data)
     .order("seq", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const offers = (data ?? []).map((r) => {
     const row = r as Record<string, unknown> & {
       ops_stock_items?: { unit_code?: string | null; identity_scope?: string | null } | null;
@@ -1776,10 +1740,7 @@ orderControlRouter.post("/:id/loan-offers", async (c) => {
     p_label: parsed.data.label ?? null,
     p_reason: parsed.data.reason ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ offer: data }, 201);
 });
 
@@ -2083,10 +2044,7 @@ orderControlRouter.post("/:id/loan-update", async (c) => {
       "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(unit_code, sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ loan: mapLoanRow(loan) });
 });
 

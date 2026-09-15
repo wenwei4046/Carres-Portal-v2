@@ -5,7 +5,7 @@ import {
   supplierPosListQuery,
 } from "@carres/shared";
 import { requireSupplier } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -312,10 +312,7 @@ supplierPosRouter.get("/:poId/threads", requireSupplier, async (c) => {
   // recursion (orders policy → threads → POs cycle). The RPC bypasses RLS,
   // gates internally on supplier_id = app_supplier_id().
   const { data, error } = await sb.rpc("supplier_threads_for_po", { p_po_id: poId });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? []);
 });
 
@@ -345,10 +342,7 @@ supplierPosRouter.get("/:poId/pickup-events", requireSupplier, async (c) => {
     .select("id, do_number, picked_up_at, ack_role")
     .eq("po_id", poId)
     .order("picked_up_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eventIds = ((data ?? []) as any[]).map((r) => r.id as string);
   const counts = new Map<string, number>();
@@ -382,10 +376,7 @@ supplierPosRouter.post("/:id/acknowledge", requireSupplier, async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("supplier_acknowledge", { p_po_id: id });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -396,10 +387,7 @@ supplierPosRouter.post("/:id/start-production", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("supplier_start_production", {
     p_po_id: id,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -410,10 +398,7 @@ supplierPosRouter.post("/:id/ready-for-pickup", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("operation_supplier_ready_confirm", {
     p_po_id: id,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -430,10 +415,7 @@ supplierPosRouter.post("/:id/mark-delivered", requireSupplier, async (c) => {
     p_do_file_path: body.data.doFilePath,
     p_do_note: body.data.doNote ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

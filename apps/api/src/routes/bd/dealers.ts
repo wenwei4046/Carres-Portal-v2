@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { userClient } from "../../lib/supabase";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import type { AppEnv } from "../../types";
 
 /**
@@ -32,10 +32,7 @@ bdDealersRouter.use("*", async (c, next) => {
 bdDealersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealers_with_stats_list");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // Loo 2026-07-25 — BD sees DEALERS only: Carres' own showrooms are the
   // principal's world and stay entirely off the BD surface (this ONE list
   // feeds the BD board's store menu, the Accounts roster AND the POS

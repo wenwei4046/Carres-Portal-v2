@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -37,10 +37,7 @@ lpInboundRouter.post("/:id/lp-accept-inbound", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("lp_accept_inbound_delivery", { p_po_id: id });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -54,10 +51,7 @@ lpInboundRouter.post("/:id/lp-reject-inbound", async (c) => {
   const body = rejectSchema.parse(await c.req.json().catch(() => ({})));
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("partner_reject_customer", { p_po_id: id, p_reason: body.reason ?? "" });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -71,10 +65,7 @@ lpInboundRouter.post("/:id/relocate-inbound", async (c) => {
     p_po_id: id,
     p_new_warehouse_id: body.new_warehouse_id,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

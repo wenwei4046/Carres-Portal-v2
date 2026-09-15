@@ -66,7 +66,7 @@ import {
   type SkuImportRow,
   type SkuImportFailure,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import { syncCompartmentSku, discontinueCompartmentSku } from "../lib/sofa-compartment-sku";
 import type { AppEnv } from "../types";
@@ -593,10 +593,7 @@ catalogRouter.post("/models", async (c) => {
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { model: Adapters.productModelFromRow(data as DB.ProductModelRow) },
     201,
@@ -631,10 +628,7 @@ catalogRouter.patch("/models/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -655,10 +649,7 @@ catalogRouter.delete("/models/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -810,10 +801,7 @@ catalogRouter.post("/skus", async (c) => {
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { sku: Adapters.productSkuFromRow(data as DB.ProductSkuRow) },
     201,
@@ -900,10 +888,7 @@ catalogRouter.patch("/skus/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -972,10 +957,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .eq("id", id)
     .select("id, model_id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -1296,10 +1278,7 @@ catalogRouter.post("/sofa-fabrics", async (c) => {
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { fabric: Adapters.sofaFabricFromRow(data as DB.SofaFabricRow) },
     201,
@@ -1330,10 +1309,7 @@ catalogRouter.patch("/sofa-fabrics/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "fabric not found" }, 404);
   }
@@ -1349,10 +1325,7 @@ catalogRouter.delete("/sofa-fabrics/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "fabric not found" }, 404);
   }
@@ -1583,7 +1556,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       .from("product_skus")
       .insert(toInsert)
       .select("id");
-    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    if (error) return fail(c, error);
     generated = (data ?? []).length;
 
     // Loo 2026-07-21 — generating a size onto an EXISTING model must also join
@@ -1641,7 +1614,7 @@ catalogRouter.get("/skus/:id/supplier-offers", async (c) => {
     .from("sku_supplier_offers")
     .select(OFFER_SELECT)
     .eq("sku_id", c.req.param("id"));
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   const offers = (data ?? []).map(offerFromRow)
     .sort((a, b) => (a.supplierName ?? "").localeCompare(b.supplierName ?? ""));
   return c.json({ offers });
@@ -1658,7 +1631,7 @@ catalogRouter.get("/supplier-offers", async (c) => {
   const { data, error } = await sb
     .from("sku_supplier_offers")
     .select("sku_id, supplier_id, supplier_code");
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     offers: (data ?? []).map((r: any) => ({
@@ -1699,7 +1672,7 @@ catalogRouter.put("/skus/:id/supplier-offers", async (c) => {
     )
     .select(OFFER_SELECT)
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
   }
@@ -1714,7 +1687,7 @@ catalogRouter.delete("/skus/:id/supplier-offers/:supplierId", async (c) => {
     .delete()
     .eq("sku_id", c.req.param("id"))
     .eq("supplier_id", c.req.param("supplierId"));
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   // Idempotent: removing an offer that is not there is not an error.
   return c.json({ ok: true });
 });
@@ -1774,7 +1747,7 @@ catalogRouter.patch("/models/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1791,7 +1764,7 @@ catalogRouter.delete("/models/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1819,7 +1792,7 @@ catalogRouter.patch("/floor-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "floor_config row missing" }, 404);
   }
@@ -1881,7 +1854,7 @@ catalogRouter.post("/addons", async (c) => {
     })
     .select("*")
     .single();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (parsed.data.serviceSku) {
     await ensureServiceSkuRow(sb, {
       sku: parsed.data.serviceSku,
@@ -1917,7 +1890,7 @@ catalogRouter.patch("/addons/:key", async (c) => {
     Object.keys(patch).length > 0
       ? await sb.from("addons").update(patch).eq("key", key).select("*").maybeSingle()
       : await sb.from("addons").select("*").eq("key", key).maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
@@ -1961,7 +1934,7 @@ catalogRouter.delete("/addons/:key", async (c) => {
     .eq("key", key)
     .select("key")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
@@ -1996,7 +1969,7 @@ catalogRouter.post("/special-addons", async (c) => {
     })
     .select("*")
     .single();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) }, 201);
 });
 
@@ -2028,7 +2001,7 @@ catalogRouter.patch("/special-addons/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
   }
@@ -2047,7 +2020,7 @@ catalogRouter.delete("/special-addons/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
   }
@@ -2083,7 +2056,7 @@ catalogRouter.patch("/fabric-tier-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "fabric_tier_addon_config row missing" },
@@ -2120,7 +2093,7 @@ catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "upsert returned no row" },
@@ -2170,7 +2143,7 @@ catalogRouter.post("/sofa-compartments", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "compartment insert returned no row" }, 500);
   }
@@ -2209,7 +2182,7 @@ catalogRouter.patch("/sofa-compartments/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2228,7 +2201,7 @@ catalogRouter.delete("/sofa-compartments/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2287,7 +2260,7 @@ catalogRouter.patch("/sofa-compartments/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2305,7 +2278,7 @@ catalogRouter.delete("/sofa-compartments/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2351,7 +2324,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
   }
@@ -2371,7 +2344,7 @@ catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) =
     .delete()
     .eq("model_id", modelId)
     .eq("compartment_id", compartmentId);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
 
   // Phase 5 — soft-discontinue the compartment's sku (pos_active=false +
   // discontinued_at). NEVER delete it: historical order_lines may FK the sku. A
@@ -2430,7 +2403,7 @@ catalogRouter.post("/sofa-combos", async (c) => {
     .insert(insert)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "sofa combo insert returned no row" }, 500);
   }
@@ -2474,7 +2447,7 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
   }
@@ -2499,7 +2472,7 @@ catalogRouter.delete("/sofa-combos/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
   }
@@ -2572,8 +2545,7 @@ catalogRouter.put("/option-pools/:pool", async (c) => {
     if (error.code === "23505") {
       return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2597,10 +2569,7 @@ catalogRouter.get("/config-history", async (c) => {
     .order("effective_from", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({
     history: (data ?? []).map((r) =>
       Adapters.catalogConfigHistoryFromRow(r as DB.CatalogConfigHistoryRow),
@@ -2645,8 +2614,7 @@ catalogRouter.put("/fabrics", async (c) => {
   });
   if (error) {
     if (error.code === "23505") return c.json(fabricDuplicate(), 409);
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2680,8 +2648,7 @@ catalogRouter.patch("/fabrics/:id/cost", async (c) => {
         404,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2698,10 +2665,7 @@ catalogRouter.get("/fabrics/history", async (c) => {
     .order("effective_from", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({
     history: (data ?? []).map((r) =>
       Adapters.catalogFabricsHistoryFromRow(r as DB.CatalogConfigHistoryRow),
@@ -2752,7 +2716,7 @@ catalogRouter.patch("/delivery-fee-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "delivery_fee_config row missing" },
@@ -2783,7 +2747,7 @@ catalogRouter.post("/special-delivery-fee-rules", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "special delivery fee rule insert returned no row" },
@@ -2822,7 +2786,7 @@ catalogRouter.patch("/special-delivery-fee-rules/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "special delivery fee rule not found" },
@@ -2841,10 +2805,7 @@ catalogRouter.delete("/special-delivery-fee-rules/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(SPECIAL_DELIVERY_FEE_RULES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -2883,7 +2844,7 @@ catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
       .from(MODEL_DEFAULT_FREE_GIFTS)
       .delete()
       .eq("model_id", modelId);
-    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    if (error) return fail(c, error);
     return c.json({ modelDefaultFreeGifts: { modelId, gifts: [] } });
   }
 
@@ -2902,7 +2863,7 @@ catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "upsert returned no row" },
@@ -2926,7 +2887,7 @@ catalogRouter.delete("/model-free-gifts/:modelId", async (c) => {
     .from(MODEL_DEFAULT_FREE_GIFTS)
     .delete()
     .eq("model_id", modelId);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -2951,7 +2912,7 @@ catalogRouter.post("/free-item-campaigns", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "free item campaign insert returned no row" },
@@ -2987,7 +2948,7 @@ catalogRouter.patch("/free-item-campaigns/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "free item campaign not found" },
@@ -3004,7 +2965,7 @@ catalogRouter.delete("/free-item-campaigns/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(FREE_ITEM_CAMPAIGNS).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -3055,7 +3016,7 @@ catalogRouter.post("/pwp-rules", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "pwp rule insert returned no row" },
@@ -3098,7 +3059,7 @@ catalogRouter.patch("/pwp-rules/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "pwp rule not found" },
@@ -3115,7 +3076,7 @@ catalogRouter.delete("/pwp-rules/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(PWP_RULES).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -3155,7 +3116,7 @@ catalogRouter.post("/bundles", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "bundle insert returned no row" },
@@ -3194,7 +3155,7 @@ catalogRouter.patch("/bundles/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "bundle not found" },
@@ -3211,7 +3172,7 @@ catalogRouter.delete("/bundles/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(PRODUCT_BUNDLES).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 

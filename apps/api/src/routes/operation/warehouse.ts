@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, type InboundInput } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -377,10 +377,7 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
     .eq("sku", sku)
     .eq("orders.warehouse_id", warehouseId)
     .in("orders.operation_stage", ["ready_to_dispatch", "dispatched"]);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   type LineWithOrder = {
     qty: number;

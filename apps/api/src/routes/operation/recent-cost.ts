@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -102,10 +102,7 @@ recentCostRouter.get("/:sku/recent-cost", async (c) => {
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   if (!data) {
     return c.json({ cost: null, lastPoId: null, lastReceivedAt: null });

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { parseOrderEntryConfigRow, setOrderEntryConfigInput } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import type { AppEnv } from "../../types";
 
 /**
@@ -49,10 +49,7 @@ router.put("/entry-config", async (c) => {
     p_payment_methods: parsed.data.paymentMethods,
     p_form_fields: parsed.data.formFields,
   });
-  if (error) {
-    const mapped = mapPgError(error);
-    return c.json(mapped.body, mapped.status);
-  }
+  if (error) return fail(c, error);
   return c.json({
     entryConfig: parseOrderEntryConfigRow(
       data as { payment_methods?: unknown; form_fields?: unknown } | null,

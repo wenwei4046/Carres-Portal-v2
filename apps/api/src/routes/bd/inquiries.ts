@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -122,10 +122,7 @@ bdInquiriesRouter.post("/:id/convert", async (c) => {
   }
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("bd_convert_inquiry", { p_inquiry_id: id });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
