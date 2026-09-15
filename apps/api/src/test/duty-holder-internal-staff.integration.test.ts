@@ -10,6 +10,10 @@ import pg from "pg";
  * or hr login a duty holder. The cases prove who is now refused and who
  * still passes, through the real doors, as the principal.
  *
+ * 0514 adds one duty-specific rule on top: the Finance Approver's holder or
+ * cover must be an active Finance user (workspace_duty_holder_roles). Every
+ * other duty keeps the 0511 rule, which the first three cases still prove.
+ *
  * Everything runs inside ONE transaction that is rolled back at the end.
  * PREREQUISITE — a throwaway local cluster with the chain:
  *
@@ -28,6 +32,7 @@ const U = {
   principal: uid("1"),
   operation: uid("2"),
   finance: uid("3"),
+  finance2: uid("a"),
   bd: uid("4"),
   supplier: uid("5"),
   showroom: uid("6"),
@@ -56,8 +61,8 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
   }
   const assign = (holder: string | null, duty = DUTY) =>
     attempt("select public.workspace_assign_duty($1, $2::uuid, current_date)", [duty, holder]);
-  const cover = (acting: string) =>
-    attempt("select public.workspace_cover_duty($1, $2::uuid, current_date, current_date + 3)", [COVERED, acting]);
+  const cover = (acting: string, duty = COVERED) =>
+    attempt("select public.workspace_cover_duty($1, $2::uuid, current_date, current_date + 3)", [duty, acting]);
 
   beforeAll(async () => {
     if (!LOCAL) throw new Error("CARRES_TEST_DATABASE_URL must point at localhost");
@@ -68,6 +73,7 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
       [U.principal, "principal", "active"],
       [U.operation, "operation", "active"],
       [U.finance, "finance", "active"],
+      [U.finance2, "finance", "active"],
       [U.bd, "bd", "active"],
       [U.supplier, "supplier", "active"],
       [U.showroom, "showroom", "active"],
@@ -113,10 +119,27 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
     expect(await cover(U.bd)).toBe("ok");
   });
 
+  it("Finance Approver: only an active Finance user holds or covers it (0514)", async () => {
+    for (const holder of [U.operation, U.principal, U.bd, U.hr, null]) {
+      expect(await assign(holder, "finance_approver")).toBe("invalid_holder");
+    }
+    expect(await assign(U.finance, "finance_approver")).toBe("ok");
+    for (const acting of [U.operation, U.bd]) {
+      expect(await cover(acting, "finance_approver")).toBe("invalid_cover");
+    }
+    expect(await cover(U.finance2, "finance_approver")).toBe("ok");
+  });
+
   it("the staff test is not callable by a signed-in user", async () => {
     await q("savepoint s");
     await q("set local role authenticated");
     await expect(q("select public.workspace_is_internal_staff($1::uuid)", [U.operation])).rejects.toThrow(
+      /permission denied/,
+    );
+    await q("rollback to savepoint s");
+    await q("savepoint s");
+    await q("set local role authenticated");
+    await expect(q("select public.workspace_duty_holder_roles('finance_approver')")).rejects.toThrow(
       /permission denied/,
     );
     await q("rollback to savepoint s");
