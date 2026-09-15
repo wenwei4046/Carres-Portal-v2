@@ -206,7 +206,13 @@ export function lineProgressOf(
 export function dateStatusPillOf(
   status: WarehouseScheduleDateStatus | null,
 ): { word: string; tone: OrderActionTone } | null {
-  if (status === "expected") return { word: "Expected", tone: "warning" };
+  /* QUIET BADGES (owner ruling 2026-09-15). `Expected` used to wear the
+     warning tone, which spent the alarm colour on the ORDINARY case — the
+     supplier simply has not confirmed yet, which is the healthy state of most
+     open orders. Slate says "here is where this date came from" without
+     shouting; blue still separates an agreed date at a glance. Warning is now
+     reserved for work that is actually overdue. */
+  if (status === "expected") return { word: "Expected", tone: "neutral" };
   if (status === "scheduled") return { word: "Scheduled", tone: "info" };
   return null;
 }
@@ -216,10 +222,23 @@ export function dateStatusPillOf(
  * It never encodes progress, damage or lateness — those are their own lines,
  * and a tint that meant two things would mean neither.
  */
-export function cardTintClassOf(status: WarehouseScheduleDateStatus | null): string {
-  if (status === "expected") return "border-kit-amber-6 bg-kit-amber-3";
-  if (status === "scheduled") return "border-kit-blue-6 bg-kit-blue-3";
+export function cardTintClassOf(): string {
   return "border-kit-slate-5 bg-white";
+}
+
+/**
+ * The card's surface, and the ONE thing it is allowed to shout about.
+ *
+ * Every card is white. Date agreement is a PROVENANCE fact and now lives in a
+ * quiet badge; painting the whole board amber for it spent the warning colour
+ * on the ordinary case, so a real problem had nothing left to say. `overdue`
+ * is that real problem — dated in the past with physical work still owing —
+ * and it is deliberately narrow: a card with no date is never overdue.
+ */
+export function cardSurfaceClassOf(card: Pick<WarehouseScheduleCard, "overdue">): string {
+  return card.overdue
+    ? "border-kit-amber-6 bg-kit-amber-3"
+    : "border-kit-slate-5 bg-white";
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -310,7 +329,7 @@ export function exceptionLinesOf(card: WarehouseScheduleCard): ExceptionLine[] {
   const out: ExceptionLine[] = [];
 
   if (card.overdue) {
-    out.push({ key: "overdue", text: "Overdue", tone: "danger" });
+    out.push({ key: "overdue", text: "Overdue", tone: "warning" });
   }
 
   const damaged = card.lines.reduce((n, l) => n + (l.damagedQty ?? 0), 0);

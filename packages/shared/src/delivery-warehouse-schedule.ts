@@ -16,6 +16,9 @@ export interface DeliveryWarehouseScheduleInput {
   fromLocation: string;
   warehouseSiteId?: string | null;
   toCustomer: string;
+  /** The customer THEMSELF. `toCustomer` is the delivery PLACE despite its
+   *  name; a party and a place are different facts and never substitute. */
+  toCustomerName?: string | null;
   logisticsPartner: string;
   driverName: string | null;
   vehicle: string | null;
@@ -61,6 +64,7 @@ export interface DeliveryWarehouseScheduleEvent {
   fromLocation: string;
   warehouseSiteId: string | null;
   toCustomer: string;
+  toCustomerName?: string | null;
   logisticsPartner: string;
   driverName: string | null;
   vehicle: string | null;
@@ -149,6 +153,7 @@ export function deliveryWarehouseScheduleEvents(
     fromLocation: input.fromLocation,
     warehouseSiteId: input.warehouseSiteId ?? null,
     toCustomer: input.toCustomer,
+    toCustomerName: input.toCustomerName ?? null,
     logisticsPartner: input.logisticsPartner,
     driverName: input.driverName,
     vehicle: input.vehicle,

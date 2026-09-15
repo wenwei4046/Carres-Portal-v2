@@ -376,6 +376,7 @@ function pickupEvents(
       fromLocation: "Carres Klang",
       warehouseSiteId: "site-1",
       toCustomer: "12 Jalan Test",
+      toCustomerName: "Ms Tan",
       logisticsPartner: "NETS",
       driverName: null,
       vehicle: null,
@@ -947,3 +948,39 @@ function stepOneDay(iso: string): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${at.getUTCFullYear()}-${p(at.getUTCMonth() + 1)}-${p(at.getUTCDate())}`;
 }
+
+
+/**
+ * THE PARTY IS NOT THE PLACE — owner refinement 2026-09-15.
+ *
+ * Measured on production: a pickup card was titled
+ * `12 Walk Street, Singapore 189555`. The approved card gives that header the
+ * PARTY; `toCustomer` has always carried the delivery ADDRESS despite its
+ * name, which is correct for the Register's `To` column (COPY-STANDARD defines
+ * that column as a place) and wrong here.
+ */
+describe("a pickup card is titled by the customer, never the address", () => {
+  it("names the customer", () => {
+    const [card] = warehousePickupScheduleCards(
+      warehouseOutboundCards(
+        pickupEvents([{ unitId: "u1", sku: "5539-CNR" }]),
+      ),
+      "2026-09-14",
+    );
+    expect(card.partyName).toBe("Ms Tan");
+    expect(card.partyName).not.toContain("Jalan");
+  });
+
+  it("states NO party rather than falling back to the address", () => {
+    const events = warehouseOutboundCards(
+      pickupEvents([{ unitId: "u1", sku: "5539-CNR" }]),
+    ).map((c) => ({
+      ...c,
+      toCustomerName: null,
+    }));
+    const [card] = warehousePickupScheduleCards(events, "2026-09-14");
+    expect(card.partyName).toBeNull();
+    /* An address is a different fact, not a weaker version of a name. */
+    expect(card.partyName).not.toBe("12 Jalan Test");
+  });
+});

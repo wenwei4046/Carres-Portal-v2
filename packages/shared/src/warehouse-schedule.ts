@@ -480,7 +480,12 @@ export function warehousePickupScheduleCards(
     sourceRef: card.doNumber,
     soRef: card.source,
     doRef: card.doNumber,
-    partyName: card.toCustomer,
+    /* THE PARTY, NOT THE PLACE. The approved card gives this header the
+       party name; `toCustomer` is the delivery address despite its name, so
+       reading it here put "12 Walk Street, Singapore 189555" where a customer
+       belongs. Null when the feed states no name — an address is not a
+       fallback for a party, it is a different fact. */
+    partyName: card.toCustomerName ?? null,
     siteId: card.warehouseSiteId ?? null,
     date: card.eventDate ?? null,
     dateStatus: card.eventDate

@@ -106,6 +106,8 @@ export interface WarehouseOutboundCard {
   fromLocation: string;
   warehouseSiteId?: string | null;
   toCustomer: string;
+  /** The customer themself, where the feed states one. */
+  toCustomerName?: string | null;
   logisticsPartner: string;
   /** The individual the Partner assigned — a separate stored fact, never
    *  merged into the company name. Null until the Partner assigns one. */
@@ -195,6 +197,7 @@ export function warehouseOutboundCards(
       fromLocation: first.fromLocation,
       warehouseSiteId: first.warehouseSiteId,
       toCustomer: first.toCustomer,
+      toCustomerName: first.toCustomerName ?? null,
       logisticsPartner: first.logisticsPartner,
       driverName: first.driverName ?? null,
       vehicle: first.vehicle ?? null,

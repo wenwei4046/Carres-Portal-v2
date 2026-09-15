@@ -185,6 +185,25 @@ export default function WarehouseWorkspace({
           <span className="min-w-0 px-1 text-body font-medium text-kit-slate-12">
             {isAgenda ? headingSentence(selectedDate) : rangeSentence(dates)}
           </span>
+          {/* TODAY — the way back. A board that has been paged three windows
+              forward gives the operator no anchor, and the day they actually
+              work is the day they most need to reach. Clearing the parameters
+              is the whole action: the projection recomputes the window from
+              today, so this button holds no date of its own. */}
+          <button
+            type="button"
+            className="ml-1 inline-flex h-7 items-center rounded-control border border-kit-slate-5 px-2 text-meta text-kit-slate-12 hover:bg-hovertint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.delete("from");
+              next.delete("date");
+              __resetScheduleContext();
+              setParams(next);
+            }}
+            data-testid="ws-today"
+          >
+            Today
+          </button>
           <button
             type="button"
             aria-label="Next dates"
@@ -228,6 +247,7 @@ export default function WarehouseWorkspace({
             cards={schedule.cards}
             direction={direction}
             feedFailed={feedFailed}
+            today={today}
           />
         )}
       </div>
@@ -290,11 +310,14 @@ export function ScheduleBoard({
   cards,
   direction,
   feedFailed,
+  today,
 }: {
   dates: string[];
   cards: ScheduleCard[];
   direction: WarehouseScheduleDirection;
   feedFailed: boolean;
+  /** Marked when it falls inside the window; absent is simply not marked. */
+  today?: string;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-board">
@@ -310,7 +333,12 @@ export function ScheduleBoard({
         }}
       >
         {dates.map((date, i) => (
-          <DateHeading key={`h-${date}`} date={date} first={i === 0} />
+          <DateHeading
+            key={`h-${date}`}
+            date={date}
+            first={i === 0}
+            isToday={date === today}
+          />
         ))}
         {dates.map((date, i) => (
           <div
@@ -332,18 +360,41 @@ export function ScheduleBoard({
 }
 
 /** 24px/32px number between two 11px/14px labels; 12px/16px cell padding. */
-function DateHeading({ date, first }: { date: string; first: boolean }) {
+function DateHeading({
+  date,
+  first,
+  isToday = false,
+}: {
+  date: string;
+  first: boolean;
+  isToday?: boolean;
+}) {
   const { weekday, day, month } = dateHeadingPartsOf(date);
   return (
     <div
-      className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3 ${
+      className={`sticky top-0 ${Z_TABLE_HEADER} border-b bg-white px-4 py-3 ${
         first ? "" : "border-l border-l-kit-slate-5"
+      } ${
+        /* TODAY is marked on the heading, never on the column body — a tinted
+           column would compete with the cards standing in it, and the cards
+           are the work. A 2px underline and the blue ink are enough to find
+           it in one glance across six columns. */
+        isToday
+          ? "border-b-2 border-b-kit-blue-9"
+          : "border-b-kit-slate-5"
       }`}
       data-testid={`ws-head-${date}`}
+      data-today={isToday ? "yes" : undefined}
     >
-      <div className="text-label text-kit-slate-11">{weekday}</div>
-      <div className="text-page text-kit-slate-12">{day}</div>
-      <div className="text-label text-kit-slate-11">{month}</div>
+      <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+        {isToday ? "Today" : weekday}
+      </div>
+      <div className={`text-page ${isToday ? "text-kit-blue-11" : "text-kit-slate-12"}`}>
+        {day}
+      </div>
+      <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+        {month}
+      </div>
     </div>
   );
 }
