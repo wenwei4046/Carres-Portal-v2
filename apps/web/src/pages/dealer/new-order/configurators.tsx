@@ -441,8 +441,8 @@ export function SofaConfigurator({
 }
 
 /**
- * Render the configurator that matches a model's category. Returns null for
- * accessory/service (no variant axis). The CALLER must key this by model.id
+ * Render the configurator that matches a model's category. Returns null for a
+ * guarantee (it opens GuaranteePickerModal instead). The CALLER must key this by model.id
  * (a fresh mount per model) so the per-category useState defaults re-init —
  * see the SO-1006 notes above.
  */
@@ -479,9 +479,11 @@ export function ConfiguratorForModel({
   if (model.category === "mattress") {
     return <MattressConfigurator model={model} skus={skus} specialAddons={specialAddons} onAdd={onAdd} />;
   }
-  if (model.category === "accessory") {
+  if (model.category === "accessory" || model.category === "service") {
     // Accessories are POS cards too (2990s parity) — the generic pick-variant
-    // + qty configurator fits them as-is; only the caption changes.
+    // + qty configurator fits them as-is; only the caption changes. A service
+    // has no card, but a bundle slot can hold one with 2+ skus or specials and
+    // opens the drawer for it — same picker, or the drawer renders empty.
     return (
       <MattressConfigurator
         model={model}

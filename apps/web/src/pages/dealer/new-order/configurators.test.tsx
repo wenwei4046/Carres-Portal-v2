@@ -380,6 +380,45 @@ describe("ConfiguratorForModel — Phase 3 builder gate", () => {
   });
 });
 
+// A service model reaches the drawer from a bundle slot (the walker opens it
+// when the slot has 2+ skus or offered specials). It gets the same option
+// picker as an accessory — before, ConfiguratorForModel returned null and the
+// drawer opened empty.
+describe("ConfigureDrawer — service model", () => {
+  it("shows the option picker for a service with 2 skus and adds the picked one", () => {
+    const onAdd = vi.fn();
+    const model: ProductModelDto = {
+      id: "m-svc",
+      category: "service",
+      modelKey: "dispose",
+      name: "Dispose old mattress",
+      blurb: null,
+      colors: null,
+      gaps: null,
+      sofaMode: null,
+    };
+    render(
+      <ConfigureDrawer
+        model={model}
+        meta={undefined}
+        skus={[
+          { id: "sv1", modelId: "m-svc", sku: "SVC-DISP-S", variant: "Single", variantKind: "size", price: 30, cost: null, supplierId: null },
+          { id: "sv2", modelId: "m-svc", sku: "SVC-DISP-K", variant: "King", variantKind: "size", price: 50, cost: null, supplierId: null },
+        ]}
+        fabrics={[]}
+        onAdd={onAdd}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByText(/pick option/i)).toBeTruthy();
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "sv2" } });
+    fireEvent.click(screen.getByText("+ Add"));
+    const ln = onAdd.mock.calls[0][0] as DraftLine;
+    expect(ln.sku).toBe("SVC-DISP-K");
+    expect(ln.unitPrice).toBe(50);
+  });
+});
+
 // -----------------------------------------------------------------------------
 // 0181 — special add-ons fold into the line price + gate on required answers.
 // -----------------------------------------------------------------------------
