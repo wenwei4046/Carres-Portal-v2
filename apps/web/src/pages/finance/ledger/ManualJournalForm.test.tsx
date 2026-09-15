@@ -35,6 +35,7 @@ const CHART = { go_live_on: "2026-09-10", accounts: [
   account("1100", "Cash and bank", { is_header: true }),
   account("1120", "Bank — current account", { parent_code: "1100" }),
   account("1210", "Trade receivables — customers", { is_control: true, control_for: "CUSTOMER" }),
+  account("1230", "Advances to suppliers"),
   account("2310", "SST payable", { kind: "LIABILITY", is_active: false }),
   account("3300", "Opening balance equity", { kind: "EQUITY" }),
   account("6100", "Rent", { kind: "EXPENSE" }),
