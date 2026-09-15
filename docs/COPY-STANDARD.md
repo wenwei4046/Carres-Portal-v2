@@ -3260,8 +3260,8 @@ they open (`money-owed.ts`). The words may appear only on these pages until the 
 
 ### Finance Settings — money accounts (migration 0512) and the Finance Approver (migration 0514)
 
-**APPROVED — YH merged #1360 (Finance Settings) and #1364 (0514) on 15 Sep 2026.** The last row
-is the one exception, marked below. Page: `Finance Settings` at `/finance/settings`, opened from
+**APPROVED — YH merged #1360 (Finance Settings) and #1364 (0514) on 15 Sep 2026, and picked the
+0515 refusal wording the same day.** Page: `Finance Settings` at `/finance/settings`, opened from
 the header gear (`GlobalTopBar.tsx`, `moduleSettingsFor`). It is the one list of money accounts:
 cash, each bank, and the holding account of each card or online payment company. A word already in
 this file keeps its meaning; a word with a second meaning says so here.
@@ -3283,7 +3283,7 @@ this file keeps its meaning; a word with a second meaning says so here.
 | | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
 | Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
-| Refusal (database, coming) | `{code} {name} is the account for the {method} payment method. It stays in use until that payment method uses another account.` | **PROPOSAL — PENDING APPROVAL.** PRs being built now add it. Taking an account out of use while a payment method still puts its money there. Used on Finance Settings and on Settings → Payment → Payment methods. |
+| Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. |
 
 An empty list would show the grid's default `No data.`, which the Empty-state pattern bans. The
 list always holds the cash account (1110), so it does not show today. A real empty sentence needs
