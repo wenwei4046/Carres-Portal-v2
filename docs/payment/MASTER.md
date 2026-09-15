@@ -1408,8 +1408,11 @@ each one is a way the same money gets recorded twice:
 * **"privileged continuation"** was not enforced anywhere. A tickbox in a page is not a
   permission — any caller could post the same payment through the API and never see it.
   §5's own owner table names the authority (`Suspected wrong/duplicate | Payment
-  Approver`), so continuation is now the approver's act, gated exactly as `payment_void`
-  is (0430): the Payment Approver duty through the Shared Duty Resolver, or principal.
+  Approver`), so continuation is now the approver's act, with the same duty check as
+  `payment_void` (0430): the Payment Approver duty through the Shared Duty Resolver, or
+  principal. The role check also matches: `payment_record` refuses anyone but an
+  operation or principal user before it looks for a duplicate (0448), the same two roles
+  0513 gave `payment_void` and the only two the API admits.
 * **"compare CUSTOMER"** was read as "compare this order". The duplicate §5 most fears is
   the transfer keyed onto the customer's OTHER SO — one customer holding several SOs is
   normal here — and nothing looked for it. The SQL comparison walks the customer: the same
