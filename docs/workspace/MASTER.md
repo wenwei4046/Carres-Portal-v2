@@ -6,10 +6,11 @@
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint.
 >
-> **2026-09-14 COMPLETION ADDENDUM — READY FOR OWNER REVIEW.** Sections 5.1–5.7, 6.1 and 8.2.1
-> complete the previously missing UI composition, state, search/filter, priority/SLA, responsive,
-> action-catalogue and Dashboard-measure contracts. They record target law separately from measured
-> implementation truth in §10; they do not approve a production release or overwrite module facts.
+> **2026-09-15 COMPLETION ADDENDUM — READY FOR OWNER REVIEW.** Sections 4.1–4.6, 5.1–5.7, 6.1
+> and 8.2.1 complete the previously missing Staff & Duties, Work and Dashboard relationship: UI
+> composition, state, search/filter, priority/SLA, responsive, action-catalogue and management-measure
+> contracts. They record target law separately from measured implementation truth in §10; they do
+> not approve a production release or overwrite module facts.
 
 ## 1 · Mission and boundary
 
@@ -112,6 +113,119 @@ visible to authorised supervision with a Staff & Duties door.
 Current Operation roster effective 2026-09-07: Yu Jun and Shasha. Khor Yee is departed and may
 appear only in immutable historical actor, employment, assignment or cover evidence; she is never a
 current/future Duty holder, cover, acting person, My Work recipient or Team Work group.
+
+### 4.1 · Page job and boundary
+
+Staff & Duties answers three questions only:
+
+1. Who normally holds each governed Duty?
+2. Who acts during a dated absence?
+3. What effective assignment/cover history proves that resolution?
+
+It is not People, leave management, a roster/calendar, workload balancing, permission administration
+or a manager dashboard. People owns active employment/access/leave facts. Modules name the Duty they
+require. Staff & Duties owns effective primary assignment and Buddy cover; the Shared Duty Resolver
+combines those truths. A manager never assigns individual routine Work here.
+
+### 4.2 · Page composition
+
+Desktop uses one catalogue and one selected-duty detail. It does not repeat two large forms and a
+full history beneath every Duty.
+
+```text
+┌ Staff & Duties ──────────────────────────────────────────────────────────────┐
+│ Who holds each company duty today and who covers an absence.   Search duties│
+├ DUTIES ──────────────────────────┬ SELECTED DUTY ────────────────────────────┤
+│ PO Duty                          │ PO Duty                                   │
+│ [YJ] Yu Jun                      │ Normal owner  [YJ] Yu Jun                 │
+│                                  │ Acting today [SH] Shasha                  │
+│ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
+│ [SH] Shasha                      │                                            │
+│                                  │ [Change holder] [Add cover]               │
+│ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
+│ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
+│                                  │ 01 Sep · Yu Jun assigned by Jess          │
+│ …                                │                                            │
+└──────────────────────────────────┴────────────────────────────────────────────┘
+```
+
+The left catalogue follows the shared Duty catalogue order and shows Duty label, current normal
+holder and exceptional state: `Covered today`, `Starts {date}`, `Ends {date}` or `Not assigned`.
+It never shows workload, performance, a recommended person or a copied module roster. Search matches
+Duty label and authorised current/historical person names; `State` may narrow to `All duties`,
+`Covered today`, `Cover scheduled` and `Not assigned`.
+
+The selected detail prints separate labelled facts: `Normal owner`, `Acting today`, `Effective`,
+`Cover` and `Reason`. The same person is not repeated as acting when no cover exists. Avatar initials
+carry a full-name accessible label and never replace the printed name. Selecting a Work
+configuration failure may deep-link directly to the required Duty while preserving this layout.
+
+### 4.3 · Change-holder contract
+
+`Change holder` opens a focused action surface with `Duty`, `New holder`, `Effective from`, optional
+`Until` and optional factual `Note`. Eligible choices come from People's active authorised Carres
+staff only; a departed, disabled, external Warehouse or ineligible account is not offered and is
+refused again at the write door. The system shows the current holder and the resulting effective
+period before confirmation.
+
+The act appends a new assignment; it never edits or deletes an old row. Overlap resolution is
+server-owned and must not leave two primaries effective on one day. A future assignment does not
+change today's resolution early. A retroactive correction requires the separately authorised
+correction law and preserves what it superseded; the ordinary form cannot rewrite history.
+
+Success says `{name} holds {Duty} from {date}` and refreshes Work resolution from the shared source.
+It does not claim that historical Work changed. Failure prints the governed server reason and keeps
+the entered facts for correction without optimistic owner changes.
+
+### 4.4 · Buddy-cover contract
+
+`Add cover` is available only when the Duty has a normal holder for the complete selected period.
+It asks for `Acting person`, `From`, `Until` and `Reason`. The acting person must be active, eligible,
+different from the normal holder and authorised for every protected act the Duty requires. Cover is
+inclusive of the governed business dates and resolves in the company's timezone, never the browser's.
+
+Overlapping active covers for one Duty are refused; the manager must close/correct the conflict
+through a governed append-only act. Cover changes only the acting person for open/future actions
+during the period. It never grants an approval capability the person lacks, rewrites the normal
+owner, changes due dates or attributes another person's completed act to the cover.
+
+Success says `{acting person} covers {normal owner} for {Duty}, {from}–{until}`. Work and protected
+module doors must resolve the same answer immediately after refresh. Ending, replacing or correcting
+cover requires its own recorded reason/actor/time; disappearance from the current view never deletes
+history.
+
+### 4.5 · Access, states and responsive behaviour
+
+| State | Required presentation and behaviour |
+|---|---|
+| Non-manager | Full authorised read view · `Duty assignments are set by the manager.` · no disabled or hidden write imitation |
+| Loading | Catalogue/detail skeletons retain page geometry · `Opening Staff & Duties…` is acceptable accessible status |
+| Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
+| No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
+| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Change holder`; Work remains visible under Duty word |
+| Cover active | Normal and acting person shown separately with effective dates/reason |
+| Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
+| Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
+| Write refused/failed | Exact reason beside action; no local mutation of displayed resolution |
+| History empty | `No assignments yet` / `No covers yet` within a valid selected Duty |
+
+At 1440px and above use the catalogue/detail split. At 1024–1439px retain the split with a narrower
+catalogue. Below 1024px show the catalogue first and open the selected Duty as a full-width detail
+with an explicit Back door; forms are single-column and dates/names never truncate. Keyboard order is
+search/filter → Duty list → selected facts → authorised actions → history. Focus returns to the
+originating Duty after a modal closes.
+
+### 4.6 · Current → proposed gap audit — 2026-09-15
+
+| Current branch evidence | Required Blueprint state |
+|---|---|
+| One shared catalogue/resolver, guarded assign/cover doors and append-only histories exist | Retain as the only authority; production-verify every catalogue consumer, not GRN alone |
+| Current page stacks Assign Holder, Add Cover and History under every Duty in a 720px document | Replace with one compact catalogue and one selected-duty detail/action surface |
+| Server `can_assign` correctly hides write forms from non-managers | Retain; separate readable facts from authorised actions |
+| Current staff picker reads Operation staff but the Blueprint roster is Yu Jun and Shasha | Enforce active/eligible source facts at read and write; never revive Khor Yee or admit external Warehouse accounts |
+| Current cover form does not explain capability eligibility or visible overlap recovery | Add pre-confirmation facts and governed conflict/correction handling; writer remains authoritative |
+| Current page has loading/read-error and immutable history evidence | Retain; add no-match, catalogue-failure, scheduled-cover and write-success/refusal contracts |
+| Current layout has no search/filter, selected Duty or narrow-screen contract | Build the §4.2/§4.5 composition and verify at 1440, 1024 and 390px |
 
 ## 5 · My Work and Team Work
 

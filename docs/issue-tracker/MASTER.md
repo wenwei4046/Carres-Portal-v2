@@ -3,6 +3,10 @@
 > **The only Issue Tracker document.** Overwritten when re-ruled; never versioned.
 > **APPROVED / LOCKED — Jess, 2026-08-14.**
 > Read `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, this file and the affected module MASTERs.
+>
+> **2026-09-15 PAGE COMPLETION ADDENDUM — READY FOR OWNER REVIEW.** Sections 11.1–11.5 complete
+> the Workspace destination, Register, object-detail, intake/result, source-state, responsive and
+> current-to-proposed contracts. They do not claim the measured current UI already satisfies them.
 
 | I am working on | Read |
 |---|---|
@@ -402,6 +406,124 @@ Permissions:
 
 No KPI-card dashboard, employee league table, bulk fault/close/recovery mutation, Issue calendar,
 duplicate Settings home, blank English report, copied Issue or deletion.
+
+## §11.1 · Workspace destination composition
+
+Issue Tracker is the third `Workspace` destination beside `Work` and `Staff & Duties`; it is not a
+Work scope and not a Dashboard. The Register answers what incidents exist and where accountability,
+money or learning remains incomplete. Shared Work answers who must perform the current admitted
+Issue action. One Issue and one versioned `issue_actions` occurrence retain the same identities on
+both pages.
+
+```text
+┌ Issue Tracker ───────────────────────────────────────────────────────────────┐
+│ Every issue stays for facts, money and learning.                            │
+│ Search issues…   Views   Filters                  Monthly report  Record issue│
+├ VIEW / FILTER ───────┬ ISSUE REGISTER ───────────────────────────────────────┤
+│ All Issues           │ Issue No. · Observed · Issue · Linked object          │
+│ Needs triage         │ Fault Owners · Current Action · Money · Review state  │
+│ Wednesday review     │                                                       │
+│ Internal issues      │ IS-2608-0001 · 14 Sep                                │
+│ Waiting response     │ Unit CU-000128 was damaged…                          │
+│ Waiting finding      │ PO-2041 · Hookka                                     │
+│ Cost not recorded    │ Supplier has not answered                            │
+│ Recovery not…        │ Ask supplier for an answer                           │
+│ Closed · Voided      │ RM80 incurred · Waiting review                       │
+└──────────────────────┴───────────────────────────────────────────────────────┘
+
+The default view is `All Issues`; materiality never removes routine Issues. Search matches Issue No.,
+official English, linked object number, governed Related Party and authorised staff identity. Filters
+are `Observed`, `Source module`, `Issue type`, `Materiality`, `Related Party`, `Internal team/person`,
+`Review state`, `Current-action state`, `Money state` and `Repeat/related`. Saved views are governed
+combinations of these filters, not separately calculated lists. Search, selected view, filters and
+opened `issue` identity are URL-visible and individually removable under one `Clear filters`.
+
+The Register is reference truth. Selecting a row opens the Issue workspace; no row-level fault,
+money, close or result mutation exists. `Current Action` uses the shared two-line presentation and
+opens the exact action/result section. It never says `Set next action`: when no valid action exists,
+it states the lifecycle fact such as `No current action`, `Waiting triage rule` or `Closed`, and a
+configuration failure remains visible to authorised supervision.
+
+## §11.2 · Issue workspace composition
+
+The Issue workspace is a full object detail, not a wide generic modal. Its fixed identity header is
+`Issue No. · lifecycle state · materiality`, with links to exact owning objects. The reading order is:
+
+1. `What is true` — official generated English and observed/source facts;
+2. `Current Action` — structured owner, fact/problem, action, recipient, required result, due and
+   exact `Record result` door when the signed-in actor is authorised;
+3. `Linked records` — live read-only identities/statuses from owning modules;
+4. `Accountability` — Found by, Staff involved, Fault Owners, Action Owner, Cost Bearer and Service
+   Provider kept distinct;
+5. `Money` — incurred, recoverable and recovered tracks with Finance doors, never local arithmetic;
+6. `Evidence & timeline` — append-only evidence, responses, findings, actions and corrections;
+7. `Review & learning` — standard/full review, Wednesday outcome and prevention evidence;
+8. `Related Issues & history` — repeat links, merge/split/reopen/void evidence.
+
+Only the current relevant section expands by default. On desktop, a quiet section index may remain
+sticky beside the document. The primary action changes with lifecycle and permission; there is never
+more than one competing blue action in a section. Closing the detail preserves Register search/view.
+
+## §11.3 · Record Issue and current-action generation
+
+`Record issue` follows §4 one governed question per step, with Back and a visible progress sentence.
+Entering from an owning object pre-fills and locks its typed identity while allowing the reporter to
+correct a visibly wrong link through a governed search. Dates use the shared date control; proof uses
+the governed uploader and records actual files, not a proof-type answer with no attachment.
+
+The system—not the reporter—derives source module, official English, materiality suggestion, review
+requirement, owner rule, next-action choices and due law from structured answers/settings. The
+reporter confirms the generated factual preview and may choose only a governed result/action branch.
+They never type an arbitrary action, required result or due date to make intake pass. `I am not sure`
+opens a complete evidence-check action owned by Issue Triage Duty.
+
+Creation is atomic: Issue identity, typed links, intake facts, evidence references and first governed
+action either persist together or not at all. An uncertain response reconciles by request/Issue
+identity before retry; it cannot create a duplicate incident. Success opens the new Issue workspace.
+
+`Record result` shows the exact action being completed and only its governed result choices. Each
+choice names the evidence required and the derived consequence before confirmation. One atomic
+transition records result, actual actor, normal owner, cover, time and evidence, then completes or
+replaces the occurrence. There is no generic `Save result`, free-text-only completion or manual
+`Done`. Optional detail supplements a structured result and never determines status.
+
+## §11.4 · Register and detail states
+
+| State | Required presentation and behaviour |
+|---|---|
+| Loading | Keep view/search/filter shell; row/detail skeletons match final geometry; never show `0 issues` early |
+| True empty | `No issues recorded` only when the complete authorised source is healthy; `Record issue` remains available |
+| No match | `No issues match these filters` · `Clear filters`; never imply there is no history |
+| List source failed | `Issue Tracker could not be opened` · `Try again`; footer does not print zero |
+| Detail source failed | Keep selected Issue identity where safe · name failed section · retry it without closing the Register |
+| No current action | Print exact lifecycle reason; do not invite a generic next action |
+| Not assigned | Print governed Duty and Staff & Duties correction door; Issue remains visible in Register and Team Work health |
+| Late action | Exact due date/working-days-late from shared Work; blocked/review state does not hide lateness |
+| Permission refused | No protected evidence, people, money or counts leak; return to authorised Register scope |
+| Save in progress | Disable duplicate submit; preserve entered structured facts; show one progress state |
+| Save failed/uncertain | Keep answers/evidence; reconcile original request before retry; never fabricate success |
+| Closed/voided | Read-only full authorised history with closure/void actor, reason and surviving links |
+
+At 1440px and above use filter rail + Register and full-width object detail. At 1024–1439px collapse
+the filter rail behind `Filters` while retaining the table's identity and action columns. Below
+1024px each Issue becomes a vertical reference row in the same column order; no sideways eight-column
+table, clipped official English or three-card accountability grid. Intake and result flows are
+single-column, touch-safe and resumable. Hover evidence is also accessible by focus/tap.
+
+## §11.5 · Current → proposed gap audit — 2026-09-15
+
+| Current branch evidence | Required Blueprint state |
+|---|---|
+| Register, saved-view labels, Record issue, object detail, monthly-report door and versioned action result exist | Retain identities and authoritative doors; rebuild presentation to §11.1–§11.4 |
+| Current list has no governed loading, error, true-empty or no-match treatment and prints `0 issues` before source health | Add explicit source-aware states; failed/unknown is never zero |
+| Current views are local state; search and structured filters are absent | Use one authorised query contract with URL-visible view/search/filters |
+| Current eight-column table relies on horizontal overflow | Preserve desktop reference table; use vertical rows below 1024px |
+| Current row says `Set next action` when no occurrence exists | Replace with exact lifecycle/configuration fact; no generic action invention |
+| Current detail is one wide modal with three simplified accountability cards | Use the governed object-detail reading order and keep all distinct identities/evidence |
+| Current intake asks for free-form linked identity/date facts and lets reporter choose action, required result and due | Make typed object/date/evidence controls and system-derived action/due law authoritative |
+| Current proof choice can save without actual evidence attachment | Require governed file/evidence record where the chosen branch says proof exists |
+| Current result flow uses generic choices plus free-text evidence and `Save result` | Show action-specific result/evidence choices and one atomic transition with actual actor/cover |
+| Current tests prove only basic register/intake/action opening | Add source-state, URL, permission, identity, atomic retry, action derivation and 1440/1024/390 responsive evidence |
 
 # §12 · Legacy Service Notes
 
