@@ -115,7 +115,7 @@ function daysFromToday(iso: string): number {
 /** "day N since lent" for the at-customer row. */
 function dayN(loan: SofaLoanDto): number | null {
   if (!loan.loaned_at) return null;
-  const end = (loan.returned_at ?? new Date().toISOString()).slice(0, 10);
+  const end = loan.returned_at ? loan.returned_at.slice(0, 10) : appTodayIso();
   const a = new Date(`${end}T00:00:00`).getTime();
   const b = new Date(`${loan.loaned_at.slice(0, 10)}T00:00:00`).getTime();
   return Math.max(0, Math.round((a - b) / 86_400_000));
