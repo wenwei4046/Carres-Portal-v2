@@ -278,6 +278,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     if (url.includes("/register/")) return json({ unit: STOCK_UNIT, events: [] });
     return json({ units: [STOCK_UNIT, { ...STOCK_UNIT, id: "bulk", unitCode: "technical-key", identityScope: "quantity", qty: 10, productName: "Interchangeable fittings", sku: "FITTING-1", category: "accessory" }], total: 2 });
   }
+  if (url.includes("/warehouse-settings")) return json({ details: { status: "active" }, workingHours: [], specialDates: [], holidayPolicy: null });
+  if (url.includes("/delivery-arrangements")) return json({ arrangements: [] });
   if (url.includes("/warehouse-schedule")) return json({ events: EVENTS });
   if (url.includes("/api/operation/warehouse/inbound")) {
     const qs = new URLSearchParams(url.split("?")[1] ?? "");
