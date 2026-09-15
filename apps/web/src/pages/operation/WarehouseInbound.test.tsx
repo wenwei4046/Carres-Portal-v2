@@ -461,31 +461,39 @@ describe("Inbound · the listing fits the screen", () => {
   /** The default set, in order. Nine columns, not fourteen — the first cut
    *  declared 2,130px of them inside ~1,010px of grid and pushed every date,
    *  every quantity and the Receive button off the right edge. */
+  /** In operational priority order. The grid's width is not ours to choose —
+   *  production gives it 826px at a 1,366px viewport, because the portal nav
+   *  and the filter rail take 480px before it starts — so ORDER is what keeps
+   *  the important things on screen. */
   const DEFAULT_COLUMNS = [
     "Document",
+    "Receiving",
     "Product",
+    "Receiving progress",
     "Supplier & DO No",
     "PO Delivery Date",
     "Supplier Delivery Date",
-    "Receiving progress",
-    "Receiving",
     "Status",
     "Exceptions",
   ];
 
-  it("shows exactly the default set, with Receiving ahead of Status", async () => {
+  it("keeps the action beside the identity, ahead of every other column", async () => {
     mount("&site=w");
     await screen.findByTestId("inbound-row-PO-1");
     for (const name of DEFAULT_COLUMNS)
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
-    /* The ACTION comes before the summary word, so it is inside the visible
-       width by construction rather than by luck. */
     const headers = screen
       .getAllByRole("button")
-      .map((b) => b.textContent?.trim() ?? "");
-    expect(headers.indexOf("Receiving")).toBeLessThan(
-      headers.indexOf("Status"),
-    );
+      .map((b) => b.textContent?.trim() ?? "")
+      .filter((t) => DEFAULT_COLUMNS.includes(t));
+    /* THE ACTION IS SECOND. Anything that pushes it rightward puts it off a
+       826px grid, which is what production actually gives this page. */
+    expect(headers.slice(0, 4)).toEqual([
+      "Document",
+      "Receiving",
+      "Product",
+      "Receiving progress",
+    ]);
   });
 
   it("does not repeat the Site name on every row inside its own tab", async () => {
