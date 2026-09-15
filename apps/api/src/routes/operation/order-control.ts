@@ -329,7 +329,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   // nobody promises a day the goods cannot make — but it does not refuse."
   // A date can be agreed with a customer while the goods and the money are
   // still coming; what may not happen is the PAPER existing for a trip that is
-  // not allowed to run, and that is `POST /:id/delivery-order` below.
+  // not allowed to run, and that is `attemptDeliveryOrderIssue`'s gate.
   //
   // What is still refused here is §5's own short list: date + slot both present
   // (zod, above) and no Sunday. The scope check above is a caller bug, not a
@@ -532,7 +532,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   // (goods reserve early, Finance exceptions are rare). FAIL-SOFT, the same
   // rule as the annotation and partner-check writes above: an issuance hiccup
   // must never undo or refuse the booking the operator just recorded — the
-  // facts persist, and the next door (or the manual backstop) issues it.
+  // facts persist, and the next door (or Request Delivery Order) issues it.
   let deliveryOrder: { do_number: string | null; issued: boolean } | null = null;
   try {
     const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data);
@@ -688,38 +688,6 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
 });
 
 /**
- * POST /:id/delivery-order — C7 · issue the delivery order (Jess 2026-07-27).
- *
- * **The whole card in one sentence:** the number was stamped by a DB trigger on
- * the DISPATCH transition (0098), which is a day too late to hand logistics the
- * paper they ask for the evening before — so the operator presses one button
- * once the customer's date is confirmed, and the SYSTEM produces the document.
- * Nobody authors a delivery order by hand (COPY-STANDARD's `Issue` verb: "the
- * SYSTEM produces a formal document", completion = "the document exists").
- *
- * **NO MIGRATION, and that was checked rather than assumed.** 0098's trigger
- * only fills `do_number` when it is NULL, so an order that already carries one
- * passes through it untouched: minting earlier cannot break dispatch for orders
- * that never take this path, which is exactly the condition the card set. The
- * trigger stays as the backstop for those.
- *
- * **The number is the LOCKED scheme** (`docNumber`, Jess 2026-07-19:
- * `DO-DDMMYY-NNNN`, tail seeded from the ORDER id so every paper of one order
- * shares it). Until now `orders.do_number` and the printed PDF disagreed — the
- * column got the trigger's `DO-000123` and the drawer's printer recomputed its
- * own number client-side. One number now, minted once, stored, and printed.
- *
- * **THIS IS THE HARD GATE** (`docs/ORDERS-WORKING-FLOW.md` §5). Goods reserved,
- * money collected, the date not a Sunday or a public holiday. It reads the same
- * `bookingConfirmGate` the confirm route reads, so the warning an operator saw
- * when agreeing the date and the refusal they meet here are the same sentence
- * about the same numbers.
- *
- * **Idempotent.** A second press returns the number already on the record
- * instead of minting a second one — a delivery order that changed its number
- * between two prints would be two documents for one trip.
- */
-/**
  * CARD 5 (0344) — record a PARTIAL or FAILED delivery attempt. A full success
  * walks the existing gated delivery door, which mints its own attempt. The
  * RPC is the one writer: attempt + exception (Reason Library key + where the
@@ -799,46 +767,6 @@ orderControlRouter.get("/:id/delivery-attempts", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ attempts: data ?? [] });
-});
-
-orderControlRouter.post("/:id/delivery-order", async (c) => {
-  const auth = c.var.auth;
-  requireOperationOrPrincipal(auth.role);
-
-  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
-  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
-
-  // SLICE 2 — the door is a BACKSTOP, not the trigger: the system issues the
-  // document itself the moment the last requirement lands (booking confirm ·
-  // stock reserve · finance clear). This POST remains for the rare order whose
-  // last fact flipped through a path with no hook, and for a client asking for
-  // the number it already knows exists. Same gate, same mint, same idempotence
-  // — `attemptDeliveryOrderIssue` is the ONE issuing path.
-  const sb = userClient(c.env, auth.jwt);
-  const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data);
-  switch (attempt.outcome) {
-    case "issued":
-      return c.json({
-        order: { id: idCheck.data, do_number: attempt.doNumber },
-        issued: true,
-      });
-    case "already":
-      return c.json({
-        order: { id: idCheck.data, do_number: attempt.doNumber },
-        issued: false,
-      });
-    case "blocked":
-      return c.json(
-        {
-          error: "delivery_order_gate",
-          code: "delivery_order_gate",
-          message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`,
-        },
-        422,
-      );
-    case "error":
-      return c.json(attempt.body, attempt.status);
-  }
 });
 
 /**

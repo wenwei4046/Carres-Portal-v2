@@ -736,7 +736,7 @@ opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
  *
  * FAIL-SOFT and FIRE-AND-CHECK: an issuance hiccup must never undo or refuse
  * the reservation the operator just made — the facts persist, and the next
- * door (or the manual backstop) issues it. Only a `SO-{n}` ref can name an
+ * door (or Request Delivery Order) issues it. Only a `SO-{n}` ref can name an
  * order; every other ref (loans, partners) has no delivery-order gate.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
