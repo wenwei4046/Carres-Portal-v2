@@ -1667,12 +1667,21 @@ read may be replaced with zero, a guessed receipt date or the current Site as hi
 
 ### 13.2 · Delivery verification
 
-PR #1372 contains the Inbound / Outbound layout, receiving product context, explicit loading entry,
-driver-confirmation distinction and visible-viewport empty-state correction. Inventory Site-visit
-projection and the Schedule-to-Loading link are follow-up work in the same delivery. Tests cover
-receipt outcomes, wrong Site/Unit, return visits, ambiguous and absent evidence, driver count zero,
-retry/input preservation and register state. Final deployment identifiers and rendered checks belong
-in the delivery evidence record; they do not turn approved but unbuilt controls into shipped features.
+PR #1368 is merged as `22e09a70`. PR #1372 (`59d57f67`) delivers the Inbound / Outbound
+layout, receiving product context, explicit loading entry, driver-confirmation distinction and
+visible-viewport empty states. PR #1373 (`96f1499c`) delivers the physical Site-visit reader,
+Inventory layout and Schedule-to-Loading link. Both later deployment workflows succeeded;
+these are existing shipped capabilities, not pending replacement work.
+
+The Mac verification checked the rendered separate schedules, Inbound document/date/product
+and receipt quantities, exact-Unit Loading scope, separate loaded/driver counts and a rejected
+wrong-Unit scan retaining its input without changing stock. At 1280px the Outbound action and
+four fact groups remain visible with the menu and filters open. Focused tests cover receipt
+outcomes, wrong Site/Unit, return visits, ambiguous and absent evidence, driver count zero,
+retry/input preservation and register state. A final identity follow-up carries source SKU onto
+schedule cards, includes SKU/quantity in Inventory exports and translates stored Unit history
+event keys. These checks do not claim that the controls marked unbuilt in §13 are complete.
+The UI Kit remains unfrozen pending the owner's rendered-design review.
 
 ## 14 · Whole-domain completion gate
 
@@ -1726,16 +1735,16 @@ measured need, and assumed external cutover.
 **RESOLVED FROM AUTHORITY:** Unit authority, ownership seams, shared Work and UI grammar and
 upstream/downstream owners.
 
-**APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
-remaining destinations in §2 (Ready stock as eligible Units, Transfers, Counts), the journeys in §5,
-Issues/Counts/correction in §6, month-end in §9 and the reports in §11.
+**BUILT / VERIFIED:** the Unit-authority foundation (PR #878), the five destinations in §2,
+existing Receiving and exact-Unit two-sided handover, 0490 arrival sources, and the layout and
+physical-history corrections recorded in §13. Verification is scoped to those capabilities;
+missing historical Site evidence remains explicitly unpaired.
 
-**BUILT / VERIFIED:** the Unit-authority foundation and the exact-Unit Stock Register that
-replaced On hand as the Warehouse master list — merged as `4246ff91` (PR #878) with all seven
-migrations, production-verified 2026-08-21 and proved by ancestry (`git merge-base --is-ancestor
-4246ff91 <live>` stays true as main moves). Measured then: 136 units · 0 without identity ·
-0 write policies/grants on the seven Warehouse objects · exactly 1 `unit_availability`.
-Everything else in §13 is evidence to re-measure before build, not target authority.
+**APPROVED TARGET / NOT BUILT:** complete blind Stock Count / Count again / Difference /
+approved Adjustment, versioned month-end reconciliation and Finance acknowledgement.
+Movement-specific supplier-return and repair coverage and reporting controls must be assessed
+against their owning workflows; arrival-source support alone does not prove end-to-end completion.
+There are no additional Ready stock, Transfers or Counts destinations in the approved five-page map.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision. The formerly open accessory
 question — does an accessory piece carry a Unit identity? — is closed by §14.1 G3: every sofa

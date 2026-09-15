@@ -272,6 +272,9 @@ function ProductRow({
         data-testid="ws-line-model"
       >
         {line.modelLabel ?? "Model not recorded"}
+        {line.sku && line.sku !== line.modelLabel && (
+          <span className="block text-label text-kit-slate-11">{line.sku}</span>
+        )}
       </span>
       <ProgressFigure progress={progress} />
     </li>

@@ -805,3 +805,9 @@ describe("the narrow width keeps the work, not just the layout", () => {
     expect(screen.getByTestId("ws-undated-open")).toBeInTheDocument();
   });
 });
+
+it("prints the exact SKU with the model on each Schedule card", () => {
+  setSchedule({ cards: [card({ lines: [line({ sku: "OH-K-01" })] })] });
+  mount();
+  expect(screen.getByTestId("ws-line-model")).toHaveTextContent("Ohana KingOH-K-01");
+});
