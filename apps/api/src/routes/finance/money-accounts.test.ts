@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
@@ -137,6 +139,26 @@ describe("rename and take out of use", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string; message: string };
     expect(body.code).toBe("money_account_not_zero");
+  });
+
+  it("an account a payment method points at stays in use, in the database's words", async () => {
+    const sentence =
+      "1121 Public Bank is the account for the Bank transfer payment method. It stays in use until that payment method uses another account.";
+    stubRpc({ data: null, error: { code: "P0001", message: sentence, details: "money_account_used_by_method" } });
+    const res = await call("PATCH", "/1121", { name: "Public Bank", is_active: false });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "money_account_used_by_method", message: sentence });
+
+    // The refusal lives in the database door, so a curl round the API meets it too.
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0515_a_money_account_stays_in_use_while_a_payment_method_points_at_it.sql"),
+      "utf-8",
+    );
+    const door = mig.slice(mig.indexOf("function public.gl_money_account_update"), mig.indexOf("comment on function public.gl_money_account_update"));
+    expect(door).toContain("from public.gl_payment_account_map g");
+    expect(door).toContain("m.active");
+    expect(door).toContain("It stays in use until that payment method uses another account.");
+    expect(door).toContain("detail = 'money_account_used_by_method'");
   });
 
   it("an unknown code is 404", async () => {
