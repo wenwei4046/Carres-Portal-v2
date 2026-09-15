@@ -3284,6 +3284,7 @@ this file keeps its meaning; a word with a second meaning says so here.
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
 | Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
 | Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. |
+| Refusal (database, 0515) | `{code} {name} is out of use. Move {method} to another account first.` | **PROPOSAL — PENDING APPROVAL.** The same rule from the other side: turning a payment method on while its account is out of use. Built only from the approved sentence above. Used on Settings → Payment → Payment methods (the Active switch). |
 
 An empty list would show the grid's default `No data.`, which the Empty-state pattern bans. The
 list always holds the cash account (1110), so it does not show today. A real empty sentence needs
