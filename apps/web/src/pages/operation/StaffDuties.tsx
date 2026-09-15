@@ -20,7 +20,10 @@ import {
 /**
  * `Workspace → Staff & Duties` — the ONE company-wide duty assignment surface
  * (docs/workspace/MASTER.md, LOCKED 2026-09-03; ERP-ARCHITECTURE Global Duty
- * Law). One duty today: GRN Duty. The page shows today's RESOLUTION (primary
+ * Law). It lists every duty in packages/shared/src/workspace-duties-catalogue.ts.
+ * A duty's holder and cover pickers offer the account roles in that duty's
+ * `roles`: Finance Approver offers Finance users only; every other duty
+ * offers operation users. The page shows today's RESOLUTION (primary
  * holder, or the active cover acting for them), lets an authorised manager
  * assign a holder and add a dated buddy cover, and lists the immutable
  * history. Every rule lives in the SQL doors; the page renders the server's
