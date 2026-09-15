@@ -60,6 +60,15 @@ const accounts = { rows: [
   { code: "6500", name: "Bank charges", kind: "EXPENSE", parent_code: "6000", is_control: false, control_for: null,
     for_bill_line: true, for_voucher_line: true, for_ap: false, for_pay_from: false },
 ] };
+// The one money-account list (0512) — what Paid from and Received into offer.
+const MONEY = "/api/finance/ledger/money-accounts";
+const moneyAccounts = [
+  { code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true },
+  { code: "1120", name: "Bank", money_kind: "BANK", is_active: true },
+  { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true },
+  { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: false },
+  { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
+];
 
 function billRow(over: Record<string, unknown>) {
   return {
@@ -107,6 +116,7 @@ beforeEach(() => {
   api.routes = {
     [`${B}/suppliers`]: suppliers,
     [`${B}/accounts`]: accounts,
+    [MONEY]: moneyAccounts,
     [`${B}/bills`]: { rows: [billRow({}), billRow({ id: BILL2, bill_no: null, status: "draft", unpaid: null,
       supplier_invoice_no: "LSW-902", total_amount: "200.00", price_flags: 0, file_count: 0 })] },
     [`${B}/bills/grn-candidates`]: { rows: [{ receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP,
@@ -278,6 +288,15 @@ describe("Payment voucher form", () => {
     expect(w.body).toMatchObject({ advanceAmount: 0 });
   });
 
+  it("Paid from offers cash and banks in use, never a holding account (0512)", async () => {
+    show("/finance/payment-vouchers/new");
+    const paidFrom = await screen.findByLabelText("Paid from");
+    await waitFor(() => expect(within(paidFrom).getAllByRole("option")).toHaveLength(4));
+    const offered = within(paidFrom).getAllByRole("option").map((o) => (o as HTMLOptionElement).value);
+    expect(offered).toEqual(["", "1110", "1120", "1121"]);
+    expect(paidFrom.closest("div.grid")).toHaveClass("grid", "grid-cols-1", "md:grid-cols-2", "gap-4");
+  });
+
   it("an advance before the bill needs no bill ticked, and is sent as advanceAmount (0484)", async () => {
     show(`/finance/payment-vouchers/new?supplier=${SUP}`);
     fireEvent.change(await screen.findByLabelText("Advance"), { target: { value: "500" } });
@@ -415,7 +434,11 @@ describe("Supplier advance (0484–0485)", () => {
     const dialog = await screen.findByRole("dialog");
     const go = within(dialog).getByRole("button", { name: "Record money back" });
     expect(go).toBeDisabled();
-    fireEvent.change(await within(dialog).findByLabelText("Received into"), { target: { value: "1120" } });
+    const into = await within(dialog).findByLabelText("Received into");
+    // Money back may come into a holding account (a card refund); never one out of use.
+    expect(within(into).getAllByRole("option").map((o) => (o as HTMLOptionElement).value))
+      .toEqual(["", "1110", "1120", "1121", "1131"]);
+    fireEvent.change(into, { target: { value: "1120" } });
     fireEvent.change(within(dialog).getByLabelText("Amount"), { target: { value: "301" } });
     expect(dialog).toHaveTextContent("More than the advance left");
     expect(go).toBeDisabled();
@@ -442,7 +465,7 @@ describe("Supplier advance (0484–0485)", () => {
   it("money back never offers an empty account list while the accounts load or fail", async () => {
     api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
       advance: advanceOf(), can: { money_back: true } });
-    api.fail.add(`${B}/accounts`);
+    api.fail.add(MONEY);
     show(`/finance/payment-vouchers/${PV}`);
     fireEvent.click(await screen.findByRole("button", { name: "Record money back" }));
     const dialog = await screen.findByRole("dialog");

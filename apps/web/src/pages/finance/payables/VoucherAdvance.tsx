@@ -7,8 +7,9 @@ import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { takesIn } from "@carres/shared/money-accounts";
+import { useMoneyAccounts } from "../settings/api";
 import {
-  useApAccounts,
   useApBillOutstanding,
   useApplyAdvance,
   useCancelMoneyBack,
@@ -264,9 +265,10 @@ function MoneyBackModal({ voucherId, voucherNo, open, onClose }: {
   open: number;
   onClose: () => void;
 }) {
-  const accounts = useApAccounts();
+  // 0512: money back may land in a holding account too (a card refund).
+  const accounts = useMoneyAccounts();
   const record = useRecordMoneyBack();
-  const choices = (accounts.data ?? []).filter((a) => a.for_pay_from);
+  const choices = (accounts.data ?? []).filter(takesIn);
   const [date, setDate] = useState(appTodayIso());
   const [account, setAccount] = useState("");
   const [amount, setAmount] = useState(String(open));

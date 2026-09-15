@@ -82,6 +82,7 @@ function moduleSettingsFor(
   pathname: string,
   search = "",
 ): { label: string; href: string } | null {
+  if (pathname.startsWith("/finance")) return { label: "Finance Settings", href: "/finance/settings" };
   if (pathname.startsWith("/operation/issues")) return { label: "Issue Tracker Settings", href: "/operation/settings/issue-tracker" };
   if (pathname.startsWith("/operation/orders")) {
     return { label: "Sales Order Settings", href: "/operation/settings/sales-orders" };

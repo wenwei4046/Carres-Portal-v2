@@ -50,6 +50,10 @@ vi.mock("./ledger/ledger-queries", () => {
     trialBalanceQuery: (asOf: string) => ({ queryKey: ["finance", "ledger", "trial-balance", asOf], queryFn: vi.fn() }),
   };
 });
+vi.mock("./settings/api", () => ({
+  useMoneyAccounts: () => ({ data: undefined, isLoading: true, isSuccess: false, isError: false, refetch: vi.fn() }),
+  useSaveMoneyAccount: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 vi.mock("@/lib/payables-queries", async (importOriginal) => {
   const waiting = { data: undefined, isLoading: true, isSuccess: false, isError: false,
     isFetching: false, error: null, refetch: vi.fn() };
@@ -152,6 +156,15 @@ describe("Finance routing", () => {
     cleanup();
     show("/finance/ar");
     expect(screen.getByTestId("ar-destination-header")).toBeInTheDocument();
+  });
+  it("opens Finance Settings, the money-account list, for Finance only (0512)", () => {
+    show("/finance/settings");
+    expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
+    cleanup();
+    auth.role = "operation";
+    show("/finance/settings");
+    expect(screen.queryByTestId("finance-settings-destination-header")).not.toBeInTheDocument();
+    auth.role = "finance";
   });
   it("operation staff never reach the ledger", () => {
     auth.role = "operation";

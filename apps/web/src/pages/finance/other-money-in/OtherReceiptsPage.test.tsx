@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OtherReceiptsPage from "./OtherReceiptsPage";
-import { ACCOUNTS, I_OPEN, INVOICES, P1, PARTIES, R1, RECEIPT_DETAIL, RECEIPTS } from "./fixtures.test-data";
+import { ACCOUNTS, I_OPEN, MONEY_ACCOUNTS, INVOICES, P1, PARTIES, R1, RECEIPT_DETAIL, RECEIPTS } from "./fixtures.test-data";
 
 const net = vi.hoisted(() => ({
   routes: {} as Record<string, unknown>,
@@ -36,6 +36,7 @@ beforeEach(() => {
     "GET /invoices": INVOICES,
     "GET /parties": PARTIES,
     "GET /accounts": ACCOUNTS,
+    "GET /api/finance/ledger/money-accounts": MONEY_ACCOUNTS,
     "GET /me": { mayCancel: false },
     [`GET /receipts/${R1}`]: RECEIPT_DETAIL,
     "POST /receipts": { id: NEW_ID },
@@ -102,6 +103,15 @@ describe("Other receipts — the Register", () => {
 });
 
 describe("Other receipts — the form", () => {
+  it("Received into offers cash, banks and holding accounts in use, from the one list (0512)", async () => {
+    show("/finance/other-receipts?receipt=new");
+    await screen.findByTestId("other-receipt-form");
+    await waitFor(() => expect(sent("GET /api/finance/ledger/money-accounts")).toHaveLength(1));
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Received into/ }), { key: "Enter" });
+    const offered = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(offered).toEqual(["1110 · Cash on hand", "1120 · Bank — current account", "1131 · GHL"]);
+  });
+
   it("from an invoice: fills what it owes, asks first, then records against it", async () => {
     show(`/finance/other-receipts?receipt=new&party=${P1}&invoice=${I_OPEN}`);
     const amount = await screen.findByLabelText("Received for ARI-20260915-4821 (RM)");
