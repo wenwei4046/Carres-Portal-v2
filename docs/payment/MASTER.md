@@ -894,7 +894,9 @@ were run before apply; an authenticated owner walk is still owed.
 
 Migration `0430` is APPLIED and PR #1110 merged as `124140a5` (deploy convergence in
 progress at this edit; the closure note carries the proof). `payment_void` requires a reason
-and gates on Payment Approver duty (Shared Duty Resolver) or principal; the posting service +
+and gates on Payment Approver duty (Shared Duty Resolver) or principal, and refuses any account
+that is not an active operation or principal account even if it holds that duty (0513: the
+database refuses whatever the API refuses); the posting service +
 column CHECK speak the §16 manual methods (`duitnow_qr` · `credit_card` · `debit_card`) with
 the arithmetic byte-for-byte 0351. The Invoice object carries the §16 Record payment
 composition — 50/50 action-and-receipt-preview, the six manual methods with their required
@@ -1643,7 +1645,9 @@ customer is holding in order to fix a bookkeeping mistake, and §5 asks for the 
 payment STANDS, its allocation is corrected, and the correction is evidence.
 
 `payment_correct_allocation` is the door. It refuses without a reason, refuses anyone but the
-Payment Approver (§12: "void, reallocation, overpayment review") or principal, voids the old
+Payment Approver (§12: "void, reallocation, overpayment review") or principal, refuses any
+account that is not an active operation, finance or principal account even if it holds that
+duty (0513: the database refuses whatever the API refuses), voids the old
 allocation rows rather than deleting them, inserts the new set, and moves every affected
 order's `paid` by exactly its share — old orders and new ones locked in id order so two
 corrections cannot deadlock. `payment_allocation_corrections` keeps before, after, actor,
