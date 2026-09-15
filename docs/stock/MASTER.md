@@ -502,13 +502,52 @@ arithmetic (`receivingSummaryOf`); Inbound owns no second subtraction engine. An
 reports the absence — **an unknown quantity is never printed as a zero**. The exact Unit counts
 remain the separate PHYSICAL answer the Schedule reads, and the two never merge into one number.
 
+**THE DEFAULT COLUMN SET IS WHAT FITS THE SCREEN (correction 2026-09-15).** The first cut of this
+card declared FOURTEEN default columns — 2,130px of them — inside roughly 1,010px of grid at
+1280px with the rail open, so every date, every quantity and the `Receive` control sat past the
+right edge. **`No page-level horizontal scroll` is not a usability measurement**; the grid scrolls,
+and an operator does not find an action they cannot see. A default set is judged by what is
+readable together at 1280px, measured, not by how many facts it can name.
+
 The Register defaults are:
 
 ```
-Document · Product · Supplier · To · PO Delivery Date · Supplier Delivery Date ·
-Goods received on · Order Qty · Received Qty · Pending Delivery Qty ·
-Damaged / Wrong · Status · Exceptions · Receiving
+Document · Product · Supplier & DO No · PO Delivery Date · Supplier Delivery Date ·
+Receiving progress · Receiving        ← all inside the visible width at 1280px
+Status · Exceptions                   ← follow, reachable by scrolling
 ```
+
+`Receiving progress` prints the governed quantities, each with its own number —
+`Order Qty` · `Received Qty` · `Pending Delivery Qty`, and `Damaged Qty` / `Wrong Item Qty` when
+either is above zero. **`Receiving` sits AHEAD of `Status`** so the action is inside the visible
+width by construction. `To` is hidden inside a Site's own tab, where it would repeat that Site's
+name on every row, and returns automatically on the `Destinations without a Site` tab where every
+row differs. Nothing is deleted: `To` · `Goods received on` · each of the five quantities on its
+own sortable, number-filterable column · `PO Issued` · `SO No` all remain one click away in the
+Columns chooser and persist once chosen. **No governed font size may be reduced to fit, and no
+column may be squeezed below its content** — a column that will not fit leaves the default set.
+
+The arrival-date filter names the date it filters (`Arrival date from … to …`): the date in force,
+which is the supplier's evidenced answer where one exists and the PO's own date otherwise.
+
+**MEASURED IN THE BROWSER, not asserted (2026-09-15).** Fourteen default columns rendered 2,243px;
+the set above renders **1,286px**, and a governed header is not allowed to set a column's width —
+`PO Delivery Date` declared 95px and rendered 143 until the grid's own two-line header
+(`headerLines`) let the governed words stand over two rows. Measured at the preview:
+
+```
+1280px   grid 1024px   Receive fully visible      Status · Exceptions trail
+1366px   grid 1110px   everything except Exceptions fully visible
+ 760px   grid  744px   rail collapses to Filters; the grid scrolls and the
+                       Receive control is NOT reachable without scrolling
+```
+
+The narrow case is a **known limitation, not a pass**: a nine-column register does not fit 744px,
+and a different narrow composition is a design change for the owner rather than something to
+invent here. **Product column width is sized to the CATALOG, not to invented strings** — measured
+across every SKU a purchase order line names: 34 SKUs, name length average 12, p90 14, longest 18
+(`Jager Super Single`), SKU codes to 13 (`LYYAR-1A(RHF)`). A fixture of 60-character names is four
+times the real worst case and is evidence about the fixture, not about this page.
 
 `Document` is the fixed header; the cell prints the record's own number with `PO Issued {date}`
 beneath, and a non-PO arrangement keeps its OWN document word (`Transfer No` · `Repair Order No` ·
@@ -564,13 +603,25 @@ to the customer is a SEPARATE outbound/delivery event for the same goods and cre
 receipt. `Ohana` and `Hookka Industries` remain destinations with NO Site: Ohana delivers straight
 to the final customer, and goods that never reach a Carres Site must not mint a warehouse receipt.
 
-🔴 **OPEN GAP — RECEIVING AUTHORITY IS NOT SITE-SCOPED.** `grn_duty` resolves globally
-(`workspace_resolve_duty('grn_duty', null)`) and `warehouse_capability_grants` carries no site
-column, so `Confirm inbound receipt` is held for the company rather than for a Site. With one Site
-that distinction was invisible; with three it is real — today a Carres GRN duty holder is offered
-the receipt door on a partner Site's rows. Neither new Site has hours or a duty holder configured,
-so nothing can be received at either until the governed Warehouse Settings door is used. **Whether
-receiving authority becomes per-Site is an owner decision and is not assumed here.**
+🔴 **MEASURED PERMISSION BOUNDARY — RECEIVING AUTHORITY IS NOT SITE-SCOPED, AND NOTHING ELSE
+GATES IT (verified against the live database 2026-09-15).** Read from `pg_proc`, not from a file:
+
+- `office_receive_post` opens with `v_ctx := public.receiving_require_post_authority();` →
+  `receiving_actor_context()`, **which takes no site argument**. That is the whole authority check.
+- The only site test in the entire function is existence:
+  `if p_actual_site_id is not null and not exists (select 1 from warehouses where id = …)`.
+- `warehouse_holds_capability` — the function that reads a `confirm_inbound_receipt` grant — is
+  referenced by `warehouse_grant_capability` and `warehouse_settings_gate` and by nothing else.
+  **The capability guards Warehouse Settings; it does not guard receiving.**
+- `warehouse_working_hours` is never consulted on the posting path.
+
+**Therefore a holder of GRN duty, its dated cover, or an Operations Superuser can post a receipt at
+ANY existing Site**, including `AL Sungai Buloh` and `HOUZS Balakong`. Creating those Sites (0509)
+widened where a receipt can land. An earlier version of this section claimed that missing hours and
+a missing Site duty holder meant nothing could be received there — **that claim was false**; neither
+is a gate. The UI offers the `Receive` control on exactly the same global answer, so screen and
+server agree and no false door is drawn. **Whether receiving authority becomes per-Site is an owner
+decision and is not assumed here.**
 
 **COUNTED STOCK IS NOT A MISSING RECORD.** A purchase line whose `identity_mode` is `quantity`
 mints no Unit IDs by design; calling that arrangement `Records incomplete` accuses the operator of

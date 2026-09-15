@@ -18,11 +18,32 @@ const sites = [
   { id: "preview-site", name: "Carres Klang Warehouse" },
   { id: "preview-partner", name: "HOUZS" },
 ];
-/** Ten product lines with long model references — the width case. */
-const TEN_LINES = Array.from({ length: 10 }, (_, i) => ({
-  sku: `LYYAR-5539-${String(i + 1).padStart(3, "0")}-CHARCOAL-3STR`,
-  name: `Booqit CNR Sectional Sofa Left-Hand Facing · Charcoal Weave ${i + 1}`,
-}));
+/**
+ * TEN product lines at PRODUCTION SCALE. Measured on the live catalog
+ * 2026-09-15 across every SKU a purchase order line actually names: 34 SKUs,
+ * name length average 12, p90 14, longest 18 (`Jager Super Single`); SKU codes
+ * up to 13 (`LYYAR-1A(RHF)`). The earlier fixture used 60-character invented
+ * names — four times the real worst case — which made the Product column look
+ * unusable at any width and is not evidence about this page.
+ *
+ * The LAST entry is a deliberate outlier far beyond anything the catalog
+ * holds, so the two-line clamp and the pinned quantity stay proven.
+ */
+const TEN_LINES = [
+  { sku: "5539-2B(LHF)", name: "Booqit 2B(LHF)" },
+  { sku: "5539-2A(RHF)", name: "Booqit 2A(RHF)" },
+  { sku: "LYYAR-1A(RHF)", name: "Lyyar 1A(RHF)" },
+  { sku: "LYYAR-1A(LHF)", name: "Lyyar 1A(LHF)" },
+  { sku: "JAGER-SS", name: "Jager Super Single" },
+  { sku: "NF-CLOUD-Q", name: "Cloud Queen" },
+  { sku: "NF-CLOUD-K", name: "Cloud King" },
+  { sku: "ALL-AASNDA-K", name: "all aasnda King" },
+  { sku: "BOOQIT-CNR", name: "Booqit CNR" },
+  {
+    sku: "LYYAR-5539-010-CHARCOAL-3STR",
+    name: "Booqit CNR Sectional Sofa Left-Hand Facing · Charcoal Weave 10",
+  },
+];
 const arrivals = inboundArrivals({
   pos: [
     {
