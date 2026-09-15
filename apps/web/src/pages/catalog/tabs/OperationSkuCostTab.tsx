@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { CatalogResponse } from "@carres/shared";
 import { PRODUCT_CATEGORIES, activeSofaSizes } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import { useOperationSuppliers, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
@@ -113,7 +114,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
     }
     const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
     const tag = category === "all" ? "" : `${category}-`;
-    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`carres-skus-${tag}${appTodayIso()}.csv`, csv);
     toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
   }
 

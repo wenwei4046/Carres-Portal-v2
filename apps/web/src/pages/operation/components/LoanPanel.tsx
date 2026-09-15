@@ -31,7 +31,7 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { lineCategory, resolvedCategory } from "@/lib/line-category";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
 import type { ReserveFreeUnit } from "./StockPickerGrid";
 
 /**
@@ -108,7 +108,7 @@ function addDays(iso: string | null, n: number): string | null {
 /** Whole-day diff from today (MYT-agnostic; date-only). */
 function daysFromToday(iso: string): number {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
-  const t = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  const t = new Date(`${appTodayIso()}T00:00:00`).getTime();
   return Math.round((d - t) / 86_400_000);
 }
 

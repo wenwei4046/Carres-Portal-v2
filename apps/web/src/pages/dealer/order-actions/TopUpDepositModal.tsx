@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { resolvePaymentMethods } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useCatalog, useTopUpOrder } from "@/lib/queries";
 import { newWizardSessionId, uploadAttachment } from "@/lib/storage";
 
@@ -75,7 +76,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
   }, [payMethods, method]);
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => appTodayIso());
   const [photos, setPhotos] = useState<PhotoSlot[]>([]);
   const [uploading, setUploading] = useState(false);
 

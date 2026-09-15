@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useOpenWorkSet } from "../../use-open-work";
 
 /**
@@ -20,7 +21,7 @@ export default function TasksPanel() {
   const mine = myId ? items.filter((item) => item.ownerId === myId) : [];
   const late = mine.filter((item) => item.workingDaysLate > 0).length;
   const today = mine.filter(
-    (item) => item.workingDaysLate === 0 && item.dueIso === new Date().toISOString().slice(0, 10),
+    (item) => item.workingDaysLate === 0 && item.dueIso === appTodayIso(),
   ).length;
   const later = mine.length - late - today;
   const counts = [

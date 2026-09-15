@@ -27,6 +27,7 @@ import {
   useExtendStorage,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useManualMethods } from "@/lib/payment-methods";
 import { renderExtensionAgreementPdf } from "@/lib/pdf/render";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
@@ -498,8 +499,6 @@ export function LogisticEtaField({
   );
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
-
 /** One-time storage delivery-extension (migration 0196; the two Delivery-
  *  Extension Google Forms, Jess 2026-06-30). Operation may record ONE extension;
  *  a 2nd needs a principal (the route 403s `extension_used`). The free storage
@@ -852,7 +851,7 @@ export function StorageCollectWaiver({
                     return;
                   }
                   collect.mutate(
-                    { amount: amt, paidOn: todayIso(), method },
+                    { amount: amt, paidOn: appTodayIso(), method },
                     { onSuccess: () => setCollecting(false) },
                   );
                 }}

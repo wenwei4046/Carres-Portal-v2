@@ -12,7 +12,7 @@ import {
   type ReceivingArrivalEvidence,
   type WarehouseReceiptLine,
 } from "@carres/shared";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useOperationWarehouse,
   useReceivingAmendMutation,
@@ -72,7 +72,7 @@ export default function ReceivingRecord({
   const isGrn = r?.status === "posted" || r?.status === "voided";
 
   // ── the live document — ONE arithmetic feeds preview, Print and Download ──
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => appTodayIso(), []);
   const previewDraft: GrnAmendDraft | null = useMemo(() => {
     if (!amending || !draft || !r) return null;
     return {

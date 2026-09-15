@@ -26,7 +26,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { groupWorkItemsByDay, orderActionLines, workspaceDutyLabelOf } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import { useAuth } from "@/lib/auth";
@@ -152,11 +152,11 @@ export default function OperationWork() {
     }
     if (linkedWhen === "today") {
       return mineAll.filter(
-        (item) => item.workingDaysLate === 0 && item.dueIso === new Date().toISOString().slice(0, 10),
+        (item) => item.workingDaysLate === 0 && item.dueIso === appTodayIso(),
       );
     }
     if (linkedWhen === "later") {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = appTodayIso();
       return mineAll.filter(
         (item) => item.workingDaysLate === 0 && (item.dueIso === null || item.dueIso > today),
       );

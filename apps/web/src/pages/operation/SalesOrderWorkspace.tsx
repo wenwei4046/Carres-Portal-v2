@@ -96,7 +96,7 @@ import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
 import SalesOrderAddons, { ServiceRowActions } from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
@@ -489,7 +489,7 @@ function draftTemplateData(
     /* An unsaved draft has NO number — never invent one (Golden rule). */
     so_number: base?.so_number ?? "DRAFT",
     /* The family template prints `Ordered` from issue_date. */
-    issue_date: base?.issue_date ?? new Date().toISOString().slice(0, 10),
+    issue_date: base?.issue_date ?? appTodayIso(),
     proceed_date: draft.proceed_date,
     order_id: base?.order_id ?? "draft",
     order_code: base?.order_code ?? "DRAFT",
@@ -2268,7 +2268,7 @@ function SalesOrderWorkspaceBody() {
           a read-only date is the "reduce descriptions" Jess asked for. */}
       <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="SO Date" value={isNew ? fmtDate(new Date().toISOString().slice(0, 10)) : fmtDate(order?.placed_at ?? null)} />
+          <Fact label="SO Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
           {mode === "create" ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
