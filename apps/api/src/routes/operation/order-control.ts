@@ -609,10 +609,7 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
     .select("stock_eta, line_etas")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (readErr) {
-    const m = mapPgError(readErr);
-    return c.json(m.body, m.status);
-  }
+  if (readErr) return fail(c, readErr);
 
   // Every factory date this order actually holds. The overlay is the only place
   // a supplier date lives (`docs/ORDERS-WORKING-FLOW.md` §2), so this set is the
@@ -983,10 +980,7 @@ async function refuseUnlessReachedCustomer(
     .eq("order_id", orderId)
     .in("result", ["delivered", "partial"])
     .limit(1);
-  if (attempts.error) {
-    const m = mapPgError(attempts.error);
-    return c.json(m.body, m.status);
-  }
+  if (attempts.error) return fail(c, attempts.error);
   if ((attempts.data ?? []).length > 0) return null;
   return c.json(
     {
@@ -1137,10 +1131,7 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     .select("delivery_photos")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
+  if (ctrlErr) return fail(c, ctrlErr);
   const existing: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
     ? (ctrl.delivery_photos as DeliveryPhoto[])
     : [];
@@ -1284,10 +1275,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     .from("order_lines")
     .select("order_id, sku, source_po")
     .not("source_po", "is", null);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const lines: OrderLineRef[] = (lineData ?? []).map((l) => ({
     orderId: l.order_id as string,
     sku: l.sku as string,
@@ -1334,10 +1322,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { data: orderData, error: ordErr } = await sb
       .from("orders")
       .select("id, source_ref");
-    if (ordErr) {
-      const m = mapPgError(ordErr);
-      return c.json(m.body, m.status);
-    }
+    if (ordErr) return fail(c, ordErr);
     const orderByRef = new Map<string, string>();
     for (const o of orderData ?? []) {
       for (const ref of (o.source_ref as string[] | null) ?? []) {
@@ -1432,10 +1417,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       .from("ops_order_control")
       .select("order_id, line_etas, line_stock_status")
       .in("order_id", orderIds);
-    if (exErr) {
-      const m = mapPgError(exErr);
-      return c.json(m.body, m.status);
-    }
+    if (exErr) return fail(c, exErr);
     const existingEtas = new Map<string, Record<string, string>>();
     const existingStatus = new Map<string, Record<string, string>>();
     for (const row of existing ?? []) {
@@ -1469,10 +1451,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: upErr } = await sb
       .from("ops_order_control")
       .upsert(upsertRows, { onConflict: "order_id" });
-    if (upErr) {
-      const m = mapPgError(upErr);
-      return c.json(m.body, m.status);
-    }
+    if (upErr) return fail(c, upErr);
     result.written = written;
   }
 
@@ -1494,10 +1473,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: feeErr } = await sb
       .from("ops_order_control")
       .upsert(feeRows, { onConflict: "order_id" });
-    if (feeErr) {
-      const m = mapPgError(feeErr);
-      return c.json(m.body, m.status);
-    }
+    if (feeErr) return fail(c, feeErr);
     result.storageWritten = feeByOrder.size;
   }
 
@@ -1518,10 +1494,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: balErr } = await sb
       .from("ops_order_control")
       .upsert(balRows, { onConflict: "order_id" });
-    if (balErr) {
-      const m = mapPgError(balErr);
-      return c.json(m.body, m.status);
-    }
+    if (balErr) return fail(c, balErr);
     result.balanceWritten = balanceByOrder.size;
   }
 
@@ -1571,18 +1544,12 @@ orderControlRouter.post("/append-missing-lines", async (c) => {
     .from("orders")
     .select("id, so, source_ref")
     .eq("source_system", "autocount");
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   const orderIds = new Set((orderData ?? []).map((o) => o.id as string));
   const { data: lineData, error: lineErr } = await sb
     .from("order_lines")
     .select("order_id, sku, source_po");
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const linesByOrder = new Map<string, { sku: string; sourcePo: string | null }[]>();
   for (const l of lineData ?? []) {
     const oid = l.order_id as string;
@@ -1825,10 +1792,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .select("id, so")
     .eq("id", orderId)
     .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   // Claim the free unit (atomic on status='free' — 409 if someone grabbed it).
@@ -1841,10 +1805,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     p_ref: `LOAN SO-${order.so}`,
     p_note: null,
   });
-  if (claimErr) {
-    const m = mapPgError(claimErr);
-    return c.json(m.body, m.status);
-  }
+  if (claimErr) return fail(c, claimErr);
   if (!Array.isArray(boundIds) || boundIds.length === 0) {
     return c.json(
       { error: "not_free", code: "conflict", message: "That sofa is no longer free" },
@@ -1856,10 +1817,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .select("id, unit_code, sku, condition, po_no")
     .eq("id", itemId)
     .maybeSingle();
-  if (readErr || !claimed) {
-    const m = mapPgError(readErr ?? new Error("unit vanished after binding"));
-    return c.json(m.body, m.status);
-  }
+  if (readErr || !claimed) return fail(c, readErr ?? new Error("unit vanished after binding"));
 
   const { data: loan, error: loanErr } = await sb
     .from("ops_sofa_loans")
@@ -1991,10 +1949,7 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, suppliers(name), delivery_partners(name)",
     )
     .single();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   return c.json({ loan: mapLoanRow(loan) });
 });
 
@@ -2085,10 +2040,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   if (!loan) throw new HTTPException(404, { message: "Loan not found" });
   if (loan.status !== "on_loan") {
     return c.json(
@@ -2103,10 +2055,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     .update({ status: "returned", returned_at: now, updated_at: now })
     .eq("id", loanId)
     .eq("status", "on_loan");
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
-  }
+  if (upErr) return fail(c, upErr);
   // Only a WAREHOUSE loan has an own-stock unit to recover; a supplier borrow
   // has item_id = null (the piece goes back to the supplier via a separate step).
   // CARD 6: the recovered unit enters the inspection hold through the governed
@@ -2118,10 +2067,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
       p_reason: "inspection",
       p_note: "Loan recovered from customer — inspect before resale",
     });
-    if (holdErr) {
-      const m = mapPgError(holdErr);
-      return c.json(m.body, m.status);
-    }
+    if (holdErr) return fail(c, holdErr);
   }
   return c.json({ ok: true });
 });
@@ -2158,10 +2104,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   if (!loan) throw new HTTPException(404, { message: "Loan not found" });
   if (loan.source !== "supplier") {
     return c.json(
@@ -2186,10 +2129,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
     })
     .eq("id", loanId)
     .is("returned_to_supplier_at", null);
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
-  }
+  if (upErr) return fail(c, upErr);
   return c.json({ ok: true });
 });
 

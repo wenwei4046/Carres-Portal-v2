@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -57,10 +57,7 @@ operationBadgesRouter.get("/", async (c) => {
     .from("user_nav_seen")
     .select("badge_key, last_seen_at")
     .in("badge_key", [ORDERS_KEY, PROCUREMENT_KEY, LP_REJECTED_KEY]);
-  if (seenRes.error) {
-    const m = mapPgError(seenRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (seenRes.error) return fail(c, seenRes.error);
   const seenMap = new Map<string, string>();
   for (const row of seenRes.data ?? []) {
     seenMap.set(row.badge_key, row.last_seen_at);
@@ -108,18 +105,9 @@ operationBadgesRouter.get("/", async (c) => {
       .not("partner_rejected_at", "is", null)
       .gt("partner_rejected_at", lpRejectedSince),
   ]);
-  if (ordersRes.error) {
-    const m = mapPgError(ordersRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (procurementRes.error) {
-    const m = mapPgError(procurementRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (lpRejectedRes.error) {
-    const m = mapPgError(lpRejectedRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (ordersRes.error) return fail(c, ordersRes.error);
+  if (procurementRes.error) return fail(c, procurementRes.error);
+  if (lpRejectedRes.error) return fail(c, lpRejectedRes.error);
 
   return c.json({
     orders: ordersRes.count ?? 0,

@@ -899,10 +899,7 @@ deliveryOrdersRouter.post(
         .eq("delivery_order_id", id)
         .eq("ops_stock_items.warehouse_id", c.var.auth.warehouseId as string)
         .limit(1);
-      if (scopeErr) {
-        const m = mapPgError(scopeErr);
-        return c.json(m.body, m.status);
-      }
+      if (scopeErr) return fail(c, scopeErr);
       if (!scoped || scoped.length === 0) {
         return c.json(
           { error: "forbidden", message: "This delivery order has no Units at your warehouse" },

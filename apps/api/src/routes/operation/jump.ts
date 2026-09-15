@@ -8,7 +8,7 @@ import {
   type JumpDocumentResult,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -224,14 +224,8 @@ jumpRouter.get("/", requireOperation, async (c) => {
         .ilike("invoice_no", `%${needle}%`)
         .limit(PER_TYPE),
     ]);
-    if (invRes.error) {
-      const m = mapPgError(invRes.error);
-      return c.json(m.body, m.status);
-    }
-    if (ordRes.error) {
-      const m = mapPgError(ordRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (invRes.error) return fail(c, invRes.error);
+    if (ordRes.error) return fail(c, ordRes.error);
     for (const row of (invRes.data ?? []) as Array<{
       invoice_no: string;
       order_id: string;

@@ -5,7 +5,7 @@ import {
   partnerRejectRfdInput,
   receivePoWithDoInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -103,10 +103,7 @@ partnerPickupsRouter.get("/", async (c) => {
     const { data: oRows, error: oErr } = await sb.rpc("partner_orders_for_threads", {
       p_order_ids: orderIds,
     });
-    if (oErr) {
-      const m = mapPgError(oErr);
-      return c.json(m.body, m.status);
-    }
+    if (oErr) return fail(c, oErr);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of ((oRows ?? []) as any[])) {
       orderInfo.set(String(r.id), {
@@ -492,10 +489,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     .eq("order_id", id)
     .eq("delivery_partner_id", auth.partnerId)
     .maybeSingle();
-  if (tErr) {
-    const m = mapPgError(tErr);
-    return c.json(m.body, m.status);
-  }
+  if (tErr) return fail(c, tErr);
   if (!ownThread) {
     // Either order doesn't exist, doesn't have a thread, or thread isn't
     // assigned to this partner. Same 404 either way — don't leak which.
@@ -512,10 +506,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     )
     .eq("id", id)
     .maybeSingle();
-  if (e1) {
-    const m = mapPgError(e1);
-    return c.json(m.body, m.status);
-  }
+  if (e1) return fail(c, e1);
   if (!order) {
     return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
   }
@@ -530,10 +521,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
     .from("order_lines")
     .select("sku, qty, unit_price")
     .eq("order_id", id);
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
+  if (e2) return fail(c, e2);
   const lineRows = lines ?? [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -544,10 +532,7 @@ partnerPickupsRouter.get("/deliveries/:id/print-do-data", async (c) => {
       .from("product_skus")
       .select("sku, variant")
       .in("sku", skus);
-    if (e3) {
-      const m = mapPgError(e3);
-      return c.json(m.body, m.status);
-    }
+    if (e3) return fail(c, e3);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const r of (skuRows ?? []) as any[]) {
       skuVariantBySku[String(r.sku)] = String(r.variant);

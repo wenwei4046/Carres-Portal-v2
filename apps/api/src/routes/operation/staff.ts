@@ -9,7 +9,7 @@ import {
   type OpsStaffMember,
 } from "@carres/shared";
 import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -82,14 +82,8 @@ staffRouter.get("/", async (c) => {
       .order("email"),
     sb.from("ops_staff_settings").select("user_id, available, note"),
   ]);
-  if (users.error) {
-    const m = mapPgError(users.error);
-    return c.json(m.body, m.status);
-  }
-  if (settings.error) {
-    const m = mapPgError(settings.error);
-    return c.json(m.body, m.status);
-  }
+  if (users.error) return fail(c, users.error);
+  if (settings.error) return fail(c, settings.error);
 
   const byId = new Map(
     (settings.data ?? []).map((s) => [s.user_id as string, s]),
@@ -218,14 +212,8 @@ staffRouter.post("/auto-assign", async (c) => {
       .eq("role", "operation"),
     sb.from("ops_staff_settings").select("user_id, available"),
   ]);
-  if (users.error) {
-    const m = mapPgError(users.error);
-    return c.json(m.body, m.status);
-  }
-  if (settings.error) {
-    const m = mapPgError(settings.error);
-    return c.json(m.body, m.status);
-  }
+  if (users.error) return fail(c, users.error);
+  if (settings.error) return fail(c, settings.error);
   const userById = new Map((users.data ?? []).map((u) => [u.id as string, u]));
   /** An account that may CARRY a customer: active, and a People record with a
    *  staff_code. A shared login or a robot account never owns (0504). */
@@ -248,10 +236,7 @@ staffRouter.post("/auto-assign", async (c) => {
       "id, status, operation_stage, ops_order_control(assigned_staff, assigned_by)",
     )
     .neq("status", "cancelled");
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   type Ovl = { assigned_staff?: string | null; assigned_by?: string | null };
   const ovlOf = (o: { ops_order_control?: Ovl[] | Ovl | null }): Ovl | null => {
     const raw = o.ops_order_control;

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -215,10 +215,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
       )
       .like("sku", `${category}:%`)
       .eq("purchase_orders.suppliers.slug", supplierSlug);
-    if (lineErr) {
-      const m = mapPgError(lineErr);
-      return c.json(m.body, m.status);
-    }
+    if (lineErr) return fail(c, lineErr);
     const matchedIds = Array.from(
       new Set(((lineRows ?? []) as Array<{ po_id: string }>).map((r) => r.po_id)),
     );
@@ -257,8 +254,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
     const enriched = await enrichPosWithOrders(sb, pos);
     return c.json({ pos: enriched });
   } catch (err) {
-    const m = mapPgError(err as { code?: string; message?: string });
-    return c.json(m.body, m.status);
+    return fail(c, err as { code?: string; message?: string });
   }
 });
 

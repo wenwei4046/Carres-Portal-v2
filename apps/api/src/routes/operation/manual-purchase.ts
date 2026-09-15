@@ -28,7 +28,7 @@ import {
   loadPurchasingSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -542,19 +542,13 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
          cancel_reason`,
       )
       .in("request_id", ids);
-    if (res.error) {
-      const m = mapPgError(res.error);
-      return c.json(m.body, m.status);
-    }
+    if (res.error) return fail(c, res.error);
     lines = await stampReceived(sb, res.data ?? []);
 
     /* Catalog words + real PO lineage — the ONE implementation the Object
        Detail also calls (`withCatalogAndLineage`). */
     const enriched = await withCatalogAndLineage(sb, lines);
-    if (enriched.error) {
-      const m = mapPgError(enriched.error);
-      return c.json(m.body, m.status);
-    }
+    if (enriched.error) return fail(c, enriched.error);
     lines = enriched.lines;
 
     /* Card 06 §7 — issuance work completes ONLY on the current PO version's
@@ -568,10 +562,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
         .select("po_id, po_version, kind")
         .eq("kind", "confirmed_sent")
         .in("po_id", poIds);
-      if (sends.error) {
-        const m = mapPgError(sends.error);
-        return c.json(m.body, m.status);
-      }
+      if (sends.error) return fail(c, sends.error);
       for (const s of sends.data ?? []) {
         // SQL already filtered; the guard keeps a permissive test double honest.
         if (s.kind != null && s.kind !== "confirmed_sent") continue;
@@ -618,10 +609,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
   ]);
   for (const r of [dests, sups, users, cases]) {
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return c.json(m.body, m.status);
-    }
+    if (r.error) return fail(c, r.error);
   }
   const approvers = await resolveApprovers(
     c,
@@ -745,19 +733,13 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
        remaining_qty, required_by, remark, po_id, cancelled_at, cancel_reason`,
     )
     .eq("request_id", id);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
 
   let stamped = await stampReceived(sb, lines ?? []);
   /* Catalog words + real PO lineage — the same one implementation the
      Register calls (Card 05 §3.3/§3.6; Law D). */
   const enriched = await withCatalogAndLineage(sb, stamped);
-  if (enriched.error) {
-    const m = mapPgError(enriched.error);
-    return c.json(m.body, m.status);
-  }
+  if (enriched.error) return fail(c, enriched.error);
   stamped = enriched.lines;
 
   /* Card 06 §3/§6 — the SAME server date projection the Register reads, so
@@ -860,14 +842,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
         .in("po_id", poIds)
         .order("recorded_at", { ascending: true }),
     ]);
-    if (poRes.error) {
-      const m = mapPgError(poRes.error);
-      return c.json(m.body, m.status);
-    }
-    if (promRes.error) {
-      const m = mapPgError(promRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (poRes.error) return fail(c, poRes.error);
+    if (promRes.error) return fail(c, promRes.error);
     pos = (poRes.data ?? []).map((p) => {
       const replies = (promRes.data ?? []).filter(row => row.po_id === p.id) as unknown as PoDatePromise[];
       const originalDate = (p.official_delivery_date as string | null) ?? null;
@@ -1022,10 +998,7 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
     .select("id")
     .eq("id", id)
     .maybeSingle();
-  if (reqErr) {
-    const m = mapPgError(reqErr);
-    return c.json(m.body, m.status);
-  }
+  if (reqErr) return fail(c, reqErr);
   if (!request) {
     return c.json({ error: "request_not_found", code: "request_not_found" }, 404);
   }
@@ -1036,10 +1009,7 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
     .from("purchase_demands")
     .select("id, sku, qty, cancelled_at")
     .eq("request_id", id);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const live = (lineRows ?? []).filter((l) => l.cancelled_at === null);
 
   /* The Catalog's human words, read the same way the Register reads them —
@@ -1048,10 +1018,7 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
   const { data: catRows, error: catErr } = await sb
     .from("product_skus")
     .select("sku, variant, variant_kind, product_models(name)");
-  if (catErr) {
-    const m = mapPgError(catErr);
-    return c.json(m.body, m.status);
-  }
+  if (catErr) return fail(c, catErr);
   const itemLabelBySku = new Map(
     (catRows ?? []).map((r) => {
       const model = r.product_models as unknown as { name: string | null } | null;
@@ -1234,10 +1201,7 @@ manualPurchaseRouter.put("/:id/deliver-to", requireOperation, async (c) => {
     .from("purchase_demands")
     .select("id, supplier_id, cancelled_at")
     .eq("request_id", id);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const supplierIds = [
     ...new Set(
       (lines ?? [])
@@ -1251,10 +1215,7 @@ manualPurchaseRouter.put("/:id/deliver-to", requireOperation, async (c) => {
       .from("purchasing_supplier_settings")
       .select("supplier_id, fixed_destination_id, collected_by_partner_id")
       .in("supplier_id", supplierIds);
-    if (collectionErr) {
-      const m = mapPgError(collectionErr);
-      return c.json(m.body, m.status);
-    }
+    if (collectionErr) return fail(c, collectionErr);
     const governed = ((collectionRows ?? []) as Record<string, unknown>[]).find(
       (r) =>
         supplierIds.includes(r.supplier_id as string) &&
@@ -1597,14 +1558,8 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     sb.from("product_skus").select("sku, supplier_id, product_models(category)"),
     sb.from("suppliers").select("id, name"),
   ]);
-  if (catRes.error) {
-    const m = mapPgError(catRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (supRes.error) {
-    const m = mapPgError(supRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (catRes.error) return fail(c, catRes.error);
+  if (supRes.error) return fail(c, supRes.error);
   const catalogBySku = new Map(
     (catRes.data ?? []).map((r) => [
       r.sku as string,
@@ -1692,20 +1647,14 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   /* Manual Purchase and SO Batch Purchase ask the same governed capability;
      the creation RPC asks again at the database boundary. */
   const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
-  if (authority.error) {
-    const m = mapPgError(authority.error);
-    return c.json(m.body, m.status);
-  }
+  if (authority.error) return fail(c, authority.error);
   if (!authority.mayIssue) return refuse(c, 403, "not_po_duty");
 
   const { data: requests, error: reqErr } = await sb
     .from("purchase_requests")
     .select("*")
     .in("id", requestIds);
-  if (reqErr) {
-    const m = mapPgError(reqErr);
-    return c.json(m.body, m.status);
-  }
+  if (reqErr) return fail(c, reqErr);
   /* ⭐ EVERY REFUSAL ON THIS DOOR TRAVELS WITH ITS WORDS (YH, 2026-09-01).
      Four of the refusals below were bare `c.json({ error, code })` while their
      neighbours ten lines away already used `refuse()`. A bare body carries no
@@ -1747,10 +1696,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       "id, request_id, sku, supplier_id, destination_id, qty, approved_qty, issued_qty, required_by, cancelled_at",
     )
     .in("request_id", requestIds);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
 
   // What is still to buy on each line: the approver's number less what was
   // already issued — never the original ask. THE one remainder arithmetic
@@ -1777,10 +1723,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     .from("product_skus")
     .select("sku, supplier_id, cost, product_models!inner(category)")
     .in("sku", skus);
-  if (catErr) {
-    const m = mapPgError(catErr);
-    return c.json(m.body, m.status);
-  }
+  if (catErr) return fail(c, catErr);
   const catalog = new Map(
     (catRows ?? []).map((r) => [
       r.sku as string,
@@ -1804,10 +1747,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const { data: collectionRows, error: collectionErr } = await sb
     .from("purchasing_supplier_settings")
     .select("supplier_id, fixed_destination_id, collected_by_partner_id");
-  if (collectionErr) {
-    const m = mapPgError(collectionErr);
-    return c.json(m.body, m.status);
-  }
+  if (collectionErr) return fail(c, collectionErr);
   const collectionBySupplier = new Map(
     ((collectionRows ?? []) as Record<string, unknown>[]).map((r) => [
       r.supplier_id as string,
@@ -1822,10 +1762,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     .from("warehouses")
     .select("id, name, kind")
     .eq("kind", "own");
-  if (whErr) {
-    const m = mapPgError(whErr);
-    return c.json(m.body, m.status);
-  }
+  if (whErr) return fail(c, whErr);
   const warehouse =
     (whRows ?? []).find((w) => /klang|klg/i.test((w.name as string) ?? "")) ??
     (whRows ?? [])[0];
@@ -1950,8 +1887,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
         detail === "not_po_duty" ? 403 : detail === "supplier_price_changed" ? 409 : 422;
       return refuse(c, status, detail);
     }
-    const m = mapPgError(batchErr);
-    return c.json(m.body, m.status);
+    return fail(c, batchErr);
   }
   const poIds = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
   return c.json({ poIds, documents: governedPos.length });

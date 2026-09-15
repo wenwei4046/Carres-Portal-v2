@@ -5,7 +5,7 @@ import {
   setDealerStatusInput,
   updateDealerInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -60,10 +60,7 @@ principalDealersRouter.get("/", async (c) => {
     sb.from("outlets").select("dealer_id"),
   ]);
   const joinErr = chanRes.error ?? outletRes.error;
-  if (joinErr) {
-    const m = mapPgError(joinErr);
-    return c.json(m.body, m.status);
-  }
+  if (joinErr) return fail(c, joinErr);
   const chanRows = chanRes.data;
   const outletRows = outletRes.data;
   const channelById = new Map<string, string>(
@@ -103,10 +100,7 @@ principalDealersRouter.get("/:id", async (c) => {
 
   // 1. Fetch dealer (basic record + stats) via the legacy RPC.
   const { data: dealerRows, error: e1 } = await sb.rpc("dealer_with_stats", { p_id: id });
-  if (e1) {
-    const m = mapPgError(e1);
-    return c.json(m.body, m.status);
-  }
+  if (e1) return fail(c, e1);
   if (!dealerRows || (Array.isArray(dealerRows) && dealerRows.length === 0)) {
     return c.json(
       { error: "not_found", code: "not_found", message: "Dealer not found" },
@@ -150,10 +144,7 @@ principalDealersRouter.get("/:id", async (c) => {
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false })
     .limit(8);
-  if (e2) {
-    const m = mapPgError(e2);
-    return c.json(m.body, m.status);
-  }
+  if (e2) return fail(c, e2);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recentOrders = (ordRows ?? []).map((o: any) => {

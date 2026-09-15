@@ -9,7 +9,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { readFreeStock } from "../../lib/purchase-demand-read";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -94,10 +94,7 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
       sb.from("order_lines").select("id, sku, qty, attrs").eq("order_id", orderId),
     ]);
   const firstError = orderErr ?? linesErr;
-  if (firstError) {
-    const m = mapPgError(firstError);
-    return c.json(m.body, m.status);
-  }
+  if (firstError) return fail(c, firstError);
   if (!order) return c.json({ error: "order_not_found", code: "order_not_found" }, 404);
 
   const lines = (lineRows ?? []) as LineRow[];
@@ -124,10 +121,7 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
           .neq("purchase_orders.status", "cancelled"),
       ]);
     const readErr = boundErr ?? srcErr;
-    if (readErr) {
-      const m = mapPgError(readErr);
-      return c.json(m.body, m.status);
-    }
+    if (readErr) return fail(c, readErr);
     for (const r of (bound ?? []) as Record<string, unknown>[]) {
       const id = r.reserved_order_line_id as string;
       const prev = reservedByLine.get(id) ?? { qty: 0, codes: [] };
@@ -248,10 +242,7 @@ soBatchReadyStockRouter.post("/ready-stock/reserve", requireOperation, async (c)
     .select("id, so")
     .eq("id", orderId)
     .maybeSingle();
-  if (orderErr) {
-    const m = mapPgError(orderErr);
-    return c.json(m.body, m.status);
-  }
+  if (orderErr) return fail(c, orderErr);
   if (!order) return c.json({ error: "order_not_found", code: "order_not_found" }, 404);
 
   const reference = referenceOf(order as OrderRow);

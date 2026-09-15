@@ -18,7 +18,7 @@ import {
 import { validateIssuePlan } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import {
   loadToOrder,
@@ -94,18 +94,12 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
     .from("product_skus")
     .select("sku, variant, variant_kind, supplier_id, model_id")
     .not("supplier_id", "is", null);
-  if (skuErr) {
-    const m = mapPgError(skuErr);
-    return c.json(m.body, m.status);
-  }
+  if (skuErr) return fail(c, skuErr);
 
   const { data: modelRows, error: modelErr } = await sb
     .from("product_models")
     .select("id, name");
-  if (modelErr) {
-    const m = mapPgError(modelErr);
-    return c.json(m.body, m.status);
-  }
+  if (modelErr) return fail(c, modelErr);
   const modelName = new Map(
     (modelRows ?? []).map((m) => [m.id as string, (m.name as string) ?? ""]),
   );
@@ -113,10 +107,7 @@ toOrderRouter.get("/demand/pick-items", requireOperation, async (c) => {
   const { data: supRows, error: supErr } = await sb
     .from("suppliers")
     .select("id, name");
-  if (supErr) {
-    const m = mapPgError(supErr);
-    return c.json(m.body, m.status);
-  }
+  if (supErr) return fail(c, supErr);
   const supplierName = new Map(
     (supRows ?? []).map((s) => [s.id as string, (s.name as string) ?? ""]),
   );
@@ -330,16 +321,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
    * The application and SQL both ask the governed capability. Duty/cover is
    * still resolved below when a refusal needs to name the normal owner. */
   const authority = await purchasingActorMayIssue(sb, c.var.auth.id);
-  if (authority.error) {
-    const m = mapPgError(authority.error);
-    return c.json(m.body, m.status);
-  }
+  if (authority.error) return fail(c, authority.error);
   if (!authority.mayIssue) {
     const actorRes = await sb.rpc("purchasing_po_actor");
-    if (actorRes.error) {
-      const m = mapPgError(actorRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (actorRes.error) return fail(c, actorRes.error);
     const actor = (actorRes.data ?? {}) as { actor_user_id?: string | null };
     const actorId = actor.actor_user_id ?? null;
     if (!actorId) return refuse(c, 403, "no_po_duty_holder");
@@ -392,10 +377,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
   const destRes = await sb
     .from("purchasing_destinations")
     .select("id, name, is_default, active");
-  if (destRes.error) {
-    const m = mapPgError(destRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (destRes.error) return fail(c, destRes.error);
   const destById = new Map(
     ((destRes.data ?? []) as Record<string, unknown>[]).map((d) => [
       d.id as string,
@@ -524,10 +506,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
         .from("purchasing_supplier_settings")
         .select("supplier_id, fixed_destination_id, collected_by_partner_id"),
     ]);
-    if (partners.error || configured.error) {
-      const m = mapPgError(partners.error ?? configured.error!);
-      return c.json(m.body, m.status);
-    }
+    if (partners.error || configured.error) return fail(c, partners.error ?? configured.error!);
     validPartners = new Set((partners.data ?? []).map((p) => p.id as string));
     for (const row of (configured.data ?? []) as Record<string, unknown>[]) {
       const partnerId = row.collected_by_partner_id as string | null;
@@ -801,8 +780,7 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       }
       return refuse(c, status, detail, facts);
     }
-    const m = mapPgError(batchErr);
-    return c.json(m.body, m.status);
+    return fail(c, batchErr);
   }
   const ids = ((batch as { po_ids?: unknown } | null)?.po_ids ??
     []) as string[];

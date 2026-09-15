@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -251,8 +251,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   if (insErr) {
     // Money safety: a link we can't track must not stay payable.
     await stripe.checkout.sessions.expire(session.id).catch(() => {});
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
+    return fail(c, insErr);
   }
 
   return c.json({ session: shape(row as SessionRow) }, 201);

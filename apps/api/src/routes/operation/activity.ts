@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { resolveActorNames } from "../../lib/actor-names";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -46,14 +46,8 @@ activityRouter.get("/", requireOperationOrPrincipal, async (c) => {
       .order("created_at", { ascending: false })
       .limit(PER),
   ]);
-  if (actRes.error) {
-    const m = mapPgError(actRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (annRes.error) {
-    const m = mapPgError(annRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (actRes.error) return fail(c, actRes.error);
+  if (annRes.error) return fail(c, annRes.error);
 
   const acts = actRes.data ?? [];
   const anns = annRes.data ?? [];

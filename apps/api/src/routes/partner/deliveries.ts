@@ -5,7 +5,7 @@ import {
   partnerSaveArrangementInput,
   type PartnerDeliveryCard,
 } from "@carres/shared";
-import { mapPgError, fail } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -157,10 +157,7 @@ partnerDeliveriesRouter.get("/", async (c) => {
         .neq("status", "cancelled"),
     ]);
   const firstErr = arrErr ?? ordErr;
-  if (firstErr) {
-    const m = mapPgError(firstErr);
-    return c.json(m.body, m.status);
-  }
+  if (firstErr) return fail(c, firstErr);
 
   const arrRows = (arrangements ?? []) as ArrangementRow[];
   const orderRows = (orders ?? []) as OrderRow[];
@@ -295,10 +292,7 @@ partnerDeliveriesRouter.put("/:orderId/arrangement", async (c) => {
     }`,
     by_role: "partner",
   });
-  if (histErr) {
-    const m = mapPgError(histErr);
-    return c.json(m.body, m.status);
-  }
+  if (histErr) return fail(c, histErr);
 
   return c.json({ saved: true });
 });
@@ -351,10 +345,7 @@ partnerDeliveriesRouter.post("/:orderId/cannot-deliver", async (c) => {
     }`,
     by_role: "partner",
   });
-  if (histErr) {
-    const m = mapPgError(histErr);
-    return c.json(m.body, m.status);
-  }
+  if (histErr) return fail(c, histErr);
 
   return c.json({ reported: true });
 });

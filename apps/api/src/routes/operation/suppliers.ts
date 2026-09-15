@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { purchasingSuppliersOnly, supplierCreateInput, supplierSlug } from "@carres/shared";
-import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -92,10 +92,7 @@ operationSuppliersRouter.post("/", async (c) => {
     .select("id, name")
     .eq("slug", slug)
     .maybeSingle();
-  if (clashErr) {
-    const m = mapPgError(clashErr);
-    return c.json(m.body, m.status);
-  }
+  if (clashErr) return fail(c, clashErr);
   if (clash) {
     return c.json(
       {
