@@ -681,6 +681,19 @@ describe("SkuMasterTab — model filter", () => {
       "true",
     );
   });
+
+  it("a picked model that moves to another category falls back to All", () => {
+    const { rerender } = render(wrap(<SkuMasterTab catalog={CATALOG_3()} />));
+    fireEvent.click(screen.getByRole("button", { name: "Mattress" }));
+    fireEvent.click(screen.getByRole("button", { name: "Carres Dream" }));
+    expect(screen.queryByTestId("sku-row-CLOUD-KING")).not.toBeInTheDocument();
+    // Carres Dream is edited to Sofa and the catalog refetches.
+    const moved = { ...MODEL_MAT2, category: "sofa" as const };
+    rerender(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_MAT2, SKU_SOFA], [MODEL_MAT, moved, MODEL_SOFA])} />));
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.queryByTestId("sku-row-DREAM-QUEEN")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All Mattress" })).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 // ---------------------------------------------------------------------------

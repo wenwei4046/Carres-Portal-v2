@@ -189,6 +189,18 @@ describe("Settings → Payment (§16)", () => {
     const call = state.fetch.mock.calls.find((c) => c[0] === "/api/finance/payment-settings/collection-timing")!;
     expect(JSON.parse(call[1].body)).toMatchObject({ askDaysBefore: 4, deadlineDaysBefore: 2, reason: "Try" });
   });
+  it("Collection timing's Effective from is today at Edit, not at page open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-09-15T04:00:00Z") });
+    try {
+      show();
+      const card = await screen.findByTestId("payment-settings-collection-timing");
+      vi.setSystemTime(new Date("2026-09-16T01:00:00Z")); // left open overnight; 09:00 KL next day
+      fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText("Effective from")).toHaveTextContent("16 Sep");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("a storage rule card edits through Review changes and carries its reason", async () => {
     show();
     const card = await screen.findByTestId("storage-card-sofa");
