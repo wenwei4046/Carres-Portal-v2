@@ -90,7 +90,9 @@ function useIsNarrow(): boolean {
 }
 
 const STATUSES = [
-  ["open", "Not finished"],
+  ["open", "Awaiting loading or driver confirmation"],
+  ["not-loaded", "Not loaded yet"],
+  ["awaiting-driver", "Awaiting driver confirmation"],
   ["loaded", "Loaded"],
   ["no-evidence", "Evidence not submitted"],
   ["all", "All pickups"],
@@ -100,6 +102,7 @@ export default function WarehouseOutboundWork() {
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const selectedDo = params.get("do");
+  const workId = params.get("loading");
   /* Menu default = every unfinished arrangement; an exact Monitor deep link
      must show its arrangement even when the work is already done. */
   const effectiveView = params.get("view") ?? (selectedDo ? "all" : "open");
@@ -129,14 +132,16 @@ export default function WarehouseOutboundWork() {
   const [railHidden, setRailHidden] = useState(false);
   const isNarrow = useIsNarrow();
   const root = useRef<HTMLDivElement>(null);
-  const scrollKey = `outbound-scroll:${params.toString()}`;
+  const listParams = new URLSearchParams(params);
+  listParams.delete("loading");
+  const scrollKey = `outbound-scroll:${listParams.toString()}`;
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || workId) return;
     const scroll =
       root.current?.querySelector<HTMLElement>('[data-testid="grid-scroll"]');
     if (scroll)
       scroll.scrollTop = Number(sessionStorage.getItem(scrollKey) ?? 0);
-  }, [isLoading, scrollKey]);
+  }, [isLoading, scrollKey, workId]);
 
   const setFilter = useCallback(
     (key: string, value: string) => {
@@ -156,11 +161,14 @@ export default function WarehouseOutboundWork() {
     (value: string) => setFilter("q", value),
     [setFilter],
   );
+  const workKey = (c: WarehouseOutboundCard) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`;
+  const workCard = allCards.find((c) => workKey(c) === workId);
 
   const columns = useMemo<DataGridColumn<WarehouseOutboundCard>[]>(
     () => [
       {
         key: "date",
+        defaultHidden: true,
         label: "Scheduled handover",
         width: 140,
         wrap: true,
@@ -179,7 +187,7 @@ export default function WarehouseOutboundWork() {
       {
         key: "document",
         label: "Document",
-        width: 150,
+        width: 245,
         wrap: true,
         searchValue: (c) => `DO No ${c.doNumber} ${c.source}`,
         accessor: (c) => (
@@ -195,13 +203,23 @@ export default function WarehouseOutboundWork() {
             >
               {c.doNumber}
             </Link>
+            <div><Link className="font-mono text-kit-blue-11 hover:underline" to={c.sourceHref}>{c.source}</Link></div>
+            <div>Scheduled handover {fmtDate(c.eventDate)}</div>
+            <div className="text-meta text-base-600">{c.expectedCollectionWindow ? `Driver pickup ${c.expectedCollectionWindow}` : "Time not provided"}</div>
+            <div className="text-meta text-base-600">{c.fromLocation} → {c.toCustomer}</div>
+            <div className="text-meta text-base-600">{c.logisticsPartner}</div>
+            <div className="text-meta text-base-600" data-testid={`wo-driver-${c.doNumber}`}>{warehouseAssignedDriverLine(c.logisticsPartner, c.driverName)}</div>
           </div>
         ),
       },
       {
+        key: "loading", label: "Loading", width: 85, wrap: true, filterable: false,
+        accessor: (c) => <button type="button" className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint" data-testid={`wo-open-loading-${c.doNumber}`} onClick={() => setFilter("loading", workKey(c))}>Loading</button>,
+      },
+      {
         key: "products",
         label: "Product",
-        width: 230,
+        width: 200,
         wrap: true,
         searchValue: (c) =>
           c.products
@@ -227,6 +245,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "from",
+        defaultHidden: true,
         label: "From",
         width: 140,
         wrap: true,
@@ -235,6 +254,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "to",
+        defaultHidden: true,
         label: "To",
         width: 190,
         wrap: true,
@@ -243,6 +263,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "partner",
+        defaultHidden: true,
         label: "Logistics Partner",
         width: 125,
         searchValue: (c) => c.logisticsPartner,
@@ -250,6 +271,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "driver",
+        defaultHidden: true,
         label: "Assigned Driver",
         width: 150,
         wrap: true,
@@ -275,11 +297,13 @@ export default function WarehouseOutboundWork() {
             </div>
             <div>Not loaded {c.notHandedOver}</div>
             <div>Driver confirmed {c.driverConfirmed}</div>
+            {outboundExceptionLines(c, today, fmtDate).map((line) => <div key={line} className="text-meta text-base-600">{line}</div>)}
           </div>
         ),
       },
       {
         key: "status",
+        defaultHidden: true,
         label: "Status",
         width: 125,
         searchValue: (c) => outboundStatusWordOf(c),
@@ -287,6 +311,7 @@ export default function WarehouseOutboundWork() {
       },
       {
         key: "exceptions",
+        defaultHidden: true,
         label: "Exceptions",
         width: 230,
         wrap: true,
@@ -352,7 +377,7 @@ export default function WarehouseOutboundWork() {
             : "",
       },
     ],
-    [today],
+    [today, setFilter],
   );
 
   const context = params.get("date") || params.get("from");
@@ -367,13 +392,13 @@ export default function WarehouseOutboundWork() {
   const empty = exactDate
     ? warehouseEmptyDaySentence(fmtDate(exactDate))
     : effectiveView === "open" && !context && !params.get("q") && !selectedDo
-      ? "No unfinished pickups. Every arranged pickup is loaded."
+      ? "No pickups awaiting loading or driver confirmation match these filters."
       : "No pickups match these filters.";
 
   const dateControls = (
     <>
       <label className="text-meta">
-        From{" "}
+        Pickup date from{" "}
         <input
           className="h-7 rounded-control border border-kit-slate-5 px-2"
           type="date"
@@ -431,7 +456,14 @@ export default function WarehouseOutboundWork() {
         docTitle="Outbound · Warehouse — Carres"
         destinationHeader
       />
-      <div className="flex min-h-0 min-w-0 flex-1">
+      {workId && <div className="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="outbound-loading-workspace">
+        <div className="flex flex-wrap items-center gap-3 border-b border-kit-slate-5 bg-white p-3">
+          <button type="button" className="text-body text-kit-blue-11" onClick={() => setFilter("loading", "")}>← Back to Outbound</button>
+          {workCard && <span className="font-mono text-body">{workCard.doNumber}</span>}
+        </div>
+        {isLoading ? <p role="status" className="p-3">Loading…</p> : error ? <div role="alert" className="p-3">{error.message}<button onClick={() => void refetch()}>Try again</button></div> : workCard ? <OutboundUnitWork card={workCard} /> : <p role="alert" className="p-3">This pickup could not be opened.</p>}
+      </div>}
+      <div className={`flex min-h-0 min-w-0 flex-1 ${workId ? "hidden" : ""}`}>
         <div
           className={`${showFilters ? "flex" : "hidden"} min-h-0 shrink-0 ${railHidden ? "md:hidden" : "md:flex"}`}
         >
@@ -516,7 +548,7 @@ export default function WarehouseOutboundWork() {
               columns={columns}
               rowKey={(c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`}
               rowTestId={(c) => `wo-row-${c.doNumber}`}
-              storageKey="carres.outbound.register.v1"
+              storageKey="carres.outbound.register.v2"
               exportName="Outbound"
               searchPlaceholder="DO, SO, product, customer, driver or Unit ID…"
               initialSearch={params.get("q") ?? ""}
@@ -579,8 +611,10 @@ export default function WarehouseOutboundWork() {
               expandable={{
                 trigger: { columnKey: "products" },
                 testId: (c) => `wo-row-toggle-${c.doNumber}`,
-                defaultExpandedKeys: selectedDo ? view.rows.filter((c) => c.doNumber === selectedDo).map((c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`) : [],
-                renderExpansion: (c) => <OutboundUnitWork card={c} />,
+                renderExpansion: (c) => <div className="space-y-2 p-3 text-body" data-testid={`wo-product-detail-${c.doNumber}`}>
+                  {c.products.map((p) => <div key={p.sku ?? "no-sku"}>{p.name ?? p.sku} · {p.sku} · Qty {p.qty}</div>)}
+                  {c.units.map((u) => <div key={u.unitId}><Link className="font-mono text-kit-blue-11" to={`/operation/stock/unit/${encodeURIComponent(u.unitId)}`}>{u.unitId}</Link> · {u.productName ?? u.sku}</div>)}
+                </div>,
               }}
               statusSummary={(visible) => {
                 const cards = visible as WarehouseOutboundCard[];
@@ -647,13 +681,14 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
     prep.mutate(
       { fact, unitCodes },
       {
-        onSuccess: () => toast.success(done),
+      onSuccess: () => { toast.success(done); if (fact === "scanned") setScanValue(""); },
         onError: (e) => toast.error(e.message),
       },
     );
   }
 
   function scanUnit() {
+    if (prep.isPending) return;
     const code = scanValue.trim();
     if (!code) return;
     const match = card.units.find(
@@ -668,7 +703,6 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       return;
     }
     recordPrep("scanned", [match.unitId], `${match.unitId} scanned`);
-    setScanValue("");
   }
 
   const operator =
@@ -684,6 +718,9 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       {/* The two evidence records, never merged (§8): the Warehouse's own
           submission and the driver's independent confirmation. */}
       <div className="mb-2 space-y-0.5 text-meta text-base-600">
+        <p>{card.fromLocation} → {card.toCustomer} · {card.logisticsPartner}</p>
+        <p>Scheduled handover {fmtDate(card.eventDate)}</p>
+        <Link className="font-mono text-kit-blue-11 hover:underline" to={card.deliveryOrderHref}>{card.doNumber}</Link>
         <p data-testid={`wo-loaded-${card.doNumber}`}>
           {warehouseLoadedLine(card)}
           {operator ? ` · recorded by ${operator}` : ""}
@@ -788,17 +825,13 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           ))}
         </div>
       )}
-      <table className="w-full border-collapse text-[13px]">
+      <div className="overflow-x-auto"><table className="w-full border-collapse text-body">
         <thead>
           <tr className="text-left text-label uppercase tracking-wide text-base-400">
             <th className="py-1 pr-3 font-medium">Unit ID</th>
             <th className="py-1 pr-3 font-medium">Product</th>
-            <th className="py-1 pr-3 font-medium">Reservation</th>
-            <th className="py-1 pr-3 font-medium">Scanned</th>
-            <th className="py-1 pr-3 font-medium">Checked</th>
-            <th className="py-1 pr-3 font-medium">Packed</th>
-            <th className="py-1 pr-3 font-medium">Loaded</th>
-            <th className="py-1 pr-3 font-medium">Driver confirmed</th>
+            <th className="py-1 pr-3 font-medium">Scanned / Checked / Packed</th>
+            <th className="py-1 pr-3 font-medium">Loaded / Driver confirmed</th>
             <th className="py-1 font-medium">Still to do</th>
           </tr>
         </thead>
@@ -807,7 +840,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             <UnitRow key={u.unitId} unit={u} />
           ))}
         </tbody>
-      </table>
+      </table></div>
       {loadOpen && card.deliveryOrderId && (
         <RecordLoadedModal
           card={card}
@@ -825,26 +858,20 @@ function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
   return (
     <tr className="border-t border-kit-slate-5" data-testid={`wo-unit-${unit.unitId}`}>
       <td className="py-1.5 pr-3 font-mono text-base-800">{unit.unitId}</td>
-      <td className="max-w-48 truncate py-1.5 pr-3" title={unit.productName ?? unit.sku ?? undefined}>
+      <td className="py-1.5 pr-3" title={unit.productName ?? unit.sku ?? undefined}>
         {unit.productName ?? unit.sku ?? "—"}
+        <div className="text-meta text-base-600">{unit.sku} · Reserved for {unit.source}</div>
       </td>
-      <td className="py-1.5 pr-3">Reserved for {unit.source}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitScannedAt)}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitCheckedAt)}</td>
-      <td className="py-1.5 pr-3 text-base-600">{at(unit.unitPackedAt)}</td>
+      <td className="py-1.5 pr-3 text-base-600"><div>Scanned {at(unit.unitScannedAt)}</div><div>Checked {at(unit.unitCheckedAt)}</div><div>Packed {at(unit.unitPackedAt)}</div></td>
       <td className="py-1.5 pr-3 text-base-600">
+        <div>Loaded {" "}
         {unit.unitHandedOverAt
           ? `${at(unit.unitHandedOverAt)}${unit.unitDeliveryPerson ? ` · ${unit.unitDeliveryPerson}` : ""}`
-          : "—"}
-      </td>
-      <td
-        className="py-1.5 pr-3 text-base-600"
-        data-testid={`wo-unit-confirmed-${unit.unitId}`}
-      >
-        {at(unit.unitDriverConfirmedAt)}
+          : "—"}</div>
+        <div data-testid={`wo-unit-confirmed-${unit.unitId}`}>Driver confirmed {at(unit.unitDriverConfirmedAt)}</div>
       </td>
       <td className="py-1.5 text-base-600" data-testid={`wo-unit-reason-${unit.unitId}`}>
-        {reason ?? "Done"}
+        {reason ?? (unit.unitDriverConfirmedAt ? "Loaded · Driver confirmed" : "Loaded · Awaiting driver confirmation")}
       </td>
     </tr>
   );

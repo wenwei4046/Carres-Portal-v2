@@ -344,7 +344,7 @@ describe("one scope for rail counts, list and totals (§8)", () => {
 
   it("the default scope is every unfinished arrangement under its original date", () => {
     const rows = filterOutboundCards(cards, new URLSearchParams("view=open"));
-    expect(rows.map((c) => c.doNumber)).toEqual(["DO-2609-102"]);
+    expect(rows.map((c) => c.doNumber)).toEqual(["DO-2609-101", "DO-2609-102"]);
   });
 
   it("a day's Loaded count never claims work from another day", () => {

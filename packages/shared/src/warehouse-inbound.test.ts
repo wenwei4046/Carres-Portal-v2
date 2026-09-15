@@ -376,8 +376,8 @@ describe("Document, products, status and exceptions", () => {
     expect(r.documentNo).toBe("PO-1");
     expect(r.from).toBe("Factory");
     expect(r.products).toEqual([
-      { sku: "MAT-Q", name: "Cloud Mattress Queen", qty: 2, received: 2 },
-      { sku: "BED-K", name: "Oak Bedframe King", qty: 1, received: 0 },
+      { sku: "MAT-Q", name: "Cloud Mattress Queen", qty: 2, received: 2, category: null },
+      { sku: "BED-K", name: "Oak Bedframe King", qty: 1, received: 0, category: null },
     ]);
     expect(r.units.find((u) => u.id === "1")?.product).toBe(
       "Cloud Mattress Queen",

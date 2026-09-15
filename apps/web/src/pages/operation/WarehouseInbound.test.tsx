@@ -262,11 +262,11 @@ describe("Inbound · the Site strip", () => {
 });
 
 describe("Inbound · the three filters", () => {
-  it("offers exactly Not finished, Received and All arrivals", async () => {
+  it("offers exactly Awaiting receipt, Received and All arrivals", async () => {
     mount("&site=w");
     await screen.findByTestId("inbound-status-open");
     expect(screen.getByTestId("inbound-status-open")).toHaveTextContent(
-      "Not finished",
+      "Awaiting receipt",
     );
     expect(screen.getByTestId("inbound-status-received")).toBeInTheDocument();
     expect(screen.getByTestId("inbound-status-all")).toBeInTheDocument();
@@ -344,10 +344,10 @@ describe("Inbound · the row's own facts", () => {
     const row = await screen.findByTestId("inbound-row-PO-1");
     /* The PO's own official date — not the supplier's answer, which has
        never been given. */
-    expect(within(row).getByText(fmtDate("2026-09-01"))).toBeInTheDocument();
+    expect(within(row).getByText(`PO Delivery Date: ${fmtDate("2026-09-01")}`)).toBeInTheDocument();
     /* No evidenced supplier reply exists, so the supplier column says so
        rather than repeating Carres's own plan back as a promise. */
-    expect(within(row).getByText("Not confirmed")).toBeInTheDocument();
+    expect(within(row).getByText("Supplier Delivery Date: Not confirmed")).toBeInTheDocument();
   });
 
   it("each delivery note links to its own receipt and actual date", async () => {
@@ -486,17 +486,7 @@ describe("Inbound · the listing fits the screen", () => {
    *  production gives it 826px at a 1,366px viewport, because the portal nav
    *  and the filter rail take 480px before it starts — so ORDER is what keeps
    *  the important things on screen. */
-  const DEFAULT_COLUMNS = [
-    "Document",
-    "Receiving",
-    "Product",
-    "Receiving progress",
-    "Supplier & DO No",
-    "PO Delivery Date",
-    "Supplier Delivery Date",
-    "Status",
-    "Exceptions",
-  ];
+  const DEFAULT_COLUMNS = ["Document", "Receiving", "Product", "Receiving progress"];
 
   it("keeps the action beside the identity, ahead of every other column", async () => {
     mount("&site=w");

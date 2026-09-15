@@ -54,7 +54,7 @@ export interface InboundInput {
     sku?: string | null;
   }>;
   /** SKU → operator product name (product_skus.variant). Display only. */
-  skuNames?: Array<{ sku: string; name: string | null }>;
+  skuNames?: Array<{ sku: string; name: string | null; category?: string | null }>;
   receipts: Array<{
     id: string;
     po_id: string | null;
@@ -77,6 +77,7 @@ export interface InboundInput {
 /** One product of one arrival arrangement — the arranged and received counts
  * are THIS arrangement's own scope, never the whole PO across arrangements. */
 export interface InboundProduct {
+  category?: string | null;
   sku: string | null;
   name: string | null;
   qty: number;
@@ -257,8 +258,8 @@ export function inboundStatusWordOf(
  * an old link shows the work, never an empty page.
  */
 export const INBOUND_STATUS_FILTERS = [
-  ["open", "Not finished"],
-  ["received", "Received"],
+  ["open", "Awaiting receipt"],
+  ["received", "Fully received"],
   ["all", "All arrivals"],
 ] as const;
 
@@ -392,7 +393,7 @@ function projectProducts(
       entry.received += 1;
     bySku.set(keyOf(u.sku), entry);
   }
-  return [...bySku.values()].sort((a, b) =>
+  return [...bySku.values()].map((product) => ({ ...product, category: input.skuNames?.find((row) => row.sku === product.sku)?.category ?? null })).sort((a, b) =>
     (a.name ?? a.sku ?? "~").localeCompare(b.name ?? b.sku ?? "~"),
   );
 }
