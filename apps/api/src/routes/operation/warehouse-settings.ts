@@ -1,7 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
   isOpsGenericAccount,
-  resolveWarehouseSchedule,
   warehouseCapabilityGrantInput,
   warehouseImportHolidayCalendarInput,
   warehouseSaveSpecialDateInput,
@@ -30,7 +29,6 @@ import type { AppEnv } from "../../types";
  *   POST /holiday-calendar    import ONE verified, sourced calendar version
  *   POST /access/grant        one capability to one active person
  *   POST /access/revoke       take it back; the record survives
- *   GET  /schedule?date=      the resolved schedule and the rule that decided
  *
  * Every write is a gated `SECURITY DEFINER` RPC. The settings tables carry no
  * write policy at all, so PostgREST cannot be used to walk around this router
@@ -344,36 +342,6 @@ warehouseSettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
       );
     }
     return await respond(c, siteId);
-  } catch (e) {
-    return c.json(
-      { error: "settings_unavailable", code: "settings_unavailable", message: (e as Error).message },
-      500,
-    );
-  }
-});
-
-warehouseSettingsRouter.get("/schedule", requireOperationOrPrincipal, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const date = c.req.query("date");
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return c.json({ error: "bad_date", code: "bad_date", message: "Give a date like 2026-09-30." }, 400);
-  }
-  try {
-    const siteId = await primarySiteId(sb, c.req.query("siteId"));
-    if (!siteId) {
-      return c.json({ error: "no_warehouse_site", code: "no_warehouse_site", message: "No warehouse site is configured." }, 404);
-    }
-    const s = await loadSettings(c, siteId);
-    return c.json(
-      resolveWarehouseSchedule({
-        date,
-        siteStatus: s.details.status,
-        workingHours: s.workingHours,
-        specialDates: s.specialDates,
-        holidayPolicy: s.holidayPolicy,
-        holidayDates: s.holidayDates,
-      }),
-    );
   } catch (e) {
     return c.json(
       { error: "settings_unavailable", code: "settings_unavailable", message: (e as Error).message },

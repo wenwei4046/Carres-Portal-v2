@@ -28,7 +28,6 @@ const env = {
 };
 
 const ITEM = "00000000-0000-0000-0000-0000000000f1";
-const WH = "00000000-0000-0000-0000-000000000w01".replace("w", "0");
 
 async function makeJwt(role: string) {
   return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
@@ -110,65 +109,6 @@ describe("0366 — every unit fact moves through its own door", () => {
     expect(m.from).not.toHaveBeenCalled();
   });
 
-  it("WHERE moves through ops_stock_set_site", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    const res = await call(`/${ITEM}/site`, "POST", { warehouseId: WH });
-    expect(res.status).toBe(200);
-    expect(m.rpcCalls[0]?.name).toBe("ops_stock_set_site");
-    expect(m.rpcCalls[0]?.args).toMatchObject({ p_item_id: ITEM, p_warehouse_id: WH });
-  });
-
-  it("WHO HAS IT moves through ops_stock_set_holder, and by party CODE — never a hard-coded NETS", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    const res = await call(`/${ITEM}/holder`, "POST", { partyCode: "nets_delivery" });
-    expect(res.status).toBe(200);
-    expect(m.rpcCalls[0]?.name).toBe("ops_stock_set_holder");
-    expect(m.rpcCalls[0]?.args).toMatchObject({ p_party_code: "nets_delivery" });
-  });
-
-  it("WHERE and WHO HAS IT are separate doors — moving one never moves the other", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    await call(`/${ITEM}/site`, "POST", { warehouseId: WH });
-    await call(`/${ITEM}/holder`, "POST", { partyCode: "pj_showroom" });
-    expect(m.rpcCalls.map((r) => r.name)).toEqual([
-      "ops_stock_set_site",
-      "ops_stock_set_holder",
-    ]);
-    expect(m.rpcCalls[0]?.args).not.toHaveProperty("p_party_code");
-    expect(m.rpcCalls[1]?.args).not.toHaveProperty("p_warehouse_id");
-  });
-
-  it("handing a Unit back to nobody in particular is a real answer, not a missing one", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    const res = await call(`/${ITEM}/holder`, "POST", { partyCode: null });
-    expect(res.status).toBe(200);
-    expect(m.rpcCalls[0]?.args.p_party_code).toBeNull();
-  });
-
-  it("ownership moves through ops_stock_set_ownership and keeps its two words", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    const ok = await call(`/${ITEM}/ownership`, "POST", {
-      ownership: "supplier_consignment",
-      supplier: "Nice Future",
-    });
-    expect(ok.status).toBe(200);
-    expect(m.rpcCalls[0]?.args).toMatchObject({
-      p_ownership: "supplier_consignment",
-      p_supplier: "Nice Future",
-    });
-
-    // The contract holds only two words, so a third never reaches the door.
-    const bad = await call(`/${ITEM}/ownership`, "POST", { ownership: "rented" });
-    expect(bad.status).toBe(400);
-  });
-
-  it("last verified is stamped by a door, never by opening a screen", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    const res = await call(`/${ITEM}/verify`, "POST");
-    expect(res.status).toBe(200);
-    expect(m.rpcCalls[0]?.name).toBe("ops_stock_verify_unit");
-  });
-
   it("repair in and out both go through their doors", async () => {
     const m = doorOnlyClient({ data: ITEM });
     await call("/refurbish", "POST", { itemId: ITEM });
@@ -193,21 +133,7 @@ describe("0366 — every unit fact moves through its own door", () => {
 
   it("a door that cannot find the unit is a 404, not a 500", async () => {
     doorOnlyClient({ error: { code: "P0002", message: "unit not found" } });
-    const res = await call(`/${ITEM}/verify`, "POST");
+    const res = await call("/refurbish-complete", "POST", { itemId: ITEM });
     expect(res.status).toBe(404);
-  });
-
-  it("a dealer cannot reach any of them", async () => {
-    const m = doorOnlyClient({ data: ITEM });
-    for (const [path, method, body] of [
-      [`/${ITEM}/site`, "POST", { warehouseId: WH }],
-      [`/${ITEM}/holder`, "POST", { partyCode: "nets_delivery" }],
-      [`/${ITEM}/ownership`, "POST", { ownership: "carres_owned" }],
-      [`/${ITEM}/verify`, "POST", undefined],
-    ] as const) {
-      const res = await call(path, method, body, "dealer");
-      expect(res.status).toBe(403);
-    }
-    expect(m.rpc).not.toHaveBeenCalled();
   });
 });

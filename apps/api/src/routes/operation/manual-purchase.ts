@@ -1768,8 +1768,8 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
 
   // What is still to buy on each line: the approver's number less what was
   // already issued — never the original ask. THE one remainder arithmetic
-  // (`manualPurchaseLineRemainingOf`, Law D — the Register expansion and
-  // issue-costs read the same function).
+  // (`manualPurchaseLineRemainingOf`, Law D — the Register expansion reads
+  // the same function).
   const toIssue = (allLines ?? [])
     .filter((l) => l.cancelled_at === null)
     .map((l) => ({
@@ -1969,80 +1969,6 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   }
   const poIds = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
   return c.json({ poIds, documents: governedPos.length });
-});
-
-/**
- * GET /issue-costs?requestIds=a,b,c — THE PRICES THE OPERATOR IS ABOUT TO
- * COMMIT TO (closure §2).
- *
- * `Issue as one PO` can pull in sibling requests whose lines are not on screen,
- * so the surface could not otherwise show — or declare — the price it was
- * buying at. This read answers exactly the SKUs those requests still have to
- * buy, and the browser sends the same numbers back to `/issue`.
- *
- * It is a READ. It creates nothing and reserves nothing, and a price it returns
- * is only a fact about right now — which is precisely why `/issue` compares it
- * again.
- */
-manualPurchaseRouter.get("/issue-costs", requireOperation, async (c) => {
-  const raw = (c.req.query("requestIds") ?? "").trim();
-  const requestIds = raw
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  if (requestIds.length === 0 || requestIds.length > 20) {
-    return refuse(c, 400, "invalid_param");
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  const { data: lines, error } = await sb
-    .from("purchase_demands")
-    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at")
-    .in("request_id", requestIds);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  /* The same arithmetic `/issue` uses (`manualPurchaseLineRemainingOf`) — the
-     approver's number less what already went out. A line with nothing left to
-     buy has no price to review. */
-  const skus = [
-    ...new Set(
-      (lines ?? [])
-        .filter((l) => l.cancelled_at === null)
-        .filter(
-          (l) =>
-            manualPurchaseLineRemainingOf({
-              qty: Number(l.qty),
-              approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
-              issuedQty: Number(l.issued_qty ?? 0),
-            }) > 0,
-        )
-        .map((l) => l.sku as string),
-    ),
-  ];
-  if (skus.length === 0) return c.json({ costs: [] });
-
-  /* ⭐ NO SKU IN A POSTGREST `.in()` LIST. `sku` is free text and live rows carry
-     a DOUBLE QUOTE (`Leg 4"`), which breaks the filter and makes the server
-     answer with whatever it could parse. The catalog is a couple of hundred
-     rows, so it is read whole and matched here — the same rule To Order keeps. */
-  const { data: catRows, error: catErr } = await sb.from("product_skus").select("sku, cost");
-  if (catErr) {
-    const m = mapPgError(catErr);
-    return c.json(m.body, m.status);
-  }
-  const wanted = new Set(skus);
-  const costBySku = new Map(
-    (catRows ?? [])
-      .filter((r) => wanted.has(r.sku as string))
-      .map((r) => [r.sku as string, (r.cost as number | null) ?? null]),
-  );
-  return c.json({
-    costs: skus
-      .map((sku) => ({ sku, unitCost: costBySku.get(sku) ?? null }))
-      .sort((a, b) => a.sku.localeCompare(b.sku)),
-  });
 });
 
 manualPurchaseRouter.get("/already-have", requireOperation, async (c) => {

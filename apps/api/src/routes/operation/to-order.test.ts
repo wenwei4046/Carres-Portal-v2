@@ -10,6 +10,7 @@ import { _setJwksForTesting } from "../../middleware/auth";
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { addWorkingDays, myHolidaySet } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
+import { loadToOrder } from "../../lib/purchase-demand-read";
 
 /**
  * `Issue Purchase Order` is the ONE act that creates a formal purchase order,
@@ -324,110 +325,25 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
-const READ = "http://t/api/operation/purchase/to-order";
-
-async function get(query = "") {
-  const jwt = await makeJwt("operation");
-  return app.fetch(new Request(`${READ}${query}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+/** The To Order projection — the recomputation the batch door and the
+ *  Purchase Demands register both read. */
+async function project(sb: ReturnType<typeof makeSb>) {
+  const res = await loadToOrder(sb as never);
+  if (!res.ok) throw new Error(`loadToOrder refused: ${JSON.stringify(res.body)}`);
+  return res.data;
 }
 
-describe("GET /api/operation/purchase/to-order", () => {
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(new Request(READ), env);
-    expect(res.status).toBe(401);
-  });
-
+describe("the To Order projection", () => {
   it("projects the live demand into one Ohana · Sofa proposal", async () => {
     const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await get();
-    expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
+    const body = (await project(sb)) as any;
 
     expect(body.proposals).toHaveLength(1);
     expect(body.proposals[0].label).toBe("Ohana · Sofa");
     // PETER's one order = one row, holding TWO builds; ella's is the other.
     expect(body.proposals[0].rows).toHaveLength(2);
     expect(body.proposals[0].poCount).toBe(2);
-    expect(body.destinations.map((d: { name: string }) => d.name)).toEqual([
-      "Carres Klang",
-      "AL Sungai Buloh",
-    ]);
-  });
-
-  it("scopes only after the full server recomputation and returns an explanatory summary", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        {
-          id: "PO-1900",
-          supplier_id: OHANA,
-          placed_at: "2025-01-01T09:00:00Z",
-          so_refs: [1207],
-        },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-1900", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await get("?so=1207");
-    expect(res.status).toBe(200);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-
-    expect(body.proposals.flatMap((p: any) => p.rows).every((r: any) => r.so === 1207)).toBe(true);
-    expect(body.unresolved).toEqual([]);
-    expect(body.ordered).toEqual([
-      expect.objectContaining({ poId: "PO-1900", so: 1207 }),
-    ]);
-    expect(body.scope).toMatchObject({
-      so: 1207,
-      orderFound: true,
-      alreadyIssued: 1,
-    });
-    expect(todayIsoStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("returns only the three demand-local blocker kinds; pickup remains document-level", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; supplier_id: string | null; cost: number | null }[])
-      .find((row) => row.sku === "5539-CNR")!.supplier_id = null;
-    (t.product_skus.data as { sku: string; cost: number | null }[])
-      .find((row) => row.sku === "5539-1A(LHF)")!.cost = null;
-    const undated = (t.orders.data as { id: string; delivery_date: string | null; delivery_date_tbd: boolean }[])
-      .find((order) => order.id === "o2")!;
-    undated.delivery_date = null;
-    undated.delivery_date_tbd = true;
-    (t.suppliers.data as { kind: string }[])[0].kind = "factory_pickup";
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    const body = (await (await get()).json()) as {
-      blockedDemand: { code: string; sku: string; so: number | null }[];
-    };
-    expect(new Set(body.blockedDemand.map((blocker) => blocker.code))).toEqual(
-      new Set(["blocked_delivery_date", "unresolved_supplier", "cost_required"]),
-    );
-    expect(body.blockedDemand).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "unresolved_supplier", sku: "5539-CNR", so: 1207 }),
-        expect.objectContaining({ code: "blocked_delivery_date", sku: "5539-1A(LHF)", so: 1204 }),
-        expect.objectContaining({ code: "cost_required", sku: "5539-1A(LHF)", so: 1204 }),
-      ]),
-    );
-    expect(body.blockedDemand.some((blocker) => blocker.code.includes("partner"))).toBe(false);
-  });
-
-  it("rejects an invalid Sales Order scope without running the engine", async () => {
-    const res = await get("?so=not-a-number");
-    expect(res.status).toBe(400);
-    expect(userClient).not.toHaveBeenCalled();
   });
 
   /**
@@ -451,7 +367,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
     expect(ella.qty).toBe(1); // 2 asked for, 1 already bought
     expect(ella.coveredByOpenPo).toBe(1); // …and this is why
@@ -468,7 +384,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
     expect(ella.qty).toBe(2);
     expect(ella.coveredByOpenPo).toBe(0);
@@ -479,7 +395,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const skus = body.proposals
       .flatMap((p: { rows: { builds: { lines: { sku: string }[] }[] }[] }) => p.rows)
       .flatMap((r: { builds: { lines: { sku: string }[] }[] }) => r.builds)
@@ -488,65 +404,11 @@ describe("GET /api/operation/purchase/to-order", () => {
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
   });
 
-  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
-      ],
-      error: null,
-    };
-    // received in full so the SUPPLY read subtracts nothing and the demand
-    // half of the fixture stays byte-identical.
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({
-      poId: "PO-2001",
-      placedAt: todayIsoStr,
-      category: "sofa",
-      so: 1207,
-      orderId: "o1",
-      delivery: "2026-08-22",
-      model: "Booqit",
-      qty: 1,
-    });
-  });
-
-  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
-  });
-
   it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     for (const r of body.proposals[0].rows) {
       expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
     }
@@ -578,7 +440,7 @@ describe("a requirement the catalog cannot answer for", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
   });
 
@@ -621,8 +483,6 @@ describe("a requirement the catalog cannot answer for", () => {
     );
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(code).not.toMatch(/\.in\(\s*["']sku["']/);
-    // order_id is a uuid — safe, and the one list that still earns its place.
-    expect(code).toMatch(/\.in\(\s*["']order_id["']/);
   });
 
   it("names a procurable SKU nobody has mapped to a supplier", async () => {
@@ -637,7 +497,7 @@ describe("a requirement the catalog cannot answer for", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved.map((u: { sku: string }) => u.sku)).toEqual(["5539-CNR"]);
   });
 
@@ -645,7 +505,7 @@ describe("a requirement the catalog cannot answer for", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
   });
 
@@ -653,7 +513,7 @@ describe("a requirement the catalog cannot answer for", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
     const skus = body.proposals
       .flatMap((p: { rows: { builds: { lines: { sku: string }[] }[] }[] }) => p.rows)
@@ -663,65 +523,11 @@ describe("a requirement the catalog cannot answer for", () => {
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
   });
 
-  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
-      ],
-      error: null,
-    };
-    // received in full so the SUPPLY read subtracts nothing and the demand
-    // half of the fixture stays byte-identical.
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({
-      poId: "PO-2001",
-      placedAt: todayIsoStr,
-      category: "sofa",
-      so: 1207,
-      orderId: "o1",
-      delivery: "2026-08-22",
-      model: "Booqit",
-      qty: 1,
-    });
-  });
-
-  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
-  });
-
   it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     for (const r of body.proposals[0].rows) {
       expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
     }
@@ -757,7 +563,7 @@ describe("the reads are chunked", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     // 78 + 95 distinct SKUs cannot ride one `.in()`; the catalog is asked more
     // than once, and nothing is lost.
     expect(sb.tableCalls.product_skus).toBeGreaterThan(1);
@@ -870,7 +676,7 @@ describe("a purchase order is born with its expected arrival", () => {
  * 500 the whole workspace.
  */
 describe("purchase_demands absent — fail closed, not down", () => {
-  it("still answers 200 with the customer-order plan when the table is missing", async () => {
+  it("still returns the customer-order plan when the table is missing", async () => {
     const t = TABLES();
     // What PostgREST answers for a table that is not there.
     t.purchase_demands = {
@@ -880,10 +686,8 @@ describe("purchase_demands absent — fail closed, not down", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
 
-    const res = await get();
-    expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
+    const body = (await project(sb)) as any;
     // The customer work is all there — the day's purchasing is unaffected.
     expect(body.proposals.length).toBeGreaterThan(0);
     expect(body.proposals[0].rows.length).toBeGreaterThan(0);
@@ -918,110 +722,6 @@ describe("purchase_demands absent — fail closed, not down", () => {
  *     draw doors (0322) are untouched; the customer-row free-stock
  *     subtraction in the grid is untouched and still covered above. */
 
-describe("POST /api/operation/purchase/to-order/demand/:id/cancel", () => {
-  const CANCEL_ID = "6299ed4e-3c91-43c5-b41b-1e8fe9677c7d";
-
-  async function cancel(
-    id: string,
-    body: unknown,
-    role = "operation",
-    rpcResult: { data: unknown; error: unknown } = {
-      data: { id: CANCEL_ID, cancelled: 2, issued: 3 },
-      error: null,
-    },
-  ) {
-    const calls: { fn: string; args: Record<string, unknown> }[] = [];
-    vi.mocked(userClient).mockReturnValue({
-      from: vi.fn(),
-      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
-        calls.push({ fn, args });
-        return rpcResult;
-      }),
-    } as never);
-    const jwt = await makeJwt(role);
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/purchase/to-order/demand/${id}/cancel`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-      env,
-    );
-    return { res, calls };
-  }
-
-  it("reaches purchasing_cancel_demand with the id and the reason — and NO quantity", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "do not want the other 2" });
-    expect(res.status).toBe(200);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].fn).toBe("purchasing_cancel_demand");
-    expect(calls[0].args.p_id).toBe(CANCEL_ID);
-    expect(calls[0].args.p_reason).toBe("do not want the other 2");
-    /**
-     * THE CARD'S OWN "nobody types a quantity", as a test rather than a
-     * sentence. A cancel takes the whole remainder, and `remaining_qty` is
-     * GENERATED — a quantity on this wire would be a number that can disagree
-     * with the one the database computed.
-     */
-    expect(Object.keys(calls[0].args).sort()).toEqual(["p_id", "p_reason"]);
-  });
-
-  it("answers with what was cancelled and what stays ordered", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "changed our mind" });
-    expect(await res.json()).toEqual({ id: CANCEL_ID, cancelled: 2, issued: 3 });
-  });
-
-  it("refuses a blank reason before it reaches the database", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "   " });
-    expect(res.status).toBe(400);
-    // The RPC would refuse it too (`reason_required`), and the table's CHECK
-    // behind that. Three refusals, and the cheapest one runs first.
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses a missing reason", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, {});
-    expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses an id that is not a demand id", async () => {
-    const { res, calls } = await cancel("PO-2040", { reason: "x" });
-    expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("hands back `already_cancelled` by name", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
-      data: null,
-      error: { code: "P0001", details: "already_cancelled", message: "already cancelled" },
-    });
-    expect(res.status).toBe(422);
-    expect(((await res.json()) as any).code).toBe("already_cancelled");
-  });
-
-  it("hands back `nothing_to_cancel` by name", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
-      data: null,
-      error: {
-        code: "P0001",
-        details: "nothing_to_cancel",
-        message: "demand has nothing left to cancel",
-      },
-    });
-    expect(res.status).toBe(422);
-    // The two refusals must not read alike: one means it already happened, the
-    // other that there is nothing left to do it to.
-    expect(((await res.json()) as any).code).toBe("nothing_to_cancel");
-  });
-
-  it("is not open to a supplier login", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "x" }, "supplier");
-    expect(res.status).toBe(403);
-    expect(calls).toHaveLength(0);
-  });
-});
-
 /**
  * P12 — CANCEL IS NOT DELETE, asserted rather than promised (Loo, 2026-08-04,
  * naming AutoCount's own weakness: *"backend dont know how can delete due to
@@ -1052,113 +752,6 @@ describe("no delete path exists for a purchase demand", () => {
 
   it("no route path in the file spells a delete or a purge", () => {
     expect(src).not.toMatch(/["'`][^"'`]*\/(delete|purge|remove)\b/i);
-  });
-
-  it("the only demand doors are create, cancel and the issue record", () => {
-    const rpcs = [...src.matchAll(/rpc\(\s*"(purchasing_[a-z_]*demand[a-z_]*)"/g)].map(
-      (m) => m[1],
-    );
-    expect([...new Set(rpcs)].sort()).toEqual([
-      "purchasing_cancel_demand",
-      "purchasing_create_demand",
-      "purchasing_demand_record_issue",
-    ]);
-  });
-});
-
-/**
- * P15 — THE SOURCE, AND THE PICKER'S OWN READ (Loo, 2026-08-04).
- *
- * `purpose` was a hardcoded `"ready_stock"` on this route because the RPC
- * refused everything else by name (Jess, 2026-08-03 — *"V1 buys READY STOCK
- * only"*). 0319 wrote that refusal so that *"the day one is approved this gate
- * is the only thing that changes"*; Loo approved the four the CHECK holds and
- * 0323 changed that one gate. The route now forwards what the operator chose.
- */
-describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
-  const DEST = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
-
-  async function create(body: unknown, role = "operation") {
-    const calls: { fn: string; args: Record<string, unknown> }[] = [];
-    vi.mocked(userClient).mockReturnValue({
-      from: vi.fn(),
-      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
-        calls.push({ fn, args });
-        return { data: { id: "d1", supplier_id: "s1" }, error: null };
-      }),
-    } as never);
-    const jwt = await makeJwt(role);
-    const res = await app.fetch(
-      new Request("http://t/api/operation/purchase/to-order/demand", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-      env,
-    );
-    return { res, calls };
-  }
-
-  const base = { sku: "SONIC-S", qty: 2, destinationId: DEST };
-
-  it("forwards each approved purpose the doors can record (Card 03, 2026-08-28)", async () => {
-    for (const p of [
-      "ready_stock",
-      "showroom_display",
-      "service_case",
-      "internal_staff_purchase",
-      "subsidiary_purchase",
-    ]) {
-      const { res, calls } = await create({ ...base, purpose: p });
-      expect(res.status).toBe(200);
-      expect(calls[0].fn).toBe("purchasing_create_demand");
-      expect(calls[0].args.p_purpose).toBe(p);
-    }
-  });
-
-  it("refuses a purpose the doors have no value for, before it reaches the RPC", async () => {
-    // `Other…` is a ruled WORD with no storable value, and the four retired
-    // purposes (`display` · `warranty` · `office` · `spare_parts`, Card 03)
-    // are history-only: the 0398 doors refuse them for a NEW demand, so the
-    // wire must too — the lists (door gate · shared constant · this enum)
-    // cannot drift into a fourth that only the api believes.
-    for (const p of ["other", "", "READY_STOCK", "display", "warranty", "office", "spare_parts"]) {
-      const { res, calls } = await create({ ...base, purpose: p });
-      expect(res.status).toBe(400);
-      expect(calls).toHaveLength(0);
-    }
-  });
-
-  it("a browser on the pre-P15 bundle still works, and means ready stock", async () => {
-    // No `purpose` key at all — the only thing that browser could have meant,
-    // and the RPC's own default.
-    const { res, calls } = await create(base);
-    expect(res.status).toBe(200);
-    expect(calls[0].args.p_purpose).toBe("ready_stock");
-  });
-
-  it("NO SUPPLIER may be smuggled through the body", async () => {
-    /**
-     * Jess's 2026-08-03 ruling as a test: a product has ONE factory and the
-     * server derives it from the SKU. P15 shows the supplier in the dialog —
-     * that is the derivation read back, never a second answer. The RPC has no
-     * supplier parameter, so a body carrying one must reach nothing.
-     */
-    const { res, calls } = await create({
-      ...base,
-      purpose: "showroom_display",
-      supplierId: "11111111-1111-1111-1111-111111111111",
-      supplier: "Somebody Else",
-    });
-    expect(res.status).toBe(200);
-    expect(Object.keys(calls[0].args).sort()).toEqual([
-      "p_destination_id",
-      "p_purpose",
-      "p_qty",
-      "p_remark",
-      "p_required_by",
-      "p_sku",
-    ]);
   });
 });
 
@@ -1363,10 +956,8 @@ describe("P18 · the proceed date rides the To Order wire", () => {
     return (async () => {
       const sb = makeSb(t);
       vi.mocked(userClient).mockReturnValue(sb as never);
-      const res = await get();
-      expect(res.status).toBe(200);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body = (await res.json()) as any;
+      const body = (await project(sb)) as any;
       const rows = body.proposals[0].rows as { so: number; proceedDate: string | null }[];
       const bySo = new Map(rows.map((r) => [r.so, r.proceedDate]));
       expect(bySo.get(1207)).toBe("2026-07-21");
@@ -1390,14 +981,13 @@ describe("P18 · the proceed date rides the To Order wire", () => {
       "\n" +
       strip(join(here, "..", "..", "lib", "purchase-demand-read.ts"));
 
-    // Every `.from("orders").select(...)` in the engine must ask for it: the
-    // demand read, the ordered/receipt read-back and the scoped SO lens — and
-    // the second is not optional, because an order whose every line is bought
-    // has no demand rows left, so its group is receipts alone.
+    // Every `.from("orders").select(...)` in the engine must ask for it. The
+    // ordered read-back and the scoped SO lens left with `GET /`, so the demand
+    // read is the one that remains.
     const selects = [
       ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
     ].map((m) => m[1]!);
-    expect(selects).toHaveLength(3);
+    expect(selects).toHaveLength(1);
     for (const s of selects) expect(s).toContain("proceed_date");
   });
 });
@@ -1429,7 +1019,7 @@ async function postBatch(body: unknown, role = "operation") {
 async function readyDemands(sb: ReturnType<typeof makeSb>) {
   vi.mocked(userClient).mockReturnValue(sb as never);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const body = (await (await get()).json()) as any;
+  const body = (await project(sb)) as any;
   const out: { demandId: string; qty: number; orderId: string; skus: string[] }[] = [];
   for (const p of body.proposals) {
     for (const r of p.rows) {
@@ -2751,105 +2341,6 @@ describe("closure §3 · a Deliver To split buys the demand ONCE", () => {
 });
 
 /**
- * ⭐ WHICH EXCEPTIONS A MANAGER HAS ALREADY APPROVED (closure §2).
- *
- * Without this read, "ask a manager to approve the price" arrives only as a
- * refusal, after the operator has typed eleven prices — and they cannot tell
- * "nobody has approved this yet" from "somebody already did".
- */
-describe("GET …/to-order/cost-approvals", () => {
-  const TODAY = new Date().toISOString().slice(0, 10);
-  const YESTERDAY = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const SUP = "bbbbbbbb-0000-0000-0000-000000000001";
-
-  async function ask(query: string, tables?: Tbl) {
-    const t = tables ?? TABLES();
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`${READ}/cost-approvals${query}`, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    return { res, sb };
-  }
-
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(new Request(`${READ}/cost-approvals`), env);
-    expect(res.status).toBe(401);
-  });
-
-  it("asks for a supplier and at least one SKU, in words", async () => {
-    const { res } = await ask("");
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { code?: string; action?: string };
-    expect(body.code).toBe("invalid_param");
-    expect(body.action?.length).toBeGreaterThan(0);
-  });
-
-  it("returns the open approvals with the approver's name", async () => {
-    const t = TABLES();
-    (t as unknown as Tbl).po_cost_approvals = {
-      data: [
-        {
-          id: "a1", sku: "5539-CNR", treatment: "hand_entered", unit_cost: 250,
-          reason: "Agreed with the factory", expires_on: null,
-          approved_at: "2026-08-24T01:00:00Z", approved_by: "u1",
-        },
-      ],
-      error: null,
-    };
-    const { res } = await ask(`?supplierId=${SUP}&skus=5539-CNR`, t);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { approvals: Record<string, unknown>[] };
-    expect(body.approvals).toEqual([
-      {
-        sku: "5539-CNR",
-        treatment: "hand_entered",
-        unitCost: 250,
-        reason: "Agreed with the factory",
-        approvedBy: "On Duty",
-        expiresOn: null,
-      },
-    ]);
-  });
-
-  it("drops an EXPIRED approval — it is for a decision, not for ever", async () => {
-    const t = TABLES();
-    (t as unknown as Tbl).po_cost_approvals = {
-      data: [
-        {
-          id: "a1", sku: "5539-CNR", treatment: "free_of_charge", unit_cost: null,
-          reason: "Claim replacement", expires_on: YESTERDAY,
-          approved_at: "2026-08-01T01:00:00Z", approved_by: "u1",
-        },
-        {
-          id: "a2", sku: "5539-2A(RHF)", treatment: "free_of_charge", unit_cost: null,
-          reason: "Claim replacement", expires_on: TODAY,
-          approved_at: "2026-08-01T01:00:00Z", approved_by: "u1",
-        },
-      ],
-      error: null,
-    };
-    const { res } = await ask(`?supplierId=${SUP}&skus=5539-CNR,5539-2A(RHF)`, t);
-    const body = (await res.json()) as { approvals: { sku: string }[] };
-    /* Today's expiry still counts; yesterday's does not. */
-    expect(body.approvals.map((a) => a.sku)).toEqual(["5539-2A(RHF)"]);
-  });
-
-  it("writes nothing at all", async () => {
-    const t = TABLES();
-    (t as unknown as Tbl).po_cost_approvals = { data: [], error: null };
-    const { sb } = await ask(`?supplierId=${SUP}&skus=5539-CNR`, t);
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-    expect(sb.inserts).toEqual([]);
-    expect(sb.updates).toEqual([]);
-  });
-});
-
-/**
  * ⭐ CARD 02-C — THE PROCEEDED-ORDER BOUNDARY AT THE WRITE DOORS
  * (RESOLVED FROM AUTHORITY, 2026-08-27).
  *
@@ -2863,14 +2354,14 @@ describe("Card 02-C · a `place` order is refused at every door", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     for (const proposal of body.proposals) {
       for (const row of proposal.rows) {
         expect(row.orderId, `SO-${row.so}`).not.toBe("o9");
         expect(row.so).not.toBe(1290);
       }
     }
-    for (const blocked of body.blockedDemand ?? []) {
+    for (const blocked of [...body.blocked, ...body.unresolved]) {
       expect(blocked.so).not.toBe(1290);
     }
   });
@@ -2888,23 +2379,5 @@ describe("Card 02-C · a `place` order is refused at every door", () => {
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe("unknown_demand");
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("direct Ready Stock reservation is refused with ZERO units drawn", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/purchase/to-order/take-stock", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: "o9", buildKey: "bk-z" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as { code?: string };
-    expect(body.code).toBe("unknown_build");
-    expect(sb.rpcCalls.filter((c) => c.fn === "ops_stock_pool_draw")).toHaveLength(0);
   });
 });

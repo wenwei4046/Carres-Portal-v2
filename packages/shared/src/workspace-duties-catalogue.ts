@@ -18,6 +18,10 @@ export const WORKSPACE_DUTIES = [
   { key: "purchasing_approver", label: "Purchasing Approver" },
   { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
   { key: "payment_approver", label: "Payment Approver" },
+  // 0508: releases money on the Finance side (payment vouchers, cancelling a
+  // confirmed bill or an issued invoice, voiding a receipt). Resolved in SQL by
+  // has_finance_approver; the holder must also be a Finance user.
+  { key: "finance_approver", label: "Finance Approver" },
   { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
   { key: "service_case_approver", label: "Service Case Approver" },
   { key: "issue_triage_duty", label: "Issue Triage Duty" },

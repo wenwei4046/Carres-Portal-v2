@@ -4,7 +4,6 @@ import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
   effectiveGuaranteeStatus,
-  guaranteeAttachInputSchema,
   guaranteeClaimInputSchema,
   guaranteeDeskStatus,
   guaranteeListQuerySchema,
@@ -22,7 +21,6 @@ import {
   type GuaranteeListResponse,
   type GuaranteeRemedy,
   type GuaranteeStatus,
-  type GuaranteeTermDto,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
@@ -118,38 +116,6 @@ async function termLabels(sb: ReturnType<typeof userClient>): Promise<Record<str
   for (const r of (data ?? []) as any[]) out[String(r.guarantee_sku)] = String(r.label);
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// GET /api/guarantees/terms — the config the POS gates on (which SKUs are
-// guarantees, and which category each one may attach to).
-// ---------------------------------------------------------------------------
-guaranteesRouter.get("/terms", async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(GUARANTEE_TERMS)
-    .select("*")
-    .eq("active", true)
-    .order("guarantee_sku");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const items: GuaranteeTermDto[] = ((data ?? []) as any[]).map((r) => ({
-    guaranteeSku: String(r.guarantee_sku),
-    label: String(r.label),
-    coversCategory: r.covers_category,
-    coverageYears: Number(r.coverage_years),
-    remedy: String(r.remedy) as GuaranteeRemedy,
-    termsText: r.terms_text ? String(r.terms_text) : null,
-    active: Boolean(r.active),
-    coversModelId: r.covers_model_id ? String(r.covers_model_id) : null,
-    coversVariants: Array.isArray(r.covers_variants) ? (r.covers_variants as string[]) : null,
-    coversComboId: r.covers_combo_id ? String(r.covers_combo_id) : null,
-    coversCompartmentId: r.covers_compartment_id ? String(r.covers_compartment_id) : null,
-  }));
-  return c.json({ items });
-});
 
 // ---------------------------------------------------------------------------
 // GET /api/guarantees — the track-back search. `q` is ONE box that resolves
@@ -299,27 +265,6 @@ guaranteesRouter.post("/:id/claim", async (c) => {
     p_case_id: parsed.data.caseId ?? null,
     p_replacement_sku: parsed.data.replacementSku ?? null,
     p_notes: parsed.data.notes ?? null,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data ?? { ok: true });
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/guarantees/:id/attach — point an unassigned guarantee (ops-added
-// or imported, so it never carried attrs.guarantee) at a real line.
-// ---------------------------------------------------------------------------
-guaranteesRouter.post("/:id/attach", async (c) => {
-  claimRoleOnly(c);
-  const id = c.req.param("id");
-  const parsed = await parseJsonBody(c, guaranteeAttachInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("guarantee_attach", {
-    p_entitlement_id: id,
-    p_order_line_id: parsed.data.orderLineId,
   });
   if (error) {
     const m = mapPgError(error);
