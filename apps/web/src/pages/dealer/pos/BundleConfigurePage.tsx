@@ -202,9 +202,6 @@ export default function BundleConfigurePage({
         fabrics={index.fabricsByModel.get(model.id) ?? []}
         fabricTierConfig={catalog.fabricTierConfig}
         modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-        sofaCompartments={catalog.sofaCompartments}
-        modelSofaCompartments={[]}
-        sofaCombos={catalog.sofaCombos}
         specialAddons={catalog.specialAddons}
       />
     );

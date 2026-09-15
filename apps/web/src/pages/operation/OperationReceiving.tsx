@@ -27,7 +27,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
-import ReceivingWorkspace from "./components/ReceivingWorkspace";
+import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
@@ -538,6 +538,7 @@ export default function OperationReceiving() {
           warehouses={warehouses}
           dutyAllowed={dutyQ.data?.allowed ?? false}
           dutyKnown={!dutyQ.isLoading}
+          backLabel="Receiving"
           onBack={closeObject}
           onOpenSession={openSession}
         />
@@ -843,73 +844,3 @@ function FindPoView({
   );
 }
 
-/* ── One PO's receiving — pre-start object and active session ────────────── */
-
-function PoReceivingView({
-  poId,
-  pos,
-  suppliers,
-  warehouses,
-  dutyAllowed,
-  dutyKnown = true,
-  onBack,
-  onOpenSession,
-}: {
-  poId: string;
-  pos: operationPoListRow[];
-  suppliers: Map<string, SupplierRow>;
-  warehouses: Array<{ id: string; name: string }>;
-  dutyAllowed: boolean;
-  dutyKnown?: boolean;
-  onBack: () => void;
-  onOpenSession: (id: string) => void;
-}) {
-  const [receiving, setReceiving] = useState(false);
-  const po = pos.find((p) => p.id === poId) ?? null;
-  if (!po) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white" data-testid="receiving-po-missing">
-        <p className="text-body text-base-700">
-          This purchase order could not be opened
-        </p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-body text-kit-blue-11 hover:underline"
-        >
-          ‹ Receiving
-        </button>
-      </div>
-    );
-  }
-  const supplier = suppliers.get(po.supplier_id);
-  const warehouseName =
-    warehouses.find((w) => w.id === po.warehouse_id)?.name ?? "";
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white" data-testid="receiving-po-view">
-      <div className="flex items-center gap-2 px-4 pt-3">
-        <button
-          type="button"
-          onClick={onBack}
-          data-testid="receiving-po-back"
-          className="text-body text-kit-blue-11 hover:underline"
-        >
-          ‹ Receiving
-        </button>
-      </div>
-      <div className="mx-auto w-full max-w-4xl">
-        <ReceivingWorkspace
-          po={po}
-          supplier={supplier}
-          warehouseName={warehouseName}
-          warehouses={warehouses}
-          dutyAllowed={dutyAllowed}
-          dutyKnown={dutyKnown}
-          receiving={receiving}
-          onReceiving={setReceiving}
-          onPosted={(id) => onOpenSession(id)}
-        />
-      </div>
-    </div>
-  );
-}

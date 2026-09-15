@@ -45,12 +45,8 @@ export type OpsStockPlanProposeInput = z.infer<
   typeof opsStockPlanProposeInputSchema
 >;
 
-/** POST /plan/:planId/consolidate — the manager's cut for one SKU. */
-export const opsStockPlanConsolidateInputSchema = z.object({
-  sku: z.string().trim().min(1).max(200),
-  qty: z.coerce.number().int().min(0).max(100000),
-  note: z.string().trim().max(300).nullish(),
-});
+/** POST /plan/:planId/consolidate — the manager's cut for one SKU. Same shape as propose. */
+export const opsStockPlanConsolidateInputSchema = opsStockPlanProposeInputSchema;
 export type OpsStockPlanConsolidateInput = z.infer<
   typeof opsStockPlanConsolidateInputSchema
 >;

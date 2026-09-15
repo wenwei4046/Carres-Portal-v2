@@ -7787,6 +7787,14 @@ export function useOfficeReceiveMutation(
          doors behaved differently after the same act - which is the worse half:
          whether your delivery appears depended on which screen filed it. */
       await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
+      /* THE PAGE THE OPERATOR IS STANDING ON (2026-09-15).
+         Receiving can now be worked WITHOUT leaving Inbound, and Inbound's
+         own query was not in this list — so the operator saved a receipt,
+         came back to the Register, and read the same `Pending Delivery Qty`
+         they had just settled. The Arrival Schedule reads the same endpoint
+         under its own key and was equally stale. */
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-inbound"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-schedule"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

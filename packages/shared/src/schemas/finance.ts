@@ -76,6 +76,13 @@ export const refundPayInput = z.object({
 }).strict();
 export type RefundPayInput = z.infer<typeof refundPayInput>;
 
+/** Inclusive YYYY-MM-DD `from`/`to` filters plus the row cap, shared by the four finance list queries. */
+const dateWindow = {
+  from:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+};
+
 /**
  * `paymentsListQuery` — GET /api/finance/payments?orderId&dealerId&direction&from&to.
  * Query string parser for the payments list. All fields optional. The
@@ -89,9 +96,7 @@ export const paymentsListQuery = z.object({
   orderId:    z.string().uuid().optional(),
   dealerId:   z.string().uuid().optional(),
   direction:  z.enum(['in', 'out']).optional(),
-  from:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:      z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type PaymentsListQuery = z.infer<typeof paymentsListQuery>;
 
@@ -136,9 +141,7 @@ export type FinanceInvoiceVoidInput = z.infer<typeof financeInvoiceVoidInput>;
 export const invoicesListQuery = z.object({
   status:    z.enum(['all', 'unpaid', 'partial', 'paid', 'voided']).optional(),
   dealerId:  z.string().uuid().optional(),
-  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:     z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type InvoicesListQuery = z.infer<typeof invoicesListQuery>;
 
@@ -176,9 +179,7 @@ export type RefundCreateInput = z.infer<typeof refundCreateInput>;
 export const refundsListQuery = z.object({
   status:    z.enum(['all', 'pending', 'approved', 'rejected', 'paid', 'issued', 'applied']).optional(),
   dealerId:  z.string().uuid().optional(),
-  from:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  limit:     z.coerce.number().int().min(1).max(500).optional(),
+  ...dateWindow,
 }).strict();
 export type RefundsListQuery = z.infer<typeof refundsListQuery>;
 
@@ -246,10 +247,8 @@ export type BankStatementCreateInput = z.infer<typeof bankStatementCreateInput>;
  * left join check on reconciliations).
  */
 export const bankStatementsListQuery = z.object({
-  from:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  ...dateWindow,
   matched: z.enum(['true', 'false']).optional(),
-  limit:   z.coerce.number().int().min(1).max(500).optional(),
 }).strict();
 export type BankStatementsListQuery = z.infer<typeof bankStatementsListQuery>;
 
