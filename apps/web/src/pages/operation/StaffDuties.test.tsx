@@ -47,12 +47,19 @@ vi.mock("@/lib/queries", () => ({
     isPending: false,
     error: state.coverError,
   }),
-  useOperationStaff: () => ({
+  qk: { operation: { staff: ["operation", "staff"] } },
+  // The page's own list is the operation accounts; the Finance Approver
+  // pickers ask for their duty's list (queryKey ends with the duty key).
+  useOperationStaff: (opts?: { queryKey?: readonly unknown[] }) => ({
     data: {
-      staff: [
-        { user_id: "u-aina", email: "aina@x", name: "Aina", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
-        { user_id: "u-ben", email: "ben@x", name: "Ben", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
-      ],
+      staff: opts?.queryKey?.includes("finance_approver")
+        ? [
+            { user_id: "u-fiona", email: "fiona@x", name: "Fiona", pooled: false, available: false, note: null, last_seen_at: null, duties: [] },
+          ]
+        : [
+            { user_id: "u-aina", email: "aina@x", name: "Aina", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+            { user_id: "u-ben", email: "ben@x", name: "Ben", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+          ],
       myDuties: [],
     },
   }),
@@ -252,6 +259,40 @@ describe("adding a cover", () => {
       endsOn: "2026-09-10",
       reason: "Aina on leave",
     });
+  });
+});
+
+// ── who each duty's pickers offer ────────────────────────────────────────────
+
+describe("the pickers offer the people the duty allows", () => {
+  const optionNames = (testId: string) =>
+    within(screen.getByTestId(testId))
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+
+  it("Finance Approver offers Finance users only; another duty keeps the operation list", () => {
+    const grn = duties().duties[0];
+    state.duties = {
+      can_assign: true,
+      duties: [
+        grn,
+        {
+          ...grn,
+          key: "finance_approver",
+          label: "Finance Approver",
+          resolution: resolution({ duty_key: "finance_approver" }),
+        },
+      ],
+    };
+    render(<StaffDuties />);
+
+    for (const id of ["assign-holder-finance_approver", "cover-acting-finance_approver"]) {
+      expect(optionNames(id)).toContain("Fiona");
+      expect(optionNames(id)).not.toContain("Aina");
+    }
+    for (const id of ["assign-holder-grn_duty", "cover-acting-grn_duty"]) {
+      expect(optionNames(id)).toEqual(["Choose staff", "Aina", "Ben"]);
+    }
   });
 });
 

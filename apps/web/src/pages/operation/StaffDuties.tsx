@@ -2,14 +2,20 @@ import { useState, type ReactNode } from "react";
 import ModuleHeader from "./components/ModuleHeader";
 import { DocSection } from "./components/workspace-doc";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { apiFetch } from "@/lib/api";
 import {
+  qk,
   useOperationStaff,
   useWorkspaceAssignDutyMutation,
   useWorkspaceCoverDutyMutation,
   useWorkspaceDuties,
   type WorkspaceDutiesResponse,
 } from "@/lib/queries";
-import type { OpsStaffMember } from "@carres/shared";
+import {
+  workspaceDutyRolesOf,
+  type OpsStaffListResponse,
+  type OpsStaffMember,
+} from "@carres/shared";
 
 /**
  * `Workspace → Staff & Duties` — the ONE company-wide duty assignment surface
@@ -336,6 +342,28 @@ function History({ duty }: { duty: Duty }) {
   );
 }
 
+/** The holder and cover forms. A duty whose catalogue entry names its own
+ *  roles (Finance Approver: Finance users) reads that list; every other duty
+ *  uses the page's operation list. */
+function DutyForms({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
+  const ownList = workspaceDutyRolesOf(duty.key).join() !== "operation";
+  const own = useOperationStaff({
+    queryKey: [...qk.operation.staff, duty.key],
+    queryFn: () =>
+      apiFetch<OpsStaffListResponse>(
+        `/api/operation/staff?duty=${encodeURIComponent(duty.key)}`,
+      ),
+    enabled: ownList,
+  });
+  const pickable = ownList ? (own.data?.staff ?? []) : staff;
+  return (
+    <>
+      <AssignForm duty={duty} staff={pickable} />
+      <CoverForm duty={duty} staff={pickable} />
+    </>
+  );
+}
+
 function DutyBlock({
   duty,
   canAssign,
@@ -352,10 +380,7 @@ function DutyBlock({
         <Resolution duty={duty} canAssign={canAssign} />
       </div>
       {canAssign ? (
-        <>
-          <AssignForm duty={duty} staff={staff} />
-          <CoverForm duty={duty} staff={staff} />
-        </>
+        <DutyForms duty={duty} staff={staff} />
       ) : (
         <p className="mt-2 text-meta text-kit-slate-9">
           Duty assignments are set by the manager.

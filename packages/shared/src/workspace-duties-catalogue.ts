@@ -20,8 +20,9 @@ export const WORKSPACE_DUTIES = [
   { key: "payment_approver", label: "Payment Approver" },
   // 0508: releases money on the Finance side (payment vouchers, cancelling a
   // confirmed bill or an issued invoice, voiding a receipt). Resolved in SQL by
-  // has_finance_approver; the holder must also be a Finance user.
-  { key: "finance_approver", label: "Finance Approver" },
+  // has_finance_approver; the holder must also be a Finance user, so the
+  // holder and cover pickers offer Finance users only (`roles`).
+  { key: "finance_approver", label: "Finance Approver", roles: ["finance"] },
   { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
   { key: "service_case_approver", label: "Service Case Approver" },
   { key: "issue_triage_duty", label: "Issue Triage Duty" },
@@ -32,6 +33,13 @@ export const WORKSPACE_DUTIES = [
 ] as const;
 
 export type WorkspaceDutyKey = (typeof WORKSPACE_DUTIES)[number]["key"];
+
+/** Which account roles a duty's holder and cover pickers offer. A duty with
+ *  no `roles` offers operation accounts, the list every duty used before. */
+export function workspaceDutyRolesOf(key: string): readonly string[] {
+  const d = WORKSPACE_DUTIES.find((x) => x.key === key);
+  return d && "roles" in d ? d.roles : ["operation"];
+}
 
 /** The governed duty word for a key; an unknown key prints as itself so a
  *  wiring gap is visible, never silently blank. */

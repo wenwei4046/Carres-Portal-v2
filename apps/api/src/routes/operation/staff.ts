@@ -5,6 +5,7 @@ import {
   updateOpsStaffSettingInput,
   isOpsGenericAccount,
   planOpsAssignment,
+  workspaceDutyRolesOf,
   type OpsStaffMember,
 } from "@carres/shared";
 import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
@@ -43,10 +44,35 @@ function requireOperationOrPrincipal(
 }
 
 // GET / — every ACTIVE operation account, joined with its pool settings.
+// GET /?duty=<key> — the Staff & Duties pickers for that duty. A duty whose
+// catalogue entry names other roles (Finance Approver: finance) gets those
+// accounts from workspace_duty_staff (0514), which only a duty manager may
+// call; every other duty gets the operation list below, unchanged.
 staffRouter.get("/", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
+
+  const roles = workspaceDutyRolesOf(c.req.query("duty") ?? "");
+  if (roles.join() !== "operation") {
+    const { data, error } = await sb.rpc("workspace_duty_staff", {
+      p_roles: roles,
+    });
+    if (error) return fail(c, error);
+    const staff: OpsStaffMember[] = (
+      (data ?? []) as { id: string; name: string | null; email: string | null }[]
+    ).map((u) => ({
+      user_id: u.id,
+      email: u.email ?? "",
+      name: u.name ?? null,
+      pooled: false,
+      available: false,
+      note: null,
+      last_seen_at: null,
+      duties: [],
+    }));
+    return c.json({ staff, myDuties: [] });
+  }
 
   const [users, settings] = await Promise.all([
     sb
