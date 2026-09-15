@@ -3258,6 +3258,37 @@ they open (`money-owed.ts`). The words may appear only on these pages until the 
 | `Activity · Recent transactions` · `Open Journal` | The Dashboard's card of the newest posted ledger entries (Date · Entry No · Source · Amount); each Entry No opens that entry in the Journal. | An entry number opens a different entry, or the card lists an entry the Journal does not. |
 | `Month` · `Export month-end pack` · `The month-end pack could not be exported. Try again.` | The Dashboard's one export: a workbook `Month-end pack {Mon YYYY}.xlsx` with three sheets — `Trial Balance`, `Profit and Loss`, `Balance Sheet` — for the chosen month (last complete month by default; this month when last month ended before go-live). The sheets reuse the report pages' own words (`As of {date}` · `Since {date} · No opening balances` · `Account` · `Kind` · `Debit` · `Credit` · `Total` · `Amount` · `Net result` · `Net result not yet closed` · `Assets differ from liabilities plus equity by`). | A sheet's figure differs from the page of the same name on the same days, or a sheet is written after a failed read. |
 
+### Finance Settings — money accounts (migration 0512) and the Finance Approver (migration 0514)
+
+**APPROVED — YH merged #1360 (Finance Settings) and #1364 (0514) on 15 Sep 2026.** The last row
+is the one exception, marked below. Page: `Finance Settings` at `/finance/settings`, opened from
+the header gear (`GlobalTopBar.tsx`, `moduleSettingsFor`). It is the one list of money accounts:
+cash, each bank, and the holding account of each card or online payment company. A word already in
+this file keeps its meaning; a word with a second meaning says so here.
+
+| Group | Word | Meaning |
+|---|---|---|
+| Page | **`Finance Settings`** | The page word, and the header gear's label on every Finance page. |
+| Button | **`Add a money account`** | The page's one create action, and the heading of its form. Same pattern as `Add a payment method`. |
+| Form | `Money account` | The form's heading when one account is opened. Same word as the Invoice doors block. |
+| | `Name` · `Kind` · `Active` · `Save` · `Cancel` | The form. `Kind` shows only when adding; `Active` only when an account is opened. |
+| Columns | `Account` · `Name` · `Kind` · `Status` | The account's code, its name, its kind, and whether it is in use. |
+| Kinds | `Cash` · `Bank transfer` · `Online payment` | **Second meaning.** These are payment method words (the Supplier bills and Invoice doors blocks). Here they are also the `Kind` of a money account: the cash account, a bank, or the holding account of a card or online payment company. This `Kind` is not the Trial Balance kind (`Asset` and the rest). Adding offers only `Bank transfer` and `Online payment`; the cash account is already on the list. |
+| Status | `Active` · `Not active` | **Second meaning.** In the Other debtors block they say whether a party can be chosen. Here they say whether the account is in use. A `Not active` account is not offered in any Paid from or Received into picker. |
+| Failed read | `The accounts could not be loaded. Try again.` · `Try again` | Reused from the Supplier advances block. |
+| Refusals (database, 0512) | `The money accounts are for Finance.` · `Only Finance changes the money accounts.` | Who may read the list, and who may change it. |
+| | `Type the account name.` · `Keep the name to 60 characters.` · `Choose the kind: a bank, or an online payment company.` | The form's checks. The API and the database say the same sentence. |
+| | `A money account named {name} is already on the list.` | Two accounts cannot share a name. |
+| | `Codes 1121 to 1129 are all used. Take an account out of use, or ask for a new range.` (a holding account: `1131 to 1139`) | The database picks the code, and every code for that kind is taken. |
+| | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
+| | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
+| Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
+| Refusal (database, coming) | `{code} {name} is the account for the {method} payment method. It stays in use until that payment method uses another account.` | **PROPOSAL — PENDING APPROVAL.** PRs being built now add it. Taking an account out of use while a payment method still puts its money there. Used on Finance Settings and on Settings → Payment → Payment methods. |
+
+An empty list would show the grid's default `No data.`, which the Empty-state pattern bans. The
+list always holds the cash account (1110), so it does not show today. A real empty sentence needs
+the page to pass its own.
+
 ---
 
 ## Header rules (see UI-KIT for the shell)
