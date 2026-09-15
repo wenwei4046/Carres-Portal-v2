@@ -1,7 +1,8 @@
 # WORKSPACE — MASTER
 
 > **APPROVED / LOCKED by Jess, 2026-09-03 / sequencing approved 2026-09-04.** This is the one
-> Workspace authority for Staff & Duties, action/approval ownership, Work and the future Dashboard.
+> Workspace authority for Staff & Duties, action/approval ownership, Work and their relationship to
+> the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint.
 >
@@ -16,6 +17,23 @@
 Dashboard   what management needs to know
 Work        what someone needs to do
 ```
+
+These jobs are related but their left-navigation homes are not nested. Carres has exactly one
+top-level `Dashboard`. It sits independently at the main start of the left bar and is never labelled,
+grouped or repeated as `Workspace → Dashboard`.
+
+```text
+Dashboard
+
+WORKSPACE
+  Work
+  Staff & Duties
+  Issue Tracker
+```
+
+`Workspace` is the left-bar section label for coordination destinations, not a landing page and not
+another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
+drill into filtered Work, while Work never becomes a Dashboard tab.
 
 `Workspace → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
 actually acted. Workspace does not own module records or their completion facts.
@@ -343,7 +361,7 @@ number has one governed drill-down. A failed source never appears as zero.
 
 ### 8.1 · Dashboard composition
 
-Dashboard is the management reading surface over authoritative module facts and the shared Work
+The one global, top-level Dashboard is the management reading surface over authoritative module facts and the shared Work
 contract. It answers, in this order:
 
 1. Is a customer, supplier, delivery or payment commitment already broken?
@@ -469,6 +487,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
 | Multiple client queries with independent loading states | Replace with one validated Dashboard composition carrying per-source health |
 | `See all orders`, `Manage POs`, `Open warehouse` generic doors | Replace with one exact filtered owning-module drill-down per measure |
 | Whole-page RPC error | Retain retry, add per-source health and last-safe observation; never turn failure into zero |
+| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work, Staff & Duties and Issue Tracker only |
 
 No Dashboard production rebuild begins until each admitted measure has the section 8.2 contract and
 its owning module is production-verified. This blocks invented totals, not the already-honest Work
