@@ -279,30 +279,6 @@ partnerPickupsRouter.post("/events/:eventId/collect", async (c) => {
   return c.json(data);
 });
 
-// 2026-05-10 (Loo) — third partner-side state transition. picked_up →
-// delivered (sup_status only; status stays 'open' so the warehouse-side
-// receive flow still has work to do). Wraps migration 0082 RPC.
-//
-// Kept around for the rare case where a partner driver wants to flag arrival
-// without simultaneously filing the DO + counts. The new POST /:id/receive
-// (Loo 2026-05-11) is the happy-path replacement that goes straight to
-// status='received'.
-partnerPickupsRouter.post("/:id/arrived", async (c) => {
-  const auth = c.var.auth;
-  if (auth.role !== "partner" || !auth.partnerId) {
-    throw new HTTPException(403, { message: "Only partner role with partner_id" });
-  }
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb.rpc("partner_arrived_at_warehouse", {
-    p_po_id: c.req.param("id"),
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
-});
-
 /**
  * POST /api/partner/pickups/:id/receive — Loo 2026-05-11
  *
@@ -314,7 +290,7 @@ partnerPickupsRouter.post("/:id/arrived", async (c) => {
  * (migration 0076). The RPC's role gate already admits partners and verifies
  * `purchase_orders.procurement_partner_id = auth.app_partner_id()` — so a
  * cross-partner call returns 42501 → 403, matching the cross-partner guard
- * on /accept, /mark-picked-up, /arrived.
+ * on /accept and /mark-picked-up.
  *
  * Body shape: receivePoWithDoInput (camelCase, same as the operation route)
  * — { doNumber, doFilePath, lines: [{ id, receivedQty }] }. Reshaped to

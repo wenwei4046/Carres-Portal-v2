@@ -220,22 +220,6 @@ describe("POST /api/guarantees/:id/claim", () => {
   });
 });
 
-describe("POST /api/guarantees/:id/attach", () => {
-  it("requires a real line id", async () => {
-    vi.mocked(userClient).mockReturnValue(buildSb({}));
-    const jwt = await makeJwt("principal");
-    const res = await app.fetch(
-      new Request("http://t/api/guarantees/e1/attach", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderLineId: "nope" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-});
-
 describe("GET /api/guarantees — the ID is the primary handle (0267)", () => {
   it("looks a typed ID up against BOTH the live and the retired column", async () => {
     const sb = buildSb({ guarantee_entitlements: [ROW], guarantee_terms: TERMS });

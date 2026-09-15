@@ -35,8 +35,6 @@ import {
   specialAddonCreateInput,
   specialAddonPatchInput,
   SPECIAL_ADDONS,
-  catalogOptionPoolCreateInput,
-  catalogOptionPoolPatchInput,
   catalogOptionPoolNameSchema,
   catalogPoolBatchSaveInput,
   CATALOG_OPTION_POOLS,
@@ -2535,97 +2533,6 @@ function optionPoolDuplicate(value?: string, pool?: string) {
         : "that value already exists in this pool",
   } as const;
 }
-
-// POST /option-pools — create a pool entry (principal-only).
-catalogRouter.post("/option-pools", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const parsed = await parseJsonBody(c, catalogOptionPoolCreateInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CATALOG_OPTION_POOLS)
-    .insert({
-      pool: parsed.data.pool,
-      value: parsed.data.value,
-      label: parsed.data.label ?? null,
-      dimensions: parsed.data.dimensions ?? null,
-      surcharge: parsed.data.surcharge ?? null,
-      active: parsed.data.active ?? true,
-      sort_order: parsed.data.sortOrder ?? 0,
-      updated_at: new Date().toISOString(),
-      updated_by: c.var.auth.id,
-    })
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    if (error.code === "23505") {
-      return c.json(optionPoolDuplicate(parsed.data.value, parsed.data.pool), 409);
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "option pool insert returned no row" }, 500);
-  }
-  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) }, 201);
-});
-
-// PATCH /option-pools/:id — update a pool entry (principal-only); empty → 422.
-// `pool` is intentionally NOT patchable (the schema omits it) — moving an entry
-// between pools would skew the UNIQUE(pool,value) intent; delete + recreate.
-catalogRouter.patch("/option-pools/:id", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const id = c.req.param("id");
-  const parsed = await parseJsonBody(c, catalogOptionPoolPatchInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const patch: Record<string, unknown> = {};
-  if (parsed.data.value !== undefined) patch.value = parsed.data.value;
-  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
-  if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
-  if (parsed.data.surcharge !== undefined) patch.surcharge = parsed.data.surcharge;
-  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
-  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
-  if (Object.keys(patch).length === 0) {
-    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
-  }
-  patch.updated_at = new Date().toISOString();
-  patch.updated_by = c.var.auth.id;
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CATALOG_OPTION_POOLS)
-    .update(patch)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    // A value-rename can also collide with an existing (pool,value).
-    if (error.code === "23505") {
-      return c.json(optionPoolDuplicate(parsed.data.value), 409);
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "not_found", code: "not_found", message: "option pool not found" }, 404);
-  }
-  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) });
-});
-
-// DELETE /option-pools/:id — HARD delete (principal-only). Nothing FKs to this
-// table (curated reference list, no order-side consumer), so deletion is safe.
-// The soft-hide path is `active=false` via PATCH. Idempotent: a missing id is a
-// no-op that still returns ok (mirrors the un-offer route).
-catalogRouter.delete("/option-pools/:id", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const id = c.req.param("id");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb.from(CATALOG_OPTION_POOLS).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ ok: true });
-});
 
 // PUT /option-pools/:pool — 0201 batch save (principal-only). REPLACE semantics:
 // the body's `entries` become the pool's full new contents (array order =

@@ -440,25 +440,3 @@ describe("Warehouse Settings cannot reach recorded Warehouse work", () => {
     for (const fn of called) expect(SETTINGS_DOORS.has(fn)).toBe(true);
   });
 });
-
-// ---------------------------------------------------------------------------
-// 13 · the resolved schedule, served by the ONE arithmetic
-// ---------------------------------------------------------------------------
-
-describe("GET /warehouse-settings/schedule", () => {
-  it("says `Not configured` while no week has been set", async () => {
-    vi.mocked(userClient).mockReturnValue(stubClient());
-    const res = await testApp().request("/warehouse-settings/schedule?date=2026-09-16");
-    expect(res.status).toBe(200);
-    expect((await res.json()) as Record<string, never>).toMatchObject({
-      date: "2026-09-16",
-      reason: "Not configured",
-    });
-  });
-
-  it("refuses a date it cannot read", async () => {
-    vi.mocked(userClient).mockReturnValue(stubClient());
-    const res = await testApp().request("/warehouse-settings/schedule?date=next%20tuesday");
-    expect(res.status).toBe(400);
-  });
-});

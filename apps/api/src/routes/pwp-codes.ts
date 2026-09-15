@@ -42,8 +42,6 @@ import type { AppEnv } from "../types";
  *                                      RESERVED codes (RESERVED only — never USED).
  *   GET    /mine                     — the caller's RESERVED set + a self-heal
  *                                      (owner-scoped orphan reaper) sweep.
- *   POST   /reap                     — the caller-scoped orphan reaper (also the
- *                                      target of the daily cron, owner-scoped here).
  *
  * All DB access via `userClient(c.env, auth.jwt)` (RLS) + the SECURITY DEFINER
  * RPCs — NEVER service_role. DORMANT: 0 active `pwp_rules` → reserve matches no
@@ -345,23 +343,6 @@ pwpCodesRouter.get("/mine", async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
   const codes = ((data ?? []) as DB.PwpCodeRow[]).map((r) => Adapters.pwpCodeFromRow(r));
   return c.json(pwpCodesResponseSchema.parse({ codes }));
-});
-
-/* ─── POST /reap — the caller-scoped orphan reaper (also the cron target) ───── */
-
-pwpCodesRouter.post("/reap", async (c) => {
-  const auth = c.var.auth;
-  const sb = userClient(c.env, auth.jwt);
-  // Self-scoped — a salesperson reclaims only their OWN orphans. The RPC forces the
-  // owner to auth.uid() (no p_owner arg) + a 15-min grace floor (review BLOCKER
-  // fix). The all-owners (incl. nulled-owner) backstop is the cron-only
-  // pwp_reap_orphans_all() (NOT granted to authenticated), wired to a daily cron
-  // when the backstop goes live (CF pwp-orphan-reaper-cron-unwired).
-  const { data, error } = await sb.rpc("pwp_reap_orphans", {
-    p_grace_minutes: 15,
-  });
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({ reaped: typeof data === "number" ? data : 0 });
 });
 
 export default pwpCodesRouter;
