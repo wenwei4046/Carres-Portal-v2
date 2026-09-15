@@ -1,16 +1,10 @@
 # WORKSPACE — MASTER
 
-> **APPROVED / LOCKED by Jess, 2026-09-03 / sequencing approved 2026-09-04.** This is the one
-> Workspace authority for Staff & Duties, action/approval ownership, Work and their relationship to
-> the one global Dashboard.
+> **APPROVED / LOCKED business architecture — Jess, 2026-09-03; complete page Blueprint ready for
+> owner review, 2026-09-15.** This is the one Workspace authority for Staff & Duties,
+> action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint.
->
-> **2026-09-15 COMPLETION ADDENDUM — READY FOR OWNER REVIEW.** Sections 4.1–4.6, 5.1–5.7, 6.1
-> and 8.2.1 complete the previously missing Staff & Duties, Work and Dashboard relationship: UI
-> composition, state, search/filter, priority/SLA, responsive, action-catalogue and management-measure
-> contracts. They record target law separately from measured implementation truth in §10; they do
-> not approve a production release or overwrite module facts.
 
 ## 1 · Mission and boundary
 
@@ -35,6 +29,22 @@ WORKSPACE
 `Workspace` is the left-bar section label for coordination destinations, not a landing page and not
 another Dashboard. Selecting `Work` opens My Work by default for staff and managers. Dashboard may
 drill into filtered Work, while Work never becomes a Dashboard tab.
+
+### 1.1 · Three-destination relationship
+
+| From | To | Exact reason and preserved context |
+|---|---|---|
+| Work item | Owning module object | Perform or record the required result; Work scope/filter remains in the URL |
+| Work `Not assigned` | Staff & Duties | Open the exact unresolved Duty; returning restores the same Work result |
+| Staff & Duties Duty | Team Work | Read-only `Open Team Work` with exact normal-owner/Duty filter; Staff & Duties never composes rows |
+| Issue Tracker Current Action | Work or same Issue result section | Shared action identity; no copied task and no second completion |
+| Work Issue item | Issue workspace | Open exact Issue and Current Action; My/Team scope remains recoverable |
+| Issue linked object | Owning module object | Read/write business truth there; Issue selection remains recoverable |
+| Owning module problem | Issue Tracker intake | Prefill typed source object and observed facts; the module event remains authoritative |
+| Dashboard Work health | Team Work | Exact URL-visible health/owner/timing filter; Dashboard never shows action rows |
+
+Browser Back returns to the same scope, saved view, search, filters, selected owner/Duty and scroll
+position where technically safe. A cross-page door never changes business state merely by opening.
 
 `Workspace → Staff & Duties` answers who holds each ERP Duty today, who covers an absence and who
 actually acted. Workspace does not own module records or their completion facts.
@@ -148,7 +158,7 @@ full history beneath every Duty.
 │                                  │ Acting today [SH] Shasha                  │
 │ GRN Duty                         │ Cover         15–17 Sep · Annual leave    │
 │ [SH] Shasha                      │                                            │
-│                                  │ [Change holder] [Add cover]               │
+│                                  │ [Assign holder] [Add cover]               │
 │ Delivery Duty                    ├ ASSIGNMENT & COVER HISTORY ───────────────┤
 │ Not assigned                     │ 15 Sep · Shasha covering for Yu Jun       │
 │                                  │ 01 Sep · Yu Jun assigned by Jess          │
@@ -169,7 +179,7 @@ configuration failure may deep-link directly to the required Duty while preservi
 
 ### 4.3 · Change-holder contract
 
-`Change holder` opens a focused action surface with `Duty`, `New holder`, `Effective from`, optional
+`Assign holder` opens a focused action surface with `Duty`, `Holder`, `Effective from`, optional
 `Until` and optional factual `Note`. Eligible choices come from People's active authorised Carres
 staff only; a departed, disabled, external Warehouse or ineligible account is not offered and is
 refused again at the write door. The system shows the current holder and the resulting effective
@@ -201,6 +211,26 @@ module doors must resolve the same answer immediately after refresh. Ending, rep
 cover requires its own recorded reason/actor/time; disappearance from the current view never deletes
 history.
 
+#### 4.4.1 · Staff & Duties validation and refusal copy
+
+| Condition | Exact sentence |
+|---|---|
+| Holder missing | `Choose a holder.` |
+| Assignment start missing | `Choose when this holder starts.` |
+| Assignment end before start | `Until must be on or after Effective from.` |
+| Ineligible/inactive holder | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
+| Conflicting primary period | `{Duty} already has a holder for these dates. Choose different dates.` |
+| Cover person missing | `Choose who will cover this duty.` |
+| Cover is normal holder | `Choose another person to cover {Duty}.` |
+| Cover dates missing/reversed | `Choose valid cover dates.` |
+| No normal owner for whole cover period | `{Duty} has no normal holder for all these dates. Assign the holder first.` |
+| Conflicting cover | `{Duty} already has cover for these dates. Choose different dates.` |
+| Eligibility changed before save | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
+| Unknown failure | `{Duty} could not be updated. Try again.` |
+
+Client validation may guide early, but the server returns the same business refusal and remains
+authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
+
 ### 4.5 · Access, states and responsive behaviour
 
 | State | Required presentation and behaviour |
@@ -209,7 +239,7 @@ history.
 | Loading | Catalogue/detail skeletons retain page geometry · `Opening Staff & Duties…` is acceptable accessible status |
 | Empty catalogue | Configuration failure, because the governed catalogue is code-owned; never `No duties yet` |
 | No search match | `No duties match this search` · `Clear search`; catalogue truth remains healthy |
-| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Change holder`; Work remains visible under Duty word |
+| Not assigned | `Not assigned` · `Nobody holds {Duty}.` · manager sees `Assign holder`; Work remains visible under Duty word |
 | Cover active | Normal and acting person shown separately with effective dates/reason |
 | Cover scheduled | Normal owner remains today's actor; future cover and start date are visible in detail |
 | Read failed | `Staff & Duties could not be opened` · `Try again`; never infer no holder |
@@ -233,6 +263,24 @@ originating Duty after a modal closes.
 | Current cover form does not explain capability eligibility or visible overlap recovery | Add pre-confirmation facts and governed conflict/correction handling; writer remains authoritative |
 | Current page has loading/read-error and immutable history evidence | Retain; add no-match, catalogue-failure, scheduled-cover and write-success/refusal contracts |
 | Current layout has no search/filter, selected Duty or narrow-screen contract | Build the §4.2/§4.5 composition and verify at 1440, 1024 and 390px |
+
+### 4.7 · Staff & Duties acceptance contract
+
+The page is ready for owner acceptance only when all are demonstrable:
+
+- every shared catalogue Duty appears once and an unknown/missing catalogue response fails visibly;
+- today's normal owner, acting cover and `Not assigned` answer match the Shared Duty Resolver byte
+  for byte on Staff & Duties, Team Work and one protected module door;
+- manager and non-manager sessions see the exact §4.5 capabilities with no leaked write control;
+- current, future and ended assignments/covers resolve on the correct company date boundary;
+- inactive, departed, external Warehouse, same-as-holder and otherwise ineligible people are absent
+  or refused at the authoritative write door;
+- assignment and cover overlap/race attempts cannot yield two effective answers;
+- success, known refusal, uncertain response and retry preserve one append-only act and honest UI;
+- search/no-match/read-failure/history-empty states and deep links retain their required meaning;
+- names, dates, action controls and history remain readable and operable at 1440, 1024 and 390px;
+- changing the current holder/cover updates open/future Work routing without rewriting completed
+  actor evidence.
 
 ## 5 · My Work and Team Work
 
@@ -388,6 +436,27 @@ identity; it never changes the owner, due date or completion fact.
 | No completed/history surface exists in shared Work | Add read-only history only after durable source result/actor evidence can support it; never synthesize Done rows |
 | Warehouse external queue and acceptance exist on the pending branch | Complete identity/offboarding/transfer guards and production proof before admission claim |
 | Service Case is absent; Bell remains a duplicate legacy queue | Keep Service Case excluded until owner/date laws close; replace Bell only with durable transition receipts |
+
+### 5.8 · Work acceptance contract
+
+Work is ready for owner acceptance only when all are demonstrable:
+
+- every admitted source rule in §6.1 produces one stable identity and source completion removes that
+  identity without a manual Done act;
+- My Work, Team Work and Right Rail use one authorised response and one cache identity;
+- normal owner, cover, acting person, Site queue, `Not assigned` and actual completed actor remain
+  distinct across assignment/cover changes;
+- broken commitment, late, today, later and no-date examples order once under the governed calendar;
+- blockers retain lateness, and source failure cannot reduce or clear any count;
+- search and every filter in §5.3 combine, serialize to the URL and restore through Dashboard/Rail
+  deep links without broadening permission scope;
+- every row exposes object, fact/problem, concrete action, recipient when applicable, required result,
+  due/late fact and exact owning door without repeating owner/object in sentence prose;
+- true empty, no match, delayed/failed source, permission refusal and read-only history cannot be
+  mistaken for one another;
+- keyboard, screen-reader, focus-return and 1440/1024/390 layouts preserve the complete action;
+- two accounts racing for Site work yield one accepted owner, and later holder/cover changes cannot
+  rewrite the winning or completed actor evidence.
 
 ## 6 · Module admission gate
 
@@ -639,6 +708,15 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-06
 
+- **Sales Orders reader boundary, production-verified 2026-09-13/15.** Sales Orders PRs #1227 and
+  #1259 preserve canonical Paid/Outstanding arithmetic while showing saved at-sale method,
+  reference and slip as independent evidence. An absent individual transaction row does not prove
+  that the customer never paid and does not authorise Workspace to infer a corrected amount.
+  Collection Work continues to project only from Payment's complete issued-Invoice truth and one
+  atomic outstanding calculation; saved evidence, an empty transaction list or the Sales Order
+  reader may never generate a duplicate collection action. Warehouse/Delivery exact-Unit work uses
+  recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
+  Unit assignment or Work source.
 - Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
   audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
@@ -771,3 +849,27 @@ Cards follow dependency slices; this MASTER is not an implementation queue.
 - Right Rail and Notifications read the same Work truth;
 - Dashboard reads verified facts and never becomes another queue;
 - production verification precedes every completion claim.
+
+## 13 · Three-page UI Blueprint trace
+
+This matrix proves document coverage, not implementation or production completion.
+
+| Required Blueprint question | Work | Staff & Duties | Issue Tracker |
+|---|---|---|---|
+| Exact page job/boundary | §§1, 5.1 | §§4.1 | Issue MASTER §§1, 11.1 |
+| Information hierarchy and ASCII composition | §§5.1–5.2 | §4.2 | Issue MASTER §§11.1–11.2 |
+| Ownership, cover and actor | §§3, 5.2, 6.1 | §§4.2–4.4 | Issue MASTER §§5–6, 11.2–11.3 |
+| Primary journeys/actions | §§5.1–5.3 | §§4.3–4.4 | Issue MASTER §§4–5, 10, 11.2–11.3 |
+| Search, views and filters | §5.3 | §4.2 | Issue MASTER §11.1 |
+| Loading, empty, no-match, late, blocked and failure states | §5.4 | §4.5 | Issue MASTER §11.4 |
+| Permission behavior | §§3–6 | §§4.3–4.5 | Issue MASTER §§11, 11.6 |
+| Exact vocabulary | §§5.2–5.4 and COPY STANDARD `Workspace destination words` | §§4.2–4.5 and same dictionary | Issue MASTER §§4–5, 11.1–11.4 and same dictionary |
+| Responsive/accessibility behavior | §5.5 | §4.5 | Issue MASTER §§11.2, 11.4 |
+| Cross-page/deep-link behavior | §§1.1, 5.3, 7 | §§1.1, 4.2 | §§1.1 and Issue MASTER §§11.1–11.2 |
+| Current → proposed evidence | §5.7 | §4.6 | Issue MASTER §11.5 |
+| Testable owner acceptance | §5.8 | §4.7 | Issue MASTER §11.7 |
+
+The page Blueprint is reviewable when every row points to current truth with no contradiction. The
+pages are built only when their acceptance contracts pass against current implementation and real
+authorised accounts. The global Dashboard remains outside these three destinations and retains its
+separate §§8–8.5 contract.
