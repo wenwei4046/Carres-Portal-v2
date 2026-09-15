@@ -93,6 +93,7 @@ export default function ManualPurchaseReadyStock({ requestId }: { requestId: str
 
   return (
     <ReadyStockDisclosure
+      className=""
       testId={`mp-ready-stock-${requestId}`}
       open={open}
       onToggle={() => setOpen((v) => !v)}

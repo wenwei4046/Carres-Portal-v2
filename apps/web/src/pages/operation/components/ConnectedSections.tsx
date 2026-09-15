@@ -83,7 +83,7 @@ export default function ConnectedSections({
   return (
     <div
       data-testid={testId}
-      style={{ paddingLeft: SECTION_PAD_L, paddingTop: SECTION_TOP_GAP, paddingBottom: 12 }}
+      style={{ paddingLeft: SECTION_PAD_L, paddingTop: SECTION_TOP_GAP, paddingBottom: SECTION_TOP_GAP }}
     >
       {sections.map((s, i) => {
         const isLast = i === sections.length - 1;
