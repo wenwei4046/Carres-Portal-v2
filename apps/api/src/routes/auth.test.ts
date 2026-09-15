@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -13,31 +12,14 @@ const env = {
   SUPABASE_JWT_SECRET: "unused-but-typed",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(payload: Record<string, unknown>) {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .setSubject(String(payload.sub ?? "11111111-1111-1111-1111-000000000002"))
-    .sign(signKey);
+  return signTestJwt(String(payload.sub ?? "11111111-1111-1111-1111-000000000002"), payload);
 }
-
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
 
 // jose's Node runtime uses node:https.request directly which msw can't catch,
 // so we inject a local JWKS via the middleware's test escape hatch.
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
 });
 
 afterAll(() => _setJwksForTesting(null));

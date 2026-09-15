@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -60,20 +53,11 @@ const env = {
   PUBLIC_WEB_URL: "https://pos.test",
 };
 
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null = null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: `${role}@x`,
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 interface TableCfg {
@@ -184,17 +168,8 @@ function makeStripe(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
   vi.mocked(stripeClient).mockReset();
