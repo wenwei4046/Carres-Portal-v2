@@ -28,6 +28,14 @@ export const ACCOUNTS: MoneyInAccountOption[] = [
   { code: "6200", name: "Rent", kind: "EXPENSE", parent_code: "6000", for_money: false, for_receipt_line: true, for_invoice_line: true },
 ];
 
+/** The one money-account list (0512) — what Received into offers. */
+export const MONEY_ACCOUNTS = [
+  { code: "1110", name: "Cash on hand", money_kind: "CASH", is_active: true },
+  { code: "1120", name: "Bank — current account", money_kind: "BANK", is_active: true },
+  { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: false },
+  { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
+];
+
 const partyBase = {
   registration_no: null,
   phone: null,

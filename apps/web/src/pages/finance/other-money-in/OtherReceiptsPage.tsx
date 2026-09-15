@@ -33,6 +33,8 @@ import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
 import Textarea from "@/components/kit/Textarea";
 import ListPageShell from "@/components/ListPageShell";
+import { takesIn } from "@carres/shared/money-accounts";
+import { useMoneyAccounts } from "../settings/api";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -273,6 +275,7 @@ function ReceiptForm({
   const parties = useOtherDebtorParties();
   const invoices = useOtherDebtorInvoices();
   const accounts = useMoneyInAccounts();
+  const moneyAccounts = useMoneyAccounts();
   const record = useRecordReceipt();
   /* One key per opening of this form — never regenerated on a re-render or a
      refused press, so a second press can only find the first receipt. */
@@ -314,8 +317,10 @@ function ReceiptForm({
   }, [invoices.data, prefillInvoiceId]);
 
   const moneyOptions = useMemo(
-    () => (accounts.data ?? []).filter((a) => a.for_money).map((a) => ({ value: a.code, label: accountLabel(a) })),
-    [accounts.data],
+    // 0512: Received into reads the one money-account list — cash, banks and
+    // holding accounts (GHL, AhaPay, Online).
+    () => (moneyAccounts.data ?? []).filter(takesIn).map((a) => ({ value: a.code, label: accountLabel(a) })),
+    [moneyAccounts.data],
   );
   const lineAccounts = useMemo(() => (accounts.data ?? []).filter((a) => a.for_receipt_line), [accounts.data]);
   const partyOptions = useMemo(
@@ -402,13 +407,14 @@ function ReceiptForm({
     });
   };
 
-  if (parties.isError || accounts.isError || invoices.isError) {
+  if (parties.isError || accounts.isError || moneyAccounts.isError || invoices.isError) {
     return (
       <LoadFailed
         what="The parties, invoices and accounts for this form"
         onRetry={() => {
           void parties.refetch();
           void accounts.refetch();
+          void moneyAccounts.refetch();
           void invoices.refetch();
         }}
       />
@@ -455,7 +461,7 @@ function ReceiptForm({
               value={moneyAccount}
               onValueChange={setMoneyAccount}
               options={moneyOptions}
-              placeholder={accounts.isLoading ? "Loading accounts…" : "Choose the bank or cash account"}
+              placeholder={moneyAccounts.isLoading ? "Loading accounts…" : "Choose the bank or cash account"}
               error={fieldErrors.account}
             />
             <DatePicker

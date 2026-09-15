@@ -74,6 +74,13 @@ describe("Settings → Warehouse", () => {
     expect(within(menu).queryByRole("menuitem", { name: "Warehouse Settings" })).toBeNull();
   });
 
+  it("offers Finance Settings on a Finance page, and it opens the money accounts", () => {
+    renderAt("/finance/payment-vouchers");
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Finance Settings" }));
+    expect(navigate).toHaveBeenCalledWith("/finance/settings");
+  });
+
   it("still offers the OTHER modules their own settings", () => {
     renderAt("/operation/orders");
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
