@@ -55,7 +55,7 @@ import {
   type ProductCategory,
 } from "@carres/shared";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftOpen, Plus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
@@ -95,6 +95,10 @@ import GoodsMiniTable, {
   type GoodsMiniLine,
 } from "./components/GoodsMiniTable";
 import ManualPurchaseReadyStock from "./ManualPurchaseReadyStock";
+import ConnectedSections, {
+  CONNECT_AT_DISCLOSURE,
+  CONNECT_AT_TABLE_HEADER,
+} from "./components/ConnectedSections";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { Block } from "./SalesOrderWorkspace";
@@ -1173,13 +1177,15 @@ export default function OperationManualPurchase() {
                     <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
                   </button>
                 )}
-                <Button
-                  variant="primary"
+                <button
+                  type="button"
                   onClick={() => setMode("create")}
                   data-testid="manual-purchase-new-request"
+                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
                 >
-                  {MW.newRequest}
-                </Button>
+                  <Plus size={14} strokeWidth={2.25} aria-hidden />
+                  <span><span className="sr-only">{MW.newRequest.slice(0, 2)}</span>{MW.newRequest.slice(2)}</span>
+                </button>
               </>
             }
             rows={filtered}
@@ -1448,28 +1454,35 @@ function RequestExpansion({
        tick is the request's, and the goods table selects nothing. */
     selectable: false,
   }));
+  const goodsTable = (
+    <GoodsMiniTable
+      label={`Goods on this ${MW.page}`}
+      lines={lines}
+      showUnitId={false}
+      showSupplier
+      showPoNo
+      showPoDeliveryDate
+      /* The number is a door here, exactly as it is on the sibling: the
+         parent cell links only when there is ONE purchase order, and with
+         several it points the reader at this table. */
+      onPoClick={(poId) =>
+        navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+      }
+    />
+  );
   return (
     <div data-testid={`mp-expansion-${row.id}`}>
-      <GoodsMiniTable
-        label={`Goods on this ${MW.page}`}
-        lines={lines}
-        showUnitId={false}
-        showSupplier
-        showPoNo
-        showPoDeliveryDate
-        /* The number is a door here, exactly as it is on the sibling: the
-           parent cell links only when there is ONE purchase order, and with
-           several it points the reader at this table. */
-        onPoClick={(poId) =>
-          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
-        }
+      <ConnectedSections
+        testId={`mp-sections-${row.id}`}
+        sections={[
+          { key: "goods", connectAt: CONNECT_AT_TABLE_HEADER, node: goodsTable },
+          {
+            key: "ready-stock",
+            connectAt: CONNECT_AT_DISCLOSURE,
+            node: <ManualPurchaseReadyStock requestId={row.id} />,
+          },
+        ]}
       />
-      {/* ⭐ READY STOCK — an INDEPENDENTLY collapsible table directly below
-          the request's own goods. A sibling SECTION, not a column and not a
-          second goods table: the table above answers *what was asked for and
-          which purchase order carries it*, this one answers *what is already
-          on the shelf*. It writes nothing. */}
-      <ManualPurchaseReadyStock requestId={row.id} />
     </div>
   );
 }

@@ -80,7 +80,7 @@
   z-index: 1;
 }
 
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) {
+.page [data-testid="goods-mini-table"] {
   background: #ffffff;
   border-color: #d2dae3;
   border-radius: 2px;
@@ -88,18 +88,18 @@
   color: #1f2937;
 }
 
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) :is(thead, tr, th, td) {
+.page [data-testid="goods-mini-table"] :is(thead, tr, th, td) {
   border-color: #d2dae3;
 }
 
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) thead,
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) th {
+.page [data-testid="goods-mini-table"] thead,
+.page [data-testid="goods-mini-table"] th {
   background: #e7ecf1;
   color: #26384a;
   font-weight: 600;
 }
 
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) tbody {
+.page [data-testid="goods-mini-table"] tbody {
   background: #ffffff;
 }
 
@@ -107,7 +107,7 @@
   color: #667085;
 }
 
-.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) :global(.text-base-900) {
+.page [data-testid="goods-mini-table"] :global(.text-base-900) {
   color: #1f2937;
 }
 
