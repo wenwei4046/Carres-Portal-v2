@@ -983,8 +983,8 @@ export default function WarehouseInbound() {
 }
 
 /** The expansion has ONE job: the full product detail. Complete products with
- *  their own governed quantities, the exact Units with per-Unit results, and
- *  every posted receipt with its supplier delivery note. */
+ *  their own governed quantities and the exact Units with per-Unit results.
+ *  Receipt documents stay in the Document cell. */
 function InboundExpansion({ row: r }: { row: InboundArrival }) {
   return (
     <div className="space-y-3 p-3 text-body">
@@ -1041,26 +1041,7 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
           ))}
         </div>
       )}
-      {r.sessions.length > 0 && (
-        <div>
-          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
-            Receiving records
-          </div>
-          {r.sessions.map((s) => (
-            <div key={s.id} className="flex flex-wrap gap-3">
-              <Link
-                className="font-mono text-kit-blue-11"
-                to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
-              >
-                {s.grnNo ?? "Receipt"}
-              </Link>
-              {s.doNumber && <span>Supplier DO No {s.doNumber}</span>}
-              {s.receivedAt && <span>Goods received on {fmtDate(s.receivedAt)}</span>}
-              {s.actualSite && <span>at {s.actualSite}</span>}
-            </div>
-          ))}
-        </div>
-      )}
+
     </div>
   );
 }
