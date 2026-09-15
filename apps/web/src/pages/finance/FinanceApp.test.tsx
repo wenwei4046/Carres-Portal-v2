@@ -157,9 +157,9 @@ describe("Finance routing", () => {
     show("/finance/ar");
     expect(screen.getByTestId("ar-destination-header")).toBeInTheDocument();
   });
-  it("opens Settings, the money-account list, for Finance only (0512)", () => {
+  it("opens Finance Settings, the money-account list, for Finance only (0512)", () => {
     show("/finance/settings");
-    expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Settings");
+    expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
     cleanup();
     auth.role = "operation";
     show("/finance/settings");

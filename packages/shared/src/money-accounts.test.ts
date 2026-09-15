@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  MONEY_ACCOUNT_KIND_WORD,
   moneyAccountAddInput,
-  moneyAccountKindWord,
   paysOut,
   takesIn,
   type MoneyAccountRow,
@@ -32,8 +32,7 @@ describe("the money-account rule (0512)", () => {
     expect(moneyAccountAddInput.safeParse({ name: "  ", kind: "BANK" }).success).toBe(false);
   });
 
-  it("never prints a kind key", () => {
-    expect(moneyAccountKindWord("HOLDING")).toBe("Online payment");
-    expect(moneyAccountKindWord("SAVINGS")).toBe("Not known");
+  it("says each kind in the standard's pay-method words, never the key", () => {
+    expect(MONEY_ACCOUNT_KIND_WORD).toEqual({ CASH: "Cash", BANK: "Bank transfer", HOLDING: "Online payment" });
   });
 });

@@ -1,5 +1,6 @@
 /**
- * Finance → Settings, at `/finance/settings` (migration 0512).
+ * Finance Settings, at `/finance/settings` (migration 0512), opened from the
+ * header gear — the ERP's one Settings entry (Jess, 19 Aug 2026).
  *
  * The one list of money accounts: cash, each real bank, and the holding
  * account of each card or online payment company. Every Paid from and
@@ -8,13 +9,14 @@
  * 1131–1139 a holding account) and refuses taking an account out of use while
  * the ledger holds money in it.
  *
- * Register shell per UI MASTER §6.7, the same as Other debtors → Parties.
+ * Words: every label is an existing COPY-STANDARD word (Money account,
+ * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the pay
+ * method words Cash · Bank transfer · Online payment for the kinds). A row
+ * click opens it; the only new phrases are the page word and the add button.
  */
 import { useMemo, useState } from "react";
 import {
-  moneyAccountAddInput,
-  moneyAccountKindWord,
-  moneyAccountUpdateInput,
+  MONEY_ACCOUNT_KIND_WORD,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
@@ -25,26 +27,25 @@ import Select from "@/components/kit/Select";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import { toast } from "sonner";
 import { LoadFailed } from "../other-money-in/parts";
 import { useMoneyAccounts, useSaveMoneyAccount } from "./api";
 
 const KIND_OPTIONS = [
-  { value: "BANK", label: moneyAccountKindWord("BANK") },
-  { value: "HOLDING", label: moneyAccountKindWord("HOLDING") },
+  { value: "BANK", label: MONEY_ACCOUNT_KIND_WORD.BANK },
+  { value: "HOLDING", label: MONEY_ACCOUNT_KIND_WORD.HOLDING },
 ];
 
 const statusWord = (r: MoneyAccountRow) => (r.is_active ? "Active" : "Not active");
 
 export default function FinanceSettings() {
   const query = useMoneyAccounts();
-  /* `undefined` = closed; `null` = a new account; a row = edit that account. */
+  /* `undefined` = closed; `null` = a new account; a row = that account. */
   const [editing, setEditing] = useState<MoneyAccountRow | null | undefined>(undefined);
   const columns = useMemo<DataGridColumn<MoneyAccountRow>[]>(
     () => [
       { key: "code", label: "Account", width: 110, accessor: (r) => r.code, searchValue: (r) => r.code },
       { key: "name", label: "Name", width: 240, accessor: (r) => r.name, searchValue: (r) => r.name },
-      { key: "kind", label: "Kind", width: 160, accessor: (r) => moneyAccountKindWord(r.money_kind), filterType: "enum" },
+      { key: "kind", label: "Kind", width: 160, accessor: (r) => MONEY_ACCOUNT_KIND_WORD[r.money_kind], filterType: "enum" },
       { key: "status", label: "Status", width: 120, accessor: statusWord, filterType: "enum" },
     ],
     [],
@@ -52,9 +53,9 @@ export default function FinanceSettings() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Settings" docTitle="Settings — Carres" />
+      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings — Carres" />
       {query.isError ? (
-        <LoadFailed what="Money accounts" onRetry={() => void query.refetch()} />
+        <LoadFailed what="The accounts" onRetry={() => void query.refetch()} />
       ) : (
         <ListPageShell register>
           <DataGrid
@@ -63,38 +64,15 @@ export default function FinanceSettings() {
             rowKey={(r) => r.code}
             storageKey="carres.finance.money-accounts.v1"
             appearance="reference"
-            exportName="Money accounts"
             groupBanner={false}
             stickyIdentity
             isLoading={!query.isSuccess}
-            searchPlaceholder="Search money accounts…"
             toolbarStart={
               <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
-                New money account
+                Add a money account
               </Button>
             }
-            emptyMessage="No money account yet. Press New money account to add a bank."
-            expandTitle="Inspect money account"
-            onRowDoubleClick={(r) => setEditing(r)}
-            expandable={{
-              renderExpansion: (r) => (
-                <div className="p-4 text-body flex flex-col items-start gap-1">
-                  <p>
-                    {r.code} · {r.name} · {moneyAccountKindWord(r.money_kind)} · {statusWord(r)}
-                  </p>
-                  <div className="mt-2">
-                    <Button variant="neutral" onClick={() => setEditing(r)}>
-                      Edit money account
-                    </Button>
-                  </div>
-                </div>
-              ),
-            }}
-            statusSummary={(visible) => (
-              <span data-testid="money-accounts-summary">
-                {visible.length} {visible.length === 1 ? "money account" : "money accounts"}
-              </span>
-            )}
+            onRowClick={(r) => setEditing(r)}
           />
           {editing !== undefined && (
             <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
@@ -108,29 +86,21 @@ export default function FinanceSettings() {
 function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | null; onClose: () => void }) {
   const save = useSaveMoneyAccount();
   const [name, setName] = useState(account?.name ?? "");
-  const [kind, setKind] = useState<string | undefined>(undefined);
+  const [kind, setKind] = useState<"BANK" | "HOLDING">("BANK");
   const [active, setActive] = useState(account?.is_active ?? true);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const trimmed = name.trim();
 
-  const done = {
-    onSuccess: () => {
-      toast.success(account ? "Money account saved." : "Money account added.");
-      onClose();
-    },
-    onError: (e: Error) => setRefusal(e.message),
-  };
-
+  /* A blank name cannot be sent (Save stays disabled) and the input stops at
+     60 characters, so the only refusals left are the database's own. */
   const submit = () => {
     setRefusal(null);
-    if (account) {
-      const p = moneyAccountUpdateInput.safeParse({ name, is_active: active });
-      if (!p.success) return setRefusal(p.error.issues[0]?.message ?? null);
-      save.mutate({ code: account.code, input: p.data }, done);
-    } else {
-      const p = moneyAccountAddInput.safeParse({ name, kind });
-      if (!p.success) return setRefusal(p.error.issues[0]?.message ?? null);
-      save.mutate({ code: null, input: p.data }, done);
-    }
+    save.mutate(
+      account
+        ? { code: account.code, input: { name: trimmed, is_active: active } }
+        : { code: null, input: { name: trimmed, kind } },
+      { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
+    );
   };
 
   return (
@@ -139,14 +109,14 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title={account ? "Edit money account" : "New money account"}
+      title={account ? "Money account" : "Add a money account"}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Back
+            Cancel
           </Button>
-          <Button variant="primary" loading={save.isPending} onClick={submit}>
-            Save money account
+          <Button variant="primary" loading={save.isPending} disabled={!trimmed} onClick={submit}>
+            Save
           </Button>
         </>
       }
@@ -154,14 +124,15 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
       <div className="flex flex-col gap-3" data-testid="money-account-form">
         <Input id="money-account-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         {account ? (
-          <Checkbox
-            id="money-account-active"
-            label="Active — can be chosen on a new voucher or receipt"
-            checked={active}
-            onCheckedChange={setActive}
-          />
+          <Checkbox id="money-account-active" label="Active" checked={active} onCheckedChange={setActive} />
         ) : (
-          <Select id="money-account-kind" label="Kind" placeholder="Choose the kind" value={kind} onValueChange={setKind} options={KIND_OPTIONS} />
+          <Select
+            id="money-account-kind"
+            label="Kind"
+            value={kind}
+            onValueChange={(v) => setKind(v as "BANK" | "HOLDING")}
+            options={KIND_OPTIONS}
+          />
         )}
         {refusal && (
           <p role="alert" className="text-body text-kit-red-11">

@@ -24,18 +24,15 @@ export interface MoneyAccountRow {
   is_active: boolean;
 }
 
-/** The kind as the page says it. HOLDING has no word of its own yet in
- *  COPY-STANDARD; `Online payment` is the closest existing one. */
+/** The kind as the page says it, in COPY-STANDARD's pay-method words:
+ *  the money arrives as cash, by bank transfer, or as an online payment. No
+ *  kind has a word of its own in the standard yet. The database's check
+ *  constraint keeps the kind to these three. */
 export const MONEY_ACCOUNT_KIND_WORD: Record<MoneyAccountKind, string> = {
   CASH: "Cash",
-  BANK: "Bank",
+  BANK: "Bank transfer",
   HOLDING: "Online payment",
 };
-
-/** A kind the page may not know yet reads as words, never the key. */
-export function moneyAccountKindWord(kind: string): string {
-  return (MONEY_ACCOUNT_KIND_WORD as Record<string, string>)[kind] ?? "Not known";
-}
 
 /** May money leave from this account (a voucher's Paid from)? */
 export function paysOut(a: MoneyAccountRow): boolean {

@@ -616,9 +616,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: BarChart3,
         financePath: "/finance/reports",
       },
-      // 0512 — the one list of bank, cash and online payment accounts that
-      // every Paid from and Received into picker reads.
-      { key: "settings", label: "Settings", icon: Settings, financePath: "/finance/settings" },
     ],
   },
   {
