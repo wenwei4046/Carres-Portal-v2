@@ -6,15 +6,10 @@ import {
   opsStockReleaseInputSchema,
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
-  opsStockHoldUnitInputSchema,
-  opsStockResolveUnitHoldInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockSetSiteInputSchema,
-  opsStockSetHolderInputSchema,
-  opsStockSetOwnershipInputSchema,
   opsStockImportInputSchema,
   opsReorderPointInputSchema,
   opsReserveLevelInputSchema,
@@ -837,36 +832,6 @@ opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
   return c.json({ itemId: data });
 });
 
-// CARD 2 (0341) — the inspection ENTRY door. A wrong / surplus / released /
-// customer-rejected unit goes free|reserved → on_hold with a reason and NO
-// supplier claim (claims are still born only at receiving). A reserved unit's
-// ref moves into ref_history; the SO keeps owing through Card 1's truth.
-opsStockRouter.post("/hold", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockHoldUnitInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_hold_unit", {
-    p_item_id: parsed.itemId,
-    p_reason: parsed.reason,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
-});
-
-// CARD 2 (0341) — the inspection EXIT door. A claimless hold ends
-// back_to_stock (Available) or written_off; `returned` needs the claim door.
-opsStockRouter.post("/hold-resolve", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockResolveUnitHoldInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_resolve_unit_hold", {
-    p_item_id: parsed.itemId,
-    p_outcome: parsed.outcome,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
-});
-
 opsStockRouter.post("/reassign", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockReassignInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -959,81 +924,6 @@ opsStockRouter.post("/refurbish-complete", requireOperationOrPrincipal, async (c
   });
   if (error) throw mapErr(error);
   return c.json({ itemId: data as string });
-});
-
-// =====================================================================
-// 0366 · THE UNIT FACTS — one door each
-//
-// WHERE and WHO HAS IT are separate facts and move separately: a Unit can sit
-// in the Klang warehouse while NETS Delivery is responsible for it, and it can
-// change hands without changing Site (Stock MASTER §3). Ownership is
-// Purchasing's answer to why Carres holds the goods. Every one of them leaves
-// an append-only event behind it.
-// =====================================================================
-
-opsStockRouter.post("/:itemId/site", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetSiteInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_site", {
-    p_item_id: itemId,
-    p_warehouse_id: parsed.warehouseId,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-opsStockRouter.post("/:itemId/holder", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetHolderInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_holder", {
-    p_item_id: itemId,
-    p_party_code: parsed.partyCode,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-opsStockRouter.post("/:itemId/ownership", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const parsed = await parseBody(c, opsStockSetOwnershipInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_set_ownership", {
-    p_item_id: itemId,
-    p_ownership: parsed.ownership,
-    p_supplier: parsed.supplier ?? null,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-// A person physically confirmed this Unit. Never inferred from an edit — an
-// operator opening a screen is not an operator looking at a sofa.
-opsStockRouter.post("/:itemId/verify", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_verify_unit", {
-    p_item_id: itemId,
-  });
-  if (error) throw mapErr(error);
-  return c.json({ itemId: data as string });
-});
-
-// GET /parties — WHO HAS IT, as configured. NETS is a row here, never a Site
-// and never a hard-coded name in this file.
-opsStockRouter.get("/parties", requireOperationOrPrincipal, async (c) => {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("stock_operating_parties")
-    .select("id, code, name, kind, active")
-    .eq("active", true)
-    .order("name", { ascending: true });
-  if (error) throw mapErr(error);
-  return c.json({ parties: data ?? [] });
 });
 
 // 0366 — "+ Add stock" IS GONE. A Unit is BORN when a PO or Consignment
