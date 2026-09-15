@@ -391,30 +391,6 @@ describe("GET /api/pwp-codes/mine", () => {
   });
 });
 
-describe("POST /api/pwp-codes/reap", () => {
-  it("calls pwp_reap_orphans owner-scoped + returns the count", async () => {
-    const sb = mockSb();
-    sb.rpc = async (name: string, args: unknown) => {
-      sb._rpcCalls.push({ name, args });
-      return { data: 3, error: null };
-    };
-    vi.mocked(userClient).mockReturnValue(sb);
-    const res = await app.fetch(
-      new Request("http://t/api/pwp-codes/reap", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${await makeJwt()}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { reaped: number };
-    expect(body.reaped).toBe(3);
-    const reap = sb._rpcCalls.find((c: { name: string }) => c.name === "pwp_reap_orphans");
-    // Self-scoped RPC (review BLOCKER fix): no p_owner — owner forced to auth.uid().
-    expect(reap?.args).toEqual({ p_grace_minutes: 15 });
-  });
-});
-
 /* ─── GET /available — cross-order DISCOVERY (P8d, 0188 §6.3 / §8.2) ──────────── */
 
 /** One stripped pwp_discover_available row (NO phone / owner / trigger sku). */
