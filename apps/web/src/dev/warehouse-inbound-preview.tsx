@@ -2,17 +2,31 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, useSearchParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { inboundArrivals, type ArrivalSource } from "@carres/shared";
+import {
+  buildInboundRegisterView,
+  inboundArrivals,
+  INBOUND_UNMAPPED_SITE,
+  type ArrivalSource,
+} from "@carres/shared";
 import ArrivalSourceWorkspace from "@/pages/operation/ArrivalSourceWorkspace";
 import WarehouseInbound from "@/pages/operation/WarehouseInbound";
 import { useAuth } from "@/lib/auth";
 import "@/index.css";
 useAuth.setState({ role: "operation" });
-const sites = [{ id: "preview-site", name: "Preview Site" }];
+/* The acceptance fixtures, each labelled by what it is there to prove. */
+const sites = [
+  { id: "preview-site", name: "Carres Klang Warehouse" },
+  { id: "preview-partner", name: "HOUZS" },
+];
+/** Ten product lines with long model references — the width case. */
+const TEN_LINES = Array.from({ length: 10 }, (_, i) => ({
+  sku: `LYYAR-5539-${String(i + 1).padStart(3, "0")}-CHARCOAL-3STR`,
+  name: `Booqit CNR Sectional Sofa Left-Hand Facing · Charcoal Weave ${i + 1}`,
+}));
 const arrivals = inboundArrivals({
   pos: [
     {
-      id: "PREVIEW-PO-1",
+      id: "PO-20260901-4471",
       supplier_id: "preview-supplier",
       warehouse_id: "preview-site",
       destination_id: null,
@@ -20,40 +34,117 @@ const arrivals = inboundArrivals({
       official_delivery_date: "2026-09-01",
       eta_date: null,
       placed_at: "2026-08-01",
+      so: 4471,
+    },
+    /* Goods bound for a destination with NO governed Site — the row that
+       used to vanish entirely. */
+    {
+      id: "PO-20260903-8812",
+      supplier_id: "preview-supplier",
+      warehouse_id: "preview-site",
+      destination_id: "preview-unlinked",
+      status: "open",
+      official_delivery_date: "2026-09-03",
+      eta_date: null,
+      placed_at: "2026-08-02",
+      so: 8812,
+    },
+    /** Counted stock — a quantity line that mints no Unit IDs. */
+    {
+      id: "PO-20260905-9003",
+      supplier_id: "preview-supplier",
+      warehouse_id: "preview-partner",
+      destination_id: null,
+      status: "open",
+      official_delivery_date: "2026-09-05",
+      eta_date: null,
+      placed_at: "2026-08-04",
       so: null,
     },
   ],
   sites,
-  suppliers: [{ id: "preview-supplier", name: "Preview Supplier" }],
-  destinations: [],
-  units: [1, 2, 3].map((n) => ({
-    id: String(n),
-    unit_code: `U1-000-00${n}`,
-    po_no: "PREVIEW-PO-1",
-    qty: 1,
-  })),
+  suppliers: [
+    { id: "preview-supplier", name: "Nice Future Manufacturing Sdn Bhd" },
+  ],
+  destinations: [
+    { id: "preview-unlinked", warehouse_id: null, name: "Ohana" },
+  ],
+  skuNames: TEN_LINES.map((l) => ({ sku: l.sku, name: l.name })),
+  lines: [
+    /* TEN product lines, one piece each: six correct, two damaged, two never
+       sent. Order Qty 10 · Received Qty 6 · Damaged Qty 2 · Pending 4. */
+    ...TEN_LINES.map((l, i) => ({
+      po_id: "PO-20260901-4471",
+      qty: 1,
+      destination_id: null,
+      sku: l.sku,
+      identity_mode: "exact_unit" as const,
+      received_qty: i < 6 ? 1 : 0,
+      damaged_qty: i === 6 || i === 7 ? 1 : 0,
+      wrong_item_qty: 0,
+    })),
+    {
+      po_id: "PO-20260903-8812",
+      qty: 2,
+      destination_id: null,
+      sku: TEN_LINES[1].sku,
+      identity_mode: "exact_unit" as const,
+      received_qty: 0,
+    },
+    {
+      po_id: "PO-20260905-9003",
+      qty: 24,
+      destination_id: null,
+      sku: TEN_LINES[2].sku,
+      identity_mode: "quantity" as const,
+      received_qty: 10,
+      damaged_qty: 2,
+      wrong_item_qty: 1,
+    },
+  ],
+  units: [
+    ...TEN_LINES.map((l, n) => ({
+      id: `unit-${n + 1}`,
+      unit_code: `U1-000-${String(n + 1).padStart(3, "0")}`,
+      po_no: "PO-20260901-4471",
+      qty: 1,
+      sku: l.sku,
+    })),
+    ...[1, 2].map((n) => ({
+      id: `unit-d${n}`,
+      unit_code: `U1-000-2${n}`,
+      po_no: "PO-20260903-8812",
+      qty: 1,
+      sku: TEN_LINES[1].sku,
+    })),
+  ],
+  /* TWO supplier delivery notes, each with its own receipt and date. */
   receipts: [
     {
-      id: "preview-receipt",
-      po_id: "PREVIEW-PO-1",
+      id: "preview-receipt-1",
+      po_id: "PO-20260901-4471",
       status: "posted",
-      posted_at: "2026-09-01",
-    },
-  ],
-  results: [
-    {
-      receipt_id: "preview-receipt",
-      stock_item_id: "1",
-      outcome: "received",
-      issue_kind: null,
+      posted_at: "2026-09-01T09:00:00Z",
+      grn_no: "GRN-010926-0001",
+      do_number: "DO-2026-0918-AAA",
+      goods_received_at: "2026-09-01",
     },
     {
-      receipt_id: "preview-receipt",
-      stock_item_id: "2",
-      outcome: "received_with_issue",
-      issue_kind: "damaged",
+      id: "preview-receipt-2",
+      po_id: "PO-20260901-4471",
+      status: "posted",
+      posted_at: "2026-09-04T09:00:00Z",
+      grn_no: "GRN-040926-0002",
+      do_number: "DO-2026-0930-BBB",
+      goods_received_at: "2026-09-04",
     },
   ],
+  results: Array.from({ length: 8 }, (_, n) => ({
+    receipt_id: n < 6 ? "preview-receipt-1" : "preview-receipt-2",
+    stock_item_id: `unit-${n + 1}`,
+    outcome: n < 6 ? "received" : "received_with_issue",
+    issue_kind: n < 6 ? null : "damaged",
+  })),
 });
 const previewId = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -194,6 +285,44 @@ function PreviewPage() {
     <WarehouseInbound />
   );
 }
+/** The preview answers with the SAME projection the Worker returns, so the
+ *  page under test is never given a shape production does not produce. */
+function previewRegister(url: string, empty: boolean) {
+  const rows = empty ? [] : [...arrivals, ...extraArrivals];
+  const params = new URLSearchParams(url.split("?")[1] ?? "");
+  const view = buildInboundRegisterView(
+    rows,
+    params,
+    Number(params.get("offset") ?? 0),
+    Number(params.get("limit") ?? 50),
+  );
+  const unmapped = new Map<string, { id: string | null; name: string | null; arrivals: number }>();
+  for (const row of rows)
+    if (!row.siteMapped) {
+      const key = row.destinationId ?? "";
+      const entry = unmapped.get(key) ?? {
+        id: row.destinationId,
+        name: row.destinationName,
+        arrivals: 0,
+      };
+      entry.arrivals += 1;
+      unmapped.set(key, entry);
+    }
+  return {
+    arrivals: view.rows,
+    sites: [...sites, ...extraSites],
+    unmappedDestinations: [...unmapped.values()],
+    unresolvedSources: [],
+    page: {
+      offset: Number(params.get("offset") ?? 0),
+      limit: Number(params.get("limit") ?? 50),
+      total: view.total,
+    },
+    facets: view.facets,
+  };
+}
+void INBOUND_UNMAPPED_SITE;
+
 const realFetch = window.fetch.bind(window);
 let retryFailed = false;
 window.fetch = async (input, init) => {
@@ -230,10 +359,7 @@ window.fetch = async (input, init) => {
       JSON.stringify(
         fail
           ? { message: "Preview connection failed" }
-          : {
-              arrivals: mode === "empty" ? [] : [...arrivals, ...extraArrivals],
-              sites: [...sites, ...extraSites],
-            },
+          : previewRegister(url, mode === "empty"),
       ),
       {
         status: fail ? 503 : 200,

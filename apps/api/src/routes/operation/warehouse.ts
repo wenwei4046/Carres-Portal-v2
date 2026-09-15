@@ -82,19 +82,22 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       read("purchase_orders", "id,version,supplier_id,warehouse_id,destination_id,status,official_delivery_date,eta_date,placed_at,so"),
       read("warehouses", "id,name"),
       read("suppliers", "id,name"),
-      read("purchasing_destinations", "id,warehouse_id"),
+      read("purchasing_destinations", "id,warehouse_id,name"),
       read("ops_stock_items", "id,unit_code,po_no,qty,sku"),
       /* `arrival_source_id` arrives with those same draft tables; without it
          every receipt is simply PO-backed, which is what production holds. */
       readOptionalRelation(
-        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number"),
         null,
       ).then((rows) =>
         rows ??
-        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number"),
       ),
       read("receiving_unit_results", "id,receipt_id,stock_item_id,outcome,issue_kind"),
-      read("purchase_order_lines", "id,po_id,qty,destination_id,sku"),
+      read(
+        "purchase_order_lines",
+        "id,po_id,qty,destination_id,sku,received_qty,damaged_qty,wrong_item_qty,identity_mode",
+      ),
       read("po_supplier_promises", "id,po_id,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
       optional("arrival_sources", "id,source_no,kind,claim_id,case_id,attempt_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
       optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
@@ -175,9 +178,29 @@ operationWarehouseRouter.get("/inbound", async (c) => {
         sku: row.sku,
         category: row.model_id ? modelCategory.get(row.model_id) ?? null : null,
       }));
+    /* WHICH DESTINATIONS HAVE GOODS COMING AND NO SITE TO RECEIVE THEM AT.
+       Additive and read-only: the Schedule ignores it, and Inbound uses it to
+       show the gap by name instead of leaving those arrangements invisible.
+       Named from the destination's OWN record — never an invented address. */
+    const unmappedDestinations = [
+      ...all
+        .filter((row) => !row.siteMapped)
+        .reduce((m, row) => {
+          const key = row.destinationId ?? "";
+          const entry = m.get(key) ?? {
+            id: row.destinationId,
+            name: row.destinationName,
+            arrivals: 0,
+          };
+          entry.arrivals += 1;
+          return m.set(key, entry);
+        }, new Map<string, { id: string | null; name: string | null; arrivals: number }>())
+        .values(),
+    ].sort((a, b) => (a.name ?? "~").localeCompare(b.name ?? "~"));
     return c.json({
       arrivals: view.rows,
       sites,
+      unmappedDestinations,
       sourceFacts,
       skuCategories,
       unresolvedSources: inboundUnresolvedSources(input),
