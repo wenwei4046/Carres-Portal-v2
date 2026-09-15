@@ -56,11 +56,16 @@ export function useSkuFilter(catalog: CatalogResponse) {
     setModelFilter("all");
   }
 
+  // A picked model can leave the category (its row edited to another category,
+  // then the catalog refetched). Treat that pick as "all" so the grid never
+  // shows 0 SKUs with no pill lit.
+  const liveModel = modelFilter === "all" || categoryModels.some((m) => m.id === modelFilter) ? modelFilter : "all";
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allRows
       .filter((r) => (category === "all" ? true : r.category === category))
-      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
+      .filter((r) => (liveModel === "all" ? true : r.sku.modelId === liveModel))
       .filter((r) =>
         supplierFilter === "all"
           ? true
@@ -78,12 +83,12 @@ export function useSkuFilter(catalog: CatalogResponse) {
         );
       })
       .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search, supplierFilter]);
+  }, [allRows, category, liveModel, search, supplierFilter]);
 
   return {
     category,
     pickCategory,
-    modelFilter,
+    modelFilter: liveModel,
     setModelFilter,
     search,
     setSearch,

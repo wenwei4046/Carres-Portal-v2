@@ -240,6 +240,8 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       {step === "view" && <Button variant="neutral" onClick={() => {
         setAsk(String(current?.ask_days_before ?? 3));
         setDeadline(String(current?.deadline_days_before ?? 2));
+        // Read today again: the page may have been open since yesterday.
+        setEffectiveFrom(appTodayIso());
         setStep("edit");
       }}>Edit</Button>}
     </div>
