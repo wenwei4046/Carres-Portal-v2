@@ -28,7 +28,7 @@ import {
   loadPurchasingSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -518,10 +518,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     )
     .order("created_at", { ascending: false })
     .limit(500);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const ids = (requests ?? []).map((r) => r.id as string);
   let lines: Array<Record<string, unknown>> = [];
@@ -738,10 +735,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!request) return c.json({ error: "not_found" }, 404);
 
   const { data: lines, error: lineErr } = await sb
@@ -1313,8 +1307,7 @@ manualPurchaseRouter.put("/:id/deliver-to", requireOperation, async (c) => {
         destination: (destRow?.name as string | null) ?? null,
       });
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, ...((data as Record<string, unknown> | null) ?? {}) });
 });
@@ -1490,15 +1483,11 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
         503,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
 
   const { data, error } = await sb.rpc("purchasing_create_request", header);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -1541,10 +1530,7 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
     p_purpose: purpose,
     p_request_id: requestId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -1986,10 +1972,7 @@ manualPurchaseRouter.get("/already-have", requireOperation, async (c) => {
     .select("po_id, qty, received_qty, purchase_orders!inner(id, status, eta_date)")
     .eq("sku", sku)
     .eq("purchase_orders.status", "open");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   let alreadyOnPo = 0;
   let firstPo: { id: string; eta: string | null } | null = null;

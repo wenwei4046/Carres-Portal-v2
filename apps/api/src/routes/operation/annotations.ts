@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -45,10 +45,7 @@ annotationsRouter.post("/:id/annotations", requireOperationOrPrincipal, async (c
     p_content: parsed.data.content,
     p_tag: parsed.data.tag ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data, 201);
 });
 
@@ -59,10 +56,7 @@ annotationsRouter.get("/:id/timeline", requireOperationOrPrincipal, async (c) =>
   const { data, error } = await sb.rpc("operation_get_timeline", {
     p_order_id: orderId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? []);
 });
 
@@ -89,10 +83,7 @@ escalationsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // created_by FK points to auth.users (not public.app_users) so PostgREST
   // can't traverse it. Names come from the one actor lookup.

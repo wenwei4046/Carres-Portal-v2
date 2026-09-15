@@ -4,7 +4,7 @@ import {
   setPartnerDeliveryRulesInput,
   setPartnerJourneyCalendarInput,
 } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -41,10 +41,7 @@ operationPartnersRouter.get("/", async (c) => {
       "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas",
     )
     .order("name", { ascending: true });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ partners: data ?? [] });
 });
 
@@ -115,10 +112,7 @@ operationPartnersRouter.put("/:id/delivery-rules", async (c) => {
     p_daily_capacity: parsed.data.dailyCapacity,
     p_booking_lead_days: parsed.data.bookingLeadDays,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const { data, error: readErr } = await sb
     .from("delivery_partners")
@@ -183,10 +177,7 @@ operationPartnersRouter.put("/:id/journey-calendar", async (c) => {
     p_journey_regions: parsed.data.regions,
     p_surcharge_areas: parsed.data.surchargeAreas,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   const { data, error: readErr } = await sb
     .from("delivery_partners")

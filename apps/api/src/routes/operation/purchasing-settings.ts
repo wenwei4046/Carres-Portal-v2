@@ -15,7 +15,7 @@ import { z } from "zod";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -87,10 +87,7 @@ purchasingSettingsRouter.put("/number", requireOperationOrPrincipal, async (c) =
     p_key: parsed.data.key,
     p_value: parsed.data.value,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -99,10 +96,7 @@ purchasingSettingsRouter.put("/po-days", requireOperationOrPrincipal, async (c) 
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.rpc("purchasing_set_po_days", { p_days: parsed.data.days });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -115,10 +109,7 @@ purchasingSettingsRouter.put("/production-days", requireOperationOrPrincipal, as
     p_category: parsed.data.category,
     p_days: parsed.data.days,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -140,10 +131,7 @@ purchasingSettingsRouter.put("/transit-days", requireOperationOrPrincipal, async
     p_supplier_id: parsed.data.supplierId,
     p_days: parsed.data.days,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -155,10 +143,7 @@ purchasingSettingsRouter.put("/work-week", requireOperationOrPrincipal, async (c
     p_supplier_id: parsed.data.supplierId,
     p_off_days: parsed.data.offDays,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -170,10 +155,7 @@ purchasingSettingsRouter.post("/destinations", requireOperationOrPrincipal, asyn
     p_name: parsed.data.name,
     p_address: parsed.data.address,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respondWithSettings(c);
 });
 
@@ -195,10 +177,7 @@ purchasingSettingsRouter.put(
       p_active: parsed.data.active,
       p_is_default: parsed.data.isDefault,
     });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return respondWithSettings(c);
   },
 );
@@ -219,10 +198,7 @@ purchasingSettingsRouter.put(
       p_destination_id: parsed.data.destinationId,
       p_partner_id: parsed.data.partnerId,
     });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return respondWithSettings(c);
   },
 );

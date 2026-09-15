@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -171,10 +171,7 @@ operationBadgesRouter.post("/seen", async (c) => {
   const { data, error } = await sb.rpc("mark_badge_seen", {
     p_badge_key: parsed.data.badgeKey,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ badgeKey: parsed.data.badgeKey, lastSeenAt: data });
 });
 

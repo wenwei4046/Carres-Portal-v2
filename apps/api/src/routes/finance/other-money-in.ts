@@ -8,7 +8,7 @@ import {
   otherReceiptInput,
 } from "@carres/shared/other-money-in";
 import { requireFinance } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -44,11 +44,6 @@ import type { AppEnv } from "../../types";
 const financeOtherMoneyInRouter = new Hono<AppEnv>();
 
 const uuid = z.string().uuid();
-
-function fail(c: Context<AppEnv>, error: { code?: string; message?: string; details?: string }) {
-  const m = mapPgError(error);
-  return c.json(m.body, m.status);
-}
 
 function notFound(c: Context<AppEnv>, what: string) {
   return c.json({ error: "not_found", code: "not_found", message: `${what} not found.` }, 404);

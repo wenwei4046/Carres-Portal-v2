@@ -8,7 +8,7 @@ import {
   type OpsStaffMember,
 } from "@carres/shared";
 import { dutyHolders, hasDuty, myDuties, requireDuty } from "../../lib/duties";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -142,10 +142,7 @@ staffRouter.post("/heartbeat", async (c) => {
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
   const { error } = await sb.rpc("touch_last_seen");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   await autoEnroll(c, sb);
   return c.json({ ok: true });
 });
@@ -310,10 +307,7 @@ staffRouter.put("/:userId", async (c) => {
       .from("ops_staff_settings")
       .delete()
       .eq("user_id", idCheck.data);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return c.json({ ok: true, pooled: false });
   }
 
@@ -327,10 +321,7 @@ staffRouter.put("/:userId", async (c) => {
     },
     { onConflict: "user_id" },
   );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, pooled: true });
 });
 

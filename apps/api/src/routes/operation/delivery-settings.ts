@@ -12,7 +12,7 @@ import {
   partnerVehicleInput,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
@@ -93,10 +93,7 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
 async function rpc(c: Context<AppEnv>, fn: string, args: Record<string, unknown>) {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc(fn, args);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? { ok: true });
 }
 

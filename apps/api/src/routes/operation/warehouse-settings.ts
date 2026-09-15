@@ -13,7 +13,7 @@ import {
   type WarehouseSettingsResponse,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -364,10 +364,7 @@ warehouseSettingsRouter.put("/details", requireOperationOrPrincipal, async (c) =
     p_key_contact_id: parsed.data.keyContactId ?? null,
     p_contact_number: parsed.data.contactNumber ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -379,10 +376,7 @@ warehouseSettingsRouter.put("/working-hours", requireOperationOrPrincipal, async
     p_site_id: parsed.data.siteId,
     p_rows: parsed.data.rows,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -399,10 +393,7 @@ warehouseSettingsRouter.post("/special-dates", requireOperationOrPrincipal, asyn
     p_closes_at: parsed.data.closesAt ?? null,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -420,10 +411,7 @@ warehouseSettingsRouter.put("/holiday-policy", requireOperationOrPrincipal, asyn
     p_opens_at: parsed.data.specialOpensAt ?? null,
     p_closes_at: parsed.data.specialClosesAt ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return respond(c, parsed.data.siteId);
 });
 
@@ -439,10 +427,7 @@ warehouseSettingsRouter.post("/holiday-calendar", requireOperationOrPrincipal, a
     p_verified_at: parsed.data.verifiedAt,
     p_dates: parsed.data.dates,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const siteId = await primarySiteId(sb, c.req.query("siteId"));
   return respond(c, siteId as string);
 });
@@ -456,10 +441,7 @@ for (const act of ["grant", "revoke"] as const) {
       act === "grant" ? "warehouse_grant_capability" : "warehouse_revoke_capability",
       { p_capability: parsed.data.capability, p_user_id: parsed.data.userId },
     );
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     const siteId = await primarySiteId(sb, c.req.query("siteId"));
     return respond(c, siteId as string);
   });

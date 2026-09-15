@@ -12,7 +12,7 @@ import {
   unitIdOf,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -532,10 +532,7 @@ deliveryOrdersRouter.post("/:id/proof-review", requireOperationOrPrincipal, asyn
     p_decision: parsed.data.decision,
     p_reason: parsed.data.reason ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ review: data }, 201);
 });
 
@@ -578,10 +575,7 @@ deliveryOrdersRouter.post("/:id/attempts/:attemptId/evidence", requireOperationO
       p_path: f.path,
       p_kind: f.kind,
     });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     recorded.push(data);
   }
   return c.json({ evidence: recorded }, 201);
@@ -626,10 +620,7 @@ deliveryOrdersRouter.post("/:id/signed-document", requireOperationOrPrincipal, a
     p_signed_by: parsed.data.signerName ?? null,
     p_signature_path: parsed.data.signaturePath ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ attached: data }, 201);
 });
 
@@ -785,10 +776,7 @@ deliveryOrdersRouter.post("/:id/handover", async (c) => {
       .select("id, trip_groups, orders!inner(order_lines(sku, qty))")
       .eq("id", id)
       .maybeSingle();
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     if (!doc) {
       return c.json({ error: "not_found", message: "Delivery order not found" }, 404);
     }
@@ -809,10 +797,7 @@ deliveryOrdersRouter.post("/:id/handover", async (c) => {
     p_unit_codes: parsed.data.unitCodes ?? null,
     p_evidence: parsed.data.evidence ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ event: data }, 201);
 });
 
@@ -851,10 +836,7 @@ deliveryOrdersRouter.post("/:id/outbound-prep", async (c) => {
     p_fact: parsed.data.fact,
     p_unit_codes: parsed.data.unitCodes,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ result: data }, 201);
 });
 
@@ -897,10 +879,7 @@ deliveryOrdersRouter.post(
       .select("id, voided_at")
       .eq("id", id)
       .maybeSingle();
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     if (!doc) {
       return c.json({ error: "not_found", message: "Delivery order not found" }, 404);
     }

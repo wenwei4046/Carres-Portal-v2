@@ -14,7 +14,7 @@ import {
   docNumber,
   storageHold,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { storageSkuCategories } from "../../lib/sku-categories";
@@ -69,10 +69,7 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
     .eq("order_id", idCheck.data)
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const rows = (data ?? []) as Array<Record<string, unknown>>;
 
   /* WHO RECORDED IT, AS A NAME (Sales Order payment card, 2026-09-10). The
@@ -128,10 +125,7 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     idempotencyKey: parsed.data.idempotencyKey,
     duplicateAck: parsed.data.duplicateAck,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const out = data as { payment: unknown; orders_paid: number | null };
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
 });
@@ -162,10 +156,7 @@ orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
     p_payment_id: pidCheck.data,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -192,10 +183,7 @@ orderPaymentsRouter.get("/:id/refunds", async (c) => {
     .select(REFUND_COLS)
     .eq("order_id", idCheck.data)
     .order("requested_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refunds: data ?? [] });
 });
 
@@ -215,10 +203,7 @@ orderPaymentsRouter.post("/:id/refunds", async (c) => {
     p_amount: parsed.data.amount,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data }, 201);
 });
 
@@ -240,10 +225,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/decide", async (c) => {
     p_decision: parsed.data.decision,
     p_note: parsed.data.note ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -263,10 +245,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/paid", async (c) => {
     p_method: parsed.data.method,
     p_reference: parsed.data.reference ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -354,10 +333,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/request", async (c) => {
     )
     .select(CONTROL_GATE_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ control: data });
 });
 
@@ -424,10 +400,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
     .eq("order_id", orderId)
     .select(CONTROL_GATE_COLS)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       {
@@ -580,10 +553,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     )
     .select(CONTROL_EXTENSION_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // T4 done-when: the reason lands in activity history. The 0211 trigger does
   // not watch the extension columns, so append the fact through the existing

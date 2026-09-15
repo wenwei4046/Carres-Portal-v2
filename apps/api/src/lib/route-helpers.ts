@@ -53,6 +53,12 @@ export function mapPgError(error: { code?: string; message?: string; details?: s
   }
 }
 
+/** Answer a database error with the status and body mapPgError picks for it. */
+export function fail(c: Context, error: { code?: string; message?: string; details?: string }) {
+  const m = mapPgError(error);
+  return c.json(m.body, m.status);
+}
+
 /**
  * Parse + zod-validate a JSON body. Returns the discriminated union so
  * the route can early-return on err without nested if-blocks.

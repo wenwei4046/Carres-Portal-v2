@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -235,10 +235,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
       .in("id", matchedIds)
       .order("placed_at", { ascending: false })
       .limit(200);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     pos = (data ?? []) as PoRow[];
   } else {
     // 3. No category filter — single-pass query. Embed lines without inner so
@@ -251,10 +248,7 @@ procurementTabsRouter.get("/:slug", async (c) => {
       .eq("suppliers.slug", supplierSlug)
       .order("placed_at", { ascending: false })
       .limit(200);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     pos = (data ?? []) as PoRow[];
   }
 

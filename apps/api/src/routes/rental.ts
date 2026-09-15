@@ -39,7 +39,7 @@ import {
   PRODUCT_MODELS,
   PRODUCT_SKUS,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
 import { stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
@@ -334,8 +334,7 @@ rentalRouter.post("/service-packages", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "service package insert returned no row" }, 500);
@@ -388,8 +387,7 @@ rentalRouter.patch("/service-packages/:id", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "service package not found" }, 404);
@@ -412,8 +410,7 @@ rentalRouter.delete("/service-packages/:id", async (c) => {
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -468,8 +465,7 @@ rentalRouter.post("/plans", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "rental plan insert returned no row" }, 500);
@@ -529,8 +525,7 @@ rentalRouter.patch("/plans/:id", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "rental plan not found" }, 404);
@@ -578,8 +573,7 @@ rentalRouter.delete("/plans/:id", async (c) => {
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -631,8 +625,7 @@ rentalRouter.post("/offers", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer insert returned no row" }, 500);
@@ -671,10 +664,7 @@ rentalRouter.patch("/offers/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "offer not found" }, 404);
   }
@@ -701,8 +691,7 @@ rentalRouter.delete("/offers/:id", async (c) => {
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -746,8 +735,7 @@ rentalRouter.post("/offers/:offerId/buy-prices", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "buy price insert returned no row" }, 500);
@@ -779,10 +767,7 @@ rentalRouter.patch("/buy-prices/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "buy price not found" }, 404);
   }
@@ -794,10 +779,7 @@ rentalRouter.delete("/buy-prices/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(RENTAL_BUY_PRICES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -842,8 +824,7 @@ rentalRouter.post("/offers/:offerId/services", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer service insert returned no row" }, 500);
@@ -879,10 +860,7 @@ rentalRouter.patch("/offer-services/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "offer service not found" }, 404);
   }
@@ -894,10 +872,7 @@ rentalRouter.delete("/offer-services/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(RENTAL_OFFER_SERVICES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -951,8 +926,7 @@ rentalRouter.post("/agreement-templates", async (c) => {
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "template insert returned no row" }, 500);
@@ -988,10 +962,7 @@ rentalRouter.patch("/agreement-templates/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "agreement wording not found" }, 404);
   }
@@ -1095,10 +1066,7 @@ rentalRouter.get("/approvals", async (c) => {
   approverOnly(c);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("rental_pending_approvals");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ approvals: (data ?? []) as unknown[] });
 });
 
@@ -1287,8 +1255,7 @@ rentalRouter.post("/agreements/:id/collections/:seq/record", async (c) => {
     if (detail === "billing_not_found") {
       return c.json({ error: "not_found", code: detail, message: error.message }, 404);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ recorded: data });
 });
@@ -1333,8 +1300,7 @@ rentalRouter.post("/agreements/:id/collections/:seq/interest", async (c) => {
     if (detail === "not_overdue" || detail === "not_owing" || detail === "no_interest") {
       return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ charged: data });
 });
@@ -1355,8 +1321,7 @@ rentalRouter.get("/agreements/:id/settlement-quote", async (c) => {
     if (detail === "agreement_not_found") {
       return c.json({ error: "not_found", code: detail, message: error.message }, 404);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ quote: data });
 });
@@ -1447,8 +1412,7 @@ rentalRouter.post("/agreements/:id/settle", async (c) => {
     ) {
       return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ settled: data });
 });
@@ -1479,8 +1443,7 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
     if (detail === "not_pending" || detail === "reason_required") {
       return c.json({ error: "decide_blocked", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
 
   const out = data as {
@@ -1713,8 +1676,7 @@ rentalRouter.post("/agreements", async (c) => {
     ) {
       return c.json({ error: "invalid_param", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   const out = data as CreateAgreementRpcResult | null;
   if (!out?.agreement) {
@@ -2035,10 +1997,7 @@ rentalRouter.get("/agreements/:id/stripe/checkout/:sid", async (c) => {
     .eq("session_id", sidCheck.data)
     .eq("agreement_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!row) throw new HTTPException(404, { message: "Checkout session not found" });
 
   let current = row as RentalSessionRow;

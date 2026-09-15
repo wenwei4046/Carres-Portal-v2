@@ -21,7 +21,7 @@ import {
   loadPurchasingNumbers,
   loadPurchasingSettings,
 } from "../../lib/purchasing-settings";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -536,10 +536,7 @@ purchaseRouter.post("/line/skip", requireOperation, async (c) => {
     .from("order_lines")
     .update({ excluded_from_plan: true })
     .in("id", lineIds);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, skipped: lineIds.length });
 });
 
@@ -593,10 +590,7 @@ purchaseRouter.post("/line/push-next", requireOperation, async (c) => {
     .from("order_lines")
     .update({ exclude_from_plan_until: untilIso })
     .in("id", lineIds);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, pushed: lineIds.length, until: untilIso });
 });
 
@@ -630,10 +624,7 @@ purchaseRouter.post("/snooze", requireOperation, async (c) => {
       .from("purchase_snoozes")
       .delete()
       .eq("supplier_id", supplierId);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     return c.json({ ok: true, action: "cleared", supplierId });
   }
   const { error } = await sb
@@ -642,10 +633,7 @@ purchaseRouter.post("/snooze", requireOperation, async (c) => {
       { supplier_id: supplierId, snooze_until: until, reason },
       { onConflict: "supplier_id" },
     );
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true, action: "snoozed", supplierId, until });
 });
 

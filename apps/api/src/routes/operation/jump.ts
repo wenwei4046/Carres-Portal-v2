@@ -8,7 +8,7 @@ import {
   type JumpDocumentResult,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -106,10 +106,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
         .or(ranges.map((r) => `and(so.gte.${r.gte},so.lt.${r.lt})`).join(","))
         .order("so", { ascending: false })
         .limit(PER_TYPE);
-      if (error) {
-        const m = mapPgError(error);
-        return c.json(m.body, m.status);
-      }
+      if (error) return fail(c, error);
       for (const row of (data ?? []) as Array<{
         id: string;
         so: number | null;
@@ -136,10 +133,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
       .ilike("id", `%${needle}%`)
       .order("id", { ascending: false })
       .limit(PER_TYPE);
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     for (const row of (data ?? []) as Array<{
       id: string;
       suppliers: { name: string | null } | Array<{ name: string | null }> | null;
@@ -173,10 +167,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
       .order("goods_received_at", { ascending: false, nullsFirst: false });
     q = onDate ? q.eq("goods_received_at", onDate) : q.limit(GRN_RECENT_WINDOW);
     const { data, error } = await q;
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     const matches: JumpDocumentResult[] = [];
     for (const row of (data ?? []) as Array<{
       id: string;

@@ -22,7 +22,7 @@ import {
   type GuaranteeRemedy,
   type GuaranteeStatus,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
 
@@ -188,10 +188,7 @@ guaranteesRouter.get("/", async (c) => {
   const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(cap + 1);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rows = (data ?? []) as any[];
 
@@ -239,10 +236,7 @@ guaranteesRouter.get("/order/:orderId", async (c) => {
     .select(ENT_SELECT)
     .eq("order_id", orderId)
     .order("unit_no");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const labels = await termLabels(sb);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const items = ((data ?? []) as any[]).map((r) => toDto(r, labels));
@@ -266,10 +260,7 @@ guaranteesRouter.post("/:id/claim", async (c) => {
     p_replacement_sku: parsed.data.replacementSku ?? null,
     p_notes: parsed.data.notes ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data ?? { ok: true });
 });
 
