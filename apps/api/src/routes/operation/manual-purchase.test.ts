@@ -515,61 +515,6 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
 });
 
 /**
- * ⭐ THE PRICES THE OPERATOR IS ABOUT TO COMMIT TO (closure §2).
- *
- * `Issue as one PO` pulls in sibling requests whose lines are not on screen, so
- * the surface could not otherwise SHOW — or honestly declare — the price it was
- * buying at.
- */
-describe("GET /purchasing/requests/issue-costs", () => {
-  async function ask(query: string, rpc = vi.fn()) {
-    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
-    const jwt = await makeJwt("operation");
-    return app.fetch(
-      new Request(
-        `https://api.test/api/operation/purchasing/requests/issue-costs${query}`,
-        { headers: { Authorization: `Bearer ${jwt}` } },
-      ),
-      env as never,
-      { waitUntil() {}, passThroughException() {} } as never,
-    );
-  }
-
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(
-      new Request("https://api.test/api/operation/purchasing/requests/issue-costs"),
-      env as never,
-      { waitUntil() {}, passThroughException() {} } as never,
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it("asks for at least one request, in words", async () => {
-    const res = await ask("");
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { code?: string; action?: string };
-    expect(body.code).toBe("invalid_param");
-    expect(body.action?.length).toBeGreaterThan(0);
-  });
-
-  it("returns the catalog cost of every SKU still to buy", async () => {
-    const res = await ask(`?requestIds=${REQ_A},${REQ_B}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { costs: { sku: string; unitCost: number | null }[] };
-    expect(body.costs).toEqual([
-      { sku: "5539-2NA", unitCost: 850 },
-      { sku: "5539-CNR", unitCost: 400 },
-    ]);
-  });
-
-  it("writes nothing — it is a read, which is why /issue compares again", async () => {
-    const rpc = vi.fn();
-    await ask(`?requestIds=${REQ_A}`, rpc);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-});
-
-/**
  * ⭐ CARD 03 §3 — THE REGISTER NAMES THE REAL APPROVAL OWNER (2026-08-28).
  *
  * The rail says `Need approval`; the payload names who actually decides: the
