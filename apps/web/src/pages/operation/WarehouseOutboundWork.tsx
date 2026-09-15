@@ -389,7 +389,7 @@ export default function WarehouseOutboundWork() {
     (!params.get("to") || params.get("to") === params.get("from"))
       ? params.get("from")
       : null);
-  const empty = exactDate
+  const empty = exactDate && !params.get("q") && !selectedDo
     ? warehouseEmptyDaySentence(fmtDate(exactDate))
     : effectiveView === "open" && !context && !params.get("q") && !selectedDo
       ? "No pickups awaiting loading or driver confirmation match these filters."
@@ -544,6 +544,7 @@ export default function WarehouseOutboundWork() {
               stickyIdentity={{ columnKey: "document" }}
               key={`${params.get("q") === null ? "clear" : "search"}:${selectedDo ?? ""}:${selectedDo ? view.rows.map((c) => c.warehouseSiteId ?? c.fromLocation).join(",") : ""}`}
               appearance="reference"
+              wrapToolbar
               rows={view.rows}
               columns={columns}
               rowKey={(c) => `${c.deliveryOrderId ?? c.doNumber}:${c.warehouseSiteId ?? c.fromLocation}`}

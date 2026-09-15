@@ -222,6 +222,8 @@ describe("the footer tells the truth about what can be promised", () => {
       unit({ id: "c", availability: "reserved", qty: 1 }),
     ];
     expect(summariseRegister(rows)).toEqual({ units: 3, available: 1, bulkOnHand: 555 });
+    expect(summariseRegister([unit({ identityScope: "quantity", qty: 1, availability: "available" })]))
+      .toEqual({ units: 1, available: 0, bulkOnHand: 1 });
   });
 
   it("a bulk record NEVER counts as promisable — 0366 forbids it being reserved", () => {
@@ -231,19 +233,19 @@ describe("the footer tells the truth about what can be promised", () => {
 
   it("prints both numbers when bulk exists, and one when it does not", () => {
     expect(registerSummaryLine({ units: 90, available: 85, bulkOnHand: 893 }, 90))
-      .toBe("90 Units · 85 you can promise · 893 pieces you cannot");
+      .toBe("90 records · 85 you can promise · 893 pieces you cannot");
     expect(registerSummaryLine({ units: 85, available: 85, bulkOnHand: 0 }, 85))
-      .toBe("85 Units · 85 you can promise");
+      .toBe("85 records · 85 you can promise");
   });
 
   it("says 'of' when the list is narrowed, so a filtered view cannot look whole", () => {
     expect(registerSummaryLine({ units: 12, available: 12, bulkOnHand: 0 }, 90))
-      .toBe("12 of 90 Units · 12 you can promise");
+      .toBe("12 of 90 records · 12 you can promise");
   });
 
   it("is plural-correct for one Unit", () => {
     expect(registerSummaryLine({ units: 1, available: 1, bulkOnHand: 0 }, 1))
-      .toBe("1 Unit · 1 you can promise");
+      .toBe("1 record · 1 you can promise");
   });
 });
 

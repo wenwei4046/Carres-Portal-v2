@@ -417,3 +417,22 @@ describe("GET /register/:unitCode — one exact Unit", () => {
     expect(body.unit.identityScope).toBe("unit");
   });
 });
+
+
+describe("physical evidence read boundary", () => {
+  it("refuses a counted row's technical key before reading movement sources", async () => {
+    const { sb, tables } = buildSb({ single: { id: "bulk", identity_scope: "quantity" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await app.request("/api/ops/stock/register/technical-key/movements", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(response.status).toBe(404);
+    expect(tables).toEqual(["stock_unit_register_v"]);
+  });
+  it("does not admit a dealer to Warehouse physical history", async () => {
+    const response = await app.request("/api/ops/stock/register/U1-000-001/movements", {
+      headers: { Authorization: `Bearer ${await makeJwt("dealer")}` },
+    }, env);
+    expect(response.status).toBe(403);
+  });
+});

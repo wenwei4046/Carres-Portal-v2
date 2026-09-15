@@ -91,6 +91,27 @@ function setSchedule(over: Partial<WarehouseScheduleResult> = {}) {
   };
 }
 
+describe("work outside the operating columns", () => {
+  it("keeps overdue work reachable with its original date and source", () => {
+    setSchedule({ cards: [card({ id: "earlier", date: "2026-09-10", overdue: true })] });
+    mount();
+    const list = screen.getByTestId("ws-earlier");
+    fireEvent.click(within(list).getByText(/Earlier work still overdue/));
+    expect(within(list).getByRole("link", { name: "PO-2609-0001" })).toHaveAttribute("href", "/operation?tab=warehouse-inbound&po=po-1");
+    expect(list).toHaveTextContent(/10/);
+    expect(screen.queryByTestId("ws-card-earlier")).toBeNull();
+  });
+  it("retains work dated on a closed day without moving it onto a working day", () => {
+    setSchedule({ operatingDates: DATES.filter((date) => date !== "2026-09-16"), cards: [card({ id: "closed", date: "2026-09-16" })] });
+    mount();
+    const list = screen.getByTestId("ws-off-days");
+    fireEvent.click(within(list).getByText(/Scheduled on other dates/));
+    expect(within(list).getByRole("link", { name: "PO-2609-0001" })).toBeInTheDocument();
+    expect(list).toHaveTextContent(/16/);
+    expect(screen.queryByTestId("ws-card-closed")).toBeNull();
+  });
+});
+
 let wide = true;
 beforeEach(() => {
   __resetScheduleContext();

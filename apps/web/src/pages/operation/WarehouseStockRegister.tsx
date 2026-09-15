@@ -193,7 +193,8 @@ export default function WarehouseStockRegister() {
       {
         key: "unitCode",
         label: "Unit ID",
-        width: 148,
+        width: 130,
+        wrap: true,
         sortable: true,
         // Display, search and EXPORT all read the one resolver. Counted goods
         // have no identity, so the column prints `—` rather than the technical
@@ -202,22 +203,25 @@ export default function WarehouseStockRegister() {
         exportValue: (u) => displayUnitId(u),
         chooserGroup: "Unit",
         accessor: (u) => (
-          <span className="font-mono text-meta text-base-900">{displayUnitId(u)}</span>
+          unitIdOf(u) ? <Link className="font-mono text-meta text-kit-blue-11 hover:underline" to={`/operation/stock/unit/${encodeURIComponent(unitIdOf(u)!)}`}>{displayUnitId(u)}</Link> : <span className="font-mono text-meta text-base-900">—</span>
         ),
       },
       {
         key: "sku",
         label: "Product",
-        minWidth: 220,
+        width: 195,
+        wrap: true,
         sortable: true,
         searchValue: (u) => `${u.productName ?? ""} ${u.sku}`,
         exportValue: (u) => u.productName ?? u.sku,
         chooserGroup: "Unit",
         accessor: (u) => (
-          <div className="min-w-0">
-            <div className="truncate text-body text-base-900" title={u.productName ?? u.sku}>
+          <div className="min-w-0 whitespace-normal break-words">
+            <div className="whitespace-normal break-words text-body text-base-900" title={u.productName ?? u.sku}>
               {u.productName ?? u.sku}
             </div>
+            <div className="whitespace-normal break-words text-meta text-base-500">{u.sku} · {u.category ?? "Not in catalog"}</div>
+            <div className="text-meta text-base-700">Qty {u.qty}</div>
             {/* An inline second line is the ONE exception to a single-line row
                 (Constitution §2) — and it earns it: a bulk record is not one
                 Unit, and the operator must see that before promising it. */}
@@ -232,6 +236,7 @@ export default function WarehouseStockRegister() {
       {
         key: "availability",
         label: "Stock use",
+        defaultHidden: true,
         width: 150,
         sortable: true,
         filterType: "enum",
@@ -247,20 +252,27 @@ export default function WarehouseStockRegister() {
       },
       {
         key: "site",
-        label: "Site",
-        width: 180,
+        label: "Site / stock use",
+        width: 160,
+        wrap: true,
         sortable: true,
         filterType: "enum",
         filterValue: (u) => u.siteName ?? "Not recorded",
         exportValue: (u) => u.siteName ?? "",
         chooserGroup: "Place",
         accessor: (u) => (
-          <span className="truncate text-meta text-base-800">{u.siteName ?? "Not recorded"}</span>
+          <div className="space-y-1 whitespace-normal break-words text-meta text-base-800">
+            <div>{u.siteName ?? "Site not recorded"}</div>
+            <div>Who has it · {u.holderName ?? "Not recorded"}</div>
+            <div>{availabilityLabel(u.availability)} · {READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition}</div>
+            {attentionSentence(u) && <div className="text-kit-amber-11">{attentionSentence(u)}</div>}
+          </div>
         ),
       },
       {
         key: "holder",
         label: "Who has it",
+        defaultHidden: true,
         width: 150,
         sortable: true,
         filterType: "enum",
@@ -269,7 +281,7 @@ export default function WarehouseStockRegister() {
         chooserGroup: "Place",
         accessor: (u) =>
           u.holderName ? (
-            <span className="truncate text-meta text-base-800">{u.holderName}</span>
+            <span className="whitespace-normal break-words text-meta text-base-800">{u.holderName}</span>
           ) : (
             /* An absent holder stays absent instead of inventing an owner. */
             <span className="text-meta text-base-400">Not recorded</span>
@@ -294,6 +306,7 @@ export default function WarehouseStockRegister() {
       {
         key: "condition",
         label: "Condition",
+        defaultHidden: true,
         width: 130,
         sortable: true,
         filterType: "enum",
@@ -317,7 +330,7 @@ export default function WarehouseStockRegister() {
         accessor: (u) => {
           const line = attentionSentence(u);
           return line ? (
-            <span className="truncate text-meta text-kit-amber-11" title={line}>
+            <span className="whitespace-normal break-words text-meta text-kit-amber-11" title={line}>
               {line}
             </span>
           ) : (
@@ -327,28 +340,31 @@ export default function WarehouseStockRegister() {
       },
       {
         key: "source",
-        label: "PO No",
-        width: 160,
+        label: "Orders / dates",
+        width: 230,
+        wrap: true,
         sortable: true,
         searchValue: (u) => u.poNo ?? "",
         exportValue: (u) => u.poNo ?? "",
         chooserGroup: "Source",
-        accessor: (u) =>
-          u.poNo ? (
-            <button className="truncate font-mono text-meta text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/procurement?po=${encodeURIComponent(u.poNo!)}`)}>{u.poNo}</button>
-          ) : (
-            <span className="text-meta text-base-400">Not recorded</span>
-          ),
+        accessor: (u) => <div className="space-y-1 whitespace-normal break-words text-meta">
+          <div>{u.poNo ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/procurement?po=${encodeURIComponent(u.poNo!)}`)}>{u.poNo}</button> : "No purchase order"}</div>
+          <div>PO issued · {u.poDate ? fmtDate(u.poDate) : "Not recorded"}</div>
+          <div>{u.soldOrderId && u.reservedRef ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}>{u.reservedRef}</button> : u.reservedRef ?? "No Sales Order"}</div>
+          <div>SO issued · {u.soDate ? fmtDate(u.soDate) : "Not recorded"}</div>
+          <div>Expected arrival · {u.expectedArrival ? fmtDate(u.expectedArrival) : "Not recorded"}</div>
+          <div>Last verified · {u.lastVerifiedAt ? fmtDate(u.lastVerifiedAt) : "Not recorded"}</div>
+        </div>,
       },
       {
-        key: "so", label: "SO No", width: 150, sortable: true, chooserGroup: "Source",
+        key: "so", defaultHidden: true, label: "SO No", width: 150, sortable: true, chooserGroup: "Source",
         searchValue: (u) => u.reservedRef ?? "", exportValue: (u) => u.reservedRef ?? "",
         accessor: (u) => u.soldOrderId && u.reservedRef
           ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}>{u.reservedRef}</button>
           : <span>{u.reservedRef ?? "Not recorded"}</span>,
       },
       ...([ ["soDate", "SO date"], ["poDate", "PO date"], ["expectedArrival", "Expected arrival"], ["lastVerifiedAt", "Last verified"] ] as const).map(([key, label]): DataGridColumn<StockRegisterUnit> => ({
-        key, label, width: 150, sortable: true, filterType: "date", chooserGroup: "Dates",
+        key, label, defaultHidden: true, width: 150, sortable: true, filterType: "date", chooserGroup: "Dates",
         dateValue: (u) => u[key] ?? null, exportValue: (u) => u[key] ?? "",
         accessor: (u) => u[key] ? fmtDate(u[key]!) : "Not recorded",
       })),
@@ -362,21 +378,7 @@ export default function WarehouseStockRegister() {
         exportValue: (u) => u.supplier ?? "",
         chooserGroup: "Source",
         accessor: (u) => (
-          <span className="truncate text-meta text-base-700">{u.supplier ?? "Not recorded"}</span>
-        ),
-      },
-      {
-        key: "dateIn",
-        label: "Received date",
-        defaultHidden: true,
-        width: 130,
-        sortable: true,
-        filterType: "date",
-        dateValue: (u) => u.dateIn,
-        exportValue: (u) => u.dateIn ?? "",
-        chooserGroup: "Dates",
-        accessor: (u) => (
-          <span className="text-meta text-base-700">{u.dateIn ? fmtDate(u.dateIn) : "Not recorded"}</span>
+          <span className="whitespace-normal break-words text-meta text-base-700">{u.supplier ?? "Not recorded"}</span>
         ),
       },
       {
@@ -465,7 +467,7 @@ export default function WarehouseStockRegister() {
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.warehouse.inventory.v2"
+              storageKey="carres.warehouse.inventory.v3"
               rowKey={(u) => u.id}
               exportName="Inventory"
               searchPlaceholder="Unit ID, product, PO, SO or supplier…"

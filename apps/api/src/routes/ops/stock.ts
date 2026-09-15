@@ -38,6 +38,7 @@ import {
   canonicalUnitIdFrom,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { stockMovementEvidence } from "../../lib/stock-movement-evidence";
 import { stockRegisterContext } from "../../lib/stock-register-context";
 import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
@@ -353,7 +354,18 @@ opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c)
     };
   });
 
-  return c.json({ unit, events });
+  const context = await stockRegisterContext(sb, [unit]);
+  return c.json({ unit: context[0], events });
+});
+
+opsStockRouter.get("/register/:unitCode/movements", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const code = c.req.param("unitCode").replace(/([\\%_])/g, "\\$1");
+  const { data: unit, error } = await sb.from("stock_unit_register_v")
+    .select("id,identity_scope").ilike("unit_code", code).maybeSingle();
+  if (error) throw mapErr(error);
+  if (!unit || unit.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
+  return c.json({ evidence: await stockMovementEvidence(sb, unit.id) });
 });
 
 // =====================================================================

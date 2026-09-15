@@ -1,6 +1,7 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   availabilityLabel,
+  stockSiteVisits,
   UNIT_LIFECYCLE_OUTCOME_LABEL,
   UNIT_OWNERSHIP_LABEL,
   type UnitAvailability,
@@ -8,7 +9,7 @@ import {
   READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
-import { useStockUnit } from "@/lib/queries";
+import { useStockMovementEvidence, useStockUnit } from "@/lib/queries";
 import ModuleHeader from "./components/ModuleHeader";
 
 /**
@@ -60,6 +61,8 @@ export default function WarehouseUnitDetail() {
   const { data, isLoading, isError, error } = useStockUnit(unitCode);
 
   const unit = data?.unit;
+  const physical = useStockMovementEvidence(unit?.unitCode);
+  const movement = stockSiteVisits(physical.data?.evidence ?? []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -146,22 +149,22 @@ export default function WarehouseUnitDetail() {
                 <h2 className="text-label font-semibold text-base-900">Connected records</h2>
               </header>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-3 px-4 py-4 md:grid-cols-3">
-                <Fact label="Product">{unit.sku}</Fact>
+                <Fact label="Product">{unit.productName ?? unit.sku}<div className="text-meta text-base-500">{unit.sku}</div></Fact>
                 <Fact label="Category">
                   {unit.category ?? <Absent>Not in catalog</Absent>}
                 </Fact>
                 <Fact label="Supplier">{unit.supplier ?? <Absent>—</Absent>}</Fact>
                 <Fact label="Source order">
                   {unit.poNo ? (
-                    <span className="font-mono">{unit.poNo}</span>
+                    <Link className="font-mono text-kit-blue-11 hover:underline" to={`/operation/procurement?po=${encodeURIComponent(unit.poNo)}`}>{unit.poNo}</Link>
                   ) : (
                     <Absent>No purchase order</Absent>
                   )}
                 </Fact>
-                <Fact label="Came in">{unit.dateIn ?? <Absent>—</Absent>}</Fact>
+                <Fact label="PO issued">{unit.poDate ? fmtDate(unit.poDate) : <Absent>Not recorded</Absent>}</Fact>
                 <Fact label="Promised to">
                   {unit.reservedRef ? (
-                    <span className="font-mono">{unit.reservedRef}</span>
+                    unit.soldOrderId ? <Link className="font-mono text-kit-blue-11 hover:underline" to={`/operation/orders/${encodeURIComponent(unit.soldOrderId)}`}>{unit.reservedRef}</Link> : <span className="font-mono">{unit.reservedRef}</span>
                   ) : (
                     <Absent>Not promised</Absent>
                   )}
@@ -169,21 +172,43 @@ export default function WarehouseUnitDetail() {
               </dl>
             </section>
 
+            <section className="rounded-md border border-base-200 bg-white">
+              <header className="border-b border-base-100 px-4 py-2.5">
+                <h2 className="text-label font-semibold text-base-900">Site visits</h2>
+              </header>
+              {physical.isLoading ? <p className="px-4 py-4 text-meta text-base-500">Loading physical receipts and departures…</p> : physical.isError ? <div className="px-4 py-4 text-meta text-base-500">Physical receipt and departure evidence could not be loaded. <button className="text-kit-blue-11 hover:underline" onClick={() => void physical.refetch()}>Try again</button></div> : <>
+                {movement.visits.length === 0 ? <p className="px-4 py-4 text-meta text-base-500">No physical receipt recorded. PO issue dates are not receipt dates.</p> : (
+                  <ul className="divide-y divide-base-100">
+                    {movement.visits.map(({ receipt, departure }) => (
+                      <li key={receipt.id} className="space-y-2 px-4 py-4 text-meta">
+                        <h3 className="font-semibold text-base-900">{receipt.siteName ?? "Site not recorded"}</h3>
+                        <p>Received {fmtDate(receipt.at)} · <button className="text-kit-blue-11 hover:underline" onClick={() => navigate(receipt.href)}>{receipt.reference}</button></p>
+                        <p>{departure ? <>Departed {fmtDate(departure.at, { time: true })} · <button className="text-kit-blue-11 hover:underline" onClick={() => navigate(departure.href)}>{departure.reference}</button></> : "Departure not paired with this receipt"}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {movement.unpairedDepartures.length > 0 && <div className="space-y-2 border-t border-base-100 px-4 py-4 text-meta">
+                  <h3 className="font-semibold text-base-900">Departures without a matching Site receipt</h3>
+                  <p className="text-base-500">These records do not establish a same-Site visit. The current Site cannot supply a missing historical Site.</p>
+                  {movement.unpairedDepartures.map((departure) => <p key={departure.id}>{fmtDate(departure.at, { time: true })} · <button className="text-kit-blue-11 hover:underline" onClick={() => navigate(departure.href)}>{departure.reference}</button> · {departure.siteName ?? "Site not recorded"}</p>)}
+                </div>}
+              </>}
+            </section>
+
             {/* ── IN & OUT ───────────────────────────────────────────────── */}
             <section className="rounded-md border border-base-200 bg-white">
               <header className="border-b border-base-100 px-4 py-2.5">
-                <h2 className="text-label font-semibold text-base-900">In &amp; out</h2>
+                <h2 className="text-label font-semibold text-base-900">History</h2>
               </header>
               {data.events.length === 0 ? (
                 <p className="px-4 py-4 text-meta text-base-500">
-                  Nothing recorded yet. Every physical change — received, moved,
-                  handed over, counted, inspected — is written here and can never
-                  be edited or deleted.
+                  No changes recorded.
                 </p>
               ) : (
                 <ul className="divide-y divide-base-100">
                   {data.events.map((e) => (
-                    <li key={e.id} className="flex items-baseline gap-3 px-4 py-2.5">
+                    <li key={e.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5">
                       <span className="w-44 shrink-0 text-meta text-base-500">
                         {fmtDate(e.eventAt, { time: true })}
                       </span>

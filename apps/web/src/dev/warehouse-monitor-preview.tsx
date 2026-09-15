@@ -17,10 +17,13 @@ import {
   deliveryWarehouseScheduleEvents,
   inboundArrivals,
   inboundUnresolvedSources,
+  warehouseArrivalSourceFacts,
   type DeliveryWarehouseScheduleInput,
   type InboundInput,
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
+import WarehouseStockRegister from "@/pages/operation/WarehouseStockRegister";
+import WarehouseUnitDetail from "@/pages/operation/WarehouseUnitDetail";
 import WarehouseWorkspace from "@/pages/operation/WarehouseWorkspace";
 import WarehouseInbound from "@/pages/operation/WarehouseInbound";
 import WarehouseOutboundWork from "@/pages/operation/WarehouseOutboundWork";
@@ -248,6 +251,15 @@ const INBOUND_INPUT = {
   sourceEvents: [],
 } as unknown as InboundInput;
 
+const STOCK_UNIT = {
+  id: "preview-unit", unitCode: "U1-260-019", identityScope: "unit", sku: "LYYAR-5539-010-CHARCOAL-3STR",
+  productName: "Boqqit CNR Sectional Sofa · Left-Hand Facing · Charcoal Weave 10", category: "sofa",
+  warehouseId: "wh-1", siteName: "Carres Klang Warehouse", holderPartyId: null, holderName: "Carres Warehouse",
+  ownership: "carres_owned", supplier: "Nice Future Manufacturing Sdn Bhd", poNo: "PO-20260901-4471",
+  status: "free", condition: "new", needsRepair: false, holdReason: null, reservedRef: null, soldOrderId: null,
+  qty: 1, dateIn: "2026-08-01", lastVerifiedAt: null, availability: "available", lifecycleOutcome: "active",
+  lastEventAt: null, lastEvent: null, poDate: "2026-08-01", soDate: null, expectedArrival: "2026-09-01",
+};
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
@@ -257,7 +269,19 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  if (url.includes("/warehouse-schedule")) return json({ events: EVENTS });
+  if (url.includes("/api/ops/stock/register")) {
+    if (url.includes("/movements")) return json({ evidence: [
+      { id: "r1", unitId: STOCK_UNIT.id, direction: "in", siteId: "wh-1", siteName: "Carres Klang Warehouse", at: "2026-09-01", reference: "GRN-1", href: "/operation?tab=receiving&session=r1", actorId: "actor" },
+      { id: "d1", unitId: STOCK_UNIT.id, direction: "out", siteId: "wh-1", siteName: "Carres Klang Warehouse", at: "2026-09-02T10:00:00Z", reference: "TR-1", href: "/operation?tab=arrival-source&arrival=d1", actorId: "actor" },
+      { id: "r2", unitId: STOCK_UNIT.id, direction: "in", siteId: "wh-1", siteName: "Carres Klang Warehouse", at: "2026-09-05", reference: "GRN-2", href: "/operation?tab=receiving&session=r2", actorId: "actor" },
+      { id: "d2", unitId: STOCK_UNIT.id, direction: "out", siteId: null, siteName: null, at: "2026-09-06T10:00:00Z", reference: "DO-1", href: "/operation?tab=warehouse-outbound&do=DO-1", actorId: "actor" },
+    ] });
+    if (url.includes("/register/")) return json({ unit: STOCK_UNIT, events: [] });
+    return json({ units: [STOCK_UNIT, { ...STOCK_UNIT, id: "bulk", unitCode: "technical-key", identityScope: "quantity", qty: 10, productName: "Interchangeable fittings", sku: "FITTING-1", category: "accessory" }], total: 2 });
+  }
+  if (url.includes("/warehouse-settings")) return json({ details: { status: "active" }, workingHours: [], specialDates: [], holidayPolicy: null });
+  if (url.includes("/warehouse-schedule")) return json({ events: EVENTS, skuCategories: [{ sku: "MAT-KING-1", category: "mattress" }, { sku: "BED-2", category: "bedframe" }, { sku: "SOFA-1", category: "sofa" }] });
+  if (url.includes("/delivery-arrangements")) return json({ arrangements: [] });
   if (url.includes("/api/operation/warehouse/inbound")) {
     const qs = new URLSearchParams(url.split("?")[1] ?? "");
     const rows = inboundArrivals(INBOUND_INPUT);
@@ -266,6 +290,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const view = buildInboundRegisterView(rows, qs, offset, limit);
     return json({
       arrivals: view.rows,
+      sourceFacts: warehouseArrivalSourceFacts({ pos: INBOUND_INPUT.pos, lines: INBOUND_INPUT.lines }),
+      skuCategories: [{ sku: "MAT-KING-1", category: "mattress" }, { sku: "BED-2", category: "bedframe" }, { sku: "SOFA-1", category: "sofa" }],
       sites: [
         { id: "wh-1", name: "Carres Klang Warehouse" },
         { id: "wh-2", name: "HOUZS Balakong" },
@@ -300,6 +326,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 function TabSwitch() {
   const [params] = useSearchParams();
   const tab = params.get("tab") ?? "warehouse-arrival-schedule";
+  if (tab === "stock-onhand") return <WarehouseStockRegister />;
   if (tab === "warehouse-inbound") return <WarehouseInbound />;
   if (tab === "warehouse-outbound") return <WarehouseOutboundWork />;
   if (tab === "warehouse-pickup-schedule")
@@ -321,6 +348,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <Routes>
+          <Route path="/operation/stock/unit/:unitCode" element={<div className="flex h-screen"><WarehouseUnitDetail /></div>} />
           <Route path="*" element={<div className="flex h-screen"><div className="hidden w-[240px] shrink-0 border-r border-kit-slate-5 md:block">Portal sidebar</div><div className="min-w-0 flex-1"><TabSwitch /></div><div className="hidden w-[52px] shrink-0 border-l border-kit-slate-5 md:block" /></div>} />
         </Routes>
       </BrowserRouter>

@@ -452,6 +452,7 @@ function pickupOpenHref(card: WarehouseOutboundCard): string {
   const site = card.warehouseSiteId ?? card.fromLocation;
   if (site) p.set("site", site);
   p.set("do", card.doNumber);
+  p.set("loading", `${card.deliveryOrderId ?? card.doNumber}:${card.warehouseSiteId ?? card.fromLocation}`);
   return `/operation?${p}`;
 }
 

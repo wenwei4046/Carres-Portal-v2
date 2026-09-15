@@ -373,7 +373,8 @@ describe("Inbound · the row's own facts", () => {
       "href",
       "/operation/stock/unit/U1-000-001",
     );
-    expect(screen.getByText("Supplier DO No DO-8821")).toBeInTheDocument();
+    expect(screen.queryByText("Receiving records")).toBeNull();
+    expect(screen.getByTestId("inbound-receipt-r1")).toHaveTextContent("DO-8821");
     /* The link-away door is gone — receiving happens on this page. */
     expect(
       screen.queryByRole("link", { name: "Open Receiving Session" }),

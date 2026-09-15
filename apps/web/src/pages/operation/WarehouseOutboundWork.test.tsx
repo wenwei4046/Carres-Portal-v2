@@ -318,6 +318,13 @@ describe("Warehouse Outbound — the unified Register", () => {
     );
   });
 
+  it("a search with no match does not claim that its date has no pickups", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-08&q=NO-SUCH-RECORD");
+    expect(await screen.findByText("No pickups match these filters.")).toBeInTheDocument();
+    expect(screen.queryByText("No pickups on Tue, 8 Sep. Choose another date.")).toBeNull();
+  });
+
   it("scanning a Unit outside this DO's scope is refused in words; a valid scan calls the governed door", async () => {
     stubApi();
     mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019&loading=do-19:Carres%20Klang%20Warehouse");
