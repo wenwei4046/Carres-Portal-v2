@@ -894,6 +894,7 @@ export default function WarehouseInbound() {
               stickyIdentity={{ columnKey: "document" }}
               key={params.get("q") === null ? "clear" : "search"}
               appearance="reference"
+              wrapToolbar
               rows={rows}
               columns={columns}
               rowKey={(r) => r.id}

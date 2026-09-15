@@ -212,6 +212,8 @@ export type DataGridProps<T> = {
   appearance?: "default" | "reference";
   /** Keep frequent controls labelled while the container has room. */
   labelledToolbar?: boolean;
+  /** Let a page's date/context controls wrap without clipping; retains icon controls. */
+  wrapToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -524,6 +526,7 @@ function DataGridInner<T>({
   initialSearch = "",
   appearance = "default",
   labelledToolbar = false,
+  wrapToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -1822,7 +1825,7 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
-        labelledToolbar ? styles.rootLabelledToolbar : null,
+        labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
