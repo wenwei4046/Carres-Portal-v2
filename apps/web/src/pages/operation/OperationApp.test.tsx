@@ -109,6 +109,9 @@ vi.mock("./components/OperationRightRail", () => ({
 vi.mock("./components/GlobalTopBar", () => ({
   default: () => <div data-testid="global-topbar-stub">topbar</div>,
 }));
+vi.mock("./ArrivalSourceWorkspace", () => ({
+  default: () => <div data-testid="arrival-workspace-stub">Transfer</div>,
+}));
 // ⭐ SALES ORDER PRODUCTION CUTOVER (2026-08-10) — the two Orders doors. Both
 // self-fetch, so both are stubbed; this suite tests WHICH ROUTE MOUNTS WHICH,
 // which is the whole of the cutover in code.
@@ -341,6 +344,11 @@ describe("OperationApp — the retired Edit Delivery URL lands on the Monitor ro
  * two bells, two gears on one screen).
  */
 describe("OperationApp — Warehouse surfaces draw one top row, not two", () => {
+  it("a transfer workspace owns its header without a second global bar", () => {
+    renderApp("/operation?tab=arrival-source&kind=transfer");
+    expect(screen.getByTestId("arrival-workspace-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
   it("?tab=stock-onhand mounts the Inventory Register with no slim bar", () => {
     renderApp("/operation?tab=stock-onhand");
     expect(screen.getByTestId("stock-register-stub")).toBeInTheDocument();

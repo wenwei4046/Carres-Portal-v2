@@ -12,6 +12,8 @@ import {
 
 const h = vi.hoisted(() => ({
   loading: false,
+  posLoading: false,
+  unresolvedSources: [] as string[],
   error: null as Error | null,
   refetch: vi.fn(),
   duty: { allowed: true, loading: false },
@@ -54,7 +56,7 @@ vi.mock("@/lib/queries", () => ({
     data: { allowed: h.duty.allowed },
     isLoading: h.duty.loading,
   }),
-  useOperationPos: () => ({ data: { pos: [] }, isLoading: false }),
+  useOperationPos: () => ({ data: { pos: [] }, isLoading: h.posLoading }),
   useOperationSuppliers: () => ({ data: { suppliers: [] }, isLoading: false }),
   useOperationWarehouse: () => ({ data: { warehouses: [] }, isLoading: false }),
 }));
@@ -64,6 +66,7 @@ vi.mock("./useWarehouseInbound", () => ({
     const view = buildInboundRegisterView(rows, params, offset, 50);
     return {
       data: {
+        unresolvedSources: h.unresolvedSources,
         arrivals: view.rows,
         sites: [
           { id: "w", name: "Carres Klang Warehouse" },
@@ -188,11 +191,29 @@ function mount(query = "") {
 beforeEach(() => {
   rows = inboundArrivals(base);
   h.loading = false;
+  h.posLoading = false;
+  h.unresolvedSources = [];
   h.error = null;
   h.duty = { allowed: true, loading: false };
 });
 
 describe("Inbound · the Site strip", () => {
+  it("does not distract a scoped PO with another PO's destination warning", () => {
+    h.unresolvedSources = ["PO-OTHER"];
+    mount("&source=PO-SELECTED");
+    expect(screen.queryByText("PO-OTHER")).not.toBeInTheDocument();
+  });
+  it("keeps a destination warning for the selected PO", () => {
+    h.unresolvedSources = ["PO-SELECTED"];
+    mount("&source=PO-SELECTED");
+    expect(screen.getByRole("link", { name: "PO-SELECTED" })).toBeInTheDocument();
+  });
+  it("waits for the requested PO before mounting the receiving view", () => {
+    h.posLoading = true;
+    mount("&receive=PO-1");
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByTestId("stage")).not.toBeInTheDocument();
+  });
   it("opens on Carres Klang Warehouse and lists the governed Sites", async () => {
     mount();
     await waitFor(() =>

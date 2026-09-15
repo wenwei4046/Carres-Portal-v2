@@ -156,6 +156,10 @@ export default function WarehouseInbound() {
   const facets = q.data?.facets ?? { status: {}, sourceType: {}, site: {} };
   const sites = useMemo(() => q.data?.sites ?? [], [q.data]);
   const unmapped = q.data?.unmappedDestinations ?? [];
+  const selectedSource = params.get("source") ?? params.get("po");
+  const unresolvedSources = (q.data?.unresolvedSources ?? []).filter(
+    (id) => !selectedSource || id === selectedSource,
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [railHidden, setRailHidden] = useState(false);
   const isNarrow = useIsNarrow();
@@ -691,7 +695,9 @@ export default function WarehouseInbound() {
         />
       )}
 
-      {receivePoId ? (
+      {receivePoId && posQ.isLoading ? (
+        <p role="status" className="p-4 text-body">Loading…</p>
+      ) : receivePoId ? (
         <PoReceivingView
           poId={receivePoId}
           pos={posQ.data?.pos ?? []}
@@ -833,14 +839,14 @@ export default function WarehouseInbound() {
               confirm the goods go straight to the customer.
             </div>
           ) : null}
-          {!q.error && q.data?.unresolvedSources?.length ? (
+          {!q.error && unresolvedSources.length ? (
             <div
               role="status"
               className="border-b border-kit-slate-5 bg-white p-3 text-body"
             >
               These sources have different destination instructions. Check their
               exact Units in Receiving:{" "}
-              {q.data.unresolvedSources.map((id) => (
+              {unresolvedSources.map((id) => (
                 <Link
                   key={id}
                   className="ml-2 text-kit-blue-11 hover:underline"

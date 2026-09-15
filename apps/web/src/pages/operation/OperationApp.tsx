@@ -391,6 +391,7 @@ export default function OperationApp() {
           tab !== "warehouse-pickup-schedule" &&
           tab !== "warehouse-inbound" &&
           tab !== "warehouse-outbound" &&
+          tab !== "arrival-source" &&
           !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
