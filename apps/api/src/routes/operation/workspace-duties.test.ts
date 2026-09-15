@@ -118,16 +118,6 @@ function dutyTables() {
         error: null,
       },
     },
-    app_users: {
-      list: {
-        data: [
-          { id: HOLDER, name: "Aina" },
-          { id: COVER, name: "Buddy cover" },
-          { id: MANAGER, name: "Jess" },
-        ],
-        error: null,
-      },
-    },
   };
 }
 
@@ -164,6 +154,13 @@ describe("GET /api/operation/workspace-duties", () => {
     const sb = makeSb(dutyTables(), {
       workspace_can_assign_duties: { data: true },
       workspace_resolve_duty: { data: RESOLVED },
+      actor_display_names: {
+        data: [
+          { id: HOLDER, name: "Aina" },
+          { id: COVER, name: "Buddy cover" },
+          { id: MANAGER, name: "Jess" },
+        ],
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

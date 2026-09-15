@@ -72,9 +72,11 @@ describe("GET / — the one read", () => {
         partner_fleet: [],
         delivery_message_templates: [],
         delivery_setting_changes: [{ id: "c1", what: "partner_details", partner_id: NETS, old_value: null, new_value: null, actor_id: "u1", changed_at: "2026-09-13T00:00:00Z" }],
-        app_users: [{ id: "u1", name: "Jess" }],
       },
-      { delivery_can_manage_settings: { data: true, error: null } },
+      {
+        delivery_can_manage_settings: { data: true, error: null },
+        actor_display_names: { data: [{ id: "u1", name: "Jess" }], error: null },
+      },
     );
     const res = await call("", "operation");
     expect(res.status).toBe(200);
