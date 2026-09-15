@@ -3,7 +3,7 @@
 -- catalog_pool_batch_save (0201) and catalog_fabrics_batch_save (0202,
 -- 0203, 0226) append a row to catalog_config_history dated current_date —
 -- the database clock's day, which is UTC on Supabase. A save between 00:00
--- and 08:00 KL was dated yesterday. 0519 changed the column's default; these
+-- and 08:00 KL was dated yesterday. 0519 changes the column's default; these
 -- two pass the date explicitly, so the default never applied to them.
 --
 -- Both bodies replayed as they are on main with only that one value changed
