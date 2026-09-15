@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 import type { AutocountImportResponse } from "@carres/shared";
@@ -19,7 +12,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-import";
 const env = {
   SUPABASE_URL,
   SUPABASE_ANON_KEY: "test-anon",
@@ -28,16 +20,8 @@ const env = {
 };
 const DEALER_HOUSE = "00000000-0000-0000-0000-0000000000d1";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string) {
-  return new SignJWT({ email: "ops@carres.com", app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000777")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000777", { email: "ops@carres.com", app_metadata: { role } });
 }
 
 type RpcReply = { data: unknown; error: unknown };
@@ -170,17 +154,8 @@ function okReply(result = "created") {
   });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 

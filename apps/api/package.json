@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8888",
-    "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -19,8 +19,8 @@
  * fully-received line leaves `owedSkus`, and that nothing is invented when a
  * table answers nothing.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -36,20 +36,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "test-service",
   SUPABASE_JWT_SECRET: "unused",
 };
-const KID = "test-kid-1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 afterAll(() => _setJwksForTesting(null));
@@ -141,15 +130,10 @@ interface ArrivalWire {
 }
 
 async function get() {
-  const jwt = await new SignJWT({
+  const jwt = await signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "operation@carres.com",
     app_metadata: { role: "operation" },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
   const res = await app.fetch(
     new Request("http://t/api/operation/orders", {
       headers: { Authorization: `Bearer ${jwt}` },

@@ -19,15 +19,9 @@
  * The page toolbar owns the month arrows, so navigation is hidden here.
  */
 import { DayPicker } from "react-day-picker";
-import { toIso } from "@/components/kit/DatePicker";
+import { fromIso, toIso } from "@/components/kit/DatePicker";
 import { fmtDate } from "@/lib/fmt-date";
 import { MONITOR_COPY, monthDaySentence, type MonthDayCounts } from "../delivery-monitor";
-
-/** `YYYY-MM-DD` → a Date at LOCAL midnight (the kit's own trick). */
-function fromIso(iso: string): Date {
-  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
-  return new Date(y || 2026, (m || 1) - 1, d || 1);
-}
 
 const CLASSNAMES = {
   root: "text-body text-kit-slate-12",
