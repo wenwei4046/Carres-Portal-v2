@@ -182,6 +182,7 @@ describe("GET /api/operation/workspace-duties", () => {
       "purchasing_approver",
       "delivery_charge_approver",
       "payment_approver",
+      "finance_approver",
       "stock_adjustment_approver",
       "service_case_approver",
       "issue_triage_duty",

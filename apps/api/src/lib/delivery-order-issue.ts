@@ -42,7 +42,7 @@ import { loadBookingContext } from "./booking-context";
  * (confirm / clear / reserve) treat any failure here as "not issued yet" —
  * an issuance hiccup must never undo or refuse the act the operator just
  * completed. The gate facts persist, so the next door's attempt (or the
- * manual POST backstop) issues it.
+ * Request Delivery Order door) issues it.
  */
 
 export type DeliveryOrderAttempt =

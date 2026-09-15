@@ -1802,42 +1802,6 @@ ordersRouter.post("/import", async (c) => {
 });
 
 /**
- * POST /api/orders/:id/accept-autocount-items — one-shot unlock for the
- * portal-wins-AutoCount guard. Clears `orders.items_edited`, so the next
- * AutoCount re-import REPLACES the order's items array with AutoCount's
- * version (instead of preserving the portal-edited one).
- *
- * Use when AutoCount has the truer items list (e.g. customer changed
- * configuration after order, ops's earlier edit is now stale).
- *
- * Allowed: operation, principal (mirrors /import gate). Only valid while
- * the order is at status='place' — past that, items are frozen anyway by
- * the proceed flow.
- */
-ordersRouter.post("/:id/accept-autocount-items", async (c) => {
-  const auth = c.var.auth;
-  if (auth.role !== "operation" && auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Operation or principal only" });
-  }
-  const id = c.req.param("id");
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
-    .from("orders")
-    .update({ items_edited: false, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("status", "place")
-    .select("id, items_edited")
-    .maybeSingle();
-  if (error) throw new HTTPException(500, { message: error.message });
-  if (!data) {
-    throw new HTTPException(404, {
-      message: "Order not found, not at status='place', or RLS-hidden",
-    });
-  }
-  return c.json({ id: data.id, items_edited: data.items_edited });
-});
-
-/**
  * POST /api/orders/:id/ops-assign — set/clear orders.ops_assigned_logistic
  * (migration 0136). The Inbox triage step: operation picks which logistic
  * partner (NETS / TSDD / AL / HOUZS) will handle this AutoCount-imported

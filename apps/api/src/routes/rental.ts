@@ -18,8 +18,6 @@ import {
   agreementTemplatePatchSchema,
   agreementTokens,
   serviceSkuCode,
-  phoneKeyMy,
-  customerInputSchema,
   createRentalAgreementInputSchema,
   recordRentalPaymentInputSchema,
   chargeRentalInterestInputSchema,
@@ -1526,80 +1524,6 @@ rentalRouter.get("/units", async (c) => {
   return c.json({
     units: ((data ?? []) as DB.RentalStockUnitRow[]).map((r) => Adapters.rentalStockUnitFromRow(r)),
   });
-});
-
-// ---------------------------------------------------------------------------
-// Customers — the 0247 first-class customer entity (internal-HQ for the base;
-// the POS sell lane widens access in its own phase).
-// ---------------------------------------------------------------------------
-
-// GET /customers?q= — pick-list search. Case-insensitive contains on name OR
-// phone; no/short q returns the newest 50 so the picker is never blank.
-rentalRouter.get("/customers", async (c) => {
-  internalOnly(c);
-  const q = (c.req.query("q") ?? "").trim();
-  const sb = userClient(c.env, c.var.auth.jwt);
-  let query = sb.from(CUSTOMERS).select("*");
-  if (q.length >= 2) {
-    // Escape ilike wildcards (a literal %/_ must not widen the match; PostgREST
-    // also treats * as %) and drop .or() syntax characters (comma/parens would
-    // split the clause).
-    const pattern =
-      "%" + q.replace(/[,()*]/g, " ").replace(/[\\%_]/g, (m) => "\\" + m) + "%";
-    query = query.or(`name.ilike.${pattern},phone.ilike.${pattern}`);
-  }
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({
-    customers: ((data ?? []) as DB.CustomerRow[]).map((r) => Adapters.customerFromRow(r)),
-  });
-});
-
-// POST /customers — create (internal). phone_key is computed SERVER-side with
-// the canonical MY-aware helper (phoneKeyMy — the JS twin of the SQL
-// pwp_phone_key, 0188): one customer per canonical phone, enforced by the
-// UNIQUE(phone_key) → friendly 409 customer_exists.
-rentalRouter.post("/customers", async (c) => {
-  internalOnly(c);
-  const parsed = await parseJsonBody(c, customerInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const d = parsed.data;
-  const key = phoneKeyMy(d.phone);
-  if (!key) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: "phone has no usable digits" },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CUSTOMERS)
-    .insert({
-      name: d.name,
-      phone: d.phone,
-      phone_key: key,
-      email: d.email ?? null,
-      address: d.address ?? null,
-      notes: d.notes ?? null,
-      updated_at: new Date().toISOString(),
-      created_by: c.var.auth.id,
-    })
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    if (error.code === "23505") {
-      return c.json(
-        { error: "conflict", code: "customer_exists", message: "a customer with that phone already exists" },
-        409,
-      );
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "customer insert returned no row" }, 500);
-  }
-  return c.json({ customer: Adapters.customerFromRow(data as DB.CustomerRow) }, 201);
 });
 
 // ---------------------------------------------------------------------------
