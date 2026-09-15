@@ -6,6 +6,7 @@ import { signTestJwt, useTestJwks } from "../../test/jwt";
 import { documentPartitionKey } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
+import { todayIsoMYT } from "../../lib/today";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { addWorkingDays, myHolidaySet } from "@carres/shared";
@@ -607,7 +608,7 @@ describe("a purchase order is born with its expected arrival", () => {
     // The route was right and the expectation was short by exactly that day.
     const holidays = myHolidaySet();
     const expected = addWorkingDays(
-      addWorkingDays(new Date().toISOString().slice(0, 10), 14, { offDays: [0], holidays }),
+      addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays }), // the route's today is KL's
       1,
       { offDays: [0, 6], holidays },
     );
