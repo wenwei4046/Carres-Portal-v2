@@ -17,6 +17,7 @@ import {
   deliveryWarehouseScheduleEvents,
   inboundArrivals,
   inboundUnresolvedSources,
+  warehouseArrivalSourceFacts,
   type DeliveryWarehouseScheduleInput,
   type InboundInput,
 } from "@carres/shared";
@@ -279,8 +280,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ units: [STOCK_UNIT, { ...STOCK_UNIT, id: "bulk", unitCode: "technical-key", identityScope: "quantity", qty: 10, productName: "Interchangeable fittings", sku: "FITTING-1", category: "accessory" }], total: 2 });
   }
   if (url.includes("/warehouse-settings")) return json({ details: { status: "active" }, workingHours: [], specialDates: [], holidayPolicy: null });
+  if (url.includes("/warehouse-schedule")) return json({ events: EVENTS, skuCategories: [{ sku: "MAT-KING-1", category: "mattress" }, { sku: "BED-2", category: "bedframe" }, { sku: "SOFA-1", category: "sofa" }] });
   if (url.includes("/delivery-arrangements")) return json({ arrangements: [] });
-  if (url.includes("/warehouse-schedule")) return json({ events: EVENTS });
   if (url.includes("/api/operation/warehouse/inbound")) {
     const qs = new URLSearchParams(url.split("?")[1] ?? "");
     const rows = inboundArrivals(INBOUND_INPUT);
@@ -289,6 +290,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const view = buildInboundRegisterView(rows, qs, offset, limit);
     return json({
       arrivals: view.rows,
+      sourceFacts: warehouseArrivalSourceFacts({ pos: INBOUND_INPUT.pos, lines: INBOUND_INPUT.lines }),
+      skuCategories: [{ sku: "MAT-KING-1", category: "mattress" }, { sku: "BED-2", category: "bedframe" }, { sku: "SOFA-1", category: "sofa" }],
       sites: [
         { id: "wh-1", name: "Carres Klang Warehouse" },
         { id: "wh-2", name: "HOUZS Balakong" },
