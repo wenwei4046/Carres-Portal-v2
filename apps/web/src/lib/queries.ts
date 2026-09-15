@@ -6517,8 +6517,18 @@ export interface StockUnitEvent {
 }
 
 export interface StockUnitPayload {
+  movementEvidence?: import("@carres/shared").StockMovementEvidence[];
   unit: StockRegisterUnit;
   events: StockUnitEvent[];
+}
+
+export function useStockMovementEvidence(unitCode: string | undefined) {
+  return useQuery<{ evidence: import("@carres/shared").StockMovementEvidence[] }, ApiError>({
+    queryKey: ["operation", "stock-unit-movements", unitCode ?? ""],
+    queryFn: () => apiFetch(`/api/ops/stock/register/${encodeURIComponent(unitCode!)}/movements`),
+    enabled: Boolean(unitCode),
+    staleTime: 30_000,
+  });
 }
 
 /** One Unit, by its PERMANENT Carres Unit ID — the thing on the label. */

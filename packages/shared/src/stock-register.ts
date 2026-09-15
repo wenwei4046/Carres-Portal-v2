@@ -306,7 +306,7 @@ export function summariseRegister(units: StockRegisterUnit[]): StockRegisterTota
   let bulkOnHand = 0;
   for (const u of units) {
     if (u.availability !== "available") continue;
-    if (u.qty > 1) bulkOnHand += u.qty;
+    if (u.identityScope === "quantity" || u.qty > 1) bulkOnHand += u.qty;
     else available += 1;
   }
   return { units: units.length, available, bulkOnHand };
@@ -316,8 +316,8 @@ export function summariseRegister(units: StockRegisterUnit[]): StockRegisterTota
 export function registerSummaryLine(t: StockRegisterTotals, ofTotal: number): string {
   const head =
     t.units === ofTotal
-      ? `${t.units} ${t.units === 1 ? "Unit" : "Units"}`
-      : `${t.units} of ${ofTotal} Units`;
+      ? `${t.units} ${t.units === 1 ? "record" : "records"}`
+      : `${t.units} of ${ofTotal} records`;
   const promise = `${t.available} you can promise`;
   return t.bulkOnHand > 0
     ? `${head} · ${promise} · ${t.bulkOnHand} pieces you cannot`
