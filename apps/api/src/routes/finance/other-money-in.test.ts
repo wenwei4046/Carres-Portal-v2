@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -16,22 +16,14 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
 const USER_ID = "11111111-1111-1111-1111-000000000001";
 const PARTY = "22222222-2222-4222-8222-000000000001";
 const INVOICE = "33333333-3333-4333-8333-000000000001";
 const RECEIPT = "44444444-4444-4444-8444-000000000001";
 const KEY = "55555555-5555-4555-8555-000000000001";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject(USER_ID)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt(USER_ID, { email: `${role}@x`, app_metadata: { role } });
 }
 
 function stubRpc(result: { data: unknown; error: unknown }) {
@@ -59,17 +51,8 @@ async function errorBody(res: Response) {
   return (await res.json()) as { error: string; code: string; message: string };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 

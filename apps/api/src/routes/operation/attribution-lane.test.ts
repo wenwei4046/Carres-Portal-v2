@@ -16,15 +16,8 @@
  *   · HR reaches the approver lane, and reaches ONLY it. GATE 3 gives HR the
  *     right to approve a salesperson move; HR must not gain SUBMIT or APPLY.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -37,17 +30,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type RpcCall = { name: string; args: Record<string, unknown> };
@@ -66,16 +51,8 @@ function makeSb(result: { data: unknown; error: unknown }, calls: RpcCall[]) {
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 afterAll(() => _setJwksForTesting(null));

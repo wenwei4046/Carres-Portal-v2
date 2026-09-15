@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 import { mintStaffToken } from "../lib/staff-token";
@@ -12,7 +12,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient, adminClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-ostaff";
 const STAFF_SESSION_SECRET = "test-staff-secret-orders-0233";
 
 const env = {
@@ -38,19 +37,11 @@ const SP1 = "00000000-0000-0000-0000-00000000ff01";
 const SP_OTHER = "00000000-0000-0000-0000-00000000ff09";
 const ORDER_ID = "11111111-1111-1111-1111-111111111111";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "store@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 function staffToken(tier: "principal" | "manager" | "salesperson", oid: string | null, sid: string | null, did = DEALER_A) {
@@ -255,17 +246,8 @@ function postOrder(jwt: string, token: string | null, body: unknown) {
   );
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });

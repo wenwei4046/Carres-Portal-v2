@@ -7,8 +7,8 @@
  * the door never hands a raw param to the database as a uuid (the measured
  * production defect: `invalid input syntax for type uuid: "SO-1362"`).
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -24,30 +24,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "test-service",
   SUPABASE_JWT_SECRET: "unused",
 };
-const KID = "test-kid-1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@carres.com`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000999", { email: `${role}@carres.com`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
