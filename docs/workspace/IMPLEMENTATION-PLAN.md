@@ -73,6 +73,9 @@ Vitest/Testing Library, Playwright, existing Carres UI kit and Tailwind tokens.
   optional communication/blocker/next consequence and `observedAt`.
 - `OperationWorkResponse` adds `complete` and `sources`; every visible count derives from validated
   authorised `items`, never from a transported second total.
+- The strict v2 extension requires one viewer-resolved `interaction` on every occurrence and allows
+  one source-versioned `closureReceipt` on the response. Until capability resolution is built, every
+  projector defaults truthfully to `open_module`; no client may infer `embedded` from the rule key.
 
 - [x] **Step 1: Write failing schema tests**
 
@@ -390,6 +393,15 @@ git commit -m "feat(work): add governed work presentation components"
   duplicate submit, uncertain response, `Not confirmed · Try again`, refreshed-feed closure,
   compact 1440×900 primary-action visibility and automatic next-row selection.
 - [ ] Keep supplier reply and every other mutation `open_module`.
+
+**Admission audit — 2026-09-16:** the existing Delivery door already owns the three decisions,
+Operation/Principal permission, exact DO/attempt binding, append-only actor/time history and the
+source completion fact. `More Proof Required` and `Proof Rejected` require a reason; `Proof
+Accepted` does not. It is not yet admissible in Work because the request carries no latest-evidence
+source version, the SQL writer appends a duplicate review on repeat submission, the page form is
+still private to `DeliveryEvidencePanel`, and the current accepted path saves immediately rather
+than using the proposed choose-then-save interaction. Keep `check_delivery_proof` as
+`open_module` until stale refusal, idempotent repeat, shared component and receipt tests all pass.
 
 ### Task 8: Assemble My Work and Team Work with URL-restorable state
 

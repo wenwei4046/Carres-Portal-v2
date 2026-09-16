@@ -1058,6 +1058,7 @@ export function composeOperationWorkResponse(
   sourceResults: readonly OperationWorkSourceResult[],
   staff: readonly OperationWorkStaff[],
   generatedOn: string,
+  closureReceipt: OperationWorkResponse["closureReceipt"] = null,
 ): OperationWorkResponse {
   const byId = new Map<string, OperationWorkItem>();
   for (const source of sourceResults) {
@@ -1072,6 +1073,7 @@ export function composeOperationWorkResponse(
     items,
     staff: [...staff],
     generatedOn,
+    closureReceipt,
     sources: sourceResults.map((source) => source.health),
   });
 }

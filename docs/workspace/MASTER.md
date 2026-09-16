@@ -491,12 +491,14 @@ filter removed it, the list retains the filter and selects the first matching ro
 failed, the last-safe brief is visibly non-current and has only its safe owning-object door.
 
 Current implementation gap: contract v2 now separates deadline/action date, missed placement/age,
-calendar health, rule/source version and cover evidence, but People-owned working eligibility,
-complete resolver cover periods, per-source read isolation, interaction mode and authorised closure
-receipts remain incomplete. Delivery proof review still lives inside its Delivery page component
-and is not admitted in Work. UI construction may use fixtures for review, but production acceptance
-requires these facts and may not disguise a gap with client defaults, hard-coded people/calendars,
-independent source calls or a copied mutation form.
+calendar health, rule/source version and cover evidence, and its strict transport shape requires a
+viewer-resolved interaction plus an optional source-versioned closure receipt. Current projectors
+truthfully default to `open_module`; viewer capability resolution and source-owned receipt loading
+are not built. People-owned working eligibility, complete resolver cover periods and governed
+last-safe delayed-source observations also remain incomplete. Delivery proof review still lives
+inside its Delivery page component and is not admitted in Work. UI construction may use fixtures
+for review, but production acceptance requires these facts and may not disguise a gap with client
+defaults, hard-coded people/calendars, independent source calls or a copied mutation form.
 
 ### 5.3 · Filter, search and URL contract
 

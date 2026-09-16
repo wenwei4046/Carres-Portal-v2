@@ -51,6 +51,10 @@ const item: OperationWorkItem = {
   communication: null,
   blocker: null,
   nextConsequence: null,
+  interaction: {
+    mode: "open_module",
+    fallbackDestination: "/operation/orders/so/order-1318",
+  },
   destination: "/operation/orders/so/order-1318",
   observedAt: "2026-09-06T01:00:00.000Z",
   sourceVersion: "orders:2026-09-06T01:00:00.000Z",
@@ -62,6 +66,45 @@ const item: OperationWorkItem = {
 describe("Operation Work wire contract", () => {
   it("carries object, two-line facts, ownership, closure, timing, and exact door", () => {
     expect(operationWorkItemSchema.parse(item)).toEqual(item);
+  });
+
+  it("requires an explicit viewer-resolved interaction mode", () => {
+    const withoutInteraction = { ...item } as Record<string, unknown>;
+    delete withoutInteraction.interaction;
+    expect(operationWorkItemSchema.safeParse(withoutInteraction).success).toBe(false);
+  });
+
+  it("carries every admission fact for an embedded owning-module action", () => {
+    const embedded = operationWorkItemSchema.parse({
+      ...item,
+      module: "delivery",
+      ruleKey: "check_delivery_proof",
+      interaction: {
+        mode: "embedded",
+        actionKey: "delivery.proof_review",
+        componentKey: "delivery.proof_review",
+        capability: "delivery_proof_review",
+        inputContract: "delivery.proof_review.v1",
+        evidenceContract: "delivery.attempt_evidence.v1",
+        idempotencyKey: "delivery:do-1:proof-review:source-v1",
+        staleVersion: "source-v1",
+        staleRefusal: "The delivery proof changed. Review the latest proof.",
+        successReceipt: "Delivery proof review recorded",
+        fallbackDestination: "/operation/delivery-orders/do-1",
+      },
+    });
+    expect(embedded.interaction.mode).toBe("embedded");
+  });
+
+  it("requires a reason when the viewer has read-only interaction", () => {
+    expect(operationWorkItemSchema.safeParse({
+      ...item,
+      interaction: {
+        mode: "read_only",
+        reason: "",
+        fallbackDestination: item.destination,
+      },
+    }).success).toBe(false);
   });
 
   it("mints one deterministic identity from module, object, and rule", () => {
@@ -155,6 +198,7 @@ describe("Operation Work wire contract", () => {
       items: [item],
       staff: [],
       generatedOn: "2026-09-06",
+      closureReceipt: null,
       sources,
     }).success).toBe(false);
   });
@@ -166,6 +210,7 @@ describe("Operation Work wire contract", () => {
       items: [item],
       staff: [],
       generatedOn: "2026-09-06",
+      closureReceipt: null,
       sources: [
         { key: "orders", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
         { key: "purchasing", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
@@ -177,6 +222,33 @@ describe("Operation Work wire contract", () => {
     });
     expect(response.sources).toHaveLength(6);
     expect(response.complete).toBe(false);
+  });
+
+  it("accepts only an authoritative, source-versioned closure receipt", () => {
+    const receipt = {
+      occurrenceId: item.id,
+      result: "Proof Accepted",
+      actor: { userId: "yujun", name: "Yu Jun" },
+      reason: null,
+      closedAt: "2026-09-06T02:00:00.000Z",
+      sourceVersion: "delivery:review:r1",
+    };
+    const parsed = operationWorkResponseSchema.parse({
+      contractVersion: 2,
+      complete: true,
+      items: [],
+      staff: [],
+      generatedOn: "2026-09-06",
+      closureReceipt: receipt,
+      sources: operationWorkSourceKeySchema.options.map((key) => ({
+        key,
+        state: "healthy" as const,
+        observedAt: item.observedAt,
+        lastSuccessfulAt: item.observedAt,
+        errorLabel: null,
+      })),
+    });
+    expect(parsed.closureReceipt).toEqual(receipt);
   });
 
   it("rejects owner names embedded into the action sentence", () => {

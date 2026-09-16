@@ -56,6 +56,40 @@ const operationWorkCalendarSchema = z.object({
   holidayName: z.string().min(1).nullable(),
 }).strict();
 
+export const operationWorkInteractionSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("embedded"),
+    actionKey: z.string().min(1),
+    componentKey: z.string().min(1),
+    capability: z.string().min(1),
+    inputContract: z.string().min(1),
+    evidenceContract: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+    staleVersion: z.string().min(1),
+    staleRefusal: z.string().min(1),
+    successReceipt: z.string().min(1),
+    fallbackDestination: z.string().startsWith("/"),
+  }).strict(),
+  z.object({
+    mode: z.literal("open_module"),
+    fallbackDestination: z.string().startsWith("/"),
+  }).strict(),
+  z.object({
+    mode: z.literal("read_only"),
+    reason: z.string().min(1),
+    fallbackDestination: z.string().startsWith("/"),
+  }).strict(),
+]);
+
+export const operationWorkClosureReceiptSchema = z.object({
+  occurrenceId: z.string().min(5),
+  result: z.string().min(1).nullable(),
+  actor: operationWorkPersonSchema.nullable(),
+  reason: z.string().min(1).nullable(),
+  closedAt: z.string().datetime(),
+  sourceVersion: z.string().min(1),
+}).strict();
+
 export const operationWorkItemSchema = z.object({
   contractVersion: z.literal(2),
   id: z.string().min(5),
@@ -126,6 +160,7 @@ export const operationWorkItemSchema = z.object({
     destination: z.string().startsWith("/"),
   }).strict().nullable(),
   nextConsequence: z.string().min(1).nullable(),
+  interaction: operationWorkInteractionSchema,
   destination: z.string().startsWith("/"),
   observedAt: z.string().datetime(),
   sourceVersion: z.string().min(1),
@@ -163,6 +198,7 @@ export const operationWorkResponseSchema = z.object({
     email: z.string().email(),
   }).strict()),
   generatedOn: z.string().date(),
+  closureReceipt: operationWorkClosureReceiptSchema.nullable(),
   sources: operationWorkSourcesSchema,
 }).strict().superRefine((response, ctx) => {
   if (response.complete && response.sources.some((source) => source.state !== "healthy")) {
@@ -174,6 +210,8 @@ export type OperationWorkModule = z.infer<typeof operationWorkModuleSchema>;
 export type OperationWorkPerson = z.infer<typeof operationWorkPersonSchema>;
 export type OperationWorkOwner = z.infer<typeof operationWorkOwnerSchema>;
 export type OperationWorkSourceHealth = z.infer<typeof operationWorkSourceHealthSchema>;
+export type OperationWorkInteraction = z.infer<typeof operationWorkInteractionSchema>;
+export type OperationWorkClosureReceipt = z.infer<typeof operationWorkClosureReceiptSchema>;
 export type OperationWorkItem = z.infer<typeof operationWorkItemSchema>;
 export type OperationWorkResponse = z.infer<typeof operationWorkResponseSchema>;
 
@@ -273,6 +311,10 @@ export function operationWorkItemFromProjection(
     communication: null,
     blocker: null,
     nextConsequence: null,
+    interaction: {
+      mode: "open_module",
+      fallbackDestination: presentation.destination,
+    },
     destination: presentation.destination,
     observedAt: presentation.observedAt ?? new Date().toISOString(),
     sourceVersion: presentation.sourceVersion ?? presentation.observedAt ?? new Date().toISOString(),

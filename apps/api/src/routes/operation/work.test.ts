@@ -63,6 +63,10 @@ const base: OperationWorkItem = {
   communication: null,
   blocker: null,
   nextConsequence: null,
+  interaction: {
+    mode: "open_module",
+    fallbackDestination: "/operation/orders/so/order-1",
+  },
   destination: "/operation/orders/so/order-1",
   observedAt: "2026-09-06T01:00:00.000Z",
   sourceVersion: "orders:2026-09-06T01:00:00.000Z",
@@ -112,6 +116,7 @@ describe("operation Work response composition", () => {
     const body = await response.json() as { items: OperationWorkItem[]; complete: boolean };
     expect(body.items).toHaveLength(1);
     expect(body.complete).toBe(true);
+    expect(body.closureReceipt).toBeNull();
   });
 
   it("returns one validated set and removes only duplicate stable identities", () => {
@@ -139,6 +144,7 @@ describe("operation Work response composition", () => {
     expect(response.items.map((item) => item.id)).toEqual([base.id, receiving.id]);
     expect(response.staff).toHaveLength(1);
     expect(response.generatedOn).toBe("2026-09-06");
+    expect(response.closureReceipt).toBeNull();
     expect(response.items).toHaveLength(2);
   });
 

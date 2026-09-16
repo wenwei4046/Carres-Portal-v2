@@ -106,6 +106,10 @@ export function projectIssueActionWork(input: {
       communication: null,
       blocker: null,
       nextConsequence: null,
+      interaction: {
+        mode: "open_module",
+        fallbackDestination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      },
       destination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
       observedAt: input.observedAt,
       sourceVersion: input.observedAt,
