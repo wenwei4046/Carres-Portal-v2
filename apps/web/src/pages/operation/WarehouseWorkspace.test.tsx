@@ -528,6 +528,12 @@ describe("long values and the narrow viewport", () => {
     expect(screen.getByTestId("ws-card-party")).toHaveTextContent(longName);
     expect(screen.getByTestId("ws-card-party").className).toContain("break-words");
     expect(screen.getByTestId("ws-card-party").className).not.toContain("truncate");
+    /* MEASURED 2026-09-16 — the name's flex FLOOR decides whether the header
+       is one line at the governed 240px column. A 6rem floor needed 198px of
+       the 197px available and pushed the pill and the door onto a second line
+       in EVERY card; 5rem fits. jsdom has no layout, so the number is locked
+       here and the measurement lives in the component's comment. */
+    expect(screen.getByTestId("ws-card-party").className).toContain("flex-[1_1_5rem]");
     expect(screen.getByTestId("ws-card-ref-primary")).toHaveTextContent(
       "PO-2609-0001-REV-B-REISSUE",
     );
@@ -563,8 +569,11 @@ describe("long values and the narrow viewport", () => {
       `repeat(${DATES.length}, minmax(240px, 1fr))`,
     );
     /* 6 × 240 = 1440px of canvas — wider than the 703px frame it must scroll
-       inside, which is the whole mechanism. */
-    expect(canvas.style.minWidth).toBe(`${DATES.length * 240}px`);
+       inside, which is the whole mechanism. The box takes that width from the
+       TRACKS (`min-content`) rather than from a second multiplication of the
+       same two numbers; Law D wants one arithmetic, and jsdom cannot lay the
+       grid out to check the resolved pixels. */
+    expect(canvas.style.minWidth).toBe("min-content");
   });
 
   it("the card CONTAINS its screen-reader label, so the portal cannot be dragged sideways", () => {

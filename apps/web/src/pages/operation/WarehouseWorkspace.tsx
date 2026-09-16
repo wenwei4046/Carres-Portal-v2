@@ -345,16 +345,23 @@ export function ScheduleBoard({
           `minWidth` is what actually produces the scroll. `minmax(240px, 1fr)`
           alone sets a TRACK floor, but the grid box itself would still be the
           width of its container, and a sticky heading measured against a box
-          narrower than its own tracks paints its background short. Stating the
-          canvas width — columns × 240px, so 1440px at six days — makes the box
-          and its tracks the same object, and the parent's `overflow-auto` then
-          has something real to scroll. */}
+          narrower than its own tracks paints its background short. Making the
+          box adopt the canvas — 1440px at six days — makes the box and its
+          tracks the same object, and the parent's `overflow-auto` then has
+          something real to scroll.
+
+          `min-content` rather than `columns × 240px`: the canvas width is the
+          sum of the track floors, and Law D says a derived fact has ONE
+          arithmetic. Multiplying the count by the constant here is a SECOND
+          arithmetic for the same number, and the two would agree only until
+          somebody gave one column a different floor. `min-content` asks the
+          tracks. */}
       <div
         className="grid min-h-full"
         style={{
           gridTemplateColumns: `repeat(${dates.length || 1}, minmax(${COLUMN_MIN_PX}px, 1fr))`,
           gridTemplateRows: "auto 1fr",
-          minWidth: `${(dates.length || 1) * COLUMN_MIN_PX}px`,
+          minWidth: "min-content",
         }}
         data-testid="ws-canvas"
       >
