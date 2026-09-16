@@ -1056,7 +1056,7 @@ fix action belongs only to the owner-resolved central Work projection:
 | `Requested delivery date is missing` | `Ask the customer which date they want` |
 | `SKU not found` | `Add this item to the SKU catalog` |
 | `Supplier not assigned` | `Check the supplier for {model}` |
-| `Production days are missing` | `Add production days for {supplier} · {category}` |
+| `Production days not set` | `Add production days for {supplier} · {category}` |
 
 `Check the supplier for {model}` is the Work Engine's own dictionary row above, reused verbatim
 rather than respelt.
@@ -3375,3 +3375,14 @@ Before merging a UI change:
 Warehouse receiving summary: **Physical arrived Qty {n}** is physical arrival, separate from accepted **Received Qty {n}**. **Loading** opens the owning exact-Unit loading workspace. **Back to Outbound** returns to the preserved register.
 
 Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver confirmation.** distinguishes the Warehouse act from the driver's act. **Loading and driver confirmation recorded.** requires both facts. **Loading evidence is still missing.** names the separate evidence gap. **Open Delivery Order** opens the owning DO. A refused scan stays visible: **{Unit ID} is not a Unit this delivery order requires. Check the label and scan the required Unit.** or **{Unit ID} was already loaded. Scan a Unit still to load.** The entered ID remains available for correction or retry.
+
+**SO Batch corrections — owner approved 2026-09-16.** `Not planned` means the
+Order By cannot yet be stated for the blocked demand. `No Sales Orders match these filters`
+with `Clear filters` is distinct from `No proceeded Sales Orders.`. The singular is
+`1 Sales Order`; narrowed scope remains `{n} of {total} Sales Orders`.
+`Only PO Duty can issue this PO` explains an unavailable Issue button.
+
+**SO Batch grouped Register — owner approved 2026-09-16.** `To buy` and
+`No purchase needed` are table group headings, never rail rows or stored statuses. The second
+includes PO coverage and Ready Stock coverage; `Ordered` must not describe an order with no PO.
+This dated group-heading ruling permits these words here only; the retired rail stays retired.

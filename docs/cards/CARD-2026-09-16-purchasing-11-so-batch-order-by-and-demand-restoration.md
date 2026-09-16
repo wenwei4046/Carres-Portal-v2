@@ -12,6 +12,11 @@ implementation sequencing, not another blueprint. Scope is SO Batch Purchase and
 capabilities; no redesign of Manual Purchase, Purchase Orders, Receiving or Purchasing navigation.
 Keep all existing coverage/selection guards, connected sections, document summaries and History.
 
+Owner extension, 2026-09-16: one table, two groups (`To buy` expanded first;
+`No purchase needed` initially collapsed), search/filter over both and reveal matches.
+No view switch or separate history page. The owner explicitly accepted the second label to
+avoid calling Ready-Stock-only coverage `Ordered`.
+
 ## Execution
 
 1. Red regression: reserve with persistent usage, release and reassign, GET demands restores

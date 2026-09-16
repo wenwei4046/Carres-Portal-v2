@@ -827,8 +827,13 @@ Module Register rails remain factual filters and do not copy central Work action
 **Approved correction, 2026-09-16 — implementation pending verification.** Order By is the
 server engine's fact on each demand. The parent shows the earliest date over exactly its
 selectable leaves; blocked demand reads `Not planned`; nothing left to buy is blank.
-Default order is actionable Order By ascending, blocked demand next, completed/no-buy last,
-with SO No descending as tie/fallback. Header sorting overrides the default. Goods carries
+**Owner-approved grouping, 2026-09-16:** one table has `To buy` first and always expanded,
+then `No purchase needed`, initially collapsed. The latter truthfully includes PO-covered and
+Ready-Stock-covered orders, including orders that never had a PO. Partly bought orders with
+remaining demand and blocked demand belong to `To buy`. Search and rail filters affect both;
+search/filter matches reveal their group. The footer counts all matching orders, including
+collapsed records. Inside groups the default is actionable Order By ascending, blocked next,
+with SO No descending as tie/fallback. Header sorting overrides ordering within each group. Goods carries
 per-line Order By. No client calendar arithmetic is admitted.
 
 Approved review A1–A15 also requires canvas-based rail overlay below 896px, 40px touch rows
@@ -908,7 +913,7 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   `Issue PO` selection. One filter may be selected per section; filters from different
   sections combine; clicking a selected timing row again clears it; `All products`,
   `All suppliers` and `All regions` clear their sections; clearing every filter restores the
-  complete permanent Register, Ordered records included.
+  complete permanent Register in its two groups, including the collapsed `No purchase needed` group.
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
   so the printed number predicts the resulting SO rows. The fixed rows (the five timing rows,
