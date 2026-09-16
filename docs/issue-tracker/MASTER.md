@@ -438,7 +438,7 @@ opened `issue` identity are URL-visible and individually removable under one `Cl
 The Register is reference truth. Selecting a row opens the Issue workspace; no row-level fault,
 money, close or result mutation exists. `Current Action` uses the shared two-line presentation and
 opens the exact action/result section. It never says `Set next action`: when no valid action exists,
-it states the lifecycle fact such as `No current action`, `Waiting triage rule` or `Closed`, and a
+it states the lifecycle fact such as `No current action`, `Waiting for triage rule` or `Closed`, and a
 configuration failure remains visible to authorised supervision.
 
 ## §11.2 · Issue workspace composition

@@ -1,7 +1,7 @@
 # WORKSPACE — MASTER
 
-> **APPROVED / LOCKED business architecture — Jess, 2026-09-03; complete page Blueprint ready for
-> owner review, 2026-09-15.** This is the one Workspace authority for Staff & Duties,
+> **APPROVED / LOCKED business architecture — Jess, 2026-09-03; complete page Blueprint review
+> closed, 2026-09-16.** This is the one Workspace authority for Staff & Duties,
 > action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint.
@@ -519,20 +519,56 @@ they may not produce a second open item. A module action not listed here is excl
 
 ## 7 · Right Rail and Notifications
 
-The Right Rail is counts and navigation into main My Work:
+The Right Rail's `My Work` slot is a glanceable doorway into main My Work. It is not another scope,
+feed or action surface:
 
 ```text
-My Work
-Late
-Due today
-Open My Work
+┌ My Work ─────────────────────┐
+│ 3 late                       │
+│ 5 due today                  │
+│                              │
+│ Open My Work                 │
+└──────────────────────────────┘
 ```
 
-It contains no independent calculation, row, Duty editor, cover chip, assignment or completion
-control. Selecting a count opens My Work with the filter visibly applied.
+The slot reads the same authorised response and cache identity as main Work. It shows only non-zero
+`Late` and `Due today` counts plus `Open My Work`; it does not preview rows, Team workload, `Later`
+or `No date`. Selecting a count opens main My Work with the corresponding URL-visible filter and
+preserves the page the operator came from for Browser Back. `Open My Work` opens the unfiltered My
+Work default. The slot contains no independent calculation, Duty editor, cover chip, assignment or
+completion control.
+
+Loading retains the slot label and uses count placeholders, never zero. A healthy clear state says
+`No work due now` and retains `Open My Work`. A source failure says `My Work could not be refreshed`
+and retains the last-safe counts with their observation time where permitted; it never prints a
+clear state. Permission refusal hides counts and objects. On widths where the global Right Rail is
+not present, the shell's existing Work destination remains the only replacement door; no floating
+mini-queue or mobile drawer is created. Keyboard and accessible names state what each count opens.
 
 Notifications are event receipts—assigned, cover activated, became late, unblocked, source failed
-or completed. Read/dismiss never changes Work. The Bell is not a second queue.
+or completed. Each receipt carries one durable event identity, the affected Work identity, recipient,
+event time and exact Work/object door. It describes what changed; it never repeats the full action
+row or supplies `Done`, assignment or result controls. Read/dismiss changes only receipt state and
+never changes Work, owner, due date or completion. Duplicate delivery of one event remains one
+receipt. The Bell is not a second queue.
+
+Notification loading, true empty, delayed source and failed source are distinct. `No notifications`
+is allowed only after the complete authorised receipt source is healthy. A failed receipt source
+does not alter Right Rail or Work counts. Until durable transition receipts exist, the current Bell
+remains legacy debt and may not be presented as this contract.
+
+### 7.1 · Right Rail and notification acceptance contract
+
+- Right Rail and My Work return the same `Late` and `Due today` identities and counts for the same
+  authorised person and observation;
+- every Rail count opens main My Work with one visible, removable URL filter and Browser Back
+  restores the originating page;
+- loading, healthy-clear, delayed/failed and permission-refused states cannot be mistaken for zero;
+- no Rail or Bell control can assign, cover, complete, dismiss Work or record a module result;
+- one Work transition produces at most one durable receipt for each governed recipient, and
+  read/dismiss cannot change the Work occurrence;
+- desktop keyboard/focus behavior and the narrow-screen absence of the Rail leave one obvious Work
+  destination without clipped counts or hover-only meaning.
 
 ## 8 · Dashboard admission law
 
@@ -682,6 +718,31 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
 No Dashboard production rebuild begins until each admitted measure has the section 8.2 contract and
 its owning module is production-verified. This blocks invented totals, not the already-honest Work
 surface.
+
+### 8.6 · Dashboard acceptance contract
+
+Dashboard is ready for owner acceptance only when all are demonstrable:
+
+- every visible measure exists in §8.2.1 and prints its governed meaning, unit, scope, observation
+  time, health and comparison/threshold only when those facts exist;
+- healthy, delayed and failed sources remain distinguishable per measure, and a failed source can
+  never reduce a value to zero or produce `No management attention needed`;
+- each count, amount, age and trend reconciles to its one owning source for the same permission scope
+  and business date;
+- every measure has exactly one tested drill-down to its filtered owning Register or Team Work, and
+  Browser Back restores Dashboard position and source-health context;
+- Dashboard contains no action sentence, action row, owner assignment, manual completion, arbitrary
+  KPI, copied pipeline or local business mutation;
+- Work health uses the same authorised Work composition and preserves normal owner, acting cover,
+  blocker, unresolved Duty and source failure as separate facts;
+- management attention includes only non-zero governed intervention facts and recent change includes
+  only durable threshold/state transitions, not a generic activity stream;
+- permissions prevent leaked people, object identities, counts and amounts while leaving authorised
+  healthy sections usable during a partial failure;
+- the reading order and complete measure meaning remain operable at 1440, 1024 and 390px by keyboard,
+  screen reader and touch, with no sideways KPI strip or hover-only evidence;
+- the global Right Rail remains a separate My Work doorway and Dashboard remains one independent
+  top-level destination outside the `WORKSPACE` navigation group.
 
 ## 9 · Delivery sequence
 
@@ -850,7 +911,7 @@ Cards follow dependency slices; this MASTER is not an implementation queue.
 - Dashboard reads verified facts and never becomes another queue;
 - production verification precedes every completion claim.
 
-## 13 · Three-page UI Blueprint trace
+## 13 · Complete UI Blueprint trace
 
 This matrix proves document coverage, not implementation or production completion.
 
@@ -872,4 +933,22 @@ This matrix proves document coverage, not implementation or production completio
 The page Blueprint is reviewable when every row points to current truth with no contradiction. The
 pages are built only when their acceptance contracts pass against current implementation and real
 authorised accounts. The global Dashboard remains outside these three destinations and retains its
-separate §§8–8.5 contract.
+separate §§8–8.6 contract. Right Rail and Notifications retain the supporting §7–7.1 contract and
+never become a fourth Workspace destination.
+
+### 13.1 · Owner-review result — 2026-09-16
+
+The composition review covers the complete relationship, not isolated screens:
+
+```text
+Dashboard ──management fact drill-down──▶ owning Register / Team Work
+Workspace ──Work──▶ exact owning action door
+          ├─Staff & Duties──▶ shared owner/cover resolution
+          └─Issue Tracker──▶ Issue truth + shared Current Action
+Right Rail ──filtered count──▶ My Work
+Notifications ──event receipt──▶ Work / owning object
+```
+
+No new business decision remains in the page composition. Implementation remains gated by the
+module admission and production-proof work in §§6, 10 and 11; `Blueprint ready` does not mean those
+sources, migrations or pages are deployed.
