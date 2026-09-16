@@ -290,6 +290,12 @@ ID, `What did you see?`, governed Site/current holder context, required photo/ev
 factual note. It never asks the observer to choose Quarantine, Hold, write-off, Supplier Claim,
 compensation, replacement or another business remedy.
 
+**Operator-flow review — owner approved 2026-09-16; implementation outstanding.** Unit Detail
+and Loading must expose this existing governed report journey where the problem is observed.
+The operator records the observation and required evidence and can see the responsible next
+owner. This is not a second Problems Register or a shortcut that merely changes condition without
+the report, evidence, protective consequence and shared Work contract below.
+
 On submission, policy derives the immediate control rather than asking the observer to guess it.
 Where the observed fact affects suitability, the Unit leaves Ready Stock and cannot receive a new
 SO reservation; unsafe or incomplete goods cannot be handed over. An existing SO reservation stays
@@ -563,6 +569,13 @@ posted, Inbound updates from that authority:
 - not yet received → remains in Inbound;
 - the supplier/PO consequence routes to Purchasing; Warehouse does not guess a replacement date.
 
+**Receiving confirmation — owner approved 2026-09-16; implementation outstanding.** Prefilled
+outcomes or quantities are proposed input, never evidence that physical verification is complete.
+The working form must make their unconfirmed nature clear and require explicit confirmation of
+the actual Unit results or quantity before saving. Its live summary must not read as a completed
+receipt. Preserve the existing Receiving engine, evidence requirements, partial receipt arithmetic,
+retry identity and GRN posting boundary; do not introduce a new stored stock status for UI review.
+
 When the expected date passes with no Receiving result, Inbound must not accuse the supplier of
 being late. It states `Expected arrival was {actual date}` and `No Receiving result was submitted`,
 then routes the dated action `Check whether these {n} Units arrived at {Site}` to the current GRN
@@ -683,6 +696,15 @@ surface full width with scans, checks, packing, loading evidence and separate dr
 The default includes outstanding loading, missing evidence and unmatched driver acceptance;
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
+
+**Completion and return — owner approved 2026-09-16; implementation outstanding.** Once all
+required Units are loaded, make outstanding driver confirmation and the owning Delivery Order
+door clear instead of continuing to emphasise scanning as the next act. Warehouse never confirms
+on the driver's behalf. Return from a Unit or work surface must reach the correct source register
+and preserve its applicable filters and position; a button labelled Inventory must not land on
+Dashboard. Reuse Delivery's shared register and object-detail grammar, not its customer-arrangement
+Monitor workspace. Keep the five Warehouse destinations, the shipped six-working-day schedules,
+the shared Receiving engine and full-width Loading. This approval introduces no new design system.
 
 The NETS operator journey is:
 
@@ -1671,6 +1693,7 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Stock Count / Difference / approved Adjustment | Approved business design in §6 and §12.5 | Not built as a complete stocktake engine. WarehouseCountModal records truck/loading counts and is not a stocktake |
 | Month-end / Finance handoff | Approved business design in §9 and §12.10 | Complete versioned confirmation and Finance acknowledgement are not claimed shipped |
 | Duty / permission / external operations | Existing personal-role guards and RLS remain authoritative | No new external rights, service-role browser access, shared credentials or second stock writer |
+| Operator-flow review, 2026-09-16 | Owner approved clearer receiving confirmation, governed in-context problem reporting, correct register return and post-loading direction | Approved target, not implemented by the review. Source at b0f7f259 still prefills Received; WarehouseUnitDetail returns to /operation/stock; inspected Unit Detail and Loading lack the governed report entrance. This review approval does not freeze the UI Kit or claim production delivery. |
 
 ### 13.1 · Required read and failure behavior
 
