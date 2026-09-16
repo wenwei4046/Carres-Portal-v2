@@ -393,6 +393,59 @@ WORKING DAY / MISSED AGE · exceptional state  metadata/footer
 - Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
   appear only in historical evidence.
 
+#### 5.2.1 · Authoritative Work feed contract
+
+The three panels render one permission-scoped server response. They do not join module reads in the
+browser, infer missing facts or keep a second Work database. Every admitted open occurrence carries
+the following structured facts; display sentences are generated from these facts and are not a
+separate editable truth.
+
+| Contract group | Required facts |
+|---|---|
+| Identity | Stable occurrence ID; admitted rule key and version; module; source object kind, ID and display label |
+| Action | Fact/problem; specific action; recipient when applicable; required result; authoritative completion fact |
+| Ownership | Owner rule; Duty key when used; normal owner; today's acting person; active cover evidence; explicit unresolved state |
+| Timing | Business deadline when one exists; governed action date/time; calendar key and source; working-day/missed calculation evidence; no-date reason when lawful |
+| Calendar health | Module-calendar state; resolved-person calendar state; holiday name when applicable; `not configured` and `read failed` remain distinct |
+| Communication | Optional source-owned channel, recipient, actual sent evidence and reply evidence/state; never a Workspace draft, send control or inferred conversation |
+| Resolution | Blocker and resolving door when blocked; optional separately governed next consequence; exact owning-object deep link |
+| Observation | Source observation time and source version needed to prove that the row and selected brief describe the same fact |
+
+`Business deadline` and `governed action date` are separate facts. For example, a Payment deadline
+on Saturday may lawfully generate a Friday action without rewriting the Saturday deadline. Receiving
+or Delivery may retain Saturday as both facts only when their rule and resolved actor calendar admit
+it. The feed never asks the UI to reverse-engineer one from the other.
+
+The response also carries one health record for every admitted source requested by the current
+authorised scope:
+
+| Source state | Required behaviour |
+|---|---|
+| `Healthy` | Return its current authorised items and observation time |
+| `Delayed` | Preserve its governed last-safe observation and name when it was last read successfully |
+| `Failed` | Name the unavailable source without exposing protected detail; do not replace its possible work with zero |
+| `Not admitted` | Never return its objects, module option or count as if they were Work |
+
+A failed source does not discard healthy-source actions. The envelope states whether the returned
+set is complete, which sources are not current and the last successful observation available for
+each. All visible counts, day/module/owner totals and Panel 2 rows derive from this same authorised
+item set and health envelope. No separately queried total may disagree with the list. Permission
+scoping happens before items, people and counts enter the response; a refused scope returns no
+protected count or identity.
+
+The selected action is addressed by its stable occurrence ID in the URL. After refresh, if source
+completion law removed it from the open set, Work returns focus to the next visible row and states
+that the previous action is no longer open; it does not preserve a stale actionable brief. If a
+filter removed it, the list retains the filter and selects the first matching row. If its source
+failed, the last-safe brief is visibly non-current and has only its safe owning-object door.
+
+Current implementation gap: the existing shared item shape does not yet carry the complete calendar
+identity/health, business-deadline-versus-action-date, communication evidence, observation version
+or separately governed next consequence above. The current endpoint composes its sources as one
+all-or-nothing read, so one rejection can erase otherwise healthy Work. UI construction may use
+fixtures for review, but production acceptance requires this contract and may not disguise the gap
+with client defaults, hard-coded people/calendars or independent source calls.
+
 ### 5.3 · Filter, search and URL contract
 
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
@@ -492,7 +545,7 @@ identity; it never changes the owner, due date or completion fact.
 | Current main Work page has scope toggles and limited Rail-linked time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
 | Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
 | Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |
-| Current empty/error handling is page-level and source composition is incomplete | Isolate source failures, distinguish true empty from no match, preserve last-safe observation where governed |
+| Current source composition is one all-or-nothing read and the item shape omits parts of §5.2.1 | Build the permission-scoped feed envelope, isolate source failures, distinguish true empty from no match and preserve governed last-safe observation |
 | No completed/history surface exists in shared Work | Add read-only history only after durable source result/actor evidence can support it; never synthesize Done rows |
 | Warehouse external queue and acceptance exist on the pending branch | Complete identity/offboarding/transfer guards and production proof before admission claim |
 | Service Case is absent; Bell remains a duplicate legacy queue | Keep Service Case excluded until owner/date laws close; replace Bell only with durable transition receipts |
@@ -504,6 +557,8 @@ Work is ready for owner acceptance only when all are demonstrable:
 - every admitted source rule in §6.1 produces one stable identity and source completion removes that
   identity without a manual Done act;
 - My Work, Team Work and Right Rail use one authorised response and one cache identity;
+- every returned occurrence and admitted-source health record satisfies §5.2.1; one failed source
+  leaves healthy-source actions usable and cannot be rendered as a complete or zero set;
 - normal owner, cover, acting person, admitted Site queue, `Not assigned` and actual completed actor remain
   distinct across assignment/cover changes;
 - broken commitment, missed, weekday, conditional Saturday, holiday and no-working-date examples order once under
@@ -1008,6 +1063,7 @@ This matrix proves document coverage, not implementation or production completio
 |---|---|---|---|
 | Exact page job/boundary | §§1, 5.1 | §§4.1 | Issue MASTER §§1, 11.1 |
 | Information hierarchy and ASCII composition | §§5.1–5.2 | §4.2 | Issue MASTER §§11.1–11.2 |
+| Authoritative read/feed contract | §5.2.1 | §§3–4 | Issue MASTER §§5–6, 11.3 |
 | Ownership, cover and actor | §§3, 5.2, 6.1 | §§4.2–4.4 | Issue MASTER §§5–6, 11.2–11.3 |
 | Primary journeys/actions | §§5.1–5.3 | §§4.3–4.4 | Issue MASTER §§4–5, 10, 11.2–11.3 |
 | Search, views and filters | §5.3 | §4.2 | Issue MASTER §11.1 |
