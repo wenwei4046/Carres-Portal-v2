@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,11 +6,12 @@ import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register
 import PaymentMonitor from "./PaymentMonitor";
 
 /**
- * PAYMENT MONITOR (owner ruling 2026-09-12): the full-width collection control
- * listing — seven columns in the ruled order, Primary School English goods and
- * storage facts, a two-line Payment timing cell with the Work feed's resolved
- * owner, the Monday–Friday follow-up plan in the rail (owner ruling
- * 2026-09-16), and the collection workspace behind the row.
+ * PAYMENT MONITOR (owner rulings 2026-09-12 · 2026-09-16): the full-width
+ * collection control listing — eight columns in the ruled order on Delivery's
+ * fixed 72px two-line row, Items & Stock from Delivery's own arithmetic, the
+ * requested and confirmed delivery dates side by side, a two-line Payment
+ * timing cell with the Work feed's own action and owner, the Monday–Friday
+ * follow-up plan in the rail, and the payment workspace opened below the row.
  */
 const state = vi.hoisted(() => ({
   invoices: { data: [] as unknown[], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null },
@@ -18,6 +19,7 @@ const state = vi.hoisted(() => ({
   requests: { data: { requests: [] as unknown[] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   settings: { data: { collection_timing: [] as unknown[], bank_accounts: [] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   work: { data: undefined as unknown, isSuccess: true, isError: false, refetch: vi.fn() },
+  orders: { data: { orders: [] as unknown[] } as unknown, isSuccess: true, isError: false, refetch: vi.fn() },
 }));
 vi.mock("@/lib/queries", () => ({
   useInvoiceRegister: () => state.invoices,
@@ -25,6 +27,14 @@ vi.mock("@/lib/queries", () => ({
   useLaterDeliveryRequests: () => state.requests,
   usePaymentSettings: () => state.settings,
   useOperationWork: () => state.work,
+  useOperationOrders: () => state.orders,
+  // Delivery's Items, Services & Stock panel reads the Sales Order expansion
+  // for Unit, PO and place; the listing tests pin the words it prints.
+  useSalesOrderExpansion: () => ({ data: { lines: [], unitCoverage: {}, unitScopes: {}, place: [] } }),
+  useDeliveryPartners: () => ({ data: { partners: [] } }),
+  useDeliveryArrangements: () => ({ data: { arrangements: [], contacts: [] } }),
+  useRecordCannotDeliver: () => ({ mutate: vi.fn(), isPending: false }),
+  useSaveDeliveryArrangement: () => ({ mutate: vi.fn(), isPending: false }),
   // 0489 — the collection owner section and the recorded results are read
   // by the workspace; the Monitor tests pin the listing, not those reads.
   useCollectionOwner: () => ({ data: { owner: null }, isLoading: false, isError: false }),
@@ -108,6 +118,21 @@ function row(over: Partial<InvoiceRegisterRow> & {
 
 const READY = { line_stock_status: { A: "ready" } };
 
+/** An Operation orders-list row — what Delivery's stock arithmetic reads. */
+function order(id: string, so: number, over: {
+  lines?: Array<{ sku: string; qty: number }>;
+  units?: Array<{ sku: string; qty: number }>;
+  status?: string;
+} = {}) {
+  return {
+    id, so, status: over.status ?? "proceed_order",
+    order_lines: (over.lines ?? [{ sku: "A", qty: 1 }]).map((l, i) => ({ id: `${id}-l${i}`, ...l, unit_price: 0 })),
+    order_addons: [],
+    allocated_units: (over.units ?? []).map((u) => ({ ...u, status: "reserved" })),
+    po_arrivals: [],
+  };
+}
+
 beforeEach(() => {
   state.invoices.data = [
     // Goods not ready, no arrival, delivery in two weeks — Wait.
@@ -124,6 +149,11 @@ beforeEach(() => {
   state.requests.data = { requests: [] };
   state.settings.data = { collection_timing: [], bank_accounts: [] };
   state.work.data = undefined; state.work.isSuccess = true; state.work.isError = false;
+  // o1 has nothing in the register; o2 and o3 hold their one piece.
+  state.orders.data = { orders: [
+    order("o1", 1300), order("o2", 1301, { units: [{ sku: "A", qty: 1 }] }),
+    order("o3", 1302, { units: [{ sku: "A", qty: 1 }] }), order("o4", 1303, { units: [{ sku: "A", qty: 1 }] }),
+  ] };
   auth.role = "operation";
   localStorage.clear();
   // jsdom's window is 1024px wide, below the 1100px rule that starts the rail
@@ -141,15 +171,22 @@ function show(at = "/finance/monitor?day=all") {
 }
 
 describe("Payment Monitor — the listing", () => {
-  it("shows the seven ruled columns, in order, and no Arrival column", () => {
+  it("shows the eight ruled columns, in the exact order, on the fixed 72px row", () => {
     show();
     const table = screen.getByRole("table");
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim() ?? "");
-    const words = ["SO No", "Customer", "Amount needed", "Goods", "Storage", "Customer delivery", "Payment timing"];
+    const words = ["SO No", "Customer", "Amount needed", "Items & Stock", "Storage",
+      "Requested Delivery Date", "Confirmed Delivery", "Payment timing"];
     const positions = words.map((w) => headers.findIndex((h) => h.startsWith(w)));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    expect(headers.some((h) => /Expected arrival|^Arrival/.test(h))).toBe(false);
+    // The retired headings and the invented ones never appear.
+    for (const retired of [/^Goods/, /^Customer delivery/, /Stock readiness/, /Stock arrival/, /Next step/, /Expected arrival|^Arrival/]) {
+      expect(headers.some((h) => retired.test(h))).toBe(false);
+    }
+    expect(document.querySelector("[data-row-height]")).toHaveAttribute("data-row-height", "72");
+    // No decorative selection: the Monitor has no bulk act.
+    expect(within(table).queryAllByRole("checkbox")).toHaveLength(0);
     expect(screen.queryByText("Invoice No")).not.toBeInTheDocument();
     expect(screen.queryByText("New Payment")).not.toBeInTheDocument();
   });
@@ -162,17 +199,20 @@ describe("Payment Monitor — the listing", () => {
     expect(screen.getByTestId("payment-monitor-summary")).toHaveTextContent("3 orders · RM 2,600.00 still needed");
   });
 
-  it("Goods and Payment timing speak Primary School English — Wait is never a blind chase", () => {
+  it("Items & Stock is Delivery's Ready / Not ready with the count; Payment timing never chases blind", () => {
     show();
-    expect(screen.getAllByText("Arrival not confirmed").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Goods ready").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("payment-monitor-stock-1300")).toHaveTextContent("Not ready");
+    expect(screen.getByTestId("payment-monitor-stock-1300")).toHaveTextContent("0 of 1 · 1 short");
+    expect(screen.getByTestId("payment-monitor-stock-1301")).toHaveTextContent("Ready");
+    expect(screen.getByTestId("payment-monitor-stock-1301")).toHaveTextContent("1 of 1");
     const waiting = screen.getByTestId("monitor-timing-1300");
     expect(waiting).toHaveTextContent("Arrival not confirmed");
     expect(waiting).toHaveTextContent("Wait");
     expect(waiting).not.toHaveTextContent("Ask customer to pay");
     const late = screen.getByTestId("monitor-timing-1302");
     expect(late).toHaveTextContent("Payment should have been received");
-    expect(late).toHaveTextContent("Ask customer to pay");
+    // No Work item for it in this feed → no action and no person are invented.
+    expect(late).not.toHaveTextContent("Ask customer to pay");
     for (const banned of ["Stock status", "Stock received", "Logistics ETA", "Chase"]) {
       expect(screen.queryByText(new RegExp(banned))).not.toBeInTheDocument();
     }
@@ -199,7 +239,7 @@ describe("Payment Monitor — the listing", () => {
     expect(late).toHaveTextContent("Ask customer to pay");
   });
 
-  it("an unassigned duty is a visible configuration exception with the one assignment door", () => {
+  it("nobody assigned to the order is a visible exception with the one door that fixes it — never Delivery Duty", () => {
     state.work.data = { items: [{
       id: "payment:i3:payment.collect_customer_balance", module: "payment",
       ruleKey: "payment.collect_customer_balance",
@@ -212,9 +252,11 @@ describe("Payment Monitor — the listing", () => {
     }] };
     show();
     const late = screen.getByTestId("monitor-timing-1302");
-    expect(within(late).getByTestId("monitor-owner-unassigned")).toHaveTextContent("Nobody holds Delivery Duty.");
-    expect(late).not.toHaveTextContent("Payment Duty");
-    expect(within(late).getByRole("link", { name: "Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
+    const door = within(late).getByTestId("monitor-owner-unassigned");
+    expect(door).toHaveTextContent("Not assigned");
+    expect(door).toHaveAccessibleName("Nobody is assigned to this order. Assign it in Sales Orders → Team");
+    expect(door).toHaveAttribute("href", "/operation/orders");
+    expect(late).not.toHaveTextContent(/Delivery Duty|Payment Duty|Staff & Duties/);
     expect(late).toHaveTextContent("Ask customer to pay");
     expect(screen.queryByTestId("monitor-owner-avatar")).not.toBeInTheDocument();
   });
@@ -255,35 +297,94 @@ describe("Payment Monitor — the listing", () => {
       approved_at: null, billed_through_period: 0, status: "open",
     }] };
     show();
-    expect(screen.getByText("Mattress / Bedframe · Day 15 · RM 150.00 so far")).toBeInTheDocument();
+    const storage = screen.getByTestId("payment-monitor-storage-1301");
+    expect(storage).toHaveTextContent("Mattress / Bedframe · Day 15");
+    expect(storage).toHaveTextContent("RM 150.00 so far");
+    expect(storage).toHaveAccessibleName("Storage · Mattress / Bedframe · Day 15 · RM 150.00 so far");
     // SO-1301 still needs the goods money only — RM 1,000.00, not 1,150.
     expect(screen.getByTestId("payment-monitor-summary")).toHaveTextContent("RM 2,600.00 still needed");
     expect(screen.getAllByText("No storage charge").length).toBe(2);
   });
 
-  it("Customer delivery shows the confirmed day, or No delivery date — never a Logistics ETA", () => {
-    state.invoices.data = [
-      row({ id: "a", order_id: "o1", so: 1300, control: { ...READY, confirmed_date: "2026-09-18" } }),
-      row({ id: "b", order_id: "o2", so: 1301, control: READY }),
-    ];
+  it("Requested Delivery Date keeps the customer's request; Confirmed Delivery is Delivery's fact", () => {
+    const withTime = row({ id: "a", order_id: "o1", so: 1300, delivery_date: "2026-09-18", control: READY });
+    withTime.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-22", confirmed_time: "2 PM to 5 PM" }];
+    const dayOnly = row({ id: "b", order_id: "o2", so: 1301, delivery_date: "2026-09-18", control: READY });
+    dayOnly.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-19", confirmed_time: null }];
+    const none = row({ id: "c", order_id: "o3", so: 1302, control: READY });
+    state.invoices.data = [withTime, dayOnly, none];
     show();
-    expect(screen.getByRole("button", { name: /Open Calendar · Customer delivery Fri, 18 Sep/ })).toBeInTheDocument();
-    expect(screen.getAllByText("No delivery date").length).toBeGreaterThan(0);
+    const cellOf = (so: number, key: string) => {
+      const tr = screen.getByRole("button", { name: `SO-${so}` }).closest("tr")!;
+      const index = within(screen.getByRole("table")).getAllByRole("columnheader")
+        .findIndex((h) => h.textContent?.trim().startsWith(key));
+      return tr.querySelectorAll("td")[index]!;
+    };
+    // The request survives the confirmation of a different day.
+    expect(cellOf(1300, "Requested Delivery Date")).toHaveTextContent("Fri, 18 Sep");
+    expect(cellOf(1300, "Confirmed Delivery")).toHaveTextContent("Confirmed");
+    expect(cellOf(1300, "Confirmed Delivery")).toHaveTextContent("Tue, 22 Sep · 2 PM to 5 PM");
+    // A day without a time is Delivery's half booking.
+    expect(cellOf(1301, "Confirmed Delivery")).toHaveTextContent("Not confirmed");
+    expect(cellOf(1301, "Confirmed Delivery")).toHaveTextContent("Sat, 19 Sep · No time agreed");
+    // Nothing agreed: `Not confirmed` and nothing beneath; no request word.
+    expect(cellOf(1302, "Confirmed Delivery").textContent?.trim()).toBe("Not confirmed");
+    expect(cellOf(1302, "Requested Delivery Date")).toHaveTextContent("No delivery date");
+    expect(screen.getByRole("button", { name: /Open Calendar · Confirmed Delivery Confirmed · Tue, 22 Sep/ })).toBeInTheDocument();
   });
 
-  it("Show items opens the read-only exact item disclosure — Item · Qty · Goods", () => {
-    state.invoices.data = [row({ id: "a", order_id: "o1", so: 1300,
-      lines: [{ sku: "A", qty: 2, unit_price: 500 }, { sku: "B", qty: 1, unit_price: 100 }],
-      control: { line_stock_status: { A: "ready", B: "waiting" }, line_etas: { B: "2026-09-21" }, confirmed_date: iso(20) } })];
+  it("the SO number opens the Sales Order; the customer's reference is its own second line", () => {
+    const r = row({ id: "a", order_id: "o1", so: 1300, control: READY });
+    r.orders!.source_ref = ["TCF0541"];
+    state.invoices.data = [r, row({ id: "b", order_id: "o2", so: 1301, control: READY })];
     show();
-    expect(screen.getByText("1 of 2 items ready · Last item arriving Mon, 21 Sep")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByTitle("Show items")[0]);
-    const items = screen.getByTestId("payment-monitor-items");
-    expect(within(items).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Item", "Qty", "Goods"]);
-    expect(items).toHaveTextContent("King Mattress");
-    expect(items).toHaveTextContent("Arriving Mon, 21 Sep");
-    expect(within(items).queryAllByRole("button")).toHaveLength(0);
+    const so = screen.getByRole("button", { name: "SO-1300" });
+    expect(so.textContent).toBe("SO-1300");
+    expect(so.closest("td")).toHaveTextContent("SO-1300TCF0541");
+    // No reference → no empty second line.
+    expect(screen.getByRole("button", { name: "SO-1301" }).closest("td")!.textContent).toBe("SO-1301");
+  });
+
+  it("a long customer name is cut to fit the row, and its full value opens by click and by keyboard", () => {
+    const r = row({ id: "a", order_id: "o1", so: 1300, control: READY });
+    r.orders!.customer_name = "TAN SRI DATO' SERI MUHAMMAD HAFIZUDDIN BIN ABDUL RAHMAN";
+    state.invoices.data = [r];
+    show();
+    const trigger = screen.getByRole("button", { name: /TAN SRI DATO' SERI MUHAMMAD HAFIZUDDIN BIN ABDUL RAHMAN · 0123456789/ });
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("monitor-full-value")).toHaveTextContent("TAN SRI DATO' SERI MUHAMMAD HAFIZUDDIN BIN ABDUL RAHMAN");
+  });
+
+  it("Items & Stock opens the row below itself at Delivery's read-only items panel", async () => {
+    state.invoices.data = [row({ id: "a", order_id: "o1", so: 1300, control: { confirmed_date: iso(20) } })];
+    state.orders.data = { orders: [order("o1", 1300, { lines: [{ sku: "A", qty: 2 }, { sku: "B", qty: 1 }], units: [{ sku: "A", qty: 2 }] })] };
+    show();
+    const cell = screen.getByTestId("payment-monitor-stock-1300");
+    expect(cell).toHaveTextContent("Not ready");
+    expect(cell).toHaveTextContent("2 of 3 · 1 short");
+    fireEvent.click(cell);
+    const items = await screen.findByTestId("delivery-brief-items");
+    expect(items).toHaveTextContent("Ready");
+    // The listing is still on screen: the row opened below itself.
+    expect(screen.getByRole("button", { name: "SO-1300" })).toBeInTheDocument();
     expect(within(items).queryAllByRole("textbox")).toHaveLength(0);
+    await waitFor(() => expect(document.querySelector("[data-section=items]")).toHaveFocus());
+  });
+
+  it("a delivered order that still owes money says Delivered, not a stock count", () => {
+    const r = row({ id: "a", order_id: "o1", so: 1300, control: READY });
+    state.invoices.data = [r];
+    state.orders.data = { orders: [order("o1", 1300, { status: "delivered" })] };
+    show();
+    expect(screen.getByTestId("payment-monitor-stock-1300").textContent).toBe("Delivered");
+  });
+
+  it("a finance reader is told whose stock facts they are, never a guess", () => {
+    auth.role = "finance";
+    show();
+    expect(screen.getAllByText("Stock facts are Operation's.").length).toBe(3);
   });
 });
 
@@ -486,12 +587,14 @@ describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (ow
   });
 });
 
-describe("Payment Monitor — the collection workspace behind the row", () => {
-  it("SO No opens the one-scroll collection workspace shared Work deep-links to", () => {
+describe("Payment Monitor — the payment workspace opens below the row", () => {
+  it("the row opens below itself with every section and door, and the listing stays", () => {
     show();
-    fireEvent.click(screen.getByRole("button", { name: "SO-1302" }));
-    expect(screen.getByTestId("invoice-object-scroll")).toBeInTheDocument();
-    for (const title of ["Money", "Goods and Delivery", "Storage", "What to do", "Invoice", "Related Payments", "Communication History"]) {
+    const tr = screen.getByRole("button", { name: "SO-1302" }).closest("tr")!;
+    fireEvent.click(within(tr).getByTitle("Show payment details"));
+    expect(screen.getByTestId("payment-monitor-workspace")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SO-1301" })).toBeInTheDocument();
+    for (const title of ["Money", "Delivery Dates", "Items, Services & Stock", "Storage", "What to do", "Invoice", "Related Payments", "Communication History"]) {
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: "Ask customer to pay" })).toBeInTheDocument();
@@ -499,10 +602,24 @@ describe("Payment Monitor — the collection workspace behind the row", () => {
     expect(screen.queryByText(/Download DO/)).not.toBeInTheDocument();
   });
 
-  it("`?invoice=` from Work opens the same workspace directly", () => {
+  it("`?invoice=` from Work opens that order's row below itself, on every day", () => {
     show("/finance/monitor?invoice=i3");
-    expect(screen.getByTestId("invoice-object-scroll")).toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-all-unpaid")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "SO-1302" })).toBeInTheDocument();
+  });
+
+  it("`?invoice=` for money no longer on the Monitor keeps the full-page workspace", () => {
+    show("/finance/monitor?invoice=i4");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("INV-1");
+    expect(screen.queryByTestId("payment-monitor-workspace")).not.toBeInTheDocument();
+  });
+
+  it("Storage opens the same row at its Storage section — it edits nothing in the cell", async () => {
+    show();
+    fireEvent.click(screen.getByTestId("payment-monitor-storage-1302"));
+    await screen.findByTestId("payment-monitor-workspace");
+    await waitFor(() => expect(document.querySelector("[data-section=storage]")).toHaveFocus());
   });
 
   it("finance reads the workspace; it does not post normal collection (§12)", () => {
@@ -515,6 +632,7 @@ describe("Payment Monitor — the collection workspace behind the row", () => {
   it("a waiting order says Wait in the workspace and offers no ask door", () => {
     show("/finance/monitor?invoice=i1");
     expect(screen.getByText("Do not ask the customer to pay yet.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-workspace")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask customer to pay" })).not.toBeInTheDocument();
   });
 
@@ -559,6 +677,8 @@ describe("Payment Monitor — states", () => {
       { ask_days_before: 6, deadline_days_before: 5, effective_from: "2026-09-01" },
     ] };
     show();
-    expect(screen.getByTestId("monitor-timing-1300")).toHaveTextContent("Ask customer to pay");
+    // The fact comes from the clock under the snapshotted rule.
+    expect(screen.getByTestId("monitor-timing-1300")).not.toHaveTextContent("Wait");
+    expect(screen.getByTestId("monitor-timing-1300")).toHaveTextContent(/Payment should have been received|Payment due|Ask customer today/);
   });
 });

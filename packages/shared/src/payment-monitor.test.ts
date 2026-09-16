@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   MONITOR_ACTION_WORD,
   mondayOf,
-  monitorDelivery,
-  monitorGoods,
-  monitorGoodsWord,
+  monitorDeliveryDates,
   monitorStorage,
+  monitorStorageLines,
   monitorStorageWord,
   paymentMonitorRows,
   paymentPlanDay,
@@ -69,45 +68,6 @@ function row(over: {
 const TODAY = "2026-09-11";
 const OPTS = {};
 
-describe("Goods — Primary School English, and the exact item disclosure", () => {
-  it("every line ready → Goods ready", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 2, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "ready" } } }));
-    expect(monitorGoodsWord(g)).toBe("Goods ready");
-    expect(g.lines.map((l) => l.word)).toEqual(["Ready", "Ready"]);
-  });
-  it("some ready, the rest dated → `2 of 3 items ready · Last item arriving Mon, 21 Sep`", () => {
-    const g = monitorGoods(row({
-      lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }, { sku: "C", qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "ready", C: "waiting" }, line_etas: { C: "2026-09-21" } },
-    }));
-    expect(monitorGoodsWord(g)).toBe("2 of 3 items ready · Last item arriving Mon, 21 Sep");
-    expect(g.lines[2]).toMatchObject({ sku: "C", qty: 1, word: "Arriving Mon, 21 Sep", ready: false });
-  });
-  it("nothing ready but every line dated → Arriving {last date}", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
-      control: { line_etas: { A: "2026-09-15", B: "2026-09-21" } } }));
-    expect(monitorGoodsWord(g)).toBe("Arriving Mon, 21 Sep");
-  });
-  it("a waiting line without a date → Arrival not confirmed, even when others are dated", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "nopo" }, line_etas: { A: "2026-09-15" } } }));
-    expect(monitorGoodsWord(g)).toBe("Arrival not confirmed");
-    expect(g.lines[1]!.word).toBe("Arrival not confirmed");
-  });
-  it("lines without a SKU still read the ladder's per-SKU signals as the items", () => {
-    const g = monitorGoods(row({ lines: [{ qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { "MS01-K": "ready" } } }));
-    expect(monitorGoodsWord(g)).toBe("Goods ready");
-    expect(g.lines.map((l) => l.sku)).toEqual(["MS01-K"]);
-  });
-  it("no signal at all → Arrival not confirmed; never a technical word", () => {
-    const word = monitorGoodsWord(monitorGoods(row()));
-    expect(word).toBe("Arrival not confirmed");
-    expect(word).not.toMatch(/Stock status|ETA|Yes|No\b/);
-  });
-});
-
 describe("Storage — the six ruled states", () => {
   const caseOf = (over: Partial<MonitorStorageCase> = {}): MonitorStorageCase => ({
     id: "c1", order_id: "o1", product_group: "mattress_bedframe", storage_start: "2026-09-01",
@@ -148,24 +108,47 @@ describe("Storage — the six ruled states", () => {
   });
 });
 
-describe("Customer delivery — the confirmed date, else the request, else none", () => {
-  it("confirmed → the day word, no note", () => {
-    expect(monitorDelivery(row({ control: { confirmed_date: "2026-09-18" } })))
-      .toEqual({ dateIso: "2026-09-18", confirmed: true, status: "confirmed", word: "Fri, 18 Sep", note: null });
+/* Owner ruling 2026-09-16 — the 72px listing never cuts a storage sentence:
+   the same words, on two lines. */
+describe("Storage on two lines — the same sentence, never a third line", () => {
+  const cases: Array<[Parameters<typeof monitorStorageLines>[0], string, string | null]> = [
+    [{ kind: "none" }, "No storage charge", null],
+    [{ kind: "free", untilIso: "2026-09-14" }, "Free until Mon, 14 Sep", null],
+    [{ kind: "approved_free", untilIso: "2026-09-21" }, "Free storage approved", "until Mon, 21 Sep"],
+    [{ kind: "request_pending", estimate: 150 }, "Free request waiting for approval", "Estimated charge RM 150.00"],
+    [{ kind: "charging", group: "Sofa", day: 29, soFar: 400 }, "Sofa · Day 29", "RM 400.00 so far"],
+    [{ kind: "invoice_unpaid", amount: 200 }, "Storage Invoice issued", "RM 200.00 not paid"],
+  ];
+  it.each(cases)("%o", (state, line1, line2) => {
+    const lines = monitorStorageLines(state, rm);
+    expect(lines).toEqual({ line1, line2 });
+    const joined = state.kind === "approved_free" ? `${line1} ${line2}` : line2 ? `${line1} · ${line2}` : line1;
+    expect(joined).toBe(monitorStorageWord(state, rm));
   });
-  it("requested only → the day word with `Not confirmed yet`", () => {
-    expect(monitorDelivery(row({ delivery_date: "2026-09-18" })).note).toBe("Not confirmed yet");
+});
+
+/* Owner ruling 2026-09-16 — `Customer delivery` is replaced by two columns.
+   The request is Sales' and survives Delivery's confirmation; the confirmed
+   day is Delivery's fact. */
+describe("Requested Delivery Date and Confirmed Delivery — two facts, never merged", () => {
+  it("the request stays after Delivery confirms a different day", () => {
+    const r = row({ delivery_date: "2026-09-18" });
+    r.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-21", confirmed_time: "2 PM to 5 PM" }];
+    expect(monitorDeliveryDates(r)).toEqual({
+      requested: { iso: "2026-09-18", tbd: false },
+      confirmed: { dateIso: "2026-09-21", time: "2 PM to 5 PM" },
+    });
   });
-  it("no date → No delivery date, never a Logistics ETA", () => {
-    expect(monitorDelivery(row()).word).toBe("No delivery date");
+  it("a customer who is not sure keeps that flag; nothing is confirmed", () => {
+    expect(monitorDeliveryDates(row({ delivery_date: null, delivery_date_tbd: true }))).toEqual({
+      requested: { iso: null, tbd: true },
+      confirmed: { dateIso: null, time: null },
+    });
   });
-  /* ⭐ ONE READ, ONE ANSWER (Law D, 2026-09-14). The Monitor used to flatten
-     `delivery_date_tbd` into `No delivery date` while the collection workspace
-     the row opens called the same order `Customer not sure`. Both now read
-     `invoiceCustomerDelivery`, so the row and the page cannot disagree. */
-  it("customer not sure is its own state, and it is the SAME word the workspace prints", () => {
-    const r = monitorDelivery(row({ delivery_date: "2026-09-18", delivery_date_tbd: true }));
-    expect(r).toMatchObject({ status: "customer_not_sure", word: "Customer not sure", dateIso: null });
+  it("a day agreed without a time is confirmed with no time", () => {
+    const r = row({ delivery_date: "2026-09-18" });
+    r.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-18", confirmed_time: null }];
+    expect(monitorDeliveryDates(r).confirmed).toEqual({ dateIso: "2026-09-18", time: null });
   });
 });
 
