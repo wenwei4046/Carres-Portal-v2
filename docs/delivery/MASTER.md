@@ -752,6 +752,12 @@ delivery` only when the DO carries `cod_instruction` from an approval granted be
 shipment's goods (`tripLinesOf`, the same derivation the DO page and the print path run); a
 service moves no Unit and is never a shortage. `Arriving after the requested date` comes from
 `deliveryArrivalStateOf`, the shared arrival reading; Delivery computes no arrival of its own.
+**Payment reads the same (2026-09-16).** `monitorGoodsOf`, the `Items, Services & Stock` panel and
+the two-line cell are shared with the Payment Monitor, which prints this cell for the whole Sales
+Order; and Delivery's confirmed day (DO → arrangement → confirmed booking, the customer leg) is the
+day Payment's collection clock and its Work item anchor on (`invoiceConfirmedDelivery`). A
+`Save confirmed delivery` therefore starts the collection clock; Delivery keeps sole write
+ownership of the date.
 
 **Chooser columns, off by default:** `State` · `Expected arrival` · `Accessories & services` ·
 `Confirmed Time` · `Building` · `Phone`. Sortable, filterable and exported. `Actions` and `Edit

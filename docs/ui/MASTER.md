@@ -727,9 +727,10 @@ directory only and said so.*
   My Work, Team Work, the PO detail and Order Route. **THE ONE RULED EXCEPTION — the Payment
   Monitor's `Payment timing` cell (owner ruling 2026-09-12, `docs/payment/MASTER.md` §3):** the
   Monitor is a CONTROL LISTING, not a document register, and the owner ruled its last column a
-  two-line fact/action surface — line 1 the fact, line 2 the governed action with the shared
-  Work feed's resolved owner as an avatar (hover/accessible name = full name, never a name in the
-  sentence). It reads the Work feed's items; it resolves no owner and creates no second action.
+  two-line fact/action surface — line 1 the fact, line 2 the shared Work item's own action with
+  its resolved owner as an avatar (hover/accessible name = full name, never a name in the
+  sentence; no Work item ⇒ no action and no person, only `Wait` stands alone — re-ruled
+  2026-09-16). It reads the Work feed's items; it resolves no owner and creates no second action.
   No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
   the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, journey rungs re-ruled
   2026-09-14, `../delivery/MASTER.md` §8.4):** its status word names the actor and the fact in
@@ -1174,10 +1175,13 @@ card; new designs and mockups show the approved destination, not the legacy red 
 **REGISTER TABLE DENSITY LAW — APPROVED / LOCKED.** The readable 2990 parent-list geometry is
 the Register baseline, expressed only through frozen Carres typography tokens: rendered 36px
 table header using `text-label` (11px / 14px); rendered 38px single-line parent row using
-`text-body` (13px / 18px). **THE ONE PAGE-SPECIFIC EXCEPTION — the Delivery Monitor work list
-(owner ruling 2026-09-12): its parent row is 72px because it deliberately carries one primary
-fact and one supporting line in every cell (`../delivery/MASTER.md` §8.3). The 38 versus 72
-decision is not reopened, and no other register inherits 72px without its own owner ruling.** The remaining height is balanced vertical breathing room, with the
+`text-body` (13px / 18px). **THE TWO PAGE-SPECIFIC EXCEPTIONS — the Delivery Monitor work list
+(owner ruling 2026-09-12) and the Payment Monitor listing (owner ruling 2026-09-16): each parent
+row is a fixed 72px because it deliberately carries one primary fact and one supporting line in
+every cell (`../delivery/MASTER.md` §8.3 · `../payment/MASTER.md` §3). Both print the cell through
+the one shared `MonitorTwoLines`; a cell never grows the row or shows a third line, and a cut value
+opens whole by click or keyboard. The 38 versus 72 decision is not reopened, and no other register
+inherits 72px without its own owner ruling.** The remaining height is balanced vertical breathing room, with the
 row's checkbox included in the measured height. Expanded content takes its
 natural governed child-row height and is not forced into 38px. Carres gains visible rows by
 removing tall page chrome, breadcrumbs, KPI bands and redundant headings — never by squeezing
