@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WORK_RULES, type WorkItem } from "./work-engine";
+import { WORK_RULES, workCompletionStatement, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
   "orders",
@@ -162,11 +162,11 @@ export interface OperationWorkPresentation {
   problem: string;
   recipient: string | null;
   requiredResult: string;
-  completionStatement: string;
+  completionStatement?: string;
   destination: string;
   today: string;
-  calendar: z.infer<typeof operationWorkCalendarSchema>;
-  observedAt: string;
+  calendar?: z.infer<typeof operationWorkCalendarSchema>;
+  observedAt?: string;
 }
 
 /** Translate a module engine's open projection into the transport contract.
@@ -179,8 +179,18 @@ export function operationWorkItemFromProjection(
   const rule = WORK_RULES.find((candidate) => candidate.key === item.ruleKey);
   if (!rule) throw new Error(`Work rule is not registered: ${item.ruleKey}`);
   const dueOn = item.dueIso;
-  const state =
-    item.workingDaysLate > 0
+  const calendar = presentation.calendar ?? {
+    module: { key: item.ruleKey, source: "work_engine", state: "ready" as const },
+    actor: {
+      key: item.actingPerson?.userId ? `person:${item.actingPerson.userId}` : `duty:${item.ownerDutyKey ?? item.ownerRule}`,
+      source: "people",
+      state: "not_configured" as const,
+    },
+    holidayName: null,
+  };
+  const state = calendar.module.state !== "ready" || calendar.actor.state !== "ready"
+    ? "calendar_gap"
+    : item.workingDaysLate > 0
       ? "missed"
       : dueOn === null
         ? "no_working_date"
@@ -196,7 +206,7 @@ export function operationWorkItemFromProjection(
     recipient: presentation.recipient,
     requiredResult: presentation.requiredResult,
     completionPredicate: rule.completionFact,
-    completionStatement: presentation.completionStatement,
+    completionStatement: presentation.completionStatement ?? workCompletionStatement(item.ruleKey),
     owner: {
       rule: item.ownerRule,
       dutyKey: item.ownerDutyKey,
@@ -208,16 +218,16 @@ export function operationWorkItemFromProjection(
     timing: {
       businessDueOn: dueOn,
       actionOn: dueOn,
-      workingDaysMissed: item.workingDaysLate,
+      workingDaysMissed: state === "calendar_gap" ? 0 : item.workingDaysLate,
       state,
       noDateReason: dueOn === null ? "The owning rule has no working date" : null,
-      calendar: presentation.calendar,
+      calendar,
     },
     communication: null,
     blocker: null,
     nextConsequence: null,
     destination: presentation.destination,
-    observedAt: presentation.observedAt,
+    observedAt: presentation.observedAt ?? new Date().toISOString(),
     tone: item.tone,
     locked: item.locked,
     broken: item.broken,

@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import {
   countWorkingDays,
   myHolidaySet,
@@ -30,6 +31,7 @@ import {
   type ReceivingWorkSource,
   type OperationWorkItem,
   type OperationWorkResponse,
+  type OperationWorkSourceHealth,
   type WorkItem,
   type WorkOwnerRule,
   type WorkspaceDutyResolution,
@@ -1002,21 +1004,93 @@ async function readCollectionTimingRules(c: Context<AppEnv>): Promise<Collection
 /** The one response boundary. Module loaders remain responsible for producing
  * valid projections; invalid input fails the request instead of presenting a
  * false clear desk. Stable identity is the only deduplication key. */
+export interface OperationWorkSourceResult {
+  health: OperationWorkSourceHealth;
+  items: readonly OperationWorkItem[];
+}
+
+type OperationWorkSourceKey = OperationWorkSourceHealth["key"];
+
+const WORK_SOURCE_LABEL: Record<OperationWorkSourceKey, string> = {
+  orders: "Sales Orders",
+  purchasing: "Purchasing",
+  receiving: "Receiving",
+  delivery: "Delivery",
+  payment: "Payment",
+  issue_tracker: "Issue Tracker",
+};
+
+export async function loadWorkSource(
+  key: OperationWorkSourceKey,
+  observedAt: string,
+  loader: () => Promise<readonly OperationWorkItem[]>,
+): Promise<OperationWorkSourceResult> {
+  try {
+    const items = await loader();
+    return {
+      health: {
+        key,
+        state: "healthy",
+        observedAt,
+        lastSuccessfulAt: observedAt,
+        errorLabel: null,
+      },
+      items,
+    };
+  } catch (error) {
+    if (error instanceof HTTPException && (error.status === 401 || error.status === 403)) {
+      throw error;
+    }
+    return {
+      health: {
+        key,
+        state: "failed",
+        observedAt: null,
+        lastSuccessfulAt: null,
+        errorLabel: `Could not refresh ${WORK_SOURCE_LABEL[key]}`,
+      },
+      items: [],
+    };
+  }
+}
+
+function incrementCount(counts: Record<string, number>, key: string): void {
+  counts[key] = (counts[key] ?? 0) + 1;
+}
+
 export function composeOperationWorkResponse(
-  moduleItems: readonly (readonly OperationWorkItem[])[],
+  sourceResults: readonly OperationWorkSourceResult[],
   staff: readonly OperationWorkStaff[],
   generatedOn: string,
 ): OperationWorkResponse {
   const byId = new Map<string, OperationWorkItem>();
-  for (const items of moduleItems) {
-    for (const item of items) {
+  for (const source of sourceResults) {
+    for (const item of source.items) {
       if (!byId.has(item.id)) byId.set(item.id, item);
     }
   }
+  const items = [...byId.values()];
+  const byDay: Record<string, number> = {};
+  const byModule: Record<string, number> = {};
+  const byOwner: Record<string, number> = {};
+  for (const item of items) {
+    incrementCount(byDay, item.timing.state === "missed"
+      ? "missed"
+      : item.timing.actionOn ?? "no_working_date");
+    incrementCount(byModule, item.module);
+    incrementCount(
+      byOwner,
+      item.owner.normal?.userId ?? item.owner.dutyKey ?? "not_assigned",
+    );
+  }
   return operationWorkResponseSchema.parse({
-    items: [...byId.values()],
+    contractVersion: 2,
+    complete: sourceResults.every((source) => source.health.state === "healthy"),
+    items,
     staff: [...staff],
     generatedOn,
+    sources: sourceResults.map((source) => source.health),
+    counts: { all: items.length, byDay, byModule, byOwner },
   });
 }
 
@@ -1205,57 +1279,6 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
   return { reviews, evidenceAt };
 }
 
-async function readStorageChecks(c: Context<AppEnv>): Promise<StorageCheckSource[]> {
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const cases = await sb
-    .from("payment_storage_cases")
-    .select("id,order_id,product_group,storage_start,status,orders(so)")
-    .eq("status", "open");
-  if (cases.error) throw new Error("Workspace storage-case source could not be read");
-  const rows = (cases.data ?? []) as unknown as Array<{
-    id: string; order_id: string; product_group: string; storage_start: string;
-    orders?: { so?: number } | Array<{ so?: number }> | null;
-  }>;
-  if (rows.length === 0) return [];
-
-  const checks = await sb
-    .from("payment_storage_inspections")
-    .select("case_id,inspected_on")
-    .in("case_id", rows.map((r) => r.id));
-  if (checks.error) throw new Error("Workspace storage-check source could not be read");
-  const lastByCase = new Map<string, string>();
-  for (const k of (checks.data ?? []) as Array<{ case_id: string; inspected_on: string }>) {
-    const seen = lastByCase.get(k.case_id);
-    if (!seen || k.inspected_on > seen) lastByCase.set(k.case_id, k.inspected_on);
-  }
-
-  // The interval is a SETTING, not a case snapshot (0431): changing it changes
-  // the cadence of every open case from now on, which is what an operational
-  // cadence should do.
-  const rules = await sb
-    .from("payment_storage_rules")
-    .select("product_group,inspection_days,effective_from")
-    .order("effective_from", { ascending: false });
-  if (rules.error) throw new Error("Workspace storage-rule source could not be read");
-  const daysByGroup = new Map<string, number>();
-  for (const r of (rules.data ?? []) as Array<{ product_group: string; inspection_days: number }>) {
-    if (!daysByGroup.has(r.product_group)) daysByGroup.set(r.product_group, r.inspection_days);
-  }
-
-  return rows.map((r) => {
-    const o = Array.isArray(r.orders) ? r.orders[0] : r.orders;
-    return {
-      caseId: r.id,
-      orderId: r.order_id,
-      so: o?.so ?? null,
-      productGroup: r.product_group,
-      storageStart: r.storage_start,
-      lastCheckedOn: lastByCase.get(r.id) ?? null,
-      inspectionDays: daysByGroup.get(r.product_group) ?? 30,
-    };
-  });
-}
-
 /**
  * §6 — `Check the stored furniture`, every configured interval.
  *
@@ -1333,7 +1356,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks, issueSource, timingRules, proofFacts] =
+         invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1366,7 +1389,6 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readAllInvoices(internal, c),
       readCollectionOutcomes(c),
       readRefunds(c),
-      readStorageChecks(c),
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
       readProofFacts(c),
@@ -1459,7 +1481,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
-  const storageCheckItems = projectStorageCheckWork({ cases: storageChecks, today });
+  const observedAt = new Date().toISOString();
   const issueItems = projectIssueActionWork({
     actions: issueSource.actions,
     dutyResolutions: {
@@ -1467,11 +1489,28 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ...(issueReviewApprover ? { issue_review_approver: issueReviewApprover } : {}),
     },
     today,
+    observedAt,
   });
+  const sourceResults = await Promise.all([
+    loadWorkSource("orders", observedAt, async () =>
+      orderItems.filter((item) => item.module === "orders" && item.ruleKey !== "collect")),
+    loadWorkSource("purchasing", observedAt, async () => [
+      ...manualItems,
+      ...purchaseOrderItems,
+      ...arrivalCheckItems,
+    ]),
+    loadWorkSource("receiving", observedAt, async () => receivingItems),
+    loadWorkSource("delivery", observedAt, async () =>
+      orderItems.filter((item) => item.module === "delivery")),
+    loadWorkSource("payment", observedAt, async () => [
+      ...paymentItems,
+      ...storageInvoiceItems,
+      ...overpaymentItems,
+    ]),
+    loadWorkSource("issue_tracker", observedAt, async () => issueItems),
+  ]);
   return composeOperationWorkResponse(
-    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     arrivalCheckItems, receivingItems, paymentItems, storageInvoiceItems, overpaymentItems,
-     storageCheckItems, issueItems],
+    sourceResults,
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

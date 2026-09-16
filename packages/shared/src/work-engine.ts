@@ -461,6 +461,43 @@ export const WORK_RULES: readonly WorkRule[] = [
   ...MODULE_WORK_RULES,
 ];
 
+const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
+  issue_po: "A purchase order covers the demand",
+  confirm_ready_date: "A standing supplier promise is recorded",
+  delay_planning: "The customer-plan decision and decided date are recorded",
+  arrange_new_delivery_date: "A reachable customer-confirmed date and slot are recorded",
+  assign_logistics: "The delivery company is recorded",
+  confirm_delivery_date: "The customer-confirmed date and slot are recorded",
+  issue_delivery_order: "The Delivery Order exists",
+  deliver_today: "The delivery attempt result is recorded",
+  upload_delivery_photo: "The delivery proof file is recorded",
+  collect: "The outstanding balance is RM 0",
+  check_delivery_proof: "A review newer than the latest delivery file is recorded",
+  collect_loan_item: "The loan item is recorded as returned",
+  resolve_payment_exception: "The payment exception is cleared with evidence",
+  ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
+  "manual_purchase.approve": "The approval or refusal decision is recorded",
+  "manual_purchase.issue_po": "Every linked current PO version has confirmed-send evidence",
+  "purchasing.confirm_ready_date": "A standing supplier promise is recorded",
+  "payment.collect_customer_balance": "The outstanding balance is RM 0",
+  "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",
+  "payment.missed_promise": "The outstanding balance is RM 0",
+  "payment.send_storage_invoice": "The live storage owing is RM 0",
+  "purchasing.supplier_reply": "An evidenced supplier answer for the current PO version is recorded",
+  "purchasing.supplier_date_passed": "A new evidenced supplier answer and governed arrival date are recorded",
+  "purchasing.confirm_tomorrows_delivery": "A supplier promise about that arrival date is recorded",
+  "purchasing.confirm_balance_delivery_date": "A balance promise for the line is recorded",
+  "payment.check_stored_furniture": "A due storage inspection is recorded",
+  "receiving.check_in": "The Receiving Session is posted",
+  "claims.confirm_what_happens_next": "The customer resolution is recorded",
+};
+
+export function workCompletionStatement(ruleKey: string): string {
+  const statement = WORK_COMPLETION_STATEMENTS[ruleKey];
+  if (!statement) throw new Error(`Work completion statement is not registered: ${ruleKey}`);
+  return statement;
+}
+
 /** The order-track rules by key — how the composition finds each `ownerRule`. */
 const ORDER_RULE_BY_KEY = new Map<string, WorkRule>(
   ORDER_WORK_RULES.map((r) => [r.key, r]),
