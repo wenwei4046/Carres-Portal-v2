@@ -86,7 +86,7 @@ export type WorkOwnerRule =
   | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
   | "purchasing_approver";
 
-export interface WorkRule {
+export interface WorkRuleDefinition {
   key: string;
   module: "orders" | "purchasing" | "receiving" | "claims" | "delivery" | "payment";
   /** ① when the item exists — the owning engine's trigger, in words. */
@@ -103,8 +103,13 @@ export interface WorkRule {
   completionFact: string;
 }
 
+export interface WorkRule extends WorkRuleDefinition {
+  version: number;
+  completionStatement: string;
+}
+
 /** Order-track rules — the keys `order-actions.ts` can raise. */
-export const ORDER_WORK_RULES: readonly WorkRule[] = [
+export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "issue_po",
     module: "orders",
@@ -289,7 +294,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
  *  engine; their items render on their own surfaces (the CALLS calendar, the
  *  Receiving rail, the Claims queue) and join the composed feed when their
  *  server feeds are wired (Card 9's recorded boundary). */
-export const MODULE_WORK_RULES: readonly WorkRule[] = [
+export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "manual_purchase.approve",
     module: "purchasing",
@@ -456,11 +461,6 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
   },
 ];
 
-export const WORK_RULES: readonly WorkRule[] = [
-  ...ORDER_WORK_RULES,
-  ...MODULE_WORK_RULES,
-];
-
 const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   issue_po: "A purchase order covers the demand",
   confirm_ready_date: "A standing supplier promise is recorded",
@@ -492,6 +492,15 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   "claims.confirm_what_happens_next": "The customer resolution is recorded",
 };
 
+export const WORK_RULES: readonly WorkRule[] = [
+  ...ORDER_WORK_RULES,
+  ...MODULE_WORK_RULES,
+].map((rule) => {
+  const completionStatement = WORK_COMPLETION_STATEMENTS[rule.key];
+  if (!completionStatement) throw new Error(`Work completion statement is not registered: ${rule.key}`);
+  return { ...rule, version: 1, completionStatement };
+});
+
 export function workCompletionStatement(ruleKey: string): string {
   const statement = WORK_COMPLETION_STATEMENTS[ruleKey];
   if (!statement) throw new Error(`Work completion statement is not registered: ${ruleKey}`);
@@ -500,7 +509,9 @@ export function workCompletionStatement(ruleKey: string): string {
 
 /** The order-track rules by key — how the composition finds each `ownerRule`. */
 const ORDER_RULE_BY_KEY = new Map<string, WorkRule>(
-  ORDER_WORK_RULES.map((r) => [r.key, r]),
+  WORK_RULES
+    .filter((r) => ORDER_WORK_RULES.some((definition) => definition.key === r.key))
+    .map((r) => [r.key, r]),
 );
 
 // ─── The composed work item ──────────────────────────────────────────────────

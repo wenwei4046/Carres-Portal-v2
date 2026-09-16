@@ -1054,10 +1054,6 @@ export async function loadWorkSource(
   }
 }
 
-function incrementCount(counts: Record<string, number>, key: string): void {
-  counts[key] = (counts[key] ?? 0) + 1;
-}
-
 export function composeOperationWorkResponse(
   sourceResults: readonly OperationWorkSourceResult[],
   staff: readonly OperationWorkStaff[],
@@ -1070,19 +1066,6 @@ export function composeOperationWorkResponse(
     }
   }
   const items = [...byId.values()];
-  const byDay: Record<string, number> = {};
-  const byModule: Record<string, number> = {};
-  const byOwner: Record<string, number> = {};
-  for (const item of items) {
-    incrementCount(byDay, item.timing.placement === "missed"
-      ? "missed"
-      : item.timing.actionOn ?? "no_working_date");
-    incrementCount(byModule, item.module);
-    incrementCount(
-      byOwner,
-      item.owner.normal?.userId ?? item.owner.dutyKey ?? "not_assigned",
-    );
-  }
   return operationWorkResponseSchema.parse({
     contractVersion: 2,
     complete: sourceResults.every((source) => source.health.state === "healthy"),
@@ -1090,7 +1073,6 @@ export function composeOperationWorkResponse(
     staff: [...staff],
     generatedOn,
     sources: sourceResults.map((source) => source.health),
-    counts: { all: items.length, byDay, byModule, byOwner },
   });
 }
 

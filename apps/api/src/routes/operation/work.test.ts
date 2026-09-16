@@ -26,6 +26,7 @@ const base: OperationWorkItem = {
   id: "orders:SO-1318:missing_delivery_date",
   module: "orders",
   ruleKey: "missing_delivery_date",
+  ruleVersion: 1,
   object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
   problem: "No delivery date",
   action: "Ask customer for a delivery date",
@@ -38,6 +39,7 @@ const base: OperationWorkItem = {
     dutyKey: null,
     normal: { userId: "shasha", name: "Shasha" },
     activeCover: null,
+    coverEvidence: null,
     acting: { userId: "shasha", name: "Shasha" },
     state: "primary",
   },
@@ -63,6 +65,7 @@ const base: OperationWorkItem = {
   nextConsequence: null,
   destination: "/operation/orders/so/order-1",
   observedAt: "2026-09-06T01:00:00.000Z",
+  sourceVersion: "orders:2026-09-06T01:00:00.000Z",
   tone: "warning",
   locked: false,
   broken: false,
@@ -136,7 +139,7 @@ describe("operation Work response composition", () => {
     expect(response.items.map((item) => item.id)).toEqual([base.id, receiving.id]);
     expect(response.staff).toHaveLength(1);
     expect(response.generatedOn).toBe("2026-09-06");
-    expect(response.counts.all).toBe(response.items.length);
+    expect(response.items).toHaveLength(2);
   });
 
   it("keeps healthy work visible when one admitted source fails", () => {
@@ -154,7 +157,7 @@ describe("operation Work response composition", () => {
     expect(response.complete).toBe(false);
     expect(response.items.map((item) => item.id)).toEqual([base.id]);
     expect(response.sources).toContainEqual(receiving.health);
-    expect(response.counts.all).toBe(1);
+    expect(response.items).toHaveLength(1);
   });
 
   it("isolates an operational source error without swallowing permission refusal", async () => {

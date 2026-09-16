@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WORK_RULES, workCompletionStatement, type WorkItem } from "./work-engine";
+import { WORK_RULES, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
   "orders",
@@ -20,6 +20,11 @@ export const operationWorkOwnerSchema = z.object({
   dutyKey: z.string().min(1).nullable(),
   normal: operationWorkPersonSchema.nullable(),
   activeCover: operationWorkPersonSchema.nullable(),
+  coverEvidence: z.object({
+    id: z.string().min(1),
+    startsOn: z.string().date(),
+    endsOn: z.string().date(),
+  }).strict().nullable(),
   acting: operationWorkPersonSchema.nullable(),
   state: z.enum(["primary", "covered", "not_assigned"]),
 }).strict();
@@ -56,6 +61,7 @@ export const operationWorkItemSchema = z.object({
   id: z.string().min(5),
   module: operationWorkModuleSchema,
   ruleKey: z.string().min(1),
+  ruleVersion: z.number().int().positive(),
   object: z.object({
     kind: z.string().min(1),
     id: z.string().min(1),
@@ -122,6 +128,7 @@ export const operationWorkItemSchema = z.object({
   nextConsequence: z.string().min(1).nullable(),
   destination: z.string().startsWith("/"),
   observedAt: z.string().datetime(),
+  sourceVersion: z.string().min(1),
   tone: z.enum(["danger", "warning", "info", "success", "neutral"]),
   locked: z.boolean(),
   broken: z.boolean(),
@@ -157,12 +164,6 @@ export const operationWorkResponseSchema = z.object({
   }).strict()),
   generatedOn: z.string().date(),
   sources: operationWorkSourcesSchema,
-  counts: z.object({
-    all: z.number().int().nonnegative(),
-    byDay: z.record(z.number().int().nonnegative()),
-    byModule: z.record(z.number().int().nonnegative()),
-    byOwner: z.record(z.number().int().nonnegative()),
-  }).strict(),
 }).strict().superRefine((response, ctx) => {
   if (response.complete && response.sources.some((source) => source.state !== "healthy")) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["complete"], message: "A response with a non-current source cannot be complete" });
@@ -198,6 +199,8 @@ export interface OperationWorkPresentation {
   today: string;
   calendar?: z.infer<typeof operationWorkCalendarSchema>;
   observedAt?: string;
+  sourceVersion?: string;
+  coverEvidence?: OperationWorkItem["owner"]["coverEvidence"];
   businessDueOn?: string | null;
   actionOn?: string | null;
   noDateReason?: string | null;
@@ -233,18 +236,20 @@ export function operationWorkItemFromProjection(
     id: operationWorkStableId(module, presentation.object.id, item.ruleKey),
     module,
     ruleKey: item.ruleKey,
+    ruleVersion: rule.version,
     object: presentation.object,
     problem: presentation.problem,
     action: item.action,
     recipient: presentation.recipient,
     requiredResult: presentation.requiredResult,
     completionPredicate: rule.completionFact,
-    completionStatement: presentation.completionStatement ?? workCompletionStatement(item.ruleKey),
+    completionStatement: presentation.completionStatement ?? rule.completionStatement,
     owner: {
       rule: item.ownerRule,
       dutyKey: item.ownerDutyKey,
       normal: item.normalOwner,
       activeCover: item.activeCover,
+      coverEvidence: presentation.coverEvidence ?? null,
       acting: item.actingPerson,
       state: item.ownerState,
     },
@@ -270,6 +275,7 @@ export function operationWorkItemFromProjection(
     nextConsequence: null,
     destination: presentation.destination,
     observedAt: presentation.observedAt ?? new Date().toISOString(),
+    sourceVersion: presentation.sourceVersion ?? presentation.observedAt ?? new Date().toISOString(),
     tone: item.tone,
     locked: item.locked,
     broken: item.broken,

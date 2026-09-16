@@ -14,6 +14,7 @@ const item: OperationWorkItem = {
   id: "orders:SO-1318:missing_delivery_date",
   module: "orders",
   ruleKey: "missing_delivery_date",
+  ruleVersion: 1,
   object: { kind: "sales_order", id: "order-1318", label: "SO-1318" },
   problem: "No delivery date",
   action: "Ask customer for a delivery date",
@@ -26,6 +27,7 @@ const item: OperationWorkItem = {
     dutyKey: null,
     normal: { userId: "shasha", name: "Shasha" },
     activeCover: { userId: "yujun", name: "Yu Jun" },
+    coverEvidence: { id: "cover-1", startsOn: "2026-09-06", endsOn: "2026-09-08" },
     acting: { userId: "yujun", name: "Yu Jun" },
     state: "covered",
   },
@@ -51,6 +53,7 @@ const item: OperationWorkItem = {
   nextConsequence: null,
   destination: "/operation/orders/so/order-1318",
   observedAt: "2026-09-06T01:00:00.000Z",
+  sourceVersion: "orders:2026-09-06T01:00:00.000Z",
   tone: "warning",
   locked: false,
   broken: false,
@@ -153,7 +156,6 @@ describe("Operation Work wire contract", () => {
       staff: [],
       generatedOn: "2026-09-06",
       sources,
-      counts: { all: 1, byDay: { "2026-09-06": 1 }, byModule: { orders: 1 }, byOwner: { yujun: 1 } },
     }).success).toBe(false);
   });
 
@@ -172,7 +174,6 @@ describe("Operation Work wire contract", () => {
         { key: "payment", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
         { key: "issue_tracker", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
       ],
-      counts: { all: 1, byDay: { "2026-09-06": 1 }, byModule: { orders: 1 }, byOwner: { yujun: 1 } },
     });
     expect(response.sources).toHaveLength(6);
     expect(response.complete).toBe(false);
