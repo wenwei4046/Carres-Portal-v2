@@ -60,7 +60,9 @@ import { Z_TABLE_HEADER } from "@/components/kit/overlay-layer";
  *
  * 240px is the width at which a date column still reads: the card header puts
  * a supplier name, a date-status pill and the open door on one line, and the
- * name keeps its `flex-[1_1_6rem]` (96px) floor before the pill and door wrap.
+ * name keeps its `flex-[1_1_5rem]` (80px) floor before the pill and door wrap.
+ * The floor is 5rem and not 6 because 6rem needed 198px of the header's 197px
+ * at this exact column width and put the pill and door on a second line.
  * Below 240px the name is squeezed into a gutter and the operator loses the
  * identity of the work. The canvas is `columns × 240px`, so the SIX dates a
  * Site normally operates make 1440px — wider than a 703px screen, and reached
