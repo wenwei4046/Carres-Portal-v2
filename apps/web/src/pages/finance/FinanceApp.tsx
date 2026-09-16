@@ -52,9 +52,14 @@ export default function FinanceApp() {
   const financeOnly = (page: React.ReactNode) =>
     role === "operation" ? <Navigate to="/finance/monitor" replace /> : page;
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    /* ⭐ A FIXED FRAME, like the Operation shell (Payment Monitor Card 02,
+       2026-09-16). With `min-h-screen` the page grew to its content, so a
+       listing's sheet was never bounded: an opened row pushed the listing and
+       its fixed footer off screen and the whole window scrolled, rail
+       included. The frame is the viewport; a long page scrolls inside `main`. */
+    <div className="flex h-screen bg-background text-foreground">
       <PortalSidebar />
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">
         <Routes>
           <Route index element={role === "operation"
             ? <Navigate to="monitor" replace /> : <Navigate to="dashboard" replace />} />

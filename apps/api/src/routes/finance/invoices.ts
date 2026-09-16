@@ -66,7 +66,14 @@ const INVOICE_REGISTER_SELECT =
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
   "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
-  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status," +
+  // Payment Monitor Card 02 (2026-09-16): the confirmed delivery is
+  // DELIVERY'S fact — its Delivery Orders and its arrangement per leg, then
+  // the booking overlay only while its stage is `confirmed`. The shared
+  // `invoiceConfirmedDelivery` reads these for the Monitor AND the Work feed,
+  // so the clock starts on the day Delivery actually agreed.
+  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time)," +
+  "ops_delivery_orders(leg,delivery_date,time_slot,voided_at,issued_at)," +
+  "ops_order_control(balance,confirmed_date,booking_stage,confirmed_time_slot,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY
   // C9 storage fee too, or they disagree with Work and the gate on a
   // pure-legacy order. The columns ride the wire; the shared

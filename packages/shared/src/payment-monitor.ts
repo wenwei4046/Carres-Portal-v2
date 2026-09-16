@@ -7,12 +7,13 @@
  * derived from the owning modules' source columns through the ONE shared
  * arithmetic (Law D):
  *
- *   Amount needed     `soRemaining` — issued live invoice obligations only
- *   Goods             the order's own readiness/arrival signals
- *   Storage           the §6/§7 storage case through `storageChargeOf`
- *   Customer delivery the confirmed date, else the requested one, else none
- *   Payment timing    the shared collection clock + readiness rule,
- *                     with the governed next action beside the fact
+ *   Amount needed            `soRemaining` — issued live invoice obligations only
+ *   Items & Stock            NOT here: Delivery's own `monitorGoodsOf` over the
+ *                            Stock register (the web reads it beside this row)
+ *   Storage                  the §6/§7 storage case through `storageChargeOf`
+ *   Requested Delivery Date  Sales' request, kept after Delivery confirms
+ *   Confirmed Delivery       Delivery's fact (`invoiceConfirmedDelivery`)
+ *   Payment timing           the shared collection clock + readiness rule
  *
  * Nothing here recalculates money, storage or the clock its own way, and
  * nothing here resolves an owner — the owner avatar comes from the shared
@@ -20,11 +21,9 @@
  * Primary School English, verbatim from the ruling.
  */
 import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "./collection-clock";
-import type { CustomerDeliveryStatus } from "./payment-invoice-register";
 import {
-  deliveryWords,
   invoiceArrivalDayWord,
-  invoiceCustomerDelivery,
+  invoiceConfirmedDelivery,
   invoicePaymentTiming,
   soRemaining,
   type InvoiceRegisterRow,
@@ -34,96 +33,8 @@ import type { WorkingDayOptions } from "./working-days";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function ctrlOf(row: InvoiceRegisterRow) {
-  const ctrl = row.orders?.ops_order_control;
-  return Array.isArray(ctrl) ? (ctrl[0] ?? null) : (ctrl ?? null);
-}
-
 /** `Monday, 21 Sep` — the one day spelling the ruling uses on Monitor. */
 export const monitorDayWord = invoiceArrivalDayWord;
-
-// ─── Goods ───────────────────────────────────────────────────────────────────
-
-export interface MonitorItemLine {
-  sku: string;
-  qty: number;
-  /** `Ready` · `Arriving Monday, 21 Sep` · `Arrival not confirmed` */
-  word: string;
-  ready: boolean;
-  arrivalIso: string | null;
-}
-
-export interface MonitorGoods {
-  /** Every goods line on the order (the delivery scope of an ordinary SO). */
-  lines: MonitorItemLine[];
-  total: number;
-  ready: number;
-  /** The LAST waiting line's arrival, when every waiting line has one. */
-  lastArrivalIso: string | null;
-  /** True when at least one waiting line has no arrival date. */
-  arrivalUnknown: boolean;
-  completed: boolean;
-}
-
-/** Per-line readiness from the order's own stores: `line_stock_status` (the
- *  operation ladder's word per SKU) first, else `line_etas` (a line with a
- *  date is waiting; one without is ready), else nothing is known. */
-export function monitorGoods(row: InvoiceRegisterRow): MonitorGoods {
-  const order = row.orders;
-  const completed = !!order && (order.status === "delivered" || !!order.delivered_at);
-  const ctrl = ctrlOf(row);
-  const status = ctrl?.line_stock_status ?? null;
-  const etas = ctrl?.line_etas ?? null;
-  const hasStatus = !!status && Object.keys(status).length > 0;
-  const hasEtas = !!etas && Object.keys(etas).length > 0;
-  // The goods lines are the order's own; a row whose lines carry no SKU (an
-  // older import) still has the ladder's per-SKU signals, so those keys stand
-  // in as the items rather than reading every line as `not ready`.
-  const sourceLines: Array<{ sku?: string; qty: number }> = (order?.order_lines ?? []).some((l) => l.sku)
-    ? (order?.order_lines ?? [])
-    : [...new Set([...Object.keys(status ?? {}), ...Object.keys(etas ?? {})])].map((sku) => ({ sku, qty: 1 }));
-  const lines: MonitorItemLine[] = sourceLines.map((l) => {
-    const sku = String(l.sku ?? "");
-    const eta = etas?.[sku] ?? null;
-    const arrivalIso = eta && ISO_DATE.test(eta) ? eta : null;
-    let ready: boolean;
-    if (completed) ready = true;
-    else if (hasStatus) ready = String(status![sku] ?? "").toLowerCase() === "ready";
-    else if (hasEtas) ready = !(sku in etas!);
-    else ready = false;
-    return {
-      sku,
-      qty: Number(l.qty),
-      ready,
-      arrivalIso: ready ? null : arrivalIso,
-      word: ready ? "Ready" : arrivalIso ? `Arriving ${monitorDayWord(arrivalIso)}` : "Arrival not confirmed",
-    };
-  });
-  const waiting = lines.filter((l) => !l.ready);
-  const arrivalUnknown = waiting.some((l) => !l.arrivalIso);
-  const lastArrivalIso = waiting.length && !arrivalUnknown
-    ? waiting.map((l) => l.arrivalIso!).sort().at(-1)!
-    : null;
-  return {
-    lines,
-    total: lines.length,
-    ready: lines.length - waiting.length,
-    lastArrivalIso,
-    arrivalUnknown,
-    completed,
-  };
-}
-
-/** The Goods cell — the ruling's four sentences, verbatim. */
-export function monitorGoodsWord(g: MonitorGoods): string {
-  if (g.completed || (g.total > 0 && g.ready === g.total)) return "Goods ready";
-  if (g.total === 0) return "Arrival not confirmed";
-  if (g.ready > 0 && g.lastArrivalIso) {
-    return `${g.ready} of ${g.total} items ready · Last item arriving ${monitorDayWord(g.lastArrivalIso)}`;
-  }
-  if (g.lastArrivalIso) return `Arriving ${monitorDayWord(g.lastArrivalIso)}`;
-  return "Arrival not confirmed";
-}
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 
@@ -223,29 +134,53 @@ export function monitorStorageWord(s: MonitorStorage, money: (n: number) => stri
   }
 }
 
-// ─── Customer delivery ───────────────────────────────────────────────────────
-
-export interface MonitorDelivery {
-  dateIso: string | null;
-  confirmed: boolean;
-  /** The full governed status, so no surface has to infer it from `confirmed`. */
-  status: CustomerDeliveryStatus;
-  /** `Friday, 18 Sep` · `No delivery date` */
-  word: string;
-  /** The second line when the date is the customer's REQUEST, not yet agreed. */
-  note: string | null;
+/**
+ * The Storage cell on the 72px listing (owner ruling 2026-09-16): the SAME
+ * governed sentence as `monitorStorageWord`, placed on two lines — the state
+ * on line one, its day or money on line two — so no part is cut off and no
+ * third line is ever needed. `monitorStorageWord` stays the Search and Excel
+ * spelling; joined with ` · ` the two lines are that sentence exactly, except
+ * `Free storage approved until {day}`, whose break is a space.
+ */
+export function monitorStorageLines(s: MonitorStorage, money: (n: number) => string): {
+  line1: string;
+  line2: string | null;
+} {
+  switch (s.kind) {
+    case "none": return { line1: "No storage charge", line2: null };
+    case "free": return { line1: `Free until ${monitorDayWord(s.untilIso)}`, line2: null };
+    case "approved_free": return { line1: "Free storage approved", line2: `until ${monitorDayWord(s.untilIso)}` };
+    case "request_pending": return { line1: "Free request waiting for approval", line2: `Estimated charge ${money(s.estimate)}` };
+    case "charging": return { line1: `${s.group} · Day ${s.day}`, line2: `${money(s.soFar)} so far` };
+    case "invoice_unpaid": return { line1: "Storage Invoice issued", line2: `${money(s.amount)} not paid` };
+  }
 }
 
+// ─── Customer delivery ───────────────────────────────────────────────────────
+
 /**
- * The Monitor's Customer delivery cell — now the SHARED read (Law D), not a
- * second derivation. It used to flatten `delivery_date_tbd` into
- * `No delivery date` while the workspace called the same order
- * `Customer not sure`; one order, two answers.
+ * The two delivery dates the listing prints side by side (owner ruling
+ * 2026-09-16, replacing the single `Customer delivery` cell):
+ *
+ *   Requested Delivery Date   Sales' request — it stays after Delivery confirms
+ *   Confirmed Delivery        Delivery's fact, the day the collection clock
+ *                             anchors on (`invoiceConfirmedDelivery`)
  */
-export function monitorDelivery(row: InvoiceRegisterRow): MonitorDelivery {
-  const d = invoiceCustomerDelivery(row);
-  const { word, note } = deliveryWords(d);
-  return { dateIso: d.dateIso, confirmed: d.word === "confirmed", status: d.word, word, note };
+export interface MonitorDeliveryDates {
+  requested: { iso: string | null; tbd: boolean };
+  confirmed: { dateIso: string | null; time: string | null };
+}
+
+export function monitorDeliveryDates(row: InvoiceRegisterRow): MonitorDeliveryDates {
+  const order = row.orders;
+  const raw = order?.delivery_date?.slice(0, 10) ?? null;
+  return {
+    requested: {
+      iso: raw && ISO_DATE.test(raw) ? raw : null,
+      tbd: !!order?.delivery_date_tbd,
+    },
+    confirmed: invoiceConfirmedDelivery(row),
+  };
 }
 
 // ─── Payment timing ──────────────────────────────────────────────────────────
@@ -358,9 +293,8 @@ export interface PaymentMonitorRow {
   door: InvoiceRegisterRow;
   rows: InvoiceRegisterRow[];
   money: ReturnType<typeof soRemaining>;
-  goods: MonitorGoods;
   storage: MonitorStorage;
-  delivery: MonitorDelivery;
+  delivery: MonitorDeliveryDates;
   timing: MonitorTiming;
   promisedIso: string | null;
 }
@@ -397,7 +331,6 @@ export function paymentMonitorRows(input: PaymentMonitorInput): PaymentMonitorRo
     const door = live.find((r) => r.kind === "sales") ?? live[0]!;
     const money = soRemaining(input.invoices as InvoiceRegisterRow[], orderId);
     if (money.known && money.outstanding <= 0) continue;
-    const goods = monitorGoods(door);
     const storage = monitorStorage({
       orderId, cases: input.cases, requests: input.requests,
       storageOwing: money.storageOwing, todayIso: input.todayIso,
@@ -411,8 +344,8 @@ export function paymentMonitorRows(input: PaymentMonitorInput): PaymentMonitorRo
       orderId,
       so: door.orders?.so ?? null,
       customer: door.orders?.customer_name ?? "Customer not available",
-      door, rows: live, money, goods, storage,
-      delivery: monitorDelivery(door),
+      door, rows: live, money, storage,
+      delivery: monitorDeliveryDates(door),
       timing, promisedIso,
     });
   }

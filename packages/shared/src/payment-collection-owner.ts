@@ -29,20 +29,19 @@ export const COLLECTION_OWNER_RULE_WORD = "Responsible Delivery Operation";
 export const COLLECTION_OWNER_DUTY_KEY = "delivery_duty";
 export const COLLECTION_OWNER_DUTY_WORD = "Delivery Duty";
 /**
- * The governed configuration failure (Delivery MASTER §13.1 · COPY-STANDARD).
- *
- * 🔴 THESE WORDS ARE WRONG AFTER 0504, AND THEY WAIT ON THE OWNER. The
- * 2026-09-13 ruling took the Delivery Duty holder out of this answer entirely:
- * the responsible person is the individual the Sales Order was dealt to, so an
- * unresolved owner means no individual is in the Operation assignment pool,
- * and Staff & Duties cannot fix it. Approved copy is the owner's to change, so
- * the sentence stays until she rules. The recommended replacement is
- * `Nobody is assigned to this order.` with the door
- * `Assign it in Sales Orders → Team`. The state is unreachable while the pool
- * holds an individual, which is why this is reported rather than shipped.
+ * ⭐ NOBODY ASSIGNED — the governed failure when no collection owner resolves
+ * (owner instruction 2026-09-16, clearing the stale `Nobody holds Delivery
+ * Duty.` hint). Since 0504 the owner is the individual the Sales Order was
+ * dealt to, so an unresolved owner means nobody is assigned to THIS order and
+ * the one door that fixes it is the Sales Orders Team (a manager assigns).
+ * Staff & Duties cannot fix it and is no longer named here. The short word on
+ * a fixed 72px row is `Not assigned`; its accessible name is the sentence and
+ * the door together.
  */
-export const NO_DELIVERY_DUTY_HOLDER = "Nobody holds Delivery Duty.";
-export const SET_HOLDER_DOOR = "Set the holder in Workspace → Staff & Duties";
+export const COLLECTION_NOT_ASSIGNED = "Not assigned";
+export const NOBODY_ASSIGNED_TO_ORDER = "Nobody is assigned to this order.";
+export const ASSIGN_IN_SALES_ORDERS = "Assign it in Sales Orders → Team";
+export const ASSIGN_IN_SALES_ORDERS_HREF = "/operation/orders";
 
 export interface CollectionOwnerHistoryRow {
   id: string;
