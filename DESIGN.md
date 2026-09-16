@@ -36,6 +36,7 @@ copy, component, or business-rule system.
 
 - Existing Carres shared component inventory is authoritative; inspect before extending.
 - Workspace Work three-panel HTML prototype — `docs/prototypes/workspace-work-three-panel.html`.
+- Workspace Work measured UI handoff — `docs/prototypes/workspace-work-three-panel-SPEC.md`.
 - Payment Register configuration — `apps/web/src/pages/finance/PaymentRegister.tsx`.
 - Operation Payments navigation — `apps/web/src/pages/portal/portal-nav.ts`.
 
