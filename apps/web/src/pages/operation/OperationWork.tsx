@@ -340,6 +340,7 @@ export default function OperationWork() {
                 key={k}
                 type="button"
                 data-testid={`work-view-${k}`}
+                aria-pressed={activeView === k}
                 onClick={() => {
                   setParams((before) => {
                     const next = new URLSearchParams(before);

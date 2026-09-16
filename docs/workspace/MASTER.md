@@ -1028,7 +1028,21 @@ Core admission covers Sales Orders, Purchasing, Receiving, Stock/Warehouse, Deli
 Service Cases and Issue Tracker. Catalog, Guarantee and Rental may join later; they do not block
 honest Work for admitted modules.
 
-## 10 · Measured implementation truth — 2026-09-06
+## 10 · Measured implementation truth — 2026-09-16
+
+- **Workspace Work composition — BUILT, repository-verified 2026-09-16; NOT production-verified.**
+  Branch `build/work-ui` now renders the governed My Work / Team Work composition from the one v2
+  server response, with working-day navigation, owner/module/cover filters, exact object selection,
+  responsive list/detail behavior and the shared Right Rail counts. The browser validates the full
+  v2 response at the query boundary: an old or partial contract is a visible read failure and can
+  neither crash the page nor masquerade as an empty desk. Repository gates: `OperationWork.test.tsx`
+  12/12; `work-cache-isolation.test.tsx` 11/11 including the invalid-contract regression; authenticated
+  manager composition and owning-object Browser Back passed; four governed-fixture viewport walks
+  passed at 1440×900, 1180×820, 820×900 and 390×844 with no document horizontal overflow. Manually
+  inspected evidence is stored in `docs/evidence/workspace-work/`. The fixture is only presentation
+  evidence; it does not claim live feed accuracy. **Still open:** authenticated non-manager acceptance
+  requires a valid live test account, and production verification requires the v2 API and web client
+  to be deployed together. No production deployment was performed by this work.
 
 - **Sales Orders reader boundary, production-verified 2026-09-13/15.** Sales Orders PRs #1227 and
   #1259 preserve canonical Paid/Outstanding arithmetic while showing saved at-sale method,

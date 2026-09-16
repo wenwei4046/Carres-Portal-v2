@@ -191,7 +191,7 @@ function CollidingLegacyProbe() {
 }
 function WorkFeedProbe() {
   const q = useOperationWork();
-  return <div data-testid="work-feed">{q.data ? ("items" in q.data ? `items:${(q.data as OperationWorkResponse).items.length}` : "WRONG-SHAPE") : "loading"}</div>;
+  return <div data-testid="work-feed">{q.isError ? "error" : q.data ? ("items" in q.data ? `items:${(q.data as OperationWorkResponse).items.length}` : "WRONG-SHAPE") : "loading"}</div>;
 }
 
 function client() {
@@ -245,6 +245,14 @@ describe("one cache key per read — the keys", () => {
 });
 
 describe("one cache key per read — both mounting orders, real QueryClient", () => {
+  it("rejects an old or partial Work contract at the query boundary", async () => {
+    state.work = { contractVersion: 1, items: [{ id: "legacy-item" }] };
+    const qc = client();
+    mount(qc, <WorkFeedProbe />);
+    await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("error"));
+    expect(qc.getQueryData(qk.operation.work())).toBeUndefined();
+  });
+
   it("1 · TasksPanel's legacy read loads first → the shared Work feed still receives the Work feed", async () => {
     const qc = client();
     const first = mount(qc, <LegacyTasksProbe />);
