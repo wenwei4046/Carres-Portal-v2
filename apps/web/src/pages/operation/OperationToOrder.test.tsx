@@ -162,7 +162,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     apiFetch.mockResolvedValue(payload());
     renderPage("/operation/to-order?so=1204");
     await screen.findByTestId("so-batch-page");
-    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands?so=1204");
+    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
   it("opens straight onto the header, the order-timing rail and the Register", async () => {
@@ -278,6 +278,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     // document. (`Status` was retired as a presentation on 2026-09-11: the
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
+    fireEvent.click(await screen.findByText("No purchase needed"));
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );

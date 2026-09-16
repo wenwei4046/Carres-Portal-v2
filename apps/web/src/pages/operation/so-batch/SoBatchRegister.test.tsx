@@ -292,15 +292,17 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 
 const onIssue = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}) {
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
         <SoBatchRegister data={data(over)} isLoading={false} onIssue={onIssue} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  if (expandHistory) { const group = screen.queryByText("No purchase needed"); if (group) fireEvent.click(group); }
+  return rendered;
 }
 
 beforeEach(() => {
@@ -329,6 +331,7 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
 describe("the approved columns, in the approved reading order", () => {
   const APPROVED = [
     "SO No",
+    "Order By",
     "Customer",
     "Proceed Date",
     "Requested Delivery Date",
@@ -386,7 +389,7 @@ describe("the approved columns, in the approved reading order", () => {
   });
 
   it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v3"');
+    expect(source()).toContain('"carres.soBatchPurchase.register.v4"');
     expect(source()).not.toContain("register.v1");
   });
 
@@ -893,7 +896,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
      walked at 459px. */
   it("leaves the flow below md so it cannot consume the table", () => {
     renderRegister();
-    expect(rail().className).toContain("max-md:absolute");
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch (width < 896px)");
     /* Its positioning context is the row it sits in, not the page. */
     expect(rail().parentElement?.className).toContain("relative");
   });
@@ -1226,7 +1229,7 @@ describe("the expansion — the ONE shared child table", () => {
     const line = within(box).getByTestId("so-batch-part-B1201S-Q");
     const cells = [...line.querySelectorAll("td")].map((c) => c.textContent);
     expect(cells).toEqual([
-      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "—", "Mattress",
+      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "—", "—", "Mattress",
     ]);
     expect(within(line).queryByRole("checkbox")).toBeNull();
     expect(screen.queryByTestId("so-batch-status-o6")).toBeNull();
@@ -2133,5 +2136,66 @@ describe("choosing a Ready Unit", () => {
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o3::b3", allocations: [{ destinationId: KLANG, qty: 1 }] },
     ]);
+  });
+});
+
+
+describe("approved Order By correction", () => {
+  it("shows the earliest selectable engine date and ignores covered leaves", () => {
+    const original = data();
+    const rows: PurchaseDemandRow[] = original.rows.map((r) => ({ ...r, orderBy: "2026-09-25" }));
+    rows.push(leaf({ id: "covered", orderBy: "2026-01-01", fullyOnPo: true }));
+    renderRegister({ rows });
+    expect(screen.getByTestId("so-batch-order-by-o1")).toHaveTextContent("25 Sep");
+    expect(screen.getByTestId("so-batch-order-by-o5")).toBeEmptyDOMElement();
+  });
+
+  it("names blocked planning and leaves the no-PO destination blank", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-order-by-o4")).toHaveTextContent("Not planned");
+    expect(screen.getByTestId("so-batch-deliver-to-o4")).toBeEmptyDOMElement();
+  });
+
+  it("explains denied Issue authority in the selected toolbar", () => {
+    renderRegister({ mayIssue: false });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByText("Only PO Duty can issue this PO")).toBeInTheDocument();
+  });
+});
+
+
+describe("two truthful groups on one permanent Register", () => {
+  it("starts with buying open and no-purchase-needed collapsed, preserving the total", () => {
+    renderRegister({}, false);
+    expect(screen.getByText("To buy")).toBeInTheDocument();
+    expect(screen.getByText("No purchase needed")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+    fireEvent.click(screen.getByText("No purchase needed"));
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
+  });
+});
+
+
+describe("search, clear and default buying order", () => {
+  it("sorts selectable dates ascending with descending SO ties before blocked demand", () => {
+    const rows = data().rows.map((r) => ({ ...r, orderBy: r.orderId === "o1" ? "2026-09-30" : "2026-09-16" }));
+    const { container } = renderRegister({ rows }, false);
+    const ids = [...container.querySelectorAll('[data-testid^="so-batch-row-"]')].map((r) => r.getAttribute("data-testid"));
+    expect(ids.indexOf("so-batch-row-o3")).toBeLessThan(ids.indexOf("so-batch-row-o1"));
+    expect(ids.indexOf("so-batch-row-o1")).toBeLessThan(ids.indexOf("so-batch-row-o4"));
+  });
+  it("search reveals a covered order and no match offers a complete clear", async () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1400" } });
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument());
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "NOT-A-REAL-SO" } });
+    await screen.findByText("No Sales Orders match these filters");
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
   });
 });

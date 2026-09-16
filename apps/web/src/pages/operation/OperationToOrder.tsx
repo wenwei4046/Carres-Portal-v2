@@ -8,6 +8,7 @@ import {
   type SoBatchSelection,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 
@@ -53,12 +54,9 @@ export default function OperationToOrder() {
    * cannot support.
    */
   const q = useQuery<SoBatchPurchaseResponse>({
-    queryKey: [...QUERY_KEY, scopeSo] as const,
+    queryKey: QUERY_KEY,
     queryFn: async () => {
-      const path =
-        scopeSo && scopeSo.trim() !== ""
-          ? `/api/operation/purchase/demands?so=${encodeURIComponent(scopeSo)}`
-          : "/api/operation/purchase/demands";
+      const path = "/api/operation/purchase/demands";
       return soBatchPurchaseResponseSchema.parse(
         await apiFetch<unknown>(path),
       ) as SoBatchPurchaseResponse;
@@ -88,13 +86,12 @@ export default function OperationToOrder() {
         {(q.error as Error | undefined)?.message ? (
           <p className="text-meta text-kit-slate-11">{(q.error as Error).message}</p>
         ) : null}
-        <button
-          type="button"
-          className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+        <Button
+          variant="neutral" size="md"
           onClick={() => void q.refetch()}
         >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -129,6 +126,7 @@ export default function OperationToOrder() {
     <SoBatchRegister
       data={data ?? empty}
       isLoading={q.isLoading}
+      initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
       onIssue={setSelections}
     />
   );

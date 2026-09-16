@@ -1133,3 +1133,19 @@ describe("soBatchOrderSelection — the parent checkbox is all eligible child de
     expect(s).toEqual({ selectable: true, checked: true, indeterminate: false });
   });
 });
+
+
+describe("SO batch timing counts share the purchase selection gate", () => {
+  it("excludes covered, unverified and already ordered leaves while retaining setup blockers", () => {
+    const facts = soBatchRailFacts(RAIL_ORDERS, [
+      row({ orderId: "oA", state: "can_order_early", fullyOnPo: true }),
+      row({ orderId: "oB", state: "can_order_early", fullyOnPo: undefined }),
+      row({ orderId: "oC", state: "can_order_early", fullyOnPo: false }),
+      row({ orderId: "oD", state: "no_production_days", toBuy: null, issueRef: null }),
+    ]);
+    const result = soBatchRailModel(facts, SO_BATCH_RAIL_CLEAR);
+    expect(result.timingCounts.can_order_early).toBe(0);
+    expect(result.setupCount).toBe(1);
+    expect(result.visibleOrderIds.size).toBe(RAIL_ORDERS.length);
+  });
+});

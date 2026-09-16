@@ -331,7 +331,7 @@ export function soBatchOrderLineOutstandingQty(
  */
 export interface SoBatchRailFacts {
   orderId: string;
-  /** Every leaf state under this order. */
+  /** Selectable timing states and unresolved setup states under this order. */
   states: ReadonlySet<PurchaseDemandState>;
   /** The CATALOG's categories on the order's lines. */
   categories: ReadonlySet<ProductCategory>;
@@ -346,7 +346,11 @@ export function soBatchRailFacts(
   leafs: readonly PurchaseDemandRow[],
 ): SoBatchRailFacts[] {
   const statesByOrder = new Map<string, Set<PurchaseDemandState>>();
+  const statusByOrder = new Map(orders.map((o) => [o.orderId, o.status]));
   for (const r of leafs) {
+    const status = statusByOrder.get(r.orderId);
+    if (status == null || status === "ordered") continue;
+    if (isPurchaseDemandTimingState(r.state) && !isSelectableForOrder(r, status)) continue;
     let s = statesByOrder.get(r.orderId);
     if (!s) {
       s = new Set();
@@ -1321,4 +1325,15 @@ export function composeDocumentLines(
   const lines = [...bySku.values()];
   if (lines.length === 0) return { ok: false, code: "nothing_to_issue" };
   return { ok: true, lines };
+}
+
+
+/** Presentation over the exact checkbox eligibility contract; no calendar arithmetic. */
+export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]) {
+  const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
+  const dates = eligible.map((r) => r.orderBy).filter((d): d is string => Boolean(d)).sort();
+  const blocked = order.status !== "ordered" && leaves.some((r) =>
+    !isPurchaseDemandTimingState(r.state) || (r.fullyOnPo !== true && (r.toBuy ?? 0) > 0 && !isSelectableForOrder(r, order.status)));
+  return { date: dates[0] ?? null, blocked: dates.length === 0 && (blocked || eligible.length > 0),
+    rank: eligible.length > 0 ? 0 : blocked ? 1 : 2 };
 }

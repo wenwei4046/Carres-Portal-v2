@@ -569,6 +569,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           so: row.so,
           customer: row.customer,
           customerDelivery: row.delivery,
+          orderBy: build.orderBy ?? null,
           item: build.model,
           // A modular sofa is a matched SET, not one variant — the engine gives
           // it no size, and its module codes are the SKUs below.
@@ -654,6 +655,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       so: fact.so,
       customer: fact.customer,
       customerDelivery: fact.delivery,
+      orderBy: null,
       item: line.modelName ?? line.sku,
       variant: line.variant,
       category: (line.category as ProductCategory | null) ?? null,

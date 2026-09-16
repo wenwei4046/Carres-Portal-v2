@@ -52,6 +52,7 @@ import {
 } from "react";
 import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import Button from "@/components/kit/Button";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
@@ -175,6 +176,12 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed groups reuse the same group rows without creating a fake data column. */
+  fixedGroups?: {
+    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean }[];
+    groupOf: (row: T) => string;
+    revealMatches?: boolean;
+  };
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
@@ -293,6 +300,8 @@ export type DataGridProps<T> = {
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
+  /** Optional truthful no-match state with a complete reset action. */
+  noMatchMessage?: string;
   isLoading?: boolean;
   /**
    * Right-click row menu. Receives the row and returns the items to show.
@@ -513,6 +522,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  fixedGroups,
   rowKey,
   searchPlaceholder = "Search…",
   exportName,
@@ -543,6 +553,7 @@ function DataGridInner<T>({
   rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
+  noMatchMessage,
   isLoading = false,
   contextMenu,
   expandable,
@@ -588,7 +599,7 @@ function DataGridInner<T>({
 
   const [search, setSearch] = useState(initialSearch);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
   const [rowCtx, setRowCtx] = useState<{
@@ -1213,10 +1224,20 @@ function DataGridInner<T>({
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
-    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean }
+    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean }
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    if (fixedGroups) {
+      const reveal = fixedGroups.revealMatches || debouncedSearch.trim() !== "" || filteredRows.length !== rows.length;
+      return fixedGroups.groups.flatMap((group): Render[] => {
+        const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
+        if (members.length === 0) return [];
+        const collapsed = !group.alwaysOpen && !reveal && collapsedGroups.has(group.key);
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen },
+          ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
+      });
+    }
     if (layout.groupBy.length === 0) return sortedRows.map((row) => ({ kind: "row" as const, row }));
 
     const out: Render[] = [];
@@ -1270,7 +1291,7 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups, debouncedSearch, filteredRows.length, rows.length]);
 
   // ── Column DnD (reorder) ──────────────────────────────────────────
   const onDragStartHeader = (e: DragEvent<HTMLTableCellElement>, key: string) => {
@@ -1557,7 +1578,7 @@ function DataGridInner<T>({
   }, [revealKey, expandedRows, renderList]);
   const VIRTUAL_THRESHOLD = 25;
   const canVirtualize =
-    !isLoading && !embedded && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
+    !isLoading && !embedded && !fixedGroups && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
   const rowVirtualizer = useVirtualizer({
     enabled: canVirtualize,
     count: canVirtualize ? renderList.length : 0,
@@ -1576,7 +1597,10 @@ function DataGridInner<T>({
   const renderGridRow = (item: Render, idx: number) => {
     if (item.kind === "group") {
       return (
-        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => toggleGroup(item.path)}>
+        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => { if (!item.alwaysOpen) toggleGroup(item.path); }}
+          tabIndex={item.alwaysOpen ? undefined : 0}
+          aria-expanded={!item.collapsed}
+          onKeyDown={(event) => { if (!item.alwaysOpen && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); toggleGroup(item.path); } }}>
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
@@ -2367,7 +2391,7 @@ function DataGridInner<T>({
             {!isLoading && renderList.length === 0 && (
               <tr>
                 <td colSpan={totalCols || 1} style={{ padding: 0 }}>
-                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{emptyMessage}</div>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchMessage && (rows.length > 0 || emptyMessage === noMatchMessage) ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
                 </td>
               </tr>
             )}

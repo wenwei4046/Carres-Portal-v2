@@ -2399,6 +2399,7 @@ export {
   soBatchOrderRowSchema,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderPlanning,
   soBatchPurchaseResponseSchema,
   type SoBatchOrderStatus,
   type SoBatchOrderPoFact,

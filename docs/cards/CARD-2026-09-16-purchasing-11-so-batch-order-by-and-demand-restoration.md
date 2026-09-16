@@ -35,5 +35,34 @@ avoid calling Ready-Stock-only coverage `Ordered`.
 
 ## Delivery evidence
 
-Pending; replace with measured files, gates, screenshots, SQL path, commit/PR/CI/deploy and
-remaining limitations before closure.
+Local implementation and focused verification complete; release gates and delivery remain open.
+
+- Demand regression was red for both release and reassignment with retained usage. Actual
+  reservation SQL → release/reassign SQL → GET demands now restores `stockTaken=0`, `toBuy=1`,
+  while the ledger is byte-for-byte unchanged. Sold bindings and legacy coverage remain covered.
+- API/SQL focused run: 106 passed; final demand suite after read-failure protection: 76 passed.
+  Shared full suite: 3,401 passed, then revised timing-count suite: 84 passed.
+- Web full run: 4,856 passed and one obsolete icon-registry count failed. After registering
+  `panelToggle`, five focused suites passed 189 tests. This is not a claim of a final full green
+  gate; CI must run the final tree. Lint passes (existing warning-only governance debt remains).
+- Local actual-component fixture walked at 1440, 1180, 820 and 390px. At 820px the 536px
+  canvas uses an absolute 240px filter overlay and 40px rows; at 390px Clear, duty avatar,
+  Issue PO and export remain reachable. Issue review: 1156px surface has 578px halves;
+  896px surface stacks and scrolls. Fixed CSS specificity after measuring the failed overlay.
+  Screenshots are local review artifacts, not authenticated production proof.
+- Full 521-file PostgreSQL 17 migration replay: only baseline failures 0149, 0317, 0339,
+  0398a and 0453. Canonical final 0500 release/reassign bodies clear the binding. Its alternate
+  accepted bodies do not; tests execute both actual alternate bodies and prove the correction.
+- Proposed forward SQL is `scripts/purchasing-reservation-binding-repair.sql`, kept OUTSIDE
+  `supabase/migrations` pending explicit approval under ENGINEERING §5. Number reconciliation
+  measured live tracker 0509 and repository/all branches maximum 0521; remeasure before numbering.
+  No production SQL has been applied.
+- Authenticated production SQL read on 2026-09-16: live release hash
+  `be8a7765464ae6a7929d31b435bf9e65`; reassign hash `332ca1257c6ce5e25b4496652715d490`.
+  Both actual UPDATE assignments already clear `reserved_order_line_id`; candidate would leave
+  them unchanged. Both have `search_path=public, pg_temp`; neither body contains the 0500
+  `v_role is null` phrase. Do not silently replace these differing live bodies.
+
+Pending: final type/build/CI proof; exact committed SQL rollback probe and approval before any
+numbered migration lands; PR/merge/deploy and authenticated production walkthrough. The groups
+and labels are already owner-approved and require no further confirmation.

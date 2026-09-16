@@ -44,6 +44,8 @@ import {
   MessageCircle,
   MoreVertical,
   Package,
+  PanelLeftOpen,
+  PanelLeftClose,
   RectangleHorizontal,
   Layers2,
   Paperclip,
@@ -93,6 +95,7 @@ const GLYPH = {
   call: Phone,
   attach: Paperclip,
   settings: Settings,
+  panelToggle: PanelLeftOpen,
   help: CircleHelp,
   lock: Lock,
   history: History,
@@ -141,14 +144,17 @@ export default function Icon({
   name,
   size = 16,
   title,
+  panelOpen = false,
 }: {
   name: IconName;
+  /** The two states of the same panel-toggle meaning. */
+  panelOpen?: boolean;
   /** 14 in a row / in a pill · 16 default · 18 page-level. */
   size?: IconSize;
   /** Give an icon a title ONLY when it carries meaning no nearby word does. */
   title?: string;
 }) {
-  const Glyph = GLYPH[name];
+  const Glyph = name === "panelToggle" && panelOpen ? PanelLeftClose : GLYPH[name];
   return (
     <Glyph
       size={size}

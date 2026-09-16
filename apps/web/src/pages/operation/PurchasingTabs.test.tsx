@@ -55,7 +55,7 @@ describe("PurchasingTabs — the destination word", () => {
       ["/operation?tab=claims", "Supplier Claims"],
       // The hidden legacy page keeps its own word — this Card retired its rail
       // row, not the page (`docs/cards/CARD-2026-08-22-...` §4).
-      ["/operation?tab=purchase-demands", "Purchase Demands"],
+      ["/operation?tab=purchase-demands", "SO Batch Purchase"],
     ] as const) {
       const view = renderAt(path);
       expect(screen.getByText(word), path).toBeInTheDocument();
@@ -79,12 +79,12 @@ describe("PurchasingTabs — the destination word", () => {
     // prefix, no tab strip.
     renderAt("/operation?tab=purchase-demands");
     const header = screen.getByTestId("purchasing-tabs");
-    expect(screen.getByText("Purchase Demands")).toBeInTheDocument();
+    expect(screen.getByText("SO Batch Purchase")).toBeInTheDocument();
     expect(header.textContent).not.toContain("Purchasing ·");
     expect(header.querySelector("svg")).toBeNull();
     // It did NOT fall through to the default page.
-    expect(screen.queryByText("SO Batch Purchase")).not.toBeInTheDocument();
-    expect(document.title).toBe("Purchase Demands · Purchasing — Carres");
+    expect(screen.queryByText("Purchase Demands")).not.toBeInTheDocument();
+    expect(document.title).toBe("SO Batch Purchase · Purchasing — Carres");
   });
 
   it("the browser tab says the same word", () => {
