@@ -38,7 +38,7 @@ export default function WorkActionRow({ item, selected, onSelect }: { item: Oper
       </span>
       <span className="mt-1 block text-body font-medium text-kit-slate-12">{item.problem}</span>
       <span className="mt-1 block text-body text-kit-slate-11">{action}</span>
-      <span className={`mt-1 block text-label ${item.timing.placement === "missed" ? "text-kit-red-11" : "text-kit-slate-10"}`}>{timingText(item)}</span>
+      <span className={`mt-1 block text-label ${item.timing.placement === "missed" ? "text-kit-red-11" : "text-kit-slate-11"}`}>{timingText(item)}</span>
     </button>
   );
 }

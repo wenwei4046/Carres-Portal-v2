@@ -470,7 +470,7 @@ export default function OperationWork() {
         ) : null}
         <div className="px-4 py-3">
         {!loading && !error && failedSources.length > 0 ? (
-          <div className="mb-3 border border-kit-amber-6 bg-kit-amber-2 px-3 py-2 text-body text-kit-amber-11" role="status">
+          <div className="mb-3 border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status">
             Some work could not be loaded · {failedSources.join(", ")}
           </div>
         ) : null}
