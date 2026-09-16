@@ -226,7 +226,7 @@ NARROW     toolbar wraps and stays usable · grid scrolls itself · no page side
 ```
 
 **Status (measured 2026-09-16, fixture render in the real portal shell, not authenticated
-production).** Page-local half built in draft PR (branch `build/sales-orders-listing-standard`), WAITING FOR PR #1395 before merge: kit
+production).** Page-local half built in draft [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396), WAITING FOR PR #1395 before merge: kit
 `New Sales Order`, kit error state, readable absences (`slate-11`, 5.9:1), the four state words,
 the footer count and its population during a server search, and Delivery Location as left-aligned
 text (the centred ghost-button popover cut long localities at both ends). **Waiting for the shared
