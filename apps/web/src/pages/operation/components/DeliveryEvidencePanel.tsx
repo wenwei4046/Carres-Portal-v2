@@ -22,6 +22,7 @@
 import { useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import {
+  latestEvidenceAtOf,
   proofDecisionLabel,
   PROOF_DECISIONS,
   type DeliveryAttemptEvidenceRow,
@@ -235,20 +236,22 @@ function SignedDoAttachForm({
 
 /** THE THREE REVIEW ACTS. Acceptance saves at once; the other two open the
  *  reason field the record requires. */
-function ProofReviewActs({ doNumber, attemptId }: { doNumber: string; attemptId: string | null }) {
+function ProofReviewActs({ doNumber, attemptId, sourceVersion }: { doNumber: string; attemptId: string | null; sourceVersion: string }) {
   const [decision, setDecision] = useState<ProofDecisionKey | null>(null);
   const [reason, setReason] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const review = useReviewDeliveryProof(doNumber, {
     onSuccess: () => {
       toast.success(EVIDENCE_COPY.reviewSaved);
       setDecision(null);
       setReason("");
+      setIdempotencyKey(crypto.randomUUID());
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
   });
   const submit = (key: ProofDecisionKey) => {
     if (key === "accepted") {
-      review.mutate({ decision: "accepted", attemptId });
+      review.mutate({ decision: "accepted", attemptId, sourceVersion, idempotencyKey });
       return;
     }
     setDecision(key);
@@ -278,7 +281,7 @@ function ProofReviewActs({ doNumber, attemptId }: { doNumber: string; attemptId:
           onSubmit={(e) => {
             e.preventDefault();
             if (!canSave || !decision) return;
-            review.mutate({ decision, attemptId, reason: reason.trim() });
+            review.mutate({ decision, attemptId, reason: reason.trim(), sourceVersion, idempotencyKey });
           }}
         >
           <Textarea
@@ -342,6 +345,12 @@ export default function DeliveryEvidencePanel({
     ...submissionFilesOf(ledger, doNumber, "video"),
   ].filter((f) => !boundPaths.has(f.path));
   const reviewsNewestFirst = [...proofReviews].sort((a, b) => b.reviewed_at.localeCompare(a.reviewed_at));
+  const evidenceVersion = latestEvidenceAtOf({
+    ledger,
+    doNumber,
+    attemptEvidence,
+    signedDoUploadedAt: signedDo.uploadedAt,
+  });
 
   const stateLine = (() => {
     switch (proofReview.state) {
@@ -468,7 +477,9 @@ export default function DeliveryEvidencePanel({
               ))}
             </ul>
           ) : null}
-          <ProofReviewActs doNumber={doNumber} attemptId={latestReached.id ?? null} />
+          {evidenceVersion ? (
+            <ProofReviewActs doNumber={doNumber} attemptId={latestReached.id ?? null} sourceVersion={evidenceVersion} />
+          ) : null}
         </div>
       ) : null}
     </Panel>

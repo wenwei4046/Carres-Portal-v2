@@ -485,18 +485,25 @@ describe("DeliveryOrderPage", () => {
     it("`Proof Accepted` saves at once against the latest attempt; a refusal must say why", () => {
       mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
       fireEvent.click(screen.getByTestId("do-proof-accepted"));
-      expect(reviewMutate).toHaveBeenCalledWith({ decision: "accepted", attemptId: "00000000-0000-0000-0000-0000000f0001" });
+      expect(reviewMutate).toHaveBeenCalledWith(expect.objectContaining({
+        decision: "accepted",
+        attemptId: "00000000-0000-0000-0000-0000000f0001",
+        sourceVersion: "2026-08-20T10:00:00Z",
+        idempotencyKey: expect.any(String),
+      }));
       fireEvent.click(screen.getByTestId("do-proof-rejected"));
       const save = screen.getByTestId("do-proof-save");
       expect(save).toBeDisabled();
       fireEvent.change(screen.getByLabelText(/Proof Rejected · Reason/), { target: { value: "The photo shows the lobby" } });
       expect(save).not.toBeDisabled();
       fireEvent.submit(screen.getByTestId("do-proof-reason-form"));
-      expect(reviewMutate).toHaveBeenLastCalledWith({
+      expect(reviewMutate).toHaveBeenLastCalledWith(expect.objectContaining({
         decision: "rejected",
         attemptId: "00000000-0000-0000-0000-0000000f0001",
         reason: "The photo shows the lobby",
-      });
+        sourceVersion: "2026-08-20T10:00:00Z",
+        idempotencyKey: expect.any(String),
+      }));
     });
 
     it("the review state and its history print the governed words with the reason and reviewer", () => {
