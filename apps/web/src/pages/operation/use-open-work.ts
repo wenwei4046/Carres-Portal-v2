@@ -14,6 +14,7 @@ import type {
 import { useOperationWork } from "@/lib/queries";
 
 export interface WorkRow extends Omit<WorkItem, "module"> {
+  source: OperationWorkItem;
   module: OperationWorkModule;
   id: string;
   problem: string;
@@ -31,6 +32,9 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
 
 export interface OpenWorkSet {
   items: WorkRow[];
+  generatedOn: string;
+  complete: boolean;
+  failedSources: string[];
   staff: OpsStaffMember[];
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
@@ -51,6 +55,7 @@ function toWorkRow(item: OperationWorkItem, generatedOn: string): WorkRow {
         ? "today"
         : "later";
   return {
+    source: item,
     id: item.id,
     ruleKey: item.ruleKey,
     module: item.module,
@@ -115,6 +120,9 @@ export function useOpenWorkSet(): OpenWorkSet {
   );
   return {
     items,
+    generatedOn: query.data?.generatedOn ?? "",
+    complete: query.data?.complete ?? false,
+    failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
     staff,
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),

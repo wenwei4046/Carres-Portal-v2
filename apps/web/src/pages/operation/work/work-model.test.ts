@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
 import { filterWork, workSections } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
+    source: {} as OperationWorkItem,
     id: "orders:1:ask_delivery_date",
     ruleKey: "ask_delivery_date",
     module: "orders",
@@ -48,9 +50,9 @@ describe("Work presentation model", () => {
     ]);
     expect(sections.map((section) => section.label)).toEqual([
       "Broken commitments",
-      "Late",
+      "Missed",
       "Later",
-      "No date",
+      "No working date",
     ]);
     expect(sections.flatMap((section) => section.items).filter((item) => item.id === "broken")).toHaveLength(1);
   });

@@ -182,11 +182,9 @@ describe("Operation Work — one server feed", () => {
       item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
       item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
     ];
-    show();
-    const list = screen.getByTestId("work-list");
-    expect(list.textContent?.indexOf("Broken commitments")).toBeLessThan(list.textContent!.indexOf("Late"));
-    expect(list.textContent?.indexOf("Late")).toBeLessThan(list.textContent!.indexOf("No date"));
+    show("/operation?tab=work&day=all");
     expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
+    expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
     expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
   });
 
@@ -237,9 +235,12 @@ describe("Operation Work — one server feed", () => {
       .toHaveAttribute("href", "/operation?tab=staff-duties");
   });
 
-  it("opens the exact destination supplied by the owning module", () => {
+  it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
+    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
@@ -255,6 +256,7 @@ describe("Operation Work — one server feed", () => {
     })];
     show();
     fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
+    fireEvent.click(screen.getByRole("button", { name: "Open DO-2041" }));
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
   });
 
@@ -270,6 +272,7 @@ describe("Operation Work — one server feed", () => {
     })];
     show();
     fireEvent.click(screen.getByTestId("work-row-INV-2041-payment.collect_customer_balance"));
+    fireEvent.click(screen.getByRole("button", { name: "Open INV-2041" }));
     expect(navigate).toHaveBeenCalledWith("/finance/invoices?invoice=invoice-1");
   });
 
