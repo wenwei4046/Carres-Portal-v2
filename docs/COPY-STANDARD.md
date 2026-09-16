@@ -166,9 +166,12 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
 | Work timing | `Broken commitments` · `Late` · `Today` · `Later` · `No date` | Upcoming · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
-| Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
+| My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
+| Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
+| Right Rail healthy clear | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
+| Right Rail refresh failure | `My Work could not be refreshed` | No work due now · No open work |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
 | Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
 | Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
