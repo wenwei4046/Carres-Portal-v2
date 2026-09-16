@@ -96,7 +96,7 @@ export default function AssignHolderForm({
         id="assign-holder"
         label="Holder"
         required
-        value={holderId || undefined}
+        value={holderId}
         onValueChange={setHolderId}
         placeholder="Choose a holder"
         options={staff.map((s) => ({

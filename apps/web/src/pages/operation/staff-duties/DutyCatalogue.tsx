@@ -1,5 +1,5 @@
 import SearchInput from "@/components/kit/SearchInput";
-import Segmented from "@/components/Segmented";
+import Select from "@/components/kit/Select";
 import {
   dutyDisplayState,
   matchesDutySearch,
@@ -60,7 +60,10 @@ export default function DutyCatalogue({
   return (
     <div
       data-testid="duty-catalogue"
-      className={`min-h-0 flex-col border-kit-slate-5 lg:flex lg:border-r ${
+      /* `min-w-0`: a grid item is `min-width: auto` and would refuse to shrink
+         below the State strip's own width, pushing the PORTAL sideways at
+         390px instead of narrowing. */
+      className={`min-h-0 min-w-0 flex-col border-kit-slate-5 lg:flex lg:border-r ${
         hiddenWhenDetailOpen ? "hidden lg:block" : "flex"
       }`}
     >
@@ -72,17 +75,18 @@ export default function DutyCatalogue({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
-        {/* The rail wraps rather than truncates — a State word that has to be
-            guessed is not a filter. */}
-        <div className="flex flex-wrap gap-1">
-          <Segmented
-            options={STATE_OPTIONS}
-            value={stateFilter}
-            onChange={onStateFilterChange}
-            ariaLabel="State"
-            testId="duty-state"
-          />
-        </div>
+        {/* A Select, not a chip strip. Measured in the rendered walk: four
+            chips are ONE indivisible `inline-flex` atom ~455px wide, so in a
+            272px rail the fourth word — `Not assigned` — was clipped out of
+            reach. A filter nobody can see is not a filter, and four full-width
+            rail rows would push the duty list itself off the screen. */}
+        <Select
+          id="duty-state"
+          label="State"
+          value={stateFilter}
+          onValueChange={(v) => onStateFilterChange(v as DutyStateFilter)}
+          options={STATE_OPTIONS}
+        />
       </div>
 
       {visible.length === 0 ? (

@@ -452,16 +452,23 @@ describe("search and State", () => {
     expect(keys).not.toContain("duty-catalogue-delivery_duty");
   });
 
-  it("offers exactly the four governed State words", () => {
+  it("offers exactly the four governed State words, none of them hidden", () => {
     draw();
-    expect(
-      screen.getAllByTestId(/^duty-state-/).map((b) => b.textContent),
-    ).toEqual(["All duties", "Covered today", "Cover scheduled", "Not assigned"]);
+    fireEvent.click(document.getElementById("duty-state")!);
+    // Measured at 390px: four chips on one indivisible strip clipped `Not
+    // assigned` out of reach. A narrowing control in a 272px rail is a Select,
+    // so every word is reachable and the duty list is not pushed down.
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "All duties",
+      "Covered today",
+      "Cover scheduled",
+      "Not assigned",
+    ]);
   });
 
   it("narrows to the duties a State word names", () => {
     draw();
-    fireEvent.click(screen.getByTestId("duty-state-not_assigned"));
+    choose("duty-state", "Not assigned");
     const rows = screen.getAllByTestId(/^duty-catalogue-/);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-delivery_duty");
@@ -469,7 +476,7 @@ describe("search and State", () => {
 
   it("narrows to today's cover without counting a scheduled one", () => {
     draw();
-    fireEvent.click(screen.getByTestId("duty-state-covered_today"));
+    choose("duty-state", "Covered today");
     const rows = screen.getAllByTestId(/^duty-catalogue-/);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-grn_duty");
@@ -509,8 +516,12 @@ describe("search and State", () => {
 describe("the narrow screen", () => {
   it("keeps catalogue and detail side by side from 1024px up", () => {
     draw();
-    expect(screen.getByTestId("staff-duties-split").className).toContain(
-      "lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]",
+    const split = screen.getByTestId("staff-duties-split").className;
+    // §4.5: the split survives from 1024px, on a NARROWER catalogue, and the
+    // catalogue only reaches its full width at 1440.
+    expect(split).toContain("lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)]");
+    expect(split).toContain(
+      "min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]",
     );
   });
 
@@ -1002,7 +1013,7 @@ describe("a scheduled cover", () => {
   it("is reachable through the Cover scheduled State word", () => {
     state.duties = withScheduledCover();
     draw();
-    fireEvent.click(screen.getByTestId("duty-state-cover_scheduled"));
+    choose("duty-state", "Cover scheduled");
     const rows = screen.getAllByTestId(/^duty-catalogue-/);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-po_duty");
@@ -1013,12 +1024,10 @@ describe("keyboard and narrow reading", () => {
   it("orders the keyboard: search, then State, then the duty list", () => {
     draw();
     const order = Array.from(
-      document.querySelectorAll<HTMLElement>("input, button, [role='tab']"),
+      document.querySelectorAll<HTMLElement>("input, button"),
     );
     const search = order.findIndex((el) => el.id === "duty-search");
-    const firstState = order.findIndex(
-      (el) => el.dataset.testid === "duty-state-all",
-    );
+    const firstState = order.findIndex((el) => el.id === "duty-state");
     const firstDuty = order.findIndex((el) =>
       el.dataset.testid?.startsWith("duty-catalogue-"),
     );
@@ -1043,5 +1052,28 @@ describe("keyboard and narrow reading", () => {
     openAssign();
     const dialog = screen.getByRole("dialog", { name: "Assign holder" });
     expect(dialog.querySelectorAll("[class*='grid-cols-2']")).toHaveLength(0);
+  });
+});
+
+describe("the 390px catalogue cannot widen the portal", () => {
+  /* Found in the rendered walk, not here: at 390px the catalogue measured
+     455px and the DOCUMENT scrolled sideways by 125px. The State strip is one
+     `inline-flex … shrink-0` atom whose four governed words cannot wrap, and a
+     grid item defaults to `min-width: auto`, so it refused to shrink and
+     pushed the page instead.
+
+     jsdom has no layout and can never catch that; these assertions are the
+     cheap guard on the two classes that hold the fix, and the walk is the
+     proof. */
+  it("lets the catalogue shrink below its content", () => {
+    draw();
+    expect(screen.getByTestId("duty-catalogue").className).toContain("min-w-0");
+  });
+
+  it("keeps the State control inside the rail's own width", () => {
+    draw();
+    expect(document.getElementById("duty-state")).toBeVisible();
+    expect(screen.getByTestId("duty-catalogue").querySelectorAll(".shrink-0"))
+      .toHaveLength(0);
   });
 });

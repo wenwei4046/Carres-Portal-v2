@@ -95,7 +95,7 @@ export default function StaffDuties() {
             </p>
             <div
               data-testid="staff-duties-split"
-              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
+              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
             >
               <div
                 data-testid="duty-catalogue-skeleton"
@@ -130,7 +130,7 @@ export default function StaffDuties() {
             </p>
             <div
               data-testid="staff-duties-split"
-              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
+              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
             >
               <DutyCatalogue
                 duties={duties}

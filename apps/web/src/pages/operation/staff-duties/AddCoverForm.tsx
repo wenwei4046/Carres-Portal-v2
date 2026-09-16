@@ -109,7 +109,7 @@ export default function AddCoverForm({
         id="cover-acting"
         label="Acting person"
         required
-        value={actingUserId || undefined}
+        value={actingUserId}
         onValueChange={setActingUserId}
         placeholder="Choose who will cover"
         options={eligible.map((s) => ({
