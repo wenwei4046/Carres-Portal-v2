@@ -164,12 +164,39 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitments` · `Late` · `Today` · `Later` · `No date` | Upcoming · Overdue as the section word · Backlog |
+| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
+| Work applied filters | `Clear all` | Reset · Clear everything |
+| Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
+| Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
+| Work embedded result | icon plus `Nice Future confirmed Fri, 18 Sep` · `Delivery proof accepted` (the exact source result; icon/colour never stands alone) | Done · Completed · Success · icon alone |
+| Work closure by another actor | icon plus `Done by {person}` only when the source supplies durable actor evidence | inferring the actor from assignment or cover |
+| Work order cancelled | icon plus `Order cancelled` | No longer needed without the known reason |
+| Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
+| Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
+| Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
+| Work current-list counts | `In this list` · `Missed {n} · {weekday, date} {n}` · `{n} in this list` | a module total that excludes visible Missed rows · counting one occurrence twice |
+| Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
+| Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
+| Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
+| Delivery proof supporting result | `More proof is required` | The driver is asked for more proof |
+| Delivery proof receipts | `Delivery proof accepted` · `More proof requested` · `Delivery proof rejected` | Done · Completed · an unconfirmed optimistic receipt |
+| Delivery proof viewer | `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` | image controls without text names |
+| Delivery proof viewed aid | `Viewed` | storing view state · treating view state as completion evidence |
+| Delivery proof load failure | `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` | allowing `Accept proof` while any file in the latest proof package is unreadable |
+| Work read-only action | `Only {acting person} can record this.` · `You can see this work here. Recording it is not part of your access.` | disabled mutation controls · implying Team Work visibility grants permission |
+| Work detail evidence | `Working day and source` · `Owner, working day and source` only when exceptional owner evidence is present · `Required` · `Working day` · `Source` | ordinary owner metadata in My Work |
+| Work source remainder | `Other work is current.` | implying one failed source made the whole list current or empty |
+| Work loading announcement | `Loading work` | No work · zero counts while loading |
+| Work object shortcut | `Open {object} (O)` | an undiscoverable keyboard shortcut |
+| Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
+| Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
+| Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
+| Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
 | Right Rail healthy clear | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure | `My Work could not be refreshed` | No work due now · No open work |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
@@ -869,6 +896,24 @@ values are `Mattress` · `Bedframe` · `Sofa`. Selecting a category reveals its 
 `Production Days`; never show or save one generic supplier lead time. A PO date never appears in
 this form because it belongs to the Purchase Order.
 
+**PO send wording — APPROVED / NOT BUILT (Jess, 2026-09-16).** Implement in the Purchase
+Orders round after SO Batch Round 1 and Manual Purchase Round 2, through the shared
+`PoIssueEvidence` component on all three PO-sending surfaces; no separate build task.
+
+| Where | Exact wording |
+|---|---|
+| Current-version sending confirmation button | `Mark as sent` |
+| Current-version sent mark absent: group, filter and cell | `Not marked as sent` |
+| Shared completion sentence | `Current PO version marked as sent` |
+
+Retired for this PO fact: `Record the PDF sent`, `PDF not sent`, `Not sent`,
+`Not sent to supplier`, and `Current PO version reached supplier with evidence`.
+Classify groups in priority order: Cancelled → Completed → Issued (current version marked,
+goods pending) → Not marked as sent. A completed PO missing a mark remains Completed.
+Preserve older version sending evidence without claiming the current version is marked.
+Never claim supplier receipt, reading or acceptance from a sent mark. Staff send externally
+before marking; the Portal cannot observe WhatsApp sending without an API.
+
 **PURCHASE ORDERS LEFT RAIL — owner corrections 2026-08-31 / 2026-09-04 (Card 07).** The visible
 rail never calls itself `Filters`; that is the UI mechanism, not the business meaning. Exact groups
 and rows:
@@ -876,7 +921,7 @@ and rows:
 | Group | Visible rows |
 |---|---|
 | `PURCHASE ORDERS` | `All purchase orders` |
-| `DOCUMENT` | `PDF not sent` · one two-line row: `Version changed` then `Send the new version to supplier` |
+| `DOCUMENT` | `Not marked as sent` · one two-line row: `Version changed` then `Send the new version to supplier` |
 | `SUPPLIER REPLY` | `Supplier has not confirmed the PO date` · `Supplier delivery date passed` |
 | `RECEIVING` | `Partly received` · `Completed` |
 
@@ -922,11 +967,15 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
+| Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
-| Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| Register columns (owner ruling R3 2026-09-16 — exactly, in this order) | `SO No` · `Order By` · `Customer` · `Supplier` · `Proceed Date` · `Requested Delivery Date` · `Delivery Location` · `Deliver To` · `PO No` · `PO Delivery Date` |
+| Table group headings (ruling R1 2026-09-16) | `To buy` (heading, count beside it) · `No purchase needed` (disclosure button, count beside it) |
+| Order By absence (ruling R2) | `Not planned` — remaining demand with no selectable Order By; blank when nothing is left to buy |
+| Footer (ruling R6) | `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order` — one total, nothing else |
+| Search clear control (ruling R4) | `Clear search` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
-| The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
+| Parent Status column | Retired. Do not restore `Partial` / `Ordered` as status pills or footer tallies. `To buy` / `No purchase needed` are the separately approved table group headings, not stored statuses. |
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
@@ -940,6 +989,17 @@ on rows. Do not write Yu Jun's name in the action sentence. The compact chip car
 `Issue PO` remains the one governed verb. This selected action replaces the Register's top Work
 Toolbar above the column headings; it is never a second bar at the bottom of the table. Summary,
 `Clear`, owner chip and `Issue PO` stay left; `Export Excel` stays at the far right.
+
+**SO Batch corrections — owner approved 2026-09-16.** `Not planned` means the
+Order By cannot yet be stated for the blocked demand. `No Sales Orders match these filters`
+with `Clear filters` is distinct from `No proceeded Sales Orders.`. The singular is
+`1 Sales Order`; narrowed scope remains `{n} of {total} Sales Orders`.
+`Only PO Duty can issue this PO` explains an unavailable Issue button.
+
+**SO Batch grouped Register — owner approved 2026-09-16.** `To buy` and
+`No purchase needed` are table group headings, never rail rows or stored statuses. The second
+includes PO coverage and Ready Stock coverage; `Ordered` must not describe an order with no PO.
+This dated group-heading ruling permits these words here only; the retired rail stays retired.
 
 **Purchasing and Receiving date facts — owner ruling 2026-08-29.** These words are never
 interchangeable:
@@ -1007,8 +1067,7 @@ one affected Sales Order exists. **`TO ORDER` / `All not ordered` is RETIRED fro
 named the page's own default — what an operator already sees with nothing selected — rather than a
 fact about a Sales Order, and it sat above the section that answers what to buy today. The
 outstanding arithmetic behind it is untouched and still governs the tick and the Ready Stock door;
-Manual Purchase keeps its own `All not ordered`, which is a different object and a different
-arithmetic.
+Manual Purchase uses its own request groups and remainder arithmetic.
 
 | Heading | Rail rows |
 |---|---|
@@ -1016,10 +1075,10 @@ arithmetic.
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
-`PURCHASE PURPOSE`, `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
+`PURPOSE` (Manual Purchase), `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
 2026-09-11; `PRODUCT`, `SUPPLIER` and `REGION` on SO Batch Purchase too). The `All …` word is the
 control's first option and its clear; every governed value stays present as an option; the
-count rides in the option text (`Ohana · 4`). `WORK TO DO` (Manual Purchase), `ORDER TIMING` and
+count rides in the option text (`Ohana · 4`). `ORDER TIMING` and
 `SETUP TO FIX` keep their visible rows.
 | `REGION` | `All regions` · `Klang Valley` first · actual outstation Delivery State names, alphabetical · `Others` last and only when Delivery State is not recorded |
 | `SETUP TO FIX` | `Production days not set` |
@@ -1032,7 +1091,7 @@ fact rows print their live count, zero included; a supplier or region row exists
 matches — except the selected row, which stays visible with `0`. Region reads the server's
 recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
 outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
-shows every proceeded record. The outstanding arithmetic reads customer quantity less Ready Stock
+retains every proceeded record in `To buy` (expanded) and `No purchase needed` (initially collapsed). The outstanding arithmetic reads customer quantity less Ready Stock
 already taken and less exact, non-cancelled PO lineage. A generic Open PO SKU pool is not proof
 that this SO was ordered; without exact `po_line_sources` the units stay outstanding. The issue
 leaf is not the coverage authority. One filter per section; sections combine; a second click on
@@ -1056,7 +1115,7 @@ fix action belongs only to the owner-resolved central Work projection:
 | `Requested delivery date is missing` | `Ask the customer which date they want` |
 | `SKU not found` | `Add this item to the SKU catalog` |
 | `Supplier not assigned` | `Check the supplier for {model}` |
-| `Production days are missing` | `Add production days for {supplier} · {category}` |
+| `Production days not set` | `Add production days for {supplier} · {category}` |
 
 `Check the supplier for {model}` is the Work Engine's own dictionary row above, reused verbatim
 rather than respelt.
@@ -1088,7 +1147,7 @@ connector line.
 | The actionable goods table | `SKU` · `Item` · `Qty` · `Ready Stock` · **`Ordered Qty`** · `To buy` · `Deliver To` · `Supplier` · `Category`. **`Ordered Qty`, NOT `On PO`** — that head means *how many an OPEN purchase order still covers*, and this figure is the exact `po_line_sources` lineage: every non-cancelled document, `Completed` ones included, never netted by what has arrived. It is the HISTORICAL ordered quantity, and `On PO` would have said *still on order* about goods already in the warehouse. `Ordered Qty` is the dictionary's own word for it, used by Manual Purchase's purchase-order lineage table for the same relationship — beside `Already On PO` for the effective coverage it is not. **It is a QUANTITY**, and a door to the details — never a stack of PO numbers, which made one item row fourteen lines tall. A line no document has ever carried reads `Not ordered yet`; a line the shelf fully answered reads `—`. **`Unit ID` and `PO Delivery Date` are absent here** — both describe a document's goods, and on an unbought row they printed an absence in the width of a real answer. **`Deliver To` on a covered line states the document LINE's own destination**, never the parent document's where the line records one. |
 | The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
 | The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
-| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Issued`** · **`Not sent to supplier`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
+| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Issued`** · **`Not marked as sent`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
 | A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
 | HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
 | `To buy` — a figure ONLY where the page offers the buy | `To buy` means *what is left to buy*, so on a row the register does not offer it prints the governed absence `—` and the row says which state it is in. **Covered** (the engine's `fullyOnPo`): `—` · **`Already on a PO`** · **`Nothing to buy here`**, titled `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` — the door's own words (`purchasingRefusal("already_on_po")`) at cell width, so the operator meets ONE sentence, not two. **Not checked** (no flag in the payload): `—` · **`Coverage not checked`**, titled `Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.` — unknown is not yes, and a page may not describe an eligibility nobody verified. **The engine's covering quantity is never printed under this head**: it is a covering quantity, not a purchasing one, and the customer's `Qty` and the historical `Ordered Qty` carry the facts two columns away. Notes are WRITTEN as short lines, never left to wrap — the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
@@ -1104,14 +1163,14 @@ connector line.
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — THE SETTLED DESIGN, owner ruling 2026-09-11, exactly and in this order | `Approval Status` · `Requested By` · `Proceed Date` · `PO No` · `Purpose` · `Items` · `Supplier` · `Deliver To` · `Delivery Date` — no number column; `Purpose` prints the six governed purposes and is the single-click entrance and the sticky business column; Order By is NOT a parent column. **Retired from the row, never to return:** `Qty` · `For` · `Status` · `Partial` · `PO Sent` · `PO Created` · `Reason` · `MPR` or any request-number column. Search, filters and export keep the accurate source values the cells summarise. |
+| The register columns — APPROVED / NOT BUILT, Jess 2026-09-16 | `Items` · `Order By` · `Purpose` · `Supplier` · `Approval Status` · `Requested By` · `Proceed Date` · `Delivery Date` · `Deliver To` · `PO No`. `Items` is sticky and opens the object. `Order By` is engine-derived; missing setup reads `Not planned`. No request-number column. |
 | Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Never apply SO Safety days. |
 | Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
-| The Approval Status facts | `Need approval` · `Approved` · `Refused` · `No approval needed` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A row's own selectability explanation may still appear, computed from the same two facts the tick reads. |
+| The Approval Status facts | `Need approval` · `Approved` · `Refused` · `Withdrawn` · `Sent back for changes` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A row's own selectability explanation may still appear, computed from the same two facts the tick reads. |
 | The deterministic summaries | `—` (no PO yet — a fact, not a button) · the one PO number · `{n} POs` (opens the object's exact linked PO list) — `{first item} + {n} more` — `{n} suppliers` — `Multiple` (several destinations) |
 | The expansion's goods table — THE SHARED `GoodsMiniTable`, owner ruling 2026-09-11 (read-only) | `Category` · `Deliver To` · `SKU` · `Qty` · `Supplier` · `PO No` · `PO Delivery Date` · `Item` — the owner's target reconciled with the ruled positions (`Category` first, `Deliver To` before `SKU`, `Item` always last). ONE ROW IS ONE ALLOCATION: each `Qty` is the quantity that document actually carries, never the whole request repeated per PO. What is still to buy is its own row and reads `Not ordered yet`. **Retired from this table:** `Still To Order` · `Covered by` · `Requested Qty` · `Approved Qty` · `Ordered Qty` (the ask and the approver's number keep their home in the object's `Items Requested` and `Approval`). `Unit ID` is absent because this page has no per-line Unit read — never `Not allocated` on every row. |
 | The Ready Stock section — owner ruling 2026-09-11 | `Ready Stock` collapsible handle, closed by default · the grouped heading `{item}` + `Asked for {n} · {m} on the shelf` · the shared table heads `Unit ID` · `Condition` · `Qty` · `Where` · `Owner` · `Item` · `What is already on the shelf. Viewing does not reserve, and it does not reduce what this purchase asks for.` · `No stock on the shelf matches this purchase.` · `Reading the stock register…` · `Ready Stock could not be read. Try again`. **Banned here:** `Choose Ready Unit`, any checkbox, and any netting of the ask against the shelf. Condition words are the ONE shared vocabulary: `New` · `Display` · `Fair (used)` · `Refurbished` · `Damaged` · `Not recorded` — a grade, never availability. |
-| The selection bar | `{n} selected · {u} unit(s) · Issue {p} PO(s)` beside the resolved PO Duty person and `Issue PO` — PO Duty renders NOWHERE without a selection; `Select at most 20 requests for one issue.` |
+| The selection bar — replaces the top toolbar, no action bar below the table | `{n} selected · {u} unit(s) · Issue {p} PO(s)` beside the resolved PO Duty person and `Issue PO` — PO Duty renders NOWHERE without a selection; `Select at most 20 requests for one issue.` |
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
 | The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
 | Retired purpose words — history only, never offered, never relabelled | `Display` · `Warranty` · `Office` · `Spare Parts` — a pre-ruling row keeps printing the word it was actually asked as; the doors refuse these values for a new request |
@@ -1121,49 +1180,53 @@ connector line.
 | The Object Detail sections — Card 05 (2026-08-29), exactly and in this order | `Request` · `Items Requested` · `What We Already Have` · `Approval` · `Purchase Orders` · `History` — one full-width scroll; no tabs, no split preview |
 | The object header — Card 08 (2026-09-04) | back destination `Manual Purchase` · the business heading `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context · one state pill · the filtered position `{n} of {m}` with previous/next — browser title `Manual Purchase — Carres`; no number, no UUID, no duplicate Back, page title, breadcrumb or PDF action |
 | The Request facts, in reading order | `Proceed Date` · `Delivery Date` · `Need for` · `For` · `Deliver To` · `Requested By` — timing second line: `Order by {date}`; if passed, `Order date passed` then `Order by {date}`; `Requested By` is the real staff display name; a shared-account record whose individual cannot be recovered reads `Staff identity not recorded` |
-| A missing Catalog supplier on a line | `No supplier yet` + `Ask Catalog to set the supplier of {sku}.` — a named fact on the affected line, fixed at the Catalog boundary, never a rail facet |
+| A missing Catalog supplier on a line | `No supplier yet` + `Ask Catalog to set the supplier of {sku}.` — a named fact on the affected line, fixed at the Catalog boundary, filterable as `Supplier not set` under `SETUP TO FIX` |
 | The already-have table heads | `SKU` · `Free Stock` · `Already On PO` · `Still Needed` — decision facts, not buttons |
-| The Approval facts | `No approval needed` · `Need approval` + `{name} approves` · `Approved` / `Refused` + the real actor, date/time and (approved) quantity per line, (refused) the reason |
+| The Approval facts | `Need approval` + `{name} approves` · `Approved` / `Refused` + the real actor, date/time and (approved) quantity per line, (refused) the reason |
 | The approver's decision line | `SKU` · `Requested Qty` · `Still Needed` · `Approved Qty` (prefilled from Still Needed, whole 0..Requested) · `Transaction Cost` · `Line Total` — read-only approval evidence, never an Operation price control |
-| The decision controls | `Approve` (the one primary) · `Refuse` (neutral) · `Decision reason` (required before the final Refuse) |
+| The decision controls | `Approve` (primary) · `Send back` · `Refuse` · `Decision reason` (required for Send back and Refuse). Requester: `Withdraw request` before decision; `Edit and send again` after return. |
 | The Purchase Orders lineage heads | `PO No` · `Ordered Qty` · `Still To Order` · `PO Issued` · `PO Delivery Date` · `Supplier Delivery Date`; supplier answer reads `Not confirmed` · `Same as PO` · the changed date; no lineage reads `Not ordered yet` |
 | The History titles (stored facts only) | `Purchase requested` · `Purchase approved` · `Purchase refused` · `Marked not going ahead` · `Purchase order issued` — three-rank grammar, grouped `Today · Yesterday · Earlier`; an event with no stored individual reads `Staff identity not recorded` |
 | The object's loading / failure states | `Opening the Manual Purchase` · `This Manual Purchase could not be opened` + `Try again` |
 | The decision refusals — two lines, fact then act | `Only the approver may decide this purchase.` + `Ask {approver} to approve or refuse it.` — `No purchase approver is set.` + `Ask management to set the purchase approver.` — `This purchase was already decided.` + `Reload the Manual Purchase to see the decision.` — `The decision reason is missing.` + `Type why this purchase is not going ahead.` — `The approved quantity is not valid.` + `Enter a whole number from 0 to {requested quantity}.` — `The decision was not recorded.` + `Reload the Manual Purchase and try once more. Tell IT if it happens again.` |
 | Retired from this surface, never to return | the object's own `Issue PO` / `Issue as one PO?` consolidation offer and every other issuance, PO Duty, price-edit or Receive control — PO issuance lives ONLY in the Register's selected action (`Issue PO` beside PO Duty); physical arrival lives only in `Receiving` |
 
-**The Manual Purchase rail — owner correction 2026-08-29 (Card 06 supersedes Card 03's
-four-section shape).** The shared 240px `FilterRail` shell (Card 02-C). Seven sections, in this
-exact order:
+**Manual Purchase — APPROVED / NOT BUILT (Jess, 2026-09-16).** Build starts after
+SO Batch Round 1 (PR #1395) is merged. Every request requires approval, regardless of purpose
+or amount; the exemption state and per-purpose approval configuration are retired.
+
+| Where | Words |
+|---|---|
+| One-table groups | `Need approval` · `To buy` · `No purchase needed` (closed by default) |
+| Waiting group | Pending approval or `Sent back for changes`; `Nothing waiting for approval` when empty |
+| Requester withdrawal | `Withdraw request` · `Withdrawn` |
+| Return and resubmit | `Send back` · `Sent back for changes` · `Edit and send again` |
+| No matches | `No Manual Purchases match these filters` |
+| Footer | `{n} Manual Purchases` · `1 Manual Purchase` · `{n} of {m} Manual Purchases` |
+
+Search/filters cover all groups and open a group holding a match. Sent-back requests remain in
+`Need approval`; approved positive remainder belongs to `To buy`, including `Not planned`;
+ordered/refused/withdrawn or confirmed zero remainder belongs to `No purchase needed` after
+those approval checks. Footer totals include collapsed rows. History keeps every return round
+and the actor/time for withdrawal and line cancellation.
+
+**The Manual Purchase rail.** Five sections, in this exact order:
 
 | Heading | Rail rows |
 |---|---|
-| `WORK TO DO` | `Approve purchase` · `Issue PO` · `Check the supplier` · `Add production days` · `Add transit days` |
-| `TO ORDER` | `All not ordered` |
 | `ORDER TIMING` | `Can order early` · `Order date reached` · `Order date passed` |
-| `PURCHASE PURPOSE` | `All purposes` · the six approved purposes above, in the approved order |
+| `PURPOSE` | `All purposes` · the six governed purposes |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
-| `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
-| `SETUP TO FIX` | `Production days not set` · `Transit days not set` — the whole section renders only when an affected request exists |
+| `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical |
+| `SETUP TO FIX` | `Supplier not set` · `Production days not set` · `Transit days not set`; section appears only when affected requests exist |
 
-Counts are UNIQUE Manual Purchase requests, cross-computed against the other selected
-sections. `WORK TO DO` is a concrete action lens over central Work: `Approve purchase` is submitted
-and undecided; `Issue PO` is approved remaining demand; the other three name their exact
-Catalog/Settings repair. `Need approval` and `Ready to order` retire from `TO ORDER`; `All not
-ordered` is live quantity not yet fully issued to a PO. The default
-no-filter Register is the permanent listing, ordered history included. One filter per
-section; sections combine with AND; each `All …` row clears only its own section; a second
-click on the active row clears it. No checkboxes; labels wrap, never truncate. `ORDER TIMING` reads
-the earliest calculated Order By and never blocks an otherwise authorised early issue. Product is
-the CATALOG's category; Supplier is the demand line's Catalog-derived supplier, never chosen
-by Operation. **Banned from this rail, never to return:** `Supplier not selected` ·
-`No supplier` · `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` ·
-`Arrived` · `Cancelled` · `My drafts` · `Need correction` · `Queues` · any safety-days row. A
-missing SKU or supplier is named inside the affected request and fixed at
-its owning Catalog boundary — never a rail facet. Price is not a rail state or filter.
+`WORK TO DO` and `TO ORDER / All not ordered` are retired from this page only. Central Work
+still uses its governed action words. Counts are unique requests, cross-computed against the
+other selected sections; sections combine with AND. Fact sections are dropdowns; no rail
+checkboxes. Product and Supplier retain their Catalog source; fixing setup remains in its
+owning Catalog/Settings surface. Timing never grants or removes issue authority.
 
-**The approval owner (Card 03 §3, corrected 2026-09-11).** The rail says `Approve purchase`;
-the OBJECT prints the REAL action owner beside `Waiting for approval` as `{name} approves` —
+**The approval owner (Card 03 §3, corrected 2026-09-11).** The OBJECT prints the REAL action owner beside `Waiting for approval` as `{name} approves` —
 the resolved `Purchasing Approver` duty holder(s), falling back to `ops_manager` only while
 that duty has no active holder (0474); several print `{name} or {name} approves`; a robot or
 shared-password login never prints while a named person holds the duty; nothing resolved
@@ -1245,13 +1308,13 @@ resolved collection fact once per governed Issue document.
 **THIS TABLE IS THE CANONICAL HOME FOR EVERY PURCHASING ACTION, INCLUDING THE ONES THE ORDERS
 LADDER DISPLAYS.** Orders and Purchasing show the same structured action; they never store two
 sentences or two completion facts. `Issue PO` is the governed act. The issue surface may prepare a
-numbered PDF, but the action stays open until that exact version has actually reached the supplier
-and its recipient/channel/actor/time evidence exists.
+numbered PDF, but the action stays open until a person marks that exact version as sent
+and its recipient/channel/actor/time evidence exists. This is not proof of supplier receipt.
 
 `Send PO`, `Prepare PO` and `Draft PO` remain banned action names. In normal sentences, use the full
 object and recipient: `Issue the purchase order to Hooka`. Inside the formal issue surface, the
-completion control may say `Record the PDF sent` because it records evidence rather than creating a
-second business action.
+completion control says `Mark as sent`; it records the person's confirmation for the exact
+version, not a second business action or proof that the supplier received/read/accepted it.
 
 **RETIRED, and it is not in the table above because it is no longer an action**
 (C3, PR #479): the old bare `Confirm` fired when everything was already arranged
@@ -2393,7 +2456,7 @@ Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is ban
 | Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
 | Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
 | The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
-| The latest PO version with `confirmed_sent` evidence, channel · date as the evidence line; else `Not sent` | **`Sent to Supplier`** | Supplier Has · No current PDF |
+| The latest PO version with `confirmed_sent` evidence, channel · date as the evidence line; else `Not marked as sent` | **`Sent to Supplier`** | Supplier Has · No current PDF |
 
 The footer totals speak the same three quantity words. Damaged, wrong and extra goods are separate
 receiving facts and never reduce `Pending Delivery Qty`.
@@ -2791,6 +2854,8 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `An uploaded file records what the driver sent. It is not proof accepted and not a successful delivery.` | the one sentence at the top of every attachment viewer. An upload is evidence of an upload — the portal never lets a count read as a verdict | **RULED 2026-09-11** |
 | `Not recorded` | `Driver submission` when the ledger never reached the screen. An UNKNOWN is printed as an unknown, never as a reassuring `0` | **REUSED 2026-09-11** |
 | `Showing only:` | the label opening the register's active-condition strip above the table; each live condition is a removable chip and `Clear filters` removes them all | **RULED 2026-09-11** |
+| `Reset columns` | Register Columns menu: restores the page's default visible columns, order and widths; leaves filters, permissions and records unchanged. Browser-personal preferences now; account sync deferred. | **APPROVED / NOT BUILT — Jess, 2026-09-16** |
+
 | `Logistics` | the Delivery Orders register's COLUMN HEADING for the partner named on the document. The role word stays `Logistics` everywhere the role itself is named; the heading spends its width on the fact | **RULED 2026-09-11** |
 | A CANCELLED document's `Driver submission` | **nothing at all** when no file was ever sent. The pill already says `Cancelled`; two absences beside it read as two outstanding jobs on a trip that will never happen. Files sent before the void are still shown — a void never erases a recorded fact | **RULED 2026-09-11** |
 

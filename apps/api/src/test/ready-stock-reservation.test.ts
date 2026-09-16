@@ -2,6 +2,8 @@ import type { PGlite } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   actingAs,
+  alternate0500Body,
+  bindingRepairDraft,
   backfillStatement,
   readyStockDatabase,
 } from "./ready-stock-reservation-database";
@@ -523,5 +525,24 @@ describe("stock_match_key in SQL", () => {
     expect(r.f).not.toBe(r.g);
     expect(r.h).toBe("modelqueen2");
     expect(r.i).toBe("1013jagerfab3pc15101|S");
+  });
+});
+
+
+describe("0500 alternate live bodies and the forward binding repair", () => {
+  it.each(["ops_stock_release", "ops_stock_reassign"] as const)("%s clears current binding on both final paths", async (name) => {
+    const item = "33333333-0000-0000-0000-00000000000a";
+    const invoke = () => db.exec(name === "ops_stock_release" ? `select ${name}('${item}')` : `select ${name}('${item}','SO-1207')`);
+    await db.exec(alternate0500Body(name));
+    await draw({ ref: "SO-1251", itemId: item, lineId: LINE_A });
+    await invoke();
+    // Negative control: the alternate 0500 branch really retains the old line.
+    expect((await rows(`select reserved_order_line_id from ops_stock_items where id='${item}'`))[0].reserved_order_line_id).toBe(LINE_A);
+    await db.exec(bindingRepairDraft());
+    await db.exec(`update ops_stock_items set status='reserved', reserved_ref='SO-1251' where id='${item}'`);
+    await invoke();
+    expect((await rows(`select reserved_order_line_id from ops_stock_items where id='${item}'`))[0].reserved_order_line_id).toBeNull();
+    expect((await rows("select count(*)::int as n from ops_stock_pool_usage"))[0].n).toBe(1);
+    await db.exec(bindingRepairDraft()); // idempotent, preserves the corrected body
   });
 });

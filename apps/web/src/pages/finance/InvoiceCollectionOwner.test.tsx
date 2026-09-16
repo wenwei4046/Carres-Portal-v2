@@ -19,10 +19,14 @@ vi.mock("@/lib/api", () => ({
     if (init?.method === "POST") { state.posts.push({ url, body: JSON.parse(init.body ?? "{}") }); return { handover: { id: "h" } }; }
     if (url.startsWith("/api/finance/collection-owner")) return { owner: state.owner };
     if (url.startsWith("/api/operation/workspace-duties")) return { can_assign: state.canAssign, duties: [] };
-    if (url.startsWith("/api/operation/work")) return { items: [], staff: [
+    if (url.startsWith("/api/operation/work")) return { contractVersion: 2, complete: true, items: [], staff: [
       { userId: "u-shasha", name: "Shasha", email: "shasha@carres.com" },
       { userId: "u-yujun", name: "Yu Jun", email: "yujun@carres.com" },
-    ], generatedOn: "2026-09-13" };
+    ], generatedOn: "2026-09-13", closureReceipt: null,
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+        key, state: "healthy", observedAt: "2026-09-13T01:00:00.000Z", lastSuccessfulAt: "2026-09-13T01:00:00.000Z", errorLabel: null,
+      })),
+    };
     return {};
   }),
 }));

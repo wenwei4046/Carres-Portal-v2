@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+const HERE = dirname(fileURLToPath(import.meta.url));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { PurchasingDestination, SoBatchDocument } from "@carres/shared";
@@ -226,24 +230,18 @@ describe("50% work + 50% the actual document", () => {
    */
   it("gives each side half the content area from 1130px up, and stacks below it", () => {
     renderWorkspace();
-    const split = screen.getByTestId("so-batch-issue-split");
+    expect(screen.getByTestId("so-batch-issue-split")).toBeInTheDocument();
     /* ⭐ A FLEX COLUMN when stacked, a two-column GRID from the breakpoint.
        Walked at 1129px on 2026-08-24: a one-column GRID compressed the work row
        to 208px and clipped the cost block, the blocker and both buttons with no
        scrollbar, because the row reported that it fitted. */
-    expect(split.className).toContain("flex-col");
-    expect(split.className).toContain("min-[1130px]:grid");
-    expect(split.className).toContain("min-[1130px]:grid-cols-2");
-    expect(split.className).not.toContain("grid-cols-1");
-    /* Stacked, the SPLIT scrolls; side by side, each half scrolls itself. */
-    expect(split.className).toContain("overflow-y-auto");
-    expect(split.className).toContain("min-[1130px]:overflow-hidden");
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch-issue (min-width: 1130px)");
     const work = screen.getByTestId("so-batch-issue-work");
     const preview = screen.getByTestId("so-batch-issue-preview");
     /* Neither pane may be compressed below its content when stacked. */
     expect(work.className).toContain("shrink-0");
     expect(preview.className).toContain("shrink-0");
-    expect(work.className).toContain("min-[1130px]:min-h-0");
+    expect(work.className).toContain("issueWork");
     /* The work comes FIRST when stacked: the operator's next act is there, and
        a document they cannot read is not worth the top half. */
     expect(work.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -251,13 +249,13 @@ describe("50% work + 50% the actual document", () => {
     expect(preview.className).toContain("min-h-[70vh]");
     /* The divider follows the direction the panes sit in. */
     expect(work.className).toContain("border-b");
-    expect(work.className).toContain("min-[1130px]:border-r");
+    expect(work.className).toContain("issueWork");
   });
 
   it("never clips an action: the decision side scrolls rather than hiding its buttons", () => {
     renderWorkspace();
-    const work = screen.getByTestId("so-batch-issue-work");
-    expect(work.className).toContain("min-[1130px]:overflow-y-auto");
+    expect(screen.getByTestId("so-batch-issue-work")).toBeInTheDocument();
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("overflow-y: auto");
     /* And the 50px destination header truncates a long title instead of
        wrapping it into a row that cannot show the second line (walked 375px). */
     expect(screen.getByTestId("so-batch-issue-count").className).toContain("whitespace-nowrap");

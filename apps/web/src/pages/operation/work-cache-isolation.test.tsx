@@ -42,6 +42,26 @@ function iso(daysFromToday: number): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
 }
 
+function timing(actionOn: string, workingDays: number): OperationWorkItem["timing"] {
+  return {
+    businessDueOn: actionOn,
+    actionOn,
+    placement: workingDays > 0 ? "missed" : "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays,
+      basis: { calendarKey: "module+person", from: actionOn, to: iso(0) },
+    },
+    eligibility: "eligible",
+    noDateReason: null,
+    calendar: {
+      module: { key: "payment", source: "payment", state: "ready" },
+      actor: { key: "person:me", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  };
+}
+
 /** One issued invoice whose goods are ready and whose delivery already
  *  passed — the Monitor admits the collection action for it. */
 function invoice(): InvoiceRegisterRow {
@@ -62,33 +82,65 @@ function invoice(): InvoiceRegisterRow {
 
 function collectItem(owner: OperationWorkItem["owner"]): OperationWorkItem {
   return {
+    contractVersion: 2,
     id: "payment:i3:payment.collect_customer_balance", module: "payment",
     ruleKey: "payment.collect_customer_balance",
+    ruleVersion: 1,
     object: { kind: "invoice", id: "i3", label: "SO-1302" },
     problem: "Customer payment should have been received", action: "Ask customer to pay",
-    recipient: "LIM KUAN YANG", requiredResult: "Payment received", completionFact: "Payment recorded",
+    recipient: "LIM KUAN YANG", requiredResult: "Payment received",
+    completionPredicate: "Payment recorded", completionStatement: "Payment received",
     owner,
-    timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+    timing: timing(iso(-5), 3),
+    communication: null, blocker: null, nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: "/finance/monitor?invoice=i3" },
     destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
+    observedAt: "2026-09-13T01:00:00.000Z", sourceVersion: "2026-09-13T01:00:00.000Z",
   };
 }
 const UNASSIGNED: OperationWorkItem["owner"] = {
-  rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null, acting: null, state: "not_assigned",
+  rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null,
+  coverEvidence: null, acting: null, state: "not_assigned",
 };
 const JESS_HOLDS: OperationWorkItem["owner"] = {
   rule: "collection_owner", dutyKey: "delivery_duty",
-  normal: { userId: JESS, name: "Jess" }, activeCover: null, acting: { userId: JESS, name: "Jess" }, state: "primary",
+  normal: { userId: JESS, name: "Jess" }, activeCover: null, coverEvidence: null,
+  acting: { userId: JESS, name: "Jess" }, state: "primary",
 };
 /** A delivery item I hold and am late on — the Quick Rail counts it under Late. */
 const MINE: OperationWorkItem = {
+  contractVersion: 2,
   id: "delivery:o9:delivery.confirm_date", module: "delivery", ruleKey: "delivery.confirm_date",
+  ruleVersion: 1,
   object: { kind: "order", id: "o9", label: "SO-1309" },
   problem: "Delivery date not confirmed", action: "Call NETS to confirm delivery date",
-  recipient: "NETS", requiredResult: "Date confirmed", completionFact: "Confirmed date recorded",
-  owner: { rule: "delivery_duty", dutyKey: "delivery_duty", normal: { userId: ME, name: "Me" }, activeCover: null, acting: { userId: ME, name: "Me" }, state: "primary" },
-  timing: { dueOn: iso(-2), workingDaysLate: 2, bucket: "overdue" },
+  recipient: "NETS", requiredResult: "Date confirmed",
+  completionPredicate: "Confirmed date recorded", completionStatement: "Date confirmed",
+  owner: { rule: "delivery_duty", dutyKey: "delivery_duty", normal: { userId: ME, name: "Me" }, activeCover: null, coverEvidence: null, acting: { userId: ME, name: "Me" }, state: "primary" },
+  timing: timing(iso(-2), 2),
+  communication: null, blocker: null, nextConsequence: null,
+  interaction: { mode: "open_module", fallbackDestination: "/operation/delivery" },
   destination: "/operation/delivery", tone: "danger", locked: false, broken: false,
+  observedAt: "2026-09-13T01:00:00.000Z", sourceVersion: "2026-09-13T01:00:00.000Z",
 };
+
+function workResponse(items: OperationWorkItem[]): OperationWorkResponse {
+  return {
+    contractVersion: 2,
+    complete: true,
+    items,
+    staff: [{ userId: ME, name: "Me", email: "me@carres.com" }],
+    generatedOn: "2026-09-13",
+    closureReceipt: null,
+    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+      key,
+      state: "healthy",
+      observedAt: "2026-09-13T01:00:00.000Z",
+      lastSuccessfulAt: "2026-09-13T01:00:00.000Z",
+      errorLabel: null,
+    })),
+  };
+}
 
 const state = vi.hoisted(() => ({
   work: { items: [] as unknown[], staff: [] as unknown[], generatedOn: "2026-09-13" } as unknown,
@@ -139,7 +191,7 @@ function CollidingLegacyProbe() {
 }
 function WorkFeedProbe() {
   const q = useOperationWork();
-  return <div data-testid="work-feed">{q.data ? ("items" in q.data ? `items:${(q.data as OperationWorkResponse).items.length}` : "WRONG-SHAPE") : "loading"}</div>;
+  return <div data-testid="work-feed">{q.isError ? "error" : q.data ? ("items" in q.data ? `items:${(q.data as OperationWorkResponse).items.length}` : "WRONG-SHAPE") : "loading"}</div>;
 }
 
 function client() {
@@ -161,7 +213,7 @@ function expectIsolatedShapes(qc: QueryClient) {
 }
 
 beforeEach(() => {
-  state.work = { items: [collectItem(UNASSIGNED), MINE], staff: [{ userId: ME, name: "Me", email: "me@carres.com" }], generatedOn: "2026-09-13" };
+  state.work = workResponse([collectItem(UNASSIGNED), MINE]);
   state.workCalls = 0;
   state.tasksCalls = 0;
   localStorage.clear();
@@ -193,6 +245,14 @@ describe("one cache key per read — the keys", () => {
 });
 
 describe("one cache key per read — both mounting orders, real QueryClient", () => {
+  it("rejects an old or partial Work contract at the query boundary", async () => {
+    state.work = { contractVersion: 1, items: [{ id: "legacy-item" }] };
+    const qc = client();
+    mount(qc, <WorkFeedProbe />);
+    await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("error"));
+    expect(qc.getQueryData(qk.operation.work())).toBeUndefined();
+  });
+
   it("1 · TasksPanel's legacy read loads first → the shared Work feed still receives the Work feed", async () => {
     const qc = client();
     const first = mount(qc, <LegacyTasksProbe />);
@@ -202,7 +262,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("items:2"));
     expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1");
     // The Quick Rail counted MY late item from the feed, not from `{ tasks }`.
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -219,6 +279,32 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
+  });
+
+  it("opens the exact My Work day and never exposes Team Work from the rail", async () => {
+    const todayItem = { ...MINE, id: "delivery:o10:delivery.confirm_date", timing: timing("2026-09-13", 0) };
+    state.work = workResponse([MINE, todayItem]);
+    mount(client(), <TasksPanel />);
+    const panel = await screen.findByTestId("my-work-panel");
+    expect(within(panel).getByRole("link", { name: "Open My Work · Missed · 1 action" }))
+      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=missed");
+    expect(within(panel).getByRole("link", { name: "Open My Work · Today · 1 action" }))
+      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-13");
+    expect(panel).not.toHaveTextContent("Team Work");
+  });
+
+  it("names incomplete source health instead of claiming My Work is clear", async () => {
+    const response = workResponse([]);
+    response.complete = false;
+    response.sources = response.sources.map((source) => source.key === "delivery"
+      ? { ...source, state: "failed", errorLabel: "Delivery could not be loaded" }
+      : source);
+    state.work = response;
+    mount(client(), <TasksPanel />);
+    const panel = await screen.findByTestId("my-work-panel");
+    expect(panel).toHaveTextContent("My Work could not be refreshed · delivery");
+    expect(panel).not.toHaveTextContent("No work due now");
+    expect(within(panel).getByRole("link", { name: "Open My Work" })).toBeInTheDocument();
   });
 
   it("negative control · the old colliding key reproduces the poisoning, so this suite detects a revert", async () => {
@@ -239,7 +325,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     const timing = await screen.findByTestId("monitor-timing-1302");
     await waitFor(() => expect(within(timing).getByTestId("monitor-owner-unassigned")).toBeInTheDocument());
     expect(timing).toHaveTextContent("Ask customer to pay");
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -253,7 +339,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1"));
 
     // The collection owner is established (Delivery Duty held); the feed now resolves Jess.
-    state.work = { items: [collectItem(JESS_HOLDS), MINE], staff: [{ userId: ME, name: "Me", email: "me@carres.com" }], generatedOn: "2026-09-13" };
+    state.work = workResponse([collectItem(JESS_HOLDS), MINE]);
     await act(async () => { await qc.invalidateQueries({ queryKey: qk.operation.work() }); });
 
     await waitFor(() => expect(within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar")).toHaveAttribute("aria-label", "Jess"));

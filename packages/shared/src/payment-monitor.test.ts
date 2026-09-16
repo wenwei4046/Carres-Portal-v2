@@ -283,8 +283,8 @@ describe("the week plan — a view of the shared Work Engine (owner ruling 2026-
       row({ id: "d2", order_id: "od", so: 4, kind: "storage", amount: 200, control: { ...ready, confirmed_date: "2026-09-30" } }),
     ], cases: [], requests: [], todayIso: "2026-09-15", opts: OPTS,
   });
-  const item = (objectId: string, ruleKey: string, dueOn: string | null) =>
-    ({ ruleKey, object: { id: objectId }, timing: { dueOn } });
+  const item = (objectId: string, ruleKey: string, actionOn: string | null) =>
+    ({ ruleKey, object: { id: objectId }, timing: { actionOn } });
   const ask = "payment.collect_customer_balance";
   const promise = "payment.missed_promise";
   const storage = "payment.send_storage_invoice";

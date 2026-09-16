@@ -11,12 +11,13 @@ let workState: {
   isError: boolean;
 };
 let authState = { role: "operation", email: "shasha@carres.test" };
+const refetch = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useOperationWork: () => workState,
+    useOperationWork: () => ({ ...workState, refetch }),
     useOperationStaff: () => ({
       data: {
         staff: [
@@ -41,27 +42,57 @@ vi.mock("react-router-dom", async () => {
 
 import OperationWork from "./OperationWork";
 
+function timing(actionOn: string | null, workingDaysLate = 0): OperationWorkItem["timing"] {
+  return {
+    businessDueOn: actionOn,
+    actionOn,
+    placement: actionOn === null ? "no_working_date" : workingDaysLate > 0 ? "missed" : "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: workingDaysLate,
+      basis: { calendarKey: "module+person", from: actionOn ?? "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
+    noDateReason: actionOn === null ? "The owning rule has no working date" : null,
+    calendar: {
+      module: { key: "orders", source: "orders", state: "ready" },
+      actor: { key: "person:shasha", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  };
+}
+
 function item(overrides: Partial<OperationWorkItem> = {}): OperationWorkItem {
   return {
+    contractVersion: 2,
     id: "orders:order-1:ask_delivery_date",
     module: "orders",
     ruleKey: "ask_delivery_date",
+    ruleVersion: 1,
     object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
     problem: "No delivery date",
     action: "Ask customer for a delivery date",
     recipient: "Tan Qu Qu",
     requiredResult: "Customer Delivery exists",
-    completionFact: "orders.delivery_date exists",
+    completionPredicate: "orders.delivery_date exists",
+    completionStatement: "Customer Delivery exists",
     owner: {
       rule: "salesperson",
       dutyKey: null,
       normal: { userId: SH, name: "Shasha" },
       activeCover: null,
+      coverEvidence: null,
       acting: { userId: SH, name: "Shasha" },
       state: "primary",
     },
-    timing: { dueOn: "2026-09-06", workingDaysLate: 0, bucket: "today" },
+    timing: timing("2026-09-06"),
+    communication: null,
+    blocker: null,
+    nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: "/operation/orders/so/order-1" },
     destination: "/operation/orders/so/order-1",
+    observedAt: "2026-09-06T01:00:00.000Z",
+    sourceVersion: "2026-09-06T01:00:00.000Z",
     tone: "warning",
     locked: false,
     broken: false,
@@ -79,15 +110,26 @@ function show(url = "/operation?tab=work") {
 
 beforeEach(() => {
   navigate.mockReset();
+  refetch.mockReset();
   authState = { role: "operation", email: "shasha@carres.test" };
   workState = {
     data: {
+      contractVersion: 2,
+      complete: true,
       items: [item()],
       staff: [
         { userId: SH, name: "Shasha", email: "shasha@carres.test" },
         { userId: YJ, name: "Yu Jun", email: "yujun@carres.test" },
       ],
       generatedOn: "2026-09-06",
+      closureReceipt: null,
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+        key,
+        state: "healthy" as const,
+        observedAt: "2026-09-06T01:00:00.000Z",
+        lastSuccessfulAt: "2026-09-06T01:00:00.000Z",
+        errorLabel: null,
+      })),
     },
     isLoading: false,
     isError: false,
@@ -118,16 +160,52 @@ describe("Operation Work — one server feed", () => {
         dutyKey: null,
         normal: { userId: SH, name: "Shasha" },
         activeCover: { userId: YJ, name: "Yu Jun" },
+        coverEvidence: { id: "cover-1", startsOn: "2026-09-06", endsOn: "2026-09-06" },
         acting: { userId: YJ, name: "Yu Jun" },
         state: "covered",
       },
     })];
     authState.email = "yujun@carres.test";
     show();
-    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
+      .toHaveTextContent("Covered for Shasha");
     fireEvent.click(screen.getByTestId("work-view-team"));
-    expect(within(screen.getByTestId(`work-owner-group-${SH}`)).getByText(/Shasha/))
-      .toBeInTheDocument();
+    const group = screen.getByTestId(`work-owner-group-${SH}`);
+    expect(within(group).getByText(/Shasha/)).toBeInTheDocument();
+    expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
+      .toHaveTextContent("Covered by Yu Jun");
+  });
+
+  it("uses the governed My Work section order and keeps No date separate", () => {
+    workState.data!.items = [
+      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
+      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
+      item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
+    ];
+    show("/operation?tab=work&day=all");
+    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
+    expect(screen.getByTestId("work-section-overdue")).toBeInTheDocument();
+    expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
+  });
+
+  it("reads search and filters from the URL", () => {
+    workState.data!.items = [
+      item(),
+      item({
+        id: "payment:invoice-1:collect",
+        module: "payment",
+        ruleKey: "collect",
+        object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
+        problem: "Customer balance due",
+        action: "Ask the customer to pay",
+        recipient: "Acme",
+        timing: timing(null),
+      }),
+    ];
+    show("/operation?tab=work&q=Acme&module=payment&when=no_date");
+    expect(screen.queryByTestId("work-row-SO-1318-ask_delivery_date")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-row-INV-2041-collect")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search work…" })).toHaveValue("Acme");
   });
 
   it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
@@ -141,6 +219,7 @@ describe("Operation Work — one server feed", () => {
         dutyKey: "delivery_duty",
         normal: null,
         activeCover: null,
+        coverEvidence: null,
         acting: null,
         state: "not_assigned",
       },
@@ -156,9 +235,12 @@ describe("Operation Work — one server feed", () => {
       .toHaveAttribute("href", "/operation?tab=staff-duties");
   });
 
-  it("opens the exact destination supplied by the owning module", () => {
+  it("selects work in the action panel before opening the owning module", () => {
     show();
     fireEvent.click(screen.getByTestId("work-row-SO-1318-ask_delivery_date"));
+    expect(screen.getByRole("region", { name: "Selected work" })).toHaveTextContent("Customer Delivery exists");
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Open SO-1318" }));
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
@@ -174,6 +256,7 @@ describe("Operation Work — one server feed", () => {
     })];
     show();
     fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
+    fireEvent.click(screen.getByRole("button", { name: "Open DO-2041" }));
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
   });
 
@@ -189,6 +272,7 @@ describe("Operation Work — one server feed", () => {
     })];
     show();
     fireEvent.click(screen.getByTestId("work-row-INV-2041-payment.collect_customer_balance"));
+    fireEvent.click(screen.getByRole("button", { name: "Open INV-2041" }));
     expect(navigate).toHaveBeenCalledWith("/finance/invoices?invoice=invoice-1");
   });
 
@@ -196,11 +280,20 @@ describe("Operation Work — one server feed", () => {
     workState = { data: undefined, isLoading: false, isError: true };
     show();
     expect(screen.getByTestId("work-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("shows a stable loading shell", () => {
+    workState = { data: undefined, isLoading: true, isError: false };
+    show();
+    expect(screen.getByTestId("work-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
   it("shows an explicit empty state", () => {
     workState.data!.items = [];
     show();
-    expect(screen.getByTestId("work-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("work-empty")).toHaveTextContent("Nothing assigned to you");
   });
 });
