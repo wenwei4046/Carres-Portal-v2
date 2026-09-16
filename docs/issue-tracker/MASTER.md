@@ -19,7 +19,8 @@
 
 # §1 · Mission
 
-Issue Tracker records **every operational issue** so Carres can answer:
+Issue Tracker records **every internal, system, process and accountability issue** so Carres can
+answer:
 
 1. What happened?
 2. Who or which party caused it?
@@ -43,6 +44,27 @@ ISSUE TRACKER = ACCOUNTABILITY + MEMORY + LEARNING
 Issue Tracker never replaces SO, PO, Receiving, Unit/Stock, Delivery, Payment, Supplier Claim,
 Service Case, Guarantee or Rental truth. It reads and links those records. Finance owns money;
 Issue Tracker explains why the cost/recovery exists.
+
+### ENTRY AND CONTROL-CENTRE BOUNDARY — OWNER-RULED 2026-09-16
+
+The system decides the record home before asking Issue questions:
+
+- A customer/product/service problem that needs customer communication, assessment, remedy,
+  outcome or customer-confirmed closure belongs to **Service Case**. Service Case is the sole
+  control centre after `Report a problem`.
+- A pure SOP, key-in, system, staff or process failure with no customer-resolution route belongs
+  to **Issue Tracker**.
+- When an internal failure also harmed a customer, open or match the Service Case first, then
+  create one linked Issue for accountability, cost, Related Party reporting and learning. Never
+  copy the complaint, customer conversation, remedy workflow or closure state into the Issue.
+- An owning-module exception remains with its factual owner. Linking it does not transfer write
+  authority.
+
+Workspace Communications owns messages, participants, attachments and channel observations,
+including Customer Service WhatsApp/API records and customer claim links. Issue Tracker links the
+governed communication/evidence object; it does not create another chat, participant list or file
+store. Service Case owns assessment, responsibility, remedy, outcome and closure. Shared Duty
+Resolver owns current holder and cover resolution; Issue Tracker never hard-codes staff names.
 
 # §2 · The non-negotiable operating model
 
@@ -115,6 +137,11 @@ object pre-fills its customer/supplier, item, quantity, dates and parties. The s
 at a time and branches from the answer:
 
 ```text
+Where does this problem belong?
+Customer or product problem · Internal, system or process problem · Both
+
+Only after the system routes to Issue Tracker:
+
 What has a problem?
 Item · Delivery · Document · Payment · Customer information · Staff work · Something else
 
@@ -126,7 +153,7 @@ Who found it?
 Me · Customer · Warehouse · Supplier · Logistics
 
 What proof do you have?
-Photo · Video · WhatsApp reply · Delivery document · Other document
+Photo · Video · Workspace message · Delivery document · Other document
 ```
 
 The answer decides the next question and evidence. A damaged Unit asks for Unit ID, label and
@@ -149,10 +176,12 @@ Staff choose `Correct` or return to the exact factual answer. They do not rewrit
 Free text is a short optional `Add detail` with sentence starters; it never determines status,
 fault, money or completion.
 
-Module events may propose an **Issue candidate**: wrong/damaged Receiving result, failed Delivery
-Attempt, reopened Service Case, voided/duplicate/corrected document, missing required evidence or
-overdue required action. A reviewer confirms the observed facts or rejects the candidate with a
-reason. Automation never accuses a person.
+Module events may propose an **Issue candidate** for an internal/system/process failure: a missed
+Receiving check, failed required Delivery step, internal failure discovered during a Service Case,
+voided/duplicate/corrected document, missing required evidence or overdue required action. A
+customer or product problem alone proposes/matches a Service Case, not an Issue. A reviewer
+confirms the observed facts or rejects the candidate with a reason. Automation never accuses a
+person.
 
 # §5 · Guided action and cover
 

@@ -23,11 +23,15 @@ describe("Issue Tracker workspace", () => {
     expect(screen.queryByText("Service Notes")).not.toBeInTheDocument();
   });
 
-  it("starts with simple factual choices and no blank English story box", () => {
+  it("routes the problem before showing Issue facts and never asks for a blank English story", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mount(); fireEvent.click(screen.getByRole("button", { name: "Record issue" }));
+    expect(screen.getByText("Where does this problem belong?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Customer or product problem" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Internal, system or process problem" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Internal, system or process problem" }));
     expect(screen.getByText("What has a problem?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Item" })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/what happened/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(consoleError.mock.calls.flat().join(" ")).not.toContain("cannot be given refs");

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildIssueEnglish,
   buildIssueWorkTitle,
+  createIssueInputSchema,
+  decideProblemHome,
   issueIntakeSchema,
   reconcileIssueMoney,
   relatedPartyReportRows,
@@ -20,6 +22,37 @@ const intake = {
 };
 
 describe("Issue Tracker operating model", () => {
+  it("routes customer remedy to Service Case and keeps pure internal failure in Issue Tracker", () => {
+    expect(decideProblemHome({ customerResolutionRequired: true, internalFailureObserved: false })).toEqual({
+      home: "service_case",
+      linkedIssueRequired: false,
+    });
+    expect(decideProblemHome({ customerResolutionRequired: false, internalFailureObserved: true })).toEqual({
+      home: "issue_tracker",
+      linkedIssueRequired: false,
+    });
+    expect(decideProblemHome({ customerResolutionRequired: true, internalFailureObserved: true })).toEqual({
+      home: "service_case",
+      linkedIssueRequired: true,
+    });
+    expect(decideProblemHome({ customerResolutionRequired: false, internalFailureObserved: false })).toEqual({
+      home: "owning_module",
+      linkedIssueRequired: false,
+    });
+  });
+
+  it("requires a Service Case link when an internal Issue also affected a customer", () => {
+    const work = { owner: "Yu Jun", object: "New issue", recipient: "Operations", action: "Check the missed label step", requiredResult: "The check result is recorded", dueOn: "2026-08-17" };
+    const withoutCase = createIssueInputSchema.safeParse({ intake, scope: "customer_impact_linked", sourceModule: "receiving", work });
+    expect(withoutCase.success).toBe(false);
+    expect(createIssueInputSchema.safeParse({
+      intake: { ...intake, linkedObjects: [...intake.linkedObjects, { kind: "service_case" as const, id: "case-1", label: "SC-104" }] },
+      scope: "customer_impact_linked",
+      sourceModule: "receiving",
+      work,
+    }).success).toBe(true);
+  });
+
   it("creates official English from facts without asking staff to compose it", () => {
     expect(issueIntakeSchema.parse(intake)).toEqual(intake);
     expect(buildIssueEnglish(intake)).toBe(

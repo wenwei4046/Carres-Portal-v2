@@ -2,13 +2,22 @@ import { z } from "zod";
 
 export const issueObjectKinds = ["item", "delivery", "document", "payment", "customer_information", "staff_work", "other"] as const;
 export const issueObservedProblems = ["wrong_item", "damaged", "missing", "wrong_quantity", "late", "no_reply", "wrong_information", "work_not_done", "not_sure"] as const;
-export const issueEvidenceKinds = ["photo", "video", "whatsapp_reply", "delivery_document", "other_document"] as const;
+export const issueEvidenceKinds = ["photo", "video", "workspace_communication", "delivery_document", "other_document"] as const;
+
+export function decideProblemHome(input: { customerResolutionRequired: boolean; internalFailureObserved: boolean }) {
+  if (input.customerResolutionRequired) {
+    return { home: "service_case" as const, linkedIssueRequired: input.internalFailureObserved };
+  }
+  return input.internalFailureObserved
+    ? { home: "issue_tracker" as const, linkedIssueRequired: false }
+    : { home: "owning_module" as const, linkedIssueRequired: false };
+}
 
 export const issueIntakeSchema = z.object({
   problemObject: z.enum(issueObjectKinds), observedProblem: z.enum(issueObservedProblems),
   foundByKind: z.enum(["me", "customer", "warehouse", "supplier", "logistics", "system", "other"]),
   foundByName: z.string().min(1), observedOn: z.string().date(),
-  linkedObjects: z.array(z.object({ kind: z.enum(["sales_order", "purchase_order", "receiving", "supplier_claim", "unit", "delivery", "payment", "service_case", "guarantee", "rental", "issue"]), id: z.string().min(1), label: z.string().min(1) })).min(1),
+  linkedObjects: z.array(z.object({ kind: z.enum(["sales_order", "purchase_order", "receiving", "supplier_claim", "unit", "delivery", "payment", "service_case", "guarantee", "rental", "issue", "workspace_communication"]), id: z.string().min(1), label: z.string().min(1) })).min(1),
   affectedObject: z.string().min(1), impact: z.string().min(1),
   evidence: z.array(z.object({ kind: z.enum(issueEvidenceKinds), count: z.number().int().positive() })).min(1),
   optionalDetail: z.string().max(300).optional(),
@@ -30,10 +39,15 @@ export function buildIssueWorkTitle(raw: z.input<typeof issueWorkSchema>) { cons
 
 export const createIssueInputSchema = z.object({
   intake: issueIntakeSchema,
+  scope: z.enum(["internal_only", "customer_impact_linked"]),
   sourceModule: z.string().min(1),
   materiality: z.enum(["routine", "significant", "critical"]).default("routine"),
   work: issueWorkSchema,
   actionOwnerId: z.string().uuid().optional(),
+}).superRefine((input, context) => {
+  if (input.scope === "customer_impact_linked" && !input.intake.linkedObjects.some((link) => link.kind === "service_case")) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["intake", "linkedObjects"], message: "Link the Service Case before recording the internal Issue" });
+  }
 });
 export const addFaultOwnerInputSchema = z.object({
   ownerKind: z.enum(["related_party", "internal_staff", "internal_team", "other"]), relatedPartyId: z.string().uuid().optional(), staffId: z.string().uuid().optional(), ownerName: z.string().min(1),
