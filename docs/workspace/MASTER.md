@@ -400,6 +400,14 @@ evidence law. Customer delivery booking, Delivery result, Issue PO, Receiving/GR
 and Service outcome remain `open_module` until separately admitted. A Case request, approval,
 uploaded slip or checkbox never means Finance paid a refund.
 
+For Delivery proof review, every file in the latest governed proof package must be readable before
+`Accept proof` is available. A failed file says `Photo could not be loaded · Try again`; `Request
+more proof`, `Reject proof` and the secondary `Open {Delivery Order}` door remain available. Once
+all current files load, acceptance may resume. `Viewed` is temporary page assistance only: it is
+not stored, is not completion evidence and creates no Work history. The UI never claims that a
+driver was contacted merely because `Request more proof` was recorded; its truthful supporting
+result is `More proof is required`.
+
 ### 5.2 · Work-item presentation contract
 
 Each visible item uses the approved two-line action grammar beneath structured object metadata:
@@ -576,6 +584,8 @@ the same group and item grammar; zero matches is not the same as zero work.
   padding, 4px internal gaps and 1px `slate-5` dividers. A row is at least 88px but grows to show the
   complete object, fact/problem, action, recipient and timing state. Selection uses the same
   `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
+  An admitted embedded row alone may carry the neutral `Do it here`; ordinary module-door and
+  read-only rows carry no repeated mode badge.
 - Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
   than 760px. `open_module` and `read_only` retain the full structured brief. `embedded` is compact:
   object/module header; one current-fact line; module-owned form with `Finish when: {statement}` as
@@ -597,6 +607,9 @@ the same group and item grammar; zero matches is not the same as zero work.
   accessible name combining object, problem and action. Hover evidence is also available by focus
   and tap; colour, initials and icon alone never carry meaning. Focus returns to the invoking row
   after Back; when that occurrence closed, it moves to the next visible row and announces the change.
+  A confirmed completion leaves an inline source receipt where the row was, including on mobile;
+  it has no timer and remains until dismissal or the next meaningful list action. Panel 3 moves to
+  the next occurrence and never displays the previous occurrence's receipt as if it belonged there.
 - Acceptance captures and measures 1440×900, 1180×820, 820×900 and 390×844. It records actual
   canvas/panel widths, overflow, focus order and wrapped action content; a screenshot without those
   measurements is not responsive proof.
@@ -1230,3 +1243,12 @@ Notifications ──event receipt──▶ Work / owning object
 No new business decision remains in the page composition. Implementation remains gated by the
 module admission and production-proof work in §§6, 10 and 11; `Blueprint ready` does not mean those
 sources, migrations or pages are deployed.
+
+**OWNER APPROVED — Work design v3.1, 2026-09-16.** The approved review surface proves the
+three/two/one-panel composition at 1440×900, 1180×820, 820×900 and 390×844; reconciled
+Missed-plus-plan-day counts; inline completion receipts; Team/My ownership density; the three
+interaction modes; keyboard/focus return; proof-image inspection and failure; and the §5.4 state
+matrix. Its example objects, people, dates, amounts, permissions, photographs, save outcomes,
+sidebar, Right Rail and unfinished filters remain fixtures and are not authority. Production must
+render the contract and owning-module facts governed here; it must not copy fixture records or the
+artifact's implementation.

@@ -178,6 +178,20 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
 | Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
 | Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
+| Work current-list counts | `In this list` · `Missed {n} · {weekday, date} {n}` · `{n} in this list` | a module total that excludes visible Missed rows · counting one occurrence twice |
+| Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
+| Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
+| Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
+| Delivery proof supporting result | `More proof is required` | The driver is asked for more proof |
+| Delivery proof receipts | `Delivery proof accepted` · `More proof requested` · `Delivery proof rejected` | Done · Completed · an unconfirmed optimistic receipt |
+| Delivery proof viewer | `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` | image controls without text names |
+| Delivery proof viewed aid | `Viewed` | storing view state · treating view state as completion evidence |
+| Delivery proof load failure | `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` | allowing `Accept proof` while any file in the latest proof package is unreadable |
+| Work read-only action | `Only {acting person} can record this.` · `You can see this work here. Recording it is not part of your access.` | disabled mutation controls · implying Team Work visibility grants permission |
+| Work detail evidence | `Working day and source` · `Owner, working day and source` only when exceptional owner evidence is present · `Required` · `Working day` · `Source` | ordinary owner metadata in My Work |
+| Work source remainder | `Other work is current.` | implying one failed source made the whole list current or empty |
+| Work loading announcement | `Loading work` | No work · zero counts while loading |
+| Work object shortcut | `Open {object} (O)` | an undiscoverable keyboard shortcut |
 | Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
