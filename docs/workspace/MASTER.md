@@ -295,26 +295,28 @@ Team Work   the same actions grouped by normal owner
 - My Work is the default for everyone, including managers, and omits their repeated avatar.
 - Team Work groups under owner avatar/name; cover appears only when today's actor differs.
 - No manual `Take it`, `Release`, generic assignment or `Mark done` exists for deterministic work.
-- The working week is explicit: `Missed`, Monday through Friday and `No working date`; blockers
-  never hide the original required working day or missed age.
+- The working week is explicit: `Missed`, Monday through Friday, calendar-admitted Saturday and
+  `No working date`; blockers never hide the original required working day or missed age.
 - Completed/History is read-only source evidence and preserves the actual actor.
 
 ### 5.1 · One Work composition
 
 Work is one page with two scopes over one open set. It is an operator workspace, not a Dashboard,
 Kanban board or second module record. Owner-approved 2026-09-16: the primary navigation is the
-Monday-to-Friday working week, and large desktop uses three working panels inside the existing
-global shell.
+working week, and large desktop uses three working panels inside the existing global shell.
 
 ```text
 ┌ WORKING DAY / MODULE ┬ ACTIONS ───────────────┬ SELECTED ACTION ─────────────┐
-│ Missed             3 │ DO-8830 · Delivery     │ DO-8830 · Delivery           │
-│ Mon, 14 Sep        4 │ Confirm appointment    │ Lim Family                   │
-│ Tue, 15 Sep        5 │ Lim Family             │                              │
-│ Wed, 16 Sep Today  8 │ Not contacted          │ Current fact                 │
-│ Thu, 17 Sep        4 │                        │ Appointment not confirmed    │
-│ Fri, 18 Sep        2 │ INV-1402 · Payment     │                              │
-│ No working date    1 │ Collect RM 1,280       │ Action                       │
+│ Missed     3 actions │ DO-8830 · Delivery     │ DO-8830 · Delivery           │
+│ Mon, 14 Sep 4 actions│ Confirm appointment    │ Lim Family                   │
+│ Tue, 15 Sep 5 actions│ Lim Family             │                              │
+│ Wed, 16 Sep          │ Not contacted          │ Current fact                 │
+│ Malaysia Day         │                        │ Appointment not confirmed    │
+│ Thu, 17 Sep 4 actions│ INV-1402 · Payment     │                              │
+│ Fri, 18 Sep 2 actions│ Collect RM 1,280       │ Action                       │
+│ Sat, 19 Sep 3 actions│ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
+│ No working date      │ Promised today         │ 2:00 to 5:00 PM             │
+│             1 action │                        │                              │
 │                      │ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
 │ All                8 │ Promised today         │ 2:00 to 5:00 PM             │
 │ Purchasing         1 │                        │                              │
@@ -329,31 +331,38 @@ global shell.
 Panel 1 chooses the working day and module. Panel 2 lists the matching authorised actions. Panel 3
 shows one selected action's fact, specific act, source-owned communication where admitted, required
 result and exact owning-object door. `Missed` contains actions whose governed working day has passed;
-the original day and working-day age remain visible. Monday through Friday show the selected week.
+the original day and working-day age remain visible. Previous/next controls move the selected week
+without changing scope or filters. Monday through Friday always show. Saturday appears only when an
+authoritative Receiving, Warehouse, Delivery or other module calendar produces real Saturday work;
+it is never moved to Friday. A separate preparation action may appear on Friday only when its owning
+module generates that action. A public holiday remains visible and is named; normal work advances by
+the source calendar, while an authorised holiday operation remains on the holiday and says so.
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
 today. Broken commitment remains the highest attention fact on the affected row; it is not another
 weekday bucket.
 
-Team Work uses the same three panels and week. Panel 1 additionally selects normal owner, Site queue
+Team Work uses the same three panels and week. It is visible to the whole Operation team: Principal,
+Operation and Jess. Visibility does not grant new module data or action permission. Panel 1
+additionally selects normal owner, Site queue
 or `Not assigned`; Panel 2 keeps actions grouped or visibly identified by that normal owner and
 Panel 3 preserves cover evidence. Counts always name actions.
 
-Workspace never owns or stores module truth. Panel 3 may host an owning module's governed action
-component only when it uses that module's authoritative API, permission, evidence and completion
-fact. Copying a message or opening WhatsApp never records a send or completes Work. Where no
-source-owned action contract exists, Panel 3 is read-only and opens the exact owning object; it does
-not invent a substitute control.
+Workspace never owns or stores module truth. In the first release, Panel 3 is an action brief, not
+Object Detail and not a module-writing surface. It shows the fact, specific act, recipient,
+communication aids, completion condition, next consequence and one `Open {object}` door. Copying a
+message or opening WhatsApp never records a send or completes Work. A later release may admit an
+owning module's governed action component only through a separately approved contract using that
+module's authoritative API, permission, validation, evidence and completion fact.
 
 ### 5.2 · Work-item presentation contract
 
-Each visible item is generated from structured facts in this order:
+Each visible item uses the approved two-line action grammar beneath structured object metadata:
 
 ```text
-OBJECT LABEL · MODULE OR SITE CONTEXT
-FACT OR PROBLEM
-ACTION · RECIPIENT (when applicable)
-REQUIRED RESULT (when it materially disambiguates completion)
-WORKING DAY / MISSED AGE · BLOCKER / COVER / SOURCE HEALTH (only when present)
+OBJECT LABEL · MODULE OR SITE CONTEXT          metadata/header
+FACT OR PROBLEM                               line 1
+ACTION · RECIPIENT (when applicable)          line 2
+WORKING DAY / MISSED AGE · exceptional state  metadata/footer
 ```
 
 - Object identity belongs in the item header and is not repeated in the action.
@@ -365,11 +374,12 @@ WORKING DAY / MISSED AGE · BLOCKER / COVER / SOURCE HEALTH (only when present)
 - The action begins with a specific verb and names its business object only when the header does not
   already make it unambiguous. `Follow up`, `Check`, `Handle`, `Process` and `Pending` alone are
   forbidden.
-- Required result is visible for physical handover, multi-result and otherwise ambiguous acts; it
-  remains available as accessible supporting text for every item.
-- Communication is a structured source-owned block: recipient, channel, prepared message, actual
-  sent evidence, reply evidence and the next authoritative act. It is absent for non-communication
-  work. Workspace does not keep a second conversation.
+- Required result belongs in Panel 3 for physical handover, multi-result and otherwise ambiguous
+  acts; it remains available as accessible supporting text for every item.
+- Communication is a structured source-owned block in Panel 3: recipient, phone/channel, prepared
+  message, `Copy message`, `Open WhatsApp`, actual sent evidence and reply state when the source
+  truly supplies them. It is absent for non-communication work. Workspace does not copy or store a
+  second conversation. Opening WhatsApp is not sent evidence.
 - Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
   appear only in historical evidence.
 
@@ -378,8 +388,8 @@ WORKING DAY / MISSED AGE · BLOCKER / COVER / SOURCE HEALTH (only when present)
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
 problem and action. It never broadens permission scope and never searches a separately cached copy.
 
-Filters are: `Scope` (`My Work` · `Team Work`), `Working day` (`Missed` · Monday through Friday ·
-`No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
+Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · Monday through
+Friday · Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
 `Missed`. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and Right Rail can open
@@ -400,6 +410,8 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
 | No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
 | Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
+| Saturday | Appears only when an admitted source calendar produces Saturday work; retains the Saturday business date |
+| Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Blocked | Name the dependency and the door that can resolve it; retain original working day and missed age |
 | Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
@@ -414,7 +426,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   and module navigation, action list, then selected-action detail.
 - At laptop width, the first panel collapses into compact working-day and module controls while the
   action list and selected detail remain together where usable.
-- At phone width, the Monday-to-Friday selector remains available above the full-width action list;
+- At phone width, the working-week selector remains available above the full-width action list;
   selecting an action opens full-screen detail. Back restores day, module, owner, filters and scroll.
 - Exact breakpoints, panel measurements, row heights and touch dimensions belong to the pending
   Work UI-kit specification. They are not approved merely because an exploratory prototype used them.
@@ -433,8 +445,9 @@ order from module truth:
 1. `Broken commitment` — an explicit customer, supplier, payment or delivery promise is past and
    its completion fact is absent.
 2. `Missed` — the governed working day is before today on that rule's calendar.
-3. The selected Monday-to-Friday working day, with `Today` marked explicitly.
-4. A later Monday-to-Friday working day in the selected week or a later week.
+3. The selected calendar-admitted working day, with `Today` marked explicitly only when today is a
+   working day for that action's authoritative calendar.
+4. A later working day in the selected or a later week.
 5. `No working date` — the module explicitly admits an obligation with no lawful clock.
 
 Materiality (`Routine` · `Significant` · `Critical`) belongs to the owning module and may raise
@@ -471,7 +484,7 @@ Work is ready for owner acceptance only when all are demonstrable:
 - My Work, Team Work and Right Rail use one authorised response and one cache identity;
 - normal owner, cover, acting person, Site queue, `Not assigned` and actual completed actor remain
   distinct across assignment/cover changes;
-- broken commitment, missed, Monday-through-Friday and no-working-date examples order once under
+- broken commitment, missed, weekday, conditional Saturday, holiday and no-working-date examples order once under
   the governed working-day law;
 - blockers retain the original working day and missed age, and source failure cannot reduce or clear
   any count;
