@@ -442,67 +442,171 @@ export function monitorRiskOrder(a: PaymentMonitorRow, b: PaymentMonitorRow): nu
   return (a.so ?? 0) - (b.so ?? 0);
 }
 
-// ─── Filters and summaries ───────────────────────────────────────────────────
+// ─── The week plan (owner ruling 2026-09-16) ──────────────────────────────────
 
-export type MonitorFilterKey =
-  | "needs_attention"
-  | "ask_today"
-  | "promised_today"
-  | "should_have_paid"
-  | "waiting_goods"
-  | "storage_payments"
-  | "all_unpaid";
+/**
+ * THE MONITOR'S WEEK PLAN — the left rail, Monday to Friday (owner ruling
+ * 2026-09-16, `docs/payment/MASTER.md` §3).
+ *
+ * It is a VIEW of the shared Work Engine and nothing else: every count is a
+ * collection Work item the engine already raised (its admission, its company
+ * calendar, the owner's working day and today's cover), placed on the item's
+ * own `dueOn`. It creates no work, stores no schedule and never re-dates an
+ * item.
+ *
+ *   · Open work whose day is before the PLAN DAY is counted once, on the plan
+ *     day, and keeps its original day (`carried.sinceIso`). Its own past day
+ *     still lists the order when picked, but does not count it again.
+ *   · The PLAN DAY is today when today is a working day for Operation
+ *     (Mon–Fri, not a public holiday); otherwise the next such day. Only a
+ *     working today is ever marked `Today` — never a weekend or a holiday.
+ *   · A count is ORDERS per kind of work: one order with two invoices under
+ *     the same rule is one customer to ask.
+ *   · Only items that resolve to a Monitor row are counted, so a picked day's
+ *     count and the listing beside it always agree.
+ */
 
-export const MONITOR_FILTERS: ReadonlyArray<{ key: MonitorFilterKey; label: string }> = [
-  { key: "needs_attention", label: "Needs attention" },
-  { key: "ask_today", label: "Ask customer today" },
-  { key: "promised_today", label: "Promised today" },
-  { key: "should_have_paid", label: "Should have been paid" },
-  { key: "waiting_goods", label: "Waiting for goods" },
-  { key: "storage_payments", label: "Storage payments" },
-  { key: "all_unpaid", label: "All unpaid" },
-];
+export type PaymentWeekWorkKind = "ask" | "check_promise" | "storage";
 
-export const DEFAULT_MONITOR_FILTER: MonitorFilterKey = "all_unpaid";
+/** The Work Engine rules the Monitor's week plan reads, and what each asks. */
+export const PAYMENT_WEEK_RULE_KIND: Readonly<Record<string, PaymentWeekWorkKind>> = Object.freeze({
+  "payment.collect_customer_balance": "ask",
+  "payment.missed_promise": "check_promise",
+  "payment.send_storage_invoice": "storage",
+});
 
-export function monitorFilterMatch(row: PaymentMonitorRow, key: MonitorFilterKey): boolean {
-  const k = row.timing.kind;
-  switch (key) {
-    case "needs_attention":
-      return row.timing.action !== null && row.timing.action !== "wait";
-    case "ask_today":
-      return k === "ask_today" || k === "due_today";
-    case "promised_today":
-      return k === "promised_today";
-    case "should_have_paid":
-      return k === "should_have_paid";
-    case "waiting_goods":
-      return k === "arrival_not_confirmed";
-    case "storage_payments":
-      return row.storage.kind === "invoice_unpaid" || row.storage.kind === "charging"
-        || row.storage.kind === "request_pending";
-    case "all_unpaid":
-      return true;
-  }
+const WEEK_KIND_ORDER: readonly PaymentWeekWorkKind[] = ["ask", "check_promise", "storage"];
+
+/** The Work item fields the week plan reads — a subset of `OperationWorkItem`. */
+export interface PaymentWeekWorkItem {
+  ruleKey: string;
+  object: { id: string };
+  timing: { dueOn: string | null };
 }
 
-/** The clear-summary sentences (never `8 open · 2 late`). Zero prints nothing;
- *  an empty desk says so in one sentence. */
-export function monitorSummaries(rows: readonly PaymentMonitorRow[]): string[] {
-  const collectToday = rows.filter((r) =>
-    r.timing.kind === "due_today" || r.timing.kind === "ask_today" || r.timing.kind === "promised_today").length;
-  const late = rows.filter((r) => r.timing.kind === "should_have_paid").length;
-  const storage = rows.filter((r) => r.storage.kind === "invoice_unpaid").length;
-  const out: string[] = [];
-  if (collectToday > 0) {
-    out.push(`${collectToday} customer ${collectToday === 1 ? "balance needs" : "balances need"} collection today`);
+export interface PaymentWeekLine {
+  kind: PaymentWeekWorkKind;
+  count: number;
+}
+
+export interface PaymentWeekDay {
+  iso: string;
+  /** The actual today, and a working day. Never a weekend or a holiday. */
+  isToday: boolean;
+  /** The day open earlier work is counted on. */
+  isPlanDay: boolean;
+  /** The public holiday's name when the day is one (`""` when unnamed), else null. */
+  holiday: string | null;
+  /** Work counted on this day (the plan day includes earlier open work). */
+  lines: PaymentWeekLine[];
+  /** On the plan day: the earlier open work inside `lines`, and its first day. */
+  carried: { count: number; sinceIso: string } | null;
+  /** On an earlier day: open orders from this day, counted on the plan day. */
+  countedOnPlanDay: number;
+  /** The orders the listing shows when this day is picked. */
+  orderIds: string[];
+}
+
+export interface PaymentWeekPlan {
+  planDayIso: string;
+  weekStartIso: string;
+  days: PaymentWeekDay[];
+}
+
+function addDaysIso(iso: string, n: number): string {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d! + n));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
+
+function weekdayOfIso(iso: string): number {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
+}
+
+/** The Monday of the week holding `iso` (a Sunday belongs to the week before it). */
+export function mondayOf(iso: string): string {
+  const dow = weekdayOfIso(iso);
+  return addDaysIso(iso, dow === 0 ? -6 : 1 - dow);
+}
+
+/** The plan day: today when Operation works today, else the next day it does. */
+export function paymentPlanDay(todayIso: string, holidays: ReadonlySet<string>): string {
+  let day = todayIso.slice(0, 10);
+  for (let guard = 0; guard < 31; guard++) {
+    const dow = weekdayOfIso(day);
+    if (dow !== 0 && dow !== 6 && !holidays.has(day)) return day;
+    day = addDaysIso(day, 1);
   }
-  if (late > 0) {
-    out.push(`${late} ${late === 1 ? "payment" : "payments"} should have been received already`);
+  return todayIso.slice(0, 10);
+}
+
+/**
+ * The Monday–Friday plan for the week holding `weekOfIso`. `rows` are the
+ * Monitor rows in scope; an item is counted only when its invoice belongs to
+ * one of them.
+ */
+export function paymentWeekPlan(input: {
+  items: readonly PaymentWeekWorkItem[];
+  rows: readonly PaymentMonitorRow[];
+  todayIso: string;
+  weekOfIso: string;
+  holidays: ReadonlySet<string>;
+  holidayName?: (iso: string) => string | null;
+}): PaymentWeekPlan {
+  const today = input.todayIso.slice(0, 10);
+  const planDayIso = paymentPlanDay(today, input.holidays);
+  const weekStartIso = mondayOf(input.weekOfIso);
+  const orderOfInvoice = new Map<string, string>();
+  for (const row of input.rows) {
+    for (const r of row.rows) orderOfInvoice.set(r.id, row.orderId);
+    orderOfInvoice.set(row.door.id, row.orderId);
   }
-  if (storage > 0) {
-    out.push(`${storage} storage ${storage === 1 ? "payment needs" : "payments need"} collection`);
+  // One entry per order and kind of work, on its EARLIEST open day.
+  const earliest = new Map<string, { orderId: string; kind: PaymentWeekWorkKind; dueOn: string }>();
+  for (const item of input.items) {
+    const kind = PAYMENT_WEEK_RULE_KIND[item.ruleKey];
+    const dueOn = item.timing.dueOn;
+    const orderId = orderOfInvoice.get(item.object.id);
+    if (!kind || !dueOn || !orderId) continue;
+    const key = `${orderId}|${kind}`;
+    const seen = earliest.get(key);
+    if (!seen || dueOn < seen.dueOn) earliest.set(key, { orderId, kind, dueOn });
   }
-  if (out.length === 0) out.push("Nothing needs collection today");
-  return out;
+  const entries = [...earliest.values()];
+  const days: PaymentWeekDay[] = [0, 1, 2, 3, 4].map((offset) => {
+    const iso = addDaysIso(weekStartIso, offset);
+    const isPlanDay = iso === planDayIso;
+    const counted = entries.filter((e) => (isPlanDay ? e.dueOn <= iso : e.dueOn === iso && iso >= planDayIso));
+    const carriedEntries = isPlanDay ? counted.filter((e) => e.dueOn < iso) : [];
+    const earlier = iso < planDayIso ? entries.filter((e) => e.dueOn === iso) : [];
+    const lines = WEEK_KIND_ORDER.map((kind) => ({
+      kind,
+      count: new Set(counted.filter((e) => e.kind === kind).map((e) => e.orderId)).size,
+    })).filter((l) => l.count > 0);
+    const carriedOrders = new Set(carriedEntries.map((e) => e.orderId));
+    return {
+      iso,
+      isToday: iso === today && isPlanDay,
+      isPlanDay,
+      holiday: input.holidays.has(iso) ? (input.holidayName?.(iso) ?? "") : null,
+      lines,
+      carried: carriedOrders.size > 0
+        ? { count: carriedOrders.size, sinceIso: carriedEntries.map((e) => e.dueOn).sort()[0]! }
+        : null,
+      countedOnPlanDay: new Set(earlier.map((e) => e.orderId)).size,
+      orderIds: [...new Set([...counted, ...earlier].map((e) => e.orderId))],
+    };
+  });
+  return { planDayIso, weekStartIso, days };
+}
+
+/** The ruled line words — the count is ORDERS, the verb is the Work action. */
+export function paymentWeekLineWord(line: PaymentWeekLine): string {
+  const n = line.count;
+  switch (line.kind) {
+    case "ask": return `Ask ${n} ${n === 1 ? "customer" : "customers"} to pay`;
+    case "check_promise": return `Check ${n} promised ${n === 1 ? "payment" : "payments"}`;
+    case "storage": return `Collect ${n} storage ${n === 1 ? "payment" : "payments"}`;
+  }
 }

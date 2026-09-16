@@ -3,22 +3,23 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { invoiceGoodsFacts } from "@carres/shared/payment-invoice-register";
 import {
-  DEFAULT_MONITOR_FILTER,
   MONITOR_ACTION_WORD,
-  MONITOR_FILTERS,
-  monitorFilterMatch,
+  PAYMENT_WEEK_RULE_KIND,
+  mondayOf,
   monitorGoodsWord,
   monitorStorageWord,
-  monitorSummaries,
   paymentMonitorRows,
-  type MonitorFilterKey,
+  paymentPlanDay,
+  paymentWeekLineWord,
+  paymentWeekPlan,
   type PaymentMonitorRow,
+  type PaymentWeekDay,
 } from "@carres/shared/payment-monitor";
 import type { CollectionTimingRule } from "@carres/shared/collection-clock";
 import type { OperationWorkItem } from "@carres/shared/operation-work";
-import { myHolidaySet } from "@carres/shared/my-holidays";
+import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
-import { PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
@@ -33,10 +34,10 @@ import { useAuth } from "@/lib/auth";
 import { rm } from "@/lib/format-currency";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "@/pages/operation/components/workspace-rail";
+import { FilterRail, FilterRailRow } from "@/pages/operation/components/workspace-rail";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
-import { appTodayIso } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 /**
  * PAYMENT MONITOR — the full-width collection control listing (owner ruling
@@ -52,9 +53,11 @@ import { appTodayIso } from "@/lib/fmt-date";
  *   SO No · Customer · Amount needed · Goods · Storage · Customer delivery ·
  *   Payment timing
  *
- * The rail holds the seven factual filters (never tabs) and the clear
- * summary sentences. Completed money leaves this view; it lives in Payment
- * Records.
+ * The rail is the Monday–Friday FOLLOW-UP PLAN (owner ruling 2026-09-16):
+ * each day names the collection work the shared Work Engine placed on it,
+ * picking a day narrows this listing to that day's orders, and `All unpaid
+ * orders` keeps every unpaid order reachable. Completed money leaves this
+ * view; it lives in Payment Records.
  */
 
 const COLUMN = {
@@ -89,8 +92,14 @@ function useIsPhone(): boolean {
   return phone;
 }
 
-function filterKeyOf(raw: string | null): MonitorFilterKey {
-  return (MONITOR_FILTERS.find((f) => f.key === raw)?.key) ?? DEFAULT_MONITOR_FILTER;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** `?day=all` — every unpaid order, the entry for orders no plan reaches yet. */
+const ALL_UNPAID = "all";
+
+function addDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d! + n));
+  return dt.toISOString().slice(0, 10);
 }
 
 /** The Work feed's resolved owner for this SO's Payment work — the ONE owner
@@ -100,8 +109,7 @@ function workOwnerFor(row: PaymentMonitorRow, items: readonly OperationWorkItem[
   if (!items) return null;
   const ids = new Set(row.rows.map((r) => r.id));
   const item = items.find((i) => i.module === "payment" && ids.has(i.object.id)
-    && (i.ruleKey === "payment.collect_customer_balance" || i.ruleKey === "payment.missed_promise"
-      || i.ruleKey === "payment.send_storage_invoice"));
+    && i.ruleKey in PAYMENT_WEEK_RULE_KIND);
   if (!item) return null;
   return item.owner;
 }
@@ -162,10 +170,12 @@ export default function PaymentMonitor() {
   const catalogQ = useCatalog();
   const role = useAuth((s) => s.role);
   // The Work feed is Operation's; a finance reader sees the facts and no owner.
-  const workQ = useOperationWork({ enabled: role === "operation" || role === "principal" });
+  const canReadWork = role === "operation" || role === "principal";
+  const workQ = useOperationWork({ enabled: canReadWork });
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
-  const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  const holidays = useMemo(() => myHolidaySet(), []);
+  const opts = useMemo(() => ({ holidays }), [holidays]);
   const isPhone = useIsPhone();
 
   /* ── The rail-collapse memory ─────────────────────────────────────────── */
@@ -184,12 +194,30 @@ export default function PaymentMonitor() {
   const railVisible = isPhone ? phoneRailOverride : filterRailOpen;
 
   /* ── The URL is the state ─────────────────────────────────────────────── */
-  const filter = filterKeyOf(params.get("view"));
-  const setFilter = (key: MonitorFilterKey) => setParams((before) => {
-    const next = new URLSearchParams(before);
-    if (key === DEFAULT_MONITOR_FILTER) next.delete("view"); else next.set("view", key);
-    return next;
-  });
+  /* ⭐ THE PICKED DAY (owner ruling 2026-09-16). Absent = the plan day —
+     today when Operation works today, else the next working day. A reader
+     without the Work feed has no plan, so its landing is every unpaid order. */
+  const planDay = paymentPlanDay(today, holidays);
+  const rawDay = params.get("day");
+  // A door that names one order (`?order=`) opens on every day — the order
+  // is the question, not the plan.
+  const picked: string = !canReadWork || rawDay === ALL_UNPAID || (rawDay === null && params.get("order") !== null)
+    ? ALL_UNPAID
+    : rawDay && ISO_DAY.test(rawDay) ? rawDay : planDay;
+  const weekOf = picked === ALL_UNPAID ? planDay : picked;
+  const pickDay = (iso: string) => {
+    setParams((before) => {
+      const next = new URLSearchParams(before);
+      if (iso === planDay) next.delete("day"); else next.set("day", iso);
+      return next;
+    });
+    setPhoneRailOverride(false);
+  };
+  /* Previous / next week: the plan day when the week holds it, else Monday. */
+  const moveWeek = (weeks: number) => {
+    const monday = addDays(mondayOf(weekOf), weeks * 7);
+    pickDay(mondayOf(planDay) === monday ? planDay : monday);
+  };
   const orderScope = orderScopeOf(params.get("order"));
   const leaveScope = () => setParams((before) => {
     const next = new URLSearchParams(before); next.delete("order"); return next;
@@ -245,15 +273,18 @@ export default function PaymentMonitor() {
   // The owner rides ON the row: the shared DataGrid renders a cell from its
   // row data, and a column accessor that read outer state would show the
   // owner the grid was mounted with, not the one the feed answered.
-  const listRows = useMemo<MonitorRow[]>(
-    () => scopedRows.filter((r) => monitorFilterMatch(r, filter))
-      .map((r) => ({ ...r, owner: workOwnerFor(r, workItems) })),
-    [scopedRows, filter, workItems],
-  );
-  const counts = useMemo(() => Object.fromEntries(
-    MONITOR_FILTERS.map((f) => [f.key, scopedRows.filter((r) => monitorFilterMatch(r, f.key)).length]),
-  ) as Record<MonitorFilterKey, number>, [scopedRows]);
-  const summaries = useMemo(() => monitorSummaries(scopedRows), [scopedRows]);
+  // The week is a VIEW of the shared Work Engine: its items, its days, its
+  // owners — nothing scheduled here.
+  const plan = useMemo(() => paymentWeekPlan({
+    items: (workItems ?? []).filter((i) => i.module === "payment"),
+    rows: scopedRows, todayIso: today, weekOfIso: weekOf, holidays, holidayName: myHolidayName,
+  }), [workItems, scopedRows, today, weekOf, holidays]);
+  const pickedDay = picked === ALL_UNPAID ? null : (plan.days.find((d) => d.iso === picked) ?? null);
+  const listRows = useMemo<MonitorRow[]>(() => {
+    const onDay = picked === ALL_UNPAID ? null : new Set(pickedDay?.orderIds ?? []);
+    return scopedRows.filter((r) => !onDay || onDay.has(r.orderId))
+      .map((r) => ({ ...r, owner: workOwnerFor(r, workItems) }));
+  }, [scopedRows, picked, pickedDay, workItems]);
 
   // Items read as human words (register ruling ③): the catalog model name
   // when the SKU is known to it, else the SKU itself — never a blank.
@@ -329,16 +360,31 @@ export default function PaymentMonitor() {
   const invoice = invoices.find((r) => r.id === selected);
   const isError = invoicesQ.isError || casesQ.isError || requestsQ.isError || settingsQ.isError;
   const loaded = invoicesQ.isSuccess && casesQ.isSuccess && requestsQ.isSuccess && settingsQ.isSuccess;
+  const planLoaded = loaded && canReadWork && workQ.isSuccess;
+  const planFailed = canReadWork && workQ.isError;
+  /** The day's words — the rail card and the collapsed sheet header say the same. */
+  const dayWords = (d: PaymentWeekDay): string[] => {
+    const words = d.lines.map(paymentWeekLineWord);
+    // A date inside a wrapped sentence never breaks in two (`Thu, 17 | Sep`).
+    const day = (iso: string) => fmtDate(iso).replace(/ /g, "\u00a0");
+    if (d.carried) words.push(`Includes ${d.carried.count} not done since ${day(d.carried.sinceIso)}`);
+    if (d.countedOnPlanDay > 0) {
+      words.push(`${d.countedOnPlanDay} not done · counted under ${plan.planDayIso === today ? "Today" : day(plan.planDayIso)}`);
+    }
+    if (words.length === 0) words.push("No follow-up planned");
+    return words;
+  };
 
-  /* ⭐ THE SUMMARY SURVIVES THE COLLAPSE (2026-09-14).
-     Payment MASTER §3 places the clear summaries above the rail's filters, and
-     that placement stays. What the MASTER does not contemplate is the rail
-     being collapsible: below 1100px it collapses on its own, the collapse is
-     REMEMBERED, and the governed summary simply disappeared — measured on
-     production at 1024px, where the whole node was absent from the page. So the
-     summary is not moved out of its governed home; it is repeated in the sheet
-     header for exactly the state where its home is not on screen. */
-  const summaryLines = loaded ? summaries : ["Reading the collection desk…"];
+  /* The picked day survives the rail being collapsed (2026-09-14 measured
+     that a collapsed rail took its governed words with it): the sheet header
+     repeats the day and its work for exactly the state where the rail is off
+     screen. */
+  const pickedWords = picked === ALL_UNPAID
+    ? ["All unpaid orders"]
+    : !planLoaded ? [planFailed ? "The follow-up plan could not be loaded." : "Reading the collection desk…"]
+      : pickedDay ? dayWords(pickedDay) : ["No follow-up planned"];
+  const pickedHeading = picked === ALL_UNPAID ? null
+    : `${fmtDate(picked)}${pickedDay?.isToday ? " · Today" : ""}`;
 
   const showFiltersButton = (
     <button type="button" aria-label="Show filters" title="Show filters"
@@ -349,21 +395,52 @@ export default function PaymentMonitor() {
     </button>
   );
 
+  const weekStart = plan.weekStartIso;
+  const weekLabel = `${fmtDate(weekStart)} – ${fmtDate(addDays(weekStart, 4))}`;
+  const onPlanWeek = mondayOf(planDay) === weekStart;
+  const weekArrow = "grid h-8 w-7 shrink-0 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3";
+
   const rail = (
-    <FilterRail testId="payment-monitor-rail" ariaLabel="Payment Monitor filters"
+    <FilterRail testId="payment-monitor-rail" ariaLabel="Payment follow-up plan"
       onHide={() => { setFilterRailVisible(false); setPhoneRailOverride(false); }}
-      /* The clear summaries — fixed above the filters, always in view. Zero
-         prints nothing; an empty desk says so in one sentence. */
-      header={<div data-testid="payment-monitor-summaries" className="space-y-1 pr-8">
-        <p className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Today</p>
-        {summaryLines.map((line) => <p key={line} className="text-body text-kit-slate-12">{line}</p>)}
-      </div>}>
-      <FilterRailGroup title="Show">
-        {MONITOR_FILTERS.map((f) => <FilterRailRow key={f.key} label={f.label}
-          count={loaded ? counts[f.key] : undefined}
-          active={filter === f.key} onClick={() => setFilter(f.key)}
-          testId={`payment-monitor-filter-${f.key}`} />)}
-      </FilterRailGroup>
+      header={canReadWork
+        /* The week, fixed above the days: ‹ Mon, 14 Sep – Fri, 18 Sep ›. */
+        ? <div data-testid="payment-monitor-week" className="space-y-1.5 pr-8">
+          <div className="flex items-center gap-1">
+            <button type="button" aria-label="Previous week" title="Previous week" className={weekArrow}
+              data-testid="payment-monitor-previous-week" onClick={() => moveWeek(-1)}>
+              <ChevronLeft size={15} aria-hidden />
+            </button>
+            <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12"
+              data-testid="payment-monitor-week-label" aria-label={weekLabel}>
+              {/* Each date stays whole: the break falls between the two days,
+                  never inside `Fri, 18 Sep`. */}
+              <span className="whitespace-nowrap">{fmtDate(weekStart)} –</span>{" "}
+              <span className="whitespace-nowrap">{fmtDate(addDays(weekStart, 4))}</span>
+            </span>
+            <button type="button" aria-label="Next week" title="Next week" className={weekArrow}
+              data-testid="payment-monitor-next-week" onClick={() => moveWeek(1)}>
+              <ChevronRight size={15} aria-hidden />
+            </button>
+          </div>
+          {!onPlanWeek && <button type="button" className="text-label text-kit-slate-11 underline underline-offset-2"
+            data-testid="payment-monitor-this-week" onClick={() => pickDay(planDay)}>This week</button>}
+        </div>
+        : <p className="pr-8 text-body text-kit-slate-11">The follow-up plan is Operation's.</p>}>
+      {canReadWork && <div className="flex flex-col gap-1" data-testid="payment-monitor-days">
+        {planFailed
+          ? <div role="alert" className="px-1.5 text-body">
+            <p>The follow-up plan could not be loaded.</p>
+            <button type="button" className="btn-secondary mt-2" onClick={() => void workQ.refetch()}>Try again</button>
+          </div>
+          : plan.days.map((d) => <DayCard key={d.iso} day={d} active={picked === d.iso}
+              words={planLoaded ? dayWords(d) : null} onPick={() => pickDay(d.iso)} />)}
+      </div>}
+      <div className={canReadWork ? "border-t border-kit-slate-5 pt-3" : ""}>
+        <FilterRailRow label="All unpaid orders" count={loaded ? scopedRows.length : undefined}
+          active={picked === ALL_UNPAID} testId="payment-monitor-all-unpaid"
+          onClick={() => { if (canReadWork) pickDay(ALL_UNPAID); }} />
+      </div>
     </FilterRail>
   );
 
@@ -408,10 +485,10 @@ export default function PaymentMonitor() {
                 </aside>
               : null}
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
-            {!railVisible && <div data-testid="payment-monitor-summaries-collapsed"
+            {!railVisible && <div data-testid="payment-monitor-day-collapsed"
               className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-kit-slate-5 bg-white px-3 py-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Today</span>
-              {summaryLines.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
+              {pickedHeading && <span className="text-body font-semibold text-kit-slate-12">{pickedHeading}</span>}
+              {pickedWords.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
             </div>}
             <ListPageShell register>
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
@@ -425,7 +502,7 @@ export default function PaymentMonitor() {
                    pay` with no customer attached to it. Identity is the SO
                    number AND whose row it is. */
                 groupBanner={false} stickyIdentity={{ columnKey: ["so", "customer"] }}
-                isLoading={!loaded} searchPlaceholder="Search by SO, customer or phone…"
+                isLoading={!loaded || (picked !== ALL_UNPAID && !planLoaded && !planFailed)} searchPlaceholder="Search by SO, customer or phone…"
                 toolbarStart={<span className="flex items-center gap-3 text-body">
                   {isPhone && !railVisible && showFiltersButton}
                   {orderScope !== null && <span className="flex items-center gap-2" data-testid="payment-monitor-order-scope">
@@ -435,9 +512,10 @@ export default function PaymentMonitor() {
                 </span>}
                 emptyMessage={orderScope !== null
                   ? `SO-${orderScope} needs no payment right now. Its money is in Payment Records.`
-                  : filter === DEFAULT_MONITOR_FILTER
+                  : picked === ALL_UNPAID
                     ? "No customer money is needed right now."
-                    : `Nothing under ${MONITOR_FILTERS.find((f) => f.key === filter)?.label ?? "this filter"} right now.`}
+                    : planFailed ? "The follow-up plan could not be loaded."
+                      : `No follow-up planned on ${fmtDate(picked)}.`}
                 expandTitle="Show items" onRowDoubleClick={(r) => open(r.door)}
                 expandable={{ renderExpansion: (r) => <ItemsDisclosure row={r} itemName={itemName} /> }}
                 statusSummary={(visible) => {
@@ -452,6 +530,40 @@ export default function PaymentMonitor() {
         </div>}
       </>}
   </div>;
+}
+
+/**
+ * One day of the follow-up plan. Today wears the blue RING and the word
+ * `Today`; the picked day wears the blue FILL — the two never compete (UI
+ * MASTER). Every line wraps; nothing is truncated.
+ */
+function DayCard({ day, active, words, onPick }: {
+  day: PaymentWeekDay;
+  active: boolean;
+  /** Null while the Work feed has not answered — no reassuring empty day. */
+  words: string[] | null;
+  onPick: () => void;
+}) {
+  const late = (w: string) => w.startsWith("Includes ");
+  return <button type="button" onClick={onPick} aria-pressed={active}
+    data-testid={`payment-monitor-day-${day.iso}`} data-today={day.isToday ? "yes" : undefined}
+    className={[
+      "relative flex w-full flex-col items-stretch gap-0.5 rounded-control px-2 py-2 text-left text-body",
+      active ? "bg-kit-blue-3 text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3",
+      day.isToday ? "ring-1 ring-inset ring-kit-blue-9" : "",
+    ].join(" ")}>
+    {active && <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" />}
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span className="font-semibold text-kit-slate-12">{fmtDate(day.iso)}</span>
+      {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11"
+        data-testid="payment-monitor-today">Today</span>}
+    </span>
+    {day.holiday !== null && <span className="break-words text-label text-kit-slate-11">
+      {day.holiday ? `Public holiday · ${day.holiday}` : "Public holiday"}</span>}
+    {words === null
+      ? <span className="text-label text-kit-slate-9">Reading the collection desk…</span>
+      : words.map((w) => <span key={w} className={`break-words ${late(w) ? "text-label text-kit-red-11" : w === "No follow-up planned" || w.includes(" not done · ") ? "text-label text-kit-slate-9" : "text-body text-kit-slate-12"}`}>{w}</span>)}
+  </button>;
 }
 
 /** `Show items` — the read-only exact item disclosure: Item · Qty · Goods,
