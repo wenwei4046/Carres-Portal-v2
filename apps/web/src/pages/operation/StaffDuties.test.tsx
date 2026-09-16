@@ -862,3 +862,186 @@ describe("adding cover", () => {
     ).toBeVisible();
   });
 });
+
+// ── Task 5 · states, history and keyboard ────────────────────────────────────
+
+describe("opening, failing and empty", () => {
+  it("keeps the page's geometry while it opens, and says so", () => {
+    state.loading = true;
+    draw();
+    // A spinner that collapses the layout makes the page jump when it lands.
+    expect(screen.getByTestId("staff-duties-split")).toBeVisible();
+    expect(screen.getByTestId("duty-catalogue-skeleton")).toBeVisible();
+    expect(screen.getByTestId("duty-detail-skeleton")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Opening Staff & Duties…",
+    );
+  });
+
+  it("never claims a duty is unheld while the read is still open", () => {
+    state.loading = true;
+    draw();
+    expect(screen.queryByText("Not assigned")).toBeNull();
+    expect(screen.queryByText(/Nobody holds/)).toBeNull();
+  });
+
+  it("says what broke and offers the act that fixes it", () => {
+    state.error = true;
+    draw();
+    expect(screen.getByText("Staff & Duties could not be opened")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("never infers that nobody holds a duty from a failed read", () => {
+    state.error = true;
+    draw();
+    expect(screen.queryByText("Not assigned")).toBeNull();
+    expect(screen.queryByText(/Nobody holds/)).toBeNull();
+  });
+
+  it("treats an empty catalogue as a configuration failure, not an empty list", () => {
+    state.duties = { can_assign: true, duties: [] };
+    draw();
+    // The catalogue is CODE-owned: zero duties means the response is wrong,
+    // never that Carres has no duties. `No duties yet` would be a lie.
+    expect(screen.getByText("Staff & Duties could not be opened")).toBeVisible();
+    expect(screen.queryByText("No duties yet")).toBeNull();
+    expect(screen.queryByText("No duties match this search")).toBeNull();
+  });
+});
+
+describe("the history", () => {
+  it("is empty in its own words inside a healthy duty", () => {
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
+    const history = screen.getByTestId("duty-history-delivery_duty");
+    expect(within(history).getByText("No assignments yet")).toBeVisible();
+    expect(within(history).getByText("No covers yet")).toBeVisible();
+  });
+
+  it("reads event first, then who and when, then the note", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const row = screen.getByTestId("assignment-as-grn_duty");
+    expect(within(row).getByTestId("record-event")).toHaveTextContent(
+      "Yu Jun holds GRN Duty",
+    );
+    expect(within(row).getByTestId("record-actor")).toHaveTextContent(
+      `from ${fmtDate(HELD_FROM)}`,
+    );
+    expect(within(row).getByTestId("record-actor")).toHaveTextContent(
+      "Assigned by Jess",
+    );
+  });
+
+  it("reads a cover the same way", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const row = screen.getByTestId("cover-cv-grn");
+    expect(within(row).getByTestId("record-event")).toHaveTextContent(
+      "Shasha covering for Yu Jun",
+    );
+    expect(within(row).getByTestId("record-actor")).toHaveTextContent(
+      `${fmtDate(COVER_FROM)} – ${fmtDate(COVER_UNTIL)}`,
+    );
+    expect(within(row).getByTestId("record-note")).toHaveTextContent(
+      "Annual leave",
+    );
+  });
+
+  it("is append-only: no edit and no delete exists anywhere in it", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const history = screen.getByTestId("duty-history-grn_duty");
+    expect(within(history).queryAllByRole("button")).toHaveLength(0);
+    for (const banned of [/^edit$/i, /^delete$/i, /^remove$/i, /^undo$/i]) {
+      expect(within(history).queryByText(banned)).toBeNull();
+    }
+  });
+
+  it("never prints a raw ISO date, a dash placeholder or a dotted sentence", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const text = screen.getByTestId("duty-history-grn_duty").textContent ?? "";
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(text).not.toContain("—");
+    expect(text).not.toContain(" · ");
+  });
+});
+
+describe("a scheduled cover", () => {
+  function withScheduledCover(): WorkspaceDutiesResponse {
+    const all = wholeCatalogue();
+    const po = all.duties.find((d) => d.key === "po_duty")!;
+    po.covers = [
+      {
+        id: "cv-future",
+        duty_key: "po_duty",
+        normal_user_id: "u-yu-jun",
+        normal_user_name: "Yu Jun",
+        acting_user_id: "u-shasha",
+        acting_user_name: "Shasha",
+        starts_on: plusDays(TODAY, 4),
+        ends_on: plusDays(TODAY, 6),
+        reason: "Training",
+        assigned_by_name: "Jess",
+        created_at: `${TODAY}T02:00:00Z`,
+      },
+    ];
+    return all;
+  }
+
+  it("leaves today's actor alone and shows the future start", () => {
+    state.duties = withScheduledCover();
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const detail = screen.getByTestId("selected-duty-po_duty");
+    // The normal owner still acts today; only the DATE is news.
+    expect(within(detail).getByText("Normal owner")).toBeVisible();
+    expect(within(detail).queryByText("Acting today")).toBeNull();
+    expect(
+      within(detail).getByText(`Starts ${fmtDate(plusDays(TODAY, 4))}`),
+    ).toBeVisible();
+  });
+
+  it("is reachable through the Cover scheduled State word", () => {
+    state.duties = withScheduledCover();
+    draw();
+    fireEvent.click(screen.getByTestId("duty-state-cover_scheduled"));
+    const rows = screen.getAllByTestId(/^duty-catalogue-/);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-po_duty");
+  });
+});
+
+describe("keyboard and narrow reading", () => {
+  it("orders the keyboard: search, then State, then the duty list", () => {
+    draw();
+    const order = Array.from(
+      document.querySelectorAll<HTMLElement>("input, button, [role='tab']"),
+    );
+    const search = order.findIndex((el) => el.id === "duty-search");
+    const firstState = order.findIndex(
+      (el) => el.dataset.testid === "duty-state-all",
+    );
+    const firstDuty = order.findIndex((el) =>
+      el.dataset.testid?.startsWith("duty-catalogue-"),
+    );
+    expect(search).toBeGreaterThanOrEqual(0);
+    expect(firstState).toBeGreaterThan(search);
+    expect(firstDuty).toBeGreaterThan(firstState);
+  });
+
+  it("wraps names and dates instead of truncating them", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    // At 390px a truncated person or date is an unanswerable screen.
+    for (const id of ["selected-duty-grn_duty", "duty-history-grn_duty"]) {
+      const block = screen.getByTestId(id);
+      expect(block.querySelectorAll(".truncate")).toHaveLength(0);
+      expect(
+        block.querySelectorAll("p.whitespace-nowrap, span.whitespace-nowrap"),
+      ).toHaveLength(0);
+    }
+  });
+
+  it("keeps the forms single-column", () => {
+    openAssign();
+    const dialog = screen.getByRole("dialog", { name: "Assign holder" });
+    expect(dialog.querySelectorAll("[class*='grid-cols-2']")).toHaveLength(0);
+  });
+});

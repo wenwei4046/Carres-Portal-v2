@@ -4,6 +4,7 @@ import ModuleHeader from "./components/ModuleHeader";
 import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
+import Loading from "@/components/kit/Loading";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useWorkspaceDuties } from "@/lib/queries";
 
@@ -66,6 +67,11 @@ export default function StaffDuties() {
 
   const selected = duties.find((d) => d.key === selectedKey) ?? null;
   const canAssign = dutiesQ.data?.can_assign === true;
+  /* The catalogue is CODE-owned (packages/shared/src/workspace-duties-catalogue.ts).
+     A healthy response with zero duties is therefore a CONFIGURATION failure,
+     not an empty list — `No duties yet` would tell the reader that Carres has
+     no duties, which is never true (§4.5). */
+  const broken = dutiesQ.isError || (!dutiesQ.isLoading && duties.length === 0);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -77,10 +83,32 @@ export default function StaffDuties() {
       />
       <div className="min-h-0 flex-1 bg-white" data-testid="staff-duties">
         {dutiesQ.isLoading ? (
-          <p className="px-6 py-8 text-body text-kit-slate-9" role="status">
-            Opening Staff &amp; Duties…
-          </p>
-        ) : dutiesQ.isError ? (
+          /* Skeletons keep the page's geometry, so nothing jumps when the read
+             lands — and nothing here claims a duty is unheld while it is still
+             open. */
+          <div className="flex min-h-0 flex-1 flex-col">
+            <p
+              role="status"
+              className="px-6 pt-3 text-meta text-kit-slate-9"
+            >
+              Opening Staff &amp; Duties…
+            </p>
+            <div
+              data-testid="staff-duties-split"
+              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
+            >
+              <div
+                data-testid="duty-catalogue-skeleton"
+                className="border-kit-slate-5 px-4 py-3 lg:border-r"
+              >
+                <Loading variant="skeleton" lines={8} label="Opening Staff & Duties…" />
+              </div>
+              <div data-testid="duty-detail-skeleton" className="px-6 py-4">
+                <Loading variant="skeleton" lines={5} label="Opening Staff & Duties…" />
+              </div>
+            </div>
+          </div>
+        ) : broken ? (
           /* A failure sentence is never the empty sentence — what broke, then
              the act that fixes it. It never infers that nobody holds a duty. */
           <div className="flex flex-col items-center gap-3 py-8">

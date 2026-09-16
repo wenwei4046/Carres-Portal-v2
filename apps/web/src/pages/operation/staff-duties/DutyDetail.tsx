@@ -250,9 +250,47 @@ export default function DutyDetail({
 
 /**
  * One immutable history — assignments then covers, newest first (the API
- * already orders both). No edit and no delete exist anywhere: an assignment
- * that was true on a day stays true for that day forever (§3, §4.3).
+ * already orders both).
+ *
+ * It uses the governed three-rank record grammar: the EVENT first, then who
+ * did it and when, then the note or reason. Not a dot-separated database
+ * sentence, not a raw ISO date, not a dash standing in for a fact nobody
+ * recorded — and no edit or delete anywhere, because an assignment that was
+ * true on a day stays true for that day forever (§3, §4.3).
  */
+function Record({
+  testId,
+  event,
+  actor,
+  note,
+}: {
+  testId: string;
+  event: string;
+  actor: string[];
+  note: string | null;
+}) {
+  return (
+    <li data-testid={testId} className="py-1">
+      <p data-testid="record-event" className="text-body text-kit-slate-12">
+        {event}
+      </p>
+      <p
+        data-testid="record-actor"
+        className="flex flex-wrap gap-x-3 text-meta text-kit-slate-11"
+      >
+        {actor.map((part) => (
+          <span key={part}>{part}</span>
+        ))}
+      </p>
+      {note ? (
+        <p data-testid="record-note" className="text-meta text-kit-slate-9">
+          {note}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 export function DutyHistory({ duty }: { duty: Duty }) {
   return (
     <section
@@ -267,28 +305,20 @@ export function DutyHistory({ duty }: { duty: Duty }) {
       ) : (
         <ul className="mt-1">
           {duty.assignments.map((a) => (
-            <li
+            <Record
               key={a.id}
-              data-testid={`assignment-${a.id}`}
-              className="flex flex-wrap items-baseline gap-x-2 py-0.5 text-body leading-6"
-            >
-              <span className="text-kit-slate-12">
-                {a.holder_name ?? a.holder_id}
-              </span>
-              <span className="text-meta text-kit-slate-11">
-                {a.effective_until
+              testId={`assignment-${a.id}`}
+              event={`${a.holder_name ?? a.holder_id} holds ${duty.label}`}
+              actor={[
+                a.effective_until
                   ? `${fmtDate(a.effective_from)} – ${fmtDate(a.effective_until)}`
-                  : `from ${fmtDate(a.effective_from)}`}
-              </span>
-              {a.assigned_by_name ? (
-                <span className="text-meta text-kit-slate-9">
-                  assigned by {a.assigned_by_name}
-                </span>
-              ) : null}
-              {a.note ? (
-                <span className="text-meta text-kit-slate-9">{a.note}</span>
-              ) : null}
-            </li>
+                  : `from ${fmtDate(a.effective_from)}`,
+                ...(a.assigned_by_name
+                  ? [`Assigned by ${a.assigned_by_name}`]
+                  : []),
+              ]}
+              note={a.note}
+            />
           ))}
         </ul>
       )}
@@ -297,22 +327,16 @@ export function DutyHistory({ duty }: { duty: Duty }) {
       ) : (
         <ul className="mt-2">
           {duty.covers.map((v) => (
-            <li
+            <Record
               key={v.id}
-              data-testid={`cover-${v.id}`}
-              className="flex flex-wrap items-baseline gap-x-2 py-0.5 text-body leading-6"
-            >
-              <span className="text-kit-slate-12">
-                {v.acting_user_name ?? v.acting_user_id} covering for{" "}
-                {v.normal_user_name ?? v.normal_user_id}
-              </span>
-              <span className="text-meta text-kit-slate-11">
-                {fmtDate(v.starts_on)} – {fmtDate(v.ends_on)}
-              </span>
-              {v.reason ? (
-                <span className="text-meta text-kit-slate-9">{v.reason}</span>
-              ) : null}
-            </li>
+              testId={`cover-${v.id}`}
+              event={`${v.acting_user_name ?? v.acting_user_id} covering for ${v.normal_user_name ?? v.normal_user_id}`}
+              actor={[
+                `${fmtDate(v.starts_on)} – ${fmtDate(v.ends_on)}`,
+                ...(v.assigned_by_name ? [`Added by ${v.assigned_by_name}`] : []),
+              ]}
+              note={v.reason}
+            />
           ))}
         </ul>
       )}
