@@ -66,6 +66,12 @@ governed communication/evidence object; it does not create another chat, partici
 store. Service Case owns assessment, responsibility, remedy, outcome and closure. Shared Duty
 Resolver owns current holder and cover resolution; Issue Tracker never hard-codes staff names.
 
+**Current delivery truth:** the existing Service wizard/evidence route is staff-only intake.
+Customer Case links, governed tokens, customer self-upload, additional-evidence requests and
+automatic write-back are not built until their Service/Workspace authority is delivered. A static
+Google Form may remain operating evidence, but it is never a second Case or Issue register and
+must not write Issue truth directly.
+
 # §2 · The non-negotiable operating model
 
 ### Record every issue

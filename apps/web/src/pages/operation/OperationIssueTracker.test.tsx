@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OperationIssueTracker from "./OperationIssueTracker";
 
@@ -9,7 +9,8 @@ vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...args
 
 function mount() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter><OperationIssueTracker /></MemoryRouter></QueryClientProvider>);
+  function LocationProbe() { const location = useLocation(); return <span data-testid="location">{location.pathname}{location.search}</span>; }
+  return render(<QueryClientProvider client={qc}><MemoryRouter><OperationIssueTracker /><LocationProbe /></MemoryRouter></QueryClientProvider>);
 }
 
 beforeEach(() => { apiFetch.mockReset(); apiFetch.mockResolvedValue({ items: [{ id: "i1", issue_no: "IS-2608-0001", observed_on: "2026-08-14", official_english: "Unit CU-000128 was damaged.", status: "open", issue_links: [{ object_label: "PO-2041" }], issue_fault_owners: [{ owner_name: "Hookka" }], issue_money_links: [] }], total: 1 }); });
@@ -36,5 +37,13 @@ describe("Issue Tracker workspace", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(consoleError.mock.calls.flat().join(" ")).not.toContain("cannot be given refs");
     consoleError.mockRestore();
+  });
+
+  it("opens the real staff Service Cases destination without claiming an unbuilt customer intake", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Record issue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Customer or product problem" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/service-cases");
+    expect(screen.getByTestId("location")).not.toHaveTextContent("new=1");
   });
 });
