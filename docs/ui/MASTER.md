@@ -402,9 +402,38 @@ the whole reason the two components share a frame.
 - **A list table never scrolls sideways by growing.** A column RESIZE takes width from its RIGHT
   NEIGHBOUR, never from the table — AutoCount lets a column grow and hands the operator a
   horizontal scrollbar.
-- **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
-  `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
-  browser layout persistence. This is a page-scoped exception, not a new kit default.
+- **PERSONAL COLUMN LAYOUT IS REMEMBERED — Listing Standard, owner approved 2026-09-16.** Resize,
+  reorder and hide are personal: remembered in that staff member's browser for now and affecting
+  nobody else, with a visible `Reset columns` back to the governed default. `register/DataGrid`
+  remembers per page key (Sales Orders `carres.salesOrders.register.v4.{role}`) and labels the act
+  `Reset columns` (PR #1396). Kit `DataTable` does not remember yet: **APPROVED TARGET / NOT
+  BUILT** there.
+- **LISTING STANDARD ENGINE POWERS — owner approved 2026-09-16, BUILT in `register/DataGrid`
+  (PR #1396).** Default-on for every register unless marked opt-in:
+  ```
+  KEYBOARD    a grid is ONE Tab stop (roving row); ↑/↓ row to row; Enter = what a double-click
+              opens; Space ticks; → / ← open and close the expansion; Shift+F10 or the Menu key
+              opens the row menu from the row or any control in it; the menu (role menu,
+              `Row actions`) takes focus, ↑/↓/Home/End move, Escape or Tab gives focus back.
+              A governed group heading is a Tab stop. Controls inside a row keep their own keys.
+  NARROW      the toolbar and condition strip never shrink (flex: none), so a wrapped toolbar
+              never slides under the header; below a 768px GRID canvas (not the device) the row
+              checkbox has a 40×40 target and a 40px column.
+  EDGE        the last column's resize handle stays inside the table — a register that exactly
+              fills its width has no phantom 3px sideways scroll.
+  opt-in errorState       a failed read drawn inside the work surface; the toolbar and its
+                          create action stay; the footer prints no count.
+  opt-in overflowText     per column: the value on one line; ONLY when the cell cuts it, a kit
+                          Popover trigger (`{column}: {value}`) opens it whole by click or keyboard.
+  searchPresentation="responsive"   the query is a `Search: {query}` condition chip; `Clear
+                          filters` clears search + header filters; a no-match state with its own
+                          `Clear filters` suppresses the strip's duplicate button.
+  ```
+  Measured on rendered fixture pages 2026-09-17 (not authenticated production): Sales Orders at
+  1440/1180/820/390 + 200% zoom; smoke on SO Batch, Manual Purchase, Purchase Orders, Delivery
+  Monitor and Payment Records — one Tab stop per grid, no page sideways scroll, no toolbar/header
+  overlap. Known 🟡: a keyboard user crosses every header sort/filter button (20 stops on Sales
+  Orders) before reaching the rows.
 - **⭐ STICKY IDENTITY IS AN ENGINE CAPABILITY — owner ruling 2026-08-15 (Chai).** When optional
   columns widen a register past its frame it scrolls sideways, and the row loses the only thing
   that says WHICH record it is. `register/DataGrid` takes an OPTIONAL `stickyIdentity`: the control
@@ -535,7 +564,8 @@ persists by panel title (`:656-673`).
 staff browser without changing anyone else's governed default. `Columns → Reset columns`
 restores the page's default columns, order and widths only; it does not clear filters or records.
 Cross-device account synchronisation is deferred. This Register rule does not add column
-customisation to object-detail goods tables; those retain their own governed capabilities.
+customisation to object-detail goods tables; those retain their own governed capabilities. Measured gap: kit `DataTable` still persists no
+column shape (`OperationOrdersControl.test.tsx`) — **APPROVED TARGET / NOT BUILT** there.
 
 
 ---

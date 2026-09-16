@@ -204,6 +204,40 @@ Search, filters, sorting, Columns and Export remain. Selection scopes output onl
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
 
+### Listing Standard — owner approved 2026-09-16
+
+The shared ERP Listing Standard applies to this Register without changing what it is (a record
+register: same eight default columns and order, no rail, no work groups, no owners, no action
+sentences, no Priority).
+
+```
+FILTERS    active search + header filters shown as conditions · one `Clear filters` clears both
+           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = unsearched population
+IDENTITY   SO No pinned and a door to the order
+1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
+           no auto-hidden default column, no squeezed text
+COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
+ACTIONS    every act reachable from the order detail (View/Edit = open · Print · Cancel SO);
+           right-click and Menu key / Shift+F10 are shortcuts only · no row buttons
+VISUAL     one shared register grammar · kit primary `New Sales Order` (32px, kit `add`)
+STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` ·
+           `No sales orders match these filters` + `Clear filters`
+NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
+```
+
+**Status — BUILT, [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396) (on the
+shared register of PR #1395).** The page runs `palette="slate"` and the responsive search; the
+page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 96 ·
+Requested Delivery Date 128 · Customer 192 · Delivery Location 172 · Showroom 100 · PO No 152 ·
+DO No 144); Customer and Delivery Location open a cut value whole (engine `overflowText`). The
+error state is the kit error inside the work surface, so the toolbar and `New Sales Order` stay.
+Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No fully visible;
+1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
+200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
+search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
+returns `24 sales orders`. The production SHA is recorded on the PR. **Owed:** the authenticated
+owner walk in production (fixture evidence is not production evidence).
+
 ### The two-line cell law
 
 A second line is allowed only when it makes the first fact understandable. It uses the governed
