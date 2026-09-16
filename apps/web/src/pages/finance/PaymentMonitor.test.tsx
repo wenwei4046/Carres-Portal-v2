@@ -149,6 +149,7 @@ beforeEach(() => {
   state.requests.data = { requests: [] };
   state.settings.data = { collection_timing: [], bank_accounts: [] };
   state.work.data = undefined; state.work.isSuccess = true; state.work.isError = false;
+  state.orders.isError = false; state.orders.isSuccess = true;
   // o1 has nothing in the register; o2 and o3 hold their one piece.
   state.orders.data = { orders: [
     order("o1", 1300), order("o2", 1301, { units: [{ sku: "A", qty: 1 }] }),
@@ -395,6 +396,12 @@ describe("Payment Monitor — the listing", () => {
     state.orders.data = { orders: [order("o1", 1300, { status: "delivered" })] };
     show();
     expect(screen.getByTestId("payment-monitor-stock-1300").textContent).toBe("Delivered");
+  });
+
+  it("a failed stock read says so on the cell — never a blank Items & Stock", () => {
+    state.orders.isError = true; state.orders.isSuccess = false; state.orders.data = undefined;
+    show();
+    expect(screen.getAllByText("Stock facts could not be loaded.").length).toBe(3);
   });
 
   it("a finance reader is told whose stock facts they are, never a guess", () => {

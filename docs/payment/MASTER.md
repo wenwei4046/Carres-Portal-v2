@@ -123,7 +123,7 @@ SO No | Customer | Amount needed | Items & Stock | Storage | Requested Delivery 
   goods opinion of its own. `Ready` is not `Received`, and neither is `deliverable`. The cell opens
   the row at Delivery's read-only `Items, Services & Stock` panel (Item · Qty · Source · Status ·
   Location, the Unit and its PO door as the source evidence), so staff never leave Payment to judge
-  the goods. A reader without Operation's orders read (Finance) sees `Stock facts are Operation's.`
+  the goods. A reader without Operation's orders read (Finance) sees `Stock facts are Operation's.`; a failed read says `Stock facts could not be loaded.`
 - **Storage** — every real state on two lines, the same governed sentence: `No storage charge` ·
   `Free until Mon, 14 Sep` · `Sofa · Day 15` / `RM 200.00 so far` · `Free request waiting for
   approval` / `Estimated charge RM 150.00` · `Free storage approved` / `until Mon, 21 Sep` ·

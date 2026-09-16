@@ -25,6 +25,7 @@ import {
   NOBODY_ASSIGNED_TO_ORDER as NOBODY_ASSIGNED,
 } from "@carres/shared/payment-collection-owner";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
   useCatalog,
@@ -96,6 +97,8 @@ const SHOW_PAYMENT_DETAILS = "Show payment details";
 /** A Finance reader cannot read Operation's stock register (the orders list
  *  is Operation's); the cell says whose fact it is instead of guessing. */
 const STOCK_FACTS_ARE_OPERATIONS = "Stock facts are Operation's.";
+/** Operation's orders read failed: an honest failure, never a blank cell. */
+const STOCK_FACTS_FAILED = "Stock facts could not be loaded.";
 
 
 /** The rail-collapse memory (ui MASTER, LOCAL FILTER RAIL COLLAPSE). Narrow
@@ -366,9 +369,10 @@ export default function PaymentMonitor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedRows, picked, pickedDay, workItems, orderById, addonNameByKey]);
 
+  const stockAbsence = !canReadWork ? STOCK_FACTS_ARE_OPERATIONS : ordersQ.isError ? STOCK_FACTS_FAILED : "";
   const stockText = (r: MonitorRow) => r.stock
     ? joinLines(r.stock.line1, r.stock.line2)
-    : canReadWork ? "" : STOCK_FACTS_ARE_OPERATIONS;
+    : stockAbsence;
   const columns = useMemo<DataGridColumn<MonitorRow>[]>(() => [
     /* SO No — the number opens the formal Sales Order; the customer's own
        reference is the supporting line, never glued to the number. */
@@ -407,7 +411,7 @@ export default function PaymentMonitor() {
             onClick={(event) => { event.stopPropagation(); openRow(r, "items"); }}>
             <TwoLines line1={r.stock.line1} tone={r.stock.ready ? "green" : "orange"} line2={r.stock.line2} />
           </button>
-        : <TwoLines line1={canReadWork ? "" : STOCK_FACTS_ARE_OPERATIONS} />,
+        : <TwoLines line1={stockAbsence} />,
       searchValue: stockText, filterValue: (r) => r.stock?.line1 ?? stockText(r), exportValue: stockText },
     /* Storage — every real state, on two lines. The cell opens the row at its
        Storage section; nothing here edits a charge. */
@@ -468,7 +472,7 @@ export default function PaymentMonitor() {
       exportValue: (r) => joinLines(r.timing.fact, timingActionText(r)),
       sortFn: (a, b) => monitorRiskRank(a) - monitorRiskRank(b) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [today, canReadWork]);
+  ], [today, canReadWork, stockAbsence]);
 
   const selected = params.get("invoice");
   const invoice = invoices.find((r) => r.id === selected);
@@ -610,11 +614,10 @@ export default function PaymentMonitor() {
               {pickedHeading && <span className="text-body font-semibold text-kit-slate-12">{pickedHeading}</span>}
               {pickedWords.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
             </div>}
-            {/* Delivery's own bounded frame: the sheet scrolls INSIDE the page,
-                so an opened row or a long day never pushes the listing off
-                screen (a height-unbounded shell let the grid grow to its
-                content and the frame clipped it). */}
-            <div className="flex min-w-0 min-h-0 flex-1 flex-col p-2" data-testid="payment-monitor-work-list">
+            {/* The governed Register shell; the Finance frame above it is a fixed
+                viewport, so the sheet scrolls INSIDE the page and an opened row
+                never pushes the listing or its footer off screen. */}
+            <ListPageShell register className="min-h-0 flex-1" testId="payment-monitor-work-list">
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
                 storageKey="carres.payment.monitor.v2" appearance="reference" exportName="Payment Monitor"
                 /* No confirmed answer is not an empty list: skeleton until every
@@ -649,7 +652,7 @@ export default function PaymentMonitor() {
                   fitExpansionToViewport: true,
                   revealExpandedKey: revealKey,
                   renderExpansion: (r) => <PaymentWorkspaceBelow row={r} invoices={invoices} timingRules={timingRules}
-                    today={today} holidays={holidays} addonNameByKey={addonNameByKey} canReadStock={canReadWork}
+                    today={today} holidays={holidays} addonNameByKey={addonNameByKey} stockAbsence={stockAbsence}
                     focusSection={reveal?.key === r.orderId ? reveal.section : null} onClose={close} />,
                 }}
                 statusSummary={(visible) => {
@@ -659,7 +662,7 @@ export default function PaymentMonitor() {
                   </span>;
                 }}
               />
-            </div>
+            </ListPageShell>
           </div>
         </div>}
       </>}
@@ -722,14 +725,14 @@ function monitorRiskRank(r: PaymentMonitorRow): number {
  * Communication History, with `Record payment`, `Ask customer to pay`,
  * `Record the result`, `Create payment link`, `Statement` and `Print`.
  */
-function PaymentWorkspaceBelow({ row, invoices, timingRules, today, holidays, addonNameByKey, canReadStock, focusSection, onClose }: {
+function PaymentWorkspaceBelow({ row, invoices, timingRules, today, holidays, addonNameByKey, stockAbsence, focusSection, onClose }: {
   row: MonitorRow;
   invoices: InvoiceRegisterRow[];
   timingRules: CollectionTimingRule[];
   today: string;
   holidays: ReadonlySet<string>;
   addonNameByKey: Map<string, string>;
-  canReadStock: boolean;
+  stockAbsence: string;
   focusSection: "items" | "storage" | null;
   onClose: () => void;
 }) {
@@ -750,6 +753,6 @@ function PaymentWorkspaceBelow({ row, invoices, timingRules, today, holidays, ad
       goodsPanel: goods && order
         ? <ItemsServicesStockPanel orderId={row.orderId} items={goods.items} extras={goods.extras}
             arrival={goods.arrival} requestedIso={row.delivery.requested.iso} loans={order.ops_sofa_loans} />
-        : <p className="text-body text-kit-slate-11">{canReadStock ? "" : STOCK_FACTS_ARE_OPERATIONS}</p>,
+        : <p className="text-body text-kit-slate-11">{stockAbsence}</p>,
     }} />;
 }
