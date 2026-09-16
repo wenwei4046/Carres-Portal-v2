@@ -223,7 +223,9 @@ describe("dutyDisplayState", () => {
         cover({ id: "cv-2", starts_on: "2026-09-20", ends_on: "2026-09-22" }),
       ],
     });
-    expect(dutyDisplayState(many, TODAY).date).toBe("2026-09-20");
+    const state = dutyDisplayState(many, TODAY);
+    expect(state.kind).toBe("cover_scheduled");
+    expect(state).toHaveProperty("date", "2026-09-20");
   });
 
   it("never lets a future cover replace today's holder facts", () => {
