@@ -5,9 +5,8 @@
 > Workspace authority for Staff & Duties,
 > action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
-> Workspace Blueprint. Detailed UI-kit specifications and final visual measurements are intentionally
-> not locked here; they require a separate clean UI review and Owner approval. Existing HTML
-> prototypes are exploration only until that approval.
+> Workspace Blueprint. The Work composition and measurable UI contract are locked in §5.5; existing
+> HTML prototypes and prototype companion specifications remain exploration only.
 
 ## 1 · Mission and boundary
 
@@ -73,7 +72,7 @@ An action enters Work only when its owning module supplies:
 | Owner rule | Stable person rule or Duty key, never a hard-coded person |
 | Due | Exact date/time and calendar, or governed `No date` |
 | Blocker | Named dependency; waiting alone is not blocked |
-| Next | Governed consequence, not a Workspace promise |
+| Next, when one exists | Governed consequence, not a Workspace promise; absence does not block admission |
 
 Workspace reads projections and opens the owning write door. It never copies the business record,
 assigns routine work independently, changes its due date or closes it.
@@ -105,6 +104,11 @@ Modules store only `rule → required Duty`. They never store another staff list
 hard-coded Jess/Manager identity or page-level cover calculation. People/HR supplies active,
 employment and leave facts; Workspace owns Duty assignments; the Shared Duty Resolver combines
 them.
+
+People/HR also owns each employee's normal working-week eligibility. Module calendars own
+business-open days and public-holiday/special-date rules. The Shared Duty Resolver combines the
+person calendar with the module calendar for the resolved actor; Staff & Duties displays that result
+but does not become a second People calendar editor.
 
 Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing
 Approver, Delivery Charge Approver, Stock Adjustment Approver, Service Case Approver and, since
@@ -308,26 +312,24 @@ working week, and large desktop uses three working panels inside the existing gl
 
 ```text
 ┌ WORKING DAY / MODULE ┬ ACTIONS ───────────────┬ SELECTED ACTION ─────────────┐
-│ Missed     3 actions │ DO-8830 · Delivery     │ DO-8830 · Delivery           │
-│ Mon, 14 Sep 4 actions│ Customer delivery      │ NETS                         │
-│ Tue, 15 Sep 5 actions│ booking not confirmed  │                              │
-│ Wed, 16 Sep          │ Call NETS              │ Current fact                 │
-│ Malaysia Day         │                        │ Customer booking not         │
-│                      │                        │ confirmed                    │
-│ Thu, 17 Sep 4 actions│ INV-1402 · Payment     │                              │
-│ Fri, 18 Sep 2 actions│ Collect RM 1,280       │ Action                       │
-│ Sat, 19 Sep 3 actions│ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
-│ No working date      │ Promised today         │ 2:00 to 5:00 PM             │
-│             1 action │                        │                              │
-│                      │ Tan Qu Qu              │ Call NETS                    │
-│ All                8 │ Promised today         │ 2:00 to 5:00 PM             │
-│ Sales Orders       1 │                        │                              │
-│ Purchasing         1 │ PO-2041 · Purchasing   │ Communication                │
-│ Receiving          1 │ Confirm governed date  │ source-owned evidence         │
-│ Delivery           2 │ Authoritative party    │                              │
-│ Payment            2 │ Waiting for reply      │ Finish when                  │
-│ Issue Tracker      1 │                        │ Customer-confirmed date      │
-│                      │                        │ and slot recorded            │
+│ Missed      {count}  │ {object} · {module}    │ {object} · {module}          │
+│ Mon, {date} {count}  │ {fact or problem}      │ {recipient, when applicable} │
+│ Tue, {date} {count}  │ {specific action}      │                              │
+│ Wed, {date} {count}  │ {recipient/context}    │ CURRENT FACT                 │
+│ {holiday name}       │ {timing/state}         │ {fact or problem}            │
+│ Thu, {date} {count}  │                        │                              │
+│ Fri, {date} {count}  │                        │ ACTION                       │
+│ Sat, {date} {count}  │                        │ {specific action}            │
+│ No working date      │                        │                              │
+│             {count}  │                        │ REQUIRED RESULT              │
+│                      │                        │ {required result}            │
+│ All          {count} │                        │                              │
+│ Sales Orders {count} │                        │ FINISH WHEN                  │
+│ Purchasing   {count} │                        │ {completion statement}       │
+│ Receiving    {count} │                        │                              │
+│ Delivery     {count} │                        │ [Open {object}]              │
+│ Payment      {count} │                        │                              │
+│ Issue Tracker{count} │                        │                              │
 └──────────────────────┴────────────────────────┴──────────────────────────────┘
 ```
 
@@ -347,11 +349,22 @@ the source calendar, while an authorised holiday operation remains on the holida
 today. Broken commitment remains the highest attention fact on the affected row; it is not another
 weekday bucket.
 
+Every action belongs to exactly one working-day count. Once its governed action day is before today,
+it moves into `Missed`; the row retains and prints the original required date, but that occurrence is
+not counted again under the past weekday. `All`, module and owner totals count the same occurrence
+once. Day selection never creates a second copy.
+
 Team Work uses the same three panels and week. It is visible to the whole Operation team: Principal,
 Operation and Jess. Visibility does not grant new module data or action permission. Panel 1
 additionally selects normal owner or `Not assigned`; a Site queue must not appear until its governed
 identity, permission and acceptance path are built and admitted. Panel 2 keeps actions grouped or visibly identified by that normal owner and
 Panel 3 preserves cover evidence. Counts always name actions.
+
+My Work is available to every active internal role that may own an admitted action, including Sales
+and Finance, and returns only occurrences routed to that signed-in acting person plus source health
+they are authorised to know. Team Work remains limited to Principal, Operation and Jess and still
+applies underlying module permissions. The Work read boundary therefore cannot remain the current
+Operation/Principal-only guard; widening the endpoint never widens an owning-module object door.
 
 Workspace never owns or stores module truth. In the first release, Panel 3 is an action brief, not
 Object Detail and not a module-writing surface. It shows the fact, specific act, recipient,
@@ -500,25 +513,29 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- Work uses the existing 50px Page Header and one 45px Work Toolbar. It creates no second title,
-  breadcrumb, KPI band or card header. The toolbar contains `My Work · Team Work`, Search, applied
-  filters and the Filters door; freshness is a read fact, not a manual business action.
+- Work uses the existing 50px Page Header. At three-panel width it has one 45px Work Toolbar; at
+  two-panel width its controls may wrap into a second 45px row because working day and module have
+  moved out of Panel 1; below 768px they use the single-panel control stack. It creates no second
+  title, breadcrumb, KPI band or card header. The controls contain `My Work · Team Work`, Search,
+  applied filters, `Clear all` when narrowed and the Filters door; freshness is a read fact, not a
+  manual business action.
 - Breakpoints use the available Work canvas after the global shell, not the browser width. At
-  **1100px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
+  **1104px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
   360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
   to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
   has no card radius, shadow or gutters between panels.
-- From **760px through 1099px**, collapse Panel 1 into toolbar controls. Panel 2 is 340px and never
+- From **768px through 1103px**, collapse Panel 1 into toolbar controls. Panel 2 is 340px and never
   below 320px; Panel 3 consumes the remainder and never below 420px. If both minima cannot be met,
   use the single-panel transition instead of squeezing text.
-- Below **760px**, show one panel at a time. Working day is a horizontally scrollable selector above
+- Below **768px**, show one panel at a time. Working day is a horizontally scrollable selector above
   the list and module/owner live in kit Select controls. Selecting an action replaces the list with
   full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
   selected occurrence and list scroll. No permanent drawer or sideways three-panel page exists.
 - The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
   detail body scroll independently beneath fixed panel headings. On single-panel screens the active
   panel owns normal document scroll.
-- Panel 1 uses the existing `FilterRail` geometry: 12px outer padding, 20px group gap, 8px heading-to-
+- Panel 1 uses the existing `FilterRail` geometry: 12px outer padding, its governed 20px component
+  group gap (an existing kit exception, not a new page spacing token), and 8px heading-to-
   row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
   marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
   wrap; the rail never truncates them.
@@ -528,10 +545,12 @@ the same group and item grammar; zero matches is not the same as zero work.
   `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
 - Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
   than 760px, with 24px major-section gaps. It renders in this order: object and module; current fact;
-  action and recipient; read-only communication evidence when sourced; `FINISH WHEN`; optional
+  action and recipient; `REQUIRED RESULT`; read-only communication evidence when sourced;
+  `FINISH WHEN`; optional
   `WHAT HAPPENS NEXT`; timing/owner/cover/source evidence; one `Open {object}` primary door. In v1
   there is no sticky send/record bar and no second primary action.
-- Desktop kit controls remain 32px high. Below 760px, every interactive target is at least 40px high
+- Desktop controls retain their owning kit geometry; Work does not force Tabs, SearchInput, Select
+  and Button to one height. Below 768px, every interactive target is at least 40px high
   with 8px between adjacent targets. Page padding is 24px on multi-panel content headings and 12px
   on single-panel screens. Only the frozen spacing, type, radius, colour and elevation tokens apply.
 - Every item wraps rather than truncating problem, action, recipient, required result or working-day
@@ -546,8 +565,10 @@ the same group and item grammar; zero matches is not the same as zero work.
   measurements is not responsive proof.
 
 The implementation reuses `PageShell`, `Tabs`, `SearchInput`, `Select`, `Button`, `FilterRail`,
-`FilterRailGroup`, `FilterRailRow`, `Loading`, `EmptyState`, `StatusPill`, `Badge`, `Tooltip` and
-Lucide icons. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
+`FilterRailGroup`, `FilterRailRow`, `Loading`, `EmptyState`, `Badge`, `Tooltip` and Lucide icons.
+Status text that must wrap does not use the truncating `StatusPill`. A shared `Avatar` must first
+govern one initials algorithm plus full-name hover/focus/tap behaviour; Work may not choose among
+page-local avatar recipes. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
 (provided dates/counts), `WorkActionRow` (presentation) and `WorkActionBrief` (structured read-only
 detail). None calculates business dates, ownership, severity, completion or source health. They are
 not promoted into the global kit until a separately governed second use exists.
@@ -573,8 +594,9 @@ an SLA changes future obligations unless the owning module explicitly versions e
 
 Calendar eligibility requires a named source for both the owning module calendar and the resolved
 person's working days. Current hard-coded role calendars are insufficient to claim personal
-Saturday eligibility. Until Staff & Duties supplies that person-calendar fact, the feed exposes a
-calendar-health gap and must not silently assume a default or fabricate missed age.
+Saturday eligibility. Until People/HR supplies that person-calendar fact through the Shared Duty
+Resolver, the feed exposes a calendar-health gap and must not silently assume a default or fabricate
+missed age.
 
 System automation that should have happened immediately is a source/integrity failure, not a fake
 person task. Supervisory escalation is a notification/management receipt derived from the same
@@ -604,7 +626,7 @@ Work is ready for owner acceptance only when all are demonstrable:
 - My Work, Team Work and Right Rail use one authorised response and one cache identity;
 - every returned occurrence and admitted-source health record satisfies §5.2.1; one failed source
   leaves healthy-source actions usable and cannot be rendered as a complete or zero set;
-- normal owner, cover, acting person, admitted Site queue, `Not assigned` and actual completed actor remain
+- normal owner, cover, acting person, `Not assigned` and actual completed actor remain
   distinct across assignment/cover changes;
 - broken commitment, missed, weekday, conditional Saturday, holiday and no-working-date examples order once under
   the governed working-day law;
@@ -616,9 +638,10 @@ Work is ready for owner acceptance only when all are demonstrable:
   due/late fact and exact owning door without repeating owner/object in sentence prose;
 - true empty, no match, delayed/failed source, permission refusal and read-only history cannot be
   mistaken for one another;
-- keyboard, screen-reader, focus-return and 1440/1024/390 layouts preserve the complete action;
-- two accounts racing for Site work yield one accepted owner, and later holder/cover changes cannot
-  rewrite the winning or completed actor evidence.
+- keyboard, screen-reader and focus-return pass; measured 1440×900, 1180×820, 820×900 and 390×844
+  layouts record both portal-sidebar state and actual Work-canvas width and preserve the complete action;
+- later holder/cover changes cannot rewrite completed actor evidence. Site-queue race acceptance is
+  deferred with Warehouse Outbound and is not a Work v1 acceptance condition.
 
 ## 6 · Module admission gate
 
@@ -641,9 +664,15 @@ This catalogue is the Workspace reading of module-owned rules. The module remain
 changing a trigger, due law or completion fact requires changing that module's MASTER and projector,
 not editing free text in Workspace. Recipient is supplied by the source object where applicable.
 
+This is a governed-rule catalogue, not proof that a rule is live in the current feed. A rule is
+admitted only when §10 records its projector evidence and every §6 gate passes, including the
+operator-safe completion statement required by §5.2.1. The current feed has no such statement field,
+so no existing occurrence may be presented as contract-v2 complete; review fixtures must say they
+are fixtures, and production keeps the current page until each admitted projection is upgraded.
+
 | Owning module · action identity | Why it exists / required result | Owner rule | Due law | What closes it / next |
 |---|---|---|---|---|
-| Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson | `No date` for admitted legacy rows | Requested Delivery Date or governed TBD fact exists · order planning continues |
+| Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson | `No date` for admitted legacy rows | Requested Delivery Date or governed no-date answer exists · order planning continues |
 | Sales Orders · `issue_po` | Demand is uncovered · obtain PO coverage | PO Duty | Purchasing Order By date | PO covers demand · supplier-confirmation work may open |
 | Sales Orders · `delay_planning` | Supplier date breaks the customer commitment · record the customer-plan decision for that exact date | Responsible Delivery Operation for the customer commitment | 2 Office working days from detection | Decision and decided ETA recorded · Delivery opens the governed next booking act when required |
 | Purchasing · `manual_purchase.approve` | Manual Purchase awaits a decision · approval/refusal recorded | Purchasing Approver | Request Order By date, Office calendar | Decision stored · approved demand may require PO issue |
@@ -665,9 +694,9 @@ not editing free text in Workspace. Recipient is supplied by the source object w
 | Payment · `payment.collect_customer_balance` / `payment.missed_promise` | Issued Invoice remains owing when collection is actionable · payment obtained | Stable Collection Owner; active cover acts | Collection deadline or customer's promised day | Atomic allocations reduce Invoice/order outstanding to RM 0 |
 | Payment · `payment.send_storage_invoice` | Live Storage Invoice remains unpaid · invoice sent and money collected | Stable Collection Owner | Shared collection deadline, else `No date` | Live storage owing is RM 0 |
 | Payment · `payment.review_overpayment` | Money exceeds live obligations · allocation or approved refund decision | Payment Approver Duty | Governed `No date` | Overpaid amount is RM 0 or approved refund covers it |
-| Payment/Stock · `payment.check_stored_furniture` | Open storage case reached inspection interval · inspection result | Warehouse capability/owner rule; admission waits for a governed person resolution | Last check/storage start + configured interval | Due inspection recorded |
+| Payment/Stock · `payment.check_stored_furniture` | **Not admitted:** open storage case reached inspection interval · inspection result | Warehouse capability/owner rule; admission waits for a governed person resolution | Last check/storage start + configured interval | Due inspection recorded |
 | Finance exception · `resolve_payment_exception` | Open Finance exception holds delivery · clearance evidence | Finance owner rule; unresolved must remain Not assigned | Immediate | Exception cleared with evidence · delivery gate re-evaluates |
-| Claims · `claims.confirm_what_happens_next` | Supplier answered but Carres resolution absent · customer resolution | PO Duty holder from claim-open month, retained historically | Governed `No date` | Customer resolution recorded · claim proceeds to its next authoritative state |
+| Claims · `claims.confirm_what_happens_next` | **Not admitted:** supplier answered but Carres resolution absent · customer resolution | PO Duty holder from claim-open month, retained historically | Governed `No date` | Customer resolution recorded · admission waits for a qualified live projection |
 | Issue Tracker · versioned `issue_actions` occurrence | Current governed issue result is required | Stored approved Duty rule resolved centrally | Stored occurrence due date | Atomic result completes or replaces occurrence |
 | Service Case · deadline/derived follow-ups | Customer/case result required | **Not admitted:** routine owner rule is not yet governed | 14-working-day deadline exists; derived-step clocks unresolved | Case outcome facts close each source step; admission waits for §11.5 |
 
@@ -792,7 +821,7 @@ unrecovered issue cost. Currency never nets incurred, recoverable and recovered.
 period come from the owning module/settings and appear in the drill-down evidence.
 
 `Work health` is the only Dashboard reading of Work. It aggregates the same server feed by normal
-owner, acting cover, lateness, blocker and source health. Selecting it opens Team Work with the exact
+owner, acting cover, missed age, blocker and source health. Selecting it opens Team Work with the exact
 filter. It never repeats My Work rows or treats `Not assigned` as somebody's queue.
 
 `Recent material change` is not an activity feed. It includes only a newly broken/recovered
@@ -834,7 +863,7 @@ meaning; it does not mean the source has passed the production gate.
 | Material customer cases | Service Case: open Significant/Critical cases under its governed materiality | Filtered Service Cases | Held until Service Case source/owner admission is complete |
 | Material goods exposure | Stock/Receiving: governed shortages, quarantine or blocked Units/quantity above owning thresholds | Filtered Warehouse/Receiving surface | Held until threshold, Site scope and one drill-down are verified |
 | Material cash exposure | Payment/Finance: overdue customer balance or approved recovery exposure, shown without netting distinct tracks | Filtered Payment/Finance register | Eligible after definition/threshold proof |
-| Work health | Shared Work: open, late, blocked, unresolved owner/cover and failed source by normal owner | Team Work with exact URL filters | Eligible per admitted source; partial health required |
+| Work health | Shared Work: open, Missed, blocked, unresolved owner/cover and failed source by normal owner | Team Work with exact URL filters | Eligible per admitted source; partial health required |
 | Recent material change | Durable owning-module/Work transition crossing one admitted measure's state or threshold | Exact owning object | Held until durable idempotent receipts exist |
 
 Counts of active Orders, open POs, GMV, generic low stock and unreviewed annotations are explicitly
@@ -1087,6 +1116,8 @@ honest Work for admitted modules.
 9. Last, complete and owner-review Dashboard against production data.
 
 Cards follow dependency slices; this MASTER is not an implementation queue.
+The execution sequence that implements this authority is recorded in
+`docs/workspace/IMPLEMENTATION-PLAN.md`; it cannot amend this MASTER.
 
 ## 12 · Done-when
 

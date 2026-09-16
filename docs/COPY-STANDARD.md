@@ -169,6 +169,11 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
+| Work applied filters | `Clear all` | Reset · Clear everything |
+| Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
+| Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
+| Work selected action closed | `This work is no longer open.` | Done! · Task disappeared |
+| Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
