@@ -1,6 +1,10 @@
-/* Compatibility entry point for the shared purchasing register theme. */
+/* SO Batch Purchase — owner ruling R5, 2026-09-16. The page no longer composes
+   the shared purchasing hex palette (`PurchasingRegister.module.css`, still
+   used by Manual Purchase and Purchase Orders). Its Register colours come from
+   DataGrid's governed `palette="slate"`; the page keeps the owner canvas. */
 .page {
-  composes: page from "../PurchasingRegister.module.css";
+  background: theme("colors.kit.canvas");
+  color: theme("colors.kit.slate.12");
 }
 
 /* Breakpoints measure the buying canvas, after both portal rails. */

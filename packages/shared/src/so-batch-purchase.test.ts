@@ -15,6 +15,9 @@ import {
   soBatchOrderStatusOf,
   soBatchCellSummary,
   soBatchOrderSelection,
+  soBatchOrderPlanning,
+  soBatchOrderRemainingQty,
+  compareSoBatchPlanning,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -1147,5 +1150,48 @@ describe("SO batch timing counts share the purchase selection gate", () => {
     expect(result.timingCounts.can_order_early).toBe(0);
     expect(result.setupCount).toBe(1);
     expect(result.visibleOrderIds.size).toBe(RAIL_ORDERS.length);
+  });
+});
+
+describe("soBatchOrderPlanning — groups by remaining demand, never by raw status (R1/R2)", () => {
+  const plan = (o: SoBatchOrderRow, leaves: PurchaseDemandRow[] = []) => soBatchOrderPlanning(o, leaves);
+
+  it("a Ready-Stock-only order with no PO needs no purchase", () => {
+    const o = railOrder({ orderId: "rs", status: "blank", lines: [line({ orderLineId: "x", qty: 2, stockTaken: 2 })] });
+    expect(soBatchOrderRemainingQty(o)).toBe(0);
+    expect(plan(o)).toEqual({ group: "no-purchase-needed", date: null, notPlanned: false, rank: 2 });
+  });
+
+  it("a fully ordered order needs no purchase", () => {
+    expect(plan(RAIL_OC).group).toBe("no-purchase-needed");
+  });
+
+  it("a partly bought order with a selectable leaf is To buy with its engine Order By", () => {
+    const o = railOrder({ orderId: "p", status: "partial", lines: [line({ orderLineId: "x", qty: 3, pos: [{ poId: "PO-9", poLineId: null, qty: 1, destinationId: null }] })] });
+    const r = plan(o, [row({ orderId: "p", orderBy: "2026-09-20" }), row({ id: "b2", orderId: "p", orderBy: "2026-09-18" })]);
+    expect(r).toEqual({ group: "to-buy", date: "2026-09-18", notPlanned: false, rank: 0 });
+  });
+
+  it("pool coverage without exact lineage never moves an order out of To buy", () => {
+    const o = railOrder({ orderId: "pool", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const r = plan(o, [row({ orderId: "pool", fullyOnPo: true, orderBy: "2026-09-18" })]);
+    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: true, rank: 1 });
+  });
+
+  it("unverified coverage and setup blockers stay in To buy as Not planned", () => {
+    const empty = railOrder({ orderId: "u" });
+    expect(plan(empty, [row({ orderId: "u", fullyOnPo: undefined })]).group).toBe("to-buy");
+    expect(plan(empty, [row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null })]))
+      .toEqual({ group: "to-buy", date: null, notPlanned: true, rank: 1 });
+  });
+
+  it("orders selectable Order By ascending, then not planned, then SO No descending", () => {
+    const items = [
+      { so: 10, plan: { group: "to-buy" as const, date: null, notPlanned: true, rank: 1 as const } },
+      { so: 11, plan: { group: "to-buy" as const, date: "2026-09-20", notPlanned: false, rank: 0 as const } },
+      { so: 12, plan: { group: "to-buy" as const, date: "2026-09-18", notPlanned: false, rank: 0 as const } },
+      { so: 13, plan: { group: "to-buy" as const, date: null, notPlanned: true, rank: 1 as const } },
+    ];
+    expect([...items].sort(compareSoBatchPlanning).map((i) => i.so)).toEqual([12, 11, 13, 10]);
   });
 });

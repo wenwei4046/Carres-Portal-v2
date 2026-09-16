@@ -1,7 +1,7 @@
 # PURCHASING — CARD 11 · SO BATCH PURCHASE — ORDER BY AND TRUTHFUL DEMAND RESTORATION
 
 Module: Purchasing × Stock · Sequence: 11 · Lane: BUILD / DELIVERY
-Status: BUILDING · Owner approved: 2026-09-16
+Status: ROUND 1 BUILT · Owner approved: 2026-09-16
 Exact fetched main base: `ab10aa57147e0c3138adddffc7003338c610208d`
 Branch: `codex/purchasing-so-batch-order-by`
 
@@ -68,6 +68,32 @@ Production rollback probe against committed `4bf5c50a` passed: the candidate lea
 function hashes unchanged, and the exact repair block rejects an unknown temporary function body
 (the negative control). The transaction rolled back; no production function or tracker changed.
 
-Pending: final CI proof; approval before any numbered migration lands; merge/deploy and
-authenticated production walkthrough. The groups
-and labels are already owner-approved and require no further confirmation.
+## Round 1 — owner rulings R1–R8 (2026-09-16)
+
+Scope: SO Batch Purchase only; rulings persisted in Purchasing MASTER §9.1, UI MASTER §6.7 (search),
+COPY-STANDARD (SO Batch rows) and the tokens doc (`kit.slate.2`, canvas text). Manual Purchase is
+the next round and starts with an audit.
+
+- **Engine (opt-in, siblings unchanged):** DataGrid `palette="slate"`, `searchPresentation="responsive"`,
+  governed group heading/button, ticked-row fill. Smoke-rendered Sales Orders frame, Delivery Orders,
+  Payments, Manual Purchase and Purchase Orders previews: no new classes, same header colours, no
+  page errors.
+- **Shared:** `soBatchOrderPlanning` groups by remaining demand; `compareSoBatchPlanning` orders it.
+  The pool-covered test fails on the previous rank rule (it put the order in `No purchase needed`).
+- **Rendered evidence — FIXTURE, not authenticated production:** `apps/web/so-batch-shell-preview.html`
+  mounts the real `OperationApp` shell with a seeded 27-order payload. Screens in
+  `docs/evidence/purchasing-11-so-batch-round1/`. Measured: grid left/width 480/900 (1440),
+  308/812 (1180), 68/692 (820, rail overlays), 68/262 (390); document never scrolls sideways;
+  all 10 headers fit text + controls at 1440, 390 and 200% zoom; header slate-3/slate-11 11px/600
+  5.22:1; heading 13px/600 16.39:1, 38px; counts, absences and footer 5.94:1; row rules slate-5;
+  ticked row and pinned cells blue-3; expansion slate-2; link on ticked row 14.62:1 (was 4.25:1,
+  fixed); `Issue PO` 32px and inside the grid at every width; search box at ≥520px toolbar, icon at
+  262px; search reveals a collapsed match; keyboard reaches and toggles `No purchase needed` with a
+  2px blue-9 focus ring (89 Tab stops away); Issue → `Esc` stays → `Back to buying` keeps scroll
+  420/150, the tick, the open group and the query.
+- **Gates:** shared 3,408 passed; web focused suites 402 + 130 passed; full web run 4,862 passed with
+  two load timeouts that pass alone (Manual Purchase 122, Warehouse Stock 26); typecheck, design
+  standard and production build pass. CI result, merge SHA and production proof are recorded in the
+  PR.
+- **Owed:** authenticated owner walk on production. `scripts/purchasing-reservation-binding-repair.sql`
+  remains a separate, unapproved production gate; this round does not apply or approve it.

@@ -116,6 +116,7 @@ export default {
           // `strip` retired the same day (Jess's polish: too many greys were
           // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {
+            2: slate.slate2, // expansion area under an opened register row (owner ruling R5, 2026-09-16 · additive)
             3: slate.slate3, // table header #F1F3F5 (Jess, 2026-08-02) · page canvas on unmigrated pages (Q2)
             4: slate.slate4, // quiet control border (Jess, 2026-08-01; thead moved to slate-3, 2026-08-02)
             5: slate.slate5, // hairline — table lines, card edge

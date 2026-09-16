@@ -333,10 +333,10 @@ describe("the approved columns, in the approved reading order", () => {
     "SO No",
     "Order By",
     "Customer",
+    "Supplier",
     "Proceed Date",
     "Requested Delivery Date",
     "Delivery Location",
-    "Supplier",
     "Deliver To",
     "PO No",
     "PO Delivery Date",
@@ -389,7 +389,7 @@ describe("the approved columns, in the approved reading order", () => {
   });
 
   it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v4"');
+    expect(source()).toContain('"carres.soBatchPurchase.register.v5"');
     expect(source()).not.toContain("register.v1");
   });
 
@@ -2197,5 +2197,79 @@ describe("search, clear and default buying order", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument());
     expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+  });
+});
+
+describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
+  const rowsIn = (container: HTMLElement) =>
+    [...container.querySelectorAll("tbody tr")].map((tr) =>
+      tr.getAttribute("data-testid") ?? tr.textContent ?? "");
+
+  it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {
+    const { container } = renderRegister({}, false);
+    const heading = screen.getByRole("heading", { name: /To buy/ });
+    expect(heading.tagName).not.toBe("BUTTON");
+    const toggle = screen.getByTestId("grid-group-toggle-no-purchase-needed");
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const order = rowsIn(container);
+    expect(order.indexOf("grid-group-to-buy")).toBeLessThan(order.indexOf("grid-group-no-purchase-needed"));
+    /* Remaining demand decides — partly bought o3 and blocked o4 buy; Ordered
+       o5, Ready-Stock-only o6 and fully linked o7 need nothing. */
+    for (const id of ["o1", "o3", "o4", "o8"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+    for (const id of ["o5", "o6", "o7"]) expect(screen.queryByTestId(`so-batch-row-${id}`)).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    for (const id of ["o5", "o6", "o7"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+  });
+
+  it("R1 — a search match inside the collapsed group is revealed, and clearing restores the collapse", async () => {
+    renderRegister({}, false);
+    const input = screen.getByTestId("search-box").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "STOCKED" } });
+    expect(await screen.findByTestId("so-batch-row-o6")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("search-clear"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o6")).not.toBeInTheDocument());
+    expect(input.value).toBe("");
+  });
+
+  it("R2 — To buy reads Order By ascending, then Not planned, then SO No descending", () => {
+    const { container } = renderRegister({
+      rows: [
+        { ...LEAF_O1, orderBy: "2026-08-25" },
+        { ...LEAF_O3, orderBy: "2026-08-23" },
+        { ...LEAF_O8A, orderBy: "2026-08-30" },
+        { ...LEAF_O8B, orderBy: "2026-08-24" },
+        LEAF_O4,
+      ],
+    }, false);
+    const rows = rowsIn(container).filter((t) => t.startsWith("so-batch-row-"));
+    expect(rows).toEqual(["so-batch-row-o3", "so-batch-row-o8", "so-batch-row-o1", "so-batch-row-o4"]);
+    expect(screen.getByTestId("so-batch-order-by-o4").textContent).toBe("Not planned");
+  });
+
+  it("R6 — the footer carries one total, singular for one order", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, false);
+    expect(screen.getByTestId("so-batch-footer").textContent).toBe("1 Sales Order");
+  });
+
+  it("R4 — the search box, its active query and its clear control are on the toolbar", () => {
+    renderRegister({}, false);
+    const box = screen.getByTestId("search-box");
+    expect(screen.getByTestId("search-icon")).toBeInTheDocument();
+    fireEvent.change(box.querySelector("input")!, { target: { value: "Kimmy" } });
+    expect(box).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("search-icon")).toHaveAttribute("data-hidden", "true");
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
+  });
+
+  it("R5 — a ticked row is marked as ticked; an expanded unticked row is not", () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    expect(screen.getByTestId("so-batch-row-o3").className).not.toMatch(/trTicked/);
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-row-o1").className).toMatch(/trTicked/);
+    expect(source()).toContain('palette="slate"');
+    expect(source()).toContain('searchPresentation="responsive"');
   });
 });

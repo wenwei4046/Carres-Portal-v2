@@ -340,6 +340,27 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       expect.anything(),
     );
   });
+
+  it("R8 — Back to buying returns to the SAME Register: search, open group and ticks kept", async () => {
+    apiFetch.mockResolvedValue(payload());
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    const search = screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "SO-" } });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    await screen.findByTestId("so-batch-issue-workspace");
+    /* The Register is hidden, never unmounted. */
+    expect(screen.getByTestId("so-batch-page")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(screen.getByTestId("so-batch-issue-back"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-issue-workspace")).not.toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-page")).not.toHaveAttribute("aria-hidden");
+    /* The tick survived, so the selection toolbar is still in place … */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    /* … and clearing it hands back the toolbar with the query still typed. */
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect((screen.getByTestId("search-box").querySelector("input") as HTMLInputElement).value).toBe("SO-");
+  });
 });
 
 /**

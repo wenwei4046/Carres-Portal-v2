@@ -12,6 +12,7 @@ import {
   type SoBatchDocument,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
@@ -492,23 +493,19 @@ export default function SoBatchIssueWorkspace({
                 </span>
               ) : null}
               <div className="mt-auto flex items-center justify-between gap-3 pt-4">
-                <button
-                  type="button"
-                  data-testid="so-batch-issue-back"
-                  className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium"
-                  onClick={onBack}
-                >
+                <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
                   {W.backToBuying}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
                   data-testid="so-batch-issue-create"
-                  className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white disabled:bg-kit-slate-6"
-                  disabled={creating || (!coveringPo && (documents.length === 0 || blocker !== null))}
+                  loading={creating}
+                  disabled={!coveringPo && (documents.length === 0 || blocker !== null)}
                   onClick={() => void issue()}
                 >
                   {W.issuePo}
-                </button>
+                </Button>
               </div>
             </>
           ) : currentPo ? (
@@ -544,14 +541,9 @@ export default function SoBatchIssueWorkspace({
                   (`SO Batch Purchase`'s own buying list), never `Purchase
                   Orders`, which is a different module's register. */}
               <div className="mt-4 flex items-center border-t border-kit-slate-5 pt-3">
-                <button
-                  type="button"
-                  data-testid="so-batch-issue-back"
-                  className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium"
-                  onClick={onBack}
-                >
+                <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
                   {W.backToBuying}
-                </button>
+                </Button>
               </div>
             </>
           ) : null}

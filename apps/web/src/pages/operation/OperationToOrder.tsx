@@ -73,7 +73,12 @@ export default function OperationToOrder() {
     );
   }, [selections, data]);
 
-  const backToBuying = useCallback(() => setSelections(null), []);
+  /* Returning also re-reads the list: a tick whose line was bought in the
+     meantime must drop rather than survive into a second Issue PO. */
+  const backToBuying = useCallback(() => {
+    setSelections(null);
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  }, [queryClient]);
   const finish = useCallback(() => {
     setSelections(null);
     void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -111,23 +116,29 @@ export default function OperationToOrder() {
     safetyDays: 14,
   };
 
-  if (selections && documents.length > 0 && data) {
-    return (
-      <SoBatchIssueWorkspace
-        documents={documents}
-        destinations={data.destinations}
-        onBack={backToBuying}
-        onDone={finish}
-      />
-    );
-  }
-
+  /* ⭐ BACK TO BUYING KEEPS THE OPERATOR'S PLACE — owner ruling R8,
+     2026-09-16. The Register stays MOUNTED (hidden) behind the Issue
+     workspace, so its search, rail filters, open groups, ticks and scroll
+     position are exactly where the operator left them. Unmounting it made
+     every return start again from the top of an unfiltered list. */
+  const issuing = selections != null && documents.length > 0 && data != null;
   return (
-    <SoBatchRegister
-      data={data ?? empty}
-      isLoading={q.isLoading}
-      initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
-      onIssue={setSelections}
-    />
+    <>
+      {issuing && (
+        <SoBatchIssueWorkspace
+          documents={documents}
+          destinations={data.destinations}
+          onBack={backToBuying}
+          onDone={finish}
+        />
+      )}
+      <SoBatchRegister
+        data={data ?? empty}
+        isLoading={q.isLoading}
+        hidden={issuing}
+        initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
+        onIssue={setSelections}
+      />
+    </>
   );
 }

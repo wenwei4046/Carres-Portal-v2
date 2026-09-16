@@ -74,6 +74,16 @@ export const SO_BATCH_PURCHASE_WORDS = {
   colProceedDate: "Proceed Date",
   colPoNo: "PO No",
   colSoNo: "SO No",
+  /** Owner rulings R1/R2, 2026-09-16 — the engine's date to issue by. */
+  colOrderBy: "Order By",
+  /** The Order By of remaining demand that cannot be stated yet (blocked or unverified). */
+  notPlanned: "Not planned",
+  /** The two governed table group headings — never stored statuses or rail rows. */
+  groupToBuy: "To buy",
+  groupNoPurchaseNeeded: "No purchase needed",
+  noMatch: "No Sales Orders match these filters",
+  footerUnitOne: "Sales Order",
+  issueNeedsPoDuty: "Only PO Duty can issue this PO",
   colCustomer: "Customer",
   colDeliveryLocation: "Delivery Location",
   colRequestedDelivery: "Requested Delivery Date",
@@ -1328,12 +1338,57 @@ export function composeDocumentLines(
 }
 
 
-/** Presentation over the exact checkbox eligibility contract; no calendar arithmetic. */
-export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]) {
+/** The two governed Register groups (owner ruling R1, 2026-09-16). Never a stored status. */
+export type SoBatchRegisterGroup = "to-buy" | "no-purchase-needed";
+
+/**
+ * Units still to buy on one Sales Order — the SAME shared line arithmetic the
+ * tick and the Ready Stock door already use (customer quantity less current
+ * Ready Stock coverage less exact, non-cancelled PO lineage). A generic open-PO
+ * pool is not proof that this order was bought, so it never lowers this number.
+ */
+export function soBatchOrderRemainingQty(order: Pick<SoBatchOrderRow, "lines">): number {
+  return order.lines.reduce((sum, line) => sum + soBatchOrderLineOutstandingQty(line), 0);
+}
+
+/**
+ * ⭐ ONE TABLE, TWO GROUPS — owner rulings R1/R2, 2026-09-16.
+ *
+ * `group` reads REMAINING DEMAND, never the raw blank/partial/ordered status:
+ * a Ready-Stock-only order is blank and needs nothing; a partly bought order
+ * still needs something. Blocked (setup) and unverified (`fullyOnPo` missing)
+ * demand is never assumed covered, so it stays in `To buy`.
+ *
+ * `date` is the engine's own Order By, the earliest over exactly the leaves the
+ * parent checkbox would tick. No calendar arithmetic happens here.
+ *
+ * `rank` is the default reading order inside `To buy`: 0 = a selectable Order
+ * By (ascending by date), 1 = remaining demand that cannot be planned yet
+ * (`Not planned`), 2 = nothing to buy. Ties fall back to SO No descending.
+ */
+export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]): {
+  group: SoBatchRegisterGroup;
+  date: string | null;
+  notPlanned: boolean;
+  rank: 0 | 1 | 2;
+} {
   const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
   const dates = eligible.map((r) => r.orderBy).filter((d): d is string => Boolean(d)).sort();
-  const blocked = order.status !== "ordered" && leaves.some((r) =>
-    !isPurchaseDemandTimingState(r.state) || (r.fullyOnPo !== true && (r.toBuy ?? 0) > 0 && !isSelectableForOrder(r, order.status)));
-  return { date: dates[0] ?? null, blocked: dates.length === 0 && (blocked || eligible.length > 0),
-    rank: eligible.length > 0 ? 0 : blocked ? 1 : 2 };
+  const blockedOrUnverified = order.status !== "ordered" && leaves.some((r) =>
+    !isPurchaseDemandTimingState(r.state) ||
+    (r.fullyOnPo !== true && (r.toBuy ?? 0) > 0 && !isSelectableForOrder(r, order.status)));
+  const toBuy = eligible.length > 0 || blockedOrUnverified || soBatchOrderRemainingQty(order) > 0;
+  const date = dates[0] ?? null;
+  if (!toBuy) return { group: "no-purchase-needed", date: null, notPlanned: false, rank: 2 };
+  return { group: "to-buy", date, notPlanned: date == null, rank: date ? 0 : 1 };
+}
+
+/** Default order inside a group: rank → Order By ascending → SO No descending. */
+export function compareSoBatchPlanning(
+  a: { plan: ReturnType<typeof soBatchOrderPlanning>; so: number | null },
+  b: { plan: ReturnType<typeof soBatchOrderPlanning>; so: number | null },
+): number {
+  return a.plan.rank - b.plan.rank ||
+    (a.plan.date ?? "9999").localeCompare(b.plan.date ?? "9999") ||
+    (b.so ?? 0) - (a.so ?? 0);
 }
