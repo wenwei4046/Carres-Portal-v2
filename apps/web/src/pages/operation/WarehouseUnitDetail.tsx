@@ -59,8 +59,12 @@ const EVENT_LABEL: Record<string, string> = {
   ownership_changed: "Ownership changed",
 };
 
-export default function WarehouseUnitDetail() {
-  const { unitCode } = useParams<{ unitCode: string }>();
+export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: {
+  unitCode?: string;
+  onBack?: () => void;
+} = {}) {
+  const { unitCode: routeCode } = useParams<{ unitCode: string }>();
+  const unitCode = selectedCode ?? routeCode;
   const navigate = useNavigate();
   const { data, isLoading, isError, error } = useStockUnit(unitCode);
 
@@ -79,7 +83,7 @@ export default function WarehouseUnitDetail() {
       <div className="min-h-0 flex-1 overflow-y-auto px-9 py-6" data-testid="stock-unit-detail">
         <button
           type="button"
-          onClick={() => navigate("/operation/stock")}
+          onClick={onBack ?? (() => navigate("/operation?tab=stock-onhand"))}
           className="mb-4 text-meta text-base-500 hover:text-base-800"
         >
           ← Inventory

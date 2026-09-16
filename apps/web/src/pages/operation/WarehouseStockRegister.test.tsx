@@ -336,3 +336,25 @@ describe("Inventory saved views", () => {
     }
   });
 });
+
+
+it("returns from a Unit without losing the register, search, rail or scroll", async () => {
+  await renderLoaded();
+  fireEvent.click(screen.getByTestId("rail-ready"));
+  fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
+  const search = screen.getByPlaceholderText("Unit ID, product, PO, SO or supplier…");
+  fireEvent.change(search, { target: { value: "aaa111111" } });
+  await waitFor(() => expect(screen.queryByText("id-ccc333333")).toBeNull());
+  const grid = screen.getByTestId("grid-scroll");
+  grid.scrollTop = 180;
+  const link = screen.getByRole("link", { name: "id-aaa111111" });
+  expect(link.getAttribute("href")).toContain("view=ready");
+  fireEvent.click(link);
+  expect(grid).not.toBeVisible();
+  fireEvent.click(await screen.findByRole("button", { name: "← Inventory" }));
+  expect(screen.getByTestId("grid-scroll")).toBe(grid);
+  expect(grid).toBeVisible();
+  expect(grid.scrollTop).toBe(180);
+  expect(search).toHaveValue("aaa111111");
+  expect(screen.getByTestId("rail-ready")).toHaveAttribute("aria-pressed", "true");
+});

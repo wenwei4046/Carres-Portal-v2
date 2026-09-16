@@ -31,6 +31,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import Button from "@/components/kit/Button";
+import WarehouseUnitDetail from "./WarehouseUnitDetail";
 
 /** Inventory is the current Unit Register. Its 240px rail narrows the same
  * authority; source facts are read-only. Sales Order alone owns reservation. */
@@ -77,6 +78,13 @@ const AVAILABILITY_DOT: Record<UnitAvailability, string> = {
 export default function WarehouseStockRegister() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const selectedUnit = params.get("unit");
+  const unitHref = (code: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "stock-onhand");
+    next.set("unit", code);
+    return `/operation?${next}`;
+  };
   const { data, isLoading, isError, error, refetch } = useStockRegister();
   const [railOpen, setRailOpen] = useState(true);
   const requestedView = params.get("view");
@@ -203,7 +211,7 @@ export default function WarehouseStockRegister() {
         exportValue: (u) => displayUnitId(u),
         chooserGroup: "Unit",
         accessor: (u) => (
-          unitIdOf(u) ? <Link className="font-mono text-meta text-kit-blue-11 hover:underline" to={`/operation/stock/unit/${encodeURIComponent(unitIdOf(u)!)}`}>{displayUnitId(u)}</Link> : <span className="font-mono text-meta text-base-900">—</span>
+          unitIdOf(u) ? <Link className="font-mono text-meta text-kit-blue-11 hover:underline" to={unitHref(unitIdOf(u)!)}>{displayUnitId(u)}</Link> : <span className="font-mono text-meta text-base-900">—</span>
         ),
       },
       {
@@ -399,20 +407,28 @@ export default function WarehouseStockRegister() {
           ),
       },
     ],
-    [navigate],
+    [navigate, params],
   );
 
   const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <ModuleHeader
+      {selectedUnit && <WarehouseUnitDetail unitCode={selectedUnit} onBack={() => {
+        const next = new URLSearchParams(params);
+        next.delete("unit");
+        setParams(next);
+      }} />}
+      {/* Keep the grid mounted: its search, column filters and viewport belong
+          to this visit, including browser Back from the selected Unit. */}
+      <div hidden={!!selectedUnit} className={selectedUnit ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
+      {!selectedUnit && <ModuleHeader
         testId="stock-register-destination-header"
         word="Inventory"
         docTitle="Inventory · Warehouse — Carres"
         right={<Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">Request Transfer</Link>}
         destinationHeader
-      />
+      />}
       <div className="flex min-h-0 flex-1" data-testid="stock-register">
         {railOpen ? <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
           <FilterRailGroup title="Stock">
@@ -479,7 +495,7 @@ export default function WarehouseStockRegister() {
               onRowDoubleClick={(u) => {
                 // A counted row has no Unit page to open — it is not a Unit.
                 const id = unitIdOf(u);
-                if (id) navigate(`/operation/stock/unit/${encodeURIComponent(id)}`);
+                if (id) navigate(unitHref(id));
               }}
               emptyMessage={
                 allUnits.length === 0
@@ -499,6 +515,7 @@ export default function WarehouseStockRegister() {
             />
           )}
         </div>
+      </div>
       </div>
     </div>
   );

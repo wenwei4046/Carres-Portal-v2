@@ -30,6 +30,7 @@ function renderAt(code: string) {
       <MemoryRouter initialEntries={[`/operation/stock/unit/${code}`]}>
         <Routes>
           <Route path="/operation/stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
+          <Route path="/operation" element={<div>Inventory destination</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -137,4 +138,12 @@ describe("physical receipt dates", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(retry).toHaveBeenCalledOnce();
   });
+});
+
+
+it("returns a directly opened Unit to the real Inventory destination", () => {
+  vi.mocked(useStockUnit).mockReturnValue({ data: undefined, isLoading: false, isError: false } as never);
+  renderAt("U1-000-082");
+  fireEvent.click(screen.getByRole("button", { name: "← Inventory" }));
+  expect(screen.getByText("Inventory destination")).toBeInTheDocument();
 });
