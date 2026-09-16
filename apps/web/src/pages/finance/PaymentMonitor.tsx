@@ -365,9 +365,11 @@ export default function PaymentMonitor() {
   /** The day's words — the rail card and the collapsed sheet header say the same. */
   const dayWords = (d: PaymentWeekDay): string[] => {
     const words = d.lines.map(paymentWeekLineWord);
-    if (d.carried) words.push(`Includes ${d.carried.count} not done since ${fmtDate(d.carried.sinceIso)}`);
+    // A date inside a wrapped sentence never breaks in two (`Thu, 17 | Sep`).
+    const day = (iso: string) => fmtDate(iso).replace(/ /g, "\u00a0");
+    if (d.carried) words.push(`Includes ${d.carried.count} not done since ${day(d.carried.sinceIso)}`);
     if (d.countedOnPlanDay > 0) {
-      words.push(`${d.countedOnPlanDay} not done · counted under ${plan.planDayIso === today ? "Today" : fmtDate(plan.planDayIso)}`);
+      words.push(`${d.countedOnPlanDay} not done · counted under ${plan.planDayIso === today ? "Today" : day(plan.planDayIso)}`);
     }
     if (words.length === 0) words.push("No follow-up planned");
     return words;
@@ -410,7 +412,12 @@ export default function PaymentMonitor() {
               <ChevronLeft size={15} aria-hidden />
             </button>
             <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12"
-              data-testid="payment-monitor-week-label">{weekLabel}</span>
+              data-testid="payment-monitor-week-label" aria-label={weekLabel}>
+              {/* Each date stays whole: the break falls between the two days,
+                  never inside `Fri, 18 Sep`. */}
+              <span className="whitespace-nowrap">{fmtDate(weekStart)} –</span>{" "}
+              <span className="whitespace-nowrap">{fmtDate(addDays(weekStart, 4))}</span>
+            </span>
             <button type="button" aria-label="Next week" title="Next week" className={weekArrow}
               data-testid="payment-monitor-next-week" onClick={() => moveWeek(1)}>
               <ChevronRight size={15} aria-hidden />
