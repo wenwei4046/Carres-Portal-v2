@@ -21,6 +21,10 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-16 — Added a standalone owner-review prototype for Workspace Work. The approved direction
+  uses the existing global navigation plus three working panels: working day/module, action list,
+  and selected owning-module action. It uses Carres surface, border, typography, selection and
+  primary-action semantics; it is not production implementation.
 - 2026-09-11 — Loaded the existing Carres React/Tailwind stack for the Payment production recovery.
   Reuse the governed Register, Object Detail, Work and action components; do not add a dashboard,
   module-specific inbox, Payment Monitor, or alternative money truth.
@@ -31,6 +35,7 @@ copy, component, or business-rule system.
 ## Components
 
 - Existing Carres shared component inventory is authoritative; inspect before extending.
+- Workspace Work three-panel HTML prototype — `docs/prototypes/workspace-work-three-panel.html`.
 - Payment Register configuration — `apps/web/src/pages/finance/PaymentRegister.tsx`.
 - Operation Payments navigation — `apps/web/src/pages/portal/portal-nav.ts`.
 
