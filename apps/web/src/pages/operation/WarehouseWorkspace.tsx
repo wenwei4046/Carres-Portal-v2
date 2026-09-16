@@ -1,6 +1,6 @@
 // design-standard: not-a-list-page — a dated Warehouse Schedule board
 // (read-only projection of one direction's work), not a Register list.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ModuleHeader from "./components/ModuleHeader";
@@ -34,9 +34,19 @@ import { Z_TABLE_HEADER } from "@/components/kit/overlay-layer";
  * only thing that differs, so it is a prop rather than a fork — and because it
  * is a prop, there are NO internal direction tabs and no upper/lower split.
  *
- * The board is six equal date columns at ≥1280px and ONE selected date below
- * that width, with the same records and the same doors either way — a narrow
- * screen loses columns, never work.
+ * THE BOARD KEEPS EVERY CONFIGURED WORKING DAY AT EVERY WIDTH (owner ruling
+ * 2026-09-16). It previously collapsed to a single selected date below 1280px.
+ * That was measured as a loss, not an adaptation: at 703px the operator saw
+ * one column and five days of committed work simply vanished, with no control
+ * on screen saying they existed. A warehouse week is the unit of the job — the
+ * operator plans Thursday's lorry while standing on Tuesday — so the week is
+ * never silently truncated to fit a screen.
+ *
+ * The narrow screen now SCROLLS to the sixth day instead of hiding it. Each
+ * date column holds a 240px floor, so six days make a 1440px canvas that
+ * overflows a 703px viewport horizontally and is reached by scrolling. A
+ * column narrower than 240px cannot hold a supplier name beside its date
+ * badge, which is why the floor is a floor and not a preference.
  *
  * THE DATE SEQUENCE IS NOT OURS. `operatingDates` arrives from the governed
  * projection, which resolves the Site's own configured calendar. This page
@@ -45,22 +55,18 @@ import { Z_TABLE_HEADER } from "@/components/kit/overlay-layer";
  * off-day here would silently hide its work.
  */
 
-/** Below this width six readable date columns cannot fit. */
-const AGENDA_BREAKPOINT = 1280;
-
-export function useIsAgendaWidth(): boolean {
-  const query = `(max-width: ${AGENDA_BREAKPOINT - 1}px)`;
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const onChange = () => setNarrow(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [query]);
-  return narrow;
-}
+/**
+ * THE COLUMN FLOOR — the one number the whole correction rests on.
+ *
+ * 240px is the width at which a date column still reads: the card header puts
+ * a supplier name, a date-status pill and the open door on one line, and the
+ * name keeps its `flex-[1_1_6rem]` (96px) floor before the pill and door wrap.
+ * Below 240px the name is squeezed into a gutter and the operator loses the
+ * identity of the work. The canvas is `columns × 240px`, so the SIX dates a
+ * Site normally operates make 1440px — wider than a 703px screen, and reached
+ * by scrolling rather than by deleting days.
+ */
+const COLUMN_MIN_PX = 240;
 
 /**
  * The date and Site the operator last stood on, remembered across the two
@@ -92,7 +98,6 @@ export default function WarehouseWorkspace({
 
   const from = params.get("from") ?? lastContext.from ?? today;
   const site = params.get("site") ?? lastContext.site ?? null;
-  const isAgenda = useIsAgendaWidth();
 
   const schedule = useWarehouseSchedule({ direction, siteId: site, from });
   const dates = schedule.operatingDates;
@@ -113,27 +118,9 @@ export default function WarehouseWorkspace({
     setParams(next, { replace: false });
   }
 
-  /** Previous/next moves the WINDOW on a board and ONE DATE on an agenda —
-   *  both walk the governed operating dates, never a raw calendar day. */
+  /** Previous/next moves the WINDOW — a whole week of governed operating
+   *  dates, never a raw calendar day, and never one date at a narrow width. */
   function step(delta: -1 | 1) {
-    if (isAgenda) {
-      const at = dates.indexOf(selectedDate);
-      const next = at >= 0 ? dates[at + delta] : undefined;
-      if (next) {
-        setParam("date", next);
-        return;
-      }
-      /* Off the end of the known window: move the window and let the
-         projection say which date really operates next. */
-      const anchor = delta === 1 ? dates[dates.length - 1] : dates[0];
-      if (anchor) {
-        const nextParams = new URLSearchParams(params);
-        nextParams.set("from", shiftIso(anchor, delta));
-        nextParams.delete("date");
-        setParams(nextParams);
-      }
-      return;
-    }
     /* A BOARD MOVES A PAGE, NOT A DAY, and the two directions are not
        symmetric.
 
@@ -164,7 +151,12 @@ export default function WarehouseWorkspace({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-1 flex-col"
+      /* `min-w-0` here as well as on the scroller: this page root is itself a
+         flex child of the shell, and a flex child's default `min-width:auto`
+         is the classic way a wide descendant escapes its frame. The scroller
+         contains the canvas today; this keeps that true if the shell ever
+         wraps this page in another flex row. */
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
       data-testid={`warehouse-${direction}-schedule`}
     >
       <ModuleHeader
@@ -178,7 +170,7 @@ export default function WarehouseWorkspace({
         <div className="flex items-center gap-1" data-testid="ws-range">
           <button
             type="button"
-            aria-label="Previous dates"
+            aria-label="Previous week"
             className="inline-flex h-7 w-7 items-center justify-center rounded-control border border-kit-slate-5 hover:bg-hovertint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
             onClick={() => step(-1)}
             data-testid="ws-prev"
@@ -186,7 +178,7 @@ export default function WarehouseWorkspace({
             <ChevronLeft size={16} />
           </button>
           <span className="min-w-0 px-1 text-body font-medium text-kit-slate-12">
-            {isAgenda ? headingSentence(selectedDate) : rangeSentence(dates)}
+            {rangeSentence(dates)}
           </span>
           {/* TODAY — the way back. A board that has been paged three windows
               forward gives the operator no anchor, and the day they actually
@@ -209,7 +201,7 @@ export default function WarehouseWorkspace({
           </button>
           <button
             type="button"
-            aria-label="Next dates"
+            aria-label="Next week"
             className="inline-flex h-7 w-7 items-center justify-center rounded-control border border-kit-slate-5 hover:bg-hovertint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
             onClick={() => step(1)}
             data-testid="ws-next"
@@ -237,13 +229,6 @@ export default function WarehouseWorkspace({
       <div className="flex min-h-0 flex-1 flex-col">
         {schedule.loading ? (
           <p className="p-4 text-body text-kit-slate-11">Loading…</p>
-        ) : isAgenda ? (
-          <AgendaDay
-            date={selectedDate}
-            cards={schedule.cards}
-            direction={direction}
-            feedFailed={feedFailed}
-          />
         ) : (
           <ScheduleBoard
             dates={dates}
@@ -313,7 +298,7 @@ function UnplacedWork({ cards, label, testId }: { cards: ScheduleCard[]; label: 
 }
 
 /**
- * THE BOARD — six equal date columns, ONE vertical scroll region.
+ * THE BOARD — every configured date, ONE scroll region that moves BOTH ways.
  *
  * The date headings are `sticky` INSIDE that single scroll container rather
  * than sitting in a second container above it. That is the whole trick: two
@@ -321,6 +306,17 @@ function UnplacedWork({ cards, label, testId }: { cards: ScheduleCard[]; label: 
  * by the width of a scrollbar, and every heading would sit a few pixels off
  * its own column. One container makes the gutter structurally equal, so no
  * width has to be hardcoded to compensate for one.
+ *
+ * It now carries the HORIZONTAL axis for the same reason. Because the heading
+ * and its column are two cells of ONE grid inside ONE scroller, scrolling
+ * sideways moves them together and a heading cannot drift off its own cards —
+ * which is exactly what a separate sticky header strip would have done. The
+ * vertical `sticky top-0` survives that unchanged.
+ *
+ * `min-w-0` on the scroller is load-bearing: without it this flex child adopts
+ * its 1440px content as its own floor, the page shell grows to match, and the
+ * WHOLE PORTAL scrolls sideways — sidebar and header dragged along with it —
+ * instead of the calendar scrolling inside its frame.
  *
  * No card gets its own scrollbar and no column gets a fixed height — a card
  * grows to hold every product line it has.
@@ -340,17 +336,34 @@ export function ScheduleBoard({
   today?: string;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-board">
+    <div className="min-h-0 min-w-0 flex-1 overflow-auto" data-testid="ws-board">
       {/* `gridTemplateRows: auto 1fr` is load-bearing. Without it the two
           implicit rows SHARE the leftover height, the heading row stretches to
           half the viewport, and every column's first card starts hundreds of
-          pixels below its own date. */}
+          pixels below its own date.
+
+          `minWidth` is what actually produces the scroll. `minmax(240px, 1fr)`
+          alone sets a TRACK floor, but the grid box itself would still be the
+          width of its container, and a sticky heading measured against a box
+          narrower than its own tracks paints its background short. Making the
+          box adopt the canvas — 1440px at six days — makes the box and its
+          tracks the same object, and the parent's `overflow-auto` then has
+          something real to scroll.
+
+          `min-content` rather than `columns × 240px`: the canvas width is the
+          sum of the track floors, and Law D says a derived fact has ONE
+          arithmetic. Multiplying the count by the constant here is a SECOND
+          arithmetic for the same number, and the two would agree only until
+          somebody gave one column a different floor. `min-content` asks the
+          tracks. */}
       <div
         className="grid min-h-full"
         style={{
-          gridTemplateColumns: `repeat(${dates.length || 1}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${dates.length || 1}, minmax(${COLUMN_MIN_PX}px, 1fr))`,
           gridTemplateRows: "auto 1fr",
+          minWidth: "min-content",
         }}
+        data-testid="ws-canvas"
       >
         {dates.map((date, i) => (
           <DateHeading
@@ -379,7 +392,18 @@ export function ScheduleBoard({
   );
 }
 
-/** 24px/32px number between two 11px/14px labels; 12px/16px cell padding. */
+/**
+ * 64px tall · 12px/16px padding · the day NUMBER on the left at 24px/32px,
+ * weekday and month stacked to its right at 11px/14px, 8px between them.
+ *
+ * The three-row stack this replaces (weekday over number over month) was 84px
+ * of chrome standing on top of every column, and it read as three separate
+ * facts. One glance should answer "which day is this" — the number carries
+ * that, and the two small labels qualify it without competing for the height
+ * the CARDS need. Every size here is a governed token: `text-page` is exactly
+ * 24px/32px at weight 600 and `text-label` exactly 11px/14px, so nothing in
+ * this heading is a hand-typed pixel.
+ */
 function DateHeading({
   date,
   first,
@@ -392,7 +416,7 @@ function DateHeading({
   const { weekday, day, month } = dateHeadingPartsOf(date);
   return (
     <div
-      className={`sticky top-0 ${Z_TABLE_HEADER} border-b bg-white px-4 py-3 ${
+      className={`sticky top-0 ${Z_TABLE_HEADER} flex h-16 items-center gap-2 border-b bg-white px-4 py-3 ${
         first ? "" : "border-l border-l-kit-slate-5"
       } ${
         /* TODAY is marked on the heading, never on the column body — a tinted
@@ -406,44 +430,21 @@ function DateHeading({
       data-testid={`ws-head-${date}`}
       data-today={isToday ? "yes" : undefined}
     >
-      <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
-        {isToday ? "Today" : weekday}
-      </div>
-      <div className={`text-page ${isToday ? "text-kit-blue-11" : "text-kit-slate-12"}`}>
+      <div
+        className={`text-page ${isToday ? "text-kit-blue-11" : "text-kit-slate-12"}`}
+        data-testid={`ws-head-day-${date}`}
+      >
         {day}
       </div>
-      <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
-        {month}
-      </div>
-    </div>
-  );
-}
-
-/** Narrow width — one selected date, the SAME cards and the same doors. */
-function AgendaDay({
-  date,
-  cards,
-  direction,
-  feedFailed,
-}: {
-  date: string;
-  cards: ScheduleCard[];
-  direction: WarehouseScheduleDirection;
-  feedFailed: boolean;
-}) {
-  const { weekday, day, month } = dateHeadingPartsOf(date);
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto" data-testid="ws-agenda">
-      <div
-        className={`sticky top-0 ${Z_TABLE_HEADER} border-b border-kit-slate-5 bg-white px-4 py-3`}
-        data-testid={`ws-head-${date}`}
-      >
-        <div className="text-label text-kit-slate-11">{weekday}</div>
-        <div className="text-page text-kit-slate-12">{day}</div>
-        <div className="text-label text-kit-slate-11">{month}</div>
-      </div>
-      <div className="flex flex-col gap-2 p-2">
-        <DayCards date={date} cards={cards} direction={direction} feedFailed={feedFailed} />
+      {/* `min-w-0` so a long month abbreviation wraps inside its own stack
+          rather than pushing the number out of a 240px column. */}
+      <div className="min-w-0">
+        <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+          {isToday ? "Today" : weekday}
+        </div>
+        <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
+          {month}
+        </div>
       </div>
     </div>
   );

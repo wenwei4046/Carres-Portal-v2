@@ -1,145 +1,183 @@
 /**
- * WAREHOUSE SCHEDULE PREVIEW — DEV ONLY (walk aid for the owner-approved
- * 2026-09-14 Schedule card).
+ * WAREHOUSE SCHEDULE PREVIEW — DEV ONLY (walk aid for the Schedule board).
  *
- * Same contract as `warehouse-monitor-preview.tsx`: the REAL board, the REAL
- * card component and the REAL stylesheet, with only the projection's OUTPUT
- * supplied as a fixture. A separate vite entry — it cannot reach production,
- * and none of these names, numbers or dates exist in the ERP.
+ * The REAL page inside the REAL portal shell: `PortalSidebar` beside
+ * `WarehouseWorkspace`, the real stylesheet, the real toolbar, and the real
+ * operating-date projection. Only two things are seeded — the session, and the
+ * Inbound register's RESPONSE. Everything else 404s, which is deliberate: the
+ * Settings endpoint refusing is exactly what a warehouse-role user meets in
+ * production, and the projection then falls back to the APPROVED standard
+ * warehouse week. So the dates on screen are the governed ones, not a fixture
+ * and not a hardcoded Monday–Saturday.
  *
- * It exists to make the measurements checkable: every state the card has to
- * render is on screen at once, so 36px rows, the 24px category slot, the four
- * progress states and a wrapping long name can be measured rather than
- * assumed.
+ * It exists to make the measurements checkable at a real viewport: the 240px
+ * column floor, the 64px date heading, the horizontal reach to the last day
+ * and the fact that the CALENDAR scrolls while the portal does not.
+ *
+ * A separate vite entry (`warehouse-schedule-preview.html`), not a route:
+ * `vite build` only emits `index.html`'s graph, so this cannot reach
+ * production. None of these names, numbers or dates exist in the ERP.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import type { WarehouseScheduleCard } from "@carres/shared";
-import { ScheduleBoard } from "@/pages/operation/WarehouseWorkspace";
+import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type {
+  InboundArrival,
+  InboundProduct,
+  WarehouseArrivalSourceFacts,
+} from "@carres/shared";
+import { useAuth } from "@/lib/auth";
+import PortalSidebar from "@/pages/portal/PortalSidebar";
+import WarehouseWorkspace from "@/pages/operation/WarehouseWorkspace";
 import "@/index.css";
 
-const DATES = [
-  "2026-09-14",
-  "2026-09-15",
-  "2026-09-16",
-  "2026-09-17",
-  "2026-09-18",
-  "2026-09-19",
-];
+useAuth.setState({
+  role: "operation",
+  user: { email: "sha@carres.co" } as never,
+});
+
+/** Calendar days from today — the PROJECTION decides which of them operate. */
+function inDays(n: number): string {
+  const at = new Date();
+  at.setDate(at.getDate() + n);
+  const p = (v: number) => String(v).padStart(2, "0");
+  return `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}`;
+}
+
+function product(over: Partial<InboundProduct> = {}): InboundProduct {
+  return { category: "Sofa", sku: "OH-K-01", name: "Ohana King", qty: 2, received: 0, ...over };
+}
 
 let n = 0;
-function card(over: Partial<WarehouseScheduleCard>): WarehouseScheduleCard {
+function arrival(over: Partial<InboundArrival> = {}): InboundArrival {
   n += 1;
+  const products = over.products ?? [product()];
+  const orderQty = products.reduce((t, p) => t + p.qty, 0);
+  const receivedQty = products.reduce((t, p) => t + p.received, 0);
   return {
     id: `demo-${n}`,
-    direction: "arrival",
-    kind: "supplier-delivery",
     sourceId: `src-${n}`,
-    sourceRef: "PO-2609-0001",
-    soRef: null,
-    doRef: null,
-    partyName: "Demo Supplier",
-    siteId: "demo-site",
-    date: DATES[1]!,
-    dateStatus: "expected",
-    lines: [],
-    driverConfirmedQty: null,
-    logisticsName: "Demo Logistics",
-    relatedRecords: [],
-    openHref: "/operation?tab=warehouse-inbound",
-    detailHref: "/operation/procurement/demo",
-    overdue: false,
+    sourceType: "supplier-delivery",
+    documentWord: "PO No",
+    documentNo: `PO-2609-${String(n).padStart(4, "0")}`,
+    party: "Ohana Furniture Sdn Bhd",
+    from: "Ohana Furniture Sdn Bhd",
+    siteId: "site-1",
+    site: "AL Sungai Buloh",
+    siteMapped: true,
+    destinationId: "dest-1",
+    destinationName: "AL Sungai Buloh",
+    date: inDays(0),
+    poDate: null,
+    poIssued: inDays(-20),
+    poDeliveryDate: inDays(0),
+    supplierDeliveryDate: null,
+    so: null,
+    expected: orderQty,
+    received: receivedQty,
+    remaining: orderQty - receivedQty,
+    issues: 0,
+    quantities: {
+      orderQty,
+      receivedQty,
+      damagedQty: 0,
+      wrongItemQty: 0,
+      pendingDeliveryQty: orderQty - receivedQty,
+      arrivedQty: receivedQty,
+      known: true,
+    },
+    products,
+    identitiesMissing: false,
+    sessionId: null,
+    sessions: [],
+    units: [],
     ...over,
   };
 }
 
-let l = 0;
-function line(over: Partial<WarehouseScheduleCard["lines"][number]>) {
-  l += 1;
-  return {
-    id: `line-${l}`,
-    categoryKey: "Mattress" as const,
-    modelLabel: "Demo Model 180x200",
-    plannedQty: 3,
-    receivedQty: null,
-    loadedQty: null,
-    damagedQty: null,
-    ...over,
-  };
-}
-
-const CARDS: WarehouseScheduleCard[] = [
-  /* Two records, same party, same date — two cards, never merged. */
-  card({ date: DATES[1], sourceRef: "PO-2609-0001", lines: [line({})] }),
-  card({
-    date: DATES[1],
-    sourceRef: "PO-2609-0002",
-    lines: [line({ categoryKey: "Bedframe", receivedQty: 0, plannedQty: 2 })],
+/* Spread across the next ten CALENDAR days. Whichever of them the governed
+   window actually operates is where these land — the harness never decides. */
+const ARRIVALS: InboundArrival[] = [
+  arrival({ date: inDays(0) }),
+  arrival({
+    date: inDays(0),
+    party: "Ohana Furniture Manufacturing Sendirian Berhad (Klang Branch)",
+    documentNo: "PO-2609-0007-REV-B",
+    products: [product({ name: "Ohana King", qty: 2, received: 2 }), product({ sku: "AC-LEG-04", name: "Steel leg set", category: "Accessory", qty: 8, received: 0 })],
   }),
-  /* The four progress states side by side. */
-  card({
-    date: DATES[2],
-    dateStatus: "scheduled",
-    sourceRef: "PO-2609-0003",
-    lines: [
-      line({ categoryKey: "Mattress", plannedQty: 3, receivedQty: null }),
-      line({ categoryKey: "Bedframe", plannedQty: 2, receivedQty: 0 }),
-      line({ categoryKey: "Sofa", plannedQty: 4, receivedQty: 2 }),
-      line({ categoryKey: "Pillow", plannedQty: 6, receivedQty: 6 }),
-    ],
-  }),
-  /* Damage inside the received count, plus a linked source record. */
-  card({
-    date: DATES[2],
-    kind: "customer-return",
-    sourceRef: "PO-2609-0004",
-    lines: [line({ plannedQty: 3, receivedQty: 3, damagedQty: 1 })],
-    relatedRecords: [{ id: "r", ref: "DO-2609-019", href: "#" }],
-    overdue: true,
-  }),
-  /* A long party name and a long reference — both must WRAP. */
-  card({
-    date: DATES[3],
-    partyName: "Demo Furniture Manufacturing Sendirian Berhad (Klang Branch)",
-    sourceRef: "PO-2609-0005-REV-B-REISSUE",
-    lines: [line({ categoryKey: "Mattress protector", plannedQty: 12 })],
-  }),
-  /* Five categories in ONE scope — five lines, no cap, no `+N more`. */
-  card({
-    date: DATES[4],
-    direction: "pickup",
-    kind: "customer_delivery_pickup",
-    soRef: "SO-1362",
-    doRef: "DO-2609-019",
-    partyName: "Demo Customer",
-    driverConfirmedQty: 4,
-    lines: (["Mattress", "Bedframe", "Sofa", "Pillow", "Topper"] as const).map((c) =>
-      line({ categoryKey: c, plannedQty: 1, loadedQty: 1 }),
-    ),
-  }),
-  /* No agreed date, no door — neutral, and nothing invented. */
-  card({
-    date: DATES[5],
-    dateStatus: null,
-    sourceRef: "PO-2609-0006",
-    openHref: null,
-    detailHref: null,
-    lines: [line({ categoryKey: "Accessory", plannedQty: 1 })],
-  }),
+  arrival({ date: inDays(1), party: "Seng Heng Timber" }),
+  arrival({ date: inDays(1), party: "Kinta Upholstery", products: [product({ sku: "KT-2S-09", name: "Kinta 2-seater", qty: 3, received: 1 })] }),
+  arrival({ date: inDays(2), party: "Seng Heng Timber" }),
+  arrival({ date: inDays(3), party: "Ohana Furniture Sdn Bhd" }),
+  arrival({ date: inDays(4), party: "Kinta Upholstery" }),
+  arrival({ date: inDays(5), party: "Seng Heng Timber" }),
+  arrival({ date: inDays(6), party: "Ohana Furniture Sdn Bhd" }),
+  arrival({ date: inDays(7), party: "Kinta Upholstery" }),
+  arrival({ date: inDays(8), party: "Seng Heng Timber" }),
+  /* A DEEP COLUMN — enough work on one date to overflow the frame, so the
+     sticky heading and the vertical scroll are actually exercised rather than
+     assumed. A real Thursday looks like this. */
+  ...Array.from({ length: 7 }, (_, i) =>
+    arrival({
+      date: inDays(1),
+      party: ["Seng Heng Timber", "Kinta Upholstery", "Ohana Furniture Sdn Bhd"][i % 3],
+      products: [product({ qty: i + 1, received: i % 3 === 0 ? 1 : 0 })],
+    }),
+  ),
 ];
+
+/* The ORDERED lines and the date standing — the two facts `InboundArrival`
+   does not carry. Supplying them is what makes the card print real product
+   identity, the category icon and the received-vs-ordered arithmetic instead
+   of falling back to recorded Units. */
+const SOURCE_FACTS: WarehouseArrivalSourceFacts[] = ARRIVALS.map((a, i) => ({
+  sourceId: a.sourceId,
+  dateStatus: i % 4 === 0 ? "scheduled" : "expected",
+  lines: a.products.map((p, j) => ({
+    id: `${a.sourceId}-L${j + 1}`,
+    sku: p.sku,
+    qty: p.qty,
+  })),
+}));
+
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (url.includes("/api/operation/warehouse/inbound")) {
+    return new Response(
+      JSON.stringify({
+        arrivals: ARRIVALS,
+        sites: [{ id: "site-1", name: "AL Sungai Buloh" }],
+        sourceFacts: SOURCE_FACTS,
+        skuCategories: [
+          { sku: "OH-K-01", category: "Sofa" },
+          { sku: "KT-2S-09", category: "Sofa" },
+          { sku: "AC-LEG-04", category: "Accessory" },
+        ],
+        page: { offset: 0, limit: 200, total: ARRIVALS.length },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+  /* Everything else refuses, exactly as it does for a warehouse-role user. */
+  if (url.startsWith("/api/")) return new Response(JSON.stringify({}), { status: 404 });
+  return realFetch(input, init);
+};
+
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <div className="flex h-screen flex-col bg-kit-canvas">
-        <ScheduleBoard
-          dates={DATES}
-          cards={CARDS}
-          direction="arrival"
-          feedFailed={false}
-        />
-      </div>
-    </BrowserRouter>
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/operation?tab=warehouse-arrival-schedule"]}>
+        <div className="flex h-screen bg-base-100">
+          <PortalSidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <WarehouseWorkspace direction="arrival" />
+          </div>
+        </div>
+      </MemoryRouter>
+    </QueryClientProvider>
   </StrictMode>,
 );

@@ -118,7 +118,9 @@ beforeEach(() => {
   wide = true;
   setSchedule();
   window.matchMedia = ((query: string) => ({
-    /* The page asks `(max-width: 1279px)` — true means the agenda. */
+    /* The Schedule no longer asks matchMedia at all — the week survives at
+       every width. The stub stays because jsdom has no matchMedia and other
+       shell components in the tree may still ask. */
     matches: !wide,
     media: query,
     addEventListener: () => {},
@@ -167,7 +169,9 @@ describe("the board", () => {
     mount();
     for (const d of DATES) expect(screen.getByTestId(`ws-col-${d}`)).toBeInTheDocument();
     const grid = screen.getByTestId("ws-board").firstElementChild as HTMLElement;
-    expect(grid.style.gridTemplateColumns).toBe("repeat(6, minmax(0, 1fr))");
+    /* `minmax(0, …)` let six columns squeeze to unreadable slivers rather
+       than scroll; the floor is now 240px (owner ruling 2026-09-16). */
+    expect(grid.style.gridTemplateColumns).toBe("repeat(6, minmax(240px, 1fr))");
   });
 
   it("names the page Arrival Schedule or Pickup Schedule — never Monitor", () => {
@@ -524,19 +528,95 @@ describe("long values and the narrow viewport", () => {
     expect(screen.getByTestId("ws-card-party")).toHaveTextContent(longName);
     expect(screen.getByTestId("ws-card-party").className).toContain("break-words");
     expect(screen.getByTestId("ws-card-party").className).not.toContain("truncate");
+    /* MEASURED 2026-09-16 — the name's flex FLOOR decides whether the header
+       is one line at the governed 240px column. A 6rem floor needed 198px of
+       the 197px available and pushed the pill and the door onto a second line
+       in EVERY card; 5rem fits. jsdom has no layout, so the number is locked
+       here and the measurement lives in the component's comment. */
+    expect(screen.getByTestId("ws-card-party").className).toContain("flex-[1_1_5rem]");
     expect(screen.getByTestId("ws-card-ref-primary")).toHaveTextContent(
       "PO-2609-0001-REV-B-REISSUE",
     );
   });
 
-  it("below 1280px shows ONE date with the same records and the same doors", () => {
+  it("a narrow viewport keeps EVERY configured date — the week is never truncated", () => {
+    /* THE REGRESSION THIS FILE EXISTS FOR (owner ruling 2026-09-16). The page
+       used to swap to a one-day agenda below 1280px, and five days of
+       committed work left the screen with nothing saying they existed. */
     wide = false;
     setSchedule({ cards: [card({ date: "2026-09-14" })] });
     mount();
-    expect(screen.getByTestId("ws-agenda")).toBeInTheDocument();
-    expect(screen.queryByTestId("ws-board")).toBeNull();
+
+    expect(screen.queryByTestId("ws-agenda")).toBeNull();
+    expect(screen.getByTestId("ws-board")).toBeInTheDocument();
+    for (const date of DATES) {
+      expect(screen.getByTestId(`ws-head-${date}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`ws-col-${date}`)).toBeInTheDocument();
+    }
+
+    /* the same records and the same doors as the wide board */
     expect(screen.getByTestId("ws-card-c1")).toBeInTheDocument();
     expect(screen.getByTestId("ws-card-open")).toBeInTheDocument();
+  });
+
+  it("the canvas is columns × 240px, so six days overflow a narrow frame", () => {
+    wide = false;
+    setSchedule();
+    mount();
+
+    const canvas = screen.getByTestId("ws-canvas");
+    expect(canvas.style.gridTemplateColumns).toBe(
+      `repeat(${DATES.length}, minmax(240px, 1fr))`,
+    );
+    /* 6 × 240 = 1440px of canvas — wider than the 703px frame it must scroll
+       inside, which is the whole mechanism. The box takes that width from the
+       TRACKS (`min-content`) rather than from a second multiplication of the
+       same two numbers; Law D wants one arithmetic, and jsdom cannot lay the
+       grid out to check the resolved pixels. */
+    expect(canvas.style.minWidth).toBe("min-content");
+  });
+
+  it("the card CONTAINS its screen-reader label, so the portal cannot be dragged sideways", () => {
+    /* `sr-only` is `position:absolute`. Measured at 703×704 on 2026-09-16:
+       with the card `static`, the last column's hidden `N of M received`
+       label resolved against the INITIAL containing block, landed at x=1441
+       on the 1440px canvas, and stretched the document to 1442px — the whole
+       portal scrolled sideways behind a calendar meant to scroll in-frame. */
+    setSchedule({ cards: [card({ lines: [line({ plannedQty: 2, receivedQty: 0 })] })] });
+    mount();
+    const article = screen.getByTestId("ws-card-c1");
+    expect(article.className).toContain("relative");
+    /* The 140px is a FLOOR. A ceiling or a clip would hide product lines. */
+    expect(article.className).toContain("min-h-[140px]");
+    expect(article.className).not.toContain("max-h-");
+    expect(article.className).not.toContain("overflow-hidden");
+    expect(screen.getByTestId("ws-line-progress").querySelector(".sr-only")).not.toBeNull();
+  });
+
+  it("the calendar scrolls, never the portal — one scroller, both axes", () => {
+    setSchedule();
+    mount();
+    const board = screen.getByTestId("ws-board");
+    expect(board.className).toContain("overflow-auto");
+    /* Without `min-w-0` this flex child adopts the 1440px canvas as its own
+       floor and drags the sidebar and header sideways with it. */
+    expect(board.className).toContain("min-w-0");
+    /* The page root is a flex child of the shell too — its default
+       `min-width:auto` is the classic escape hatch for a wide descendant. */
+    expect(screen.getByTestId("warehouse-arrival-schedule").className).toContain("min-w-0");
+  });
+
+  it("the date header is 64px with the number beside its labels, not stacked in three rows", () => {
+    setSchedule();
+    mount();
+    const head = screen.getByTestId("ws-head-2026-09-15");
+    expect(head.className).toContain("h-16");
+    expect(head.className).toContain("gap-2");
+    /* `text-page` IS 24px/32px weight 600 and `text-label` IS 11px/14px —
+       governed tokens, so the sizes cannot drift without the config moving. */
+    const day = screen.getByTestId("ws-head-day-2026-09-15");
+    expect(day.className).toContain("text-page");
+    expect(day).toHaveTextContent("15");
   });
 
   it("Previous uses the PROJECTION's answer, never its own arithmetic", () => {
@@ -570,12 +650,16 @@ describe("long values and the narrow viewport", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-20");
   });
 
-  it("narrow previous/next walks ONE governed operating date, not a raw calendar day", () => {
+  it("a narrow viewport pages the WEEK, exactly as the wide board does", () => {
+    /* It used to advance one date at narrow width. With every date on screen
+       there is no single date to advance, and two navigation grammars for one
+       control was the confusion this removes. */
     wide = false;
     setSchedule();
     mount();
     fireEvent.click(screen.getByTestId("ws-next"));
-    expect(screen.getByTestId("location")).toHaveTextContent("date=2026-09-15");
+    expect(screen.getByTestId("location")).toHaveTextContent("from=2026-09-20");
+    expect(screen.getByTestId("location").textContent ?? "").not.toContain("date=");
   });
 });
 
@@ -749,16 +833,18 @@ describe("finding today", () => {
 
 
 /**
- * NARROW SCREENS — owner refinement 2026-09-15.
+ * NARROW SCREENS — owner refinement 2026-09-15, CORRECTED 2026-09-16.
  *
  * The shell already collapses its own rail to 60px below 1280 and offers
  * `Show menu` to reopen it (`PortalSidebar`, its own test). What nothing
  * covered was the other half of that width: that the Schedule standing beside
- * the collapsed rail keeps the single-day view, its date navigation and its
- * card actions. No Schedule-specific navigation exists, and none should.
+ * the collapsed rail keeps its dates, its date navigation and its card
+ * actions. The 2026-09-15 answer was a single-day view; the owner overturned
+ * it on 2026-09-16 because a day the operator cannot see is work the operator
+ * cannot plan. The week now survives and the frame scrolls.
  */
 describe("the narrow width keeps the work, not just the layout", () => {
-  it("shows ONE day with date navigation, Today, and the card's own door", () => {
+  it("shows EVERY day with date navigation, Today, and the card's own door", () => {
     wide = false;
     setSchedule({
       cards: [
@@ -770,9 +856,10 @@ describe("the narrow width keeps the work, not just the layout", () => {
     });
     mount();
 
-    /* single-day view, not the six-column board */
-    expect(screen.getByTestId("ws-agenda")).toBeInTheDocument();
-    expect(screen.queryByTestId("ws-board")).toBeNull();
+    /* the full board, never a single-day substitute */
+    expect(screen.queryByTestId("ws-agenda")).toBeNull();
+    expect(screen.getByTestId("ws-board")).toBeInTheDocument();
+    expect(screen.getByTestId(`ws-head-${DATES[DATES.length - 1]}`)).toBeInTheDocument();
 
     /* date navigation survives */
     expect(screen.getByTestId("ws-prev")).toBeInTheDocument();
@@ -795,7 +882,7 @@ describe("the narrow width keeps the work, not just the layout", () => {
     expect(screen.getByTestId("location").textContent ?? "").not.toContain("date=");
   });
 
-  it("undated work is still reachable when the board is one day wide", () => {
+  it("undated work is still reachable at a narrow width", () => {
     wide = false;
     setSchedule({
       cards: [card({ date: null, openHref: "/operation?tab=warehouse-inbound&source=po-9" })],
