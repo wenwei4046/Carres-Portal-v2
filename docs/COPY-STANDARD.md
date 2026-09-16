@@ -922,11 +922,11 @@ sidebar page. Existing implementation constants do not override these approved p
 |---|---|
 | Page | No page — use `SO Batch Purchase` or the source object |
 | Search | `Search Sales Order, customer, SKU or supplier…` |
-| Rail headings | `TO ORDER` · `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
+| Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
-| Register columns (Card 02-B, 2026-08-27 — exactly, in this order) | `Status` · `Proceed Date` · `PO No` · `SO No` · `Customer` · `Delivery Location` · `Requested Delivery Date` · `Supplier` · `Deliver To` · `PO Delivery Date` |
+| Register columns (owner approval 2026-09-16 — exactly, in this order) | `SO No` · `Order By` · `Customer` · `Proceed Date` · `Requested Delivery Date` · `Delivery Location` · `Supplier` · `Deliver To` · `PO No` · `PO Delivery Date` |
 | `Proceed Date` on SO Batch Purchase | The actual date Sales handed the complete order to Operations (`orders.proceeded_at`). Never the planned production-start field (`orders.proceed_date`) |
-| The Status words | blank · `Partial` · `Ordered` — and nothing else. Never `Ready Stock` · `Ready to buy` · `Cannot buy` · `No buying needed` · `Posted` · `Sent` · `Not sent` · `Covered` |
+| Parent Status column | Retired. Do not restore `Partial` / `Ordered` as status pills or footer tallies. `To buy` / `No purchase needed` are the separately approved table group headings, not stored statuses. |
 | A parent cell over several values | one value prints itself; several print `2 POs` · `2 suppliers` · `Multiple` — the exact mapping lives in the expansion |
 | Open local filter-rail control | `Hide filters` |
 | Hidden local filter-rail control | `Show filters` |
@@ -940,6 +940,17 @@ on rows. Do not write Yu Jun's name in the action sentence. The compact chip car
 `Issue PO` remains the one governed verb. This selected action replaces the Register's top Work
 Toolbar above the column headings; it is never a second bar at the bottom of the table. Summary,
 `Clear`, owner chip and `Issue PO` stay left; `Export Excel` stays at the far right.
+
+**SO Batch corrections — owner approved 2026-09-16.** `Not planned` means the
+Order By cannot yet be stated for the blocked demand. `No Sales Orders match these filters`
+with `Clear filters` is distinct from `No proceeded Sales Orders.`. The singular is
+`1 Sales Order`; narrowed scope remains `{n} of {total} Sales Orders`.
+`Only PO Duty can issue this PO` explains an unavailable Issue button.
+
+**SO Batch grouped Register — owner approved 2026-09-16.** `To buy` and
+`No purchase needed` are table group headings, never rail rows or stored statuses. The second
+includes PO coverage and Ready Stock coverage; `Ordered` must not describe an order with no PO.
+This dated group-heading ruling permits these words here only; the retired rail stays retired.
 
 **Purchasing and Receiving date facts — owner ruling 2026-08-29.** These words are never
 interchangeable:
@@ -1032,7 +1043,7 @@ fact rows print their live count, zero included; a supplier or region row exists
 matches — except the selected row, which stays visible with `0`. Region reads the server's
 recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
 outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
-shows every proceeded record. The outstanding arithmetic reads customer quantity less Ready Stock
+retains every proceeded record in `To buy` (expanded) and `No purchase needed` (initially collapsed). The outstanding arithmetic reads customer quantity less Ready Stock
 already taken and less exact, non-cancelled PO lineage. A generic Open PO SKU pool is not proof
 that this SO was ordered; without exact `po_line_sources` the units stay outstanding. The issue
 leaf is not the coverage authority. One filter per section; sections combine; a second click on
@@ -3375,14 +3386,3 @@ Before merging a UI change:
 Warehouse receiving summary: **Physical arrived Qty {n}** is physical arrival, separate from accepted **Received Qty {n}**. **Loading** opens the owning exact-Unit loading workspace. **Back to Outbound** returns to the preserved register.
 
 Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver confirmation.** distinguishes the Warehouse act from the driver's act. **Loading and driver confirmation recorded.** requires both facts. **Loading evidence is still missing.** names the separate evidence gap. **Open Delivery Order** opens the owning DO. A refused scan stays visible: **{Unit ID} is not a Unit this delivery order requires. Check the label and scan the required Unit.** or **{Unit ID} was already loaded. Scan a Unit still to load.** The entered ID remains available for correction or retry.
-
-**SO Batch corrections — owner approved 2026-09-16.** `Not planned` means the
-Order By cannot yet be stated for the blocked demand. `No Sales Orders match these filters`
-with `Clear filters` is distinct from `No proceeded Sales Orders.`. The singular is
-`1 Sales Order`; narrowed scope remains `{n} of {total} Sales Orders`.
-`Only PO Duty can issue this PO` explains an unavailable Issue button.
-
-**SO Batch grouped Register — owner approved 2026-09-16.** `To buy` and
-`No purchase needed` are table group headings, never rail rows or stored statuses. The second
-includes PO coverage and Ready Stock coverage; `Ordered` must not describe an order with no PO.
-This dated group-heading ruling permits these words here only; the retired rail stays retired.

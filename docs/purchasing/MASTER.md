@@ -901,11 +901,11 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   they are the daily worklist, not a fact list.
 - **⭐ `TO ORDER / All not ordered` IS RETIRED — owner correction 2026-09-11.** It was the one
   rail row that named no FACT about a Sales Order: it named the page's own DEFAULT, which is
-  exactly what an operator already sees with nothing selected — and it sat ABOVE `ORDER TIMING`,
+  the unfiltered purchasing population — and it sat ABOVE `ORDER TIMING`,
   the section that answers *what to buy today*. The section, the row and the word are gone from
   this surface and may not return under another spelling. **The arithmetic behind it is
-  untouched** (`soBatchOrderLineOutstandingQty`): customer quantity less the Ready Stock ledger
-  draw less exact non-cancelled `po_line_sources` lineage still governs the tick and the Ready
+  untouched** (`soBatchOrderLineOutstandingQty`): customer quantity less current Ready Stock coverage
+  less exact non-cancelled `po_line_sources` lineage still governs the tick and the Ready
   Stock reservation door. Manual Purchase keeps its OWN `All not ordered` (§9.2) — a different
   object, a different arithmetic, and this ruling does not reach it.
 - **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
@@ -1090,7 +1090,7 @@ when the customer wants it, where it goes, who supplies it, where the goods land
 documents. `SO No` is the identity and stays sticky during horizontal scrolling. `Proceed Date`
 reads `orders.proceeded_at`: the actual date Sales handed the complete order to Operations. It
 never reads `orders.proceed_date`, the planned production-start date. The saved column layout key
-was bumped to `…register.v3` in the same change, because a stored arrangement would otherwise pin
+is `…register.v4` for the approved Order By column, because a stored arrangement would otherwise pin
 a returning operator to the retired order.
 
 - **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·

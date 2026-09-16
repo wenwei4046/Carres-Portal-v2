@@ -35,7 +35,8 @@ avoid calling Ready-Stock-only coverage `Ordered`.
 
 ## Delivery evidence
 
-Local implementation and focused verification complete; release gates and delivery remain open.
+Local implementation, typecheck, lint, migration guard and production build pass.
+Draft PR: https://github.com/wenwei4046/Carres-Portal-v2/pull/1395. CI and delivery remain open.
 
 - Demand regression was red for both release and reassignment with retained usage. Actual
   reservation SQL → release/reassign SQL → GET demands now restores `stockTaken=0`, `toBuy=1`,
@@ -63,6 +64,10 @@ Local implementation and focused verification complete; release gates and delive
   them unchanged. Both have `search_path=public, pg_temp`; neither body contains the 0500
   `v_role is null` phrase. Do not silently replace these differing live bodies.
 
-Pending: final type/build/CI proof; exact committed SQL rollback probe and approval before any
-numbered migration lands; PR/merge/deploy and authenticated production walkthrough. The groups
+Production rollback probe against committed `4bf5c50a` passed: the candidate leaves both live
+function hashes unchanged, and the exact repair block rejects an unknown temporary function body
+(the negative control). The transaction rolled back; no production function or tracker changed.
+
+Pending: final CI proof; approval before any numbered migration lands; merge/deploy and
+authenticated production walkthrough. The groups
 and labels are already owner-approved and require no further confirmation.
