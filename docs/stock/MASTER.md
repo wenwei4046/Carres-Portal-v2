@@ -347,9 +347,23 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
 Arrival Schedule and Pickup Schedule are separate full-width six-working-day projections. Registers
-have date filters instead of calendar strips. Cards preserve the owning document and Site, use
-quiet Expected/Scheduled badges, and show real loading separately from driver acceptance. Delayed
-and undated work stays reachable under its real dates; no automatic rescheduling occurs.
+have date filters instead of calendar strips.
+
+**EVERY CONFIGURED WORKING DAY SURVIVES EVERY VIEWPORT WIDTH — owner ruling 2026-09-16, APPROVED /
+LOCKED.** The board previously swapped to a single-date agenda below 1280px; at 703px the operator
+saw one column and five days of committed work left the screen with no control saying they existed.
+That is a loss, not an adaptation: the operator plans Thursday's lorry while standing on Tuesday, so
+the week is the unit of the job and is never silently truncated to fit a screen. A narrow screen
+SCROLLS to the sixth day instead of hiding it. Each date column holds a **240px floor** — the width
+at which a supplier name still stands beside its date badge and open door — so six dates make a
+1440px calendar canvas that scrolls horizontally inside its own frame. The portal itself never
+scrolls sideways, date headings stay sticky at the calendar's top and stay aligned with their own
+column, and previous/next page the whole week at every width. The date sequence remains the governed
+projection's; this law fixes presentation only and hardcodes no weekday.
+
+Cards preserve the owning document and Site, use quiet Expected/Scheduled badges, and show real
+loading separately from driver acceptance. Delayed and undated work stays reachable under its real
+dates; no automatic rescheduling occurs.
 
 The daily journey is: open the appropriate schedule, follow its exact Inbound or Outbound entry,
 complete the owning receipt or loading action, and read the resulting Inventory and evidence.

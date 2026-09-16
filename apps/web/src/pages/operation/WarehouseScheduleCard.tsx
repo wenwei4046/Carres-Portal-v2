@@ -58,9 +58,23 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
     <article
       data-testid={`ws-card-${card.id}`}
       data-direction={card.direction}
-      /* 1px border · 10px corner · NO decorative shadow. The surface says one
-         thing only, and it is not date agreement: `overdue`. */
-      className={`min-w-0 rounded-card border ${cardSurfaceClassOf(card)}`}
+      /* 1px border · 10px corner (`rounded-card`) · NO decorative shadow. The
+         surface says one thing only, and it is not date agreement: `overdue`.
+
+         The 140px floor is a RHYTHM, not a box: it keeps a one-line card and a
+         four-line card close enough in height that a column scans as a stack
+         of days rather than a ragged pile, and `min-h` never caps growth — a
+         card with eleven product lines is eleven product lines tall. */
+      /* `relative` is CONTAINMENT, not decoration. The receipt arithmetic
+         carries a visually-hidden `sr-only` label, and `sr-only` is
+         `position:absolute`. With no positioned ancestor it resolves against
+         the INITIAL containing block, so on a 1440px calendar canvas the last
+         column's hidden label landed at x=1441 and stretched the DOCUMENT to
+         1442px — the whole portal, sidebar included, scrolled sideways behind
+         a calendar that was supposed to scroll inside its own frame. Measured
+         at 703×704, 2026-09-16. The label is contained here instead of being
+         removed: it is what a screen reader reads out for the arithmetic. */
+      className={`relative flex min-h-[140px] min-w-0 flex-col rounded-card border ${cardSurfaceClassOf(card)}`}
       aria-label={`${party} · ${refs.primary.ref}`}
     >
       {/* ── 1 · HEADER — 8px/12px padding, 4px gaps, and it WRAPS.
