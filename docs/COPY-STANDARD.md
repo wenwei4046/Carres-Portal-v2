@@ -1553,6 +1553,11 @@ do not take the five-string shape.
 | `Received Qty` | per-line physical count | What physically arrived in this receiving session; it is distinct from damaged and wrong quantities. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
+| `Prefilled results are not confirmed. Check the goods before saving.` | active receiving form | Proposed input is not proof of physical verification; owner-approved operator-flow review, 2026-09-16. |
+| `Receiving results confirmed. Not saved yet.` | confirmed receiving draft | Explicit review is distinct from saved receipt/GRN. |
+| `Proposed results · not saved` | live Receiving Summary | These quantities describe the draft, not a completed receipt. |
+| `I checked the goods and confirm these receiving results.` | receiving confirmation | Confirmation belongs to the exact draft, including evidence; changing the draft requires confirmation again. |
+| `Save — confirm receiving results` | save blocker | Names the missing verification once other required facts are present. |
 | `Save — {what is missing}` | the Save button otherwise | The button NAMES the gap: `Save — add a DO number` · `Save — upload signed DO` · `Save — count at least one unit`. A grey button that will not say why is a puzzle. |
 | `Pending Delivery Qty after save: {n}` | beside Save | Quiet, never a popup: a short receipt is normal, the number stays on the source PO, and routine confirms train people to click OK. |
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
@@ -3322,3 +3327,5 @@ Before merging a UI change:
 `This action is no longer available. Use Ready Stock in SO Batch Purchase.` — HTTP 410 refusal for the retired `warehouse` and `transfer-ready` doors. The drawer no longer offers `Transfer to ready`. The destination uses the existing governed Ready Stock journey, never a replacement stock writer.
 
 Warehouse receiving summary: **Physical arrived Qty {n}** is physical arrival, separate from accepted **Received Qty {n}**. **Loading** opens the owning exact-Unit loading workspace. **Back to Outbound** returns to the preserved register.
+
+Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver confirmation.** distinguishes the Warehouse act from the driver's act. **Loading and driver confirmation recorded.** requires both facts. **Loading evidence is still missing.** names the separate evidence gap. **Open Delivery Order** opens the owning DO. A refused scan stays visible: **{Unit ID} is not a Unit this delivery order requires. Check the label and scan the required Unit.** or **{Unit ID} was already loaded. Scan a Unit still to load.** The entered ID remains available for correction or retry.

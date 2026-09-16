@@ -182,9 +182,11 @@ describe("Warehouse Outbound — the unified Register", () => {
     fireEvent.click(screen.getByTestId("wo-scan-btn"));
     await waitFor(() => expect(screen.getByTestId("wo-scan-btn")).not.toBeDisabled());
     expect(input).toHaveValue("U1-260-019");
+    expect(screen.getByRole("alert")).toHaveTextContent("Connection failed");
     fireEvent.click(screen.getByTestId("wo-scan-btn"));
     await waitFor(() => expect(input).toHaveValue(""));
     expect(attempts).toBe(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("keeps a fully loaded but unconfirmed pickup visible without calling it Done", async () => {
@@ -196,6 +198,9 @@ describe("Warehouse Outbound — the unified Register", () => {
     fireEvent.click(screen.getByTestId("wo-open-loading-DO-2609-019"));
     expect(screen.getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent("Loaded · Awaiting driver confirmation");
     expect(screen.queryByRole("button", { name: /confirm.*driver/i })).toBeNull();
+    expect(screen.queryByTestId("wo-scan-input")).toBeNull();
+    expect(screen.getByTestId("wo-loading-next-step")).toHaveTextContent("Awaiting driver confirmation");
+    expect(screen.getByRole("link", { name: "Open Delivery Order" })).toHaveAttribute("href", "/operation/delivery-orders/DO-2609-019");
   });
   it("has the pickup-status rail and separate carrier/driver facts, and keeps the two evidence records apart", async () => {
     stubApi();
