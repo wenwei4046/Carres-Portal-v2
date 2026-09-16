@@ -21,16 +21,19 @@
  * The page WRITES NOTHING. A row is a door to the Sales Order Workspace.
  * There is no Done button anywhere, structurally.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { groupWorkItemsByDay, orderActionLines, workspaceDutyLabelOf } from "@carres/shared";
+import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
+import SearchInput from "@/components/kit/SearchInput";
+import Select from "@/components/kit/Select";
 import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
+import { filterWork, workSections, type WorkWhen } from "./work/work-model";
 
 type ViewKey = "mine" | "team";
 
@@ -40,6 +43,18 @@ const TONE_DOT: Record<string, string> = {
   info: "bg-info",
   success: "bg-success",
   neutral: "bg-base-300",
+};
+
+const MODULE_LABEL: Record<OperationWorkModule, string> = {
+  orders: "Sales Orders",
+  purchasing: "Purchasing",
+  receiving: "Receiving",
+  claims: "Claims",
+  stock: "Stock",
+  delivery: "Delivery",
+  payment: "Payment",
+  service_case: "Service Case",
+  issue_tracker: "Issue Tracker",
 };
 
 /** Timing is metadata. Object, problem, and action keep their own ranks. */
@@ -68,9 +83,11 @@ function deliveryLines(item: WorkRow): { act: string; result: string | null } | 
 function WorkRowButton({
   item,
   onOpen,
+  scope,
 }: {
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
+  scope: ViewKey;
 }) {
   const delivery = deliveryLines(item);
   return (
@@ -78,39 +95,44 @@ function WorkRowButton({
       type="button"
       data-testid={`work-row-${item.soRef}-${item.ruleKey}`}
       onClick={() => onOpen(item)}
-      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-base-50"
+      className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-base-50"
     >
       <span
         aria-hidden="true"
         className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[item.broken ? "danger" : item.tone] ?? "bg-base-300"}`}
       />
       <span className="flex-1 min-w-0">
-        <span className="block truncate text-label font-semibold text-base-500">
-          {item.soRef}
+        <span className="block text-label font-semibold text-base-500">
+          {item.soRef} · {MODULE_LABEL[item.module]}
         </span>
-        <span className={`${cjkClassName(item.problem)} block truncate text-body font-semibold text-base-900`}>
+        <span className={`${cjkClassName(item.problem)} block text-body font-semibold text-base-900`}>
           {item.problem}
         </span>
-        <span className={`${cjkClassName(item.action)} block truncate text-body text-base-700`}>
+        <span className={`${cjkClassName(item.action)} block text-body text-base-700`}>
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {delivery?.act ?? item.action}
+          {delivery?.act ?? item.action}{item.recipient ? ` · ${item.recipient}` : ""}
         </span>
-        {delivery?.result ? (
+        {item.requiredResult ? (
           <span
-            className="block truncate text-body text-base-700"
+            className="block text-body text-base-600"
             data-testid="work-row-result"
           >
-            {delivery.result}
+            {delivery?.result ?? item.requiredResult}
           </span>
         ) : null}
         <span
-          className={`block truncate text-label font-normal ${
+          className={`block text-label font-normal ${
             item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
           }`}
         >
           {supportingLine(item)}
+          {item.ownerState === "covered" && item.activeCover
+            ? scope === "mine"
+              ? ` · Covered for ${item.normalOwner?.name ?? "normal owner"}`
+              : ` · Covered by ${item.activeCover.name ?? "cover"}`
+            : ""}
         </span>
       </span>
     </button>
@@ -119,7 +141,7 @@ function WorkRowButton({
 
 export default function OperationWork() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
 
   const authEmail = useAuth((s) => s.user?.email ?? null);
 
@@ -129,11 +151,24 @@ export default function OperationWork() {
   const linkedScope = params.get("scope");
   const linkedOwner = params.get("owner");
   const linkedWhen = params.get("when");
-  const [view, setView] = useState<ViewKey | null>(
-    linkedScope === "team" ? "team" : linkedScope === "mine" ? "mine" : null,
-  );
-  const activeView: ViewKey = view ?? "mine";
-  const [ownerFocus, setOwnerFocus] = useState<string | null>(linkedOwner);
+  const activeView: ViewKey = linkedScope === "team" ? "team" : "mine";
+  const ownerFocus = linkedOwner;
+  const search = params.get("q") ?? "";
+  const when: WorkWhen = ["broken", "overdue", "today", "later", "no_date"].includes(linkedWhen ?? "")
+    ? linkedWhen as WorkWhen
+    : "all";
+  const moduleParam = params.get("module");
+  const moduleFilter: OperationWorkModule | "all" = [
+    "orders", "purchasing", "receiving", "claims", "stock", "delivery", "payment", "service_case", "issue_tracker",
+  ].includes(moduleParam ?? "") ? moduleParam as OperationWorkModule : "all";
+  const covered = params.get("covered") === "1";
+
+  const updateParam = (key: string, value: string | null) => setParams((before) => {
+    const next = new URLSearchParams(before);
+    if (!value || value === "all") next.delete(key);
+    else next.set(key, value);
+    return next;
+  }, { replace: true });
 
   const myUserId = useMemo(() => {
     if (!authEmail) return null;
@@ -146,24 +181,10 @@ export default function OperationWork() {
     () => (myUserId ? allItems.filter((i) => i.ownerId === myUserId) : []),
     [allItems, myUserId],
   );
-  const mine = useMemo(() => {
-    if (linkedWhen === "overdue") {
-      return mineAll.filter((item) => item.workingDaysLate > 0);
-    }
-    if (linkedWhen === "today") {
-      return mineAll.filter(
-        (item) => item.workingDaysLate === 0 && item.dueIso === new Date().toISOString().slice(0, 10),
-      );
-    }
-    if (linkedWhen === "later") {
-      const today = new Date().toISOString().slice(0, 10);
-      return mineAll.filter(
-        (item) => item.workingDaysLate === 0 && (item.dueIso === null || item.dueIso > today),
-      );
-    }
-    return mineAll;
-  }, [linkedWhen, mineAll]);
-  const myGroups = useMemo(() => groupWorkItemsByDay(mine), [mine]);
+  const filters = useMemo(() => ({ search, when, module: moduleFilter, covered }), [search, when, moduleFilter, covered]);
+  const mine = useMemo(() => filterWork(mineAll, filters), [filters, mineAll]);
+  const myGroups = useMemo(() => workSections(mine), [mine]);
+  const filteredTeamItems = useMemo(() => filterWork(allItems, filters), [allItems, filters]);
 
   /** Team Work — grouped per RESOLVED owner (§0.1 Action Owner Engine,
    *  2026-08-27): an ops account (PIC · PO-duty holder), a named non-account
@@ -171,7 +192,7 @@ export default function OperationWork() {
    *  word. */
   const teamGroups = useMemo(() => {
     const byOwner = new Map<string, WorkRow[]>();
-    for (const i of allItems) {
+    for (const i of filteredTeamItems) {
       const key =
         i.normalOwnerId ??
         (i.ownerName
@@ -216,14 +237,16 @@ export default function OperationWork() {
     return groups.sort((a, b) =>
       a.person && !b.person ? -1 : !a.person && b.person ? 1 : a.name.localeCompare(b.name),
     );
-  }, [allItems, staffById]);
+  }, [filteredTeamItems, staffById]);
 
   const visibleTeamGroups = useMemo(
     () => (ownerFocus ? teamGroups.filter((g) => g.userId === ownerFocus) : teamGroups),
     [teamGroups, ownerFocus],
   );
 
-  const visible = activeView === "mine" ? mine : allItems;
+  const visible = activeView === "mine"
+    ? mine
+    : visibleTeamGroups.flatMap((group) => group.items);
   const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
 
   const openRow = (i: WorkRow) => navigate(i.destination);
@@ -253,8 +276,14 @@ export default function OperationWork() {
                 type="button"
                 data-testid={`work-view-${k}`}
                 onClick={() => {
-                  setView(k);
-                  if (k === "mine") setOwnerFocus(null);
+                  setParams((before) => {
+                    const next = new URLSearchParams(before);
+                    if (k === "mine") {
+                      next.delete("scope");
+                      next.delete("owner");
+                    } else next.set("scope", "team");
+                    return next;
+                  }, { replace: true });
                 }}
                 className={`px-3 py-1.5 text-body ${
                   activeView === k
@@ -270,13 +299,70 @@ export default function OperationWork() {
             <button
               type="button"
               data-testid="work-owner-clear"
-              onClick={() => setOwnerFocus(null)}
+              onClick={() => updateParam("owner", null)}
               className="px-2 py-1 rounded-full text-label border border-base-900 bg-base-900 text-white"
             >
               {staffById.get(ownerFocus)
                 ? personLabel(staffById.get(ownerFocus)!.name, staffById.get(ownerFocus)!.email)
                 : "One person"}{" "}
               · Clear
+            </button>
+          )}
+          <SearchInput
+            id="work-search"
+            value={search}
+            onChange={(event) => updateParam("q", event.target.value)}
+            placeholder="Search work…"
+          />
+          <Select
+            id="work-when"
+            value={when}
+            onValueChange={(value) => updateParam("when", value)}
+            options={[
+              { value: "all", label: "All dates" },
+              { value: "broken", label: "Broken commitments" },
+              { value: "overdue", label: "Late" },
+              { value: "today", label: "Today" },
+              { value: "later", label: "Later" },
+              { value: "no_date", label: "No date" },
+            ]}
+          />
+          <Select
+            id="work-module"
+            value={moduleFilter}
+            onValueChange={(value) => updateParam("module", value)}
+            options={[
+              { value: "all", label: "All modules" },
+              { value: "orders", label: "Sales Orders" },
+              { value: "purchasing", label: "Purchasing" },
+              { value: "receiving", label: "Receiving" },
+              { value: "stock", label: "Stock" },
+              { value: "delivery", label: "Delivery" },
+              { value: "payment", label: "Payment" },
+              { value: "service_case", label: "Service Case" },
+              { value: "claims", label: "Claims" },
+              { value: "issue_tracker", label: "Issue Tracker" },
+            ]}
+          />
+          <button
+            type="button"
+            aria-pressed={covered}
+            onClick={() => updateParam("covered", covered ? null : "1")}
+            className={`px-3 py-1.5 rounded-md border text-body ${covered ? "border-base-900 bg-base-900 text-white" : "border-base-200 bg-white text-base-600"}`}
+          >
+            Covered
+          </button>
+          {(search || when !== "all" || moduleFilter !== "all" || covered) && (
+            <button
+              type="button"
+              onClick={() => setParams((before) => {
+                const next = new URLSearchParams(before);
+                for (const key of ["q", "when", "module", "covered", "owner"]) next.delete(key);
+                return next;
+              }, { replace: true })}
+              className="px-2 py-1.5 text-body text-kit-blue-11"
+            >
+              Clear all
             </button>
           )}
         </div>
@@ -292,23 +378,23 @@ export default function OperationWork() {
         ) : activeView === "mine" ? (
           myGroups.length === 0 ? (
             <div className="text-body text-base-400 py-8" data-testid="work-empty">
-              {!myUserId
-                ? "Your account is not in the staff list yet — switch to Team Work."
-                : "No open work — every track is clear."}
+              {search || when !== "all" || moduleFilter !== "all" || covered
+                ? "No work matches these filters."
+                : "Nothing assigned to you"}
             </div>
           ) : (
             myGroups.map((g) => (
-              <section key={g.dayIso ?? "none"} className="mb-5" data-testid={`work-day-${g.dayIso ?? "none"}`}>
+              <section key={g.key} className="mb-5" data-testid={`work-section-${g.key}`}>
                 <h2 className="text-label font-semibold text-base-500 uppercase tracking-wide mb-1.5">
-                  {g.dayIso ? fmtDate(g.dayIso) : "No date"}
+                  {g.label}
                   <span className="ml-2 font-normal normal-case text-base-400">
                     {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-                    {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
+                    {g.items.filter((item) => item.workingDaysLate > 0).length > 0 && <span className="text-danger"> · {g.items.filter((item) => item.workingDaysLate > 0).length} late</span>}
                   </span>
                 </h2>
                 <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                   {g.items.map((i) => (
-                    <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i as WorkRow} onOpen={openRow} />
+                    <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i as WorkRow} onOpen={openRow} scope="mine" />
                   ))}
                 </div>
               </section>
@@ -316,7 +402,9 @@ export default function OperationWork() {
           )
         ) : visibleTeamGroups.length === 0 ? (
           <div className="text-body text-base-400 py-8" data-testid="work-empty">
-            No open work — every track is clear.
+            {search || when !== "all" || moduleFilter !== "all" || covered || ownerFocus
+              ? "No work matches these filters."
+              : "No open work — every track is clear."}
           </div>
         ) : (
           visibleTeamGroups.map((g) => (
@@ -361,7 +449,7 @@ export default function OperationWork() {
               )}
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (
-                  <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} />
+                  <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} scope="team" />
                 ))}
               </div>
             </section>

@@ -7,12 +7,14 @@
 import { useMemo } from "react";
 import type {
   OperationWorkItem,
+  OperationWorkModule,
   OpsStaffMember,
   WorkItem,
 } from "@carres/shared";
 import { useOperationWork } from "@/lib/queries";
 
-export interface WorkRow extends WorkItem {
+export interface WorkRow extends Omit<WorkItem, "module"> {
+  module: OperationWorkModule;
   id: string;
   problem: string;
   recipient: string | null;
@@ -24,6 +26,7 @@ export interface WorkRow extends WorkItem {
   ownerId: string | null;
   normalOwnerId: string | null;
   deliveryDoNumber: string | null;
+  timingBucket: OperationWorkItem["timing"]["bucket"];
 }
 
 export interface OpenWorkSet {
@@ -38,16 +41,7 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
   return {
     id: item.id,
     ruleKey: item.ruleKey,
-    module:
-      item.module === "claims" || item.module === "issue_tracker"
-        ? "claims"
-        : item.module === "orders" ||
-            item.module === "purchasing" ||
-            item.module === "receiving" ||
-            item.module === "delivery" ||
-            item.module === "payment"
-          ? item.module
-          : "orders",
+    module: item.module,
     soRef: item.object.label,
     orderId: item.object.id,
     action: item.action,
@@ -77,6 +71,7 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
     ownerId: item.owner.acting?.userId ?? null,
     normalOwnerId: item.owner.normal?.userId ?? null,
     deliveryDoNumber: null,
+    timingBucket: item.timing.bucket,
   };
 }
 

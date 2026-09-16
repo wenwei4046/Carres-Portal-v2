@@ -124,10 +124,47 @@ describe("Operation Work — one server feed", () => {
     })];
     authState.email = "yujun@carres.test";
     show();
-    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date")).toBeInTheDocument();
+    expect(screen.getByTestId("work-row-SO-1318-ask_delivery_date"))
+      .toHaveTextContent("Covered for Shasha");
     fireEvent.click(screen.getByTestId("work-view-team"));
-    expect(within(screen.getByTestId(`work-owner-group-${SH}`)).getByText(/Shasha/))
-      .toBeInTheDocument();
+    const group = screen.getByTestId(`work-owner-group-${SH}`);
+    expect(within(group).getByText(/Shasha/)).toBeInTheDocument();
+    expect(within(group).getByTestId("work-row-SO-1318-ask_delivery_date"))
+      .toHaveTextContent("Covered by Yu Jun");
+  });
+
+  it("uses the governed My Work section order and keeps No date separate", () => {
+    workState.data!.items = [
+      item({ id: "orders:broken", broken: true, timing: { dueOn: "2026-09-14", workingDaysLate: 2, bucket: "overdue" } }),
+      item({ id: "orders:late", ruleKey: "issue_po", timing: { dueOn: "2026-09-15", workingDaysLate: 1, bucket: "overdue" } }),
+      item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: { dueOn: null, workingDaysLate: 0, bucket: "no_date" } }),
+    ];
+    show();
+    const list = screen.getByTestId("work-list");
+    expect(list.textContent?.indexOf("Broken commitments")).toBeLessThan(list.textContent!.indexOf("Late"));
+    expect(list.textContent?.indexOf("Late")).toBeLessThan(list.textContent!.indexOf("No date"));
+    expect(screen.getByTestId("work-section-broken")).toBeInTheDocument();
+    expect(screen.getByTestId("work-section-no_date")).toBeInTheDocument();
+  });
+
+  it("reads search and filters from the URL", () => {
+    workState.data!.items = [
+      item(),
+      item({
+        id: "payment:invoice-1:collect",
+        module: "payment",
+        ruleKey: "collect",
+        object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
+        problem: "Customer balance due",
+        action: "Ask the customer to pay",
+        recipient: "Acme",
+        timing: { dueOn: null, workingDaysLate: 0, bucket: "no_date" },
+      }),
+    ];
+    show("/operation?tab=work&q=Acme&module=payment&when=no_date");
+    expect(screen.queryByTestId("work-row-SO-1318-ask_delivery_date")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-row-INV-2041-collect")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search work…" })).toHaveValue("Acme");
   });
 
   it("groups an unheld duty under its governed word with the Staff & Duties door — never a person", () => {
@@ -201,6 +238,6 @@ describe("Operation Work — one server feed", () => {
   it("shows an explicit empty state", () => {
     workState.data!.items = [];
     show();
-    expect(screen.getByTestId("work-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("work-empty")).toHaveTextContent("Nothing assigned to you");
   });
 });
