@@ -109,6 +109,7 @@ function fillAValidCount() {
   fireEvent.change(screen.getByTestId("receive-now-line-1"), {
     target: { value: "3" },
   });
+  fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
 }
 
 beforeEach(() => {
@@ -209,10 +210,10 @@ describe("Receiving · repeated submission", () => {
     expect(h.calls).toHaveLength(0);
 
     fireEvent.click(screen.getByTestId("fake-do-upload"));
-    /* A quantity line opens FULLY COUNTED — `receivedNow` is seeded to the
-       outstanding quantity, because the truck usually brings what was
-       ordered. So the form is now complete and the door opens. */
+    /* Prefill is only proposed input; papers alone cannot confirm the goods. */
     expect(screen.getByTestId("receive-now-line-1")).toHaveValue(5);
+    expect(screen.getByTestId("receiving-save")).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
     expect(screen.getByTestId("receiving-save")).not.toBeDisabled();
     expect(screen.getByTestId("receiving-save")).toHaveTextContent(
       "Save Receiving",
@@ -228,5 +229,32 @@ describe("Receiving · repeated submission", () => {
     );
     fireEvent.click(screen.getByTestId("receiving-save"));
     expect(h.calls).toHaveLength(0);
+  });
+});
+
+
+describe("Receiving · confirmation belongs to the actual draft", () => {
+  it("cannot save prefilled results just by supplying the papers", () => {
+    mount();
+    fireEvent.change(screen.getByTestId("do-number"), { target: { value: "DO-8821" } });
+    fireEvent.click(screen.getByTestId("fake-do-upload"));
+    expect(screen.getByText("Proposed results · not saved")).toBeInTheDocument();
+    expect(screen.getByTestId("receiving-save")).toBeDisabled();
+    expect(screen.getByTestId("receiving-save")).toHaveTextContent("confirm receiving results");
+    fireEvent.click(screen.getByTestId("receiving-save"));
+    expect(h.calls).toHaveLength(0);
+  });
+  it("requires confirmation again after changing quantity or actual Site/date", () => {
+    mount(); fillAValidCount();
+    const confirm = screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." });
+    expect(screen.getByTestId("receiving-save")).not.toBeDisabled();
+    fireEvent.change(screen.getByTestId("receive-now-line-1"), { target: { value: "2" } });
+    expect(confirm).not.toBeChecked();
+    expect(screen.getByTestId("receiving-save")).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(screen.getByTestId("receiving-save")).not.toBeDisabled();
+    fireEvent.change(screen.getByTestId("goods-received-at"), { target: { value: "2026-09-10" } });
+    expect(confirm).not.toBeChecked();
+    expect(screen.getByTestId("receiving-save")).toBeDisabled();
   });
 });

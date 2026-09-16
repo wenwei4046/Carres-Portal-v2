@@ -655,6 +655,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
   const doId = card.deliveryOrderId ?? "";
   const prep = useRecordOutboundPrep(doId);
   const [scanValue, setScanValue] = useState("");
+  const [prepError, setPrepError] = useState<string | null>(null);
   const [loadOpen, setLoadOpen] = useState(false);
 
   const remaining = card.units.filter((u) => !u.unitHandedOverAt);
@@ -676,14 +677,15 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
 
   function recordPrep(fact: WarehousePrepFact, unitCodes: string[], done: string) {
     if (!doId) {
-      toast.error("This delivery order cannot be addressed — reload the page.");
+      setPrepError("This delivery order cannot be addressed — reload the page.");
       return;
     }
+    setPrepError(null);
     prep.mutate(
       { fact, unitCodes },
       {
       onSuccess: () => { toast.success(done); if (fact === "scanned") setScanValue(""); },
-        onError: (e) => toast.error(e.message),
+        onError: (e) => setPrepError(e.message),
       },
     );
   }
@@ -696,11 +698,11 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       (u) => u.unitId.toLowerCase() === code.toLowerCase(),
     );
     if (!match) {
-      toast.error(`${code} is not a Unit this delivery order requires.`);
+      setPrepError(`${code} is not a Unit this delivery order requires. Check the label and scan the required Unit.`);
       return;
     }
     if (match.unitHandedOverAt) {
-      toast.error(`${match.unitId} was already loaded.`);
+      setPrepError(`${match.unitId} was already loaded. Scan a Unit still to load.`);
       return;
     }
     recordPrep("scanned", [match.unitId], `${match.unitId} scanned`);
@@ -740,7 +742,18 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         </p>
         {card.vehicle && <p>Vehicle {card.vehicle}</p>}
       </div>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      {remaining.length === 0 && card.units.length > 0 && (
+        <div className="mb-2 text-body text-base-700" data-testid="wo-loading-next-step">
+          <p>{card.driverConfirmed < card.unitsRequired
+            ? "Loading recorded. Awaiting driver confirmation."
+            : "Loading and driver confirmation recorded."}</p>
+          {card.evidenceNotSubmitted && <p>Loading evidence is still missing.</p>}
+          <Link className="text-kit-blue-11 hover:underline" to={card.deliveryOrderHref}>
+            Open Delivery Order
+          </Link>
+        </div>
+      )}
+      {remaining.length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-meta text-base-600">
           Scan Unit ID
           <input
@@ -810,7 +823,8 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             {warehouseRecordLoadedSentence(readyUnits.length, receiverWord)}
           </button>
         )}
-      </div>
+      </div>}
+      {prepError && <p role="alert" className="mb-2 text-meta text-kit-red-11">{prepError}</p>}
       {readyUnits.length > 0 && (
         <p className="mb-2 text-label text-base-500" data-testid="wo-receiver-consequence">
           Recording the load moves the accepted Units to {card.logisticsPartner}. Name the person

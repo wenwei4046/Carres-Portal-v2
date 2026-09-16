@@ -1028,6 +1028,7 @@ describe("ReceivingWorkspace — the active Session", () => {
       target: { value: "DO-5512" },
     });
     fireEvent.click(screen.getByTestId("mock-do-upload"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
     await waitFor(() =>
       expect(screen.getByTestId("receiving-save")).toHaveTextContent(
         "Save Receiving",
@@ -1039,6 +1040,7 @@ describe("ReceivingWorkspace — the active Session", () => {
       target: { value: "SF99" },
     });
 
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked the goods and confirm these receiving results." }));
     fireEvent.click(screen.getByTestId("receiving-save"));
     expect(h.officeReceive).toHaveLength(1);
     const [poId, body] = h.officeReceive[0];
