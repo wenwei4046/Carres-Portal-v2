@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKSPACE_DUTIES } from "@carres/shared";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 
 /**
@@ -36,7 +36,16 @@ const state: {
   error: boolean;
   assignError: Error | null;
   coverError: Error | null;
-} = { loading: false, error: false, assignError: null, coverError: null };
+  assignPending: boolean;
+  coverPending: boolean;
+} = {
+  loading: false,
+  error: false,
+  assignError: null,
+  coverError: null,
+  assignPending: false,
+  coverPending: false,
+};
 
 const refetch = vi.fn();
 
@@ -49,12 +58,12 @@ vi.mock("@/lib/queries", () => ({
   }),
   useWorkspaceAssignDutyMutation: () => ({
     mutate: assignMutate,
-    isPending: false,
+    isPending: state.assignPending,
     error: state.assignError,
   }),
   useWorkspaceCoverDutyMutation: () => ({
     mutate: coverMutate,
-    isPending: false,
+    isPending: state.coverPending,
     error: state.coverError,
   }),
   qk: { operation: { staff: ["operation", "staff"] } },
@@ -85,7 +94,21 @@ import StaffDuties from "./StaffDuties";
 
 type Duty = WorkspaceDutiesResponse["duties"][number];
 
-const TODAY = "2026-09-16";
+/* The company date the page itself reads. Fixtures are built RELATIVE to it,
+   so no test passes only because it was written on a convenient day. */
+const TODAY = appTodayIso();
+
+function plusDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const at = new Date(y!, m! - 1, d! + days);
+  const mm = String(at.getMonth() + 1).padStart(2, "0");
+  const dd = String(at.getDate()).padStart(2, "0");
+  return `${at.getFullYear()}-${mm}-${dd}`;
+}
+
+const COVER_FROM = plusDays(TODAY, -1);
+const COVER_UNTIL = plusDays(TODAY, 1);
+const HELD_FROM = plusDays(TODAY, -15);
 
 function heldBy(key: string, label: string, name: string, id: string): Duty {
   return {
@@ -109,7 +132,7 @@ function heldBy(key: string, label: string, name: string, id: string): Duty {
         duty_key: key,
         holder_id: id,
         holder_name: name,
-        effective_from: "2026-09-01",
+        effective_from: HELD_FROM,
         effective_until: null,
         assigned_by_name: "Jess",
         note: null,
@@ -162,11 +185,11 @@ function coveredGrn(): Duty {
         normal_user_name: "Yu Jun",
         acting_user_id: "u-shasha",
         acting_user_name: "Shasha",
-        starts_on: "2026-09-15",
-        ends_on: "2026-09-17",
+        starts_on: COVER_FROM,
+        ends_on: COVER_UNTIL,
         reason: "Annual leave",
         assigned_by_name: "Jess",
-        created_at: "2026-09-14T02:00:00Z",
+        created_at: `${COVER_FROM}T02:00:00Z`,
       },
     ],
   };
@@ -214,11 +237,12 @@ function draw(url = "/operation?tab=staff-duties") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.setSystemTime(new Date(`${TODAY}T03:00:00+08:00`));
   state.loading = false;
   state.error = false;
   state.assignError = null;
   state.coverError = null;
+  state.assignPending = false;
+  state.coverPending = false;
   state.duties = wholeCatalogue();
   lastSearch = "";
 });
@@ -319,7 +343,7 @@ describe("the selected duty", () => {
     expect(within(detail).getByText("Annual leave")).toBeVisible();
     expect(
       within(detail).getByText(
-        `${fmtDate("2026-09-15")} – ${fmtDate("2026-09-17")}`,
+        `${fmtDate(COVER_FROM)} – ${fmtDate(COVER_UNTIL)}`,
       ),
     ).toBeVisible();
   });
@@ -512,5 +536,178 @@ describe("the narrow screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to duties" }));
     expect(new URLSearchParams(lastSearch).get("duty")).toBeNull();
     expect(new URLSearchParams(lastSearch).get("tab")).toBe("staff-duties");
+  });
+});
+
+// ── Task 3 · one focused assignment ──────────────────────────────────────────
+
+/** The kit's DatePicker is a popover calendar with no text box, so a date is
+ *  chosen by opening it and clicking a day. The calendar opens on the current
+ *  month when nothing is picked, so the day is taken from THIS month and the
+ *  expected ISO is derived from the same clock. */
+function pickDay(triggerId: string, dayOfMonth: number): string {
+  fireEvent.click(document.getElementById(triggerId)!);
+  const cell = screen
+    .getAllByRole("gridcell")
+    .find((c) => c.textContent?.trim() === String(dayOfMonth));
+  if (!cell) throw new Error(`no day cell for ${dayOfMonth}`);
+  fireEvent.click(cell.querySelector("button") ?? cell);
+  const [y, m] = TODAY.split("-");
+  return `${y}-${m}-${String(dayOfMonth).padStart(2, "0")}`;
+}
+
+/** The kit's Select is a Radix listbox, opened then chosen by its option name. */
+function choose(triggerId: string, optionName: string) {
+  fireEvent.click(document.getElementById(triggerId)!);
+  fireEvent.click(screen.getByRole("option", { name: optionName }));
+}
+
+function openAssign(url = "/operation?tab=staff-duties&duty=po_duty") {
+  draw(url);
+  const door = screen.getByRole("button", { name: "Assign holder" });
+  /* A real click focuses the button; jsdom's `click` event does not. The
+     dialog frame returns focus to whatever HAD it, so the test must put focus
+     where a browser would. */
+  door.focus();
+  fireEvent.click(door);
+  return door;
+}
+
+describe("assigning a holder", () => {
+  it("gives an unassigned duty the manager's door", () => {
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
+    expect(
+      within(screen.getByTestId("selected-duty-delivery_duty")).getByRole(
+        "button",
+        { name: "Assign holder" },
+      ),
+    ).toBeVisible();
+  });
+
+  it("opens ONE focused surface instead of a permanently expanded form", () => {
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    // Before the door is used there is no form on the page at all.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Assign holder" }));
+    expect(screen.getByRole("dialog", { name: "Assign holder" })).toBeVisible();
+  });
+
+  it("prints the duty it is about and does not let it be retargeted", () => {
+    openAssign();
+    const dialog = screen.getByRole("dialog", { name: "Assign holder" });
+    expect(within(dialog).getByText("Duty")).toBeVisible();
+    expect(within(dialog).getByText("PO Duty")).toBeVisible();
+    // The duty is a FACT of this dialog, never a field: a picker here would be
+    // a second way to choose a duty, competing with the catalogue.
+    expect(within(dialog).queryByRole("combobox", { name: "Duty" })).toBeNull();
+  });
+
+  it("offers the active staff the SERVER returned, never a name typed here", () => {
+    openAssign();
+    fireEvent.click(document.getElementById("assign-holder")!);
+    const names = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(names).toEqual(["Yu Jun", "Shasha"]);
+  });
+
+  it("offers a role-scoped duty its own list", () => {
+    openAssign("/operation?tab=staff-duties&duty=finance_approver");
+    fireEvent.click(document.getElementById("assign-holder")!);
+    // Finance Approver takes Finance users; the API, not the browser, decides.
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Fiona",
+    ]);
+  });
+
+  it("refuses an empty holder with the governed sentence", () => {
+    openAssign();
+    fireEvent.click(screen.getByTestId("assign-submit"));
+    expect(screen.getByText("Choose a holder.")).toBeVisible();
+    expect(assignMutate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a missing start with the governed sentence", () => {
+    openAssign();
+    choose("assign-holder", "Shasha");
+    fireEvent.click(screen.getByTestId("assign-submit"));
+    expect(screen.getByText("Choose when this holder starts.")).toBeVisible();
+    expect(assignMutate).not.toHaveBeenCalled();
+  });
+
+  it("refuses an end before the start", () => {
+    openAssign();
+    choose("assign-holder", "Shasha");
+    pickDay("assign-effective-from", 20);
+    pickDay("assign-effective-until", 15);
+    fireEvent.click(screen.getByTestId("assign-submit"));
+    expect(
+      screen.getByText("Until must be on or after Effective from."),
+    ).toBeVisible();
+    expect(assignMutate).not.toHaveBeenCalled();
+  });
+
+  it("sends the exact camelCase contract the API validates", () => {
+    openAssign();
+    choose("assign-holder", "Shasha");
+    const from = pickDay("assign-effective-from", 10);
+    fireEvent.click(screen.getByTestId("assign-submit"));
+    expect(assignMutate).toHaveBeenCalledTimes(1);
+    expect(assignMutate.mock.calls[0]![0]).toEqual({
+      dutyKey: "po_duty",
+      holderId: "u-shasha",
+      effectiveFrom: from,
+    });
+  });
+
+  it("prints the server's own refusal and keeps every entered fact", () => {
+    state.assignError = new Error(
+      "Shasha cannot hold PO Duty. Choose an eligible active staff member.",
+    );
+    openAssign();
+    choose("assign-holder", "Shasha");
+    pickDay("assign-effective-from", 10);
+    expect(
+      screen.getByText(
+        "Shasha cannot hold PO Duty. Choose an eligible active staff member.",
+      ),
+    ).toBeVisible();
+    // The refusal is authoritative and visible BESIDE the action; nothing the
+    // manager typed is thrown away, and the dialog stays open to be corrected.
+    expect(screen.getByRole("dialog", { name: "Assign holder" })).toBeVisible();
+    expect(document.getElementById("assign-holder")).toHaveTextContent("Shasha");
+  });
+
+  it("does not close or touch the shown resolution while the write is pending", () => {
+    state.assignPending = true;
+    openAssign();
+    expect(screen.getByRole("dialog", { name: "Assign holder" })).toBeVisible();
+    expect(screen.getByTestId("assign-submit")).toBeDisabled();
+    // The catalogue still prints the CURRENT holder — no optimistic owner.
+    expect(
+      within(screen.getByTestId("duty-catalogue-po_duty")).getByText("Yu Jun"),
+    ).toBeVisible();
+  });
+
+  it("announces the governed success sentence and keeps the duty selected", async () => {
+    openAssign();
+    choose("assign-holder", "Shasha");
+    const from = pickDay("assign-effective-from", 10);
+    fireEvent.click(screen.getByTestId("assign-submit"));
+    // react-query runs the mutation-level callback only after the hook's own
+    // onSuccess has awaited invalidation, so the refreshed read is already in.
+    act(() => assignMutate.mock.calls[0]![1].onSuccess());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByText(`Shasha holds PO Duty from ${fmtDate(from)}`),
+    ).toBeVisible();
+    expect(screen.getByTestId("selected-duty-po_duty")).toBeVisible();
+  });
+
+  it("returns focus to the door it came from", async () => {
+    const door = openAssign();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Radix returns focus to the trigger — the reader lands back on the door
+    // they used, not at the top of the page (§4.5 keyboard order).
+    await waitFor(() => expect(document.activeElement).toBe(door));
   });
 });

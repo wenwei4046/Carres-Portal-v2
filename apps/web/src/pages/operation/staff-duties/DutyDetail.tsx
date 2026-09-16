@@ -1,7 +1,12 @@
-import type { ReactNode } from "react";
-import { fmtDate } from "@/lib/fmt-date";
+import { useState, type ReactNode } from "react";
+import Button from "@/components/kit/Button";
+import AssignHolderForm from "./AssignHolderForm";
 import { dutyDisplayState } from "./staff-duties-model";
+import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
+import { qk, useOperationStaff } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
+import type { OpsStaffListResponse } from "@carres/shared";
 
 /**
  * The selected duty (workspace/MASTER.md §4.2, §4.5).
@@ -56,7 +61,6 @@ export default function DutyDetail({
   canAssign,
   today,
   onBack,
-  actions,
 }: {
   duty: Duty;
   canAssign: boolean;
@@ -65,10 +69,30 @@ export default function DutyDetail({
    *  what shows, so there is nothing to go back FROM. A door to a page the
    *  reader is already on is not a door. */
   onBack?: () => void;
-  /** The authorised action row. A reader is passed nothing at all — §4.5
-   *  forbids a disabled control standing in for an absent capability. */
-  actions?: ReactNode;
 }) {
+  /** Which focused act is open. One at a time: two overlapping dialogs would
+   *  be two answers to the same duty. */
+  const [acting, setActing] = useState<"assign" | null>(null);
+  /* Bumped on every open so a form arrives EMPTY rather than wearing the last
+     attempt's answers. Clearing fields by hand instead would flip the kit
+     Select between controlled and uncontrolled. */
+  const [actingSeq, setActingSeq] = useState(0);
+  /** The governed success sentence, announced after the refreshed read. */
+  const [notice, setNotice] = useState<string | null>(null);
+
+  /* The pickers offer whatever THIS duty's list returned. A duty the shared
+     catalogue scopes to a role (Finance Approver) gets that role's accounts
+     from the API; every other duty gets the operation list. No name is
+     chosen, filtered or excluded here. */
+  const staffQ = useOperationStaff({
+    queryKey: [...qk.operation.staff, duty.key],
+    queryFn: () =>
+      apiFetch<OpsStaffListResponse>(
+        `/api/operation/staff?duty=${encodeURIComponent(duty.key)}`,
+      ),
+    enabled: canAssign,
+  });
+  const staff = staffQ.data?.staff ?? [];
   const r = duty.resolution;
   const note = dutyDisplayState(duty, today);
   /** The cover the detail describes: the one in force today, else the next
@@ -162,8 +186,38 @@ export default function DutyDetail({
         )}
 
         {canAssign ? (
-          <div className="mt-3 flex flex-wrap gap-2">{actions}</div>
+          <>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  setActingSeq((n) => n + 1);
+                  setActing("assign");
+                }}
+              >
+                Assign holder
+              </Button>
+            </div>
+            {notice ? (
+              <p
+                role="status"
+                data-testid="duty-notice"
+                className="mt-2 text-meta text-kit-slate-11"
+              >
+                {notice}
+              </p>
+            ) : null}
+            <AssignHolderForm
+              key={`assign-${duty.key}-${actingSeq}`}
+              duty={duty}
+              staff={staff}
+              open={acting === "assign"}
+              onClose={() => setActing(null)}
+              onDone={setNotice}
+            />
+          </>
         ) : (
+          /* §4.5: a reader gets the sentence, never a disabled control — an
+             imitation of a capability is worse than its absence. */
           <p className="mt-3 text-meta text-kit-slate-9">
             Duty assignments are set by the manager.
           </p>
