@@ -782,6 +782,33 @@ honest Work for admitted modules.
   audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
   for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
   module consumers remain implementation evidence until each module is production-verified.
+- **Staff & Duties §4.2 composition — BUILT, repository-verified 2026-09-16; NOT production-verified.**
+  Branch `build/staff-duties-ui`, PR #1388, head `d809f908` (unmerged, undeployed). The stacked
+  720px document is replaced by one catalogue and one selected Duty (`StaffDuties.tsx` +
+  `staff-duties/`). The shared catalogue, `GET /api/operation/workspace-duties`, the SQL resolver
+  and the assign/cover doors are unchanged and remain the only ownership truth; no API, migration
+  or roster was added. Presentation helpers read today's actor from `resolution` alone and take the
+  company date from `appTodayIso()`. Measured: catalogue rows equal `WORKSPACE_DUTIES.length` (12,
+  including Finance Approver); unknown `duty` keys are corrected with history-replace; readers
+  receive `Duty assignments are set by the manager.` and zero write controls; `Assign holder` and
+  `Add cover` are focused kit `Modal` acts with §4.4.1 sentences, server refusals printed verbatim,
+  no optimistic owner change, and `Add cover` absent while nobody holds the Duty; an empty
+  catalogue renders the read-failure sentence; history uses event / who-when / note ranks with no
+  controls. Gates: repo typecheck and `pnpm build` clean; `design-standard: no new violations`;
+  API `workspace-duties.test.ts` 13/13 unchanged; Staff & Duties suites 99/99 on merged head
+  `d809f908`; full web suite 4,829/4,829 before the final responsive change and 4,830 pass + 1
+  after it, the one being unrelated `OtherReceiptsPage.test.tsx`, which fails 1 of 3 solo runs
+  with no Staff & Duties import. `pnpm test` also timed out `ops/stock-register.test.ts` under
+  parallel load (34.5s); alone it passes 16/16 in 1.7s. A seeded rendered walk (real
+  page, real portal shell, fixture responses, no authentication) measured 1440px catalogue 320 /
+  detail 888, 1024px 272 / 692, 390px one pane with `Back to duties`, zero document horizontal
+  overflow at every width, dialogs inside the viewport and single-column (`docs/evidence/staff-duties/`).
+  That walk found and fixed two defects jsdom passed: a four-chip State strip that widened the
+  390px document by 125px and clipped `Not assigned`, and a catalogue not narrower at 1024px.
+  **Not yet performed:** authenticated manager and non-manager sessions against live data;
+  byte-for-byte resolver agreement across Staff & Duties, Team Work and a protected module door;
+  live refusal, overlap, race and company-date-boundary checks; eligibility exclusion of departed
+  or external Warehouse accounts at the write door. §4.7 acceptance stays open until those run.
 - Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
