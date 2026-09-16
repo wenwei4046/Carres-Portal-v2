@@ -4,8 +4,8 @@
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the governed Workspace Work feed and responsive three-panel Work page without
-duplicating module truth or admitting unqualified module queues.
+**Goal:** Build the governed Workspace Work feed and responsive three-panel Work page, including
+rule-admitted owning-module actions, without duplicating module truth or admitting unqualified queues.
 
 **Architecture:** Owning modules continue to project open occurrences. A permission-scoped API
 envelope isolates each admitted source, resolves owner/calendar/timing once, and supplies all facts
@@ -21,7 +21,10 @@ Vitest/Testing Library, Playwright, existing Carres UI kit and Tailwind tokens.
 
 - Production code must follow `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, `docs/ui/MASTER.md`,
   `docs/01-design-tokens.md` and `docs/COPY-STANDARD.md`.
-- Work is read-only in v1. Its only business door is `Open {object}`.
+- Every occurrence declares `embedded`, `open_module` or `read_only`. Embedded actions reuse the
+  owning component/API/permission/evidence/completion law; Workspace owns no substitute form.
+- Delivery proof review is the first embedded vertical slice. No second embedded action is admitted
+  until it passes permission, stale-version, idempotency, uncertain-response and feed-closure tests.
 - Only Sales Orders, Purchasing, Receiving, Delivery, Payment and Issue Tracker are admitted.
 - Warehouse Outbound, Service Case and Claims remain absent from items, filters and counts.
 - `requiredResult`, machine `completionPredicate` and operator-safe `completionStatement` remain
@@ -50,7 +53,7 @@ Vitest/Testing Library, Playwright, existing Carres UI kit and Tailwind tokens.
 | `apps/web/src/pages/operation/work/WorkSplitShell.tsx` | Three/two/one-panel geometry only |
 | `apps/web/src/pages/operation/work/WorkDayNav.tsx` | Supplied weekday/module/owner navigation and counts |
 | `apps/web/src/pages/operation/work/WorkActionRow.tsx` | Governed two-line selectable action row |
-| `apps/web/src/pages/operation/work/WorkActionBrief.tsx` | Structured read-only selected-action detail |
+| `apps/web/src/pages/operation/work/WorkActionPanel.tsx` | Structured selected-action detail and governed module-action host |
 | `apps/web/src/pages/operation/OperationWork.tsx` | URL state and assembly of the four page-specific components |
 | `apps/web/src/pages/operation/OperationWork.test.tsx` | Page states, scopes, URL restoration and access tests |
 | `apps/web/src/pages/operation/components/OperationRightRail.tsx` | Same-feed My Work summary and deep links |
@@ -68,7 +71,8 @@ Vitest/Testing Library, Playwright, existing Carres UI kit and Tailwind tokens.
 - Produces: `OperationWorkResponse`, `OperationWorkItem`, `OperationWorkSourceHealth`.
 - `OperationWorkItem` adds `contractVersion: 2`, `completionStatement`, structured timing/calendar,
   optional communication/blocker/next consequence and `observedAt`.
-- `OperationWorkResponse` adds `complete`, `sources` and reconciled `counts`.
+- `OperationWorkResponse` adds `complete` and `sources`; every visible count derives from validated
+  authorised `items`, never from a transported second total.
 
 - [x] **Step 1: Write failing schema tests**
 
@@ -128,7 +132,7 @@ git commit -m "feat(work): version authoritative work contract"
 
 Cover six admitted source keys, one failed/others healthy, duplicate stable ID, invalid projector
 data, permission refusal and last-safe delayed data. Assert `complete === false`, healthy actions
-remain, failed source has no invented zero, and counts equal the returned authorised items.
+remain and a failed source has no invented zero.
 
 ```ts
 expect(body).toMatchObject({
@@ -136,7 +140,6 @@ expect(body).toMatchObject({
   sources: expect.arrayContaining([{ key: "receiving", state: "failed" }]),
 });
 expect(body.items.map((item) => item.module)).toContain("payment");
-expect(body.counts.all).toBe(body.items.length);
 ```
 
 - [ ] **Step 2: Run the focused API test and confirm failure**
@@ -154,8 +157,8 @@ failures become safe `failed` health records. Do not add Warehouse, Claims or Se
 
 - [ ] **Step 4: Compose one reconciled response**
 
-Deduplicate only by stable occurrence ID, validate every healthy source item, generate counts from
-the validated authorised array, and attach observation timestamps. A missing source result is a
+Deduplicate only by stable occurrence ID, validate every healthy source item and attach observation
+timestamps. Consumers derive counts from the validated authorised array. A missing source result is a
 schema error, never an empty source.
 
 - [ ] **Step 5: Run API and shared Work tests**
@@ -305,7 +308,9 @@ git commit -m "feat(ui): govern shared staff avatar"
 
 Test My Work acting-person routing, Team Work normal-owner grouping, cover labels, Monday–Friday
 always present, conditional Saturday, no-working-date, missed ordering, admitted module filter,
-combined URL filters, source-failed visibility and selected-row closure fallback.
+combined URL filters, source-failed visibility and selected-row closure fallback. First open shows
+`Missed` plus the current governed day, or the next eligible day when a named public holiday admits
+no operation, without duplicating an occurrence.
 
 - [ ] **Step 2: Run model tests and confirm failure**
 
@@ -335,22 +340,23 @@ git commit -m "refactor(work): derive one reconciled week view"
 - Create: `apps/web/src/pages/operation/work/WorkSplitShell.tsx`
 - Create: `apps/web/src/pages/operation/work/WorkDayNav.tsx`
 - Create: `apps/web/src/pages/operation/work/WorkActionRow.tsx`
-- Create: `apps/web/src/pages/operation/work/WorkActionBrief.tsx`
+- Create: `apps/web/src/pages/operation/work/WorkActionPanel.tsx`
 - Create focused `.test.tsx` files beside each component.
 
 **Interfaces:**
 - Consumes only Tasks 5–6 presentation/view data and callbacks.
-- Produces no mutation and computes no business fact.
+- Hosts only contract-admitted owning-module mutation components and computes no business fact.
 
 - [ ] **Step 1: Write component contract tests**
 
 Assert panel landmarks and keyboard order; 13/11 two-line grammar; structured owner metadata;
 wrapped content; completion statement (never predicate); optional communication and consequence;
-one `Open {object}` door; hover/selected/focus states; no WhatsApp, Copy, Record sent or Done.
+all three interaction modes; one `Open {object}` fallback; hover/selected/focus states; no generic
+WhatsApp, Copy, Record sent or Done.
 
 - [ ] **Step 2: Run focused tests and confirm failure**
 
-Run: `pnpm --filter @carres/web test -- src/pages/operation/work/WorkSplitShell.test.tsx src/pages/operation/work/WorkDayNav.test.tsx src/pages/operation/work/WorkActionRow.test.tsx src/pages/operation/work/WorkActionBrief.test.tsx`
+Run: `pnpm --filter @carres/web test -- src/pages/operation/work/WorkSplitShell.test.tsx src/pages/operation/work/WorkDayNav.test.tsx src/pages/operation/work/WorkActionRow.test.tsx src/pages/operation/work/WorkActionPanel.test.tsx`
 
 - [ ] **Step 3: Implement with existing kit only**
 
@@ -368,6 +374,22 @@ Run: `pnpm --filter @carres/web test -- src/pages/operation/work && pnpm --filte
 git add apps/web/src/pages/operation/work
 git commit -m "feat(work): add governed work presentation components"
 ```
+
+### Task 7A: Admit Delivery proof review as the first embedded action
+
+**Files:**
+- Extract from: `apps/web/src/pages/operation/components/DeliveryEvidencePanel.tsx`
+- Create: one owning Delivery proof-review component reused by Delivery and Work
+- Modify: `apps/web/src/pages/operation/work/WorkActionPanel.tsx`
+- Modify Delivery API/contract tests only where source-version or idempotency proof is missing.
+
+- [ ] Prove the existing Delivery API owns permission, evidence, result and completion; add exact
+  source-version refusal and idempotent repeat behaviour where absent.
+- [ ] Extract one Delivery-owned component and render that same component in Delivery and Work.
+- [ ] Test `Accept proof`, `Request more proof` and `Reject proof`, cover permission, stale version,
+  duplicate submit, uncertain response, `Not confirmed · Try again`, refreshed-feed closure,
+  compact 1440×900 primary-action visibility and automatic next-row selection.
+- [ ] Keep supplier reply and every other mutation `open_module`.
 
 ### Task 8: Assemble My Work and Team Work with URL-restorable state
 
@@ -394,9 +416,9 @@ Run: `pnpm --filter @carres/web test -- src/pages/operation/OperationWork.test.t
 
 - [ ] **Step 3: Assemble the page and remove legacy rendering**
 
-Keep `OperationWork.tsx` as orchestration only. Opening a row selects its brief; only the brief's
-button navigates to `destination`. Use source-provided words and dates. Do not create local example
-records in production code.
+Keep `OperationWork.tsx` as orchestration only. Opening a row selects its action panel. Embedded
+mutation is owned by Task 7A; `open_module` navigates to `destination`; `read_only` exposes no fake
+control. Use source-provided words and dates. Do not create local example records in production code.
 
 - [ ] **Step 4: Update the dev preview with clearly labelled contract-v2 fixtures**
 
@@ -504,5 +526,6 @@ git commit -m "test(work): prove workspace work acceptance"
 ## Review gates
 
 After Tasks 1–3, review the transport against MASTER §§2–3, 5.2.1 and every admitted row in §6.1.
-After Tasks 4–9, review permissions, exact copy, totals, focus, URL restoration and the absence of
-module writes. After Task 10, request owner review. Merge/deploy is a separate explicitly authorised operation.
+After Tasks 4–9, review permissions, exact copy, totals, focus, URL restoration and prove that the
+only embedded write is the admitted owning-module Delivery component/API. After Task 10, request
+owner review. Merge/deploy is a separate explicitly authorised operation.

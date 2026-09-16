@@ -172,7 +172,12 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Work applied filters | `Clear all` | Reset · Clear everything |
 | Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
 | Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
-| Work selected action closed | `This work is no longer open.` | Done! · Task disappeared |
+| Work embedded result | icon plus `Nice Future confirmed Fri, 18 Sep` · `Delivery proof accepted` (the exact source result; icon/colour never stands alone) | Done · Completed · Success · icon alone |
+| Work closure by another actor | icon plus `Done by {person}` only when the source supplies durable actor evidence | inferring the actor from assignment or cover |
+| Work order cancelled | icon plus `Order cancelled` | No longer needed without the known reason |
+| Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
+| Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
+| Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
 | Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |

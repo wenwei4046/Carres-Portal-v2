@@ -21,9 +21,14 @@ copy, component, or business-rule system.
 
 ## Decisions
 
+- 2026-09-16 — Owner-approved Work is an execution workspace, not a read-only directory. My Work
+  opens with `Missed` plus the actual current governed day (or next eligible day when a named public
+  holiday admits no operation) while the full week remains visible. Panel 3 declares `embedded`,
+  `open_module` or `read_only`; embedded actions reuse the owning component/API/permission/evidence/
+  completion law. Delivery proof review is the first vertical slice.
 - 2026-09-16 — Workspace Work is governed only by `docs/workspace/MASTER.md` §§5–6. The approved
   direction uses the existing global navigation plus three working panels: working day/module,
-  action list and a read-only selected-action brief. The standalone prototype and its companion
+  action list and a selected-action execution panel. The standalone prototype and its companion
   specification are exploratory artefacts, not implementation authority.
 - 2026-09-11 — Loaded the existing Carres React/Tailwind stack for the Payment production recovery.
   Reuse the governed Register, Object Detail, Work and action components; do not add a dashboard,
