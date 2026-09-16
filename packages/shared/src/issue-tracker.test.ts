@@ -62,7 +62,11 @@ describe("Issue Tracker operating model", () => {
       problem: "Supplier has not answered",
       action: "Ask supplier for an answer",
       owner: { rule: "issue_triage_duty", normal: { name: "Shasha" }, acting: { name: "Yu Jun" }, state: "covered" },
-      timing: { state: "calendar_gap", calendar: { actor: { state: "not_configured" } } },
+      timing: {
+        placement: "missed",
+        missedAge: { state: "not_calculable" },
+        calendar: { actor: { state: "not_configured" } },
+      },
       destination: "/operation/issues?issue=issue-1",
     });
   });

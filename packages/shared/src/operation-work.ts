@@ -5,11 +5,8 @@ export const operationWorkModuleSchema = z.enum([
   "orders",
   "purchasing",
   "receiving",
-  "claims",
-  "stock",
   "delivery",
   "payment",
-  "service_case",
   "issue_tracker",
 ]);
 
@@ -77,11 +74,41 @@ export const operationWorkItemSchema = z.object({
   timing: z.object({
     businessDueOn: z.string().date().nullable(),
     actionOn: z.string().date().nullable(),
-    workingDaysMissed: z.number().int().nonnegative(),
-    state: z.enum(["missed", "scheduled", "no_working_date", "calendar_gap", "no_eligible_actor"]),
+    placement: z.enum(["missed", "on_day", "no_working_date"]),
+    missedAge: z.discriminatedUnion("state", [
+      z.object({
+        state: z.literal("counted"),
+        workingDays: z.number().int().nonnegative(),
+        basis: z.object({
+          calendarKey: z.string().min(1),
+          from: z.string().date(),
+          to: z.string().date(),
+        }).strict(),
+      }).strict(),
+      z.object({
+        state: z.literal("not_calculable"),
+        workingDays: z.null(),
+        basis: z.null(),
+      }).strict(),
+    ]),
+    eligibility: z.enum(["eligible", "no_eligible_actor", "unknown"]),
     noDateReason: z.string().min(1).nullable(),
     calendar: operationWorkCalendarSchema,
-  }).strict(),
+  }).strict().superRefine((timing, ctx) => {
+    const calendarReady = timing.calendar.module.state === "ready" && timing.calendar.actor.state === "ready";
+    if (!calendarReady && timing.missedAge.state !== "not_calculable") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["missedAge"], message: "Missed age needs both calendars" });
+    }
+    if ((timing.actionOn === null) !== (timing.placement === "no_working_date")) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["placement"], message: "No working date must match a null action date" });
+    }
+    if ((timing.actionOn === null) !== (timing.noDateReason !== null)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["noDateReason"], message: "A no-date reason is required only when the action date is absent" });
+    }
+    if (timing.missedAge.state === "counted" && timing.missedAge.workingDays > 0 && timing.placement !== "missed") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["placement"], message: "Positive missed age belongs in Missed" });
+    }
+  }),
   communication: z.object({
     channel: z.string().min(1),
     recipient: z.string().min(1),
@@ -136,7 +163,11 @@ export const operationWorkResponseSchema = z.object({
     byModule: z.record(z.number().int().nonnegative()),
     byOwner: z.record(z.number().int().nonnegative()),
   }).strict(),
-}).strict();
+}).strict().superRefine((response, ctx) => {
+  if (response.complete && response.sources.some((source) => source.state !== "healthy")) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["complete"], message: "A response with a non-current source cannot be complete" });
+  }
+});
 
 export type OperationWorkModule = z.infer<typeof operationWorkModuleSchema>;
 export type OperationWorkPerson = z.infer<typeof operationWorkPersonSchema>;
@@ -167,6 +198,9 @@ export interface OperationWorkPresentation {
   today: string;
   calendar?: z.infer<typeof operationWorkCalendarSchema>;
   observedAt?: string;
+  businessDueOn?: string | null;
+  actionOn?: string | null;
+  noDateReason?: string | null;
 }
 
 /** Translate a module engine's open projection into the transport contract.
@@ -178,7 +212,9 @@ export function operationWorkItemFromProjection(
 ): OperationWorkItem {
   const rule = WORK_RULES.find((candidate) => candidate.key === item.ruleKey);
   if (!rule) throw new Error(`Work rule is not registered: ${item.ruleKey}`);
-  const dueOn = item.dueIso;
+  const module = operationWorkModuleSchema.parse(item.module);
+  const businessDueOn = presentation.businessDueOn === undefined ? item.dueIso : presentation.businessDueOn;
+  const actionOn = presentation.actionOn === undefined ? item.dueIso : presentation.actionOn;
   const calendar = presentation.calendar ?? {
     module: { key: item.ruleKey, source: "work_engine", state: "ready" as const },
     actor: {
@@ -188,17 +224,14 @@ export function operationWorkItemFromProjection(
     },
     holidayName: null,
   };
-  const state = calendar.module.state !== "ready" || calendar.actor.state !== "ready"
-    ? "calendar_gap"
-    : item.workingDaysLate > 0
-      ? "missed"
-      : dueOn === null
-        ? "no_working_date"
-        : "scheduled";
+  const calendarReady = calendar.module.state === "ready" && calendar.actor.state === "ready";
+  const placement = actionOn === null
+    ? "no_working_date"
+    : actionOn < presentation.today ? "missed" : "on_day";
   return operationWorkItemSchema.parse({
     contractVersion: 2,
-    id: operationWorkStableId(item.module, presentation.object.id, item.ruleKey),
-    module: item.module,
+    id: operationWorkStableId(module, presentation.object.id, item.ruleKey),
+    module,
     ruleKey: item.ruleKey,
     object: presentation.object,
     problem: presentation.problem,
@@ -216,11 +249,20 @@ export function operationWorkItemFromProjection(
       state: item.ownerState,
     },
     timing: {
-      businessDueOn: dueOn,
-      actionOn: dueOn,
-      workingDaysMissed: state === "calendar_gap" ? 0 : item.workingDaysLate,
-      state,
-      noDateReason: dueOn === null ? "The owning rule has no working date" : null,
+      businessDueOn,
+      actionOn,
+      placement,
+      missedAge: calendarReady ? {
+        state: "counted",
+        workingDays: item.workingDaysLate,
+        basis: {
+          calendarKey: `${calendar.module.key}+${calendar.actor.key}`,
+          from: actionOn ?? presentation.today,
+          to: presentation.today,
+        },
+      } : { state: "not_calculable", workingDays: null, basis: null },
+      eligibility: item.ownerState === "not_assigned" ? "unknown" : "eligible",
+      noDateReason: actionOn === null ? (presentation.noDateReason ?? "The owning rule has no working date") : null,
       calendar,
     },
     communication: null,

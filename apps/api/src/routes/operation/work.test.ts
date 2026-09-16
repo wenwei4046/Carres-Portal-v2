@@ -44,8 +44,13 @@ const base: OperationWorkItem = {
   timing: {
     businessDueOn: "2026-09-06",
     actionOn: "2026-09-06",
-    workingDaysMissed: 0,
-    state: "scheduled",
+    placement: "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: 0,
+      basis: { calendarKey: "office+person:shasha", from: "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
     noDateReason: null,
     calendar: {
       module: { key: "office", source: "purchasing_settings", state: "ready" },
@@ -609,7 +614,7 @@ describe("operation Work response composition", () => {
       action: "Ask Nice Future to confirm the PO delivery date",
       recipient: "Nice Future",
       owner: { dutyKey: "po_duty", normal: person, acting: person },
-      timing: { actionOn: "2026-09-04", workingDaysMissed: 0, state: "calendar_gap" },
+      timing: { actionOn: "2026-09-04", placement: "missed", missedAge: { state: "not_calculable" } },
       destination: "/operation?tab=purchase-orders&po=PO-2041",
     });
     expect(item?.action).not.toContain("Yu Jun");
@@ -663,7 +668,7 @@ describe("operation Work response composition", () => {
         destination: "/operation?tab=purchase-orders&po=PO-3001",
       });
       /* Fri 11 Sep arrival − 1 OFFICE working day = Thu 10 Sep. */
-      expect(item?.timing).toMatchObject({ actionOn: "2026-09-10", workingDaysMissed: 0, state: "calendar_gap" });
+      expect(item?.timing).toMatchObject({ actionOn: "2026-09-10", placement: "on_day", missedAge: { state: "not_calculable" } });
       /* The owner is a resolved person, never spelled into the sentence. */
       expect(item?.action).not.toContain("Khor Yee");
     });
@@ -699,8 +704,8 @@ describe("operation Work response composition", () => {
     it("stays open and turns late once the check day has passed", () => {
       const [late] = project({}, "2026-09-14");
       expect(late).toBeTruthy();
-      expect(late?.timing?.state).toBe("calendar_gap");
-      expect(late?.timing?.workingDaysMissed).toBe(0);
+      expect(late?.timing?.placement).toBe("missed");
+      expect(late?.timing?.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
     });
   });
 
@@ -762,7 +767,7 @@ describe("operation Work response composition", () => {
       action: "Ask customer to pay",
       recipient: "Tan Qu Qu",
       owner: { dutyKey: "delivery_duty", normal: person, acting: person },
-      timing: { actionOn: "2026-09-07", state: "calendar_gap" },
+      timing: { actionOn: "2026-09-07", placement: "missed", missedAge: { state: "not_calculable" } },
       destination: "/finance/monitor?invoice=invoice-1",
     });
     expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
@@ -827,9 +832,9 @@ describe("payment.missed_promise — the promise outranks the window", () => {
       problem: "Customer promise was missed",
       action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
-      timing: { actionOn: "2026-09-05", state: "calendar_gap" },
+      timing: { actionOn: "2026-09-05", placement: "missed" },
     });
-    expect(item?.timing.workingDaysMissed).toBe(0);
+    expect(item?.timing.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
     expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
   });
 
@@ -1020,7 +1025,7 @@ describe("payment.check_stored_furniture", () => {
       module: "payment",
       problem: "Stored furniture has not been checked",
       action: "Check the stored furniture",
-      timing: { actionOn: "2026-07-31", state: "calendar_gap" },
+      timing: { actionOn: "2026-07-31", placement: "missed", missedAge: { state: "not_calculable" } },
     });
     expect(item?.completionPredicate).toContain("storage inspection recorded");
     // §6 names no warehouse duty roster, so there is no duty KEY to resolve —

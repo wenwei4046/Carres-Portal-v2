@@ -3,6 +3,7 @@ import {
   operationWorkItemFromProjection,
   operationWorkItemSchema,
   operationWorkResponseSchema,
+  operationWorkSourceKeySchema,
   operationWorkStableId,
   type OperationWorkItem,
 } from "./operation-work";
@@ -31,8 +32,13 @@ const item: OperationWorkItem = {
   timing: {
     businessDueOn: "2026-09-06",
     actionOn: "2026-09-06",
-    workingDaysMissed: 0,
-    state: "scheduled",
+    placement: "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: 0,
+      basis: { calendarKey: "office+person:yujun", from: "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
     noDateReason: null,
     calendar: {
       module: { key: "office", source: "purchasing_settings", state: "ready" },
@@ -92,6 +98,7 @@ describe("Operation Work wire contract", () => {
       ...item,
       timing: {
         ...item.timing,
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
         calendar: {
           ...item.timing.calendar,
           actor: { key: "person:yujun", source: "people", state: "not_configured" },
@@ -102,6 +109,7 @@ describe("Operation Work wire contract", () => {
       ...item,
       timing: {
         ...item.timing,
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
         calendar: {
           ...item.timing.calendar,
           actor: { key: "person:yujun", source: "people", state: "read_failed" },
@@ -110,6 +118,43 @@ describe("Operation Work wire contract", () => {
     });
     expect(notConfigured.timing.calendar.actor.state).toBe("not_configured");
     expect(readFailed.timing.calendar.actor.state).toBe("read_failed");
+  });
+
+  it("keeps a past action in Missed when its calendar cannot calculate the age", () => {
+    const parsed = operationWorkItemSchema.parse({
+      ...item,
+      timing: {
+        ...item.timing,
+        actionOn: "2026-09-05",
+        placement: "missed",
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
+        calendar: {
+          ...item.timing.calendar,
+          actor: { key: "person:yujun", source: "people", state: "read_failed" },
+        },
+      },
+    });
+    expect(parsed.timing.placement).toBe("missed");
+    expect(parsed.timing.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
+  });
+
+  it("rejects complete when any requested source is not current", () => {
+    const sources = operationWorkSourceKeySchema.options.map((key) => ({
+      key,
+      state: key === "receiving" ? "failed" as const : "healthy" as const,
+      observedAt: item.observedAt,
+      lastSuccessfulAt: item.observedAt,
+      errorLabel: key === "receiving" ? "Could not refresh Receiving" : null,
+    }));
+    expect(operationWorkResponseSchema.safeParse({
+      contractVersion: 2,
+      complete: true,
+      items: [item],
+      staff: [],
+      generatedOn: "2026-09-06",
+      sources,
+      counts: { all: 1, byDay: { "2026-09-06": 1 }, byModule: { orders: 1 }, byOwner: { yujun: 1 } },
+    }).success).toBe(false);
   });
 
   it("requires health for every admitted response source", () => {
@@ -182,7 +227,7 @@ describe("Operation Work wire contract", () => {
 
     expect(adapted.owner.normal?.name).toBe("Shasha");
     expect(adapted.owner.acting?.name).toBe("Yu Jun");
-    expect(adapted.timing.state).toBe("missed");
+    expect(adapted.timing.placement).toBe("missed");
     expect(adapted.completionPredicate).toContain("posted Receiving Session");
     expect(adapted.completionStatement).toBe("The GRN is posted");
   });

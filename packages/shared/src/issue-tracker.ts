@@ -87,8 +87,9 @@ export function projectIssueActionWork(input: {
       timing: {
         businessDueOn: source.dueOn,
         actionOn: source.dueOn,
-        workingDaysMissed: 0,
-        state: "calendar_gap",
+        placement: source.dueOn < input.today ? "missed" : "on_day",
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
+        eligibility: duty?.state === "not_assigned" || !duty ? "unknown" : "eligible",
         noDateReason: null,
         calendar: {
           module: { key: "issue_action", source: "issue_actions.due_on", state: "ready" },

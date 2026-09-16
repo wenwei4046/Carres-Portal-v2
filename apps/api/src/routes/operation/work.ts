@@ -1074,7 +1074,7 @@ export function composeOperationWorkResponse(
   const byModule: Record<string, number> = {};
   const byOwner: Record<string, number> = {};
   for (const item of items) {
-    incrementCount(byDay, item.timing.state === "missed"
+    incrementCount(byDay, item.timing.placement === "missed"
       ? "missed"
       : item.timing.actionOn ?? "no_working_date");
     incrementCount(byModule, item.module);
