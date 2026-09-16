@@ -65,7 +65,6 @@ import {
   HelpCircle,
   PanelLeftOpen,
 } from "lucide-react";
-import type { DeliveryWorkStatusTone } from "@carres/shared";
 import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
 import {
   ARRIVAL_COPY,
@@ -94,6 +93,7 @@ import {
 } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
 import DeliveryBrief, { STATUS_TONE_TEXT } from "./components/DeliveryBrief";
+import { TwoLines, joinLines, confirmedDeliveryLines } from "./components/MonitorTwoLines";
 /* The kit's own glyph registry — a business meaning, never a Lucide name
    (`components/kit/Icon`). The contact deadline draws `call` and `late`. */
 import Icon, { type IconName } from "@/components/kit/Icon";
@@ -618,53 +618,8 @@ function MonitorWorkCard({
   );
 }
 
-/* ── THE TWO-LINE CELL (Delivery MASTER §8.3) ──────────────────────────────
-   One primary fact in its text colour, one supporting line beneath. Colour
-   never replaces the word; no icon ever enters a status fact. */
-const TONE_TEXT = STATUS_TONE_TEXT;
-const LINE2_TEXT: Record<"none" | "orange" | "red", string> = {
-  none: "text-kit-slate-11",
-  orange: "text-kit-amber-11",
-  red: "text-kit-red-11",
-};
-
-function TwoLines({
-  line1,
-  line2 = null,
-  tone = "none",
-  line2Tone = "none",
-  line1Title,
-  line2TestId,
-}: {
-  line1: string;
-  line2?: string | null;
-  tone?: DeliveryWorkStatusTone;
-  line2Tone?: "none" | "orange" | "red";
-  line1Title?: string;
-  line2TestId?: string;
-}) {
-  return (
-    <span className="block min-w-0">
-      <span className={`block truncate ${TONE_TEXT[tone]}`} title={line1Title ?? line1}>
-        {line1}
-      </span>
-      {line2 ? (
-        <span
-          className={`block truncate text-label ${LINE2_TEXT[line2Tone]}`}
-          title={line2}
-          data-testid={line2TestId}
-        >
-          {line2}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-/** The sheet's own spelling of a two-line cell — never an em dash. */
-function joinLines(a: string, b: string | null | undefined): string {
-  return b ? `${a} · ${b}` : a;
-}
+/* ── THE TWO-LINE CELL (Delivery MASTER §8.3) — `./components/MonitorTwoLines`,
+   shared with the Payment Monitor so both 72px listings print one cell. ── */
 
 /**
  * ⭐ WHICH ROWS OWE A CONTACT DEADLINE — the ONE predicate, asked in one place.
@@ -738,40 +693,12 @@ function buildingLine(r: DeliveryMonitorCard): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-/** COLUMN 8's two lines (§8.3): a full booking, a half booking, or the call. */
-function confirmedLines(r: DeliveryMonitorCard): {
-  line1: string;
-  tone: DeliveryWorkStatusTone;
-  line2: string | null;
-  line2Tone: "none" | "orange" | "red";
-} {
-  if (r.booked && r.confirmedDate) {
-    return {
-      line1: MONITOR_COPY.confirmed,
-      tone: "green",
-      line2: `${fmtDate(r.confirmedDate)} · ${r.confirmedTime}`,
-      line2Tone: "none",
-    };
-  }
-  if (r.confirmedDate) {
-    return {
-      line1: MONITOR_COPY.notConfirmed,
-      tone: "orange",
-      line2: `${fmtDate(r.confirmedDate)} · ${MONITOR_COPY.noTimeAgreed}`,
-      line2Tone: "none",
-    };
-  }
-  /* ⭐ THE DEADLINE IS SHOWN ONCE, AND IT IS SHOWN IN WORK (owner ruling
-     2026-09-14). This cell used to repeat `Call by {date}` beside the
-     `Delivery Status` cell that already carried it — the same day printed
-     twice on one row, in two different spellings. `Confirmed Delivery` owns
-     the BOOKING; when there is no booking it says so and stops. */
-  return {
-    line1: MONITOR_COPY.notConfirmed,
-    tone: "orange",
-    line2: null,
-    line2Tone: "none",
-  };
+/** COLUMN 8's two lines (§8.3): a full booking, a half booking, or no booking.
+ *  ⭐ THE DEADLINE IS SHOWN ONCE, AND IT IS SHOWN IN WORK (owner ruling
+ *  2026-09-14): with no booking the cell says so and stops. The spelling is
+ *  the shared `confirmedDeliveryLines`, so the Payment Monitor prints it too. */
+function confirmedLines(r: DeliveryMonitorCard) {
+  return confirmedDeliveryLines({ dateIso: r.confirmedDate, time: r.booked ? r.confirmedTime : null });
 }
 
 export default function OperationDelivery() {
