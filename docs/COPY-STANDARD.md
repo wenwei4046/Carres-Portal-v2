@@ -155,6 +155,51 @@ Opening an action must answer these five questions in this order:
 Omit a section that does not apply; an empty heading teaches nothing. A complex execution still
 uses the governed maximum-four-step `What to do` block below.
 
+## Workspace destination words
+
+These words govern the three destinations under the left-bar `WORKSPACE` section. The one global
+`Dashboard` remains an independent top-level destination and is never called `Workspace Dashboard`.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
+| Work timing | `Broken commitments` · `Late` · `Today` · `Later` · `No date` | Upcoming · Overdue as the section word · Backlog |
+| Work search | `Search work…` | Search tasks… |
+| My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
+| Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
+| Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
+| Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
+| Right Rail healthy clear | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
+| Right Rail refresh failure | `My Work could not be refreshed` | No work due now · No open work |
+| Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |
+| Duty facts | `Normal owner` · `Acting today` · `Effective` · `Cover` · `Reason` | PIC · Assigned to · Substitute |
+| Duty actions | `Assign holder` · `Add cover` | Change owner · Reassign · Take it · Release |
+| Duty filters | `All duties` · `Covered today` · `Cover scheduled` · `Not assigned` | Active · Inactive · Upcoming |
+| Duty no match | `No duties match this search` · `Clear search` | No duties |
+| Duty read failure | `Staff & Duties could not be opened` · `Try again` | No duties · Error |
+| Duty unassigned | `Not assigned` · `Nobody holds {Duty}.` | Unowned · Available · — |
+| Duty resolution with cover | `{acting person} covering for {normal owner}` | `{acting person}` alone · owner name inside action sentence |
+| Duty write success | `{name} holds {Duty} from {date}` · `{acting person} covers {normal owner} for {Duty}, {from}–{until}` | Saved · Updated successfully |
+| Duty validation | `Choose a holder.` · `Choose when this holder starts.` · `Choose who will cover this duty.` · `Choose valid cover dates.` | Required · Invalid date · Error |
+| Duty conflict | `{Duty} already has a holder for these dates. Choose different dates.` · `{Duty} already has cover for these dates. Choose different dates.` | Conflict · Overlap found |
+| Issue Register purpose | `Every issue stays for facts, money and learning.` | Issue dashboard · Problem inbox |
+| Issue search | `Search issues…` | Search Service Notes… |
+| Issue true empty | `No issues recorded` | All clear · `0 issues` while loading/failed |
+| Issue no match | `No issues match these filters` · `Clear filters` | No issues · No results |
+| Issue read failure | `Issue Tracker could not be opened` · `Try again` | No issues · Something went wrong |
+| Issue creation | `Record issue` | Create ticket · Add problem · New SN |
+| Issue current action | `Current Action` · `No current action` · `Waiting for triage rule` | Set next action · Follow up · Handle |
+| Issue action result | `Record result` | Save result · Mark done · Complete task |
+| Issue intake validation | `Choose what has a problem.` · `Choose what you saw.` · `Choose who found the issue.` · `Choose when the issue was found.` · `Find and choose the linked record.` · `Add the required proof.` | Required · Invalid · Complete all fields |
+| Issue result validation | `Choose what happened.` · `Add the evidence needed for this result.` · `This action has changed. Read the current action before recording a result.` | Save failed · Conflict · Try later |
+| Issue detail sections | `What is true` · `Linked records` · `Accountability` · `Money` · `Evidence & timeline` · `Review & learning` · `Related Issues & history` | Details · Activity · Notes as catch-all sections |
+| Issue report door | `Monthly report` | Report dashboard · Export issues |
+
+An empty or failure sentence uses the exact object it describes. `No open work` cannot describe an
+empty Issue Register; `No issues recorded` cannot describe a filtered no-match; neither may appear
+until the complete authorised source is healthy.
+
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,
