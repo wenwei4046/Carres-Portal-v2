@@ -24,23 +24,19 @@ import { toast } from "sonner";
 import {
   latestEvidenceAtOf,
   proofDecisionLabel,
-  PROOF_DECISIONS,
   type DeliveryAttemptEvidenceRow,
   type DeliveryProofReviewRow,
-  type ProofDecisionKey,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { ApiError, apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
   useAttachSignedDeliveryOrder,
-  useReviewDeliveryProof,
   type DeliveryOrderAttemptRow,
 } from "@/lib/queries";
 import Panel from "@/components/kit/Panel";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
-import Textarea from "@/components/kit/Textarea";
 import {
   DELIVERY_RESULT_LABEL,
   DOR_COPY,
@@ -49,6 +45,7 @@ import {
   type DriverSubmissionFile,
 } from "../delivery-orders-register";
 import { DeliveryProofUploadButton, SignedDeliveryDocumentLink } from "./DriverSubmission";
+import DeliveryProofReviewForm from "./DeliveryProofReviewForm";
 
 /** ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery Order words). */
 export const EVIDENCE_COPY = {
@@ -95,7 +92,15 @@ function Absent({ children }: { children: string }) {
 }
 
 /** One bound file — a thumbnail for a picture, a named link for the rest. */
-function EvidenceFileView({ file, index }: { file: { url: string | null; kind: string; at: string; path: string }; index: number }) {
+function EvidenceFileView({
+  file,
+  index,
+  onReadState,
+}: {
+  file: { url: string | null; kind: string; at: string; path: string };
+  index: number;
+  onReadState?: (path: string, readable: boolean) => void;
+}) {
   const word = file.kind === "video" ? DOR_COPY.videos : file.kind === "document" ? DOR_COPY.signedDo : DOR_COPY.photos;
   if (!file.url) {
     return (
@@ -107,7 +112,13 @@ function EvidenceFileView({ file, index }: { file: { url: string | null; kind: s
   if (file.kind === "photo") {
     return (
       <a href={file.url} target="_blank" rel="noreferrer" className="block" data-testid="do-evidence-photo">
-        <img src={file.url} alt={`${word} ${index + 1}`} className="h-24 w-24 rounded-md border border-kit-slate-5 object-cover" />
+        <img
+          src={file.url}
+          alt={`${word} ${index + 1}`}
+          className="h-24 w-24 rounded-md border border-kit-slate-5 object-cover"
+          onLoad={() => onReadState?.(file.path, true)}
+          onError={() => onReadState?.(file.path, false)}
+        />
         <span className="mt-1 block text-label text-kit-slate-11">{fmtDate(file.at)}</span>
       </a>
     );
@@ -234,78 +245,6 @@ function SignedDoAttachForm({
   );
 }
 
-/** THE THREE REVIEW ACTS. Acceptance saves at once; the other two open the
- *  reason field the record requires. */
-function ProofReviewActs({ doNumber, attemptId, sourceVersion }: { doNumber: string; attemptId: string | null; sourceVersion: string }) {
-  const [decision, setDecision] = useState<ProofDecisionKey | null>(null);
-  const [reason, setReason] = useState("");
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
-  const review = useReviewDeliveryProof(doNumber, {
-    onSuccess: () => {
-      toast.success(EVIDENCE_COPY.reviewSaved);
-      setDecision(null);
-      setReason("");
-      setIdempotencyKey(crypto.randomUUID());
-    },
-    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Save failed"),
-  });
-  const submit = (key: ProofDecisionKey) => {
-    if (key === "accepted") {
-      review.mutate({ decision: "accepted", attemptId, sourceVersion, idempotencyKey });
-      return;
-    }
-    setDecision(key);
-  };
-  const canSave = Boolean(decision) && reason.trim().length > 0 && !review.isPending;
-  return (
-    <div className="mt-3 flex flex-col gap-2" data-testid="do-proof-review-acts">
-      <div className="flex flex-wrap items-center gap-2">
-        {PROOF_DECISIONS.map((d) => (
-          <Button
-            key={d.key}
-            size="sm"
-            variant={d.key === "accepted" ? "primary" : "neutral"}
-            type="button"
-            disabled={review.isPending}
-            onClick={() => submit(d.key)}
-            data-testid={`do-proof-${d.key}`}
-          >
-            {d.label}
-          </Button>
-        ))}
-      </div>
-      {decision ? (
-        <form
-          className="flex flex-col gap-2"
-          data-testid="do-proof-reason-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSave || !decision) return;
-            review.mutate({ decision, attemptId, reason: reason.trim(), sourceVersion, idempotencyKey });
-          }}
-        >
-          <Textarea
-            id={`do-proof-reason-${doNumber}`}
-            label={`${proofDecisionLabel(decision)} · ${EVIDENCE_COPY.reason}`}
-            hint={EVIDENCE_COPY.reasonHint}
-            required
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" type="submit" disabled={!canSave} data-testid="do-proof-save">
-              {EVIDENCE_COPY.saveReview}
-            </Button>
-            <Button size="sm" type="button" onClick={() => setDecision(null)} data-testid="do-proof-cancel">
-              {EVIDENCE_COPY.cancel}
-            </Button>
-          </div>
-        </form>
-      ) : null}
-    </div>
-  );
-}
-
 export default function DeliveryEvidencePanel({
   doNumber,
   orderId,
@@ -332,6 +271,7 @@ export default function DeliveryEvidencePanel({
   arrivalOnly?: boolean;
 }) {
   const [attaching, setAttaching] = useState(false);
+  const [readablePhotos, setReadablePhotos] = useState<Record<string, boolean>>({});
   const reached = arrivalOnly
     ? []
     : [...attempts]
@@ -351,6 +291,18 @@ export default function DeliveryEvidencePanel({
     attemptEvidence,
     signedDoUploadedAt: signedDo.uploadedAt,
   });
+  const reviewPhotoPaths = latestReached
+    ? [
+        ...attemptEvidence.filter((file) => file.attempt_id === latestReached.id && file.kind === "photo"),
+        ...unbound.filter((file) => file.kind !== "video"),
+      ].map((file) => ({ path: file.path, hasUrl: Boolean(file.url) }))
+    : [];
+  const allEvidenceReadable = reviewPhotoPaths.every(
+    (file) => file.hasUrl && readablePhotos[file.path] === true,
+  );
+  const recordPhotoReadState = (path: string, readable: boolean) => {
+    setReadablePhotos((before) => before[path] === readable ? before : { ...before, [path]: readable });
+  };
 
   const stateLine = (() => {
     switch (proofReview.state) {
@@ -414,7 +366,7 @@ export default function DeliveryEvidencePanel({
                 ) : (
                   <div className="flex flex-wrap items-start gap-3">
                     {shown.map((f, j) => (
-                      <EvidenceFileView key={f.path} file={f} index={j} />
+                      <EvidenceFileView key={f.path} file={f} index={j} onReadState={isLatestReached ? recordPhotoReadState : undefined} />
                     ))}
                   </div>
                 )}
@@ -478,7 +430,14 @@ export default function DeliveryEvidencePanel({
             </ul>
           ) : null}
           {evidenceVersion ? (
-            <ProofReviewActs doNumber={doNumber} attemptId={latestReached.id ?? null} sourceVersion={evidenceVersion} />
+            <div className="mt-3" data-testid="do-proof-review-acts">
+              <DeliveryProofReviewForm
+                doNumber={doNumber}
+                attemptId={latestReached.id ?? null}
+                sourceVersion={evidenceVersion}
+                allEvidenceReadable={allEvidenceReadable}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}

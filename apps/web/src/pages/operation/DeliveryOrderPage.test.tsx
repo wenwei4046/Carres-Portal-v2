@@ -475,28 +475,31 @@ describe("DeliveryOrderPage", () => {
       expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://signed/p.jpg");
       /* The file is there, nobody has judged it: the pill is AMBER, the state says so. */
       expect(screen.getByTestId("do-proof-review-state")).toHaveTextContent("Check delivery proof");
-      for (const word of ["Proof Accepted", "More Proof Required", "Proof Rejected"]) {
-        expect(screen.getByRole("button", { name: word })).toBeTruthy();
+      for (const word of ["Accept proof", "Request more proof", "Reject proof"]) {
+        expect(screen.getByRole("radio", { name: word })).toBeTruthy();
       }
       /* The same uploader every other surface renders — never a second picker. */
       expect(screen.getByTestId("do-evidence-upload-photo")).toBeTruthy();
     });
 
-    it("`Proof Accepted` saves at once against the latest attempt; a refusal must say why", () => {
+    it("chooses a proof result, then saves it against the latest attempt; a refusal must say why", () => {
       mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
-      fireEvent.click(screen.getByTestId("do-proof-accepted"));
+      fireEvent.load(screen.getByRole("img", { name: "Photos 1" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Accept proof" }));
+      expect(reviewMutate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Save review" }));
       expect(reviewMutate).toHaveBeenCalledWith(expect.objectContaining({
         decision: "accepted",
         attemptId: "00000000-0000-0000-0000-0000000f0001",
         sourceVersion: "2026-08-20T10:00:00Z",
         idempotencyKey: expect.any(String),
       }));
-      fireEvent.click(screen.getByTestId("do-proof-rejected"));
-      const save = screen.getByTestId("do-proof-save");
+      fireEvent.click(screen.getByRole("radio", { name: "Reject proof" }));
+      const save = screen.getByRole("button", { name: "Save review" });
       expect(save).toBeDisabled();
-      fireEvent.change(screen.getByLabelText(/Proof Rejected · Reason/), { target: { value: "The photo shows the lobby" } });
+      fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "The photo shows the lobby" } });
       expect(save).not.toBeDisabled();
-      fireEvent.submit(screen.getByTestId("do-proof-reason-form"));
+      fireEvent.click(save);
       expect(reviewMutate).toHaveBeenLastCalledWith(expect.objectContaining({
         decision: "rejected",
         attemptId: "00000000-0000-0000-0000-0000000f0001",
@@ -504,6 +507,17 @@ describe("DeliveryOrderPage", () => {
         sourceVersion: "2026-08-20T10:00:00Z",
         idempotencyKey: expect.any(String),
       }));
+    });
+
+    it("cannot accept proof while a current evidence photo cannot be read", () => {
+      mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
+      const photo = screen.getByRole("img", { name: "Photos 1" });
+      fireEvent.error(photo);
+      expect(screen.getByText("Photo could not be loaded · Try again")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Accept proof" })).toBeDisabled();
+      expect(screen.getByRole("radio", { name: "Request more proof" })).not.toBeDisabled();
+      fireEvent.load(photo);
+      expect(screen.getByRole("radio", { name: "Accept proof" })).not.toBeDisabled();
     });
 
     it("the review state and its history print the governed words with the reason and reviewer", () => {
