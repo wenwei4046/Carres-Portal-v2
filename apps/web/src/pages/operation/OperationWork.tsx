@@ -145,7 +145,7 @@ export default function OperationWork() {
 
   const authEmail = useAuth((s) => s.user?.email ?? null);
 
-  const { items: allItems, staff, staffById, loading, error } = useOpenWorkSet();
+  const { items: allItems, staff, staffById, loading, error, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -240,9 +240,13 @@ export default function OperationWork() {
   }, [filteredTeamItems, staffById]);
 
   const visibleTeamGroups = useMemo(
-    () => (ownerFocus ? teamGroups.filter((g) => g.userId === ownerFocus) : teamGroups),
+    () => (ownerFocus ? teamGroups.filter((g) => g.key === ownerFocus) : teamGroups),
     [teamGroups, ownerFocus],
   );
+  const ownerOptions = useMemo(() => [
+    { value: "all", label: "All owners" },
+    ...teamGroups.map((group) => ({ value: group.key, label: group.name })),
+  ], [teamGroups]);
 
   const visible = activeView === "mine"
     ? mine
@@ -302,9 +306,7 @@ export default function OperationWork() {
               onClick={() => updateParam("owner", null)}
               className="px-2 py-1 rounded-full text-label border border-base-900 bg-base-900 text-white"
             >
-              {staffById.get(ownerFocus)
-                ? personLabel(staffById.get(ownerFocus)!.name, staffById.get(ownerFocus)!.email)
-                : "One person"}{" "}
+              {teamGroups.find((group) => group.key === ownerFocus)?.name ?? "One owner"}{" "}
               · Clear
             </button>
           )}
@@ -327,6 +329,14 @@ export default function OperationWork() {
               { value: "no_date", label: "No date" },
             ]}
           />
+          {activeView === "team" && (
+            <Select
+              id="work-owner"
+              value={ownerFocus ?? "all"}
+              onValueChange={(value) => updateParam("owner", value)}
+              options={ownerOptions}
+            />
+          )}
           <Select
             id="work-module"
             value={moduleFilter}
@@ -370,10 +380,21 @@ export default function OperationWork() {
     >
       <div className="h-full overflow-y-auto px-5 py-4" data-testid="work-list">
         {loading ? (
-          <div className="text-body text-base-400 py-8">Loading…</div>
+          <div className="space-y-3 py-2" aria-label="Loading work" data-testid="work-loading">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="rounded-md border border-base-200 bg-white px-4 py-3 animate-pulse">
+                <div className="h-3 w-24 rounded bg-base-100" />
+                <div className="mt-2 h-4 w-56 max-w-full rounded bg-base-100" />
+                <div className="mt-2 h-3 w-80 max-w-full rounded bg-base-100" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
-          <div className="text-body text-danger py-8" data-testid="work-error">
-            Work could not be loaded. Try again.
+          <div className="py-8" data-testid="work-error">
+            <p className="text-body text-danger">Work could not be loaded. Try again.</p>
+            <button type="button" onClick={retry} className="mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700">
+              Try again
+            </button>
           </div>
         ) : activeView === "mine" ? (
           myGroups.length === 0 ? (

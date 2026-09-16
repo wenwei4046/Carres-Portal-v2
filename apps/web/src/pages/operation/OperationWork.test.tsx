@@ -11,12 +11,13 @@ let workState: {
   isError: boolean;
 };
 let authState = { role: "operation", email: "shasha@carres.test" };
+const refetch = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useOperationWork: () => workState,
+    useOperationWork: () => ({ ...workState, refetch }),
     useOperationStaff: () => ({
       data: {
         staff: [
@@ -79,6 +80,7 @@ function show(url = "/operation?tab=work") {
 
 beforeEach(() => {
   navigate.mockReset();
+  refetch.mockReset();
   authState = { role: "operation", email: "shasha@carres.test" };
   workState = {
     data: {
@@ -233,6 +235,15 @@ describe("Operation Work — one server feed", () => {
     workState = { data: undefined, isLoading: false, isError: true };
     show();
     expect(screen.getByTestId("work-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("shows a stable loading shell", () => {
+    workState = { data: undefined, isLoading: true, isError: false };
+    show();
+    expect(screen.getByTestId("work-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-empty")).not.toBeInTheDocument();
   });
 
   it("shows an explicit empty state", () => {

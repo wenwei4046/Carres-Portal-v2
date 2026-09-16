@@ -35,6 +35,7 @@ export interface OpenWorkSet {
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
   error: boolean;
+  retry: () => void;
 }
 
 function toWorkRow(item: OperationWorkItem): WorkRow {
@@ -107,5 +108,6 @@ export function useOpenWorkSet(): OpenWorkSet {
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),
     error: query.isError,
+    retry: () => { void query.refetch(); },
   };
 }
