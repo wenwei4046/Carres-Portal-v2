@@ -62,6 +62,7 @@ import {
   MONITOR_COLUMN,
   MONITOR_COPY,
   type DeliveryMonitorCard,
+  type MonitorExtraLine,
   type MonitorGoodsLine,
 } from "../delivery-monitor";
 import { requestedDeliveryText } from "../sales-order-columns";
@@ -546,6 +547,187 @@ interface BriefLine {
   location: string | null;
 }
 
+/**
+ * PANEL 4 · `Items, Services & Stock` — read-only, from Sales, Purchasing and
+ * Stock (§8.5). Exported unchanged (Payment Monitor Card 02, 2026-09-16) so
+ * the Payment collection workspace shows the SAME item, source, status and
+ * location a Delivery operator sees, with the same door to the PO behind a
+ * Unit — never a second stock reading.
+ */
+export function ItemsServicesStockPanel({
+  orderId,
+  items,
+  extras,
+  arrival,
+  requestedIso,
+  loans,
+}: {
+  orderId: string;
+  items: readonly MonitorGoodsLine[];
+  extras: readonly MonitorExtraLine[];
+  arrival: DeliveryMonitorCard["arrival"];
+  requestedIso: string | null;
+  loans: DeliveryMonitorCard["scope"]["o"]["ops_sofa_loans"];
+}) {
+  const navigate = useNavigate();
+  const expansion = useSalesOrderExpansion(orderId);
+  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  const coverage = expansion.data?.unitCoverage ?? {};
+  const unitScopes = expansion.data?.unitScopes ?? {};
+  const placeByUnit = new Map((expansion.data?.place ?? []).map((p) => [p.unitCode, p]));
+  const unitsOf = (lineId: string | null): Array<{ unit: string; po: string | null }> =>
+    (lineId ? factsByLine.get(lineId)?.unitIds ?? [] : [])
+      .map((code) => ({
+        unit: unitIdOf({ unitCode: code, identityScope: unitScopes[code] as "unit" | "quantity" | undefined }),
+        po: coverage[code] ?? null,
+      }))
+      .filter((u): u is { unit: string; po: string | null } => u.unit !== null);
+  const locationOf = (units: Array<{ unit: string }>): string | null => {
+    const places = units
+      .map((u) => placeByUnit.get(u.unit))
+      .map((p) => (p?.siteName ? p.siteName : p?.holderName ? MONITOR_COPY.withHolder(p.holderName) : null))
+      .filter((p): p is string => Boolean(p));
+    return places.length > 0 ? [...new Set(places)].join(" · ") : null;
+  };
+  const arrivalDay = arrivalDayOf(arrival);
+  const arrivalWord = (): { word: string; tone: DeliveryWorkStatusTone } => {
+    if (arrival.kind === "no_purchase_order") {
+      return { word: ARRIVAL_COPY.noPurchaseOrder, tone: "orange" };
+    }
+    if (arrivalDay && requestedIso && arrivalDay > requestedIso) {
+      return { word: MONITOR_COPY.arrivingAfterRequested, tone: "orange" };
+    }
+    if (arrivalDay) return { word: MONITOR_COPY.arriving(fmtDate(arrivalDay)), tone: "none" };
+    return { word: MONITOR_COPY.notReceivedYet, tone: "orange" };
+  };
+  const goodsLine = (line: MonitorGoodsLine): BriefLine => {
+    const units = unitsOf(line.lineId);
+    const ready = line.shortQty === 0;
+    const arrival = ready ? null : arrivalWord();
+    return {
+      key: line.key,
+      item: line.name,
+      qty: line.qty,
+      units,
+      status: ready ? ARRIVAL_COPY.stockReady : arrival!.word,
+      statusTone: ready ? "green" : arrival!.tone,
+      location: locationOf(units),
+    };
+  };
+  const briefLines: BriefLine[] = [
+    ...items.map(goodsLine),
+    ...extras.filter((l) => l.kind === "accessory").map(goodsLine),
+    ...extras
+      .filter((l) => l.kind === "service")
+      .map(
+        (l): BriefLine => ({
+          key: l.key,
+          item: l.name,
+          qty: l.qty,
+          units: null,
+          status: null,
+          statusTone: "none",
+          location: null,
+        }),
+      ),
+    /* 0492 (Card 15) — one line per loan Unit out, naming the exact Unit ID
+       the crew must bring back: `Loan {Unit ID} · collect back on delivery day`. */
+    ...(loans ?? [])
+      .filter((l) => l.status === "on_loan")
+      .map((l, index) => {
+        const unit = Array.isArray(l.ops_stock_items) ? l.ops_stock_items[0] : l.ops_stock_items;
+        return {
+          key: `loan-${index}`,
+          item: MONITOR_COPY.loanLine(
+            unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
+          ),
+          qty: 1,
+          units: null,
+          status: null,
+          statusTone: "none" as const,
+          location: null,
+        };
+      }),
+  ];
+  const physicalLines = briefLines.filter(line => line.units !== null);
+  const serviceLines = briefLines.filter(line => line.units === null);
+  return (
+    <Panel title={MONITOR_COPY.panelItems} padding="none">
+      {briefLines.length === 0 ? (
+        <div className="px-4 py-3 text-body text-kit-slate-11">{DW.noGoods}</div>
+      ) : physicalLines.length > 0 ? (
+        <div className="min-w-0">
+          <table className="block w-full text-left xl:table xl:table-fixed" aria-label={MONITOR_COPY.panelItems} data-testid="delivery-brief-items">
+            <colgroup className="hidden xl:table-column-group">
+              {BRIEF_COLUMNS.map((c) => (
+                <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+              ))}
+            </colgroup>
+            <thead className="sr-only border-b border-base-200 bg-base-50 xl:not-sr-only xl:table-header-group">
+              <tr className="divide-x divide-base-200">
+                {BRIEF_COLUMNS.map((c) => (
+                  <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="block divide-y divide-base-200 text-body xl:table-row-group">
+              {physicalLines.map((line) => (
+                <tr key={line.key} className="grid grid-cols-[minmax(0,1fr)_auto] align-top xl:table-row xl:divide-x xl:divide-base-200" data-testid={`delivery-brief-line-${line.key}`}>
+                  <td className="min-w-0 break-words px-2 py-1.5">{line.item}</td>
+                  <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
+                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
+                    {!line.units?.length ? (
+                      absentWord(DW.notAllocated)
+                    ) : (
+                      line.units.map((u) => (
+                        <span key={u.unit} className="block">
+                          <span className="block font-mono">{u.unit}</span>
+                          <span className="block text-label">
+                            {u.po ? (
+                              <button
+                                type="button"
+                                className="text-blue-700 underline-offset-2 hover:underline"
+                                onClick={() => navigate(`/operation/procurement/${encodeURIComponent(u.po!)}`)}
+                              >
+                                {u.po}
+                              </button>
+                            ) : (
+                              <span className="text-kit-slate-11">{MONITOR_COPY.countedStock}</span>
+                            )}
+                          </span>
+                        </span>
+                      ))
+                    )}
+                  </td>
+                  <td className={`col-span-2 min-w-0 break-words px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
+                    {line.status ?? absentWord(DW.notRecorded)}
+                  </td>
+                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
+                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
+                    {line.location ?? absentWord(DW.notRecorded)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {serviceLines.length ? <div className="border-t border-kit-slate-5 px-4 py-3" data-testid="delivery-brief-services">
+        <h3 className="mb-2 text-body font-medium">{MONITOR_COPY.services}</h3>
+        {serviceLines.map(line => <div key={line.key} className="flex items-start justify-between gap-3 py-1 text-body">
+          <span className="min-w-0 break-words">{line.item}</span>
+          <span className="shrink-0 tabular-nums">×{line.qty}</span>
+        </div>)}
+      </div> : null}
+    </Panel>
+  );
+
+}
+
 export default function DeliveryBrief({
   card,
   onOpenOrder,
@@ -553,11 +735,9 @@ export default function DeliveryBrief({
   card: DeliveryMonitorCard;
   onOpenOrder: (card: DeliveryMonitorCard) => void;
 }) {
-  const navigate = useNavigate();
   const row = card.scope;
   const o = row.o;
   const arrangement = row.arrangement;
-  const expansion = useSalesOrderExpansion(row.orderId);
   const allArrangements = useDeliveryArrangements();
   const emergency = parseEmergencyContact(o.customer_emergency);
   const missing = new Set(row.missingFacts);
@@ -741,159 +921,15 @@ export default function DeliveryBrief({
   );
 
   /* ── PANEL 4 · Items, Services & Stock (Sales, Purchasing, Stock) ──────── */
-  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
-  const coverage = expansion.data?.unitCoverage ?? {};
-  const unitScopes = expansion.data?.unitScopes ?? {};
-  const placeByUnit = new Map((expansion.data?.place ?? []).map((p) => [p.unitCode, p]));
-  const unitsOf = (lineId: string | null): Array<{ unit: string; po: string | null }> =>
-    (lineId ? factsByLine.get(lineId)?.unitIds ?? [] : [])
-      .map((code) => ({
-        unit: unitIdOf({ unitCode: code, identityScope: unitScopes[code] as "unit" | "quantity" | undefined }),
-        po: coverage[code] ?? null,
-      }))
-      .filter((u): u is { unit: string; po: string | null } => u.unit !== null);
-  const locationOf = (units: Array<{ unit: string }>): string | null => {
-    const places = units
-      .map((u) => placeByUnit.get(u.unit))
-      .map((p) => (p?.siteName ? p.siteName : p?.holderName ? MONITOR_COPY.withHolder(p.holderName) : null))
-      .filter((p): p is string => Boolean(p));
-    return places.length > 0 ? [...new Set(places)].join(" · ") : null;
-  };
-  const arrivalDay = arrivalDayOf(card.arrival);
-  const arrivalWord = (): { word: string; tone: DeliveryWorkStatusTone } => {
-    if (card.arrival.kind === "no_purchase_order") {
-      return { word: ARRIVAL_COPY.noPurchaseOrder, tone: "orange" };
-    }
-    if (arrivalDay && row.customerDeliveryIso && arrivalDay > row.customerDeliveryIso) {
-      return { word: MONITOR_COPY.arrivingAfterRequested, tone: "orange" };
-    }
-    if (arrivalDay) return { word: MONITOR_COPY.arriving(fmtDate(arrivalDay)), tone: "none" };
-    return { word: MONITOR_COPY.notReceivedYet, tone: "orange" };
-  };
-  const goodsLine = (line: MonitorGoodsLine): BriefLine => {
-    const units = unitsOf(line.lineId);
-    const ready = line.shortQty === 0;
-    const arrival = ready ? null : arrivalWord();
-    return {
-      key: line.key,
-      item: line.name,
-      qty: line.qty,
-      units,
-      status: ready ? ARRIVAL_COPY.stockReady : arrival!.word,
-      statusTone: ready ? "green" : arrival!.tone,
-      location: locationOf(units),
-    };
-  };
-  const briefLines: BriefLine[] = [
-    ...card.items.map(goodsLine),
-    ...card.extras.filter((l) => l.kind === "accessory").map(goodsLine),
-    ...card.extras
-      .filter((l) => l.kind === "service")
-      .map(
-        (l): BriefLine => ({
-          key: l.key,
-          item: l.name,
-          qty: l.qty,
-          units: null,
-          status: null,
-          statusTone: "none",
-          location: null,
-        }),
-      ),
-    /* 0492 (Card 15) — one line per loan Unit out, naming the exact Unit ID
-       the crew must bring back: `Loan {Unit ID} · collect back on delivery day`. */
-    ...(o.ops_sofa_loans ?? [])
-      .filter((l) => l.status === "on_loan")
-      .map((l, index) => {
-        const unit = Array.isArray(l.ops_stock_items) ? l.ops_stock_items[0] : l.ops_stock_items;
-        return {
-          key: `loan-${index}`,
-          item: MONITOR_COPY.loanLine(
-            unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
-          ),
-          qty: 1,
-          units: null,
-          status: null,
-          statusTone: "none" as const,
-          location: null,
-        };
-      }),
-  ];
-  const physicalLines = briefLines.filter(line => line.units !== null);
-  const serviceLines = briefLines.filter(line => line.units === null);
   const panelItems = (
-    <Panel title={MONITOR_COPY.panelItems} padding="none">
-      {briefLines.length === 0 ? (
-        <div className="px-4 py-3 text-body text-kit-slate-11">{DW.noGoods}</div>
-      ) : physicalLines.length > 0 ? (
-        <div className="min-w-0">
-          <table className="block w-full text-left xl:table xl:table-fixed" aria-label={MONITOR_COPY.panelItems} data-testid="delivery-brief-items">
-            <colgroup className="hidden xl:table-column-group">
-              {BRIEF_COLUMNS.map((c) => (
-                <col key={c.key} style={c.width ? { width: c.width } : undefined} />
-              ))}
-            </colgroup>
-            <thead className="sr-only border-b border-base-200 bg-base-50 xl:not-sr-only xl:table-header-group">
-              <tr className="divide-x divide-base-200">
-                {BRIEF_COLUMNS.map((c) => (
-                  <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="block divide-y divide-base-200 text-body xl:table-row-group">
-              {physicalLines.map((line) => (
-                <tr key={line.key} className="grid grid-cols-[minmax(0,1fr)_auto] align-top xl:table-row xl:divide-x xl:divide-base-200" data-testid={`delivery-brief-line-${line.key}`}>
-                  <td className="min-w-0 break-words px-2 py-1.5">{line.item}</td>
-                  <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
-                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
-                    {!line.units?.length ? (
-                      absentWord(DW.notAllocated)
-                    ) : (
-                      line.units.map((u) => (
-                        <span key={u.unit} className="block">
-                          <span className="block font-mono">{u.unit}</span>
-                          <span className="block text-label">
-                            {u.po ? (
-                              <button
-                                type="button"
-                                className="text-blue-700 underline-offset-2 hover:underline"
-                                onClick={() => navigate(`/operation/procurement/${encodeURIComponent(u.po!)}`)}
-                              >
-                                {u.po}
-                              </button>
-                            ) : (
-                              <span className="text-kit-slate-11">{MONITOR_COPY.countedStock}</span>
-                            )}
-                          </span>
-                        </span>
-                      ))
-                    )}
-                  </td>
-                  <td className={`col-span-2 min-w-0 break-words px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
-                    {line.status ?? absentWord(DW.notRecorded)}
-                  </td>
-                  <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
-                    {line.location ?? absentWord(DW.notRecorded)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      {serviceLines.length ? <div className="border-t border-kit-slate-5 px-4 py-3" data-testid="delivery-brief-services">
-        <h3 className="mb-2 text-body font-medium">{MONITOR_COPY.services}</h3>
-        {serviceLines.map(line => <div key={line.key} className="flex items-start justify-between gap-3 py-1 text-body">
-          <span className="min-w-0 break-words">{line.item}</span>
-          <span className="shrink-0 tabular-nums">×{line.qty}</span>
-        </div>)}
-      </div> : null}
-    </Panel>
+    <ItemsServicesStockPanel
+      orderId={row.orderId}
+      items={card.items}
+      extras={card.extras}
+      arrival={card.arrival}
+      requestedIso={row.customerDeliveryIso}
+      loans={o.ops_sofa_loans}
+    />
   );
 
   return (

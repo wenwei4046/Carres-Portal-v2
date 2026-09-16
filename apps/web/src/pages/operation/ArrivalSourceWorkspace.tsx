@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ARRIVAL_SOURCE_TYPES,
   COLLECTION_CONDITIONS,
+  COLLECTION_REFUSAL_REASONS,
   inboundArrivals,
   arrivalSourceCreateInput,
   arrivalReceivingInput,
@@ -68,6 +69,9 @@ type Detail = {
     person: string | null;
     evidence: string | null;
     unit_ids: string[];
+    payload?: {
+      collection_review?: { failed_reason?: string };
+    } | null;
   }[];
 };
 const actionCls =
@@ -698,6 +702,15 @@ function ArrivalDetail({
           <p>
             {fmtDate(e.occurred_at)} · {e.kind.replaceAll("_", " ")} {e.person}
           </p>
+          {e.kind === "collection_refused" &&
+            e.payload?.collection_review?.failed_reason && (
+              <p>
+                {COLLECTION_REFUSAL_REASONS.find(
+                  ([key]) =>
+                    key === e.payload?.collection_review?.failed_reason,
+                )?.[1] ?? e.payload.collection_review.failed_reason}
+              </p>
+            )}
           {e.evidence && <p>{e.evidence}</p>}
           <p className="text-meta">
             {e.unit_ids
@@ -931,6 +944,7 @@ function HandoverArrival({
   const [date, setDate] = useState("");
   const [evidence, setEvidence] = useState("");
   const [checks, setChecks] = useState<string[]>([]);
+  const [failedReason, setFailedReason] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const m = useMutation({
     mutationFn: () =>
@@ -949,6 +963,9 @@ function HandoverArrival({
                 collection_review: {
                   passed_conditions: checks,
                   evidence_paths: photos,
+                  ...(kind === "collection_refused"
+                    ? { failed_reason: failedReason }
+                    : {}),
                 },
               }
             : {}),
@@ -1070,6 +1087,25 @@ function HandoverArrival({
                 {label}
               </label>
             ))}
+            {kind === "collection_refused" && (
+              <label className="block">
+                Why collection was refused
+                <select
+                  required
+                  aria-label="Why collection was refused"
+                  className={fieldCls}
+                  value={failedReason}
+                  onChange={(e) => setFailedReason(e.target.value)}
+                >
+                  <option value="">Choose the observed condition</option>
+                  {COLLECTION_REFUSAL_REASONS.map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <DOFileUploadField
               imageOnly
               poId=""

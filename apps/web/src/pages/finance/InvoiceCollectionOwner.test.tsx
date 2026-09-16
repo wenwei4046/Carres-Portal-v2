@@ -59,11 +59,12 @@ describe("Collection owner", () => {
     expect(screen.getByTestId("collection-owner-history")).toHaveTextContent("Established · Shasha");
   });
 
-  it("nobody established → the governed Delivery sentence and the Staff & Duties door, never a blank", async () => {
+  it("nobody established → nobody is assigned to this order, with the Sales Orders door — never Delivery Duty, never a blank", async () => {
     state.owner = null;
     show();
-    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody holds Delivery Duty.");
-    expect(screen.getByRole("link", { name: "Set the holder in Workspace → Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
+    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody is assigned to this order.");
+    expect(screen.getByRole("link", { name: "Assign it in Sales Orders → Team" })).toHaveAttribute("href", "/operation/orders");
+    expect(screen.queryByText(/Delivery Duty|Staff & Duties/)).not.toBeInTheDocument();
   });
 
   it("the handover door exists only for someone the Staff & Duties gate admits", async () => {
