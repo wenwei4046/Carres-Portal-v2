@@ -1,18 +1,28 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceDutiesResponse } from "@/lib/queries";
+import { WORKSPACE_DUTIES } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
+import type { WorkspaceDutiesResponse } from "@/lib/queries";
 
 /**
  * `Workspace → Staff & Duties` — the ONE duty assignment surface
- * (workspace/MASTER.md, LOCKED 2026-09-03).
+ * (workspace/MASTER.md §§4.1–4.7).
  *
- * What matters: today's resolution is honest (holder, cover-acting, or the
- * explicit Not-assigned exception — never a fallback person, never "—"); the
- * forms exist only when the SERVER says `can_assign` (a non-manager gets the
- * quiet sentence, never a disabled control); mutations carry the exact
- * camelCase contract the API validates; and history is immutable — names and
- * ruled dates, no edit or delete anywhere.
+ * The page answers three questions and no more: who normally holds each
+ * governed duty, who acts during a dated absence, and what history proves it.
+ * It is one CATALOGUE and one SELECTED duty — not the 720px document that
+ * stacked two forms and a full history under all twelve duties.
+ *
+ * What these tests hold:
+ *   · every catalogue duty appears exactly once, in the shared order, and the
+ *     count comes from the CATALOGUE rather than a number typed here;
+ *   · today's facts are the resolver's answer, printed under the governed
+ *     labels, with the acting line absent when nobody covers;
+ *   · search and `State` narrow the catalogue only — they never change who
+ *     holds a duty;
+ *   · the selected duty lives in the URL, so a Work configuration failure can
+ *     deep-link to the duty it needs.
  */
 
 // ── hook mocks ───────────────────────────────────────────────────────────────
@@ -48,17 +58,13 @@ vi.mock("@/lib/queries", () => ({
     error: state.coverError,
   }),
   qk: { operation: { staff: ["operation", "staff"] } },
-  // The page's own list is the operation accounts; the Finance Approver
-  // pickers ask for their duty's list (queryKey ends with the duty key).
   useOperationStaff: (opts?: { queryKey?: readonly unknown[] }) => ({
     data: {
       staff: opts?.queryKey?.includes("finance_approver")
-        ? [
-            { user_id: "u-fiona", email: "fiona@x", name: "Fiona", pooled: false, available: false, note: null, last_seen_at: null, duties: [] },
-          ]
+        ? [{ user_id: "u-fiona", email: "fiona@x", name: "Fiona", pooled: false, available: false, note: null, last_seen_at: null, duties: [] }]
         : [
-            { user_id: "u-aina", email: "aina@x", name: "Aina", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
-            { user_id: "u-ben", email: "ben@x", name: "Ben", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+            { user_id: "u-yu-jun", email: "yujun@x", name: "Yu Jun", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+            { user_id: "u-shasha", email: "shasha@x", name: "Shasha", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
           ],
       myDuties: [],
     },
@@ -69,7 +75,7 @@ vi.mock("@/lib/queries", () => ({
 // this page's subject. A stub keeps the word visible and the page isolated.
 vi.mock("./components/ModuleHeader", () => ({
   default: ({ word }: { word: string }) => (
-    <div data-testid="module-header">{word}</div>
+    <h1 data-testid="module-header">{word}</h1>
   ),
 }));
 
@@ -77,323 +83,434 @@ import StaffDuties from "./StaffDuties";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
-function resolution(
-  over: Partial<WorkspaceDutiesResponse["duties"][number]["resolution"]> = {},
-): WorkspaceDutiesResponse["duties"][number]["resolution"] {
+type Duty = WorkspaceDutiesResponse["duties"][number];
+
+const TODAY = "2026-09-16";
+
+function heldBy(key: string, label: string, name: string, id: string): Duty {
   return {
-    duty_key: "grn_duty",
-    normal_user_id: "u-aina",
-    normal_user_name: "Aina",
-    acting_user_id: null,
-    acting_user_name: null,
-    actor_user_id: "u-aina",
-    is_cover: false,
-    is_superuser: false,
-    allowed: true,
-    source: "assignment",
-    ...over,
+    key,
+    label,
+    resolution: {
+      duty_key: key,
+      normal_user_id: id,
+      normal_user_name: name,
+      acting_user_id: id,
+      acting_user_name: name,
+      actor_user_id: id,
+      is_cover: false,
+      is_superuser: false,
+      allowed: true,
+      source: "assignment",
+    },
+    assignments: [
+      {
+        id: `as-${key}`,
+        duty_key: key,
+        holder_id: id,
+        holder_name: name,
+        effective_from: "2026-09-01",
+        effective_until: null,
+        assigned_by_name: "Jess",
+        note: null,
+        created_at: "2026-09-01T02:00:00Z",
+      },
+    ],
+    covers: [],
   };
 }
 
-function duties(
-  over: Partial<WorkspaceDutiesResponse["duties"][number]> = {},
-  canAssign = true,
-): WorkspaceDutiesResponse {
+function notAssigned(key: string, label: string): Duty {
   return {
-    can_assign: canAssign,
-    duties: [
+    key,
+    label,
+    resolution: {
+      duty_key: key,
+      normal_user_id: null,
+      normal_user_name: null,
+      acting_user_id: null,
+      acting_user_name: null,
+      actor_user_id: null,
+      is_cover: false,
+      is_superuser: false,
+      allowed: false,
+      source: "not_assigned",
+    },
+    assignments: [],
+    covers: [],
+  };
+}
+
+/** GRN Duty: Yu Jun normally holds it, Shasha is acting today on annual
+ *  leave cover — the §4.2 picture, so the detail must separate the two. */
+function coveredGrn(): Duty {
+  const base = heldBy("grn_duty", "GRN Duty", "Yu Jun", "u-yu-jun");
+  return {
+    ...base,
+    resolution: {
+      ...base.resolution,
+      acting_user_id: "u-shasha",
+      acting_user_name: "Shasha",
+      actor_user_id: "u-shasha",
+      is_cover: true,
+    },
+    covers: [
       {
-        key: "grn_duty",
-        label: "GRN Duty",
-        resolution: resolution(),
-        assignments: [],
-        covers: [],
-        ...over,
+        id: "cv-grn",
+        duty_key: "grn_duty",
+        normal_user_id: "u-yu-jun",
+        normal_user_name: "Yu Jun",
+        acting_user_id: "u-shasha",
+        acting_user_name: "Shasha",
+        starts_on: "2026-09-15",
+        ends_on: "2026-09-17",
+        reason: "Annual leave",
+        assigned_by_name: "Jess",
+        created_at: "2026-09-14T02:00:00Z",
       },
     ],
   };
 }
 
+/** The whole shared catalogue, so a row count is the CATALOGUE's truth. */
+function wholeCatalogue(canAssign = true): WorkspaceDutiesResponse {
+  return {
+    can_assign: canAssign,
+    duties: WORKSPACE_DUTIES.map((d) => {
+      if (d.key === "grn_duty") return coveredGrn();
+      if (d.key === "delivery_duty") return notAssigned(d.key, d.label);
+      if (d.key === "po_duty") return heldBy(d.key, d.label, "Yu Jun", "u-yu-jun");
+      return heldBy(d.key, d.label, "Shasha", "u-shasha");
+    }),
+  };
+}
+
+// ── render ───────────────────────────────────────────────────────────────────
+
+let lastSearch = "";
+
+function Probe() {
+  lastSearch = useLocation().search;
+  return null;
+}
+
+function draw(url = "/operation?tab=staff-duties") {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <Routes>
+        <Route
+          path="/operation"
+          element={
+            <>
+              <StaffDuties />
+              <Probe />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.setSystemTime(new Date(`${TODAY}T03:00:00+08:00`));
   state.loading = false;
   state.error = false;
   state.assignError = null;
   state.coverError = null;
-  state.duties = duties();
+  state.duties = wholeCatalogue();
+  lastSearch = "";
 });
 
-// ── resolution ───────────────────────────────────────────────────────────────
+// ── the page ─────────────────────────────────────────────────────────────────
 
-describe("today's resolution", () => {
-  it("names the primary holder", () => {
-    render(<StaffDuties />);
-    expect(screen.getByText("GRN Duty")).toBeInTheDocument();
-    const line = screen.getByTestId("duty-resolution-grn_duty");
-    expect(line).toHaveTextContent("Aina");
-    expect(line).not.toHaveTextContent("covering for");
+describe("the destination", () => {
+  it("wears the destination word and its one purpose sentence", () => {
+    draw();
+    expect(screen.getByTestId("module-header")).toHaveTextContent("Staff & Duties");
+    expect(
+      screen.getByText(
+        "Who holds each company duty today and who covers an absence.",
+      ),
+    ).toBeVisible();
   });
 
-  it("says who is covering for whom when a cover acts today", () => {
-    state.duties = duties({
-      resolution: resolution({
-        acting_user_id: "u-ben",
-        acting_user_name: "Ben",
-        is_cover: true,
-      }),
-    });
-    render(<StaffDuties />);
-    expect(screen.getByTestId("duty-resolution-grn_duty")).toHaveTextContent(
-      "Ben covering for Aina",
+  it("is a catalogue beside a selected duty, not a stacked document", () => {
+    draw();
+    expect(screen.getByTestId("duty-catalogue")).toBeVisible();
+    expect(screen.getByTestId("duty-detail")).toBeVisible();
+    // The old page drew every duty's forms and history at once. One selected
+    // duty means exactly one history block on the page.
+    expect(screen.getAllByTestId(/^duty-history-/)).toHaveLength(1);
+  });
+});
+
+describe("the catalogue", () => {
+  it("prints every shared catalogue duty exactly once, in catalogue order", () => {
+    draw();
+    const rows = screen.getAllByTestId(/^duty-catalogue-/);
+    // The count is the CATALOGUE's, never a number typed into a test — a duty
+    // added to the shared list must show up here without editing this file.
+    expect(rows).toHaveLength(WORKSPACE_DUTIES.length);
+    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual(
+      WORKSPACE_DUTIES.map((d) => `duty-catalogue-${d.key}`),
     );
   });
 
-  it("shows the honest Not-assigned exception — never a fallback person, never a dash", () => {
-    state.duties = duties({
-      resolution: resolution({
-        normal_user_id: null,
-        normal_user_name: null,
-        actor_user_id: null,
-        allowed: false,
-        source: "not_assigned",
-      }),
-    });
-    render(<StaffDuties />);
-    expect(screen.getByText("Not assigned")).toBeInTheDocument();
+  it("shows each duty's word and the person who holds it", () => {
+    draw();
+    const row = screen.getByTestId("duty-catalogue-po_duty");
+    expect(within(row).getByText("PO Duty")).toBeVisible();
+    expect(within(row).getByText("Yu Jun")).toBeVisible();
+  });
+
+  it("carries the exceptional state word beside the holder", () => {
+    draw();
     expect(
-      screen.getByText("Nobody holds GRN Duty. Assign a holder below."),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("duty-resolution-grn_duty")).not.toHaveTextContent("—");
+      within(screen.getByTestId("duty-catalogue-grn_duty")).getByText(
+        "Covered today",
+      ),
+    ).toBeVisible();
+    expect(
+      within(screen.getByTestId("duty-catalogue-delivery_duty")).getByText(
+        "Not assigned",
+      ),
+    ).toBeVisible();
+  });
+
+  it("says nothing exceptional about an ordinary held duty", () => {
+    draw();
+    const row = screen.getByTestId("duty-catalogue-po_duty");
+    expect(within(row).queryByText("Covered today")).toBeNull();
+    expect(within(row).queryByText("Not assigned")).toBeNull();
+  });
+
+  it("never shows workload, performance or a recommended person", () => {
+    draw();
+    for (const banned of [/workload/i, /recommend/i, /performance/i, /suggest/i]) {
+      expect(screen.queryByText(banned)).toBeNull();
+    }
   });
 });
 
-// ── permission gate ──────────────────────────────────────────────────────────
+describe("the selected duty", () => {
+  it("opens the first catalogue duty when the URL names none", () => {
+    draw();
+    expect(
+      screen.getByTestId(`selected-duty-${WORKSPACE_DUTIES[0].key}`),
+    ).toBeVisible();
+  });
 
-describe("the can_assign gate", () => {
-  it("hides both forms for a non-manager and says who sets assignments — no disabled controls", () => {
-    state.duties = duties({}, false);
-    render(<StaffDuties />);
+  it("opens the duty a deep link names", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    expect(screen.getByTestId("selected-duty-grn_duty")).toBeVisible();
+  });
+
+  it("separates the normal owner from the person acting today", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const detail = screen.getByTestId("selected-duty-grn_duty");
+    expect(within(detail).getByText("Normal owner")).toBeVisible();
+    expect(within(detail).getByText("Yu Jun")).toBeVisible();
+    expect(within(detail).getByText("Acting today")).toBeVisible();
+    expect(within(detail).getByText("Shasha")).toBeVisible();
+    expect(within(detail).getByText("Cover")).toBeVisible();
+    expect(within(detail).getByText("Reason")).toBeVisible();
+    expect(within(detail).getByText("Annual leave")).toBeVisible();
+    expect(
+      within(detail).getByText(
+        `${fmtDate("2026-09-15")} – ${fmtDate("2026-09-17")}`,
+      ),
+    ).toBeVisible();
+  });
+
+  it("does not print the same person twice when nobody covers", () => {
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const detail = screen.getByTestId("selected-duty-po_duty");
+    expect(within(detail).getByText("Normal owner")).toBeVisible();
+    // §4.2: the same person is NOT repeated as acting when no cover exists.
+    expect(within(detail).queryByText("Acting today")).toBeNull();
+    expect(within(detail).getAllByText("Yu Jun")).toHaveLength(1);
+    expect(within(detail).getByText("Effective")).toBeVisible();
+  });
+
+  it("gives an unassigned duty the honest sentence and the manager's door", () => {
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
+    const detail = screen.getByTestId("selected-duty-delivery_duty");
+    expect(within(detail).getByText("Not assigned")).toBeVisible();
+    expect(within(detail).getByText("Nobody holds Delivery Duty.")).toBeVisible();
+  });
+
+  it("gives a reader the quiet sentence and no write control at all", () => {
+    state.duties = wholeCatalogue(false);
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
     expect(
       screen.getByText("Duty assignments are set by the manager."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Assign holder")).toBeNull();
-    expect(screen.queryByText("Add cover")).toBeNull();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    ).toBeVisible();
+    // Not a disabled button, not a hidden-but-present form: absent.
+    expect(screen.queryByRole("button", { name: "Assign holder" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add cover" })).toBeNull();
+  });
+
+  it("carries an avatar whose accessible name is the full person", () => {
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const avatar = screen.getByTestId("duty-avatar-normal");
+    expect(avatar).toHaveTextContent("YJ");
+    // Initials never REPLACE the printed name — they carry it for a reader.
+    expect(avatar).toHaveAccessibleName("Yu Jun");
   });
 });
 
-// ── mutations ────────────────────────────────────────────────────────────────
-
-describe("assigning a holder", () => {
-  it("sends the exact camelCase contract, omitting the fields left empty", () => {
-    render(<StaffDuties />);
-    fireEvent.change(screen.getByTestId("assign-holder-grn_duty"), {
-      target: { value: "u-ben" },
-    });
-    fireEvent.change(screen.getByTestId("assign-from-grn_duty"), {
-      target: { value: "2026-09-04" },
-    });
-    fireEvent.click(screen.getByTestId("assign-submit-grn_duty"));
-    expect(assignMutate).toHaveBeenCalledTimes(1);
-    expect(assignMutate.mock.calls[0][0]).toEqual({
-      dutyKey: "grn_duty",
-      holderId: "u-ben",
-      effectiveFrom: "2026-09-04",
-    });
+describe("selecting a duty", () => {
+  it("writes the choice into the URL so the page can be shared", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("duty-catalogue-grn_duty"));
+    expect(screen.getByTestId("selected-duty-grn_duty")).toBeVisible();
+    expect(new URLSearchParams(lastSearch).get("duty")).toBe("grn_duty");
   });
 
-  it("carries Until and the note when the manager fills them", () => {
-    render(<StaffDuties />);
-    fireEvent.change(screen.getByTestId("assign-holder-grn_duty"), {
-      target: { value: "u-aina" },
-    });
-    fireEvent.change(screen.getByTestId("assign-from-grn_duty"), {
-      target: { value: "2026-09-04" },
-    });
-    fireEvent.change(screen.getByTestId("assign-until-grn_duty"), {
-      target: { value: "2026-09-30" },
-    });
-    fireEvent.change(screen.getByTestId("assign-note-grn_duty"), {
-      target: { value: "while Ben is on site" },
-    });
-    fireEvent.click(screen.getByTestId("assign-submit-grn_duty"));
-    expect(assignMutate.mock.calls[0][0]).toEqual({
-      dutyKey: "grn_duty",
-      holderId: "u-aina",
-      effectiveFrom: "2026-09-04",
-      effectiveUntil: "2026-09-30",
-      note: "while Ben is on site",
-    });
+  it("keeps the tab it was opened on", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("duty-catalogue-grn_duty"));
+    expect(new URLSearchParams(lastSearch).get("tab")).toBe("staff-duties");
   });
 
-  it("shows the API's governed refusal inline", () => {
-    state.assignError = new Error("only a manager can assign duties");
-    render(<StaffDuties />);
-    expect(screen.getByTestId("assign-error")).toHaveTextContent(
-      "only a manager can assign duties",
-    );
-  });
-});
-
-describe("adding a cover", () => {
-  it("sends the cover contract with both dates", () => {
-    render(<StaffDuties />);
-    fireEvent.change(screen.getByTestId("cover-acting-grn_duty"), {
-      target: { value: "u-ben" },
-    });
-    fireEvent.change(screen.getByTestId("cover-from-grn_duty"), {
-      target: { value: "2026-09-08" },
-    });
-    fireEvent.change(screen.getByTestId("cover-until-grn_duty"), {
-      target: { value: "2026-09-10" },
-    });
-    fireEvent.change(screen.getByTestId("cover-reason-grn_duty"), {
-      target: { value: "Aina on leave" },
-    });
-    fireEvent.click(screen.getByTestId("cover-submit-grn_duty"));
-    expect(coverMutate).toHaveBeenCalledTimes(1);
-    expect(coverMutate.mock.calls[0][0]).toEqual({
-      dutyKey: "grn_duty",
-      actingUserId: "u-ben",
-      startsOn: "2026-09-08",
-      endsOn: "2026-09-10",
-      reason: "Aina on leave",
-    });
-  });
-});
-
-// ── who each duty's pickers offer ────────────────────────────────────────────
-
-describe("the pickers offer the people the duty allows", () => {
-  const optionNames = (testId: string) =>
-    within(screen.getByTestId(testId))
-      .getAllByRole("option")
-      .map((o) => o.textContent);
-
-  it("Finance Approver offers Finance users only; another duty keeps the operation list", () => {
-    const grn = duties().duties[0];
-    state.duties = {
-      can_assign: true,
-      duties: [
-        grn,
-        {
-          ...grn,
-          key: "finance_approver",
-          label: "Finance Approver",
-          resolution: resolution({ duty_key: "finance_approver" }),
-        },
-      ],
-    };
-    render(<StaffDuties />);
-
-    for (const id of ["assign-holder-finance_approver", "cover-acting-finance_approver"]) {
-      expect(optionNames(id)).toContain("Fiona");
-      expect(optionNames(id)).not.toContain("Aina");
-    }
-    for (const id of ["assign-holder-grn_duty", "cover-acting-grn_duty"]) {
-      expect(optionNames(id)).toEqual(["Choose staff", "Aina", "Ben"]);
-    }
-  });
-});
-
-// ── history ──────────────────────────────────────────────────────────────────
-
-describe("history", () => {
-  it("lists assignments and covers with names and ruled dates — never a raw ISO string", () => {
-    state.duties = duties({
-      assignments: [
-        {
-          id: "a1",
-          duty_key: "grn_duty",
-          holder_id: "u-aina",
-          holder_name: "Aina",
-          effective_from: "2026-09-01",
-          effective_until: null,
-          assigned_by_name: "Jess",
-          note: "first holder",
-          created_at: "2026-09-01T02:00:00Z",
-        },
-      ],
-      covers: [
-        {
-          id: "c1",
-          duty_key: "grn_duty",
-          normal_user_id: "u-aina",
-          normal_user_name: "Aina",
-          acting_user_id: "u-ben",
-          acting_user_name: "Ben",
-          starts_on: "2026-09-08",
-          ends_on: "2026-09-10",
-          reason: "annual leave",
-          assigned_by_name: "Jess",
-          created_at: "2026-09-02T02:00:00Z",
-        },
-      ],
-    });
-    render(<StaffDuties />);
-
-    const a = screen.getByTestId("assignment-a1");
-    expect(a).toHaveTextContent("Aina");
-    expect(a).toHaveTextContent(`from ${fmtDate("2026-09-01")}`);
-    expect(a).toHaveTextContent("assigned by Jess");
-    expect(a).toHaveTextContent("first holder");
-
-    const c = screen.getByTestId("cover-c1");
-    expect(c).toHaveTextContent("Ben covering for Aina");
-    expect(c).toHaveTextContent(fmtDate("2026-09-08"));
-    expect(c).toHaveTextContent(fmtDate("2026-09-10"));
-    expect(c).toHaveTextContent("annual leave");
-
-    // Dates come through fmtDate — a bare ISO string never reaches the screen.
-    expect(screen.queryByText(/2026-09-0\d/)).toBeNull();
+  it("is reachable by keyboard, because every row is a real button", () => {
+    draw();
+    const row = screen.getByTestId("duty-catalogue-grn_duty");
+    expect(row.tagName).toBe("BUTTON");
+    row.focus();
+    expect(document.activeElement).toBe(row);
   });
 
-  it("carries no edit or delete controls — history is append-only", () => {
-    state.duties = duties(
-      {
-        assignments: [
-          {
-            id: "a1",
-            duty_key: "grn_duty",
-            holder_id: "u-aina",
-            holder_name: "Aina",
-            effective_from: "2026-09-01",
-            effective_until: "2026-09-30",
-            assigned_by_name: "Jess",
-            note: null,
-            created_at: "2026-09-01T02:00:00Z",
-          },
-        ],
-      },
-      false, // even hidden forms leave zero buttons inside history
-    );
-    render(<StaffDuties />);
-    const history = screen.getByTestId("assignment-a1");
-    expect(within(history).queryAllByRole("button")).toHaveLength(0);
-    expect(history).toHaveTextContent(
-      `${fmtDate("2026-09-01")} → ${fmtDate("2026-09-30")}`,
-    );
-  });
-});
-
-// ── loading and failure ──────────────────────────────────────────────────────
-
-describe("loading and failure", () => {
-  it("says it is opening while the read runs", () => {
-    state.loading = true;
-    state.duties = undefined;
-    render(<StaffDuties />);
-    expect(screen.getByText("Opening Staff & Duties…")).toBeInTheDocument();
+  it("marks exactly one row as the current one", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const pressed = screen
+      .getAllByTestId(/^duty-catalogue-/)
+      .filter((r) => r.getAttribute("aria-current") === "true");
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveAttribute("data-testid", "duty-catalogue-grn_duty");
   });
 
-  it("a failed read says what broke and Try again refetches", () => {
-    state.error = true;
-    state.duties = undefined;
-    render(<StaffDuties />);
+  it("corrects an unknown duty key to the first duty without a history entry", () => {
+    draw("/operation?tab=staff-duties&duty=not_a_duty");
     expect(
-      screen.getByText("Staff & Duties could not be opened"),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(refetch).toHaveBeenCalledTimes(1);
+      screen.getByTestId(`selected-duty-${WORKSPACE_DUTIES[0].key}`),
+    ).toBeVisible();
+    // A correction REPLACES: Back must not walk the reader through a key that
+    // never existed.
+    expect(new URLSearchParams(lastSearch).get("duty")).toBe(
+      WORKSPACE_DUTIES[0].key,
+    );
+  });
+});
+
+describe("search and State", () => {
+  it("narrows the catalogue by duty word", () => {
+    draw();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search duties" }), {
+      target: { value: "grn" },
+    });
+    expect(screen.getAllByTestId(/^duty-catalogue-/)).toHaveLength(1);
+    expect(screen.getByTestId("duty-catalogue-grn_duty")).toBeVisible();
+  });
+
+  it("finds a duty by the person who holds it", () => {
+    draw();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search duties" }), {
+      target: { value: "yu jun" },
+    });
+    const keys = screen
+      .getAllByTestId(/^duty-catalogue-/)
+      .map((r) => r.getAttribute("data-testid"));
+    expect(keys).toContain("duty-catalogue-po_duty");
+    expect(keys).toContain("duty-catalogue-grn_duty"); // normal owner under cover
+    expect(keys).not.toContain("duty-catalogue-delivery_duty");
+  });
+
+  it("offers exactly the four governed State words", () => {
+    draw();
+    expect(
+      screen.getAllByTestId(/^duty-state-/).map((b) => b.textContent),
+    ).toEqual(["All duties", "Covered today", "Cover scheduled", "Not assigned"]);
+  });
+
+  it("narrows to the duties a State word names", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("duty-state-not_assigned"));
+    const rows = screen.getAllByTestId(/^duty-catalogue-/);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-delivery_duty");
+  });
+
+  it("narrows to today's cover without counting a scheduled one", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("duty-state-covered_today"));
+    const rows = screen.getAllByTestId(/^duty-catalogue-/);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute("data-testid", "duty-catalogue-grn_duty");
+  });
+
+  it("says no duties match and offers the way back", () => {
+    draw();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search duties" }), {
+      target: { value: "zzzz" },
+    });
+    expect(screen.getByText("No duties match this search")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeVisible();
+    expect(screen.queryAllByTestId(/^duty-catalogue-/)).toHaveLength(0);
+  });
+
+  it("brings every duty back when the search is cleared", () => {
+    draw();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search duties" }), {
+      target: { value: "zzzz" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getAllByTestId(/^duty-catalogue-/)).toHaveLength(
+      WORKSPACE_DUTIES.length,
+    );
+  });
+
+  it("keeps the selected duty open while the catalogue is narrowed away", () => {
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search duties" }), {
+      target: { value: "grn" },
+    });
+    // Narrowing the LIST must not silently change WHICH duty is being read.
+    expect(screen.getByTestId("selected-duty-delivery_duty")).toBeVisible();
+  });
+});
+
+describe("the narrow screen", () => {
+  it("keeps catalogue and detail side by side from 1024px up", () => {
+    draw();
+    expect(screen.getByTestId("staff-duties-split").className).toContain(
+      "lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]",
+    );
+  });
+
+  it("hides the detail below 1024px until a duty is chosen", () => {
+    draw();
+    expect(screen.getByTestId("duty-detail").className).toContain("hidden");
+    expect(screen.getByTestId("duty-detail").className).toContain("lg:block");
+    expect(screen.queryByRole("button", { name: "Back to duties" })).toBeNull();
+  });
+
+  it("gives a chosen duty the full width and an explicit Back door", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    expect(screen.getByTestId("duty-detail").className).not.toContain("hidden");
+    expect(screen.getByTestId("duty-catalogue").className).toContain("lg:block");
+    const back = screen.getByRole("button", { name: "Back to duties" });
+    expect(back).toBeVisible();
+    // The door belongs to the narrow screen only.
+    expect(back.className).toContain("lg:hidden");
+  });
+
+  it("returns to the catalogue and drops the duty from the URL", () => {
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    fireEvent.click(screen.getByRole("button", { name: "Back to duties" }));
+    expect(new URLSearchParams(lastSearch).get("duty")).toBeNull();
+    expect(new URLSearchParams(lastSearch).get("tab")).toBe("staff-duties");
   });
 });
