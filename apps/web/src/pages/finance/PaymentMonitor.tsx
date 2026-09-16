@@ -18,6 +18,12 @@ import type { CollectionTimingRule } from "@carres/shared/collection-clock";
 import type { OperationWorkItem } from "@carres/shared/operation-work";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
+import {
+  ASSIGN_IN_SALES_ORDERS,
+  ASSIGN_IN_SALES_ORDERS_HREF,
+  COLLECTION_NOT_ASSIGNED as NOT_ASSIGNED,
+  NOBODY_ASSIGNED_TO_ORDER as NOBODY_ASSIGNED,
+} from "@carres/shared/payment-collection-owner";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
@@ -90,12 +96,7 @@ const SHOW_PAYMENT_DETAILS = "Show payment details";
 /** A Finance reader cannot read Operation's stock register (the orders list
  *  is Operation's); the cell says whose fact it is instead of guessing. */
 const STOCK_FACTS_ARE_OPERATIONS = "Stock facts are Operation's.";
-/** 0504 — the collection owner is the individual the Sales Order was dealt to.
- *  Nobody resolvable means nobody is assigned to THIS order, and the one door
- *  that fixes it is the Sales Orders Team (manager). */
-const NOT_ASSIGNED = "Not assigned";
-const NOBODY_ASSIGNED = "Nobody is assigned to this order.";
-const ASSIGN_IN_SALES_ORDERS = "Assign it in Sales Orders → Team";
+
 
 /** The rail-collapse memory (ui MASTER, LOCAL FILTER RAIL COLLAPSE). Narrow
  *  windows start with the rail closed, the same 1100px rule Delivery runs. */
@@ -163,7 +164,7 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
        Order was dealt to, so an unresolved owner means nobody is assigned to
        THIS order. The word stays short on the fixed row; the full sentence and
        the one door that fixes it are the link's own name. */
-    return <Link to="/operation/orders" className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
+    return <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
       aria-label={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`} title={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`}
       onClick={(event) => event.stopPropagation()}
       data-testid="monitor-owner-unassigned">{NOT_ASSIGNED}</Link>;
