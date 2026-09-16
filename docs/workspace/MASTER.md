@@ -309,23 +309,25 @@ working week, and large desktop uses three working panels inside the existing gl
 ```text
 ┌ WORKING DAY / MODULE ┬ ACTIONS ───────────────┬ SELECTED ACTION ─────────────┐
 │ Missed     3 actions │ DO-8830 · Delivery     │ DO-8830 · Delivery           │
-│ Mon, 14 Sep 4 actions│ Confirm appointment    │ Lim Family                   │
-│ Tue, 15 Sep 5 actions│ Lim Family             │                              │
-│ Wed, 16 Sep          │ Not contacted          │ Current fact                 │
-│ Malaysia Day         │                        │ Appointment not confirmed    │
+│ Mon, 14 Sep 4 actions│ Customer delivery      │ NETS                         │
+│ Tue, 15 Sep 5 actions│ booking not confirmed  │                              │
+│ Wed, 16 Sep          │ Call NETS              │ Current fact                 │
+│ Malaysia Day         │                        │ Customer booking not         │
+│                      │                        │ confirmed                    │
 │ Thu, 17 Sep 4 actions│ INV-1402 · Payment     │                              │
 │ Fri, 18 Sep 2 actions│ Collect RM 1,280       │ Action                       │
 │ Sat, 19 Sep 3 actions│ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
 │ No working date      │ Promised today         │ 2:00 to 5:00 PM             │
 │             1 action │                        │                              │
-│                      │ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
+│                      │ Tan Qu Qu              │ Call NETS                    │
 │ All                8 │ Promised today         │ 2:00 to 5:00 PM             │
-│ Purchasing         1 │                        │                              │
-│ Receiving          1 │ PO-2041 · Purchasing   │ Communication                │
-│ Warehouse          1 │ Confirm Fri arrival    │ source-owned evidence/action │
-│ Delivery           2 │ Nice Future            │                              │
+│ Sales Orders       1 │                        │                              │
+│ Purchasing         1 │ PO-2041 · Purchasing   │ Communication                │
+│ Receiving          1 │ Confirm governed date  │ source-owned evidence         │
+│ Delivery           2 │ Authoritative party    │                              │
 │ Payment            2 │ Waiting for reply      │ Finish when                  │
-│ Service            1 │                        │ appointment is recorded      │
+│ Issue Tracker      1 │                        │ Customer-confirmed date      │
+│                      │                        │ and slot recorded            │
 └──────────────────────┴────────────────────────┴──────────────────────────────┘
 ```
 
@@ -356,9 +358,11 @@ Object Detail and not a module-writing surface. It shows the fact, specific act,
 source-provided communication evidence, completion condition, source-provided next consequence and
 one `Open {object}` door. It does not show `Copy message`, `Open WhatsApp` or another communication
 control in the first release, because those governed module controls may record preparation evidence.
-A `FINISH WHEN` block prints the authoritative completion fact. `WHAT HAPPENS NEXT` appears only
-when the owning module supplies a separate governed consequence; Workspace never relabels the
-completion fact or writes a likely consequence itself.
+A `FINISH WHEN` block prints the operator-safe completion statement supplied beside the
+authoritative machine completion predicate. It does not expose table names or substitute
+`requiredResult` merely because that sentence already exists. `WHAT HAPPENS NEXT` appears only when
+the owning module supplies a separate governed consequence; Workspace never relabels the completion
+predicate, required result or a likely consequence as one another.
 A later release may admit an
 owning module's governed action component only through a separately approved contract using that
 module's authoritative API, permission, validation, evidence and completion fact.
@@ -386,6 +390,10 @@ WORKING DAY / MISSED AGE · exceptional state  metadata/footer
   forbidden.
 - Required result belongs in Panel 3 for physical handover, multi-result and otherwise ambiguous
   acts; it remains available as accessible supporting text for every item.
+- Required result describes the result the actor must produce. The machine completion predicate is
+  the source rule that closes the occurrence. `FINISH WHEN` uses a third, operator-safe completion
+  statement bound to that predicate. These may coincide in simple cases but the UI never assumes
+  they are interchangeable and never exposes schema/table language.
 - Communication is a read-only structured source-owned block in Panel 3: recipient, channel, actual
   sent evidence and reply state when the source truly supplies them. It is absent for
   non-communication work. Workspace does not copy or store a second conversation. Module-owned
@@ -403,7 +411,7 @@ separate editable truth.
 | Contract group | Required facts |
 |---|---|
 | Identity | Stable occurrence ID; admitted rule key and version; module; source object kind, ID and display label |
-| Action | Fact/problem; specific action; recipient when applicable; required result; authoritative completion fact |
+| Action | Fact/problem; specific action; recipient when applicable; required result; authoritative machine completion predicate; operator-safe completion statement |
 | Ownership | Owner rule; Duty key when used; normal owner; today's acting person; active cover evidence; explicit unresolved state |
 | Timing | Business deadline when one exists; governed action date/time; calendar key and source; working-day/missed calculation evidence; no-date reason when lawful |
 | Calendar health | Module-calendar state; resolved-person calendar state; holiday name when applicable; `not configured` and `read failed` remain distinct |
@@ -492,20 +500,57 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- At wide desktop, Work shows all three working panels after the existing global shell: working-day
-  and module navigation, action list, then selected-action detail.
-- At laptop width, the first panel collapses into compact working-day and module controls while the
-  action list and selected detail remain together where usable.
-- At phone width, the working-week selector remains available above the full-width action list;
-  selecting an action opens full-screen detail. Back restores day, module, owner, filters and scroll.
-- Exact breakpoints, panel measurements, row heights and touch dimensions belong to the pending
-  Work UI-kit specification. They are not approved merely because an exploratory prototype used them.
+- Work uses the existing 50px Page Header and one 45px Work Toolbar. It creates no second title,
+  breadcrumb, KPI band or card header. The toolbar contains `My Work · Team Work`, Search, applied
+  filters and the Filters door; freshness is a read fact, not a manual business action.
+- Breakpoints use the available Work canvas after the global shell, not the browser width. At
+  **1100px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
+  360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
+  to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
+  has no card radius, shadow or gutters between panels.
+- From **760px through 1099px**, collapse Panel 1 into toolbar controls. Panel 2 is 340px and never
+  below 320px; Panel 3 consumes the remainder and never below 420px. If both minima cannot be met,
+  use the single-panel transition instead of squeezing text.
+- Below **760px**, show one panel at a time. Working day is a horizontally scrollable selector above
+  the list and module/owner live in kit Select controls. Selecting an action replaces the list with
+  full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
+  selected occurrence and list scroll. No permanent drawer or sideways three-panel page exists.
+- The page body does not own one long desktop scroll. Panel 1, Panel 2's action region and Panel 3's
+  detail body scroll independently beneath fixed panel headings. On single-panel screens the active
+  panel owns normal document scroll.
+- Panel 1 uses the existing `FilterRail` geometry: 12px outer padding, 20px group gap, 8px heading-to-
+  row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
+  marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
+  wrap; the rail never truncates them.
+- Panel 2 has a 44px heading and selectable action rows with 12px vertical / 16px horizontal
+  padding, 4px internal gaps and 1px `slate-5` dividers. A row is at least 88px but grows to show the
+  complete object, fact/problem, action, recipient and timing state. Selection uses the same
+  `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
+- Panel 3 has 24px horizontal / 16px vertical heading padding and a left-aligned detail body no wider
+  than 760px, with 24px major-section gaps. It renders in this order: object and module; current fact;
+  action and recipient; read-only communication evidence when sourced; `FINISH WHEN`; optional
+  `WHAT HAPPENS NEXT`; timing/owner/cover/source evidence; one `Open {object}` primary door. In v1
+  there is no sticky send/record bar and no second primary action.
+- Desktop kit controls remain 32px high. Below 760px, every interactive target is at least 40px high
+  with 8px between adjacent targets. Page padding is 24px on multi-panel content headings and 12px
+  on single-panel screens. Only the frozen spacing, type, radius, colour and elevation tokens apply.
 - Every item wraps rather than truncating problem, action, recipient, required result or working-day
   state. No horizontal owner board or hidden completion text is permitted.
 - Keyboard order follows scope → search → working day → module/owner → filters → items → selected
   detail. Every item has one descriptive
   accessible name combining object, problem and action. Hover evidence is also available by focus
-  and tap; colour, initials and icon alone never carry meaning.
+  and tap; colour, initials and icon alone never carry meaning. Focus returns to the invoking row
+  after Back; when that occurrence closed, it moves to the next visible row and announces the change.
+- Acceptance captures and measures 1440×900, 1180×820, 820×900 and 390×844. It records actual
+  canvas/panel widths, overflow, focus order and wrapped action content; a screenshot without those
+  measurements is not responsive proof.
+
+The implementation reuses `PageShell`, `Tabs`, `SearchInput`, `Select`, `Button`, `FilterRail`,
+`FilterRailGroup`, `FilterRailRow`, `Loading`, `EmptyState`, `StatusPill`, `Badge`, `Tooltip` and
+Lucide icons. The only page-specific pieces permitted are `WorkSplitShell` (geometry), `WorkDayNav`
+(provided dates/counts), `WorkActionRow` (presentation) and `WorkActionBrief` (structured read-only
+detail). None calculates business dates, ownership, severity, completion or source health. They are
+not promoted into the global kit until a separately governed second use exists.
 
 ### 5.6 · Priority, due and SLA law
 
