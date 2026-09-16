@@ -824,6 +824,23 @@ Module Register rails remain factual filters and do not copy central Work action
 
 **Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
 
+**Approved correction, 2026-09-16 — implementation pending verification.** Order By is the
+server engine's fact on each demand. The parent shows the earliest date over exactly its
+selectable leaves; blocked demand reads `Not planned`; nothing left to buy is blank.
+Default order is actionable Order By ascending, blocked demand next, completed/no-buy last,
+with SO No descending as tie/fallback. Header sorting overrides the default. Goods carries
+per-line Order By. No client calendar arithmetic is admitted.
+
+Approved review A1–A15 also requires canvas-based rail overlay below 896px, 40px touch rows
+below 768px canvas, issue halves only at 1130px surface width, truthful no-match and true-empty
+states, clearable SO deep-link Search over the full Register, singular footer, unified
+`Production days not set`, kit panel-toggle icons and 32px Buttons, explicit issue-permission
+copy, two-line headers, token-based blocker panel and the retired Purchase Demands redirect.
+Existing sidebar, rail sections, summaries, read-only PO details, Ready Stock, stale-selection
+removal, coverage refusal, sticky identity and replacement selection toolbar remain intact.
+Unreserve/Reassign restores item-line demand through current reservation truth; append-only
+usage remains History, never a released-before purchasing badge or a second coverage table.
+
 **Table listing frame — APPROVED / LOCKED, Owner correction 2026-08-29.** SO Batch inherits the
 shared Register Kit's complete light four-sided frame around its Work Toolbar, table and fixed status
 footer. It does not add a page-local second frame. This is not a card around the page and not a box
@@ -939,10 +956,10 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
   that staff browser. This is one local-filter control, not another module-navigation control.
 - **⭐ ON A NARROW WINDOW THE RAIL FLOATS; IT DOES NOT EAT THE TABLE — owner correction
-  2026-09-11.** Below `md` the 240px rail leaves the flow and overlays the Register, which is the
+  2026-09-11.** Below 896px of available canvas the 240px rail leaves the flow and overlays the Register, which is the
   shared purchasing responsive pattern already shipped on Purchase Orders. At 459px the Register
   keeps its full width, the page itself never scrolls sideways, each table scrolls inside its own
-  box, and `Issue PO` stays on screen. Above `md` nothing changes. The rail is never squeezed
+  box, and `Issue PO` stays on screen. At or above 896px of available canvas the rail stays in flow. The rail is never squeezed
   below 240px and a governed label is never truncated.
 - **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
   never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
@@ -1061,7 +1078,7 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns, exactly and in this reading order — owner correction 2026-09-11:** SO No · Customer ·
+**Columns, exactly and in this reading order — owner approval 2026-09-16:** SO No · Order By · Customer ·
 Proceed Date · Requested Delivery Date · Delivery Location · Supplier · Deliver To · PO No ·
 PO Delivery Date. The row is read the way the work is read — which order, whose, when it arrived,
 when the customer wants it, where it goes, who supplies it, where the goods land, and finally the
