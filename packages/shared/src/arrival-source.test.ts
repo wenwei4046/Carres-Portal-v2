@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   arrivalSourceCreateInput,
+  arrivalHandoverInput,
   arrivalReceivingInput,
   COLLECTION_CONDITIONS,
   arrivalHandoverDifferences,
@@ -87,6 +88,31 @@ describe("arrival source boundaries", () => {
         [{ kind: "collected", unit_ids: [id] }],
       ),
     ).toEqual([{ unitId: id, originMissing: false, carrierMissing: true }]);
+  });
+  it("records a governed observed reason when collection is refused", () => {
+    const handover = {
+      key: id,
+      kind: "collection_refused",
+      unit_ids: [id],
+      party_id: id,
+      person: "NETS driver",
+      occurred_at: "2026-09-12T02:00:00.000Z",
+      evidence: "Mattress was not loaded",
+      collection_review: {
+        passed_conditions: [],
+        evidence_paths: ["source/photo.jpg"],
+      },
+    };
+    expect(arrivalHandoverInput.safeParse(handover).success).toBe(false);
+    expect(
+      arrivalHandoverInput.safeParse({
+        ...handover,
+        collection_review: {
+          ...handover.collection_review,
+          failed_reason: "stain",
+        },
+      }).success,
+    ).toBe(true);
   });
   it("refuses invented dates", () =>
     expect(

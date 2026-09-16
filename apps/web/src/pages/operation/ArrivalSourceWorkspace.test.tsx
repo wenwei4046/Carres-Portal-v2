@@ -13,7 +13,7 @@ const id=(n:number)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
 const units=[1,2,3].map(n=>({id:id(n),unit_code:`U1-000-00${n}`,sku:"Fixture",status:n===3?"transferred":"free",qty:1,warehouse_id:id(20),reserved_ref:null}));
 const detail={source:{id:id(10),source_no:"TR-TEST",kind:"transfer",to_site_id:id(20),from_site_id:id(21),party_id:id(30),expected_date:"2026-09-07",collection_date:"2026-09-06",reason:"Fixture request",claim_id:null,case_id:null,cancelled_at:null,created_at:"2026-09-05"},units:units.map(u=>({source_id:id(10),stock_item_id:u.id,replaces_item_id:null,unit:u})),events:[],receipts:[{id:id(40),grn_no:"GRN-TEST",status:"posted",goods_received_at:"2026-09-06",posted_at:"2026-09-06",do_number:"DO-TEST",do_file_path:"proof.pdf",unit_results:[{stock_item_id:id(1),unit_code:units[0].unit_code,outcome:"received",issue_kind:null},{stock_item_id:id(2),unit_code:units[1].unit_code,outcome:"received_with_issue",issue_kind:"damaged"}]}]};
 const options={sites:[{id:id(20),name:"Destination"}],parties:[{id:id(30),name:"Recorded Warehouse",kind:"warehouse_operator"}],units,limit:100};
-function show(receiving=false){render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})}><MemoryRouter initialEntries={[`/operation?tab=receiving&arrival=${id(10)}`]}><ArrivalSourceWorkspace receiving={receiving}/></MemoryRouter></QueryClientProvider>);}
+function show(receiving=false,outbound=false){render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})}><MemoryRouter initialEntries={[`/operation?tab=receiving&arrival=${id(10)}`]}><ArrivalSourceWorkspace receiving={receiving} outbound={outbound}/></MemoryRouter></QueryClientProvider>);}
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(useReceivingDuty).mockReturnValue({data:{allowed:true},isLoading:false} as never);vi.mocked(apiFetch).mockImplementation(async url=>String(url).includes("/options")?options:detail as never);});
 describe("source Receiving journey",()=>{
  it("opens the exact source and separates Outbound from Receiving",async()=>{show();expect(await screen.findByText(/TR-TEST/)).toBeInTheDocument();expect(screen.getByRole("link",{name:"Open Outbound"})).toHaveAttribute("href",`/operation?tab=warehouse-outbound&arrival=${id(10)}`);expect(screen.queryByRole("button",{name:"Save Receiving"})).not.toBeInTheDocument();});
@@ -27,4 +27,13 @@ describe("source Receiving journey",()=>{
  });
  it("keeps the write action disabled without GRN Duty",async()=>{vi.mocked(useReceivingDuty).mockReturnValue({data:{allowed:false},isLoading:false} as never);show(true);expect(await screen.findByRole("button",{name:"Save Receiving"})).toBeDisabled();});
  it("a failed source read has a working retry",async()=>{let failed=false;vi.mocked(apiFetch).mockImplementation(async url=>{if(String(url).includes("/options"))return options as never;if(!failed){failed=true;throw new Error("Source unavailable");}return detail as never;});show();expect(await screen.findByRole("alert")).toHaveTextContent("Source unavailable");fireEvent.click(screen.getByRole("button",{name:"Retry"}));expect(await screen.findByText(/TR-TEST/)).toBeInTheDocument();});
+ it("requires a governed observed condition when logistics refuses collection",async()=>{
+  vi.mocked(apiFetch).mockImplementation(async url=>String(url).includes("/options")?options:{...detail,source:{...detail.source,case_id:id(99),case_approval:{condition_required:true}}} as never);
+  show(false,true);
+  const event=await screen.findByLabelText("Handover event");
+  fireEvent.change(event,{target:{value:"collection_refused"}});
+  expect(screen.getByLabelText("Why collection was refused")).toBeRequired();
+  expect(screen.getByRole("option",{name:"Stain"})).toHaveValue("stain");
+  expect(screen.getByRole("option",{name:"Bed bugs or other pest evidence"})).toHaveValue("pests");
+ });
 });
