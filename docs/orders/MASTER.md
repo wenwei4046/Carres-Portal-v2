@@ -204,6 +204,39 @@ Search, filters, sorting, Columns and Export remain. Selection scopes output onl
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
 
+### Listing Standard — owner approved 2026-09-16
+
+The shared ERP Listing Standard applies to this Register without changing what it is (a record
+register: same eight default columns and order, no rail, no work groups, no owners, no action
+sentences, no Priority).
+
+```
+FILTERS    active search + header filters shown as conditions · one `Clear filters` clears both
+           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = unsearched population
+IDENTITY   SO No pinned and a door to the order
+1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
+           no auto-hidden default column, no squeezed text
+COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
+ACTIONS    every act reachable from the order detail (View/Edit = open · Print · Cancel SO);
+           right-click and Menu key / Shift+F10 are shortcuts only · no row buttons
+VISUAL     one shared register grammar · kit primary `New Sales Order` (32px, kit `add`)
+STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No sales orders yet` ·
+           `No sales orders match these filters` + `Clear filters`
+NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
+```
+
+**Status (measured 2026-09-16, fixture render in the real portal shell, not authenticated
+production).** Page-local half built in draft PR (branch `build/sales-orders-listing-standard`), WAITING FOR PR #1395 before merge: kit
+`New Sales Order`, kit error state, readable absences (`slate-11`, 5.9:1), the four state words,
+the footer count and its population during a server search, and Delivery Location as left-aligned
+text (the centred ghost-button popover cut long localities at both ends). **Waiting for the shared
+register work (PR #1395), not page-local:** search inside the condition strip and its
+`Clear filters`, `Clear filters` inside the no-match state, the `Reset columns` label, the keyboard
+row menu, the shared palette that retires `SalesOrdersRegister.module.css`, the width rule (at
+1440 the eight defaults need 1181px against a 1140px grid, so DO No is cut 41px), the 390px
+toolbar whose Export/Columns row sits under the grid header, and a keyboard way to read a
+truncated Customer/Delivery Location.
+
 ### The two-line cell law
 
 A second line is allowed only when it makes the first fact understandable. It uses the governed

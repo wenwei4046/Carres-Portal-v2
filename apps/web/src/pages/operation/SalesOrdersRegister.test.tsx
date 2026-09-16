@@ -137,10 +137,10 @@ describe("FIX 1 · the register asks the SERVER", () => {
   it("distinguishes a server search with no matches from an empty system", async () => {
     listHookState.data = { orders: [] };
     mount();
-    expect(screen.getByText("No orders yet")).toBeInTheDocument();
+    expect(screen.getByText("No sales orders yet")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing-order" } });
-    await waitFor(() => expect(screen.getByText("No matching sales orders.")).toBeInTheDocument());
-    expect(screen.queryByText("No orders yet")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
   });
 
   it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
@@ -430,7 +430,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     };
     mount();
     const footer = screen.getByTestId("grid-footer");
-    expect(footer).toHaveTextContent("1 order");
+    expect(footer).toHaveTextContent("1 sales order");
     expect(footer).toHaveTextContent("Mattress 2");
     expect(footer).toHaveTextContent("Pillow 4");
     /* The governed word, never the AutoCount sheet's `M.P` abbreviation. */
@@ -581,7 +581,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
     }
     expect(footer).toHaveTextContent("Other goods 5");
-    expect(footer).toHaveTextContent("1 order");
+    expect(footer).toHaveTextContent("1 sales order");
   });
 
   it("an OLDER Worker that sends no category behaves exactly as before", () => {
@@ -606,7 +606,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     const absences = document.querySelectorAll('[data-absence="true"]');
     expect(absences.length).toBeGreaterThan(0);
-    for (const el of absences) expect(el.className).toContain("text-kit-slate-9");
+    for (const el of absences) expect(el.className).toContain("text-kit-slate-11");
     // The real document is a link, never a muted absence.
     expect(screen.getByText("PO-2041").closest("[data-absence]")).toBeNull();
   });
@@ -987,5 +987,80 @@ describe("Sales Orders table correction", () => {
       "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__", "grid-expansion-gutter-customer",
     ]);
     expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v4.anon")!).widths).toEqual(saved.widths);
+  });
+});
+
+/**
+ * LISTING STANDARD — owner approved 2026-09-16, the page-local half.
+ * (The shared search, palette, width rule, `Reset columns` label and keyboard
+ * row menu wait for the shared register work in PR #1395.)
+ */
+describe("Listing Standard 2026-09-16 · page-local", () => {
+  it("counts sales orders by their document name, singular and filtered", async () => {
+    listHookState.data = { orders: [order({}), order({ id: "o-2", so: 1304, customer_name: "Wong Mei Ling" })] };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent(/^2 sales orders/);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+    await waitFor(() => expect(footer).toHaveTextContent(/^1 of 2 sales orders/));
+    expect(footer).not.toHaveTextContent(/\borders\b(?! )/);
+  });
+
+  it("keeps the population in `{n} of {m}` when the SERVER answers a search", async () => {
+    const wong = order({ id: "o-3", so: 1305, customer_name: "Wong Mei Ling" });
+    const everyone = [order({}), order({ id: "o-2", so: 1304 }), wong];
+    /* The server answers a search with ONLY the match, so the rows alone can no
+       longer say how many sales orders there are. */
+    useOperationOrdersSpy.mockImplementation((...args: unknown[]) => {
+      const search = (args[0] as { search?: string } | undefined)?.search;
+      return { ...listHookState, data: { orders: search ? [wong] : everyone } };
+    });
+    try {
+      mount();
+      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^3 sales orders/);
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      /* Wait for the SERVER's answer, not the engine's instant local filter —
+         the local filter alone already reads `1 of 3`. */
+      await waitFor(() =>
+        expect(useOperationOrdersSpy.mock.calls.some((c) => (c[0] as { search?: string })?.search === "Wong")).toBe(true),
+      );
+      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/);
+    } finally {
+      useOperationOrdersSpy.mockImplementation((..._args: unknown[]) => listHookState);
+    }
+  });
+
+  it("names a single ticked row in the singular", () => {
+    mount();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 selected sales order\b/);
+  });
+
+  it("draws New Sales Order as the kit primary 32px control, not a page-local capsule", () => {
+    mount();
+    const create = screen.getByTestId("new-sales-order");
+    expect(create).toHaveAttribute("data-kit", "button");
+    expect(create.className).toContain("h-8");
+    expect(create.className).not.toContain("rounded-full");
+    expect(create.querySelector("svg")).toHaveAttribute("stroke-width", "2");
+  });
+
+  it("says a failed load in one kit error with the fact and Try again", () => {
+    const refetch = vi.fn();
+    listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("socket hang up"), refetch };
+    mount();
+    const alert = screen.getByRole("alert");
+    expect(alert.querySelector('[data-kit="empty-state"]')).not.toBeNull();
+    expect(alert).toHaveTextContent("Sales orders could not be loaded");
+    expect(alert).not.toHaveTextContent("socket hang up");
+    expect(alert.innerHTML).not.toMatch(/\bbase-\d/);
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("prints Delivery Location as left-aligned text, not a centred button that cuts both ends", () => {
+    mount();
+    const row = screen.getByTestId("grid-parent-row");
+    expect(within(row).queryByRole("button", { name: /Kelana|Selangor|Not recorded/ })).toBeNull();
   });
 });

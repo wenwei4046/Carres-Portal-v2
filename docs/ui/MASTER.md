@@ -402,9 +402,12 @@ the whole reason the two components share a frame.
 - **A list table never scrolls sideways by growing.** A column RESIZE takes width from its RIGHT
   NEIGHBOUR, never from the table — AutoCount lets a column grow and hands the operator a
   horizontal scrollbar.
-- **Kit `DataTable` layout is NOT remembered across a reload.** Sales Orders uses the existing
-  `register/DataGrid` engine instead; Loo explicitly ruled that Stage A preserves that engine's
-  browser layout persistence. This is a page-scoped exception, not a new kit default.
+- **PERSONAL COLUMN LAYOUT IS REMEMBERED — Listing Standard, owner approved 2026-09-16.** Resize,
+  reorder and hide are personal: remembered in that staff member's browser for now and affecting
+  nobody else, with a visible `Reset columns` back to the governed default. `register/DataGrid`
+  already remembers (per page key, Sales Orders `carres.salesOrders.register.v4.{role}`); its
+  chooser still labels the act `Reset` — the label is shared-engine work (PR #1395). Kit
+  `DataTable` does not remember yet: **APPROVED TARGET / NOT BUILT** there.
 - **⭐ STICKY IDENTITY IS AN ENGINE CAPABILITY — owner ruling 2026-08-15 (Chai).** When optional
   columns widen a register past its frame it scrolls sideways, and the row loses the only thing
   that says WHICH record it is. `register/DataGrid` takes an OPTIONAL `stickyIdentity`: the control
@@ -531,13 +534,13 @@ gone."* It binds every object detail in the portal; it is not re-argued per modu
 **Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
 `OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
 persists by panel title (`:656-673`).
-**Not remembered: the grid's shape** — width, order, visibility. A test asserts it
-(`OperationOrdersControl.test.tsx:614`: *"persists no column shape"*), and §4's reload-is-the-reset
-rule stands.
-**The line is whether the choice changes what the record MEANS to the next reader.** Collapsing a
-rail is where my eyes are now; re-cutting the columns redefines the table for everyone who opens
-it next. *(Written down because a 2026-08-18 chat read the layout-memory rule, did not read the
-shipped code, and stated the opposite.)*
+**Also remembered: a person's own grid shape** — width, order, visibility (Listing Standard, owner
+approved 2026-09-16). It is personal: stored in that staff member's browser, it changes nothing
+for the next reader, and `Reset columns` returns the governed default. The line is whether the
+choice changes what the record MEANS to someone else — a personal layout does not; a governed
+default column set does, and only the owner changes that. Measured gap: kit `DataTable` still
+persists no column shape (`OperationOrdersControl.test.tsx` asserts the old rule) — **APPROVED
+TARGET / NOT BUILT** for kit `DataTable` pages.
 
 ---
 

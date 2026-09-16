@@ -41,8 +41,7 @@
 // ruling), full-bleed as SO-4 shipped it. The engine owns the toolbar, search,
 // filters, chooser and footer; ListPageShell would wrap a second chrome
 // around the one the engine already draws.
-import { useCallback, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -53,6 +52,7 @@ import {
 } from "@/components/register/DataGrid";
 import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
+import EmptyState from "@/components/kit/EmptyState";
 import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -84,7 +84,9 @@ import {
 } from "./sales-order-columns";
 
 /**
- * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai).
+ * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai),
+ * and it stays READABLE — Listing Standard 2026-09-16: `slate-11`, never the
+ * disabled `slate-9` grey (3.3:1 on white, below the 4.5:1 text floor).
  *
  * `Not recorded` / `Not given` keep their words — a blank may never carry two
  * meanings — and lose their weight. A `PO No` column of eight absences and two
@@ -95,7 +97,7 @@ import {
 function absenceAware(text: string) {
   if (!MUTED_ABSENCES.has(text)) return text;
   return (
-    <span className="text-kit-slate-9" data-absence="true">
+    <span className="text-kit-slate-11" data-absence="true">
       {text}
     </span>
   );
@@ -222,7 +224,7 @@ function toGridColumn(
          object; many open Delivery's register filtered to this SO. */
       accessor: (r) => {
         if (r.deliveryOrders.length === 0) {
-          return <span className="text-kit-slate-9">No delivery order yet</span>;
+          return <span className="text-kit-slate-11" data-absence="true">No delivery order yet</span>;
         }
         if (r.deliveryOrders.length === 1) {
           const deliveryOrder = r.deliveryOrders[0]!;
@@ -324,9 +326,17 @@ function toGridColumn(
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
   if (f.key === "delivery_location") {
-    return { ...base, accessor: (r) => <Popover label="Delivery Location" trigger={<Button size="sm" variant="ghost">{f.text(r)}</Button>}>
-      <p className="text-body">{f.text(r)}</p>
-    </Popover> };
+    /* Plain text, left-aligned like Customer (Listing Standard 2026-09-16).
+       The popover repeated this same string inside a centred ghost button,
+       so a long locality was cut at BOTH ends — `Seremban` read `eremban`. */
+    return {
+      ...base,
+      accessor: (r) => (
+        <span className="block truncate" title={f.text(r)}>
+          {f.text(r)}
+        </span>
+      ),
+    };
   }
   if (f.key === "items") {
     return {
@@ -522,7 +532,7 @@ export default function SalesOrdersRegister() {
      naming which Sales Order the dialog is about. */
   const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useOperationOrders(
+  const { data, isLoading, isError, isPlaceholderData, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
   );
   /* ▸ D4 · EACH ORDER CARRIES ITS OWN DELIVERY ORDERS NOW.
@@ -554,6 +564,13 @@ export default function SalesOrdersRegister() {
     () => [...all].sort((a, b) => b.ordered.localeCompare(a.ordered)),
     [all],
   );
+  /* `{n} of {m}` — `m` is the register's population, not the server's search
+     answer. A server search REPLACES the rows, so without this a search for
+     `kimmy` read `3 sales orders` as if nothing had been narrowed. The last
+     unsearched count is remembered; placeholder data is never a population. */
+  const populationRef = useRef<number | null>(null);
+  if (!serverSearch && data && !isPlaceholderData) populationRef.current = rows.length;
+  const population = serverSearch ? (populationRef.current ?? rows.length) : rows.length;
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
      for Finance/Principal); the chooser opens every column either way.
@@ -650,22 +667,17 @@ export default function SalesOrdersRegister() {
       {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
         {isError ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-            <p className="text-body text-base-700">The register could not be loaded</p>
-            {(error as Error | undefined)?.message ? (
-              <p className="text-meta text-base-500">
-                {(error as Error).message}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-              onClick={() => {
-                void refetch();
-              }}
-            >
-              Try again
-            </button>
+          /* ONE kit error: the fact and one way forward. The raw transport
+             message is not an operator word. */
+          <div role="alert" className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">
+            <EmptyState
+              title="Sales orders could not be loaded"
+              action={
+                <Button variant="neutral" onClick={() => void refetch()}>
+                  Try again
+                </Button>
+              }
+            />
           </div>
         ) : (
           <DataGrid<RegisterRow>
@@ -684,7 +696,7 @@ export default function SalesOrdersRegister() {
                item, and the ▽ per-column filters say so column by column. */
             searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
-            emptyMessage={rows.length === 0 && !serverSearch ? "No orders yet" : "No matching sales orders."}
+            emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
             groupBanner={false}
             /* Optional columns may widen the sheet (MASTER §0.1), so the row's
                identity pins: ☐ · ▸ · SO No stay against the left edge while
@@ -720,20 +732,23 @@ export default function SalesOrdersRegister() {
               },
             ]}
             toolbarStart={
-              <button
-                type="button"
+              /* The kit primary control (32px, kit `add` glyph at the governed
+                 stroke) — never a raw page-local capsule. */
+              <Button
+                variant="primary"
+                size="md"
+                icon="add"
                 data-testid="new-sales-order"
                 onClick={() => navigate("/operation/orders/so/new")}
-                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
               >
-                <Plus size={14} strokeWidth={2.25} /> New Sales Order
-              </button>
+                New Sales Order
+              </Button>
             }
             statusSummary={(filtered, selectedRows) => (
               <RegisterResultSummary
                 filtered={filtered}
                 selected={selectedRows}
-                total={rows.length}
+                total={population}
               />
             )}
           />
@@ -807,12 +822,14 @@ function RegisterResultSummary({
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
     }
   }
-  const orderWord = scope.length === 1 ? "order" : "orders";
+  /* Listing Standard 2026-09-16: the footer names the document —
+     `{n} of {m} sales orders`, singular `1 sales order`. */
+  const salesOrders = (n: number) => (n === 1 ? "sales order" : "sales orders");
   const countWord = selected.length > 0
-    ? `${selected.length} selected ${orderWord}`
+    ? `${selected.length} selected ${salesOrders(selected.length)}`
     : filtered.length === total
-      ? `${filtered.length} ${orderWord}`
-      : `${filtered.length} of ${total} orders`;
+      ? `${filtered.length} ${salesOrders(filtered.length)}`
+      : `${filtered.length} of ${total} ${salesOrders(total)}`;
   // A quantity breakdown must account for every counted line, including
   // goods the classifier cannot name. It is separate from the order count.
   const parts = FOOTER_WORDS.filter(
