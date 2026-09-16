@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { operationWorkItemSchema, operationWorkStableId, type OperationWorkItem } from "./operation-work";
-import { countWorkingDays } from "./working-days";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 
 export const issueObjectKinds = ["item", "delivery", "document", "payment", "customer_information", "staff_work", "other"] as const;
@@ -61,32 +60,59 @@ export function projectIssueActionWork(input: {
   actions: readonly IssueActionSource[];
   dutyResolutions: Partial<Record<IssueActionOwnerRule, WorkspaceDutyResolution>>;
   today: string;
+  observedAt: string;
 }): OperationWorkItem[] {
   return input.actions.map((source) => {
     const duty = input.dutyResolutions[source.ownerRule] ?? null;
-    const late = source.dueOn < input.today
-      ? Math.max(1, countWorkingDays(source.dueOn, input.today))
-      : 0;
     return operationWorkItemSchema.parse({
+      contractVersion: 2,
       id: operationWorkStableId("issue_tracker", source.id, "current_action"),
       module: "issue_tracker",
       ruleKey: "current_action",
+      ruleVersion: 1,
       object: { kind: "issue", id: source.issueId, label: source.issueNo },
       problem: source.trigger,
       action: source.action,
       recipient: source.recipient,
       requiredResult: source.requiredResult,
-      completionFact: "Current Issue action has a governed result",
+      completionPredicate: "Current Issue action has a governed result",
+      completionStatement: "The current Issue action has a recorded result",
       owner: {
         rule: source.ownerRule,
         dutyKey: source.ownerRule,
         normal: duty?.normalOwner ?? null,
         activeCover: duty?.activeCover ?? null,
+        coverEvidence: null,
         acting: duty?.actingPerson ?? null,
         state: duty?.state ?? "not_assigned",
       },
-      timing: { dueOn: source.dueOn, workingDaysLate: late, bucket: late > 0 ? "overdue" : source.dueOn === input.today ? "today" : "later" },
+      timing: {
+        businessDueOn: source.dueOn,
+        actionOn: source.dueOn,
+        placement: source.dueOn < input.today ? "missed" : "on_day",
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
+        eligibility: duty?.state === "not_assigned" || !duty ? "unknown" : "eligible",
+        noDateReason: null,
+        calendar: {
+          module: { key: "issue_action", source: "issue_actions.due_on", state: "ready" },
+          actor: {
+            key: duty?.actingPerson?.userId ? `person:${duty.actingPerson.userId}` : `duty:${source.ownerRule}`,
+            source: "people",
+            state: "not_configured",
+          },
+          holidayName: null,
+        },
+      },
+      communication: null,
+      blocker: null,
+      nextConsequence: null,
+      interaction: {
+        mode: "open_module",
+        fallbackDestination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      },
       destination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      observedAt: input.observedAt,
+      sourceVersion: input.observedAt,
       tone: source.materiality === "critical" ? "danger" : source.materiality === "significant" ? "warning" : "info",
       locked: false,
       broken: duty === null || duty.state === "not_assigned",

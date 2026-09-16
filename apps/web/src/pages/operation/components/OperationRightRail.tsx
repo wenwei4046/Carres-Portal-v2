@@ -42,7 +42,7 @@ export default function OperationRightRail() {
   const { items } = useOpenWorkSet();
   const myId = useAuth((s) => s.session)?.user?.id ?? null;
   const myWork = myId ? items.filter((item) => item.ownerId === myId) : [];
-  const myOverdue = myWork.filter((item) => item.workingDaysLate > 0).length;
+  const myOverdue = myWork.filter((item) => item.timingBucket === "overdue").length;
 
   // Per-tab badge: Tasks = my open follow-ups (red when any overdue).
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {

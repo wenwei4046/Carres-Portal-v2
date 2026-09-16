@@ -414,7 +414,8 @@ const WEEK_KIND_ORDER: readonly PaymentWeekWorkKind[] = ["ask", "check_promise",
 export interface PaymentWeekWorkItem {
   ruleKey: string;
   object: { id: string };
-  timing: { dueOn: string | null };
+  /** The governed person-action day from the shared Work v2 contract. */
+  timing: { actionOn: string | null };
 }
 
 export interface PaymentWeekLine {
@@ -499,7 +500,7 @@ export function paymentWeekPlan(input: {
   const earliest = new Map<string, { orderId: string; kind: PaymentWeekWorkKind; dueOn: string }>();
   for (const item of input.items) {
     const kind = PAYMENT_WEEK_RULE_KIND[item.ruleKey];
-    const dueOn = item.timing.dueOn;
+    const dueOn = item.timing.actionOn;
     const orderId = orderOfInvoice.get(item.object.id);
     if (!kind || !dueOn || !orderId) continue;
     const key = `${orderId}|${kind}`;

@@ -164,12 +164,39 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitments` · `Late` · `Today` · `Later` · `No date` | Upcoming · Overdue as the section word · Backlog |
+| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
+| Work applied filters | `Clear all` | Reset · Clear everything |
+| Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
+| Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
+| Work embedded result | icon plus `Nice Future confirmed Fri, 18 Sep` · `Delivery proof accepted` (the exact source result; icon/colour never stands alone) | Done · Completed · Success · icon alone |
+| Work closure by another actor | icon plus `Done by {person}` only when the source supplies durable actor evidence | inferring the actor from assignment or cover |
+| Work order cancelled | icon plus `Order cancelled` | No longer needed without the known reason |
+| Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
+| Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
+| Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
+| Work current-list counts | `In this list` · `Missed {n} · {weekday, date} {n}` · `{n} in this list` | a module total that excludes visible Missed rows · counting one occurrence twice |
+| Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
+| Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
+| Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
+| Delivery proof supporting result | `More proof is required` | The driver is asked for more proof |
+| Delivery proof receipts | `Delivery proof accepted` · `More proof requested` · `Delivery proof rejected` | Done · Completed · an unconfirmed optimistic receipt |
+| Delivery proof viewer | `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` | image controls without text names |
+| Delivery proof viewed aid | `Viewed` | storing view state · treating view state as completion evidence |
+| Delivery proof load failure | `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` | allowing `Accept proof` while any file in the latest proof package is unreadable |
+| Work read-only action | `Only {acting person} can record this.` · `You can see this work here. Recording it is not part of your access.` | disabled mutation controls · implying Team Work visibility grants permission |
+| Work detail evidence | `Working day and source` · `Owner, working day and source` only when exceptional owner evidence is present · `Required` · `Working day` · `Source` | ordinary owner metadata in My Work |
+| Work source remainder | `Other work is current.` | implying one failed source made the whole list current or empty |
+| Work loading announcement | `Loading work` | No work · zero counts while loading |
+| Work object shortcut | `Open {object} (O)` | an undiscoverable keyboard shortcut |
+| Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
+| Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
+| Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
+| Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
 | Right Rail healthy clear | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure | `My Work could not be refreshed` | No work due now · No open work |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |

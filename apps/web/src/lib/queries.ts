@@ -313,6 +313,7 @@ import {
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
 } from "@carres/shared";
+import { operationWorkResponseSchema } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
@@ -4154,7 +4155,9 @@ export function useOperationWork(
 ) {
   return useQuery({
     queryKey: qk.operation.work(),
-    queryFn: () => apiFetch<OperationWorkResponse>("/api/operation/work"),
+    queryFn: async () => operationWorkResponseSchema.parse(
+      await apiFetch<unknown>("/api/operation/work"),
+    ),
     staleTime: 30_000,
     ...opts,
   });

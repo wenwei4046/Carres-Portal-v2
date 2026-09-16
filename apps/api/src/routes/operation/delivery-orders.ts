@@ -531,6 +531,8 @@ deliveryOrdersRouter.post("/:id/proof-review", requireOperationOrPrincipal, asyn
     p_attempt_id: parsed.data.attemptId ?? null,
     p_decision: parsed.data.decision,
     p_reason: parsed.data.reason ?? null,
+    p_expected_evidence_at: parsed.data.sourceVersion,
+    p_idempotency_key: parsed.data.idempotencyKey,
   });
   if (error) return fail(c, error);
   return c.json({ review: data }, 201);

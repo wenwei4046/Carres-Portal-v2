@@ -238,7 +238,12 @@ describe("§6.1 (0489) — the review, the evidence binding and the signed paper
     const { rpc } = mockSb([{ data: DOC }], [{ data: { id: "r1", decision: "rejected" } }]);
     const res = await call("/DO-180826-3035/proof-review", "operation", {
       method: "POST",
-      body: JSON.stringify({ decision: "rejected", reason: "The photo shows the lobby, not the goods" }),
+      body: JSON.stringify({
+        decision: "rejected",
+        reason: "The photo shows the lobby, not the goods",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000001",
+      }),
     });
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalledWith("delivery_proof_review", {
@@ -246,6 +251,8 @@ describe("§6.1 (0489) — the review, the evidence binding and the signed paper
       p_attempt_id: null,
       p_decision: "rejected",
       p_reason: "The photo shows the lobby, not the goods",
+      p_expected_evidence_at: "2026-09-16T01:00:00.000Z",
+      p_idempotency_key: "00000000-0000-4000-8000-000000000001",
     });
   });
 
@@ -253,7 +260,11 @@ describe("§6.1 (0489) — the review, the evidence binding and the signed paper
     const { rpc } = mockSb([{ data: DOC }]);
     const res = await call("/DO-180826-3035/proof-review", "operation", {
       method: "POST",
-      body: JSON.stringify({ decision: "more_required" }),
+      body: JSON.stringify({
+        decision: "more_required",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000002",
+      }),
     });
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
@@ -263,10 +274,39 @@ describe("§6.1 (0489) — the review, the evidence binding and the signed paper
     mockSb([{ data: DOC }], [{ error: { code: "22023", message: "that delivery attempt does not belong to this document", details: "attempt_mismatch" } }]);
     const res = await call("/DO-180826-3035/proof-review", "operation", {
       method: "POST",
-      body: JSON.stringify({ decision: "accepted", attemptId: "00000000-0000-0000-0000-0000000f0001" }),
+      body: JSON.stringify({
+        decision: "accepted",
+        attemptId: "00000000-0000-0000-0000-0000000f0001",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000003",
+      }),
     });
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(((await res.json()) as { message: string }).message).toContain("does not belong");
+  });
+
+  it("reports stale proof as a conflict so the operator reviews the latest evidence", async () => {
+    mockSb([{ data: DOC }], [{
+      error: {
+        code: "40001",
+        message: "The delivery proof changed. Review the latest proof.",
+        details: "stale_proof_evidence",
+      },
+    }]);
+    const res = await call("/DO-180826-3035/proof-review", "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "accepted",
+        sourceVersion: "2026-09-16T01:00:00.000Z",
+        idempotencyKey: "00000000-0000-4000-8000-000000000004",
+      }),
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: "conflict",
+      code: "stale_proof_evidence",
+      message: "The delivery proof changed. Review the latest proof.",
+    });
   });
 
   it("evidence binds each file to the exact attempt, and only from this order's own prefixes", async () => {

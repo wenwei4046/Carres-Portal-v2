@@ -7,12 +7,15 @@
 import { useMemo } from "react";
 import type {
   OperationWorkItem,
+  OperationWorkModule,
   OpsStaffMember,
   WorkItem,
 } from "@carres/shared";
 import { useOperationWork } from "@/lib/queries";
 
-export interface WorkRow extends WorkItem {
+export interface WorkRow extends Omit<WorkItem, "module"> {
+  source: OperationWorkItem;
+  module: OperationWorkModule;
   id: string;
   problem: string;
   recipient: string | null;
@@ -24,30 +27,38 @@ export interface WorkRow extends WorkItem {
   ownerId: string | null;
   normalOwnerId: string | null;
   deliveryDoNumber: string | null;
+  timingBucket: "overdue" | "today" | "later" | "no_date";
 }
 
 export interface OpenWorkSet {
   items: WorkRow[];
+  generatedOn: string;
+  complete: boolean;
+  failedSources: string[];
   staff: OpsStaffMember[];
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
   error: boolean;
+  retry: () => void;
 }
 
-function toWorkRow(item: OperationWorkItem): WorkRow {
+function toWorkRow(item: OperationWorkItem, generatedOn: string): WorkRow {
+  const dueIso = item.timing.actionOn;
+  const workingDaysLate = item.timing.missedAge.state === "counted"
+    ? item.timing.missedAge.workingDays
+    : 0;
+  const timingBucket: WorkRow["timingBucket"] = item.timing.placement === "missed"
+    ? "overdue"
+    : dueIso === null
+      ? "no_date"
+      : dueIso === generatedOn
+        ? "today"
+        : "later";
   return {
+    source: item,
     id: item.id,
     ruleKey: item.ruleKey,
-    module:
-      item.module === "claims" || item.module === "issue_tracker"
-        ? "claims"
-        : item.module === "orders" ||
-            item.module === "purchasing" ||
-            item.module === "receiving" ||
-            item.module === "delivery" ||
-            item.module === "payment"
-          ? item.module
-          : "orders",
+    module: item.module,
     soRef: item.object.label,
     orderId: item.object.id,
     action: item.action,
@@ -65,26 +76,27 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
     tone: item.tone,
     locked: item.locked,
     broken: item.broken,
-    dueIso: item.timing.dueOn,
-    workingDaysLate: item.timing.workingDaysLate,
+    dueIso,
+    workingDaysLate,
     problem: item.problem,
     recipient: item.recipient,
     requiredResult: item.requiredResult,
-    completionFact: item.completionFact,
+    completionFact: item.completionPredicate,
     destination: item.destination,
     line: item.action,
     customer: item.module === "orders" ? item.recipient : null,
     ownerId: item.owner.acting?.userId ?? null,
     normalOwnerId: item.owner.normal?.userId ?? null,
     deliveryDoNumber: null,
+    timingBucket,
   };
 }
 
 export function useOpenWorkSet(): OpenWorkSet {
   const query = useOperationWork();
   const items = useMemo(
-    () => (query.data?.items ?? []).map(toWorkRow),
-    [query.data?.items],
+    () => (query.data?.items ?? []).map((item) => toWorkRow(item, query.data?.generatedOn ?? "")),
+    [query.data?.generatedOn, query.data?.items],
   );
   const staff = useMemo(
     () =>
@@ -108,9 +120,13 @@ export function useOpenWorkSet(): OpenWorkSet {
   );
   return {
     items,
+    generatedOn: query.data?.generatedOn ?? "",
+    complete: query.data?.complete ?? false,
+    failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
     staff,
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),
     error: query.isError,
+    retry: () => { void query.refetch(); },
   };
 }

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
-import type { OperationWorkItem } from "@carres/shared";
+import { HTTPException } from "hono/http-exception";
+import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 import {
   projectOverpaymentReviewWork,
   projectStorageCheckWork,
   composeOperationWorkResponse,
   createOperationWorkRouter,
+  loadWorkSource,
   manualPurchaseWorkInputsFromRegister,
   receivingWorkSourceFromModuleFacts,
   projectManualPurchaseWork,
@@ -15,33 +17,75 @@ import {
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
+  type OperationWorkSourceResult,
 } from "./work";
 import type { AppEnv } from "../../types";
 
 const base: OperationWorkItem = {
+  contractVersion: 2,
   id: "orders:SO-1318:missing_delivery_date",
   module: "orders",
   ruleKey: "missing_delivery_date",
+  ruleVersion: 1,
   object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
   problem: "No delivery date",
   action: "Ask customer for a delivery date",
   recipient: "Customer",
   requiredResult: "Customer Delivery exists",
-  completionFact: "orders.delivery_date exists",
+  completionPredicate: "orders.delivery_date exists",
+  completionStatement: "The customer delivery date is recorded",
   owner: {
     rule: "salesperson",
     dutyKey: null,
     normal: { userId: "shasha", name: "Shasha" },
     activeCover: null,
+    coverEvidence: null,
     acting: { userId: "shasha", name: "Shasha" },
     state: "primary",
   },
-  timing: { dueOn: "2026-09-06", workingDaysLate: 0, bucket: "today" },
+  timing: {
+    businessDueOn: "2026-09-06",
+    actionOn: "2026-09-06",
+    placement: "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: 0,
+      basis: { calendarKey: "office+person:shasha", from: "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
+    noDateReason: null,
+    calendar: {
+      module: { key: "office", source: "purchasing_settings", state: "ready" },
+      actor: { key: "person:shasha", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  },
+  communication: null,
+  blocker: null,
+  nextConsequence: null,
+  interaction: {
+    mode: "open_module",
+    fallbackDestination: "/operation/orders/so/order-1",
+  },
   destination: "/operation/orders/so/order-1",
+  observedAt: "2026-09-06T01:00:00.000Z",
+  sourceVersion: "orders:2026-09-06T01:00:00.000Z",
   tone: "warning",
   locked: false,
   broken: false,
 };
+
+const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const healthySources = (ordersItems: OperationWorkItem[] = []): OperationWorkSourceResult[] => sourceKeys.map((key) => ({
+  health: {
+    key,
+    state: "healthy" as const,
+    observedAt: "2026-09-06T01:00:00.000Z",
+    lastSuccessfulAt: "2026-09-06T01:00:00.000Z",
+    errorLabel: null,
+  },
+  items: key === "orders" ? ordersItems : [],
+}));
 
 describe("operation Work response composition", () => {
   it("serves the one composed response from GET /api/operation/work", async () => {
@@ -63,14 +107,16 @@ describe("operation Work response composition", () => {
     app.route(
       "/api/operation/work",
       createOperationWorkRouter(async () =>
-        composeOperationWorkResponse([[base]], [], "2026-09-06"),
+        composeOperationWorkResponse(healthySources([base]), [], "2026-09-06"),
       ),
     );
 
     const response = await app.request("/api/operation/work");
     expect(response.status).toBe(200);
-    const body = await response.json() as { items: OperationWorkItem[] };
+    const body = await response.json() as OperationWorkResponse;
     expect(body.items).toHaveLength(1);
+    expect(body.complete).toBe(true);
+    expect(body.closureReceipt).toBeNull();
   });
 
   it("returns one validated set and removes only duplicate stable identities", () => {
@@ -83,11 +129,14 @@ describe("operation Work response composition", () => {
       problem: "Goods arrived · GRN not posted",
       action: "Check in PO-2041 from Nice Future",
       requiredResult: "GRN posted",
-      completionFact: "a posted Receiving Session",
+      completionPredicate: "a posted Receiving Session",
+      completionStatement: "The GRN is posted",
       destination: "/operation?tab=receiving&session=receipt-1",
     };
+    const sources = healthySources([base, base]);
+    sources.find((source) => source.health.key === "receiving")!.items = [receiving];
     const response = composeOperationWorkResponse(
-      [[base, base], [receiving]],
+      sources,
       [{ userId: "shasha", name: "Shasha", email: "shasha@carres.test" }],
       "2026-09-06",
     );
@@ -95,12 +144,56 @@ describe("operation Work response composition", () => {
     expect(response.items.map((item) => item.id)).toEqual([base.id, receiving.id]);
     expect(response.staff).toHaveLength(1);
     expect(response.generatedOn).toBe("2026-09-06");
+    expect(response.closureReceipt).toBeNull();
+    expect(response.items).toHaveLength(2);
+  });
+
+  it("keeps healthy work visible when one admitted source fails", () => {
+    const sources = healthySources([base]);
+    const receiving = sources.find((source) => source.health.key === "receiving")!;
+    receiving.health = {
+      key: "receiving",
+      state: "failed",
+      observedAt: null,
+      lastSuccessfulAt: "2026-09-05T01:00:00.000Z",
+      errorLabel: "Could not refresh Receiving",
+    };
+    const response = composeOperationWorkResponse(sources, [], "2026-09-06");
+
+    expect(response.complete).toBe(false);
+    expect(response.items.map((item) => item.id)).toEqual([base.id]);
+    expect(response.sources).toContainEqual(receiving.health);
+    expect(response.items).toHaveLength(1);
+  });
+
+  it("isolates an operational source error without swallowing permission refusal", async () => {
+    const failed = await loadWorkSource(
+      "receiving",
+      "2026-09-06T01:00:00.000Z",
+      async () => { throw new Error("database unavailable"); },
+    );
+    expect(failed).toEqual({
+      health: {
+        key: "receiving",
+        state: "failed",
+        observedAt: null,
+        lastSuccessfulAt: null,
+        errorLabel: "Could not refresh Receiving",
+      },
+      items: [],
+    });
+
+    await expect(loadWorkSource(
+      "receiving",
+      "2026-09-06T01:00:00.000Z",
+      async () => { throw new HTTPException(403, { message: "forbidden" }); },
+    )).rejects.toMatchObject({ status: 403 });
   });
 
   it("rejects an invalid module projection instead of returning a false empty desk", () => {
     expect(() =>
       composeOperationWorkResponse(
-        [[{ ...base, completionFact: "" } as OperationWorkItem]],
+        healthySources([{ ...base, completionPredicate: "" } as OperationWorkItem]),
         [],
         "2026-09-06",
       ),
@@ -176,7 +269,7 @@ describe("operation Work response composition", () => {
 
     expect(approval[0]?.action).toBe("Approve purchase");
     expect(approval[0]?.owner.acting?.userId).toBe("jess");
-    expect(approval[0]?.completionFact).toContain("stored approval or refusal");
+    expect(approval[0]?.completionPredicate).toContain("stored approval or refusal");
     /* ⭐ THE APPROVER LANDS ON THE DECISION (owner ruling 2026-09-11) — the
        object is one six-section scroll, and hunting for the section is the
        step this row exists to remove. */
@@ -299,6 +392,41 @@ describe("operation Work response composition", () => {
       destination: "/operation/delivery-orders/DO-2041",
     });
     expect(run?.action).not.toContain("Operation PIC");
+  });
+
+  it("admits only Delivery proof review as an embedded Work action", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: "2026-09-08",
+      deliveredAtIso: "2026-09-08T08:00:00.000Z",
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const items = projectSalesOrderWork({
+      open: [
+        { key: "check_delivery_proof", track: "delivery", tone: "warning" },
+        { key: "upload_delivery_photo", track: "delivery", tone: "warning" },
+      ],
+      context,
+      customer: "Tan Qu Qu",
+      deliveryOrderNumber: "DO-2041",
+      today: "2026-09-08",
+    });
+
+    expect(items.find((item) => item.ruleKey === "check_delivery_proof")?.interaction).toMatchObject({
+      mode: "embedded",
+      actionKey: "delivery.proof_review",
+      componentKey: "delivery.proof_review",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
+    expect(items.find((item) => item.ruleKey === "upload_delivery_photo")?.interaction).toEqual({
+      mode: "open_module",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
   });
 
   it("derives Manual Purchase projector input from the module register facts", () => {
@@ -530,11 +658,11 @@ describe("operation Work response composition", () => {
       action: "Ask Nice Future to confirm the PO delivery date",
       recipient: "Nice Future",
       owner: { dutyKey: "po_duty", normal: person, acting: person },
-      timing: { dueOn: "2026-09-04", workingDaysLate: 2, bucket: "overdue" },
+      timing: { actionOn: "2026-09-04", placement: "missed", missedAge: { state: "not_calculable" } },
       destination: "/operation?tab=purchase-orders&po=PO-2041",
     });
     expect(item?.action).not.toContain("Yu Jun");
-    expect(item?.completionFact).toContain("exact current PO version");
+    expect(item?.completionPredicate).toContain("exact current PO version");
   });
 
   /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling
@@ -584,7 +712,7 @@ describe("operation Work response composition", () => {
         destination: "/operation?tab=purchase-orders&po=PO-3001",
       });
       /* Fri 11 Sep arrival − 1 OFFICE working day = Thu 10 Sep. */
-      expect(item?.timing).toMatchObject({ dueOn: "2026-09-10", workingDaysLate: 0 });
+      expect(item?.timing).toMatchObject({ actionOn: "2026-09-10", placement: "on_day", missedAge: { state: "not_calculable" } });
       /* The owner is a resolved person, never spelled into the sentence. */
       expect(item?.action).not.toContain("Khor Yee");
     });
@@ -594,7 +722,7 @@ describe("operation Work response composition", () => {
          arrival steps back over it to Tue 15 Sep — the shared calendar's
          answer, not a second one. */
       const [item] = project({ eta_date: "2026-09-17" }, "2026-09-15");
-      expect(item?.timing?.dueOn).toBe("2026-09-15");
+      expect(item?.timing?.actionOn).toBe("2026-09-15");
     });
 
     it("stays silent with no anchor, on a settled PO, and before the window opens", () => {
@@ -614,14 +742,14 @@ describe("operation Work response composition", () => {
         eta_date: "2026-09-14",
         tomorrow_answer_about_date: "2026-09-11",
       }, "2026-09-12");
-      expect(reopened?.timing?.dueOn).toBe("2026-09-11");
+      expect(reopened?.timing?.actionOn).toBe("2026-09-11");
     });
 
     it("stays open and turns late once the check day has passed", () => {
       const [late] = project({}, "2026-09-14");
       expect(late).toBeTruthy();
-      expect(late?.timing?.bucket).toBe("overdue");
-      expect(late?.timing?.workingDaysLate).toBeGreaterThan(0);
+      expect(late?.timing?.placement).toBe("missed");
+      expect(late?.timing?.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
     });
   });
 
@@ -683,10 +811,10 @@ describe("operation Work response composition", () => {
       action: "Ask customer to pay",
       recipient: "Tan Qu Qu",
       owner: { dutyKey: "delivery_duty", normal: person, acting: person },
-      timing: { dueOn: "2026-09-07", bucket: "overdue" },
+      timing: { actionOn: "2026-09-07", placement: "missed", missedAge: { state: "not_calculable" } },
       destination: "/finance/monitor?invoice=invoice-1",
     });
-    expect(item?.completionFact).toContain("outstanding balance is RM 0");
+    expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
     expect(item?.action).not.toContain("Shasha");
   });
 });
@@ -748,10 +876,10 @@ describe("payment.missed_promise — the promise outranks the window", () => {
       problem: "Customer promise was missed",
       action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
-      timing: { dueOn: "2026-09-05", bucket: "overdue" },
+      timing: { actionOn: "2026-09-05", placement: "missed" },
     });
-    expect(item?.timing.workingDaysLate).toBeGreaterThan(0);
-    expect(item?.completionFact).toContain("outstanding balance is RM 0");
+    expect(item?.timing.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
+    expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
   });
 
   it("raises ONE row, never the window item beside it", () => {
@@ -941,9 +1069,9 @@ describe("payment.check_stored_furniture", () => {
       module: "payment",
       problem: "Stored furniture has not been checked",
       action: "Check the stored furniture",
-      timing: { dueOn: "2026-07-31", bucket: "overdue" },
+      timing: { actionOn: "2026-07-31", placement: "missed", missedAge: { state: "not_calculable" } },
     });
-    expect(item?.completionFact).toContain("storage inspection recorded");
+    expect(item?.completionPredicate).toContain("storage inspection recorded");
     // §6 names no warehouse duty roster, so there is no duty KEY to resolve —
     // the rule stands and the owner is honestly unassigned.
     expect(item?.owner.rule).toBe("warehouse_duty");
@@ -977,7 +1105,6 @@ describe("payment.check_stored_furniture", () => {
       today: "2026-09-08",
     });
     expect(items).toHaveLength(1);
-    expect(items[0]?.timing.dueOn).toBe("2026-09-06");
+    expect(items[0]?.timing.actionOn).toBe("2026-09-06");
   });
 });
-

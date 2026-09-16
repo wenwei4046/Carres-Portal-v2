@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carres Work · Three-panel prototype</title>
+  <style>
+    :root {
+      --canvas: hsl(210 20% 98%);
+      --surface: hsl(0 0% 100%);
+      --surface-alt: hsl(210 18% 96%);
+      --hover: hsl(210 18% 95%);
+      --selected: hsl(210 100% 97%);
+      --border: hsl(210 14% 89%);
+      --divider: hsl(210 12% 82%);
+      --text: hsl(215 28% 17%);
+      --text-secondary: hsl(215 16% 38%);
+      --text-muted: hsl(215 12% 55%);
+      --primary: hsl(213 92% 48%);
+      --primary-dark: hsl(213 92% 40%);
+      --danger: hsl(358 66% 48%);
+      --warning: hsl(32 92% 40%);
+      --success: hsl(145 55% 34%);
+      --radius-control: 6px;
+      --radius-card: 10px;
+      --shadow-overlay: 0 1px 2px hsl(215 30% 15% / .08), 0 12px 28px hsl(215 30% 15% / .08);
+      --nav-width: 214px;
+      --filter-width: 204px;
+      --list-width: 360px;
+      --focus: 0 0 0 3px hsl(213 92% 48% / .24);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    button, input, select { font: inherit; }
+    button, select { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: none; box-shadow: var(--focus); }
+    button:disabled { cursor: not-allowed; opacity: .5; pointer-events: none; }
+    button:active { transform: translateY(1px); }
+
+    .app { height: 100%; display: grid; grid-template-columns: var(--nav-width) minmax(0, 1fr); }
+    .global-nav {
+      background: hsl(216 28% 14%);
+      color: hsl(210 20% 92%);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow-y: auto;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+    .brand-mark { width: 26px; height: 26px; border-radius: 50%; background: var(--primary); display: grid; place-items: center; font-weight: 600; }
+    .brand-name { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+    .nav-group { display: grid; gap: 4px; }
+    .nav-label { padding: 0 9px 5px; color: hsl(214 12% 62%); font-size: 11px; font-weight: 600; letter-spacing: .08em; }
+    .nav-item {
+      border: 0;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: inherit;
+      padding: 8px 10px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      transition: background 150ms ease;
+    }
+    .nav-item:hover { background: hsl(216 22% 21%); }
+    .nav-item.active { background: hsl(216 20% 25%); color: var(--surface); font-weight: 600; }
+    .nav-icon { width: 16px; text-align: center; color: hsl(214 12% 68%); }
+
+    .page { min-width: 0; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .page-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 18px 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .mobile-week { display: none; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .mobile-week::-webkit-scrollbar { display: none; }
+    .day-chip { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); padding: 6px 10px; white-space: nowrap; }
+    .day-chip:hover { background: var(--hover); }
+    .day-chip.active { background: var(--text); border-color: var(--text); color: var(--surface); }
+    .heading-row, .control-row { display: flex; align-items: center; gap: 10px; }
+    .heading-row { justify-content: space-between; }
+    h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.02em; }
+    .freshness { color: var(--text-muted); font-size: 12px; }
+    .control-row { flex-wrap: wrap; }
+    .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-control); overflow: hidden; }
+    .segment { border: 0; border-right: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); padding: 7px 13px; font-weight: 500; }
+    .segment:last-child { border-right: 0; }
+    .segment:hover { background: var(--hover); }
+    .segment.active { background: var(--text); color: var(--surface); }
+    .search-wrap { margin-left: auto; position: relative; min-width: 260px; }
+    .search-wrap span { position: absolute; left: 10px; top: 8px; color: var(--text-muted); }
+    .search {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 12px 0 31px;
+    }
+    .select {
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--surface);
+      color: var(--text-secondary);
+      padding: 0 9px;
+    }
+
+    .workspace { min-height: 0; display: grid; grid-template-columns: var(--filter-width) var(--list-width) minmax(420px, 1fr); }
+    .filter-panel, .action-panel, .detail-panel { min-height: 0; background: var(--surface); }
+    .filter-panel { border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 10px; }
+    .action-panel { border-right: 1px solid var(--border); display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .detail-panel { overflow-y: auto; }
+    .panel-label { margin: 0 8px 8px; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .07em; }
+    .scope-list { display: grid; gap: 3px; margin-bottom: 22px; }
+    .scope-button {
+      width: 100%;
+      border: 0;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+    }
+    .scope-button:hover { background: var(--hover); }
+    .scope-button.active { background: var(--selected); color: var(--text); font-weight: 600; box-shadow: inset 3px 0 var(--primary); }
+    .count { min-width: 24px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .scope-button.active .count { color: var(--primary-dark); }
+    .today { color: var(--primary-dark); font-size: 11px; font-weight: 600; }
+
+    .action-header { padding: 14px 16px 11px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline; }
+    .action-header h2 { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+    .action-header span { color: var(--text-muted); font-size: 12px; }
+    .action-list { overflow-y: auto; }
+    .action-row {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      padding: 13px 15px;
+      text-align: left;
+      display: grid;
+      gap: 3px;
+      transition: background 150ms ease;
+    }
+    .action-row:hover { background: var(--hover); }
+    .action-row.active { background: var(--selected); box-shadow: inset 3px 0 var(--primary); }
+    .action-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .object { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .module { color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+    .action-title { color: var(--text); font-weight: 600; }
+    .party { color: var(--text-secondary); }
+    .state { color: var(--text-muted); font-size: 12px; }
+    .state.waiting { color: var(--warning); }
+    .state.ready { color: var(--success); }
+
+    .detail-inner { min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+    .detail-heading { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); }
+    .eyebrow { color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .07em; }
+    .detail-heading h2 { margin: 5px 0 2px; font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -.015em; }
+    .detail-heading p { margin: 0; color: var(--text-secondary); }
+    .detail-content { padding: 20px 24px 32px; max-width: 760px; width: 100%; }
+    .detail-section { margin-bottom: 26px; }
+    .detail-section h3 { margin: 0 0 9px; font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: .07em; color: var(--text-muted); }
+    .problem { font-size: 15px; line-height: 22px; font-weight: 600; margin: 0 0 9px; }
+    .instruction { margin: 0; color: var(--text-secondary); }
+    .fact-grid { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 7px 14px; }
+    .fact-label { color: var(--text-muted); }
+    .fact-value { color: var(--text); }
+    .message-box { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface-alt); padding: 14px 16px; margin: 12px 0; line-height: 1.55; }
+    .button-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .button {
+      min-height: 34px;
+      border-radius: var(--radius-control);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 7px 12px;
+      font-weight: 500;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+    .button:hover { background: var(--hover); border-color: var(--divider); }
+    .button.primary { background: var(--primary); border-color: var(--primary); color: var(--surface); }
+    .button.primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+    .notice { margin-top: 9px; color: var(--text-muted); font-size: 12px; }
+    .timeline { border-left: 1px solid var(--divider); margin-left: 5px; padding-left: 17px; display: grid; gap: 15px; }
+    .timeline-item { position: relative; }
+    .timeline-item::before { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--surface); border: 2px solid var(--divider); left: -22px; top: 5px; }
+    .timeline-time { color: var(--text-muted); font-size: 11px; }
+    .timeline-title { font-weight: 600; margin-top: 2px; }
+    .timeline-copy { color: var(--text-secondary); margin-top: 3px; }
+    .finish { border-left: 3px solid var(--success); background: hsl(145 55% 97%); padding: 12px 14px; border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+    .finish strong { display: block; margin-bottom: 3px; }
+    .detail-actions { position: sticky; bottom: 0; border-top: 1px solid var(--border); background: hsl(0 0% 100% / .96); backdrop-filter: blur(12px); padding: 12px 24px; display: flex; justify-content: space-between; gap: 12px; }
+    .prototype-state { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 11px; }
+    .filter-popover { position: absolute; right: 18px; top: 98px; z-index: 20; width: 260px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-overlay); padding: 14px; display: none; }
+    .filter-popover.open { display: block; }
+    .filter-popover h3 { margin: 0 0 10px; font-size: 11px; color: var(--text-muted); letter-spacing: .07em; }
+    .check-row { display: flex; align-items: center; gap: 9px; padding: 7px 2px; color: var(--text-secondary); }
+    .check-row input { accent-color: var(--primary); }
+
+    .skeleton { display: none; padding: 16px; gap: 14px; }
+    .skeleton.visible { display: grid; }
+    .bone { height: 12px; border-radius: var(--radius-control); background: var(--surface-alt); animation: pulse 1.4s ease-in-out infinite; }
+    .bone.short { width: 38%; }
+    .bone.medium { width: 68%; }
+    .bone.tall { height: 70px; width: 100%; }
+    @keyframes pulse { 50% { opacity: .45; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+    .empty { min-height: 280px; display: grid; place-items: center; padding: 32px; text-align: center; }
+    .empty-icon { width: 42px; height: 42px; border-radius: 50%; background: var(--surface-alt); display: grid; place-items: center; margin: 0 auto 12px; color: var(--text-muted); font-size: 18px; }
+    .empty h3 { margin: 0; font-size: 15px; }
+    .empty p { margin: 5px 0 14px; color: var(--text-muted); }
+
+    .mobile-back { display: none; }
+    @media (max-width: 1180px) {
+      :root { --nav-width: 190px; --list-width: 340px; }
+      .workspace { grid-template-columns: var(--list-width) minmax(400px, 1fr); }
+      .filter-panel { display: none; }
+      .search-wrap { min-width: 220px; }
+    }
+    @media (max-width: 820px) {
+      .app { grid-template-columns: 1fr; }
+      .global-nav { display: none; }
+      .page-header { padding: 12px; }
+      .freshness { display: none; }
+      .control-row { align-items: stretch; }
+      .search-wrap { order: 3; width: 100%; min-width: 0; margin-left: 0; }
+      .workspace { grid-template-columns: 1fr; }
+      .action-panel { border-right: 0; }
+      .detail-panel { display: none; position: fixed; inset: 0; z-index: 10; background: var(--surface); }
+      .detail-panel.mobile-open { display: block; }
+      .mobile-back { display: inline-flex; margin-bottom: 10px; }
+      .detail-heading, .detail-content { padding-left: 16px; padding-right: 16px; }
+      .detail-actions { padding: 10px 16px; }
+      .prototype-state { display: none; }
+      .mobile-week { display: flex; }
+      .filter-popover { position: fixed; left: 12px; right: 12px; top: 126px; width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="global-nav" aria-label="Main navigation">
+      <div class="brand"><span class="brand-mark">C</span><span class="brand-name">CARRES</span></div>
+      <nav class="nav-group">
+        <button class="nav-item"><span class="nav-icon">⌂</span>Dashboard</button>
+      </nav>
+      <nav class="nav-group">
+        <div class="nav-label">WORKSPACE</div>
+        <button class="nav-item active"><span class="nav-icon">✓</span>Work</button>
+        <button class="nav-item"><span class="nav-icon">♙</span>Staff &amp; Duties</button>
+        <button class="nav-item"><span class="nav-icon">!</span>Issue Tracker</button>
+      </nav>
+      <nav class="nav-group">
+        <div class="nav-label">OPERATIONS</div>
+        <button class="nav-item"><span class="nav-icon">▤</span>Sales Orders</button>
+        <button class="nav-item"><span class="nav-icon">□</span>Purchasing</button>
+        <button class="nav-item"><span class="nav-icon">↓</span>Receiving</button>
+        <button class="nav-item"><span class="nav-icon">▦</span>Warehouse</button>
+        <button class="nav-item"><span class="nav-icon">◇</span>Delivery</button>
+      </nav>
+      <nav class="nav-group">
+        <div class="nav-label">FINANCE</div>
+        <button class="nav-item"><span class="nav-icon">$</span>Payment</button>
+      </nav>
+    </aside>
+
+    <section class="page">
+      <header class="page-header">
+        <div class="heading-row">
+          <h1>Work</h1>
+          <span class="freshness">Refreshed today at 09:42</span>
+        </div>
+        <div class="control-row">
+          <div class="segmented" aria-label="Work scope">
+            <button class="segment active" data-scope="mine">My Work</button>
+            <button class="segment" data-scope="team">Team Work</button>
+          </div>
+          <div class="search-wrap"><span>⌕</span><input class="search" id="search" type="search" placeholder="Search work…" aria-label="Search work"></div>
+          <select class="select" id="ownerFilter" aria-label="Owner" hidden><option value="all">All owners</option><option>Shasha</option><option>Yu Jun</option><option>Site queues</option><option>Not assigned</option></select>
+          <button class="button" id="filterButton">Filters</button>
+          <label class="prototype-state">Prototype state
+            <select class="select" id="stateSelect" aria-label="Prototype state"><option value="normal">Normal</option><option value="loading">Loading</option><option value="empty">Empty</option></select>
+          </label>
+        </div>
+        <div class="mobile-week" id="mobileWeek" aria-label="Working day">
+          <button class="day-chip" data-mobile-day="Missed">Missed 3</button>
+          <button class="day-chip" data-mobile-day="Monday">Mon 4</button>
+          <button class="day-chip" data-mobile-day="Tuesday">Tue 5</button>
+          <button class="day-chip active" data-mobile-day="Wednesday">Wed 8 · Today</button>
+          <button class="day-chip" data-mobile-day="Thursday">Thu 4</button>
+          <button class="day-chip" data-mobile-day="Friday">Fri 2</button>
+          <button class="day-chip" data-mobile-day="No working date">No date 1</button>
+        </div>
+      </header>
+
+      <aside class="filter-popover" id="filterPopover" aria-label="Work filters">
+        <h3>CONDITION</h3>
+        <label class="check-row"><input type="checkbox" value="waiting">Waiting for reply</label>
+        <label class="check-row"><input type="checkbox" value="covered">Covered</label>
+        <label class="check-row"><input type="checkbox" value="blocked">Blocked</label>
+        <label class="check-row"><input type="checkbox" value="failed">Source failed</label>
+        <div class="button-row" style="margin-top:10px"><button class="button" id="clearConditions">Clear</button><button class="button primary" id="applyConditions">Show work</button></div>
+      </aside>
+
+      <div class="workspace">
+        <aside class="filter-panel" aria-label="Work navigation">
+          <p class="panel-label">WORKING DAY</p>
+          <div class="scope-list" id="dayList">
+            <button class="scope-button" data-day="Missed"><span>Missed</span><span class="count">3</span></button>
+            <button class="scope-button" data-day="Monday"><span>Mon, 14 Sep</span><span class="count">4</span></button>
+            <button class="scope-button" data-day="Tuesday"><span>Tue, 15 Sep</span><span class="count">5</span></button>
+            <button class="scope-button active" data-day="Wednesday"><span>Wed, 16 Sep <span class="today">Today</span></span><span class="count">8</span></button>
+            <button class="scope-button" data-day="Thursday"><span>Thu, 17 Sep</span><span class="count">4</span></button>
+            <button class="scope-button" data-day="Friday"><span>Fri, 18 Sep</span><span class="count">2</span></button>
+            <button class="scope-button" data-day="No working date"><span>No working date</span><span class="count">1</span></button>
+          </div>
+          <p class="panel-label">MODULE</p>
+          <div class="scope-list" id="moduleList">
+            <button class="scope-button active" data-module="All"><span>All</span><span class="count">8</span></button>
+            <button class="scope-button" data-module="Purchasing"><span>Purchasing</span><span class="count">1</span></button>
+            <button class="scope-button" data-module="Receiving"><span>Receiving</span><span class="count">1</span></button>
+            <button class="scope-button" data-module="Warehouse"><span>Warehouse</span><span class="count">1</span></button>
+            <button class="scope-button" data-module="Delivery"><span>Delivery</span><span class="count">2</span></button>
+            <button class="scope-button" data-module="Payment"><span>Payment</span><span class="count">2</span></button>
+            <button class="scope-button" data-module="Service"><span>Service</span><span class="count">1</span></button>
+          </div>
+        </aside>
+
+        <section class="action-panel" aria-label="Actions">
+          <div class="action-header"><h2 id="actionHeading">Wednesday</h2><span id="actionCount">8 actions</span></div>
+          <div class="skeleton" id="listSkeleton" aria-label="Loading actions"><div class="bone short"></div><div class="bone medium"></div><div class="bone tall"></div><div class="bone medium"></div><div class="bone tall"></div></div>
+          <div class="action-list" id="actionList"></div>
+        </section>
+
+        <section class="detail-panel" id="detailPanel" aria-label="Selected action"></section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const actions = [
+      { id:'delivery-8830', object:'DO 8830', module:'Delivery', title:'Confirm tomorrow’s appointment', party:'Lim Family', state:'Not contacted', stateClass:'', problem:'Tomorrow’s delivery appointment is not confirmed', action:'Ask Lim Family to confirm Thu, 17 Sep · 2:00 to 5:00 PM', contact:'Lim Family · +60 12 345 6789', message:'Hi, please confirm your delivery appointment for Thursday, 17 September, from 2:00 to 5:00 PM.', finish:'Confirmed appointment and customer reply evidence are recorded on DO 8830', source:'Delivery Order DO 8830', communication:true },
+      { id:'delivery-8842', object:'DO 8842', module:'Delivery', title:'Record today’s delivery result', party:'Tan Qu Qu', state:'Delivery in progress', stateClass:'ready', problem:'Today’s delivery has no recorded result', action:'Record the actual delivery result', finish:'A governed delivery attempt result is recorded', source:'Delivery Order DO 8842' },
+      { id:'payment-1402', object:'INV 1402', module:'Payment', title:'Collect RM 1,280', party:'Tan Qu Qu', state:'Promised today', stateClass:'waiting', problem:'RM 1,280 was promised today', action:'Ask Tan Qu Qu to pay RM 1,280', contact:'Tan Qu Qu · +60 16 234 8899', message:'Hi Tan Qu Qu, this is a reminder that RM 1,280 for INV 1402 was promised today.', finish:'Payment is recorded and allocated; invoice outstanding becomes RM 0', source:'Invoice INV 1402', communication:true },
+      { id:'payment-1410', object:'INV 1410', module:'Payment', title:'Record payment promise', party:'Wong Family', state:'Reply received', stateClass:'ready', problem:'The customer replied with a payment date', action:'Record the customer’s payment promise', finish:'The evidenced customer promise is recorded against INV 1410', source:'Invoice INV 1410' },
+      { id:'purchasing-2041', object:'PO 2041', module:'Purchasing', title:'Confirm Friday’s arrival', party:'Nice Future', state:'Waiting for reply', stateClass:'waiting', problem:'Supplier has not confirmed Friday’s arrival', action:'Ask Nice Future to confirm the Friday arrival', contact:'Nice Future · Jason · +60 16 222 8899', message:'Hi Jason, please confirm whether PO 2041 will arrive this Friday, 18 September.', finish:'Supplier answer and evidence are recorded against PO 2041', source:'Purchase Order PO 2041', communication:true },
+      { id:'receiving-2098', object:'PO 2098', module:'Receiving', title:'Receive goods from Hooka', party:'Hooka', state:'Arrival expected today', stateClass:'', problem:'Goods are expected today', action:'Receive PO 2098 from Hooka', finish:'Every expected Unit is recorded as Received, Received with issue or Not received', source:'Receiving for PO 2098' },
+      { id:'warehouse-8821', object:'DO 8821', module:'Warehouse', title:'Hand over 2 Units', party:'NETS Delivery', state:'Pickup at 3:00 PM', stateClass:'', problem:'2 Units must be handed to NETS Delivery today', action:'Check, pack and hand over the exact Units', finish:'Every Unit has check, pack, receiver and handover proof', source:'Warehouse Work for DO 8821' },
+      { id:'service-0188', object:'CASE 0188', module:'Service', title:'Obtain damage photo', party:'Lim Family', state:'Waiting for evidence', stateClass:'waiting', problem:'Damage evidence is incomplete', action:'Ask Lim Family for a clear photo of the damaged bedframe', contact:'Lim Family · +60 12 345 6789', message:'Hi, please send us one clear photo showing the damaged area of the bedframe.', finish:'The required photo is attached to CASE 0188', source:'Service Case CASE 0188', communication:true }
+    ];
+    let selectedId = actions[0].id;
+    let moduleFilter = 'All';
+    let query = '';
+
+    const actionList = document.getElementById('actionList');
+    const detailPanel = document.getElementById('detailPanel');
+    const stateSelect = document.getElementById('stateSelect');
+
+    function filteredActions() {
+      return actions.filter(item => (moduleFilter === 'All' || item.module === moduleFilter) && [item.object,item.module,item.title,item.party,item.problem,item.action].join(' ').toLowerCase().includes(query));
+    }
+
+    function renderList() {
+      const rows = filteredActions();
+      document.getElementById('actionCount').textContent = `${rows.length} action${rows.length === 1 ? '' : 's'}`;
+      if (!rows.length) {
+        actionList.innerHTML = '<div class="empty"><div><div class="empty-icon">⌕</div><h3>No work matches these filters</h3><p>Change the module or search to see other work.</p><button class="button" id="clearFilters">Clear filters</button></div></div>';
+        document.getElementById('clearFilters').onclick = () => { moduleFilter='All'; query=''; document.getElementById('search').value=''; document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('active',b.dataset.module==='All')); renderAll(); };
+        return;
+      }
+      if (!rows.some(item => item.id === selectedId)) selectedId = rows[0].id;
+      actionList.innerHTML = rows.map(item => `<button class="action-row ${item.id===selectedId?'active':''}" data-id="${item.id}"><span class="action-top"><span class="object">${item.object}</span><span class="module">${item.module.toUpperCase()}</span></span><span class="action-title">${item.title}</span><span class="party">${item.party}</span><span class="state ${item.stateClass}">${item.state}</span></button>`).join('');
+      actionList.querySelectorAll('.action-row').forEach(row => row.onclick = () => { selectedId=row.dataset.id; renderAll(); detailPanel.classList.add('mobile-open'); });
+    }
+
+    function renderDetail() {
+      const item = actions.find(action => action.id === selectedId);
+      if (!item || !filteredActions().length) { detailPanel.innerHTML=''; return; }
+      detailPanel.innerHTML = `<div class="detail-inner">
+        <div class="detail-heading"><button class="button mobile-back" id="mobileBack">← Back to work</button><div class="eyebrow">${item.object} · ${item.module.toUpperCase()}</div><h2>${item.party}</h2><p>${item.source}</p></div>
+        <div class="detail-content">
+          <section class="detail-section"><h3>CURRENT FACT</h3><p class="problem">${item.problem}</p><p class="instruction">${item.action}</p></section>
+          ${item.communication ? `<section class="detail-section"><h3>COMMUNICATION</h3><div class="fact-grid"><div class="fact-label">To</div><div class="fact-value">${item.contact}</div><div class="fact-label">Channel</div><div class="fact-value">WhatsApp</div><div class="fact-label">State</div><div class="fact-value">${item.state}</div></div><div class="message-box">${item.message}</div><div class="button-row"><button class="button" id="copyMessage">Copy message</button><button class="button" id="openWhatsapp">Open WhatsApp</button></div><p class="notice">Opening WhatsApp does not record that the message was sent.</p></section><section class="detail-section"><h3>COMMUNICATION HISTORY</h3><p class="notice">No communication recorded</p></section>` : ''}
+          <section class="detail-section"><h3>FINISH WHEN</h3><div class="finish"><strong>Required result</strong>${item.finish}</div></section>
+        </div>
+        <div class="detail-actions"><button class="button">Open ${item.source}</button><button class="button primary" id="primaryAction" ${item.communication ? 'disabled' : ''}>${item.communication ? 'Record message sent' : item.title}</button></div>
+      </div>`;
+      const back = document.getElementById('mobileBack'); if (back) back.onclick=()=>detailPanel.classList.remove('mobile-open');
+      const primary = document.getElementById('primaryAction');
+      const enableSent = () => { if (primary) primary.disabled=false; };
+      const copy = document.getElementById('copyMessage'); if (copy) copy.onclick=async()=>{ try { await navigator.clipboard.writeText(item.message); copy.textContent='Copied'; } catch { copy.textContent='Message prepared'; } enableSent(); };
+      const whatsapp = document.getElementById('openWhatsapp'); if (whatsapp) whatsapp.onclick=()=>{ enableSent(); alert('Prototype: opens WhatsApp for the selected recipient.'); };
+    }
+
+    function renderAll() { renderList(); renderDetail(); }
+    document.querySelectorAll('[data-module]').forEach(button => button.onclick=()=>{ moduleFilter=button.dataset.module; document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('active',b===button)); renderAll(); });
+    document.querySelectorAll('[data-day]').forEach(button => button.onclick=()=>{ document.querySelectorAll('[data-day]').forEach(b=>b.classList.toggle('active',b===button)); document.getElementById('actionHeading').textContent=button.dataset.day; });
+    document.querySelectorAll('[data-mobile-day]').forEach(button => button.onclick=()=>{ document.querySelectorAll('[data-mobile-day]').forEach(b=>b.classList.toggle('active',b===button)); document.getElementById('actionHeading').textContent=button.dataset.mobileDay; });
+    document.querySelectorAll('[data-scope]').forEach(button => button.onclick=()=>{ document.querySelectorAll('[data-scope]').forEach(b=>b.classList.toggle('active',b===button)); const team=button.dataset.scope==='team'; document.getElementById('ownerFilter').hidden=!team; document.getElementById('actionHeading').textContent=team?'Wednesday · Team':'Wednesday'; });
+    document.getElementById('search').oninput=event=>{ query=event.target.value.trim().toLowerCase(); renderAll(); };
+    const filterPopover=document.getElementById('filterPopover');
+    document.getElementById('filterButton').onclick=()=>filterPopover.classList.toggle('open');
+    document.getElementById('applyConditions').onclick=()=>filterPopover.classList.remove('open');
+    document.getElementById('clearConditions').onclick=()=>{ filterPopover.querySelectorAll('input').forEach(input=>input.checked=false); };
+    stateSelect.onchange=()=>{
+      const loading=stateSelect.value==='loading', empty=stateSelect.value==='empty';
+      document.getElementById('listSkeleton').classList.toggle('visible',loading);
+      actionList.style.display=loading?'none':'block';
+      detailPanel.style.visibility=loading?'hidden':'visible';
+      if(empty){ moduleFilter='Impossible'; renderAll(); } else if(moduleFilter==='Impossible'){ moduleFilter='All'; renderAll(); }
+    };
+    renderAll();
+  </script>
+</body>
+</html>
