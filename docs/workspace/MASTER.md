@@ -1,10 +1,13 @@
 # WORKSPACE — MASTER
 
-> **APPROVED / LOCKED business architecture — Jess, 2026-09-03; complete page Blueprint review
-> closed, 2026-09-16.** This is the one Workspace authority for Staff & Duties,
+> **APPROVED / LOCKED business architecture — Jess, 2026-09-03; Work architecture reconciled
+> with the owner-approved working-week and three-panel direction, 2026-09-16.** This is the one
+> Workspace authority for Staff & Duties,
 > action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
-> Workspace Blueprint.
+> Workspace Blueprint. Detailed UI-kit specifications and final visual measurements are intentionally
+> not locked here; they require a separate clean UI review and Owner approval. Existing HTML
+> prototypes are exploration only until that approval.
 
 ## 1 · Mission and boundary
 
@@ -292,42 +295,54 @@ Team Work   the same actions grouped by normal owner
 - My Work is the default for everyone, including managers, and omits their repeated avatar.
 - Team Work groups under owner avatar/name; cover appears only when today's actor differs.
 - No manual `Take it`, `Release`, generic assignment or `Mark done` exists for deterministic work.
-- Ordering is broken commitment, late, today, then later; blockers never hide lateness.
+- The working week is explicit: `Missed`, Monday through Friday and `No working date`; blockers
+  never hide the original required working day or missed age.
 - Completed/History is read-only source evidence and preserves the actual actor.
 
 ### 5.1 · One Work composition
 
-Work is one page with two scopes over one open set. It is not a board, inbox, calendar or module
-dashboard.
+Work is one page with two scopes over one open set. It is an operator workspace, not a Dashboard,
+Kanban board or second module record. Owner-approved 2026-09-16: the primary navigation is the
+Monday-to-Friday working week, and large desktop uses three working panels inside the existing
+global shell.
 
 ```text
-┌ Work ────────────────────────────────────────────────────────────────────────┐
-│ [My Work] [Team Work]                         Search work…   Filters   Refresh│
-│ Applied: Late · Delivery                                            Clear all│
-├ BROKEN COMMITMENTS / LATE ──────────────────────────────────────────────────┤
-│ SO-1318 · Sales Order                                                        │
-│ No delivery date                                                            │
-│ Ask customer for a delivery date                                            │
-│ No date                                                    Open Sales Order  │
-├ TODAY ───────────────────────────────────────────────────────────────────────┤
-│ DO-2041 · Carres Klang Warehouse                                             │
-│ 2 Units have not been handed over                                           │
-│ Check, pack and hand over the exact Units · NETS Delivery                    │
-│ Every required Unit handed over with receiver and proof         Due today   │
-├ LATER ───────────────────────────────────────────────────────────────────────┤
-│ …                                                                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌ WORKING DAY / MODULE ┬ ACTIONS ───────────────┬ SELECTED ACTION ─────────────┐
+│ Missed             3 │ DO-8830 · Delivery     │ DO-8830 · Delivery           │
+│ Mon, 14 Sep        4 │ Confirm appointment    │ Lim Family                   │
+│ Tue, 15 Sep        5 │ Lim Family             │                              │
+│ Wed, 16 Sep Today  8 │ Not contacted          │ Current fact                 │
+│ Thu, 17 Sep        4 │                        │ Appointment not confirmed    │
+│ Fri, 18 Sep        2 │ INV-1402 · Payment     │                              │
+│ No working date    1 │ Collect RM 1,280       │ Action                       │
+│                      │ Tan Qu Qu              │ Confirm Thu, 17 Sep          │
+│ All                8 │ Promised today         │ 2:00 to 5:00 PM             │
+│ Purchasing         1 │                        │                              │
+│ Receiving          1 │ PO-2041 · Purchasing   │ Communication                │
+│ Warehouse          1 │ Confirm Fri arrival    │ source-owned evidence/action │
+│ Delivery           2 │ Nice Future            │                              │
+│ Payment            2 │ Waiting for reply      │ Finish when                  │
+│ Service            1 │                        │ appointment is recorded      │
+└──────────────────────┴────────────────────────┴──────────────────────────────┘
 ```
 
-My Work groups by timing: `Broken commitments` when an authoritative promise is already broken,
-then `Late`, `Today`, `Later` and `No date`. A broken commitment is also late when its due fact says
-so; it appears once, at the highest applicable severity. Team Work first groups by normal owner,
-Site queue or unresolved Duty, then uses the same timing order inside each group. Group headers say
-what they count: `8 actions to do · 2 late`, never `8 open` without a noun.
+Panel 1 chooses the working day and module. Panel 2 lists the matching authorised actions. Panel 3
+shows one selected action's fact, specific act, source-owned communication where admitted, required
+result and exact owning-object door. `Missed` contains actions whose governed working day has passed;
+the original day and working-day age remain visible. Monday through Friday show the selected week.
+`No working date` is an admitted obligation without a lawful day and never pretends to belong to
+today. Broken commitment remains the highest attention fact on the affected row; it is not another
+weekday bucket.
 
-The page never writes module truth. Selecting any item opens its exact owning object and focuses the
-required act. Where the owning surface cannot perform the act, the item is read-only and says where
-to go; Workspace does not add a substitute button.
+Team Work uses the same three panels and week. Panel 1 additionally selects normal owner, Site queue
+or `Not assigned`; Panel 2 keeps actions grouped or visibly identified by that normal owner and
+Panel 3 preserves cover evidence. Counts always name actions.
+
+Workspace never owns or stores module truth. Panel 3 may host an owning module's governed action
+component only when it uses that module's authoritative API, permission, evidence and completion
+fact. Copying a message or opening WhatsApp never records a send or completes Work. Where no
+source-owned action contract exists, Panel 3 is read-only and opens the exact owning object; it does
+not invent a substitute control.
 
 ### 5.2 · Work-item presentation contract
 
@@ -338,7 +353,7 @@ OBJECT LABEL · MODULE OR SITE CONTEXT
 FACT OR PROBLEM
 ACTION · RECIPIENT (when applicable)
 REQUIRED RESULT (when it materially disambiguates completion)
-DUE / LATENESS · BLOCKER / COVER / SOURCE HEALTH (only when present)
+WORKING DAY / MISSED AGE · BLOCKER / COVER / SOURCE HEALTH (only when present)
 ```
 
 - Object identity belongs in the item header and is not repeated in the action.
@@ -352,6 +367,9 @@ DUE / LATENESS · BLOCKER / COVER / SOURCE HEALTH (only when present)
   forbidden.
 - Required result is visible for physical handover, multi-result and otherwise ambiguous acts; it
   remains available as accessible supporting text for every item.
+- Communication is a structured source-owned block: recipient, channel, prepared message, actual
+  sent evidence, reply evidence and the next authoritative act. It is absent for non-communication
+  work. Workspace does not keep a second conversation.
 - Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
   appear only in historical evidence.
 
@@ -360,14 +378,16 @@ DUE / LATENESS · BLOCKER / COVER / SOURCE HEALTH (only when present)
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
 problem and action. It never broadens permission scope and never searches a separately cached copy.
 
-Filters are: `Scope` (`My Work` · `Team Work`), `When` (`Late` · `Today` · `Later` · `No date`),
-`Module`, `Owner` (Team only), `Covered`, `Blocked` and `Source failed`. `Broken commitment` is an
-attention filter, not a synonym for late. Multiple filters combine and every active filter is
+Filters are: `Scope` (`My Work` · `Team Work`), `Working day` (`Missed` · Monday through Friday ·
+`No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
+`Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
+`Missed`. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and Right Rail can open
 the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
 does not change business state.
 
-Default ordering is severity, due time, oldest opened occurrence, object label. Users may narrow
+Default ordering inside a working day is broken commitment, module-governed materiality, oldest
+opened occurrence, then object label. Users may narrow
 the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
 the same group and item grammar; zero matches is not the same as zero work.
 
@@ -379,8 +399,8 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Empty My Work | `Nothing assigned to you` · `Open Team Work` for authorised supervisors; source freshness remains visible |
 | Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
 | No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
-| Late | `Late — was due {date}` and working-day age; colour supports the words and is never the only signal |
-| Blocked | Name the dependency and the door that can resolve it; retain late status and ordering |
+| Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
+| Blocked | Name the dependency and the door that can resolve it; retain original working day and missed age |
 | Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
 | Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
@@ -390,13 +410,18 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- At 1440px and above, Work uses the full main canvas; the global Right Rail may remain beside it but
-  contains only the §7 peek. Team owner groups stay vertically readable, never become board columns.
-- At 1024–1439px, controls wrap into two lines and item content remains one continuous reading order.
-- Below 1024px, My/Team scope, search and filters become a touch-safe stacked toolbar; every item
-  wraps rather than truncating the problem, action, required result or due state. No horizontal
-  owner board or hidden completion text is permitted.
-- Keyboard order follows scope → search → filters → groups → items. Every item has one descriptive
+- At wide desktop, Work shows all three working panels after the existing global shell: working-day
+  and module navigation, action list, then selected-action detail.
+- At laptop width, the first panel collapses into compact working-day and module controls while the
+  action list and selected detail remain together where usable.
+- At phone width, the Monday-to-Friday selector remains available above the full-width action list;
+  selecting an action opens full-screen detail. Back restores day, module, owner, filters and scroll.
+- Exact breakpoints, panel measurements, row heights and touch dimensions belong to the pending
+  Work UI-kit specification. They are not approved merely because an exploratory prototype used them.
+- Every item wraps rather than truncating problem, action, recipient, required result or working-day
+  state. No horizontal owner board or hidden completion text is permitted.
+- Keyboard order follows scope → search → working day → module/owner → filters → items → selected
+  detail. Every item has one descriptive
   accessible name combining object, problem and action. Hover evidence is also available by focus
   and tap; colour, initials and icon alone never carry meaning.
 
@@ -407,10 +432,10 @@ order from module truth:
 
 1. `Broken commitment` — an explicit customer, supplier, payment or delivery promise is past and
    its completion fact is absent.
-2. `Late` — the governed due instant is past on the named calendar.
-3. `Due today` — due on the current business day for that rule/calendar.
-4. `Later` — a governed future due instant.
-5. `No date` — the module explicitly admits an obligation with no lawful clock.
+2. `Missed` — the governed working day is before today on that rule's calendar.
+3. The selected Monday-to-Friday working day, with `Today` marked explicitly.
+4. A later Monday-to-Friday working day in the selected week or a later week.
+5. `No working date` — the module explicitly admits an obligation with no lawful clock.
 
 Materiality (`Routine` · `Significant` · `Critical`) belongs to the owning module and may raise
 attention within the same timing band; it cannot turn an undated item into late. A blocker is an
@@ -446,8 +471,10 @@ Work is ready for owner acceptance only when all are demonstrable:
 - My Work, Team Work and Right Rail use one authorised response and one cache identity;
 - normal owner, cover, acting person, Site queue, `Not assigned` and actual completed actor remain
   distinct across assignment/cover changes;
-- broken commitment, late, today, later and no-date examples order once under the governed calendar;
-- blockers retain lateness, and source failure cannot reduce or clear any count;
+- broken commitment, missed, Monday-through-Friday and no-working-date examples order once under
+  the governed working-day law;
+- blockers retain the original working day and missed age, and source failure cannot reduce or clear
+  any count;
 - search and every filter in §5.3 combine, serialize to the URL and restore through Dashboard/Rail
   deep links without broadening permission scope;
 - every row exposes object, fact/problem, concrete action, recipient when applicable, required result,
@@ -524,16 +551,16 @@ feed or action surface:
 
 ```text
 ┌ My Work ─────────────────────┐
-│ 3 late                       │
-│ 5 due today                  │
+│ 3 missed                     │
+│ 5 today                      │
 │                              │
 │ Open My Work                 │
 └──────────────────────────────┘
 ```
 
 The slot reads the same authorised response and cache identity as main Work. It shows only non-zero
-`Late` and `Due today` counts plus `Open My Work`; it does not preview rows, Team workload, `Later`
-or `No date`. Selecting a count opens main My Work with the corresponding URL-visible filter and
+`Missed` and `Today` counts plus `Open My Work`; it does not preview rows, Team workload, other
+weekdays or `No working date`. Selecting a count opens main My Work with the corresponding URL-visible filter and
 preserves the page the operator came from for Browser Back. `Open My Work` opens the unfiltered My
 Work default. The slot contains no independent calculation, Duty editor, cover chip, assignment or
 completion control.
@@ -545,7 +572,7 @@ clear state. Permission refusal hides counts and objects. On widths where the gl
 not present, the shell's existing Work destination remains the only replacement door; no floating
 mini-queue or mobile drawer is created. Keyboard and accessible names state what each count opens.
 
-Notifications are event receipts—assigned, cover activated, became late, unblocked, source failed
+Notifications are event receipts—assigned, cover activated, became missed, unblocked, source failed
 or completed. Each receipt carries one durable event identity, the affected Work identity, recipient,
 event time and exact Work/object door. It describes what changed; it never repeats the full action
 row or supplies `Done`, assignment or result controls. Read/dismiss changes only receipt state and
@@ -559,7 +586,7 @@ remains legacy debt and may not be presented as this contract.
 
 ### 7.1 · Right Rail and notification acceptance contract
 
-- Right Rail and My Work return the same `Late` and `Due today` identities and counts for the same
+- Right Rail and My Work return the same `Missed` and `Today` identities and counts for the same
   authorised person and observation;
 - every Rail count opens main My Work with one visible, removable URL filter and Browser Back
   restores the originating page;

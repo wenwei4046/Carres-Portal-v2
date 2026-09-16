@@ -164,7 +164,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitments` · `Late` · `Today` · `Later` · `No date` | Upcoming · Overdue as the section word · Backlog |
+| Work timing | `Broken commitment` · `Missed` · Monday through Friday · `Today` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
