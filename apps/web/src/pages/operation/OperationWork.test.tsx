@@ -42,27 +42,57 @@ vi.mock("react-router-dom", async () => {
 
 import OperationWork from "./OperationWork";
 
+function timing(actionOn: string | null, workingDaysLate = 0): OperationWorkItem["timing"] {
+  return {
+    businessDueOn: actionOn,
+    actionOn,
+    placement: actionOn === null ? "no_working_date" : workingDaysLate > 0 ? "missed" : "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: workingDaysLate,
+      basis: { calendarKey: "module+person", from: actionOn ?? "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
+    noDateReason: actionOn === null ? "The owning rule has no working date" : null,
+    calendar: {
+      module: { key: "orders", source: "orders", state: "ready" },
+      actor: { key: "person:shasha", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  };
+}
+
 function item(overrides: Partial<OperationWorkItem> = {}): OperationWorkItem {
   return {
+    contractVersion: 2,
     id: "orders:order-1:ask_delivery_date",
     module: "orders",
     ruleKey: "ask_delivery_date",
+    ruleVersion: 1,
     object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
     problem: "No delivery date",
     action: "Ask customer for a delivery date",
     recipient: "Tan Qu Qu",
     requiredResult: "Customer Delivery exists",
-    completionFact: "orders.delivery_date exists",
+    completionPredicate: "orders.delivery_date exists",
+    completionStatement: "Customer Delivery exists",
     owner: {
       rule: "salesperson",
       dutyKey: null,
       normal: { userId: SH, name: "Shasha" },
       activeCover: null,
+      coverEvidence: null,
       acting: { userId: SH, name: "Shasha" },
       state: "primary",
     },
-    timing: { dueOn: "2026-09-06", workingDaysLate: 0, bucket: "today" },
+    timing: timing("2026-09-06"),
+    communication: null,
+    blocker: null,
+    nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: "/operation/orders/so/order-1" },
     destination: "/operation/orders/so/order-1",
+    observedAt: "2026-09-06T01:00:00.000Z",
+    sourceVersion: "2026-09-06T01:00:00.000Z",
     tone: "warning",
     locked: false,
     broken: false,
@@ -84,12 +114,22 @@ beforeEach(() => {
   authState = { role: "operation", email: "shasha@carres.test" };
   workState = {
     data: {
+      contractVersion: 2,
+      complete: true,
       items: [item()],
       staff: [
         { userId: SH, name: "Shasha", email: "shasha@carres.test" },
         { userId: YJ, name: "Yu Jun", email: "yujun@carres.test" },
       ],
       generatedOn: "2026-09-06",
+      closureReceipt: null,
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+        key,
+        state: "healthy" as const,
+        observedAt: "2026-09-06T01:00:00.000Z",
+        lastSuccessfulAt: "2026-09-06T01:00:00.000Z",
+        errorLabel: null,
+      })),
     },
     isLoading: false,
     isError: false,
@@ -120,6 +160,7 @@ describe("Operation Work — one server feed", () => {
         dutyKey: null,
         normal: { userId: SH, name: "Shasha" },
         activeCover: { userId: YJ, name: "Yu Jun" },
+        coverEvidence: { id: "cover-1", startsOn: "2026-09-06", endsOn: "2026-09-06" },
         acting: { userId: YJ, name: "Yu Jun" },
         state: "covered",
       },
@@ -137,9 +178,9 @@ describe("Operation Work — one server feed", () => {
 
   it("uses the governed My Work section order and keeps No date separate", () => {
     workState.data!.items = [
-      item({ id: "orders:broken", broken: true, timing: { dueOn: "2026-09-14", workingDaysLate: 2, bucket: "overdue" } }),
-      item({ id: "orders:late", ruleKey: "issue_po", timing: { dueOn: "2026-09-15", workingDaysLate: 1, bucket: "overdue" } }),
-      item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: { dueOn: null, workingDaysLate: 0, bucket: "no_date" } }),
+      item({ id: "orders:broken", broken: true, timing: timing("2026-09-04", 2) }),
+      item({ id: "orders:late", ruleKey: "issue_po", timing: timing("2026-09-05", 1) }),
+      item({ id: "orders:none", ruleKey: "confirm_supplier_date", timing: timing(null) }),
     ];
     show();
     const list = screen.getByTestId("work-list");
@@ -160,7 +201,7 @@ describe("Operation Work — one server feed", () => {
         problem: "Customer balance due",
         action: "Ask the customer to pay",
         recipient: "Acme",
-        timing: { dueOn: null, workingDaysLate: 0, bucket: "no_date" },
+        timing: timing(null),
       }),
     ];
     show("/operation?tab=work&q=Acme&module=payment&when=no_date");
@@ -180,6 +221,7 @@ describe("Operation Work — one server feed", () => {
         dutyKey: "delivery_duty",
         normal: null,
         activeCover: null,
+        coverEvidence: null,
         acting: null,
         state: "not_assigned",
       },

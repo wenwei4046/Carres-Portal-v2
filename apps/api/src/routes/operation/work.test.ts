@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { OperationWorkItem } from "@carres/shared";
+import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 import {
   projectOverpaymentReviewWork,
   projectStorageCheckWork,
@@ -113,7 +113,7 @@ describe("operation Work response composition", () => {
 
     const response = await app.request("/api/operation/work");
     expect(response.status).toBe(200);
-    const body = await response.json() as { items: OperationWorkItem[]; complete: boolean };
+    const body = await response.json() as OperationWorkResponse;
     expect(body.items).toHaveLength(1);
     expect(body.complete).toBe(true);
     expect(body.closureReceipt).toBeNull();

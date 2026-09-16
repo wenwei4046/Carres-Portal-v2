@@ -18,8 +18,10 @@
  * under its DUTY word — never a hand-picked person, never the PIC borrowed
  * for another module's work.
  *
- * The page WRITES NOTHING. A row is a door to the Sales Order Workspace.
- * There is no Done button anywhere, structurally.
+ * Interaction comes from the v2 feed. `open_module` remains a door to the
+ * owning object; admitted `embedded` actions may use the owning module's
+ * shared form and write contract. This legacy list renderer currently opens
+ * the supplied destination while the approved three-panel shell is built.
  */
 import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -49,17 +51,14 @@ const MODULE_LABEL: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
   purchasing: "Purchasing",
   receiving: "Receiving",
-  claims: "Claims",
-  stock: "Stock",
   delivery: "Delivery",
   payment: "Payment",
-  service_case: "Service Case",
   issue_tracker: "Issue Tracker",
 };
 
 /** Timing is metadata. Object, problem, and action keep their own ranks. */
 function supportingLine(i: WorkRow): string {
-  if (i.workingDaysLate > 0 && i.dueIso) {
+  if (i.timingBucket === "overdue" && i.dueIso) {
     return `Late — was due ${fmtDate(i.dueIso)}`;
   }
   return i.dueIso ? `due ${fmtDate(i.dueIso)}` : "No date";
@@ -124,7 +123,7 @@ function WorkRowButton({
         ) : null}
         <span
           className={`block text-label font-normal ${
-            item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
+            item.timingBucket === "overdue" ? "text-danger" : "text-base-600"
           }`}
         >
           {supportingLine(item)}
@@ -159,7 +158,7 @@ export default function OperationWork() {
     : "all";
   const moduleParam = params.get("module");
   const moduleFilter: OperationWorkModule | "all" = [
-    "orders", "purchasing", "receiving", "claims", "stock", "delivery", "payment", "service_case", "issue_tracker",
+    "orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker",
   ].includes(moduleParam ?? "") ? moduleParam as OperationWorkModule : "all";
   const covered = params.get("covered") === "1";
 
@@ -229,7 +228,7 @@ export default function OperationWork() {
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),
-        late: items.filter((i) => i.workingDaysLate > 0).length,
+        late: items.filter((i) => i.timingBucket === "overdue").length,
         coverName: items.find((i) => i.activeCover)?.activeCover?.name ?? null,
       };
     });
@@ -251,7 +250,7 @@ export default function OperationWork() {
   const visible = activeView === "mine"
     ? mine
     : visibleTeamGroups.flatMap((group) => group.items);
-  const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
+  const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
   const openRow = (i: WorkRow) => navigate(i.destination);
 
@@ -410,7 +409,7 @@ export default function OperationWork() {
                   {g.label}
                   <span className="ml-2 font-normal normal-case text-base-400">
                     {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
-                    {g.items.filter((item) => item.workingDaysLate > 0).length > 0 && <span className="text-danger"> · {g.items.filter((item) => item.workingDaysLate > 0).length} late</span>}
+                    {g.items.filter((item) => item.timingBucket === "overdue").length > 0 && <span className="text-danger"> · {g.items.filter((item) => item.timingBucket === "overdue").length} late</span>}
                   </span>
                 </h2>
                 <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">

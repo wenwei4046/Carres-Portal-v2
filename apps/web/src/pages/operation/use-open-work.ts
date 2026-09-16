@@ -26,7 +26,7 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
   ownerId: string | null;
   normalOwnerId: string | null;
   deliveryDoNumber: string | null;
-  timingBucket: OperationWorkItem["timing"]["bucket"];
+  timingBucket: "overdue" | "today" | "later" | "no_date";
 }
 
 export interface OpenWorkSet {
@@ -38,7 +38,18 @@ export interface OpenWorkSet {
   retry: () => void;
 }
 
-function toWorkRow(item: OperationWorkItem): WorkRow {
+function toWorkRow(item: OperationWorkItem, generatedOn: string): WorkRow {
+  const dueIso = item.timing.actionOn;
+  const workingDaysLate = item.timing.missedAge.state === "counted"
+    ? item.timing.missedAge.workingDays
+    : 0;
+  const timingBucket: WorkRow["timingBucket"] = item.timing.placement === "missed"
+    ? "overdue"
+    : dueIso === null
+      ? "no_date"
+      : dueIso === generatedOn
+        ? "today"
+        : "later";
   return {
     id: item.id,
     ruleKey: item.ruleKey,
@@ -60,27 +71,27 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
     tone: item.tone,
     locked: item.locked,
     broken: item.broken,
-    dueIso: item.timing.dueOn,
-    workingDaysLate: item.timing.workingDaysLate,
+    dueIso,
+    workingDaysLate,
     problem: item.problem,
     recipient: item.recipient,
     requiredResult: item.requiredResult,
-    completionFact: item.completionFact,
+    completionFact: item.completionPredicate,
     destination: item.destination,
     line: item.action,
     customer: item.module === "orders" ? item.recipient : null,
     ownerId: item.owner.acting?.userId ?? null,
     normalOwnerId: item.owner.normal?.userId ?? null,
     deliveryDoNumber: null,
-    timingBucket: item.timing.bucket,
+    timingBucket,
   };
 }
 
 export function useOpenWorkSet(): OpenWorkSet {
   const query = useOperationWork();
   const items = useMemo(
-    () => (query.data?.items ?? []).map(toWorkRow),
-    [query.data?.items],
+    () => (query.data?.items ?? []).map((item) => toWorkRow(item, query.data?.generatedOn ?? "")),
+    [query.data?.generatedOn, query.data?.items],
   );
   const staff = useMemo(
     () =>

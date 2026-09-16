@@ -42,6 +42,26 @@ function iso(daysFromToday: number): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
 }
 
+function timing(actionOn: string, workingDays: number): OperationWorkItem["timing"] {
+  return {
+    businessDueOn: actionOn,
+    actionOn,
+    placement: workingDays > 0 ? "missed" : "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays,
+      basis: { calendarKey: "module+person", from: actionOn, to: iso(0) },
+    },
+    eligibility: "eligible",
+    noDateReason: null,
+    calendar: {
+      module: { key: "payment", source: "payment", state: "ready" },
+      actor: { key: "person:me", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  };
+}
+
 /** One issued invoice whose goods are ready and whose delivery already
  *  passed — the Monitor admits the collection action for it. */
 function invoice(): InvoiceRegisterRow {
@@ -62,33 +82,65 @@ function invoice(): InvoiceRegisterRow {
 
 function collectItem(owner: OperationWorkItem["owner"]): OperationWorkItem {
   return {
+    contractVersion: 2,
     id: "payment:i3:payment.collect_customer_balance", module: "payment",
     ruleKey: "payment.collect_customer_balance",
+    ruleVersion: 1,
     object: { kind: "invoice", id: "i3", label: "SO-1302" },
     problem: "Customer payment should have been received", action: "Ask customer to pay",
-    recipient: "LIM KUAN YANG", requiredResult: "Payment received", completionFact: "Payment recorded",
+    recipient: "LIM KUAN YANG", requiredResult: "Payment received",
+    completionPredicate: "Payment recorded", completionStatement: "Payment received",
     owner,
-    timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+    timing: timing(iso(-5), 3),
+    communication: null, blocker: null, nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: "/finance/monitor?invoice=i3" },
     destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
+    observedAt: "2026-09-13T01:00:00.000Z", sourceVersion: "2026-09-13T01:00:00.000Z",
   };
 }
 const UNASSIGNED: OperationWorkItem["owner"] = {
-  rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null, acting: null, state: "not_assigned",
+  rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null,
+  coverEvidence: null, acting: null, state: "not_assigned",
 };
 const JESS_HOLDS: OperationWorkItem["owner"] = {
   rule: "collection_owner", dutyKey: "delivery_duty",
-  normal: { userId: JESS, name: "Jess" }, activeCover: null, acting: { userId: JESS, name: "Jess" }, state: "primary",
+  normal: { userId: JESS, name: "Jess" }, activeCover: null, coverEvidence: null,
+  acting: { userId: JESS, name: "Jess" }, state: "primary",
 };
 /** A delivery item I hold and am late on — the Quick Rail counts it under Late. */
 const MINE: OperationWorkItem = {
+  contractVersion: 2,
   id: "delivery:o9:delivery.confirm_date", module: "delivery", ruleKey: "delivery.confirm_date",
+  ruleVersion: 1,
   object: { kind: "order", id: "o9", label: "SO-1309" },
   problem: "Delivery date not confirmed", action: "Call NETS to confirm delivery date",
-  recipient: "NETS", requiredResult: "Date confirmed", completionFact: "Confirmed date recorded",
-  owner: { rule: "delivery_duty", dutyKey: "delivery_duty", normal: { userId: ME, name: "Me" }, activeCover: null, acting: { userId: ME, name: "Me" }, state: "primary" },
-  timing: { dueOn: iso(-2), workingDaysLate: 2, bucket: "overdue" },
+  recipient: "NETS", requiredResult: "Date confirmed",
+  completionPredicate: "Confirmed date recorded", completionStatement: "Date confirmed",
+  owner: { rule: "delivery_duty", dutyKey: "delivery_duty", normal: { userId: ME, name: "Me" }, activeCover: null, coverEvidence: null, acting: { userId: ME, name: "Me" }, state: "primary" },
+  timing: timing(iso(-2), 2),
+  communication: null, blocker: null, nextConsequence: null,
+  interaction: { mode: "open_module", fallbackDestination: "/operation/delivery" },
   destination: "/operation/delivery", tone: "danger", locked: false, broken: false,
+  observedAt: "2026-09-13T01:00:00.000Z", sourceVersion: "2026-09-13T01:00:00.000Z",
 };
+
+function workResponse(items: OperationWorkItem[]): OperationWorkResponse {
+  return {
+    contractVersion: 2,
+    complete: true,
+    items,
+    staff: [{ userId: ME, name: "Me", email: "me@carres.com" }],
+    generatedOn: "2026-09-13",
+    closureReceipt: null,
+    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+      key,
+      state: "healthy",
+      observedAt: "2026-09-13T01:00:00.000Z",
+      lastSuccessfulAt: "2026-09-13T01:00:00.000Z",
+      errorLabel: null,
+    })),
+  };
+}
 
 const state = vi.hoisted(() => ({
   work: { items: [] as unknown[], staff: [] as unknown[], generatedOn: "2026-09-13" } as unknown,
@@ -161,7 +213,7 @@ function expectIsolatedShapes(qc: QueryClient) {
 }
 
 beforeEach(() => {
-  state.work = { items: [collectItem(UNASSIGNED), MINE], staff: [{ userId: ME, name: "Me", email: "me@carres.com" }], generatedOn: "2026-09-13" };
+  state.work = workResponse([collectItem(UNASSIGNED), MINE]);
   state.workCalls = 0;
   state.tasksCalls = 0;
   localStorage.clear();
@@ -253,7 +305,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1"));
 
     // The collection owner is established (Delivery Duty held); the feed now resolves Jess.
-    state.work = { items: [collectItem(JESS_HOLDS), MINE], staff: [{ userId: ME, name: "Me", email: "me@carres.com" }], generatedOn: "2026-09-13" };
+    state.work = workResponse([collectItem(JESS_HOLDS), MINE]);
     await act(async () => { await qc.invalidateQueries({ queryKey: qk.operation.work() }); });
 
     await waitFor(() => expect(within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar")).toHaveAttribute("aria-label", "Jess"));

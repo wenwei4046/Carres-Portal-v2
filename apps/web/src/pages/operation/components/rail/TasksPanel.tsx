@@ -18,7 +18,7 @@ export default function TasksPanel() {
   const myId = useAuth((state) => state.session)?.user?.id ?? null;
   const { items, loading, error } = useOpenWorkSet();
   const mine = myId ? items.filter((item) => item.ownerId === myId) : [];
-  const late = mine.filter((item) => item.workingDaysLate > 0).length;
+  const late = mine.filter((item) => item.timingBucket === "overdue").length;
   const today = mine.filter(
     (item) => item.workingDaysLate === 0 && item.dueIso === new Date().toISOString().slice(0, 10),
   ).length;
