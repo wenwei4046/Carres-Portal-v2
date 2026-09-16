@@ -254,7 +254,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("items:2"));
     expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1");
     // The Quick Rail counted MY late item from the feed, not from `{ tasks }`.
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -271,6 +271,32 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
+  });
+
+  it("opens the exact My Work day and never exposes Team Work from the rail", async () => {
+    const todayItem = { ...MINE, id: "delivery:o10:delivery.confirm_date", timing: timing("2026-09-13", 0) };
+    state.work = workResponse([MINE, todayItem]);
+    mount(client(), <TasksPanel />);
+    const panel = await screen.findByTestId("my-work-panel");
+    expect(within(panel).getByRole("link", { name: "Open My Work · Missed · 1 action" }))
+      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=missed");
+    expect(within(panel).getByRole("link", { name: "Open My Work · Today · 1 action" }))
+      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-13");
+    expect(panel).not.toHaveTextContent("Team Work");
+  });
+
+  it("names incomplete source health instead of claiming My Work is clear", async () => {
+    const response = workResponse([]);
+    response.complete = false;
+    response.sources = response.sources.map((source) => source.key === "delivery"
+      ? { ...source, state: "failed", errorLabel: "Delivery could not be loaded" }
+      : source);
+    state.work = response;
+    mount(client(), <TasksPanel />);
+    const panel = await screen.findByTestId("my-work-panel");
+    expect(panel).toHaveTextContent("My Work could not be refreshed · delivery");
+    expect(panel).not.toHaveTextContent("No work due now");
+    expect(within(panel).getByRole("link", { name: "Open My Work" })).toBeInTheDocument();
   });
 
   it("negative control · the old colliding key reproduces the poisoning, so this suite detects a revert", async () => {
@@ -291,7 +317,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     const timing = await screen.findByTestId("monitor-timing-1302");
     await waitFor(() => expect(within(timing).getByTestId("monitor-owner-unassigned")).toBeInTheDocument());
     expect(timing).toHaveTextContent("Ask customer to pay");
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
