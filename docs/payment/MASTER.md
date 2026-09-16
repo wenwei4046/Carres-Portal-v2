@@ -550,6 +550,30 @@ Operation informed customer. Payment may show linked read-only history; it does 
 
 ## 14 · Current build truth
 
+### BUILD — PAYMENTS CARD 01 · Monitor rail = the Monday–Friday follow-up plan, 2026-09-16
+
+**SHIPPED AND DEPLOYED, NOT PRODUCTION-VERIFIED (logged-in walk owed to the owner).** PR #1389 →
+main `ec7718e3`; `erp.carresofficial.com/__carres_deploy.json` and `api.carresofficial.com/health`
+both report `ec7718e3`; the live bundle carries the rail words. No migration. The §3 rail ruling
+above is the built behaviour: `paymentWeekPlan` (`packages/shared/src/payment-monitor.ts`) over the
+existing `/api/operation/work` feed, rendered by `PaymentMonitor.tsx`; the seven filters,
+`monitorFilterMatch` and `monitorSummaries` are deleted.
+
+- **Proven:** shared suite 3,396 (7 week-plan cases: week, Today, per-order counts, carried once,
+  other weeks, holiday, weekend, unresolvable items); `PaymentMonitor.test.tsx` 33 (12 rail cases
+  incl. cover, Finance, loading/error, collapse, `?order=` opening on every day); cache-isolation /
+  banned-words / money-figures 128; typecheck shared/web/api; CI green. Local Playwright walk of the
+  real component on a fixture at 1440, 1024 and 390 px: page `scrollWidth` equals the viewport, rail
+  240 px, zero clipped or overflowing rail text; picking Thu listed exactly its 3 orders, Mon (past)
+  listed its 1 carried order, `All unpaid orders` listed all 8. Screenshots:
+  `docs/evidence/payment-monitor-week-rail/`.
+- **Two defects found by the walk and fixed before ship:** an `?order=` door landed on the plan day
+  and hid its own order; a wrapped rail sentence split a date (`Thu, 17 | Sep`).
+- **Not proven:** the signed-in production page — this chat had no portal session. On 2026-09-16
+  (Malaysia Day) production correctly shows no `Today` and plans Thu 17 Sep.
+- **Out of scope, handed to CARD 02 (right listing):** the Customer cell truncates long names
+  (`TAN SRI DATO' MUHAM…`).
+
 ### BUILD — PAYMENTS → Monitor · Payment Records, collection timing, 7-day free storage, the shut approval door, 2026-09-13
 
 Owner ruling 2026-09-12, delivered as one slice (migration `0486`):
