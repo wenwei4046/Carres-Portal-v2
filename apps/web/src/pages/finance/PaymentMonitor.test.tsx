@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import PaymentMonitor from "./PaymentMonitor";
 
@@ -9,15 +9,15 @@ import PaymentMonitor from "./PaymentMonitor";
  * PAYMENT MONITOR (owner ruling 2026-09-12): the full-width collection control
  * listing — seven columns in the ruled order, Primary School English goods and
  * storage facts, a two-line Payment timing cell with the Work feed's resolved
- * owner, seven factual rail filters, clear summaries, and the collection
- * workspace behind the row.
+ * owner, the Monday–Friday follow-up plan in the rail (owner ruling
+ * 2026-09-16), and the collection workspace behind the row.
  */
 const state = vi.hoisted(() => ({
   invoices: { data: [] as unknown[], isLoading: false, isError: false, isSuccess: true, refetch: vi.fn(), error: null },
   cases: { data: { cases: [] as unknown[] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   requests: { data: { requests: [] as unknown[] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
   settings: { data: { collection_timing: [] as unknown[], bank_accounts: [] }, isLoading: false, isError: false, isSuccess: true, refetch: vi.fn() },
-  work: { data: undefined as unknown },
+  work: { data: undefined as unknown, isSuccess: true, isError: false, refetch: vi.fn() },
 }));
 vi.mock("@/lib/queries", () => ({
   useInvoiceRegister: () => state.invoices,
@@ -123,7 +123,7 @@ beforeEach(() => {
   state.cases.data = { cases: [] };
   state.requests.data = { requests: [] };
   state.settings.data = { collection_timing: [], bank_accounts: [] };
-  state.work.data = undefined;
+  state.work.data = undefined; state.work.isSuccess = true; state.work.isError = false;
   auth.role = "operation";
   localStorage.clear();
   // jsdom's window is 1024px wide, below the 1100px rule that starts the rail
@@ -131,7 +131,7 @@ beforeEach(() => {
   Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
 });
 
-function show(at = "/finance/monitor") {
+function show(at = "/finance/monitor?day=all") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -287,61 +287,189 @@ describe("Payment Monitor — the listing", () => {
   });
 });
 
-describe("Payment Monitor — the rail: filters are facts, summaries name the work", () => {
-  it("has the seven filters as rail rows, never tabs, with live counts", () => {
-    show();
-    const rail = screen.getByTestId("payment-monitor-rail");
-    expect(within(rail).queryAllByRole("tab")).toHaveLength(0);
-    for (const label of ["Needs attention", "Ask customer today", "Promised today", "Should have been paid",
-      "Waiting for goods", "Storage payments", "All unpaid"]) {
-      expect(within(rail).getByText(label)).toBeInTheDocument();
-    }
-    expect(screen.getByTestId("payment-monitor-filter-all_unpaid")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("payment-monitor-filter-all_unpaid")).toHaveTextContent("3");
-    expect(screen.getByTestId("payment-monitor-filter-should_have_paid")).toHaveTextContent("1");
-    expect(screen.getByTestId("payment-monitor-filter-waiting_goods")).toHaveTextContent("1");
+/** A collection Work item exactly as the shared feed ships it. */
+function workItem(objectId: string, dueOn: string, over: {
+  ruleKey?: string;
+  owner?: Record<string, unknown>;
+} = {}) {
+  return {
+    id: `payment:${objectId}:${over.ruleKey ?? "payment.collect_customer_balance"}`, module: "payment",
+    ruleKey: over.ruleKey ?? "payment.collect_customer_balance",
+    object: { kind: "invoice", id: objectId, label: "INV-1" },
+    problem: "Customer balance due", action: "Ask customer to pay",
+    recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
+    owner: over.owner ?? { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha" },
+      activeCover: null, acting: { userId: "u-shasha", name: "Shasha" }, state: "primary" },
+    timing: { dueOn, workingDaysLate: 0, bucket: "later" },
+    destination: `/finance/monitor?invoice=${objectId}`, tone: "warning", locked: false, broken: false,
+  };
+}
+
+/** The frozen clock for the week plan: Tuesday 15 Sep 2026 in Kuala Lumpur. */
+const TUESDAY = new Date("2026-09-15T02:00:00Z");
+
+describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (owner ruling 2026-09-16)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(TUESDAY);
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const days = () => screen.getAllByTestId(/^payment-monitor-day-\d/).map((b) => b.getAttribute("data-testid")!.slice(-10));
+  const listed = () => screen.queryAllByRole("button", { name: /^SO-13/ }).map((b) => b.textContent);
+
+  it("shows this week Monday to Friday, picks today by default and marks only today as Today", () => {
+    state.work.data = { items: [] };
+    show("/finance/monitor");
+    expect(days()).toEqual(["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"]);
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 14 Sep – Fri, 18 Sep");
+    expect(screen.getAllByTestId("payment-monitor-today")).toHaveLength(1);
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveAttribute("data-today", "yes");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveAttribute("aria-pressed", "true");
+    // Wed 16 Sep is Malaysia Day — named, never Today.
+    expect(screen.getByTestId("payment-monitor-day-2026-09-16")).toHaveTextContent("Public holiday · Malaysia Day");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-16")).not.toHaveAttribute("data-today");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-14")).toHaveTextContent("No follow-up planned");
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
-  it("picking a filter narrows the listing and the URL, never the summaries", () => {
-    show();
-    fireEvent.click(screen.getByTestId("payment-monitor-filter-should_have_paid"));
-    expect(screen.getAllByRole("button", { name: /^SO-13/ }).map((b) => b.textContent)).toEqual(["SO-1302"]);
-    expect(screen.getByTestId("payment-monitor-summaries")).toHaveTextContent("1 payment should have been received already");
-    fireEvent.click(screen.getByTestId("payment-monitor-filter-waiting_goods"));
-    expect(screen.getAllByRole("button", { name: /^SO-13/ }).map((b) => b.textContent)).toEqual(["SO-1300"]);
+  it("each day names its work and picking it shows exactly that day's orders", () => {
+    state.work.data = { items: [
+      workItem("i2", "2026-09-17"), workItem("i3", "2026-09-17"),
+      workItem("i1", "2026-09-18", { ruleKey: "payment.missed_promise" }),
+    ] };
+    show("/finance/monitor");
+    const thu = screen.getByTestId("payment-monitor-day-2026-09-17");
+    expect(thu).toHaveTextContent("Ask 2 customers to pay");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-18")).toHaveTextContent("Check 1 promised payment");
+    // Today has nothing → the listing is empty, and says so.
+    expect(listed()).toEqual([]);
+    expect(screen.getByText("No follow-up planned on Tue, 15 Sep.")).toBeInTheDocument();
+    fireEvent.click(thu);
+    expect(listed()).toEqual(["SO-1302", "SO-1301"]);
+    expect(screen.getByTestId("payment-monitor-summary")).toHaveTextContent("2 orders");
+    fireEvent.click(screen.getByTestId("payment-monitor-day-2026-09-18"));
+    expect(listed()).toEqual(["SO-1300"]);
   });
 
-  it("summaries are sentences, never `8 open · 2 late`", () => {
-    show();
-    const summaries = screen.getByTestId("payment-monitor-summaries");
-    expect(summaries).toHaveTextContent("1 payment should have been received already");
-    expect(summaries.textContent).not.toMatch(/\d+ open/);
+  it("unfinished earlier work stays visible today with its own day, counted once", () => {
+    state.work.data = { items: [
+      workItem("i3", "2026-09-10", { ruleKey: "payment.missed_promise" }),
+      workItem("i2", "2026-09-14"),
+    ] };
+    show("/finance/monitor");
+    const tue = screen.getByTestId("payment-monitor-day-2026-09-15");
+    expect(tue).toHaveTextContent("Ask 1 customer to pay");
+    expect(tue).toHaveTextContent("Check 1 promised payment");
+    expect(tue).toHaveTextContent("Includes 2 not done since Thu, 10 Sep");
+    expect(listed()).toEqual(["SO-1302", "SO-1301"]);
+    const mon = screen.getByTestId("payment-monitor-day-2026-09-14");
+    expect(mon).toHaveTextContent("1 not done · counted under Today");
+    expect(mon).not.toHaveTextContent("Ask 1 customer to pay");
+    fireEvent.click(mon);
+    expect(listed()).toEqual(["SO-1301"]);
   });
 
-  it("the rail hides and comes back on Show filters, remembered for the browser", () => {
-    show();
+  it("previous and next week move the plan; This week comes back to today", () => {
+    state.work.data = { items: [workItem("i2", "2026-09-22"), workItem("i3", "2026-09-10")] };
+    show("/finance/monitor");
+    fireEvent.click(screen.getByTestId("payment-monitor-next-week"));
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep – Fri, 25 Sep");
+    expect(screen.queryByTestId("payment-monitor-today")).not.toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-day-2026-09-22")).toHaveTextContent("Ask 1 customer to pay");
+    fireEvent.click(screen.getByTestId("payment-monitor-day-2026-09-22"));
+    expect(listed()).toEqual(["SO-1301"]);
+    fireEvent.click(screen.getByTestId("payment-monitor-previous-week"));
+    fireEvent.click(screen.getByTestId("payment-monitor-previous-week"));
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 7 Sep – Fri, 11 Sep");
+    // The late item is counted on today, not a second time on its own day.
+    expect(screen.getByTestId("payment-monitor-day-2026-09-10")).toHaveTextContent("1 not done · counted under Today");
+    fireEvent.click(screen.getByTestId("payment-monitor-this-week"));
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveTextContent("Includes 1 not done since Thu, 10 Sep");
+  });
+
+  it("on a public holiday nothing is Today and the work waits on the next working day", () => {
+    vi.setSystemTime(new Date("2026-09-16T02:00:00Z"));
+    state.work.data = { items: [workItem("i3", "2026-09-15")] };
+    show("/finance/monitor");
+    expect(screen.queryByTestId("payment-monitor-today")).not.toBeInTheDocument();
+    const thu = screen.getByTestId("payment-monitor-day-2026-09-17");
+    expect(thu).toHaveAttribute("aria-pressed", "true");
+    expect(thu).toHaveTextContent("Includes 1 not done since Tue, 15 Sep");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveTextContent("1 not done · counted under Thu, 17 Sep");
+  });
+
+  it("on a weekend nothing is Today and the plan opens on Monday", () => {
+    vi.setSystemTime(new Date("2026-09-19T02:00:00Z"));
+    state.work.data = { items: [] };
+    show("/finance/monitor");
+    expect(screen.getByTestId("payment-monitor-week-label")).toHaveTextContent("Mon, 21 Sep – Fri, 25 Sep");
+    expect(screen.queryByTestId("payment-monitor-today")).not.toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-day-2026-09-21")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("today's cover rides the same item: the count is unchanged and the row avatar is the cover", () => {
+    state.work.data = { items: [workItem("i3", "2026-09-15", { owner: {
+      rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha" },
+      activeCover: { userId: "u-yujun", name: "Yu Jun" }, acting: { userId: "u-yujun", name: "Yu Jun" }, state: "covered" } })] };
+    show("/finance/monitor");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-15")).toHaveTextContent("Ask 1 customer to pay");
+    const avatar = within(screen.getByTestId("monitor-timing-1302")).getByTestId("monitor-owner-avatar");
+    expect(avatar).toHaveAttribute("aria-label", "Yu Jun");
+    expect(avatar).toHaveAttribute("title", "Normal owner: Shasha · Today's cover: Yu Jun");
+  });
+
+  it("All unpaid orders keeps every unpaid order reachable, including ones no plan reaches", () => {
+    state.work.data = { items: [] };
+    show("/finance/monitor");
+    const all = screen.getByTestId("payment-monitor-all-unpaid");
+    expect(all).toHaveTextContent("All unpaid orders");
+    expect(all).toHaveTextContent("3");
+    fireEvent.click(all);
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    expect(listed()).toEqual(["SO-1302", "SO-1301", "SO-1300"]);
+    expect(screen.getByTestId("payment-monitor-summary")).toHaveTextContent("3 orders · RM 2,600.00 still needed");
+  });
+
+  it("the plan does not change money or rows: every day's orders are Monitor rows with the same amounts", () => {
+    state.work.data = { items: [workItem("i3", "2026-09-15")] };
+    show("/finance/monitor");
+    expect(screen.getByTestId("payment-monitor-summary")).toHaveTextContent("1 order · RM 1,000.00 still needed");
+    expect(screen.getByTestId("monitor-timing-1302")).toHaveTextContent("Payment should have been received");
+  });
+
+  it("a finance reader has no Work feed: the plan says whose it is and every unpaid order stays listed", () => {
+    auth.role = "finance";
+    show("/finance/monitor");
+    expect(screen.getByTestId("payment-monitor-rail")).toHaveTextContent("The follow-up plan is Operation's.");
+    expect(screen.queryByTestId("payment-monitor-days")).not.toBeInTheDocument();
+    expect(screen.getByTestId("payment-monitor-all-unpaid")).toHaveAttribute("aria-pressed", "true");
+    expect(listed()).toHaveLength(3);
+  });
+
+  it("an unanswered plan is never a quiet week, and a failed plan offers Try again", () => {
+    state.work.data = undefined;
+    state.work.isSuccess = false;
+    show("/finance/monitor");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-14")).toHaveTextContent("Reading the collection desk…");
+    expect(screen.getByTestId("payment-monitor-day-2026-09-14")).not.toHaveTextContent("No follow-up planned");
+    state.work.isError = true;
+    show("/finance/monitor");
+    expect(screen.getAllByText("The follow-up plan could not be loaded.").length).toBeGreaterThan(0);
+  });
+
+  it("the rail hides and comes back on Show filters, and the picked day survives the collapse", () => {
+    state.work.data = { items: [workItem("i3", "2026-09-15")] };
+    show("/finance/monitor");
     fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
     expect(screen.queryByTestId("payment-monitor-rail")).not.toBeInTheDocument();
     expect(localStorage.getItem("carres.paymentMonitor.filterRail")).toBe("0");
+    const collapsed = screen.getByTestId("payment-monitor-day-collapsed");
+    expect(collapsed).toHaveTextContent("Tue, 15 Sep · Today");
+    expect(collapsed).toHaveTextContent("Ask 1 customer to pay");
     fireEvent.click(screen.getByTestId("payment-monitor-show-filters"));
     expect(screen.getByTestId("payment-monitor-rail")).toBeInTheDocument();
-  });
-
-  /* ⭐ 2026-09-14 — measured on production at 1024px: the rail collapses on its
-     own below 1100px, the collapse is REMEMBERED, and the governed Today
-     summary went with it; the node was simply absent from the page. §3 places
-     the summary above the rail's filters, so it stays there — and it is
-     repeated in the sheet header for exactly the state where its home is off
-     screen. */
-  it("the Today summary survives the rail being collapsed", () => {
-    show();
-    expect(screen.getByTestId("payment-monitor-summaries")).toBeInTheDocument();
-    expect(screen.queryByTestId("payment-monitor-summaries-collapsed")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
-    const collapsed = screen.getByTestId("payment-monitor-summaries-collapsed");
-    expect(collapsed).toHaveTextContent("Today");
-    expect(collapsed).toHaveTextContent(/needs? collection|should have been received|Nothing needs collection/);
-    expect(collapsed.textContent).not.toMatch(/\d+ open/);
   });
 
   /* ⭐ 2026-09-14 — seven columns need 1295px and the sheet has ~950px, so the
@@ -349,7 +477,7 @@ describe("Payment Monitor — the rail: filters are facts, summaries name the wo
      end showed the action with no customer attached to it — the same defect the
      owner ruled on for Delivery Monitor on 2026-09-12. */
   it("the row keeps its NAME when the sheet is scrolled: SO No and Customer both pin", () => {
-    show();
+    show("/finance/monitor");
     const pinned = [...document.querySelectorAll("th")]
       .filter((th) => th.style.left !== "")
       .map((th) => th.textContent?.replace(/\s+/g, " ").trim());
@@ -416,13 +544,11 @@ describe("Payment Monitor — states", () => {
     state.invoices.isSuccess = false; state.invoices.data = [];
     show();
     expect(screen.queryByText("No customer money is needed right now.")).not.toBeInTheDocument();
-    expect(screen.getByTestId("payment-monitor-summaries")).toHaveTextContent("Reading the collection desk…");
   });
   it("nothing needed is a useful empty state", () => {
     state.invoices.data = [row({ id: "a", paid: 1000 })];
     show();
     expect(screen.getByText("No customer money is needed right now.")).toBeInTheDocument();
-    expect(screen.getByTestId("payment-monitor-summaries")).toHaveTextContent("Nothing needs collection today");
   });
   it("the timing rule is read from Settings, snapshotted on the invoice's issue day", () => {
     // Delivery in 4 working days: under the default 3·2 that is before the

@@ -128,12 +128,46 @@ SO No | Customer | Amount needed | Goods | Storage | Customer delivery | Payment
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. The footer says
   `{n} orders · RM {x} still needed`.
-- The rail holds the seven factual filters — never tabs — with live counts, `All unpaid` the
-  landing: `Needs attention · Ask customer today · Promised today · Should have been paid ·
-  Waiting for goods · Storage payments · All unpaid`. Above them the clear summaries:
-  `3 customer balances need collection today` · `1 payment should have been received already` ·
-  `2 storage payments need collection`; zero prints nothing; an empty desk says `Nothing needs
-  collection today`. `8 open · 2 late` is forbidden.
+- **The rail is the Monday–Friday follow-up plan (owner ruling 2026-09-16 — this replaces the
+  seven rail filters and the summary sentences completely).** It answers *what do I do today, and
+  this week*:
+
+  ```text
+  ‹  Mon, 14 Sep – Fri, 18 Sep  ›          previous / next week · `This week` when elsewhere
+  Mon, 14 Sep                              No follow-up planned
+  Tue, 15 Sep  [Today]                     Ask 3 customers to pay
+                                           Check 2 promised payments
+                                           Includes 2 not done since Thu, 10 Sep
+  Wed, 16 Sep                              Public holiday · Malaysia Day
+  ──────────────
+  All unpaid orders                  42
+  ```
+
+  - **One source: the shared Work Engine.** A day's lines are the collection Work items the engine
+    already raised — `payment.collect_customer_balance` → `Ask {n} customer(s) to pay`,
+    `payment.missed_promise` → `Check {n} promised payment(s)`, `payment.send_storage_invoice` →
+    `Collect {n} storage payment(s)` — placed on the item's own due day. The engine's admission
+    (催钱前先看货), company calendar, the owner's working day and today's cover therefore apply
+    unchanged. The rail creates no work, stores no schedule and has no manual planning. A count is
+    ORDERS: one order with two invoices under one rule is one customer.
+  - **Picking a day narrows the listing beside it to that day's orders** (`?day=YYYY-MM-DD`); the
+    count and the listing are one set by construction — an item that resolves to no Monitor row is
+    not counted. The default is the plan day. `All unpaid orders` (`?day=all`) keeps every unpaid SO
+    reachable, including orders the engine has not placed (waiting for goods, no delivery date).
+  - **The plan day and Today.** The plan day is today when Operation works today (Mon–Fri, not a
+    public holiday), else the next such day. Only a working today wears the blue ring and the word
+    `Today`; another date, a weekend or a public holiday never does. The picked day is the blue
+    fill; the two never compete (UI MASTER). A public holiday is named on its card.
+  - **Unfinished earlier work** stays open on the plan day, counted once, with its original day
+    (`Includes {n} not done since {day}`); its own past day never re-counts it and says
+    `{n} not done · counted under Today` (or the plan day's date), and still lists those orders when
+    picked. No due date is ever changed.
+  - An empty day says `No follow-up planned`; an unanswered feed says `Reading the collection desk…`
+    (never a quiet week); a failed feed says `The follow-up plan could not be loaded.` with `Try
+    again`. A role that cannot read the Work feed (Finance) sees `The follow-up plan is
+    Operation's.` and lands on `All unpaid orders`.
+  - Every line wraps inside the 240px rail — no truncation, clipping or sideways scroll. The rail
+    keeps the governed collapse; collapsed, the sheet header repeats the picked day and its lines.
 - Completed payment work leaves the Monitor; historical money remains in Payment Records. A
   scoped `?order=` for a paid SO says `SO-{n} needs no payment right now. Its money is in
   Payment Records.`
@@ -2103,8 +2137,8 @@ Use the UI MASTER Register Shell: 50px destination header (`Monitor` · `Payment
 global utilities only; 45px toolbar with Search, Export, Columns at right. No `New Payment`.
 Column filters live in table headers. Selection replaces the same toolbar in place. The footer
 names visible record count and money. The first data identity remains sticky. At 390px and 200%
-zoom preserve one semantic listing with governed horizontal scrolling; the Monitor's 240px filter
-rail starts collapsed under 1100px and is a drawer on a phone.
+zoom preserve one semantic listing with governed horizontal scrolling; the Monitor's 240px follow-up
+plan rail starts collapsed under 1100px and is a drawer on a phone.
 
 The two destinations, their columns, Inspect contents, filters, summaries and states are ruled in
 §3 (owner ruling 2026-09-12) and are not restated here. The former `Payments · Invoices` toolbar
