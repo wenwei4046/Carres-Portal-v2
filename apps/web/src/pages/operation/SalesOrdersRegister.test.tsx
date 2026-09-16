@@ -679,9 +679,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
 
   it("shows only the customer name in the default cell while retaining phone search context", () => {
     mount();
-    const customer = screen.getByTitle("Kimmy · 019-3478913");
-    expect(customer).toHaveTextContent("Kimmy");
+    const row = screen.getByTestId("grid-parent-row");
+    const customer = within(row).getByText("Kimmy");
     expect(customer).not.toHaveTextContent("019-3478913");
+    expect(row).not.toHaveTextContent("019-3478913");
   });
 
   it("renders six goods columns with separate SKU, Stock Unit IDs and Purchasing Deliver To", () => {
@@ -909,8 +910,8 @@ describe("Copy to new Sales Order — retired", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
     // The menu still renders — so this is a real absence, not an empty query.
-    expect(screen.getByRole("button", { name: "Cancel SO" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Copy to new Sales Order" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Cancel SO" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Copy to new Sales Order" })).toBeNull();
   });
 });
 
@@ -922,7 +923,7 @@ describe("Cancel SO", () => {
   it("opens the governed cancellation door for the row, and navigates nowhere", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel SO" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel SO" }));
     expect(screen.getByText("Cancel SO-1303")).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
   });
@@ -931,7 +932,7 @@ describe("Cancel SO", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
     const labels = screen
-      .getAllByRole("button")
+      .getAllByRole("menuitem")
       .map((b) => b.textContent?.trim())
       .filter((t): t is string =>
         [
@@ -952,7 +953,7 @@ describe("Cancel SO", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
     const labels = screen
-      .getAllByRole("button")
+      .getAllByRole("menuitem")
       .map((b) => b.textContent?.trim());
     expect(labels).toContain("Print PDF");
     expect(labels).not.toContain("Preview PDF");
@@ -1056,6 +1057,20 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(alert.innerHTML).not.toMatch(/\bbase-\d/);
     fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the toolbar and New Sales Order when the list fails to load", () => {
+    listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("x"), refetch: vi.fn() };
+    mount();
+    expect(within(screen.getByTestId("work-toolbar")).getByTestId("new-sales-order")).toBeInTheDocument();
+    expect(screen.getByTestId("grid-footer")).not.toHaveTextContent("sales order");
+  });
+
+  it("runs the shared slate register palette and governed search", () => {
+    mount();
+    const root = screen.getByTestId("work-toolbar").parentElement!;
+    expect(root.className).toMatch(/rootPaletteSlate/);
+    expect(root.className).toMatch(/rootSearchResponsive/);
   });
 
   it("prints Delivery Location as left-aligned text, not a centred button that cuts both ends", () => {

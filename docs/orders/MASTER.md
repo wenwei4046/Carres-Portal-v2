@@ -225,17 +225,18 @@ STATES     skeleton · `Sales orders could not be loaded` + `Try again` · `No s
 NARROW     toolbar wraps and stays usable · grid scrolls itself · no page sideways scroll
 ```
 
-**Status (measured 2026-09-16, fixture render in the real portal shell, not authenticated
-production).** Page-local half built in draft [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396), WAITING FOR PR #1395 before merge: kit
-`New Sales Order`, kit error state, readable absences (`slate-11`, 5.9:1), the four state words,
-the footer count and its population during a server search, and Delivery Location as left-aligned
-text (the centred ghost-button popover cut long localities at both ends). **Waiting for the shared
-register work (PR #1395), not page-local:** search inside the condition strip and its
-`Clear filters`, `Clear filters` inside the no-match state, the `Reset columns` label, the keyboard
-row menu, the shared palette that retires `SalesOrdersRegister.module.css`, the width rule (at
-1440 the eight defaults need 1181px against a 1140px grid, so DO No is cut 41px), the 390px
-toolbar whose Export/Columns row sits under the grid header, and a keyboard way to read a
-truncated Customer/Delivery Location.
+**Status — BUILT, [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396) (on the
+shared register of PR #1395).** The page runs `palette="slate"` and the responsive search; the
+page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 96 ·
+Requested Delivery Date 128 · Customer 192 · Delivery Location 172 · Showroom 100 · PO No 152 ·
+DO No 144); Customer and Delivery Location open a cut value whole (engine `overflowText`). The
+error state is the kit error inside the work surface, so the toolbar and `New Sales Order` stay.
+Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No fully visible;
+1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
+200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
+search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
+returns `24 sales orders`. The production SHA is recorded on the PR. **Owed:** the authenticated
+owner walk in production (fixture evidence is not production evidence).
 
 ### The two-line cell law
 

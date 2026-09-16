@@ -66,7 +66,6 @@ import {
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import GoodsMiniTable, { UnitEvidence, goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
-import styles from "./SalesOrdersRegister.module.css";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -173,7 +172,7 @@ function toGridColumn(
       accessor: (r) => (
         <button
           type="button"
-          className="font-medium text-blue-700 underline-offset-2 hover:underline"
+          className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
           onClick={(event) => {
             event.stopPropagation();
             navigate(`/operation/orders/so/${r.id}`);
@@ -191,7 +190,7 @@ function toGridColumn(
         r.poNumbers.length === 0 ? (
           absenceAware(f.text(r))
         ) : r.poNumbers.length === 1 ? (
-          <button type="button" className="font-medium text-blue-700 underline-offset-2 hover:underline" onClick={(event) => {
+          <button type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={(event) => {
             event.stopPropagation();
             navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
           }}>{r.poNumbers[0]}</button>
@@ -202,7 +201,7 @@ function toGridColumn(
               <button
                 key={po}
                 type="button"
-                className="font-medium text-blue-700 underline-offset-2 hover:underline"
+                className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                 onClick={(event) => {
                   event.stopPropagation();
                   navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
@@ -231,7 +230,7 @@ function toGridColumn(
           return (
             <button
               type="button"
-              className="font-medium text-blue-700 underline-offset-2 hover:underline"
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
               onClick={(event) => {
                 event.stopPropagation();
                 navigate(
@@ -246,7 +245,7 @@ function toGridColumn(
         return (
           <button
             type="button"
-            className="font-medium text-blue-700 underline-offset-2 hover:underline"
+            className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
             onClick={(event) => {
               event.stopPropagation();
               navigate(`/operation/delivery-orders?order=${encodeURIComponent(r.id)}`);
@@ -261,14 +260,9 @@ function toGridColumn(
   if (f.key === "customer") {
     return {
       ...base,
-      accessor: (r) => (
-        <span
-          className="block truncate"
-          title={r.phone ? `${r.customer} · ${r.phone}` : r.customer}
-        >
-          {r.customer}
-        </span>
-      ),
+      /* A cut name opens whole by click or keyboard (engine `overflowText`,
+         Listing Standard 2026-09-16) — a hover title is not a way to read. */
+      overflowText: (r) => r.customer,
       /* The digits ride the search so `0162389…` finds the row however the
          phone was punctuated. */
       searchValue: (r) => `${r.customer} ${r.phone} ${r.phoneDigits}`,
@@ -326,17 +320,11 @@ function toGridColumn(
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
   if (f.key === "delivery_location") {
-    /* Plain text, left-aligned like Customer (Listing Standard 2026-09-16).
-       The popover repeated this same string inside a centred ghost button,
-       so a long locality was cut at BOTH ends — `Seremban` read `eremban`. */
-    return {
-      ...base,
-      accessor: (r) => (
-        <span className="block truncate" title={f.text(r)}>
-          {f.text(r)}
-        </span>
-      ),
-    };
+    /* Left-aligned like Customer, and a cut locality opens whole through the
+       engine's `overflowText` (Listing Standard 2026-09-16). The old centred
+       ghost-button popover cut long values at BOTH ends — `Seremban` read
+       `eremban`. */
+    return { ...base, overflowText: (r) => f.text(r) };
   }
   if (f.key === "items") {
     return {
@@ -646,7 +634,7 @@ export default function SalesOrdersRegister() {
   );
 
   return (
-    <div className={`${styles.page} flex h-full min-h-0 flex-col`}>
+    <div className="flex h-full min-h-0 flex-col">
       <DestinationHeader />
 
       {cancelTarget && (
@@ -666,23 +654,28 @@ export default function SalesOrdersRegister() {
 
       {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
-        {isError ? (
-          /* ONE kit error: the fact and one way forward. The raw transport
-             message is not an operator word. */
-          <div role="alert" className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">
-            <EmptyState
-              title="Sales orders could not be loaded"
-              action={
-                <Button variant="neutral" onClick={() => void refetch()}>
-                  Try again
-                </Button>
-              }
-            />
-          </div>
-        ) : (
           <DataGrid<RegisterRow>
             appearance="reference"
+            palette="slate"
+            searchPresentation="responsive"
             labelledToolbar
+            /* ONE kit error INSIDE the work surface: the toolbar — and New
+               Sales Order with it — stays, because creating an order does not
+               depend on the list loading. No raw transport message. */
+            errorState={
+              isError ? (
+                <div role="alert">
+                  <EmptyState
+                    title="Sales orders could not be loaded"
+                    action={
+                      <Button variant="neutral" onClick={() => void refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                </div>
+              ) : undefined
+            }
             rows={rows}
             columns={columns}
             storageKey={storageKey}
@@ -697,6 +690,7 @@ export default function SalesOrdersRegister() {
             searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
+            noMatchMessage="No sales orders match these filters"
             groupBanner={false}
             /* Optional columns may widen the sheet (MASTER §0.1), so the row's
                identity pins: ☐ · ▸ · SO No stay against the left edge while
@@ -752,7 +746,6 @@ export default function SalesOrdersRegister() {
               />
             )}
           />
-        )}
       </div>
     </div>
   );
