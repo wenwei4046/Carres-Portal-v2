@@ -118,7 +118,7 @@ function item(so: number, dueOn: string, owner: Record<string, unknown>, ruleKey
     object: { kind: "invoice", id: ruleKey === "payment.send_storage_invoice" ? `is-${so}` : `i-${so}`, label: `INV-${so}` },
     problem: "Customer balance due", action, recipient: "Customer", requiredResult: "Outstanding balance reduced to RM 0",
     completionFact: "outstanding = RM 0", owner,
-    timing: { dueOn, workingDaysLate: dueOn < TODAY ? 2 : 0, bucket: dueOn < TODAY ? "overdue" : "today" },
+    timing: { actionOn: dueOn, workingDaysLate: dueOn < TODAY ? 2 : 0, bucket: dueOn < TODAY ? "overdue" : "today" },
     destination: `/finance/monitor?invoice=i-${so}`, tone: "warning", locked: false, broken: false,
   };
 }

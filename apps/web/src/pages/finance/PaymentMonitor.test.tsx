@@ -228,7 +228,7 @@ describe("Payment Monitor — the listing", () => {
       recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
       owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha Tan" },
         activeCover: null, acting: { userId: "u-shasha", name: "Shasha Tan" }, state: "primary" },
-      timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+      timing: { actionOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
       destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
     }] };
     show();
@@ -248,7 +248,7 @@ describe("Payment Monitor — the listing", () => {
       problem: "Customer payment should have been received", action: "Ask customer to pay",
       recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
       owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null, acting: null, state: "not_assigned" },
-      timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+      timing: { actionOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
       destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
     }] };
     show();
@@ -271,7 +271,7 @@ describe("Payment Monitor — the listing", () => {
       recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
       owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha" },
         activeCover: { userId: "u-yujun", name: "Yu Jun" }, acting: { userId: "u-yujun", name: "Yu Jun" }, state: "covered" },
-      timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+      timing: { actionOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
       destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
     }] };
     show();
@@ -412,7 +412,7 @@ describe("Payment Monitor — the listing", () => {
 });
 
 /** A collection Work item exactly as the shared feed ships it. */
-function workItem(objectId: string, dueOn: string, over: {
+function workItem(objectId: string, actionOn: string, over: {
   ruleKey?: string;
   owner?: Record<string, unknown>;
 } = {}) {
@@ -424,7 +424,7 @@ function workItem(objectId: string, dueOn: string, over: {
     recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
     owner: over.owner ?? { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha" },
       activeCover: null, acting: { userId: "u-shasha", name: "Shasha" }, state: "primary" },
-    timing: { dueOn, workingDaysLate: 0, bucket: "later" },
+    timing: { actionOn, workingDaysLate: 0, bucket: "later" },
     destination: `/finance/monitor?invoice=${objectId}`, tone: "warning", locked: false, broken: false,
   };
 }
