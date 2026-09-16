@@ -761,179 +761,326 @@ remains legacy debt and may not be presented as this contract.
 - desktop keyboard/focus behavior and the narrow-screen absence of the Rail leave one obvious Work
   destination without clipped counts or hover-only meaning.
 
-## 8 · Dashboard admission law
+## 8 · Global Dashboard Blueprint — APPROVED / LOCKED, 2026-09-16
 
-Dashboard is built after core module projections are stable. It admits only facts that change
-management intervention, commitment risk or confidence:
+Jess approved persistence of the complete Dashboard Blueprint after owner review. This is the one
+Dashboard authority, replacing the former provisional measure register. Approval is product truth,
+not proof of implementation or production readiness. No production code, Cards or deployment is
+authorised by this PLAN closure.
 
-- broken customer, supplier or delivery commitments;
-- missing Duty holder or cover;
-- Work source/integrity failure;
-- material customer, goods or cash risk;
-- workload health and valid trends;
-- recent material change with an exact owning-object door.
+### 8.1 · Purpose, composition and management journey
 
-Dashboard contains no action queue, manual completion, copied report or arbitrary KPI card. Every
-number has one governed drill-down. A failed source never appears as zero.
+Dashboard answers **what management needs to know**; Work answers **what someone needs to do**.
+There is exactly one independent top-level `Dashboard`; `WORKSPACE` contains only `Work`,
+`Staff & Duties`, and `Issue Tracker`. Dashboard owns no transaction, assignment, deadline,
+severity, calculation or completion. It contains no action rows, forms, manual completion, copied
+pipeline, annotation inbox or generic navigation cards. Right Rail remains a separate My Work door.
 
-### 8.1 · Dashboard composition
-
-The one global, top-level Dashboard is the management reading surface over authoritative module facts and the shared Work
-contract. It answers, in this order:
-
-1. Is a customer, supplier, delivery or payment commitment already broken?
-2. Is material customer, goods or cash exposure increasing?
-3. Can the accountable people act today, or is ownership/cover/source integrity broken?
-4. Where is intervention changing the trend?
-
-The desktop composition is:
+The questions are: which confirmed commitments failed; which customer money should have arrived;
+which work, Duty or cover is missing; and whether those observations are complete and reliable.
 
 ```text
-┌ Dashboard ─────────────────────────────── Refreshed 09:42 · All sources healthy ┐
-│ MANAGEMENT ATTENTION                                                        │
-│ 3 broken customer commitments  2 supplier promises broken  1 Work source failed│
-│ Each fact is a drill-down aggregate; no action sentence or Done control.     │
-├ COMMITMENT HEALTH ───────────────────────┬ MATERIAL EXPOSURE ─────────────────┤
-│ Customer delivery · broken / due today   │ Customer cases · significant/critical│
-│ Supplier promise · broken / no answer    │ Goods · shortage/quarantine/blocked │
-│ Delivery result · missing / failed       │ Cash · overdue balance/recovery      │
-│ Payment promise · overdue                │ Direction vs previous governed period│
-├ WORK HEALTH ─────────────────────────────┼ RECENT MATERIAL CHANGE ─────────────┤
-│ Open · late · blocked · no owner/cover   │ Time · fact changed · object door    │
-│ Load by normal owner; cover shown apart  │ Only changes that alter intervention │
-│ Oldest late and ageing distribution      │ Never a copied activity stream       │
-└──────────────────────────────────────────┴────────────────────────────────────┘
+1440px and above
+┌ Dashboard ─────────────────────────────────────── Refresh ┐
+│ Scope · business date · observation time · source health │
+├ Management attention ───────────────────────────────────┤
+│ Non-zero facts; unit + oldest date / amount + exact door │
+├ Commitment health ─────────────┬ Material exposure ──────┤
+│ Overdue delivery               │ Payment should have     │
+│ Failed / partial delivery      │ been received           │
+│ Supplier date passed           │ {n} orders              │
+│ Supplier reply day missed      │ Amount needed RM {x.xx} │
+├ Work health ───────────────────┴─────────────────────────┤
+│ Actions to do · Missed · Blocked · ownership/source gaps │
+│ Required Duty vacancies · no eligible cover              │
+│ Normal owner       Actions to do       Missed   Blocked  │
+│ {name}             {n}                 {n}      {n}      │
+│ Covered by {name}, when applicable                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-`Management attention` contains only non-zero intervention facts. A fact identifies its measure,
-scope and oldest/amount context, then opens the already-filtered owning Register or Team Work. It
-does not list individual actions. When no intervention is required it says `No management attention
-needed` and still shows source freshness; it never celebrates a failed source as a clear desk.
+Management attention repeats the SAME measure identity, observation and destination shown below,
+not a second calculation. Never add a cross-module `total problems`: one SO can affect several
+measures. Source integrity warnings stay at the top. Reading order is customer delivery failure,
+supplier commitment, overdue money, missed supplier reply, then ownership/cover/blocking gaps.
+This is presentation order, not a new severity system. Within a measure, the oldest governed date
+leads. `Material exposure` v1 covers only the overdue customer money defined below, never a claim
+that goods, cases and recovery have all been checked. Routine due-today/due-later volumes remain
+in Work and owning schedules, not a new KPI strip.
 
-`Commitment health` uses explicit promises only. An internal estimate, open PO, active order or
-pipeline stage is not a broken commitment. Each row shows `Broken · Due today · Due later` only where
-the owning module has a governed date and completion fact. Selecting a row opens the owning module,
-not a Dashboard drawer.
+Morning: verify coverage/health, read attention, open the exact affected population. Enter Team
+Work for action ownership, Staff & Duties for Duty gaps. Staff record results in the owning module;
+returning refreshes Dashboard. At close, review remaining commitments/money/ownership without
+replacing Finance close, Stock count or Issue review. Reports, exports, calendar and external
+communications keep their existing homes; no Dashboard export, notification engine or new calendar.
 
-`Material exposure` admits only consequences that can change a management decision: significant or
-critical customer cases, quarantined/blocked goods, material shortage, overdue customer cash and
-unrecovered issue cost. Currency never nets incurred, recoverable and recovered. Threshold and
-period come from the owning module/settings and appear in the drill-down evidence.
+### 8.2 · First-release measure register and arithmetic
 
-`Work health` is the only Dashboard reading of Work. It aggregates the same server feed by normal
-owner, acting cover, missed age, blocker and source health. Selecting it opens Team Work with the exact
-filter. It never repeats My Work rows or treats `Not assigned` as somebody's queue.
+Every measure has stable identity, owning source/rule version, definition, included/excluded
+population, unit, permission coverage, business date, observation time/version, completeness,
+threshold, comparison (v1: none), and exactly one tested filtered drill-down. An approved meaning
+is not an admitted production source: every owner and destination must pass §8.6 before release.
 
-`Recent material change` is not an activity feed. It includes only a newly broken/recovered
-commitment, material exposure crossing its governed threshold, owner/cover/source failure or a
-material recovery. Each receipt states the changed fact, time and exact object door.
+Common rules: Asia/Kuala_Lumpur business date; a date-only commitment is past on the following
+local date, with no extra grace period. Work missed age uses its own governed calendar. Include
+unresolved obligations of ALL ages, not a recent-order cap. Lifecycle exclusions come from the
+owner. Unknown is never zero or complete. Deduplicate by business identity, not joined lines,
+PDF versions, repeated reads or Work occurrences. Amounts have two decimals, no rounding; currencies
+stay separate, with no implicit conversion. Unsupported currency/unknown value prevents a complete
+amount claim. Exact predicates below are owned and shared by the named module, never implemented
+as independent Dashboard arithmetic.
 
-### 8.2 · Measure contract and source health
+| ID / visible measure | Unit / owning truth | Exactly one destination |
+|---|---|---|
+| D1 `Overdue delivery` | Customer-delivery scopes / Delivery | Delivery → Monitor: confirmed customer scope past with no result |
+| D2 `Failed Delivery / Partially Delivered` | Unresolved customer-delivery scopes / Delivery | Delivery → Monitor: unresolved failed/partial scope |
+| P1 `Supplier delivery date passed` | POs / Purchasing | Purchase Orders: current evidenced supplier promise past and goods owing |
+| P2 `Supplier has not confirmed the PO date` | POs / Purchasing | Purchase Orders: current-version reply absent AND reply action day missed |
+| M1 `Payment should have been received` | Distinct SOs / Payment | Payments → Monitor → Should have been paid |
+| M2 `Amount needed` | Money / Payment, same SO set as M1 | Same overdue Payment Monitor population as M1 |
+| W / Work health readings | Distinct actions; source count separately / Shared Work | Team Work with exact condition/module/owner/date filters |
+| G1 `Required duties not assigned` | Duties / Staff & Duties | Staff & Duties: current required duties + Not assigned |
+| G2 `No eligible cover` | Duties / Shared Duty Resolver | Staff & Duties: required current duty + holder unavailable + no eligible cover |
 
-Every Dashboard measure carries:
+**D1.** Current effective customer scope has Confirmed Delivery before today and lacks its required
+actual result. Requested Delivery Date alone, Estimated delivery, supplier arrivals and intermediate
+partner-warehouse legs never establish a customer commitment. Exclude arrangements formally cancelled
+or superseded before a visit, recorded Delivered/Failed/Partially Delivered, and proof-only work.
+Count split customer scopes independently, each once. An otherwise valid confirmed scope without a
+DO must remain locatable in Monitor, not disappear. Threshold: one unresolved scope past confirmation.
+Show earliest qualifying Confirmed Delivery; no new elapsed-day arithmetic.
 
-| Fact | Requirement |
+**D2.** Latest authoritative actual result is Failed Delivery or Partially Delivered and the required
+remainder/remedy is unresolved under Delivery completion law. Count a scope once, not its delivered
+and undelivered lines separately. Exclude resolved historical failures, pre-visit rescheduling,
+cancelled arrangements and proof-only work. A new arrangement alone is not completion. Threshold:
+one unresolved adverse outcome. D1 (no result) and D2 (adverse recorded result) are disjoint.
+
+**P1.** Non-cancelled, incomplete PO; current official version has confirmed-sent evidence; qualifying
+current-version evidenced supplier promise is before today; its affected Pending Delivery Qty > 0.
+Accepted correct receipt reduces that balance; damaged, wrong and extra goods do not. Exclude unsent
+revisions, old-version/unevidenced replies, planning ETA alone and settled balances. Count each PO
+once; preserve line/quantity-specific promises, so one future balance date cannot hide another late
+line. Threshold: any owing quantity past its evidenced promise. Show earliest qualifying Supplier
+Delivery Date; never rewrite the immutable original PO date.
+
+**P2.** Current version confirmed sent, goods owing, qualifying answer absent AND the governed reply
+action day is missed. Use the same Purchasing Work rule: first confirmed-send day, next Office
+working day when closed, with lawful calendar resolution. Resends never restart the clock. Exclude
+unsent, completed/cancelled and same-day ordinary waiting. Previous-version replies do not qualify.
+Threshold: missed reply working day, not an invented supplier SLA. The destination must retain both
+no-answer AND missed-day conditions; the existing broad no-answer filter alone is insufficient.
+
+**M1/M2.** Use Payment's exact `Should have been paid` population and authoritative timing. Retain
+two causes in its drill-down: latest valid customer promise passed, or governed actionable collection
+deadline passed. Ordinary collection retains confirmed-delivery and goods-ready/reliable-arrival
+admission; genuine missed promises follow their own rule even without a delivery date. Latest
+outcome governs; later promises replace earlier promises, while `Customer paid` without canonical
+posting does not settle money. M1 counts each SO once despite multiple invoices/actions. M2 sums
+Payment's canonical Amount needed once per included SO: live issued obligations less valid allocated
+money, never order-line/legacy-paid recomputation. Exclude unissued storage accrual, void/replacement
+obligations, unknown unpriced value, settled balances, AP, rental and Issue recovery. Storage lacking
+a lawful overdue deadline is not automatically overdue. Threshold: positive canonical balance and
+Payment's passed promise/deadline classification; no arbitrary material-RM cutoff. Partial posting,
+void, replacement and settlement must reconcile with the same Monitor footer.
+
+**W.** Same stable admitted open occurrences and health envelope as §5.2.1, all dates (not only the
+current week). Readings: Actions to do; Missed (governed action day before today); Blocked (named
+dependency/resolving door); Not assigned (no normal owner); no eligible actor on the required day;
+Source failed (number of failed admitted sources, never guessed missing actions). Every positive
+Missed/blocker/ownership/calendar/source gap qualifies for attention; total open work alone does not.
+Normal-owner rows show Actions to do / Missed / Blocked; cover is separate metadata, never double
+counted. No staff league table, productivity score or invented capacity percentage. No working date
+is not missed/today. Show oldest required action date; numeric missed age only from the shared
+calendar-backed calculation, no invented ageing buckets. Calendar failures preserve safe facts and
+suppress affected ages. A person-owned order with no owner is not falsely a vacant Duty; retain its
+source-provided resolution door via Team Work. A default week must not truncate the drill-down.
+
+**G1/G2.** Read the authoritative current effective required-Duty catalogue and Shared Resolver,
+not Work-action existence. G1 includes required active Duties without eligible Primary; exclude
+inactive/future/non-required duties. A vacancy remains visible even with zero open actions. G2
+includes a currently required duty whose normal holder cannot act and whose governing rule requires
+coverage but supplies no eligible acting cover. No Buddy while the Primary can act is not failure.
+Missing/unreadable calendar or leave evidence is a source gap, not proof of vacancy/absence. Count
+Duties separately from affected actions; never add them together. Each corresponding Staff & Duties
+filter must reproduce this exact predicate before admission. No assignment control on Dashboard.
+
+### 8.3 · Held content, comparisons and material change
+
+| Candidate | V1 disposition / exact future admission condition |
 |---|---|
-| Identity | stable measure key and owning module |
-| Meaning | one sentence defining included and excluded records |
-| Value | count, amount, age or rate with unit |
-| As of | source observation time and business date |
-| Comparison | governed prior period or none; never a decorative percentage |
-| Threshold | named module rule where attention depends on a threshold |
-| Coverage | included population and permission scope |
-| Drill-down | one filtered owning Register or Team Work destination |
-| Health | healthy · delayed · failed; last successful observation preserved |
+| Separate broken requested-customer-date count | Reject: a request is not a confirmed promise; a distinct committed Sales obligation needs its own source/completion |
+| Significant/Critical customer cases | Hold: Service-owned materiality, permission, qualified source and exact filter; its 14-day deadline is not a materiality classifier and Issue severity cannot be borrowed |
+| Goods shortage/quarantine/controlled totals | Hold: one owning meaning, compatible counting units, Site scope, governed management threshold, exact Unit/document destination; never rename Needs checking to generic Quarantine |
+| Issue recovery exposure | Hold: Finance-owned amount/deadline, configured materiality, restricted-record permissions and exact Finance destination |
+| Trends, percentages, sparklines | No comparison in v1; reproducible historical observations and compatible populations required |
+| Recent material change | Hold until durable idempotent transition receipts and exact object links exist |
+| Active orders, GMV, open POs, generic low stock | Reject as management indicators; routine volume is not intervention |
+| AP, ledger/profit, targets, rental, guarantee totals | Outside v1, remain in their owning modules/Reports; absence never means zero/healthy |
 
-Partial source failure is isolated. Healthy sections remain visible; the affected measure reads
-`Could not load {source}` with `Last available {time}` where safe. A whole-page failure appears only
-when the Dashboard composition itself cannot be validated. Retry re-reads sources and never changes
-business state.
+No empty placeholder claims an unadmitted domain was assessed. Holding these measures is the final
+v1 admission decision, not an unresolved owner question. Normal module capability remains intact.
 
-#### 8.2.1 · Management measure register
+Future comparisons require the same definition/version, unit/currency, authorised population and
+explicit period in the business timezone, with complete reproducible observations on both sides.
+Missing baseline, changed rule/scope, partial failure or zero denominator suppresses the comparison
+with its reason. Do not reconstruct yesterday from mutable current records or present a rule change
+as improvement. No decorative arrows or default percentage.
 
-These are the only planned first-release measures. `Eligible` means the Blueprint admits the
-meaning; it does not mean the source has passed the production gate.
+Future Recent material change admits only newly broken/recovered admitted commitments, crossing a
+source-owned materiality threshold, owner/cover/source failure or recovery, and evidenced material
+financial recovery. Receipt identity, event time, prior/new fact and one exact owning-object door
+are mandatory; retries deduplicate. Routine edits, new orders, notes and uploads do not qualify.
+No durable history is not equivalent to `no recent changes`. Incurred, recoverable and recovered
+money remain separate and never netted.
 
-| Dashboard measure | Owning truth and inclusion | Drill-down | Admission state |
-|---|---|---|---|
-| Broken customer delivery commitments | Sales Orders/Delivery: explicit confirmed/requested commitment past without governed result | Filtered Sales Orders or Delivery Register | Eligible after date/result source proof |
-| Broken supplier promises / no answer | Purchasing: current PO version's evidenced promise passed, or confirmed-send answer clock passed, with goods owing | Filtered Purchase Orders | Eligible after exact-version proof |
-| Missing/failed delivery result | Delivery: due Delivery Order without an accepted result, or latest attempt is an exception requiring intervention | Filtered Delivery Orders | Eligible after result/exception threshold proof |
-| Overdue payment promise | Payment: issued Invoice outstanding after governed collection or customer-promise deadline | Filtered Payment Monitor | Eligible after one-Invoice arithmetic/source proof |
-| Material customer cases | Service Case: open Significant/Critical cases under its governed materiality | Filtered Service Cases | Held until Service Case source/owner admission is complete |
-| Material goods exposure | Stock/Receiving: governed shortages, quarantine or blocked Units/quantity above owning thresholds | Filtered Warehouse/Receiving surface | Held until threshold, Site scope and one drill-down are verified |
-| Material cash exposure | Payment/Finance: overdue customer balance or approved recovery exposure, shown without netting distinct tracks | Filtered Payment/Finance register | Eligible after definition/threshold proof |
-| Work health | Shared Work: open, Missed, blocked, unresolved owner/cover and failed source by normal owner | Team Work with exact URL filters | Eligible per admitted source; partial health required |
-| Recent material change | Durable owning-module/Work transition crossing one admitted measure's state or threshold | Exact owning object | Held until durable idempotent receipts exist |
+### 8.4 · Observation, permissions, navigation and UI states
 
-Counts of active Orders, open POs, GMV, generic low stock and unreviewed annotations are explicitly
-not admitted measures. A measure without an authoritative threshold remains absent rather than
-using an attractive default.
+Refresh on entry, explicit Refresh and return from an owning module; while visible refresh every
+60 seconds. A successful observation older than five minutes is delayed; a failed refresh is named
+immediately. These are technical freshness standards, not business deadlines. Business-date rollover
+invalidates an unqualified current-health claim. Observations are read-only: opening, refreshing or
+drilling down must not establish owners or write transactions, even through an idempotent reader.
 
-### 8.3 · Dashboard vocabulary
-
-Use: `Management attention` · `Commitment health` · `Material exposure` · `Work health` ·
-`Recent material change` · `Broken` · `Due today` · `Due later` · `Blocked` · `Not assigned` ·
-`Covered by` · `Last available` · `Could not load` · `Open Team Work` · `Open {module}`.
-
-Do not use: `At Risk` · `SLA` · `Open POs` as an alert · `Active pipeline` as management health ·
-`to action` · `All on track` without source evidence · `No alerts ✓` · `Escalations` for an
-unreviewed annotation · `Upcoming` · `Take it` · `Release`.
-
-### 8.4 · Responsive behaviour
-
-- At 1440px and above, use the two-column reading order shown in section 8.1; attention spans both.
-- At 1024–1439px, keep attention full width and stack each paired section in a single column.
-- Below 1024px, use one continuous document: source health, attention, commitment, exposure, Work
-  health, recent changes. No horizontal pipeline, compressed five-column board or sideways KPI strip.
-- Counts and amounts never truncate. Long measure explanations wrap; object doors remain keyboard and
-  touch accessible. Hover-only source/threshold evidence also opens by focus/tap.
-- Right Rail remains a My Work navigation peek beside Dashboard on supported desktop widths; it is
-  not folded into Dashboard. On narrow screens its existing navigation door remains separate.
-
-### 8.5 · Current → proposed gap audit — 2026-09-07
-
-| Current production | Decision |
+| State | Presentation / behaviour |
 |---|---|
-| `Today`, `Open POs`, `Overdue` KPI tiles | Replace with governed intervention facts; an open PO is not itself a problem |
-| Active orders and GMV hero | Remove unless a governed comparison/threshold proves management relevance |
-| Five-column order pipeline with recent order cards | Remove from Dashboard; Sales Orders owns its Register and flow views |
-| Open Purchase Orders card | Remove; show only broken supplier promise/no-answer commitments from Purchasing truth |
-| Low Stock plus separate Stock Alerts/Reorder queries | Replace with one material goods-exposure measure after Stock defines threshold, site scope and drill-down |
-| Emoji Escalation inbox from annotations | Remove; an annotation is not a reviewed escalation or Work transition |
-| Multiple client queries with independent loading states | Replace with one validated Dashboard composition carrying per-source health |
-| `See all orders`, `Manage POs`, `Open warehouse` generic doors | Replace with one exact filtered owning-module drill-down per measure |
-| Whole-page RPC error | Retain retry, add per-source health and last-safe observation; never turn failure into zero |
-| Dashboard currently grouped under the left-bar `Workspace` section | Move it to the one independent top-level Dashboard position; Workspace contains Work, Staff & Duties and Issue Tracker only |
+| Loading | Shell and geometry remain; quiet placeholders, never 0 |
+| Healthy | Complete current authorised value, actual source time and business date |
+| Delayed | Explicitly non-current last-safe value and actual time |
+| Failed with safe prior observation | Could not refresh source; Last available date/time; prior number is historical |
+| Failed without safe observation | Could not load source; no numeric substitute |
+| Missing rule/calendar/required fact | Name the missing fact; suppress affected totals/ages |
+| Partial source failure | Healthy independent sections remain; dependent measures inherit failure |
+| Invalid overall composition | Whole-page error and Try again |
+| Permission refusal | No protected identity/count/amount |
+| Complete healthy zero | Real zero/empty filtered set |
 
-No Dashboard production rebuild begins until each admitted measure has the section 8.2 contract and
-its owning module is production-verified. This blocks invented totals, not the already-honest Work
-surface.
+Unread pages, truncated results and malformed payloads mean incomplete, never a smaller total.
+Do not label a healthy-source subtotal as all-company/all-Work. Suppress affected complete totals;
+explicitly scoped healthy module readings may remain. Show coverage of admitted/excluded domains.
+`No management attention needed` requires all admitted measures in the stated authorised scope
+healthy and zero; retain coverage alongside it. Never claim whole-ERP health. Inaccessible domains
+must not leak even through their source-health labels.
 
-### 8.6 · Dashboard acceptance contract
+Dashboard grants no access. Company totals require company source access; narrower users see only
+permitted scope. Work health uses Team Work eligibility in §5.1 plus underlying module permissions;
+Sales/Finance My Work access does not grant Team Work. Payment amounts require matching money access.
+External suppliers/customers/logistics do not enter this internal cross-module Dashboard. Restricted
+Issue/People/financial data never leaks through counts, names, tooltips, differences or caches.
+Revalidate and discard prior observations when permissions narrow; no preserved wider-scope number.
 
-Dashboard is ready for owner acceptance only when all are demonstrable:
+Every measure has ONE navigation target carrying identity, exact predicate, authorised scope,
+business date, observation reference/version and applicable module/owner/timing filters. The target
+shows removable filters, the same unit and reproducible population. Refresh/Back preserve context
+and Dashboard scroll. If records changed, reproduce the observation when supported or explicitly
+state that results refreshed to current truth; never silently open a generic Register. Zero can open
+a true empty filtered set. Failed sources never open fabricated zero sets; Source failed opens the
+exact Team Work source-health context even without action rows. Historical access is never expanded.
 
-- every visible measure exists in §8.2.1 and prints its governed meaning, unit, scope, observation
-  time, health and comparison/threshold only when those facts exist;
-- healthy, delayed and failed sources remain distinguishable per measure, and a failed source can
-  never reduce a value to zero or produce `No management attention needed`;
-- each count, amount, age and trend reconciles to its one owning source for the same permission scope
-  and business date;
-- every measure has exactly one tested drill-down to its filtered owning Register or Team Work, and
-  Browser Back restores Dashboard position and source-health context;
-- Dashboard contains no action sentence, action row, owner assignment, manual completion, arbitrary
-  KPI, copied pipeline or local business mutation;
-- Work health uses the same authorised Work composition and preserves normal owner, acting cover,
-  blocker, unresolved Duty and source failure as separate facts;
-- management attention includes only non-zero governed intervention facts and recent change includes
-  only durable threshold/state transitions, not a generic activity stream;
-- permissions prevent leaked people, object identities, counts and amounts while leaving authorised
-  healthy sections usable during a partial failure;
-- the reading order and complete measure meaning remain operable at 1440, 1024 and 390px by keyboard,
-  screen reader and touch, with no sideways KPI strip or hover-only evidence;
-- the global Right Rail remains a separate My Work doorway and Dashboard remains one independent
-  top-level destination outside the `WORKSPACE` navigation group.
+Responsive: 1440px+ paired commitment/exposure with full-width attention and Work; 1024–1439px stack
+paired sections; below 1024px one continuous document: source health → attention → commitments →
+exposure → Work. V1 omits the held recent-change section. At 390px each complete measure and each
+owner's labelled readings wrap vertically. No horizontal KPI strip/five-column pipeline. Counts and
+money never truncate; source/definition evidence works with keyboard, focus and touch, not hover only.
+Use existing Panel, Card, SectionHeader, Button, Loading and EmptyState; no new global component.
+Token values stay unchanged, tabular numbers and shared date/currency formatters bind, minimum touch
+40px. Colour supports explicit words, not decoration. Narrative summaries are not forced into fixed
+transaction rows. Right Rail retains its independent governed desktop/mobile entry.
+
+COPY-STANDARD owns exact words (Dashboard dictionary). No At Risk, SLA, unqualified All on track,
+No alerts checkmark, annotation Escalations, bare counts or rounded money. No inline operational act.
+
+### 8.5 · Evidence, reference translation and current-to-approved audit
+
+Authority resolution: Constitution → ERP Architecture → Workspace → relevant Sales Orders,
+Purchasing/Receiving/Claims, Delivery, Payment, Stock, Service, Issue, People, Rental and Guarantee
+MASTER sections → UI/copy/tokens/components/patterns. Current code is evidence, not authority.
+Owner-reviewed baseline was 699a8a5b and updated through 5db1a1f7's Work contract/calendar/admission
+corrections. The later Work implementation commit does not establish Dashboard production readiness.
+
+Code-inspected evidence: `apps/web/src/pages/operation/OperationDashboard.tsx` and its KPI/pipeline/
+PO/stock/escalation components; `apps/api/src/routes/operation/dashboard.ts`;
+`supabase/migrations/0125_fix_alias_dl_after_0123_rename.sql` summary;
+`packages/shared/src/purchase-order-register.ts`; `apps/api/src/routes/operation/work.ts`.
+No fresh live volume/fill-rate/performance claim: existing transactions are test data under CLAUDE §6.
+
+| Current / problem | Approved replacement / trade-off |
+|---|---|
+| Hero active orders/GMV, rounded amounts | Remove: fewer large figures, governed intervention meaning |
+| Today scheduled volume | Remove, preserve in schedules |
+| Open PO tile/card treats ordinary buying as warning | P1/P2 exact-version evidence, filtered PO destination |
+| Overdue legacy date/stage arithmetic | D1 confirmed customer scope |
+| Five-column pipeline/recent order cards | Remove; Sales Orders owns flow and Register |
+| Low Stock + Stock Alerts + Reorder incompatible calculations | Remove; goods exposure held pending governing contract |
+| Capped annotation inbox and false empty reassurance | Remove; Issue truth and admitted Work keep accountability |
+| Generic See all/Manage/Open warehouse doors | Exact filtered destination per measure |
+| Independent client queries/mixed observations | Validated source-health composition |
+| Whole-page failure on any source | Isolate dependencies; whole-page error only for invalid composition |
+| Old Dashboard action-queue page pattern / nested navigation | Reconcile to this authority |
+| Work loader calls owner-establishment operation | Consume genuinely read-only shared projection; idempotence is not permission to write |
+
+Reference-to-Carres capability matrix:
+
+| Reference lesson | Decision / owner and consequence |
+|---|---|
+| SAP overview cards navigate into related business content | Adapt filtered drill-through, owning module retains records |
+| Dynamics workspaces navigate from data into deeper pages | Keep context, avoid generic-page round trips |
+| Dynamics lightweight in-workspace execution | Reject for Dashboard, execution belongs to Work/owner |
+| Dynamics vertical workspace direction | Adapt for narrow screens |
+| Current Stock MASTER's recorded 2990 research traces totals to Units/documents | Keep exact source identity and physical/financial ownership split |
+| Generic ERP KPI walls | Reject without Carres intervention meaning |
+
+Primary external references: [SAP Overview Cards](https://www.sap.com/design-system/fiori-design-web/v1-108/page-types/floorplans/overview-page-ovp/overview-page-card),
+[Microsoft Operational Workspaces](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/user-interface/build-workspaces).
+2990 was not accessed directly in this audit; its evidence is Stock MASTER §12.12, not a claimed
+live inspection. Foreign products do not supply Carres business policy.
+
+### 8.6 · Release acceptance and PLAN closure
+
+These are required acceptance scenarios, not executed-test or deployment claims:
+
+1. One top-level Dashboard; only the three governed Workspace destinations.
+2. Past requested date without confirmation is not D1; today's confirmed date becomes past only
+   at the next Malaysia business date.
+3. Delivered with proof missing is not missing result; failed/partial unresolved scope is D2 once
+   and leaves only on authoritative completion. Split scopes count independently; intermediate legs
+   and joins do not inflate customer measures. Valid scope without DO remains visible.
+4. V1 reply never confirms V2; PDF open is not send; resend never restarts reply clock.
+5. Accepted partial receipt retains remainder; damaged/wrong/extra quantities do not settle it;
+   future line promise cannot hide another overdue owing line.
+6. Same-day unanswered PO is not P2; missed lawful working day is; holidays/calendars match Work.
+7. Multiple invoices/actions on one SO yield one M1 count; M2 matches canonical Monitor footer.
+   Partial payment, void, replacement, latest promise and settlement reconcile; Customer paid text
+   without posting does not reduce money. Unknown/unissued amounts never become zero or debt.
+8. Friday action for Saturday payment deadline is not Friday overdue money. Unknown arrival does
+   not invent ordinary collection; real missed promises retain their own lawful rule.
+9. Required Duty vacancy remains visible with no actions; Duty/action counts never mix. Cover
+   changes acting context without duplicating work or rewriting normal owner/actual-actor history.
+   Holder present but no eligible actor is not Nobody holds Duty; no unnecessary Buddy warning.
+10. All-date Work totals/drill-downs match; stable occurrences count once, blocked stays missed when
+    applicable, undated is not late. Calendar missing/failed produces no invented days or ages.
+11. Fail each source/dependency: never zero/clear reassurance, independent healthy sections survive.
+    Pagination truncation/malformed data/unknown value prevents complete-total claims.
+12. Freshness expiry, refresh failure and date rollover invalidate current-health claims; permission
+    removal clears wider cached observations, including restricted people, amounts and source labels.
+13. Every count/amount/date context (and any future trend) reconciles for the same predicate, unit,
+    permission, business date and source version. Exactly one link works, filters survive refresh/
+    Back, changed populations are explained; failed-source context works without action rows.
+14. Opening/refresh/drill-down writes no business record, owner establishment, assignment or result.
+15. 1440/1024/390px keyboard, screen-reader, focus-return and touch preserve full meanings/dates/money;
+    no hover-only evidence, action queue, generic KPI, annotation inbox, fake trend or unadmitted count.
+
+PLAN MISSION COMPLETE — the complete owner-reviewed operating model is persisted here. No open
+owner business-policy question remains for v1. Source qualification, lawful calendars, shared feed
+health/read-only behaviour, exact filters and production reconciliation remain delivery acceptance
+obligations, not permission to substitute defaults. The next lane is BUILD/DELIVERY only after an
+explicit takeover, constrained by those dependencies; this PLAN authors no Cards or implementation.
+
+Revisit a measure if its owner supplies a distinct governed commitment/materiality/history contract,
+if reconciliation disproves the proposed population, or if production observation shows no management
+value. Freshness/permission failures falsify the observation contract. Revise the affected measure,
+not the one-Dashboard/one-owner boundary. Source-verification and production acceptance remain open
+until measured; approved documents do not claim them complete.
 
 ## 9 · Delivery sequence
 
@@ -951,7 +1098,8 @@ AFTER CORE MODULES CONVERGE
 My Work → Team Work → module-rail previews → Notifications
 
 LAST
-Dashboard → management facts → cross-module trends → production validation
+Dashboard → admitted management facts → production validation
+Trends/recent material change remain outside v1 until §8.3 qualifies their evidence.
 ```
 
 Core admission covers Sales Orders, Purchasing, Receiving, Stock/Warehouse, Delivery, Payment,
@@ -1088,7 +1236,7 @@ honest Work for admitted modules.
   completed Workspace feature.
 - Dashboard was re-audited against its RPC, route, client composition and all shipped tiles on
   2026-09-07. The current page remains an old order-pipeline prototype with duplicated PO/stock/order
-  calculations and an annotation inbox; it is not accepted as management truth. Sections 8.1–8.5
+  calculations and an annotation inbox; it is not accepted as management truth. Sections 8.1–8.6
   now govern the replacement composition, measure/source-health contract, exact vocabulary,
   responsive layout and current-to-proposed cutover. Production rebuild remains last and begins only
   when every admitted measure has a verified owner, definition, threshold where applicable and exact
@@ -1113,7 +1261,7 @@ honest Work for admitted modules.
    Tracker generation are retired, while the legacy Bell remains the governed gap above.
 8. Replace the legacy Bell queue with durable, idempotent Work-transition receipts and migrate the
    header to those receipts; read/dismiss must never alter Work.
-9. Last, complete and owner-review Dashboard against production data.
+9. Last, implement and production-verify the owner-approved Dashboard §8; Blueprint review is closed, source and production acceptance remain open.
 
 Cards follow dependency slices; this MASTER is not an implementation queue.
 The execution sequence that implements this authority is recorded in

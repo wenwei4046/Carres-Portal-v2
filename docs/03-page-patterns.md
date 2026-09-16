@@ -77,11 +77,19 @@ Carres Examples**
 
 # Dashboard
 
-**Purpose.** Monitor overall status.
+**Purpose.** What management needs to know. One independent top-level destination, never under
+Workspace. The complete approved product contract lives in `workspace/MASTER.md` §8.
 
-**Information Hierarchy.** 1 Current Actions · 2 KPIs · 3 Issues · 4 Recent Activity
+**Information Hierarchy.** Source health and scope → Management attention → Commitment health →
+Material exposure → Work health. Recent material change and trends are held outside v1 until the
+owning evidence qualifies; do not fill their space with placeholders or activity.
 
-**Regions.** Header · KPI area · Action queue · Issues · Activity
+**Regions.** Read-only governed aggregates with one exact filtered owning-module/Team Work door.
+Required-Duty gaps open the exact Staff & Duties view. No action queue, KPI-volume preamble,
+assignment/completion control, pipeline or annotation inbox.
+
+**Responsive.** Paired sections at 1440px+, stacked at 1024–1439px, continuous document below 1024px.
+Preserve complete values and accessible source evidence. Existing kit/tokens bind unchanged.
 
 ---
 

@@ -208,6 +208,35 @@ An empty or failure sentence uses the exact object it describes. `No open work` 
 empty Issue Register; `No issues recorded` cannot describe a filtered no-match; neither may appear
 until the complete authorised source is healthy.
 
+## Global Dashboard words — owner-approved Blueprint, 2026-09-16
+
+The independent Dashboard's product/measure rules live once in `workspace/MASTER.md` §8.
+These are Dashboard-specific words, not permission to change owning-module vocabulary.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Sections | `Management attention` · `Commitment health` · `Material exposure` · `Work health` | Workspace Dashboard · KPI wall |
+| Customer delivery facts | `Overdue delivery` · `Failed Delivery / Partially Delivered` | Requested date as a broken promise · proof missing as delivery missing |
+| Supplier facts | `Supplier delivery date passed` · `Supplier has not confirmed the PO date` | Open POs as an alert |
+| Reply population qualifier | `Reply working day missed` | Supplier SLA |
+| Customer money | `Payment should have been received` · `Amount needed` · `{n} orders` | GMV · rounded money |
+| Work aggregates | `Actions to do` · `Missed` · `Blocked` · `Not assigned` · `Source failed` | bare open/late counts · employee ranking |
+| Ownership | `Normal owner` · `Covered by {name}` · `Required duties not assigned` · `No eligible cover` · `{n} duties` | missing Buddy as a failure when holder can act |
+| Action-day gap | `No eligible actor on the required day` | Nobody holds Duty when a holder exists |
+| Scope and source evidence | `Scope` · `Business date` · `Last updated {date and time}` · `Source health` · `Included sources` · `Not included` | All ERP healthy |
+| V1 coverage explanation | `Customer money covers overdue payments only.` · `Goods, customer cases and recovery are not included.` | implying all material exposure is checked |
+| Freshness / failure | `Data is delayed.` · `Could not refresh {source}` · `Could not load {source}` · `Last available {date and time}` | 0 after failure |
+| Incomplete aggregate | `Some sources could not be read. The total is unavailable.` | healthy-source subtotal labelled as the complete total |
+| Changed drill-down population | `Results refreshed. Records have changed since the Dashboard was read.` | silently opening a different population |
+| Clear state, only complete healthy admitted scope | `No management attention needed` | All on track · No alerts ✓ |
+| Controls | `Refresh` · `Try again` · `Open Team Work` · `Open {module}` | Done · Assign on Dashboard |
+| Future qualified section | `Recent material change` | Activity · unreviewed Escalations |
+
+Counts name their units. Dates use the shared formatter; money always has two decimals. Technical
+rule keys, table names and error bodies never substitute for these readable statements. A source
+or scope label must itself be authorised. Source-health copy does not override the Work page's own
+`Last updated {time}` contract.
+
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
 When a surface represents something a human must handle, follow up, confirm, call, chase or do,
