@@ -1,4 +1,4 @@
--- 0516_delivery_proof_review_refuses_stale_evidence_and_retries_once.sql
+-- 0517_delivery_proof_review_refuses_stale_evidence_and_retries_once.sql
 -- Work may host Delivery's proof-review door only when the door itself refuses
 -- stale evidence and a retry cannot append a second review.
 
@@ -146,4 +146,4 @@ revoke all on function public.delivery_proof_review(text, uuid, text, text, time
 grant execute on function public.delivery_proof_review(text, uuid, text, text, timestamptz, uuid) to authenticated;
 
 comment on function public.delivery_proof_review(text, uuid, text, text, timestamptz, uuid) is
-  '0489, 0516: append one personally attributed proof review only when the evidence version is current; an identical retry key returns the first result.';
+  '0489, 0517: append one personally attributed proof review only when the evidence version is current; an identical retry key returns the first result.';
