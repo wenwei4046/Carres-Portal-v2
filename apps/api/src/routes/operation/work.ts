@@ -841,6 +841,14 @@ export function projectSalesOrderWork(input: {
           dayAgreed: Boolean(input.context.confirmedDateIso),
         })
       : null;
+    const destination = deliveryOwned
+      ? deliveryOrder &&
+        (item.ruleKey === "deliver_today" ||
+          item.ruleKey === "upload_delivery_photo" ||
+          item.ruleKey === "check_delivery_proof")
+        ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
+        : `/operation?tab=delivery&view=all&open=${encodeURIComponent(input.context.orderId)}`
+      : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`;
     return operationWorkItemFromProjection(lines ? { ...item, action: lines.act } : item, {
       object: deliveryOwned
         ? {
@@ -862,17 +870,22 @@ export function projectSalesOrderWork(input: {
           : null,
       requiredResult:
         lines?.result ?? ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
-      destination: deliveryOwned
-        ? deliveryOrder &&
-          (item.ruleKey === "deliver_today" ||
-            item.ruleKey === "upload_delivery_photo" ||
-            item.ruleKey === "check_delivery_proof")
-          ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
-          : /* The Edit Delivery page is retired (Card 11): every arrangement
-               write lives in the Monitor row's expanded brief, so the Work
-               row names that door directly (Card 20). */
-            `/operation?tab=delivery&view=all&open=${encodeURIComponent(input.context.orderId)}`
-        : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
+      destination,
+      interaction: item.ruleKey === "check_delivery_proof" && deliveryOrder
+        ? {
+            mode: "embedded",
+            actionKey: "delivery.proof_review",
+            componentKey: "delivery.proof_review",
+            capability: "POST /api/operation/delivery-orders/:doNumber/proof-review",
+            inputContract: "ProofReviewInput",
+            evidenceContract: "Latest governed Delivery proof package",
+            idempotencyKey: "ProofReviewInput.idempotencyKey",
+            staleVersion: "ProofReviewInput.sourceVersion",
+            staleRefusal: "stale_proof_evidence",
+            successReceipt: "Delivery proof review result, actor, time and source version",
+            fallbackDestination: destination,
+          }
+        : undefined,
       today: input.today,
     });
   });

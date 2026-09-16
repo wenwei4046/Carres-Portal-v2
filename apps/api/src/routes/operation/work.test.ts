@@ -394,6 +394,41 @@ describe("operation Work response composition", () => {
     expect(run?.action).not.toContain("Operation PIC");
   });
 
+  it("admits only Delivery proof review as an embedded Work action", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: "2026-09-08",
+      deliveredAtIso: "2026-09-08T08:00:00.000Z",
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const items = projectSalesOrderWork({
+      open: [
+        { key: "check_delivery_proof", track: "delivery", tone: "warning" },
+        { key: "upload_delivery_photo", track: "delivery", tone: "warning" },
+      ],
+      context,
+      customer: "Tan Qu Qu",
+      deliveryOrderNumber: "DO-2041",
+      today: "2026-09-08",
+    });
+
+    expect(items.find((item) => item.ruleKey === "check_delivery_proof")?.interaction).toMatchObject({
+      mode: "embedded",
+      actionKey: "delivery.proof_review",
+      componentKey: "delivery.proof_review",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
+    expect(items.find((item) => item.ruleKey === "upload_delivery_photo")?.interaction).toEqual({
+      mode: "open_module",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
+  });
+
   it("derives Manual Purchase projector input from the module register facts", () => {
     const inputs = manualPurchaseWorkInputsFromRegister({
       requests: [{

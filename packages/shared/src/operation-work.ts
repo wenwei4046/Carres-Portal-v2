@@ -242,6 +242,7 @@ export interface OperationWorkPresentation {
   businessDueOn?: string | null;
   actionOn?: string | null;
   noDateReason?: string | null;
+  interaction?: OperationWorkInteraction;
 }
 
 /** Translate a module engine's open projection into the transport contract.
@@ -311,7 +312,7 @@ export function operationWorkItemFromProjection(
     communication: null,
     blocker: null,
     nextConsequence: null,
-    interaction: {
+    interaction: presentation.interaction ?? {
       mode: "open_module",
       fallbackDestination: presentation.destination,
     },

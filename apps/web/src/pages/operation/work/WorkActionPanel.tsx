@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { OperationWorkItem, OperationWorkModule } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import DeliveryProofReviewWork from "../components/DeliveryProofReviewWork";
 
 const MODULE: Record<OperationWorkModule, string> = {
   orders: "Sales Orders",
@@ -13,6 +14,9 @@ const MODULE: Record<OperationWorkModule, string> = {
 
 export default function WorkActionPanel({ item, embedded, onOpen }: { item: OperationWorkItem; embedded?: ReactNode; onOpen: () => void }) {
   const action = `${item.action}${item.recipient ? ` · ${item.recipient}` : ""}`;
+  const owningForm = item.interaction.mode === "embedded" && item.interaction.componentKey === "delivery.proof_review"
+    ? <DeliveryProofReviewWork doNumber={item.object.id} />
+    : null;
   return (
     <div className="min-h-full bg-white">
       <header className="border-b border-kit-slate-5 px-6 py-4">
@@ -24,7 +28,7 @@ export default function WorkActionPanel({ item, embedded, onOpen }: { item: Oper
         {item.interaction.mode === "embedded" ? (
           <section aria-label="Do this work" className="flex flex-col gap-3">
             <p className="text-label text-kit-slate-11">Finish when: {item.completionStatement}</p>
-            {embedded}
+            {embedded ?? owningForm}
           </section>
         ) : item.interaction.mode === "read_only" ? (
           <p className="text-body text-kit-slate-11">{item.interaction.reason}</p>

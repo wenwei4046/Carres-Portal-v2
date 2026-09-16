@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import WorkActionPanel from "./WorkActionPanel";
 
+vi.mock("../components/DeliveryProofReviewWork", () => ({
+  default: ({ doNumber }: { doNumber: string }) => <div>Delivery proof form for {doNumber}</div>,
+}));
+
 const base = {
   object: { label: "DO-140926-0007", kind: "delivery_order" }, module: "delivery",
   problem: "Delivery proof needs review", action: "Review the delivery proof", recipient: null,
@@ -17,6 +21,27 @@ describe("WorkActionPanel", () => {
     expect(screen.getByText("Finish when: The proof review is recorded")).toBeInTheDocument();
     expect(screen.queryByText("delivery_proof_reviews exists")).not.toBeInTheDocument();
     expect(screen.getByText("Delivery owned form")).toBeInTheDocument();
+  });
+
+  it("resolves the admitted Delivery proof component without a Workspace copy of the form", () => {
+    render(<WorkActionPanel item={{
+      ...base,
+      object: { ...base.object, id: "DO-140926-0007" },
+      interaction: {
+        mode: "embedded",
+        actionKey: "delivery.proof_review",
+        componentKey: "delivery.proof_review",
+        capability: "POST /api/operation/delivery-orders/:doNumber/proof-review",
+        inputContract: "ProofReviewInput",
+        evidenceContract: "Latest governed Delivery proof package",
+        idempotencyKey: "ProofReviewInput.idempotencyKey",
+        staleVersion: "ProofReviewInput.sourceVersion",
+        staleRefusal: "stale_proof_evidence",
+        successReceipt: "Delivery proof review result, actor, time and source version",
+        fallbackDestination: base.destination,
+      },
+    } as OperationWorkItem} onOpen={() => {}} />);
+    expect(screen.getByText("Delivery proof form for DO-140926-0007")).toBeInTheDocument();
   });
 
   it("opens the owning object and gives read-only work no fake completion control", () => {
