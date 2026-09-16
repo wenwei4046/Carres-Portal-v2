@@ -164,12 +164,15 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 |---|---|---|
 | Workspace destinations | `Work` · `Staff & Duties` · `Issue Tracker` | Workspace Dashboard · Tasks · Duty roster · Service Notes |
 | Work scopes | `My Work` · `Team Work` | My Tasks · Team Tasks · Work queue |
-| Work timing | `Broken commitment` · `Missed` · Monday through Friday · Saturday when authoritative work exists · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
+| Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` · `Public holiday` · `Holiday operation` · `No working date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
 | Work search | `Search work…` | Search tasks… |
 | My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
 | Team Work true empty | `No open work — every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
 | Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
+| Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
+| Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing invented missed age |
+| Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Workspace → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
 | Right Rail healthy clear | `No work due now` · `Open My Work` | All done! · `0` while loading/failed |
 | Right Rail refresh failure | `My Work could not be refreshed` | No work due now · No open work |
 | Duty page purpose | `Who holds each company duty today and who covers an absence.` | Manage staff · Duty roster |

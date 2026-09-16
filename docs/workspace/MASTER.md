@@ -295,8 +295,9 @@ Team Work   the same actions grouped by normal owner
 - My Work is the default for everyone, including managers, and omits their repeated avatar.
 - Team Work groups under owner avatar/name; cover appears only when today's actor differs.
 - No manual `Take it`, `Release`, generic assignment or `Mark done` exists for deterministic work.
-- The working week is explicit: `Missed`, Monday through Friday, calendar-admitted Saturday and
-  `No working date`; blockers never hide the original required working day or missed age.
+- The working week is explicit: `Missed`, the working days admitted by each owning module and
+  resolved owner's calendar, and `No working date`; blockers never hide the original required
+  working day or missed age.
 - Completed/History is read-only source evidence and preserves the actual actor.
 
 ### 5.1 · One Work composition
@@ -333,9 +334,12 @@ shows one selected action's fact, specific act, source-owned communication where
 result and exact owning-object door. `Missed` contains actions whose governed working day has passed;
 the original day and working-day age remain visible. Previous/next controls move the selected week
 without changing scope or filters. Monday through Friday always show. Saturday appears only when an
-authoritative Receiving, Warehouse, Delivery or other module calendar produces real Saturday work;
-it is never moved to Friday. A separate preparation action may appear on Friday only when its owning
-module generates that action. A public holiday remains visible and is named; normal work advances by
+authoritative module action remains scheduled on Saturday after applying that module's rule and the
+resolved owner's working calendar. Payment keeps its locked Friday-action rule for a Saturday
+deadline. Physical Receiving or Delivery work remains on Saturday when its authoritative rule and
+resolved actor admit Saturday; without a qualified actor it is `Not assigned`, not silently moved.
+There is no invented `Saturday Duty`. A separate preparation action may appear on Friday only when
+its owning module generates that action. A public holiday remains visible and is named; normal work advances by
 the source calendar, while an authorised holiday operation remains on the holiday and says so.
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
 today. Broken commitment remains the highest attention fact on the affected row; it is not another
@@ -343,14 +347,19 @@ weekday bucket.
 
 Team Work uses the same three panels and week. It is visible to the whole Operation team: Principal,
 Operation and Jess. Visibility does not grant new module data or action permission. Panel 1
-additionally selects normal owner, Site queue
-or `Not assigned`; Panel 2 keeps actions grouped or visibly identified by that normal owner and
+additionally selects normal owner or `Not assigned`; a Site queue must not appear until its governed
+identity, permission and acceptance path are built and admitted. Panel 2 keeps actions grouped or visibly identified by that normal owner and
 Panel 3 preserves cover evidence. Counts always name actions.
 
 Workspace never owns or stores module truth. In the first release, Panel 3 is an action brief, not
 Object Detail and not a module-writing surface. It shows the fact, specific act, recipient,
-communication aids, completion condition, next consequence and one `Open {object}` door. Copying a
-message or opening WhatsApp never records a send or completes Work. A later release may admit an
+source-provided communication evidence, completion condition, source-provided next consequence and
+one `Open {object}` door. It does not show `Copy message`, `Open WhatsApp` or another communication
+control in the first release, because those governed module controls may record preparation evidence.
+A `FINISH WHEN` block prints the authoritative completion fact. `WHAT HAPPENS NEXT` appears only
+when the owning module supplies a separate governed consequence; Workspace never relabels the
+completion fact or writes a likely consequence itself.
+A later release may admit an
 owning module's governed action component only through a separately approved contract using that
 module's authoritative API, permission, validation, evidence and completion fact.
 
@@ -369,17 +378,18 @@ WORKING DAY / MISSED AGE · exceptional state  metadata/footer
 - Owner belongs in the Team group/avatar or exceptional cover/handover metadata, never the sentence.
 - My Work omits the signed-in person's avatar. It shows `Covered for {normal owner}` when routed by
   active cover. Team Work keeps the normal owner's group and shows `Covered by {acting person}`.
-- A Site queue is an owner state, not a person. It prints `{Site} queue` until a qualified person
-  accepts; acceptance changes resolution, not the source object or completion fact.
+- A future Site queue is an owner state, not a person. It may render only after a governed queue
+  identity, permission and atomic acceptance path are built and admitted; until then unresolved
+  site work is `Not assigned`.
 - The action begins with a specific verb and names its business object only when the header does not
   already make it unambiguous. `Follow up`, `Check`, `Handle`, `Process` and `Pending` alone are
   forbidden.
 - Required result belongs in Panel 3 for physical handover, multi-result and otherwise ambiguous
   acts; it remains available as accessible supporting text for every item.
-- Communication is a structured source-owned block in Panel 3: recipient, phone/channel, prepared
-  message, `Copy message`, `Open WhatsApp`, actual sent evidence and reply state when the source
-  truly supplies them. It is absent for non-communication work. Workspace does not copy or store a
-  second conversation. Opening WhatsApp is not sent evidence.
+- Communication is a read-only structured source-owned block in Panel 3: recipient, channel, actual
+  sent evidence and reply state when the source truly supplies them. It is absent for
+  non-communication work. Workspace does not copy or store a second conversation. Module-owned
+  preparation/send controls remain in the owning module; opening WhatsApp is not sent evidence.
 - Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
   appear only in historical evidence.
 
@@ -388,13 +398,17 @@ WORKING DAY / MISSED AGE · exceptional state  metadata/footer
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
 problem and action. It never broadens permission scope and never searches a separately cached copy.
 
-Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · Monday through
-Friday · Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
+Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
+Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
 `Missed`. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and Right Rail can open
 the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
 does not change business state.
+
+The Module filter lists only currently admitted projections: `Sales Orders` · `Purchasing` ·
+`Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
+`Claims` do not appear until their admission gates and live projection close.
 
 Default ordering inside a working day is broken commitment, module-governed materiality, oldest
 opened occurrence, then object label. Users may narrow
@@ -410,8 +424,11 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
 | No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
 | Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
-| Saturday | Appears only when an admitted source calendar produces Saturday work; retains the Saturday business date |
+| Saturday | Appears only when an admitted action remains on Saturday after module and resolved-owner calendar law; retains the Saturday business date |
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
+| Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
+| Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
+| No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Workspace → Staff & Duties`; do not falsely say the Duty has no holder |
 | Blocked | Name the dependency and the door that can resolve it; retain original working day and missed age |
 | Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
@@ -456,6 +473,11 @@ orthogonal fact and never lowers severity. The displayed due date is the module'
 displayed working-days-late value is calculated with the same snapshotted calendar/rule. Changing
 an SLA changes future obligations unless the owning module explicitly versions existing ones.
 
+Calendar eligibility requires a named source for both the owning module calendar and the resolved
+person's working days. Current hard-coded role calendars are insufficient to claim personal
+Saturday eligibility. Until Staff & Duties supplies that person-calendar fact, the feed exposes a
+calendar-health gap and must not silently assume a default or fabricate missed age.
+
 System automation that should have happened immediately is a source/integrity failure, not a fake
 person task. Supervisory escalation is a notification/management receipt derived from the same
 identity; it never changes the owner, due date or completion fact.
@@ -482,7 +504,7 @@ Work is ready for owner acceptance only when all are demonstrable:
 - every admitted source rule in §6.1 produces one stable identity and source completion removes that
   identity without a manual Done act;
 - My Work, Team Work and Right Rail use one authorised response and one cache identity;
-- normal owner, cover, acting person, Site queue, `Not assigned` and actual completed actor remain
+- normal owner, cover, acting person, admitted Site queue, `Not assigned` and actual completed actor remain
   distinct across assignment/cover changes;
 - broken commitment, missed, weekday, conditional Saturday, holiday and no-working-date examples order once under
   the governed working-day law;
@@ -532,7 +554,7 @@ not editing free text in Workspace. Recipient is supplied by the source object w
 | Purchasing · `purchasing.confirm_tomorrows_delivery` | Arrival is tomorrow · confirmation about that date | PO Duty | Office working day before arrival | Tomorrow-delivery promise exists |
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
 | Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival | GRN Duty | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
-| Warehouse · `warehouse.outbound_handover` | Dated pickup has Units not handed over · exact receiver/proof result | Authorised Site queue, then accepting operator | Scheduled Site handover date | Every required Unit has accepted handover evidence · Delivery owns the next leg/result |
+| Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
 | Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Governed Delivery proxy rule | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
 | Delivery · `assign_logistics` | Delivery required with no company · company selected | Delivery Duty | 3 delivery working days before promise | Delivery company recorded · booking action may open |
 | Delivery · `confirm_delivery_date` | Company assigned but customer date/slot unconfirmed · evidenced booking | Delivery Duty | Configured call days before promise | Confirmed date and slot with evidence |
