@@ -48,7 +48,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
   describe("the collection desk — the Payment Monitor", () => {
     itSaysNoBannedWord(join(PAGES, "finance", "PaymentMonitor.tsx"), {
       minStrings: 40,
-      expectString: "Show items",
+      expectString: "Show payment details",
     });
   });
 
