@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
+import AddCoverForm from "./AddCoverForm";
 import AssignHolderForm from "./AssignHolderForm";
 import { dutyDisplayState } from "./staff-duties-model";
 import { apiFetch } from "@/lib/api";
@@ -72,7 +73,7 @@ export default function DutyDetail({
 }) {
   /** Which focused act is open. One at a time: two overlapping dialogs would
    *  be two answers to the same duty. */
-  const [acting, setActing] = useState<"assign" | null>(null);
+  const [acting, setActing] = useState<"assign" | "cover" | null>(null);
   /* Bumped on every open so a form arrives EMPTY rather than wearing the last
      attempt's answers. Clearing fields by hand instead would flip the kit
      Select between controlled and uncontrolled. */
@@ -196,6 +197,18 @@ export default function DutyDetail({
               >
                 Assign holder
               </Button>
+              {/* §4.4: cover exists only when there is somebody to cover FOR.
+                  An offer the write door would refuse is not an offer. */}
+              {r.normal_user_id ? (
+                <Button
+                  onClick={() => {
+                    setActingSeq((n) => n + 1);
+                    setActing("cover");
+                  }}
+                >
+                  Add cover
+                </Button>
+              ) : null}
             </div>
             {notice ? (
               <p
@@ -211,6 +224,14 @@ export default function DutyDetail({
               duty={duty}
               staff={staff}
               open={acting === "assign"}
+              onClose={() => setActing(null)}
+              onDone={setNotice}
+            />
+            <AddCoverForm
+              key={`cover-${duty.key}-${actingSeq}`}
+              duty={duty}
+              staff={staff}
+              open={acting === "cover"}
               onClose={() => setActing(null)}
               onDone={setNotice}
             />

@@ -711,3 +711,154 @@ describe("assigning a holder", () => {
     await waitFor(() => expect(document.activeElement).toBe(door));
   });
 });
+
+// ── Task 4 · one focused, dated cover ────────────────────────────────────────
+
+function openCover(url = "/operation?tab=staff-duties&duty=po_duty") {
+  draw(url);
+  const door = screen.getByRole("button", { name: "Add cover" });
+  door.focus();
+  fireEvent.click(door);
+  return door;
+}
+
+describe("adding cover", () => {
+  it("offers no cover door at all while nobody holds the duty", () => {
+    draw("/operation?tab=staff-duties&duty=delivery_duty");
+    const detail = screen.getByTestId("selected-duty-delivery_duty");
+    // §4.4: cover is available only when the duty HAS a normal holder. There
+    // is nobody to cover FOR, so the act does not exist here - an offer the
+    // server would refuse is not an offer.
+    expect(within(detail).queryByRole("button", { name: "Add cover" })).toBeNull();
+    expect(
+      within(detail).getByRole("button", { name: "Assign holder" }),
+    ).toBeVisible();
+  });
+
+  it("opens one focused surface on the duty already chosen", () => {
+    openCover();
+    const dialog = screen.getByRole("dialog", { name: "Add cover" });
+    expect(within(dialog).getByText("PO Duty")).toBeVisible();
+  });
+
+  it("shows who is being covered for before anything is confirmed", () => {
+    openCover();
+    const dialog = screen.getByRole("dialog", { name: "Add cover" });
+    expect(within(dialog).getByText("Normal owner")).toBeVisible();
+    expect(within(dialog).getByText("Yu Jun")).toBeVisible();
+  });
+
+  it("shows the resulting period before anything is confirmed", () => {
+    openCover();
+    const from = pickDay("cover-from", 10);
+    const until = pickDay("cover-until", 12);
+    expect(
+      screen.getByText(`${fmtDate(from)} – ${fmtDate(until)}`),
+    ).toBeVisible();
+  });
+
+  it("never offers the normal owner as their own cover", () => {
+    openCover();
+    fireEvent.click(document.getElementById("cover-acting")!);
+    // Yu Jun holds PO Duty; a person cannot cover for themselves, and the
+    // write door refuses it again.
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Shasha",
+    ]);
+  });
+
+  it("refuses a missing acting person with the governed sentence", () => {
+    openCover();
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    expect(screen.getByText("Choose who will cover this duty.")).toBeVisible();
+    expect(coverMutate).not.toHaveBeenCalled();
+  });
+
+  it("refuses missing cover dates with the governed sentence", () => {
+    openCover();
+    choose("cover-acting", "Shasha");
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    expect(screen.getByText("Choose valid cover dates.")).toBeVisible();
+    expect(coverMutate).not.toHaveBeenCalled();
+  });
+
+  it("refuses reversed cover dates with the same sentence", () => {
+    openCover();
+    choose("cover-acting", "Shasha");
+    pickDay("cover-from", 20);
+    pickDay("cover-until", 15);
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    expect(screen.getByText("Choose valid cover dates.")).toBeVisible();
+    expect(coverMutate).not.toHaveBeenCalled();
+  });
+
+  it("sends the exact camelCase contract the API validates", () => {
+    openCover();
+    choose("cover-acting", "Shasha");
+    const from = pickDay("cover-from", 10);
+    const until = pickDay("cover-until", 12);
+    fireEvent.change(screen.getByLabelText("Reason"), {
+      target: { value: "Annual leave" },
+    });
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    expect(coverMutate).toHaveBeenCalledTimes(1);
+    expect(coverMutate.mock.calls[0]![0]).toEqual({
+      dutyKey: "po_duty",
+      actingUserId: "u-shasha",
+      startsOn: from,
+      endsOn: until,
+      reason: "Annual leave",
+    });
+  });
+
+  it("prints the server's own refusal and keeps every entered fact", () => {
+    state.coverError = new Error(
+      "PO Duty already has cover for these dates. Choose different dates.",
+    );
+    openCover();
+    choose("cover-acting", "Shasha");
+    expect(
+      screen.getByText(
+        "PO Duty already has cover for these dates. Choose different dates.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Add cover" })).toBeVisible();
+    expect(document.getElementById("cover-acting")).toHaveTextContent("Shasha");
+  });
+
+  it("cannot be sent twice while the first write is still in flight", () => {
+    state.coverPending = true;
+    openCover();
+    expect(screen.getByTestId("cover-submit")).toBeDisabled();
+  });
+
+  it("does not activate cover or move the owner while the write is pending", () => {
+    state.coverPending = true;
+    openCover();
+    // The catalogue still resolves to the NORMAL owner: only the server's
+    // refreshed answer may change who acts.
+    expect(
+      within(screen.getByTestId("duty-catalogue-po_duty")).getByText("Yu Jun"),
+    ).toBeVisible();
+    expect(
+      within(screen.getByTestId("duty-catalogue-po_duty")).queryByText(
+        "Covered today",
+      ),
+    ).toBeNull();
+  });
+
+  it("announces the governed success sentence", async () => {
+    openCover();
+    choose("cover-acting", "Shasha");
+    const from = pickDay("cover-from", 10);
+    const until = pickDay("cover-until", 12);
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    act(() => coverMutate.mock.calls[0]![1].onSuccess());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByText(
+        `Shasha covers Yu Jun for PO Duty, ${fmtDate(from)}–${fmtDate(until)}`,
+      ),
+    ).toBeVisible();
+  });
+});
