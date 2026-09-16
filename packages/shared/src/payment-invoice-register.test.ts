@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  invoiceConfirmedDelivery,
   invoiceCustomerDelivery,
   invoiceGoodsFacts,
   invoiceGoodsWord,
@@ -230,5 +231,72 @@ describe("invoicePaymentTiming", () => {
     const { timing } = invoicePaymentTiming(
       row({ status: "delivered", delivered_at: "2026-08-30", paid: 100 }), TODAY, OPTS);
     expect(timing.kind).not.toBe("wait");
+  });
+});
+
+/* ⭐ Payment Monitor Card 02 (2026-09-16) — the confirmed delivery is
+   DELIVERY'S fact. Before this, a day Delivery agreed (written to its
+   arrangement) never reached Payment's clock, because Payment read only the
+   booking overlay's `confirmed_date`. */
+describe("invoiceConfirmedDelivery — Delivery's ladder", () => {
+  function withDelivery(extra: {
+    arrangements?: NonNullable<NonNullable<InvoiceRegisterRow["orders"]>["ops_delivery_arrangements"]>;
+    docs?: NonNullable<NonNullable<InvoiceRegisterRow["orders"]>["ops_delivery_orders"]>;
+    control?: { confirmed_date?: string | null; booking_stage?: string | null; confirmed_time_slot?: string | null };
+    delivery_date?: string | null;
+  }): InvoiceRegisterRow {
+    const r = row({ delivery_date: extra.delivery_date ?? "2026-09-20" });
+    r.orders!.ops_delivery_arrangements = extra.arrangements ?? [];
+    r.orders!.ops_delivery_orders = extra.docs ?? [];
+    r.orders!.ops_order_control = [{
+      balance: null, line_etas: null, line_stock_status: null,
+      confirmed_date: extra.control?.confirmed_date ?? null,
+      booking_stage: extra.control?.booking_stage ?? null,
+      confirmed_time_slot: extra.control?.confirmed_time_slot ?? null,
+    }];
+    return r;
+  }
+
+  it("a day saved in Delivery's arrangement is the confirmed delivery, and starts the clock", () => {
+    const r = withDelivery({ arrangements: [{ leg: 0, confirmed_date: "2026-09-10", confirmed_time: null }] });
+    expect(invoiceConfirmedDelivery(r)).toEqual({ dateIso: "2026-09-10", time: null });
+    expect(invoiceCustomerDelivery(r)).toEqual({ dateIso: "2026-09-10", word: "confirmed" });
+    // The clock anchors on Delivery's day (10 Sep), not the requested 20 Sep.
+    const { clock } = invoicePaymentTiming(r, TODAY, OPTS);
+    expect(clock.anchorIso).toBe("2026-09-10");
+  });
+
+  it("the live Delivery Order outranks the arrangement; a voided one does not", () => {
+    const arrangements = [{ leg: 0, confirmed_date: "2026-09-10", confirmed_time: "10 AM to 1 PM" }];
+    expect(invoiceConfirmedDelivery(withDelivery({
+      arrangements,
+      docs: [{ leg: 0, delivery_date: "2026-09-11", time_slot: "2 PM to 5 PM", voided_at: null, issued_at: "2026-09-05T01:00:00Z" }],
+    }))).toEqual({ dateIso: "2026-09-11", time: "2 PM to 5 PM" });
+    expect(invoiceConfirmedDelivery(withDelivery({
+      arrangements,
+      docs: [{ leg: 0, delivery_date: "2026-09-11", time_slot: "2 PM to 5 PM", voided_at: "2026-09-06T00:00:00Z" }],
+    }))).toEqual({ dateIso: "2026-09-10", time: "10 AM to 1 PM" });
+  });
+
+  it("a Journey reads the leg that reaches the customer (the highest leg)", () => {
+    expect(invoiceConfirmedDelivery(withDelivery({
+      arrangements: [
+        { leg: 1, confirmed_date: "2026-09-08", confirmed_time: "9 AM to 12 PM" },
+        { leg: 2, confirmed_date: "2026-09-12", confirmed_time: null },
+      ],
+    }))).toEqual({ dateIso: "2026-09-12", time: null });
+  });
+
+  it("the booking overlay counts only while its stage is confirmed", () => {
+    expect(invoiceConfirmedDelivery(withDelivery({
+      control: { confirmed_date: "2026-09-09", booking_stage: "confirmed", confirmed_time_slot: "2 PM to 5 PM" },
+    }))).toEqual({ dateIso: "2026-09-09", time: "2 PM to 5 PM" });
+    const provisional = withDelivery({ control: { confirmed_date: "2026-09-09", booking_stage: "provisional" } });
+    expect(invoiceConfirmedDelivery(provisional)).toEqual({ dateIso: null, time: null });
+    expect(invoiceCustomerDelivery(provisional).word).toBe("requested");
+  });
+
+  it("nothing agreed anywhere is no confirmed delivery", () => {
+    expect(invoiceConfirmedDelivery(withDelivery({}))).toEqual({ dateIso: null, time: null });
   });
 });
