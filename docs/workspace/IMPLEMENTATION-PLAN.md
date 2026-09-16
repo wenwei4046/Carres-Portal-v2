@@ -70,7 +70,7 @@ Vitest/Testing Library, Playwright, existing Carres UI kit and Tailwind tokens.
   optional communication/blocker/next consequence and `observedAt`.
 - `OperationWorkResponse` adds `complete`, `sources` and reconciled `counts`.
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 Add fixtures proving: machine predicate containing `warehouse_receipts` is accepted but never used as
 `completionStatement`; Saturday business deadline and Friday action date coexist; calendar
@@ -87,26 +87,26 @@ expect(operationWorkItemSchema.parse(fixture)).toMatchObject({
 });
 ```
 
-- [ ] **Step 2: Run the shared contract test and confirm failure**
+- [x] **Step 2: Run the shared contract test and confirm failure**
 
 Run: `pnpm --filter @carres/shared test -- operation-work.test.ts`
 
 Expected: FAIL because contract v2 fields and source health do not exist.
 
-- [ ] **Step 3: Add strict v2 schemas and exported inferred types**
+- [x] **Step 3: Add strict v2 schemas and exported inferred types**
 
 Use enums for source state (`healthy | delayed | failed`) and calendar state
 (`ready | not_configured | read_failed`). Keep `operationWorkStableId()` unchanged. Rename the
 transport field `completionFact` to `completionPredicate`; do not keep two public names for it.
 Require an operator-safe `completionStatement` from each projector adapter.
 
-- [ ] **Step 4: Run shared tests and typecheck**
+- [x] **Step 4: Run shared tests and typecheck**
 
 Run: `pnpm --filter @carres/shared test -- operation-work.test.ts && pnpm --filter @carres/shared typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/shared/src/operation-work.ts packages/shared/src/operation-work.test.ts

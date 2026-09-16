@@ -53,6 +53,7 @@ describe("Issue Tracker operating model", () => {
       actions: [{ id: "action-1", issueId: "issue-1", issueNo: "IS-2608-0001", trigger: "Supplier has not answered", ownerRule: "issue_triage_duty", action: "Ask supplier for an answer", recipient: "Hookka", requiredResult: "Supplier answer recorded", dueOn: "2026-09-06", materiality: "significant" }],
       dutyResolutions: { issue_triage_duty: { dutyKey: "issue_triage_duty", onDate: "2026-09-07", normalOwner: { userId: "staff-1", name: "Shasha" }, buddy: { userId: "staff-2", name: "Yu Jun" }, activeCover: { userId: "staff-2", name: "Yu Jun" }, actingPerson: { userId: "staff-2", name: "Yu Jun" }, state: "covered", assignmentId: "assignment-1" } },
       today: "2026-09-07",
+      observedAt: "2026-09-07T01:00:00.000Z",
     });
     expect(item).toMatchObject({
       id: "issue_tracker:action-1:current_action",
@@ -61,7 +62,7 @@ describe("Issue Tracker operating model", () => {
       problem: "Supplier has not answered",
       action: "Ask supplier for an answer",
       owner: { rule: "issue_triage_duty", normal: { name: "Shasha" }, acting: { name: "Yu Jun" }, state: "covered" },
-      timing: { bucket: "overdue" },
+      timing: { state: "calendar_gap", calendar: { actor: { state: "not_configured" } } },
       destination: "/operation/issues?issue=issue-1",
     });
   });
