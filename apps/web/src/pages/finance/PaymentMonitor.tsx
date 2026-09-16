@@ -19,7 +19,6 @@ import type { OperationWorkItem } from "@carres/shared/operation-work";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
-import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
   useCatalog,
@@ -136,8 +135,15 @@ function addDays(iso: string, n: number): string {
 function workItemFor(row: PaymentMonitorRow, items: readonly OperationWorkItem[] | undefined) {
   if (!items) return null;
   const ids = new Set(row.rows.map((r) => r.id));
-  return items.find((i) => i.module === "payment" && ids.has(i.object.id)
-    && i.ruleKey in PAYMENT_WEEK_RULE_KIND) ?? null;
+  const mine = items.filter((i) => i.module === "payment" && ids.has(i.object.id)
+    && i.ruleKey in PAYMENT_WEEK_RULE_KIND);
+  /* One order can carry two collection items (its balance AND an unpaid
+     Storage Invoice). Line 2 answers line 1, so the item whose work IS the
+     printed fact wins; otherwise the engine's own order stands. */
+  const wanted = row.timing.kind === "storage_invoice_unpaid" ? "payment.send_storage_invoice"
+    : row.timing.kind === "promised_today" ? "payment.missed_promise"
+      : "payment.collect_customer_balance";
+  return mine.find((i) => i.ruleKey === wanted) ?? mine[0] ?? null;
 }
 
 /** A Monitor row with what rides beside it: the Work item and Delivery's
@@ -384,7 +390,7 @@ export default function PaymentMonitor() {
       searchValue: (r) => `${r.customer} ${r.door.orders?.customer_phone ?? ""}`,
       filterValue: (r) => r.customer,
       exportValue: (r) => joinLines(r.customer, r.door.orders?.customer_phone ?? null) },
-    { key: "needed", label: COLUMN.needed, width: 150, align: "right", sortable: true,
+    { key: "needed", label: COLUMN.needed, width: 200, align: "right", sortable: true,
       accessor: (r) => <TwoLines
         line1={r.money.known ? rm(r.money.outstanding) : "Value not recorded"}
         line2={r.money.known && r.money.storageOwing > 0 ? `includes storage ${rm(r.money.storageOwing)}` : null} />,
@@ -445,7 +451,7 @@ export default function PaymentMonitor() {
        2026-09-16). Line 1 the fact. Line 2 the shared Work item's OWN action
        beside its owner avatar — no Work item, no action and no person; only
        the ruled `Wait` stands alone. The owner is never a word in the line. */
-    { key: "timing", label: COLUMN.timing, width: 250, sortable: true, filterType: "enum",
+    { key: "timing", label: COLUMN.timing, width: 300, sortable: true, filterType: "enum",
       accessor: (r) => {
         const action = timingActionText(r);
         return <span className="block min-w-0" data-testid={`monitor-timing-${r.so ?? r.orderId}`}>
@@ -603,7 +609,11 @@ export default function PaymentMonitor() {
               {pickedHeading && <span className="text-body font-semibold text-kit-slate-12">{pickedHeading}</span>}
               {pickedWords.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
             </div>}
-            <ListPageShell register>
+            {/* Delivery's own bounded frame: the sheet scrolls INSIDE the page,
+                so an opened row or a long day never pushes the listing off
+                screen (a height-unbounded shell let the grid grow to its
+                content and the frame clipped it). */}
+            <div className="flex min-w-0 min-h-0 flex-1 flex-col p-2" data-testid="payment-monitor-work-list">
               <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.orderId}
                 storageKey="carres.payment.monitor.v2" appearance="reference" exportName="Payment Monitor"
                 /* No confirmed answer is not an empty list: skeleton until every
@@ -611,7 +621,10 @@ export default function PaymentMonitor() {
                 /* ⭐ THE ROW KEEPS ITS NAME (owner ruling 2026-09-12, Delivery
                    Monitor; applied here 2026-09-14): `SO No` AND `Customer`
                    stay pinned while the eight columns scroll inside the sheet. */
-                groupBanner={false} stickyIdentity={{ columnKey: ["so", "customer"] }}
+                /* On a phone the two pins (≈340px) are wider than the sheet
+                   itself (≈314px at 390): nothing else could ever scroll into
+                   view, so the phone pins the SO number alone. */
+                groupBanner={false} stickyIdentity={{ columnKey: isPhone ? ["so"] : ["so", "customer"] }}
                 /* ⭐ 72px, one fact and one supporting line in every cell (owner
                    ruling 2026-09-16 — the Payment Monitor's own ruling, beside
                    Delivery's). A cell never grows the row. */
@@ -645,7 +658,7 @@ export default function PaymentMonitor() {
                   </span>;
                 }}
               />
-            </ListPageShell>
+            </div>
           </div>
         </div>}
       </>}

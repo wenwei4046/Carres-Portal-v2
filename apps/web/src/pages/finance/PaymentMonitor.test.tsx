@@ -283,6 +283,22 @@ describe("Payment Monitor — the listing", () => {
     expect(late).not.toHaveTextContent("Yu Jun");
   });
 
+  it("two Work items on one order: line 2 is the item whose work is the printed fact", () => {
+    state.invoices.data = [
+      row({ id: "i3", order_id: "o3", so: 1302, paid: 0, control: { ...READY, confirmed_date: iso(-3) } }),
+      row({ id: "s3", order_id: "o3", so: 1302, kind: "storage", amount: 200, control: { ...READY, confirmed_date: iso(-3) } }),
+    ];
+    state.work.data = { items: [
+      workItem("i3", iso(-5)),
+      { ...workItem("s3", iso(-5), { ruleKey: "payment.send_storage_invoice" }), action: "Send the invoice and collect payment" },
+    ] };
+    show();
+    const cell = screen.getByTestId("monitor-timing-1302");
+    expect(cell).toHaveTextContent("Storage Invoice not paid");
+    expect(cell).toHaveTextContent("Send the invoice and collect payment");
+    expect(cell).not.toHaveTextContent("Ask customer to pay");
+  });
+
   it("no Work item for the SO → no invented owner", () => {
     state.work.data = { items: [] };
     show();

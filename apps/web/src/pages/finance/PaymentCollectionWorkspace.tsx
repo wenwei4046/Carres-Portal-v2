@@ -212,8 +212,18 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
     // After the listing has revealed the row — the section is then brought
     // into view inside the same scroll, and takes the keyboard focus.
     const timer = setTimeout(() => {
-      target?.scrollIntoView?.({ block: "nearest" });
-      target?.focus({ preventScroll: true });
+      if (!target) return;
+      /* Only the LISTING scrolls (owner ruling 2026-09-16: the day, the rail
+         and the page stay put). `scrollIntoView` would also scroll every
+         ancestor — the portal frame included — so the grid's own viewport is
+         moved by hand, clearing its sticky header. */
+      const viewport = target.closest<HTMLElement>('[data-testid="grid-scroll"]');
+      if (viewport) {
+        const header = viewport.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+        const offset = target.getBoundingClientRect().top - viewport.getBoundingClientRect().top - header;
+        viewport.scrollTop = Math.max(0, viewport.scrollTop + offset - 8);
+      }
+      target.focus({ preventScroll: true });
     }, 0);
     return () => clearTimeout(timer);
   }, [focus]);
