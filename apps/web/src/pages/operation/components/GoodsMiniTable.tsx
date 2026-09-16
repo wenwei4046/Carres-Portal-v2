@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/fmt-date";
 /**
  * ⭐ THE CHILD MINI-TABLE — ONE IMPLEMENTATION, owner ruling 2026-08-15 (Chai).
  *
@@ -197,6 +198,8 @@ export interface GoodsMiniLine {
   fromStock?: number | null;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
+  orderBy?: string | null;
+  orderByAbsence?: string;
   /**
    * ⭐ THE SENTENCE UNDER `To buy`, when that number is NOT a remainder
    * (owner correction 2026-09-11).
@@ -330,6 +333,7 @@ export default function GoodsMiniTable({
   showFromStock = false,
   showOrderedQty = false,
   showToBuy = false,
+  showOrderBy = false,
   identityFirst = false,
   salesOrderLayout = false,
   showSupplier = false,
@@ -352,6 +356,7 @@ export default function GoodsMiniTable({
   showFromStock?: boolean;
   showOrderedQty?: boolean;
   showToBuy?: boolean;
+  showOrderBy?: boolean;
   /**
    * ⭐ IDENTITY FIRST — owner correction 2026-09-11, the buying page only.
    *
@@ -442,12 +447,13 @@ export default function GoodsMiniTable({
     fromStock: { ...FROM_STOCK_COLUMN },
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
+    orderBy: { key: "orderBy", label: "Order By", width: 104 },
   };
   const order = salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
-    ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
-    : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
+    ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
+    : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     unit: showUnitId,
     supplier: showSupplier,
@@ -456,6 +462,7 @@ export default function GoodsMiniTable({
     fromStock: showFromStock,
     orderedQty: showOrderedQty,
     toBuy: showToBuy,
+    orderBy: showOrderBy,
   };
   const columns: Column[] = order
     .filter((key) => asked[key] ?? true)
@@ -575,6 +582,8 @@ export default function GoodsMiniTable({
                   ) : (
                     <span className="tabular-nums">{line.fromStock}</span>
                   );
+                case "orderBy":
+                  return <span className="tabular-nums">{line.orderBy ? fmtDate(line.orderBy) : line.orderByAbsence ?? "—"}</span>;
                 case "toBuy":
                   /* ⭐ A NUMBER ONLY WHERE THERE IS ONE TO ACT ON, and the note
                      belongs to BOTH branches (owner correction 2026-09-11).

@@ -531,13 +531,12 @@ gone."* It binds every object detail in the portal; it is not re-argued per modu
 **Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
 `OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
 persists by panel title (`:656-673`).
-**Not remembered: the grid's shape** — width, order, visibility. A test asserts it
-(`OperationOrdersControl.test.tsx:614`: *"persists no column shape"*), and §4's reload-is-the-reset
-rule stands.
-**The line is whether the choice changes what the record MEANS to the next reader.** Collapsing a
-rail is where my eyes are now; re-cutting the columns redefines the table for everyone who opens
-it next. *(Written down because a 2026-08-18 chat read the layout-memory rule, did not read the
-shipped code, and stated the opposite.)*
+**Register column preferences are personal.** Width, order and visibility may persist in the
+staff browser without changing anyone else's governed default. `Columns → Reset columns`
+restores the page's default columns, order and widths only; it does not clear filters or records.
+Cross-device account synchronisation is deferred. This Register rule does not add column
+customisation to object-detail goods tables; those retain their own governed capabilities.
+
 
 ---
 
@@ -1061,7 +1060,7 @@ scope capabilities such as All orders / Not delivered are saved/reusable Views, 
 row of pills. A View control is conditional on a useful, distinct view capability; do not render
 one merely to repeat status filters. Supplier Claims defaults to all permitted new and historical
 records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
-add a duplicate generic Filters button. `Reset layout` remains inside Columns.
+add a duplicate generic Filters button. `Reset columns` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
 permanent band. Left = truthful selected count + Clear + the primary work action and any structured
@@ -1420,6 +1419,55 @@ breathing gap
 
 # §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
 
+### Shared listing standard — APPROVED / NOT BUILT, staged adoption (Jess, 2026-09-16)
+
+The common interaction standard applies across modules; initial adoption covers Sales Orders,
+SO Batch Purchase, Manual Purchase and Purchase Orders. It does not redefine module business
+facts, permissions, complete-record populations or task ownership.
+
+1. **Search and filters.** Show active conditions and `Clear filters` whenever search, rail or
+   header filters narrow the list. Clear all three together; preserve permissions and the
+   page's governed base population. Footer shows filtered versus total records (`5 of 62`).
+   Grouping/collapse is presentation, not a filter, and does not reduce the total.
+2. **Identity.** Keep the identity visible during horizontal scrolling and make it open the
+   object: Sales Orders/SO Batch `SO No`, Manual Purchase `Items`, Purchase Orders `PO No`.
+   Personal column changes must not hide or move this identity out of its fixed position.
+3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
+   judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
+   scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
+4. **Personal columns.** Reuse Columns for resize/reorder/visibility and `Reset columns`.
+   Keep browser persistence for now, isolated from other people's defaults. Account-level
+   cross-device persistence is deferred. Reset restores column shape only, not filters/data.
+5. **Actions.** Essential actions remain discoverable on the object opened via identity.
+   Right-click is a shortcut, not the sole door. Pages with batch actions replace the toolbar
+   with their selection actions; do not invent batch actions on read-only registers.
+6. **Presentation.** Reuse shared header, typography, palette, icons, row treatment and measured
+   column-width rules. Content drives default width; full two-line headers plus controls set
+   minimum width. No separate page theme to imitate the shared component.
+7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
+   goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
+   Collapsed records remain in totals; missing/failed data must not imply zero or completion.
+8. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
+   Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
+   overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
+
+**Different jobs, shared interaction:** Sales Orders remains the complete customer-transaction
+register governed by Orders MASTER, not a purchasing work queue. SO Batch uses `To buy` /
+`No purchase needed`. Manual Purchase uses `Need approval` / `To buy` / `No purchase needed`.
+Purchase Orders' proposed four-group arrangement must use one mutually exclusive classifier:
+Cancelled first, Completed next, then current-version confirmed-send evidence for remaining work.
+Its module-specific copy and display proposal are reconciled in Purchasing MASTER before build.
+
+**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `Mark as sent`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
+not proof that no external send happened. Completed legacy documents must not become resend work
+solely because a send record is absent. Purchasing MASTER owns the full send/version contract.
+
+**Adoption order:** SO Batch establishes shared capabilities; Manual Purchase reuses them;
+Sales Orders gets a separately agreed audit/proposal and Claude task; Purchase Orders follows its
+agreed module proposal. No parallel reimplementation of the shared engine. Record built, merged,
+deployed and rendered verification separately; approval alone is not implementation evidence.
+
+
 **This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain
 the measured implementation record; where they disagree with the shape below, this one rules. The
 owner's reference is Gmail: *the fixed bar carries only what is true on every page, the list carries
@@ -1463,9 +1511,15 @@ search that belongs to every page, and a second box here would be a second globa
 action, written in full (`⊕ New Sales Order`) — it is the page's only blue. Right = how the operator
 looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
 
-- **Search is an icon** that expands leftward into an input on click or `/`, with the caret already
-  inside; `Esc` collapses it. While a query is active it stays collapsed but carries its result
-  count (`🔍⁷`) so a narrowed listing can never look like the whole listing.
+- **Register Search — owner ruling R4, 2026-09-16 (overwrites the icon-only rule for every
+  Register; adoption is staged).** The TOOLBAR's available width chooses, never a device label:
+  with room, a readable search box carrying its governed placeholder; narrow, a search icon that
+  opens the box with the caret inside. An active query keeps the box and its `Clear search` control
+  visible at every width, so a narrowed listing never looks like the whole listing. `Esc` clears
+  and closes the transient box. Selection still replaces the toolbar in place (`Clear` · owner ·
+  primary action first). Engine capability: `DataGrid searchPresentation="responsive"`. **Adopted
+  on SO Batch Purchase first (PR #1395); every other Register keeps its current icon search until
+  its own toolbar is migrated and walked — never with a page-local search component.**
 - **Columns is icon-only** (`▥`). Its hover/accessible name is `Columns`.
 - **Export is icon-only too** (`⤓`) — owner ruling 2026-08-15, correcting this section's first
   draft, which reserved icon-only for view controls and kept the word on the verb. The right side

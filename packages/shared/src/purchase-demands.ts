@@ -146,7 +146,7 @@ export function purchaseDemandStateWords(
     no_sku: "SKU not found",
     no_supplier: "Supplier not assigned",
     no_cost: "Catalog cost is missing",
-    no_production_days: "Production days are missing",
+    no_production_days: "Production days not set",
     no_pickup_partner: "Collection is not configured",
   };
 }
@@ -216,6 +216,8 @@ export interface PurchaseDemandRow {
   customer: string | null;
   /** The customer's promised day. `null` = TBD or never set. */
   customerDelivery: IsoDate | null;
+  /** Server planning fact; optional for older Workers, never calculated in React. */
+  orderBy?: IsoDate | null;
   /** `product_models.name` — or the raw SKU when Catalog has no such SKU. */
   item: string;
   /** `product_skus.variant` — the size or the module code. */
@@ -822,6 +824,7 @@ export const purchaseDemandRowSchema = z.object({
   so: z.number().nullable(),
   customer: z.string().nullable(),
   customerDelivery: z.string().nullable(),
+  orderBy: z.string().nullable().optional(),
   item: z.string(),
   variant: z.string().nullable(),
   /* The catalog's own enum, so the wire type and the domain type are ONE type

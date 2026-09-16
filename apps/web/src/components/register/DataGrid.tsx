@@ -50,8 +50,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer, X } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import Button from "@/components/kit/Button";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
@@ -175,6 +176,12 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed groups reuse the same group rows without creating a fake data column. */
+  fixedGroups?: {
+    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean }[];
+    groupOf: (row: T) => string;
+    revealMatches?: boolean;
+  };
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
@@ -210,6 +217,14 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Opt-in Radix slate register palette (SO Batch first, owner ruling R5
+      2026-09-16): white toolbar/rows/footer, slate-3 header, blue-3 ticked
+      rows including pinned cells, slate-2 expansion. Omitted = unchanged. */
+  palette?: "slate";
+  /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
+      readable box when the toolbar has room, an icon that opens when narrow,
+      and an active query plus its clear control always visible. */
+  searchPresentation?: "icon" | "responsive";
   /** Keep frequent controls labelled while the container has room. */
   labelledToolbar?: boolean;
   /** Let a page's date/context controls wrap without clipping; retains icon controls. */
@@ -293,6 +308,8 @@ export type DataGridProps<T> = {
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
+  /** Optional truthful no-match state with a complete reset action. */
+  noMatchMessage?: string;
   isLoading?: boolean;
   /**
    * Right-click row menu. Receives the row and returns the items to show.
@@ -513,6 +530,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  fixedGroups,
   rowKey,
   searchPlaceholder = "Search…",
   exportName,
@@ -525,6 +543,8 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  palette,
+  searchPresentation = "icon",
   labelledToolbar = false,
   wrapToolbar = false,
   toolbar,
@@ -543,6 +563,7 @@ function DataGridInner<T>({
   rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
+  noMatchMessage,
   isLoading = false,
   contextMenu,
   expandable,
@@ -588,7 +609,7 @@ function DataGridInner<T>({
 
   const [search, setSearch] = useState(initialSearch);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
   const [rowCtx, setRowCtx] = useState<{
@@ -642,6 +663,7 @@ function DataGridInner<T>({
      dropdown has its own scrollable value list (maxHeight 320 / overflow auto). */
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
 
   // Refocus search when parent bumps focusSearchNonce ("Find" button).
   useEffect(() => {
@@ -1213,10 +1235,21 @@ function DataGridInner<T>({
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
-    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean }
+    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean }
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    if (fixedGroups) {
+      return fixedGroups.groups.flatMap((group): Render[] => {
+        const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
+        /* The always-open group keeps its heading at 0 while the Register has
+           records, so "nothing to buy" is stated rather than implied. */
+        if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
+        const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen },
+          ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
+      });
+    }
     if (layout.groupBy.length === 0) return sortedRows.map((row) => ({ kind: "row" as const, row }));
 
     const out: Render[] = [];
@@ -1270,7 +1303,28 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
+
+  /* ⭐ A MATCH IS NEVER HIDDEN IN A COLLAPSED GROUP (owner ruling R1). While a
+     search, column filter or page filter narrows the Register, every governed
+     group opens once; the operator may still close one. Clearing the
+     narrowing puts back the open/closed state the operator had before it. */
+  const fixedGroupReveal = fixedGroups != null &&
+    (fixedGroups.revealMatches === true || debouncedSearch.trim() !== "" || filteredRows.length !== rows.length);
+  const collapsedBeforeReveal = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!fixedGroups) return;
+    if (fixedGroupReveal) {
+      setCollapsedGroups((prev) => {
+        collapsedBeforeReveal.current = prev;
+        return new Set();
+      });
+    } else if (collapsedBeforeReveal.current) {
+      setCollapsedGroups(collapsedBeforeReveal.current);
+      collapsedBeforeReveal.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixedGroupReveal]);
 
   // ── Column DnD (reorder) ──────────────────────────────────────────
   const onDragStartHeader = (e: DragEvent<HTMLTableCellElement>, key: string) => {
@@ -1557,7 +1611,7 @@ function DataGridInner<T>({
   }, [revealKey, expandedRows, renderList]);
   const VIRTUAL_THRESHOLD = 25;
   const canVirtualize =
-    !isLoading && !embedded && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
+    !isLoading && !embedded && !fixedGroups && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
   const rowVirtualizer = useVirtualizer({
     enabled: canVirtualize,
     count: canVirtualize ? renderList.length : 0,
@@ -1574,9 +1628,41 @@ function DataGridInner<T>({
   /* One grid row (group banner OR data row + optional expansion). Extracted so
      the normal path and the virtualized window render through the same code. */
   const renderGridRow = (item: Render, idx: number) => {
+    if (item.kind === "group" && fixedGroups) {
+      /* Governed groups: the always-open group is a HEADING, never a control;
+         a collapsible group is a real button announcing its state. Both stay
+         pinned to the visible left edge while the sheet scrolls sideways. */
+      return (
+        <tr key={`g-${item.path}`} className={`${styles.groupRow} ${styles.fixedGroupRow}`} data-testid={`grid-group-${item.path}`}>
+          <td className={styles.groupRowCell} colSpan={totalCols || 1}>
+            {item.alwaysOpen ? (
+              <span role="heading" aria-level={3} className={styles.fixedGroupLabel}>
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.fixedGroupLabel} ${styles.fixedGroupToggle}`}
+                aria-expanded={!item.collapsed}
+                data-testid={`grid-group-toggle-${item.path}`}
+                onClick={() => toggleGroup(item.path)}
+              >
+                <ChevronRight size={14} strokeWidth={2} aria-hidden className={item.collapsed ? undefined : styles.fixedGroupChevronOpen} />
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+    }
     if (item.kind === "group") {
       return (
-        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => toggleGroup(item.path)}>
+        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => { if (!item.alwaysOpen) toggleGroup(item.path); }}
+          tabIndex={item.alwaysOpen ? undefined : 0}
+          aria-expanded={!item.collapsed}
+          onKeyDown={(event) => { if (!item.alwaysOpen && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); toggleGroup(item.path); } }}>
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
@@ -1598,7 +1684,11 @@ function DataGridInner<T>({
         <tr
           data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
-          className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
+          className={`${styles.tr} ${
+            palette === "slate"
+              ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
+              : selectedKey === key ? styles.trSelected : ""
+          }`}
           style={{
             ...rowStyle?.(row),
             ...(selectable || onRowClick || expandKey != null ? { cursor: "pointer" } : {}),
@@ -1787,7 +1877,7 @@ function DataGridInner<T>({
           })}
         </tr>
         {isExpanded && expandable && (
-          <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
+          <tr className={`${styles.tr} ${styles.trExpansion}`} style={{ background: "var(--grid-expansion, var(--c-cream))" }}>
             {/* The gutter, kept EMPTY beside the child rows — the indent IS
                 the parent-child link (owner ruling 2026-08-15). */}
             {expansionGutter.map((key) => (
@@ -1825,6 +1915,8 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        palette === "slate" ? styles.rootPaletteSlate : null,
+        searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
         labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
@@ -1841,7 +1933,70 @@ function DataGridInner<T>({
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
-        {!embedded && (
+        {!embedded && searchPresentation === "responsive" ? (
+          /* R4 (owner ruling 2026-09-16): both forms are rendered and the
+             TOOLBAR's own width chooses (container query), so a narrow canvas
+             inside a wide window still gets the icon. An active query keeps
+             the box and its clear control on screen at every width. */
+          <>
+            <button
+              ref={searchIconRef}
+              type="button"
+              aria-label="Search"
+              title="Search"
+              data-testid="search-icon"
+              data-hidden={searchOpen || search !== "" ? "true" : undefined}
+              className={`${styles.toolbarIcon} ${styles.searchResponsiveIcon}`}
+              onClick={() => {
+                setSearchOpen(true);
+                requestAnimationFrame(() => searchRef.current?.focus());
+              }}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+            </button>
+            <div
+              className={`${styles.searchWrap} ${styles.searchResponsiveBox}`}
+              data-testid="search-box"
+              data-active={searchOpen || search !== "" ? "true" : undefined}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+              <input
+                ref={searchRef}
+                className={styles.searchInput}
+                type="search"
+                aria-label="Search"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                    requestAnimationFrame(() => {
+                      if (searchIconRef.current && getComputedStyle(searchIconRef.current).display !== "none") searchIconRef.current.focus();
+                    });
+                  }
+                }}
+                onBlur={() => { if (!search) setSearchOpen(false); }}
+              />
+              {search !== "" && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  data-testid="search-clear"
+                  className={styles.searchClear}
+                  onClick={() => {
+                    setSearch("");
+                    searchRef.current?.focus();
+                  }}
+                >
+                  <X size={14} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </div>
+          </>
+        ) : !embedded && (
           isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
@@ -2367,7 +2522,7 @@ function DataGridInner<T>({
             {!isLoading && renderList.length === 0 && (
               <tr>
                 <td colSpan={totalCols || 1} style={{ padding: 0 }}>
-                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{emptyMessage}</div>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchMessage && (rows.length > 0 || emptyMessage === noMatchMessage) ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
                 </td>
               </tr>
             )}

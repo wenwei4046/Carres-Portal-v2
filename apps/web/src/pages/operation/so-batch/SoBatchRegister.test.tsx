@@ -292,15 +292,17 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 
 const onIssue = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}) {
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
         <SoBatchRegister data={data(over)} isLoading={false} onIssue={onIssue} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  if (expandHistory) { const group = screen.queryByText("No purchase needed"); if (group) fireEvent.click(group); }
+  return rendered;
 }
 
 beforeEach(() => {
@@ -329,11 +331,12 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
 describe("the approved columns, in the approved reading order", () => {
   const APPROVED = [
     "SO No",
+    "Order By",
     "Customer",
+    "Supplier",
     "Proceed Date",
     "Requested Delivery Date",
     "Delivery Location",
-    "Supplier",
     "Deliver To",
     "PO No",
     "PO Delivery Date",
@@ -386,7 +389,7 @@ describe("the approved columns, in the approved reading order", () => {
   });
 
   it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v3"');
+    expect(source()).toContain('"carres.soBatchPurchase.register.v5"');
     expect(source()).not.toContain("register.v1");
   });
 
@@ -893,7 +896,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
      walked at 459px. */
   it("leaves the flow below md so it cannot consume the table", () => {
     renderRegister();
-    expect(rail().className).toContain("max-md:absolute");
+    expect(readFileSync(join(HERE, "SoBatchRegister.module.css"), "utf8")).toContain("@container so-batch (width < 896px)");
     /* Its positioning context is the row it sits in, not the page. */
     expect(rail().parentElement?.className).toContain("relative");
   });
@@ -1226,7 +1229,7 @@ describe("the expansion — the ONE shared child table", () => {
     const line = within(box).getByTestId("so-batch-part-B1201S-Q");
     const cells = [...line.querySelectorAll("td")].map((c) => c.textContent);
     expect(cells).toEqual([
-      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "—", "Mattress",
+      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "—", "—", "Mattress",
     ]);
     expect(within(line).queryByRole("checkbox")).toBeNull();
     expect(screen.queryByTestId("so-batch-status-o6")).toBeNull();
@@ -2133,5 +2136,140 @@ describe("choosing a Ready Unit", () => {
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o3::b3", allocations: [{ destinationId: KLANG, qty: 1 }] },
     ]);
+  });
+});
+
+
+describe("approved Order By correction", () => {
+  it("shows the earliest selectable engine date and ignores covered leaves", () => {
+    const original = data();
+    const rows: PurchaseDemandRow[] = original.rows.map((r) => ({ ...r, orderBy: "2026-09-25" }));
+    rows.push(leaf({ id: "covered", orderBy: "2026-01-01", fullyOnPo: true }));
+    renderRegister({ rows });
+    expect(screen.getByTestId("so-batch-order-by-o1")).toHaveTextContent("25 Sep");
+    expect(screen.getByTestId("so-batch-order-by-o5")).toBeEmptyDOMElement();
+  });
+
+  it("names blocked planning and leaves the no-PO destination blank", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-order-by-o4")).toHaveTextContent("Not planned");
+    expect(screen.getByTestId("so-batch-deliver-to-o4")).toBeEmptyDOMElement();
+  });
+
+  it("explains denied Issue authority in the selected toolbar", () => {
+    renderRegister({ mayIssue: false });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByText("Only PO Duty can issue this PO")).toBeInTheDocument();
+  });
+});
+
+
+describe("two truthful groups on one permanent Register", () => {
+  it("starts with buying open and no-purchase-needed collapsed, preserving the total", () => {
+    renderRegister({}, false);
+    expect(screen.getByText("To buy")).toBeInTheDocument();
+    expect(screen.getByText("No purchase needed")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-row-o5")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+    fireEvent.click(screen.getByText("No purchase needed"));
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-row-o6")).toBeInTheDocument();
+  });
+});
+
+
+describe("search, clear and default buying order", () => {
+  it("sorts selectable dates ascending with descending SO ties before blocked demand", () => {
+    const rows = data().rows.map((r) => ({ ...r, orderBy: r.orderId === "o1" ? "2026-09-30" : "2026-09-16" }));
+    const { container } = renderRegister({ rows }, false);
+    const ids = [...container.querySelectorAll('[data-testid^="so-batch-row-"]')].map((r) => r.getAttribute("data-testid"));
+    expect(ids.indexOf("so-batch-row-o3")).toBeLessThan(ids.indexOf("so-batch-row-o1"));
+    expect(ids.indexOf("so-batch-row-o1")).toBeLessThan(ids.indexOf("so-batch-row-o4"));
+  });
+  it("search reveals a covered order and no match offers a complete clear", async () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1400" } });
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument());
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "NOT-A-REAL-SO" } });
+    await screen.findByText("No Sales Orders match these filters");
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("7 Sales Orders");
+  });
+});
+
+describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
+  const rowsIn = (container: HTMLElement) =>
+    [...container.querySelectorAll("tbody tr")].map((tr) =>
+      tr.getAttribute("data-testid") ?? tr.textContent ?? "");
+
+  it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {
+    const { container } = renderRegister({}, false);
+    const heading = screen.getByRole("heading", { name: /To buy/ });
+    expect(heading.tagName).not.toBe("BUTTON");
+    const toggle = screen.getByTestId("grid-group-toggle-no-purchase-needed");
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const order = rowsIn(container);
+    expect(order.indexOf("grid-group-to-buy")).toBeLessThan(order.indexOf("grid-group-no-purchase-needed"));
+    /* Remaining demand decides — partly bought o3 and blocked o4 buy; Ordered
+       o5, Ready-Stock-only o6 and fully linked o7 need nothing. */
+    for (const id of ["o1", "o3", "o4", "o8"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+    for (const id of ["o5", "o6", "o7"]) expect(screen.queryByTestId(`so-batch-row-${id}`)).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    for (const id of ["o5", "o6", "o7"]) expect(screen.getByTestId(`so-batch-row-${id}`)).toBeInTheDocument();
+  });
+
+  it("R1 — a search match inside the collapsed group is revealed, and clearing restores the collapse", async () => {
+    renderRegister({}, false);
+    const input = screen.getByTestId("search-box").querySelector("input")!;
+    fireEvent.change(input, { target: { value: "STOCKED" } });
+    expect(await screen.findByTestId("so-batch-row-o6")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("search-clear"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o6")).not.toBeInTheDocument());
+    expect(input.value).toBe("");
+  });
+
+  it("R2 — To buy reads Order By ascending, then Not planned, then SO No descending", () => {
+    const { container } = renderRegister({
+      rows: [
+        { ...LEAF_O1, orderBy: "2026-08-25" },
+        { ...LEAF_O3, orderBy: "2026-08-23" },
+        { ...LEAF_O8A, orderBy: "2026-08-30" },
+        { ...LEAF_O8B, orderBy: "2026-08-24" },
+        LEAF_O4,
+      ],
+    }, false);
+    const rows = rowsIn(container).filter((t) => t.startsWith("so-batch-row-"));
+    expect(rows).toEqual(["so-batch-row-o3", "so-batch-row-o8", "so-batch-row-o1", "so-batch-row-o4"]);
+    expect(screen.getByTestId("so-batch-order-by-o4").textContent).toBe("Not planned");
+  });
+
+  it("R6 — the footer carries one total, singular for one order", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, false);
+    expect(screen.getByTestId("so-batch-footer").textContent).toBe("1 Sales Order");
+  });
+
+  it("R4 — the search box, its active query and its clear control are on the toolbar", () => {
+    renderRegister({}, false);
+    const box = screen.getByTestId("search-box");
+    expect(screen.getByTestId("search-icon")).toBeInTheDocument();
+    fireEvent.change(box.querySelector("input")!, { target: { value: "Kimmy" } });
+    expect(box).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("search-icon")).toHaveAttribute("data-hidden", "true");
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
+  });
+
+  it("R5 — a ticked row is marked as ticked; an expanded unticked row is not", () => {
+    renderRegister({}, false);
+    fireEvent.click(screen.getByTestId("so-batch-expand-o3"));
+    expect(screen.getByTestId("so-batch-row-o3").className).not.toMatch(/trTicked/);
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-row-o1").className).toMatch(/trTicked/);
+    expect(source()).toContain('palette="slate"');
+    expect(source()).toContain('searchPresentation="responsive"');
   });
 });

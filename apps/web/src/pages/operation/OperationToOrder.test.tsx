@@ -162,7 +162,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     apiFetch.mockResolvedValue(payload());
     renderPage("/operation/to-order?so=1204");
     await screen.findByTestId("so-batch-page");
-    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands?so=1204");
+    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
 
   it("opens straight onto the header, the order-timing rail and the Register", async () => {
@@ -278,6 +278,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     // document. (`Status` was retired as a presentation on 2026-09-11: the
     // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
+    fireEvent.click(await screen.findByText("No purchase needed"));
     await waitFor(() =>
       expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );
@@ -338,6 +339,27 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       expect.stringContaining("issue-batch"),
       expect.anything(),
     );
+  });
+
+  it("R8 — Back to buying returns to the SAME Register: search, open group and ticks kept", async () => {
+    apiFetch.mockResolvedValue(payload());
+    renderPage();
+    await screen.findByTestId("so-batch-row-o1");
+    const search = screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "SO-" } });
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    await screen.findByTestId("so-batch-issue-workspace");
+    /* The Register is hidden, never unmounted. */
+    expect(screen.getByTestId("so-batch-page")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(screen.getByTestId("so-batch-issue-back"));
+    await waitFor(() => expect(screen.queryByTestId("so-batch-issue-workspace")).not.toBeInTheDocument());
+    expect(screen.getByTestId("so-batch-page")).not.toHaveAttribute("aria-hidden");
+    /* The tick survived, so the selection toolbar is still in place … */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    /* … and clearing it hands back the toolbar with the query still typed. */
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect((screen.getByTestId("search-box").querySelector("input") as HTMLInputElement).value).toBe("SO-");
   });
 });
 

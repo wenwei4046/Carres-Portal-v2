@@ -11,7 +11,7 @@
  * grows one, this file is what it replaces.
  */
 import type { ReactNode } from "react";
-import { PanelLeftClose } from "lucide-react";
+import Icon from "@/components/kit/Icon";
 
 export function RailGroup({
   title,
@@ -146,7 +146,7 @@ export function FilterRail({
             title="Hide filters"
             className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
           >
-            <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
+            <Icon name="panelToggle" panelOpen />
           </button>
         )}
         <div
@@ -183,7 +183,7 @@ export function FilterRail({
           title="Hide filters"
           className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
         >
-          <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
+          <Icon name="panelToggle" panelOpen />
         </button>
       )}
       {children}

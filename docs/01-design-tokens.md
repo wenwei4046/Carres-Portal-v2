@@ -86,9 +86,10 @@ nobody can mistype a digit.** The law names the STEP; Tailwind resolves the hex.
 
 | Semantic | Step | Use |
 |---|---|---|
-| `background` | `slate-3` | page canvas |
+| `background` | `kit.canvas` (`#F7F8FA`) | page canvas — see the note below |
 | `surface` | `white` | card · panel |
-| `surface-alt` | `slate-3` | inset · nested surface |
+| `surface-alt` | `slate-3` | inset · nested surface · table header |
+| `surface-expansion` | `slate-2` | the area under an opened register row (ruling R5, 2026-09-16) |
 | `border` | `slate-5` | table lines · card edge |
 | `divider` | `slate-6` | section split |
 | `text-primary` | `slate-12` | primary text |
@@ -101,6 +102,13 @@ nobody can mistype a digit.** The law names the STEP; Tailwind resolves the hex.
 | `success` | `green-3` / `green-11` | |
 | `warning` | `amber-3` / `amber-11` | |
 | `error` | `red-3` / `red-11` | |
+
+**The canvas is the one step that is not a Radix step.** Jess specified `#F7F8FA` for the page
+canvas on 2026-08-02, and `tailwind.config.ts` publishes it as `kit.canvas` with that dated ruling.
+This table previously said `slate-3`; that text disagreed with the shipped pixels and is corrected
+here without changing any colour. `slate-3` remains the canvas only on pages not yet migrated to
+`bg-kit-canvas`. `slate-2` was added on 2026-09-16 (owner ruling R5, SO Batch Purchase) — additive,
+no existing step moved.
 
 `primary-hover` and `primary-active` are reserved on purpose: the token exists,
 the implementation is not required until something needs it.

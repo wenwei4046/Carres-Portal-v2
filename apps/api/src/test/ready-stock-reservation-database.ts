@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { migration } from "./stock-register-database";
 
@@ -142,6 +143,14 @@ export async function readyStockDatabase() {
     ),
   );
 
+  // Final committed 0500 path, including its hash checks, not a copied body.
+  await db.exec("create temporary table _g0500(signature text, result text)");
+  const gates = migration("0500_role_gates_refuse_a_caller_with_no_role");
+  for (const name of ["ops_stock_release", "ops_stock_reassign"]) {
+    const block = gates.slice(gates.indexOf(`-- ${name}(`));
+    await db.exec(statement(block, "do $g0500$", "$g0500$;"));
+  }
+  await db.exec(bindingRepairDraft());
   return db;
 }
 
@@ -157,4 +166,16 @@ export async function actingAs(db: PGlite, role: string, uid?: string) {
     `update public._test_actor set role = ${role === "null" ? "null" : `'${role}'`}` +
       (uid ? `, uid = '${uid}'` : ""),
   );
+}
+
+
+/** Reviewable candidate; never applies outside this disposable database. */
+export function bindingRepairDraft() {
+  return readFileSync(new URL("../../../../scripts/purchasing-reservation-binding-repair.sql", import.meta.url), "utf8").replace(CRLF, "\n");
+}
+
+export function alternate0500Body(name: "ops_stock_release" | "ops_stock_reassign") {
+  const gates = migration("0500_role_gates_refuse_a_caller_with_no_role");
+  const block = gates.slice(gates.indexOf(`-- ${name}(`));
+  return block.split("execute $s0500b$")[1]!.split("$s0500b$;")[0]!;
 }

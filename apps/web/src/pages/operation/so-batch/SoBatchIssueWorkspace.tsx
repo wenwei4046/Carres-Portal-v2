@@ -1,3 +1,4 @@
+import layoutStyles from "./SoBatchRegister.module.css";
 // design-standard: not-a-list-page — this is the 50/50 ISSUE surface
 // (CARD-2026-08-22-purchasing-02 §5), not a Register. Its table is the lines of
 // ONE purchase order being checked before it is sent, sitting beside that
@@ -11,6 +12,7 @@ import {
   type SoBatchDocument,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
@@ -362,7 +364,7 @@ export default function SoBatchIssueWorkspace({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
+      className={`${layoutStyles.issue} flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas`}
       data-testid="so-batch-issue-workspace"
     >
       {/* The 50px destination header keeps its height at every width. Walked at
@@ -416,7 +418,7 @@ export default function SoBatchIssueWorkspace({
           a grid compressed the work row and clipped every control in it. A flex
           column with `shrink-0` panes is as tall as its content and scrolls. */}
       <div
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto min-[1130px]:grid min-[1130px]:grid-cols-2 min-[1130px]:overflow-hidden"
+        className={`${layoutStyles.issueBody} min-h-0 flex-1`}
         data-testid="so-batch-issue-split"
       >
         {/* ── 50% · the only editable side ──────────────────────────────── */}
@@ -429,7 +431,7 @@ export default function SoBatchIssueWorkspace({
              this pane is as tall as its content; the split scrolls. Side by side
              it is a grid item and `min-h-0` again, so the pane scrolls inside a
              fixed split. */
-          className="flex shrink-0 flex-col border-b border-kit-slate-5 bg-white p-4 min-[1130px]:min-h-0 min-[1130px]:shrink min-[1130px]:overflow-y-auto min-[1130px]:border-b-0 min-[1130px]:border-r"
+          className={`${layoutStyles.issueWork} flex shrink-0 flex-col border-b border-kit-slate-5 bg-white p-4`}
           data-testid="so-batch-issue-work"
         >
           {mode === "review" && current ? (
@@ -491,23 +493,19 @@ export default function SoBatchIssueWorkspace({
                 </span>
               ) : null}
               <div className="mt-auto flex items-center justify-between gap-3 pt-4">
-                <button
-                  type="button"
-                  data-testid="so-batch-issue-back"
-                  className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium"
-                  onClick={onBack}
-                >
+                <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
                   {W.backToBuying}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
                   data-testid="so-batch-issue-create"
-                  className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white disabled:bg-kit-slate-6"
-                  disabled={creating || (!coveringPo && (documents.length === 0 || blocker !== null))}
+                  loading={creating}
+                  disabled={!coveringPo && (documents.length === 0 || blocker !== null)}
                   onClick={() => void issue()}
                 >
                   {W.issuePo}
-                </button>
+                </Button>
               </div>
             </>
           ) : currentPo ? (
@@ -543,14 +541,9 @@ export default function SoBatchIssueWorkspace({
                   (`SO Batch Purchase`'s own buying list), never `Purchase
                   Orders`, which is a different module's register. */}
               <div className="mt-4 flex items-center border-t border-kit-slate-5 pt-3">
-                <button
-                  type="button"
-                  data-testid="so-batch-issue-back"
-                  className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium"
-                  onClick={onBack}
-                >
+                <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
                   {W.backToBuying}
-                </button>
+                </Button>
               </div>
             </>
           ) : null}
@@ -560,7 +553,7 @@ export default function SoBatchIssueWorkspace({
         <div
           /* Stacked, the document keeps a readable height rather than
              collapsing to the height of an iframe nobody can read. */
-          className="flex min-h-[70vh] shrink-0 flex-col bg-kit-canvas p-4 min-[1130px]:min-h-0 min-[1130px]:shrink min-[1130px]:overflow-y-auto"
+          className={`${layoutStyles.issuePreview} flex min-h-[70vh] shrink-0 flex-col bg-kit-canvas p-4`}
           data-testid="so-batch-issue-preview"
         >
           {mode === "review" ? (

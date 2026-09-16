@@ -855,16 +855,11 @@ export async function loadToOrder(
    * read still uses `stock_balances`; that is a different surface and is
    * reported, not changed here.
    *
-   * THE LEDGER, NOT `status = 'reserved'`. A unit that is delivered becomes
-   * `sold`, so a reservation-based reading would let a satisfied requirement
-   * come BACK as something to buy the day the goods went out. The ledger is
-   * permanent and dated, and its own comment says why: it counts the DECISION,
-   * never net units.
-   *
-   * NEITHER READ MAY TAKE THE PAGE DOWN. To Order turned customer orders into
-   * purchase orders for months before ready stock was on it; if either table
-   * is unreachable the FEATURE is unavailable and the workspace is exactly
-   * what it was — no offer, no netting, nothing invented.
+   * Current exact bindings count both reserved and sold Units. The permanent
+   * ledger supplies only legacy coverage; modern reservation History excludes
+   * its Units from that fallback even after release. If coverage cannot be read,
+   * refuse the demand response rather than offer duplicate purchasing. The
+   * optional free-stock offer may still degrade independently.
    */
   const { stockWarehouse, freeStock, stockQtyById } = await readFreeStock(sb);
 
@@ -880,7 +875,8 @@ export async function loadToOrder(
    *              both count, because the binding survives the sale — a
    *              delivered requirement must not return as something to buy.
    *
-   *   LEGACY     `ops_stock_pool_usage`, read for units that carry NO binding.
+   *   LEGACY     `ops_stock_pool_usage`, excluding every Unit whose reservation
+   *              History records a line binding, even after that binding clears.
    *              That ledger counts the DECISION and is append-only by law
    *              (0292: "a later release does not unmake the decision"), which
    *              is exactly why it cannot answer coverage on its own. It stays
@@ -901,13 +897,15 @@ export async function loadToOrder(
     if (boundErr) throw new Error(boundErr.message);
     for (const r of (boundRows ?? []) as Record<string, unknown>[]) {
       const lineId = r.reserved_order_line_id as string;
+      if (!lineId) continue;
       boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
       boundUnitIds.add(r.id as string);
       const code = (r.unit_code as string | null) ?? null;
       if (code) boundUnitCodesByLine.set(lineId, [...(boundUnitCodesByLine.get(lineId) ?? []), code]);
     }
   } catch (e) {
-    console.error("ready stock bindings unavailable — coverage not shown", (e as Error).message);
+    console.error("ready stock bindings unavailable", (e as Error).message);
+    return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
   }
 
   /** `{ref}::{stockKey}` → units already drawn for it, UNBOUND rows only. */
@@ -917,17 +915,41 @@ export async function loadToOrder(
       .from("ops_stock_pool_usage")
       .select("item_id, sku, qty, ref");
     if (usageErr) throw new Error(usageErr.message);
+    // A cleared binding is not evidence of a legacy reservation. 0471 writes
+    // order_line_id to reservation History; that immutable provenance excludes
+    // the Unit from ledger fallback forever. Only the current Unit binding
+    // above supplies coverage, so release/reassign restores demand immediately.
+    const modernIds = new Set(boundUnitIds);
+    const usageIds = [...new Set((usageRows ?? []).map((u) => u.item_id).filter(Boolean))] as string[];
+    for (const ids of chunk(usageIds)) {
+      for (let offset = 0; ; offset += 500) {
+        const { data: events, error } = await sb.from("ops_activity_log")
+          .select("id, detail")
+          .eq("action", "stock_reserve")
+          .in("detail->>item_id", ids)
+          .not("detail->>order_line_id", "is", null)
+          .order("id")
+          .range(offset, offset + 499);
+        if (error) return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
+        for (const event of events ?? []) {
+          const detail = event.detail as { item_id?: string; order_line_id?: string } | null;
+          if (detail?.item_id && detail.order_line_id) modernIds.add(detail.item_id);
+        }
+        if ((events?.length ?? 0) < 500) break;
+      }
+    }
     for (const u of (usageRows ?? []) as Record<string, unknown>[]) {
       const ref = (u.ref as string | null) ?? "";
       if (!ref) continue;
       /* Bound units answer through their line; counting their ledger row too
          would net the same goods twice. */
-      if (u.item_id && boundUnitIds.has(u.item_id as string)) continue;
+      if (u.item_id && modernIds.has(u.item_id as string)) continue;
       const k = `${ref}::${stockMatchKey(u.sku as string)}`;
       takenByRefKey.set(k, (takenByRefKey.get(k) ?? 0) + Math.max(0, Number(u.qty ?? 0)));
     }
   } catch (e) {
-    console.error("ready stock ledger unavailable — takes not shown", (e as Error).message);
+    console.error("ready stock coverage unavailable", (e as Error).message);
+    return { ok: false, status: 503, body: { error: "stock_coverage_unavailable" } };
   }
 
   /**
