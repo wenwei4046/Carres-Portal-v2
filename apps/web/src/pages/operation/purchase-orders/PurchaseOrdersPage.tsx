@@ -617,7 +617,7 @@ export default function PurchaseOrdersPage() {
       key: "grn",
       chooserGroup: "Receiving",
       label: "GRN No",
-      width: 150,,
+      width: 150,
       sortable: true,
       /* One GRN opens it in Receiving; several open this PO's receiving; none
          is blank. A Worker that sent no GRN list is not "no GRN". */
