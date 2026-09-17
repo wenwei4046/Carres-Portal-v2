@@ -83,13 +83,13 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
       <table className="w-full text-body" data-testid="so-payments">
         <thead>
           <tr className="text-label text-base-500">
-            <th className="py-1 pr-3 text-left font-medium">Date</th>
-            <th className="py-1 pr-3 text-left font-medium">Method</th>
-            <th className="py-1 pr-3 text-right font-medium">Amount</th>
-            <th className="py-1 pr-3 text-left font-medium">Reference</th>
-            <th className="py-1 pr-3 text-left font-medium">Receipt</th>
-            <th className="py-1 pr-3 text-left font-medium">Slip</th>
-            <th className="py-1 text-left font-medium">Recorded by</th>
+            <th className="py-2 pr-4 text-left font-medium align-top whitespace-nowrap">Date</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Method</th>
+            <th className="py-2 pr-4 text-right font-medium align-top whitespace-nowrap">Amount</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Reference</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Receipt</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Slip</th>
+            <th className="py-2 text-left font-medium align-top">Recorded by</th>
           </tr>
         </thead>
         <tbody>
@@ -102,17 +102,17 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
                 className={`border-t border-kit-slate-5 ${live ? "" : "text-base-500"}`}
                 data-testid={live ? "so-payment-row" : "so-payment-row-voided"}
               >
-                <td className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(p.paid_on)}</td>
-                <td className="py-1.5 pr-3">
+                <td className="py-2 pr-4 align-top whitespace-nowrap">{fmtDate(p.paid_on)}</td>
+                <td className="py-2 pr-4 align-top">
                   <div>{payMethodWord(p.method)}</div>
                   {kind && <div className="mt-0.5 text-meta text-base-600">{kind}</div>}
                 </td>
-                <td className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
+                <td className={`py-2 pr-4 align-top text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
                   {fmtMoney(Number(p.amount ?? 0))}
                 </td>
-                <td className="py-1.5 pr-3 font-mono text-meta">{p.reference || "Not recorded"}</td>
-                <td className="py-1.5 pr-3 font-mono text-meta">{p.receipt_no || "Not recorded"}</td>
-                <td className="py-1.5 pr-3">
+                <td className="py-2 pr-4 align-top font-mono text-meta">{p.reference || "Not recorded"}</td>
+                <td className="py-2 pr-4 align-top font-mono text-meta">{p.receipt_no || "Not recorded"}</td>
+                <td className="py-2 pr-4 align-top">
                   {p.receipt_url ? (
                     <button
                       type="button"
@@ -125,7 +125,7 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
                     <span className="text-meta text-base-500">Not recorded</span>
                   )}
                 </td>
-                <td className="py-1.5">
+                <td className="py-2 align-top">
                   <div>{p.recorded_by_name || "Not recorded"}</div>
                   {!live && (
                     <div className="mt-0.5 text-meta font-medium text-danger">

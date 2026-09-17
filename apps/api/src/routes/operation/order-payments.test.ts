@@ -119,6 +119,33 @@ const PAY_ID = "00000000-0000-0000-0000-0000000002bb";
 // GET /api/operation/orders/:id/payments
 // =====================================================================
 describe("GET /:id/payments", () => {
+  it.each([
+    ["sale-time uploaded slip", "order_create", "deposit", null, " dealer/order/slip.png ", "dealer/order/slip.png"],
+    ["existing receipt takes precedence", "order_create", "deposit", "existing.png", "original.png", "existing.png"],
+    ["later collection cannot inherit deposit proof", "manual", "payment", null, "original.png", null],
+    ["non-deposit cannot inherit deposit proof", "order_create", "payment", null, "original.png", null],
+    ["missing proof stays absent", "order_create", "deposit", null, undefined, null],
+    ["blank proof stays absent", "order_create", "deposit", null, "  ", null],
+    ["malformed proof stays absent", "order_create", "deposit", null, 123, null],
+  ])("resolves %s", async (_label, source, kind, receipt, slip, expected) => {
+    const sb = makeSb({ order_payments: { list: { data: [{
+      id: PAY_ID, order_id: ORDER_ID, amount: 915, kind,
+      receipt_url: receipt, source_channel: source,
+      source_metadata: { payment_slip_url: slip },
+    }], error: null } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { payments: Array<Record<string, unknown>> };
+    expect(body.payments[0].receipt_url).toBe(expected);
+    expect(body.payments[0].amount).toBe(915);
+    expect(body.payments[0]).not.toHaveProperty("source_metadata");
+    expect(sb.calls.updates).toEqual([]);
+  });
+
   it("401 without Authorization", async () => {
     const res = await app.fetch(
       new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`),
