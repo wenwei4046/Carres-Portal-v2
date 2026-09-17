@@ -421,6 +421,32 @@ describe("GET /api/operation/procurement/:slug", () => {
     }
   });
 
+  it("urgency uses the KL calendar date, not the UTC date (00:00-08:00 MYT window)", async () => {
+    // 2026-05-31T17:00Z is 2026-06-01 01:00 MYT. KL today = 06-01, UTC today = 05-31.
+    // delivery 2026-06-07 is 6 KL-days out → critical. UTC math says 7 → urgent.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-31T17:00:00Z"));
+    try {
+      const PO = { ...NICE_FUTURE_PO, id: "PO-3003", so: 5003, so_refs: null };
+      mockSinglePass(
+        [PO],
+        [{ so: 5003, customer_name: "Tan", delivery_date: "2026-06-07" }],
+      );
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/procurement/nice-future", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { pos: Array<{ id: string; urgency: string | null }> };
+      expect(body.pos.find((p) => p.id === "PO-3003")?.urgency).toBe("critical");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stockpile POs (no so + no so_refs) skip Pass C and get orders=[] urgency=null", async () => {
     const STOCKPILE_PO = {
       ...NICE_FUTURE_PO,
