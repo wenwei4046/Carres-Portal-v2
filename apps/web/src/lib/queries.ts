@@ -588,12 +588,6 @@ export const qk = {
   // and `operation` so mutations can blast `["finance"]` (e.g. a receipt
   // ripples to the invoice and payment registers) or a tighter sub-tree.
   finance: {
-    arAging:          () => ["finance", "ar-aging"] as const,
-    apAging:          () => ["finance", "ap-aging"] as const,
-    monthlyPl:        (months?: number) =>
-      ["finance", "monthly-pl", months ?? 6] as const,
-    topSkus:          (limit?: number) =>
-      ["finance", "top-skus", limit ?? 8] as const,
     bankStatements:   (filters?: { from?: string; to?: string; matched?: "true" | "false" }) =>
       ["finance", "bank-statements", filters ?? {}] as const,
     reconSuggest:     (bankStmtId: string) =>
@@ -738,108 +732,6 @@ export interface FinanceRefundsFilters {
 // payloads; no need for a domain layer for these aggregates since they're
 // read-only dashboard data, never round-tripped through adapters).
 // ---------------------------------------------------------------------------
-// No route reaches the AR aging read any more; FinancePayments/FinanceInvoices still import these types.
-export interface FinanceArAgingRow {
-  order_id:      string;
-  so:            number;
-  customer_name: string;
-  dealer_id:     string | null;
-  dealer_name:   string | null;
-  placed_at:     string;
-  days:          number;
-  aging:         "0-30" | "31-60" | "61-90" | "90+";
-  total:         number;
-  paid:          number;
-  outstanding:   number;
-  invoice_no:    string;
-  status:        string;
-}
-export interface FinanceArAgingBucket {
-  amount: number;
-  count:  number;
-}
-export interface FinanceArAgingResponse {
-  rows:    FinanceArAgingRow[];
-  buckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
-}
-
-// AP aging — finance_ap_aging() RPC payload (migration 0063). pay_status_ui
-// is a derived 5-value bucket; the raw db enum (pay_status) only has 3 values.
-// No route reaches the AP aging read any more (/finance/ap redirects to
-// /finance/ap-outstanding); FinanceAP/APDrawer still import these types.
-export type FinanceApPayStatusUi =
-  | "matched"
-  | "scheduled"
-  | "paid"
-  | "in_transit"
-  | "in_production";
-export interface FinanceApAgingLine {
-  sku:          string;
-  sku_name:     string;
-  qty:          number;
-  received_qty: number;
-  unit_cost:    number | null;
-  line_total:   number;
-}
-export interface FinanceApAgingHistoryEntry {
-  text:        string;
-  occurred_at: string;
-  by_role:     string | null;
-}
-export interface FinanceApAgingRow {
-  po_id:               string;
-  so:                  number | null;
-  supplier_id:         string | null;
-  supplier_name:       string | null;
-  warehouse_id:        string | null;
-  placed_at:           string;
-  expected_ready_date: string | null;
-  eta_date:            string | null;
-  pickup_date:         string | null;
-  status:              string;
-  sup_status:          string;
-  pay_status:          "unpaid" | "scheduled" | "paid";
-  pay_status_ui:       FinanceApPayStatusUi;
-  qty:                 number;
-  total:               number;
-  do_number:           string | null;
-  has_do:              boolean;
-  due_in:              number | null;
-  lines:               FinanceApAgingLine[];
-  history:             FinanceApAgingHistoryEntry[];
-}
-export interface FinanceApAgingBucket {
-  amount: number;
-  count:  number;
-}
-export interface FinanceApAgingResponse {
-  rows:        FinanceApAgingRow[];
-  byPayStatus: Record<FinanceApPayStatusUi, FinanceApAgingBucket>;
-}
-
-// Monthly P&L (Chunk B) — finance_monthly_pl RPC payload.
-export interface FinanceMonthlyPlRow {
-  m:       string;     // "Nov 25"
-  revenue: number;
-  cogs:    number;
-  opex:    number;
-  net:     number;
-}
-export interface FinanceMonthlyPlResponse {
-  rows: FinanceMonthlyPlRow[];
-}
-
-// Top SKUs (Chunk B) — finance_top_skus RPC payload.
-export interface FinanceTopSkuRow {
-  sku:     string;
-  name:    string;
-  qty:     number;
-  revenue: number;
-}
-export interface FinanceTopSkusResponse {
-  rows: FinanceTopSkuRow[];
-}
-
 // Bank statement row (from /api/finance/bank-statements list — augmented
 // with matched_ref derived from reconciliations join).
 export interface FinanceBankStatementRow {
@@ -8043,7 +7935,6 @@ export function useReassignPoWarehouseMutation(
 // Server contract:
 //   GET   /api/finance/invoices/register          -> InvoiceRegisterRow[] (paged, fail-closed)
 //   GET   /api/finance/payments/register          -> PaymentRegisterRow[] (paged, fail-closed)
-//   GET   /api/finance/reports/monthly-pl|top-skus
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
@@ -8082,60 +7973,6 @@ function toFinanceRefundsSearch(f?: FinanceRefundsFilters): string {
   if (f.limit)    p.set("limit",    String(f.limit));
   const qs = p.toString();
   return qs ? `?${qs}` : "";
-}
-
-// No route reaches this any more (/finance/ar reads the invoice register); FinancePayments/FinanceInvoices still import it.
-export function useFinanceArAging(
-  opts?: Partial<UseQueryOptions<FinanceArAgingResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.arAging(),
-    queryFn: () => apiFetch<FinanceArAgingResponse>("/api/finance/reports/ar-aging"),
-    staleTime: 30_000,
-    ...opts,
-  });
-}
-
-// No route reaches this any more (/finance/ap redirects to /finance/ap-outstanding); FinanceAP still imports it.
-export function useFinanceApAging(
-  opts?: Partial<UseQueryOptions<FinanceApAgingResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.apAging(),
-    queryFn: () => apiFetch<FinanceApAgingResponse>("/api/finance/reports/ap-aging"),
-    staleTime: 30_000,
-    ...opts,
-  });
-}
-
-export function useFinanceMonthlyPl(
-  months?: number,
-  opts?: Partial<UseQueryOptions<FinanceMonthlyPlResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.monthlyPl(months),
-    queryFn: () =>
-      apiFetch<FinanceMonthlyPlResponse>(
-        `/api/finance/reports/monthly-pl${months ? `?months=${months}` : ""}`,
-      ),
-    staleTime: 60_000,
-    ...opts,
-  });
-}
-
-export function useFinanceTopSkus(
-  limit?: number,
-  opts?: Partial<UseQueryOptions<FinanceTopSkusResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.topSkus(limit),
-    queryFn: () =>
-      apiFetch<FinanceTopSkusResponse>(
-        `/api/finance/reports/top-skus${limit ? `?limit=${limit}` : ""}`,
-      ),
-    staleTime: 60_000,
-    ...opts,
-  });
 }
 
 export function useFinanceBankStatements(

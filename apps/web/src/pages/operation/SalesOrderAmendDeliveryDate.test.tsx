@@ -121,3 +121,29 @@ describe("the trio", () => {
     );
   });
 });
+
+describe("the day the customer asked is gated by the Malaysian day", () => {
+  it("keeps a KL-today asked-on date when the browser's own day still lags", () => {
+    /* 17:00 UTC 17 Sep = 01:00 18 Sep in Kuala Lumpur, but still 10:00 17 Sep
+       in Los Angeles. The customer asked on the 18th — the KL day. */
+    const tz = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-17T17:00:00Z"));
+    try {
+      draw();
+      pickDayOfThisMonth("so-amend-asked-on", 18);
+      pickDayOfThisMonth("so-amend-new-date", 24);
+      fireEvent.change(screen.getByLabelText(/reason for change/i), {
+        target: { value: "Customer moving house" },
+      });
+      fireEvent.click(screen.getByTestId("amend-delivery-date-submit"));
+      const arg = submitMutate.mock.calls[0]![0] as { customerAskedOn: string | null };
+      expect(arg.customerAskedOn).toBe("2026-09-18"); // before the fix: null — silently dropped
+    } finally {
+      vi.useRealTimers();
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
+});

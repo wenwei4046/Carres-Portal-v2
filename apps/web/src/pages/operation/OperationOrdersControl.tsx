@@ -20,7 +20,7 @@ import {
 import { workspaceDutyActor } from "./workspace-duty-owner";
 import { useActiveOrder } from "@/lib/active-order";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
@@ -448,8 +448,7 @@ function daysToDue(o: operationOrderListRow): number | null {
   if (o.delivery_date_tbd || !o.delivery_date) return null;
   const d = new Date(`${o.delivery_date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(`${appTodayIso()}T00:00:00`);
   return Math.round((d.getTime() - today.getTime()) / 86_400_000);
 }
 
@@ -458,10 +457,9 @@ function daysToDue(o: operationOrderListRow): number | null {
 //  customer-deadline DEADLINE band; the supplier stock-window nuance stays in
 //  the NEXT verb's red/amber tone, not a separate filter.)
 
-/** Today as a local ISO date (YYYY-MM-DD) — for lexical ISO date compares. */
+/** Today as YYYY-MM-DD in the business timezone — for lexical ISO date compares. */
 export function todayIso(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  return appTodayIso();
 }
 /** Shift an ISO date by n days (n may be negative), returned as ISO. */
 function addDaysIso(iso: string, n: number): string {

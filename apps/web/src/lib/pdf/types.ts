@@ -69,7 +69,8 @@ export type DoTemplateData = {
 export type ReceiptTemplateData = {
   receipt_no: string;
   issue_date: string; // paid_on (yyyy-mm-dd)
-  order_code: string; // SO-123
+  /** SO-123. Null for a receipt that belongs to no order (an other receipt, RV). */
+  order_code: string | null;
   customer: { name: string };
   amount: number;
   method: string; // cash / bank / card / cheque / online / other
@@ -81,6 +82,26 @@ export type ReceiptTemplateData = {
    *  withdrawn when a payment is voided — it is reprinted saying so. */
   voided?: boolean;
   void_reason?: string | null;
+  /** Right-hand signature caption; defaults to "Customer signature". */
+  payer_sign_label?: string;
+};
+
+/** Other debtor invoice (ARI, migration 0478) — e.g. office rent billed to a
+ *  sister company. Only an issued or cancelled invoice prints: a draft has no
+ *  number yet. */
+export type OtherDebtorInvoiceTemplateData = {
+  invoice_no: string;
+  issue_date: string;
+  due_date: string | null;
+  reference: string | null;
+  narration: string | null;
+  party: { name: string; address: string | null; phone: string | null; registration_no: string | null };
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  currency: string;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  issued_by: string | null;
 };
 
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-

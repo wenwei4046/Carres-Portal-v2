@@ -274,24 +274,14 @@ export const reconciliationCreateInput = z.object({
 export type ReconciliationCreateInput = z.infer<typeof reconciliationCreateInput>;
 
 /**
- * `cashflowSeriesQuery` / `monthlyPlQuery` / `topSkusQuery` — report params.
- * Each clamps the period parameter to a sensible range before passing to
+ * `cashflowSeriesQuery` — report params.
+ * It clamps the period parameter to a sensible range before passing to
  * the SQL RPC (which also clamps server-side).
  */
 export const cashflowSeriesQuery = z.object({
   weeks: z.coerce.number().int().min(1).max(52).optional(),
 }).strict();
 export type CashflowSeriesQuery = z.infer<typeof cashflowSeriesQuery>;
-
-export const monthlyPlQuery = z.object({
-  months: z.coerce.number().int().min(1).max(24).optional(),
-}).strict();
-export type MonthlyPlQuery = z.infer<typeof monthlyPlQuery>;
-
-export const topSkusQuery = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-}).strict();
-export type TopSkusQuery = z.infer<typeof topSkusQuery>;
 
 /**
  * `refundApplyInput` — POST /api/finance/refunds/:id/apply.

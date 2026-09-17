@@ -3498,3 +3498,11 @@ Supporting copy (BUILT 2026-09-17): the name field `Layout name` and its button 
 refusals `You can keep 10 layouts. Save under an existing name to replace one.` ·
 `The layout could not be saved. Try again.` · `Your default could not be saved. Try again.`
 Purchase Orders rail: `All suppliers` · `All destinations`; row disclosure hover `Show goods`.
+
+**Other money in: printed documents (PROPOSAL — PENDING APPROVAL, 17 Sep 2026).** The other
+debtor invoice and the other receipt pages each get `Download PDF` (already in this standard).
+New words: on the invoice PDF `INVOICE` · `INVOICE · CANCELLED` · `CANCELLED · {reason}` ·
+`Reg No` · `Due` · `Description` · `Amount (RM)` · `TOTAL DUE` · `Note: {narration}`; on the
+receipt PDF the right-hand signature line `Payer signature`; and the failure toasts
+`The invoice could not be opened — {error}` · `The receipt could not be opened — {error}`. A draft
+invoice has no number and no PDF.

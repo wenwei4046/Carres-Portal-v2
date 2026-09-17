@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { fmtDate } from "@/lib/fmt-date";
 import { useOpenWorkSet } from "../../use-open-work";
+import { myMissedAndToday, WORK_SOURCE_LABEL } from "../../work/work-model";
 
 /**
  * The LEGACY `ops_tasks` read's own key (the header Bell and the Orders Control
@@ -13,17 +14,30 @@ import { useOpenWorkSet } from "../../use-open-work";
  */
 export const TASKS_KEY = ["operation", "legacy-tasks"] as const;
 
-/** Quick Rail is a count/navigation peek at My Work, never a second queue. */
+/** `Last updated {time}` — a timestamp through the one date home. */
+function lastUpdated(at: string | number | null): string | null {
+  if (at === null) return null;
+  const iso = typeof at === "number" ? new Date(at).toISOString() : at;
+  return `Last updated ${fmtDate(iso, { time: true })}`;
+}
+
+/**
+ * Quick Rail is a count/navigation peek at My Work, never a second queue
+ * (Workspace MASTER §7). Its numbers come from `myMissedAndToday` — the same
+ * selector the icon badge reads — so the badge, this panel and My Work's focus
+ * list print one number. Loading keeps the rows with placeholders; a failed
+ * refresh keeps the last safe counts and says so; a failed source is named in
+ * words and never reads as `0` or as a clear state.
+ */
 export default function TasksPanel() {
-  const myId = useAuth((state) => state.session)?.user?.id ?? null;
-  const { items, generatedOn, complete, failedSources, loading, error } = useOpenWorkSet();
-  const mine = myId ? items.filter((item) => item.ownerId === myId) : [];
-  const missed = mine.filter((item) => item.timingBucket === "overdue").length;
-  const today = mine.filter((item) => item.timingBucket !== "overdue" && item.dueIso === generatedOn).length;
-  const counts = [
+  const {
+    items, myUserId, myFocus, unhealthySources, hasData, refreshFailed, lastUpdatedAt, error, retry,
+  } = useOpenWorkSet();
+  const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
+  const rows = [
     { label: "Missed", count: missed, href: "/operation?tab=work&scope=mine&day=missed", danger: true },
-    { label: "Today", count: today, href: `/operation?tab=work&scope=mine&day=${generatedOn}`, danger: false },
-  ].filter((row) => row.count > 0);
+    { label: "Today", count: today, href: `/operation?tab=work&scope=mine&day=${myFocus?.to ?? ""}`, danger: false },
+  ];
 
   const openMyWork = (
     <Link
@@ -35,32 +49,81 @@ export default function TasksPanel() {
     </Link>
   );
 
-  if (loading) return <div className="text-meta text-base-400 py-4">Loading My Work…</div>;
-  if (error) return <div className="space-y-3"><p className="text-meta text-danger py-2">My Work could not be loaded.</p>{openMyWork}</div>;
+  if (!hasData) {
+    return (
+      <div className="space-y-3" data-testid="my-work-panel">
+        {error ? (
+          <div role="status" className="space-y-2">
+            <p className="text-meta text-kit-amber-11">My Work could not be refreshed</p>
+            <button
+              type="button"
+              onClick={retry}
+              className="px-3 py-1.5 rounded-md border border-base-200 bg-white text-meta text-base-700"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <>
+            <span className="sr-only" role="status">Loading work</span>
+            <div className="rounded-lg border border-base-200 bg-white divide-y divide-base-100" aria-hidden="true">
+              {rows.map((row) => (
+                <div key={row.label} className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="flex-1 text-body text-base-700">{row.label}</span>
+                  <span className="h-3 w-5 rounded bg-base-100 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {openMyWork}
+      </div>
+    );
+  }
+
+  const healthy = !refreshFailed && unhealthySources.length === 0;
+  const counted = rows.filter((row) => row.count > 0);
 
   return (
     <div className="space-y-3" data-testid="my-work-panel">
-      {!complete ? (
-        <p className="text-meta text-kit-amber-11" role="status">
-          My Work could not be refreshed{failedSources.length > 0 ? ` · ${failedSources.join(", ")}` : ""}
-        </p>
+      {!healthy ? (
+        <div className="space-y-1 text-meta text-kit-amber-11" role="status">
+          <p>
+            <span>My Work could not be refreshed</span>
+            {refreshFailed && lastUpdatedAt !== null ? (
+              <span className="block text-base-500">{lastUpdated(lastUpdatedAt)}</span>
+            ) : null}
+          </p>
+          {unhealthySources.map((source) => (
+            <p key={source.key}>
+              <span>{`Could not refresh ${WORK_SOURCE_LABEL[source.key]}`}</span>
+              {source.lastSuccessfulAt ? (
+                <span className="block text-base-500">{lastUpdated(source.lastSuccessfulAt)}</span>
+              ) : null}
+            </p>
+          ))}
+        </div>
       ) : null}
-      {counts.length > 0 ? <div className="rounded-lg border border-base-200 bg-white divide-y divide-base-100">
-        {counts.map((row) => (
-          <Link
-            key={row.href}
-            to={row.href}
-            aria-label={`Open My Work · ${row.label} · ${row.count} ${row.count === 1 ? "action" : "actions"}`}
-            className="flex items-center gap-3 px-3 py-2.5 hover:bg-base-50"
-          >
-            <span className={`flex-1 text-body ${row.danger && row.count > 0 ? "text-danger font-semibold" : "text-base-700"}`}>
-              {row.label}
-            </span>
-            <span className="text-body tabular-nums text-base-900">{row.count}</span>
-            <ChevronRight size={14} className="text-base-300" />
-          </Link>
-        ))}
-      </div> : complete ? <p className="text-body text-base-500">No work due now</p> : null}
+      {counted.length > 0 ? (
+        <div className="rounded-lg border border-base-200 bg-white divide-y divide-base-100">
+          {counted.map((row) => (
+            <Link
+              key={row.href}
+              to={row.href}
+              aria-label={`Open My Work · ${row.label} · ${row.count} ${row.count === 1 ? "action" : "actions"}`}
+              className="flex items-center gap-3 px-3 py-2.5 hover:bg-base-50"
+            >
+              <span className={`flex-1 text-body ${row.danger ? "text-danger font-semibold" : "text-base-700"}`}>
+                {row.label}
+              </span>
+              <span className="text-body tabular-nums text-base-900">{row.count}</span>
+              <ChevronRight size={14} className="text-base-300" />
+            </Link>
+          ))}
+        </div>
+      ) : healthy ? (
+        <p className="text-body text-base-500">No work due now</p>
+      ) : null}
       {openMyWork}
     </div>
   );

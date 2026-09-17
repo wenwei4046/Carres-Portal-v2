@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import { appTodayIso } from "@/lib/fmt-date";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { accShort, fmtMoney } from "@carres/shared";
@@ -2057,8 +2058,7 @@ describe("orders export", () => {
 describe("nextActionOf (C2)", () => {
   // Local-midnight date N days from today → daysToDue returns exactly N.
   const inDays = (n: number) => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
+    const d = new Date(`${appTodayIso()}T00:00:00`);
     d.setDate(d.getDate() + n);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
       d.getDate(),
@@ -2768,8 +2768,7 @@ describe("nextActionOf (C2)", () => {
 
 // Relative local-midnight ISO date, N days from today (daysToDue → exactly N).
 const relISO = (n: number) => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
+  const d = new Date(`${appTodayIso()}T00:00:00`);
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),
@@ -2779,6 +2778,31 @@ const relISO = (n: number) => {
 describe("stockEtaOf (STOCK supplier ETA — stock_eta version)", () => {
   it("no overlay → none", () => {
     expect(stockEtaOf(makeRow({ id: "x", so: 1 })).state).toBe("none");
+  });
+
+  describe("today is the Malaysian day, not the browser's", () => {
+    const savedTz = process.env.TZ;
+    beforeEach(() => {
+      process.env.TZ = "UTC";
+      vi.useFakeTimers();
+      // 23:30 UTC on 14 Aug is already 07:30 on 15 Aug in Kuala Lumpur.
+      vi.setSystemTime(new Date("2026-08-14T23:30:00Z"));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      if (savedTz === undefined) delete process.env.TZ;
+      else process.env.TZ = savedTz;
+    });
+
+    it("an ETA of 14 Aug is overdue once KL is on 15 Aug", () => {
+      const o = makeRow({
+        id: "x",
+        so: 1,
+        delivery_date: "2026-08-30",
+        ops_order_control: { line_stock_status: { A: "waiting" }, line_etas: { A: "2026-08-14" } },
+      });
+      expect(stockEtaOf(o).state).toBe("overdue");
+    });
   });
 
   it("all lines ready → ready, no ETA line", () => {
@@ -2844,6 +2868,19 @@ describe("stockEtaOf (STOCK supplier ETA — stock_eta version)", () => {
 });
 
 describe("slackDays (Option B — DEADLINE-primary + bounded stock bump)", () => {
+  it("daysToDue counts from the KL calendar date, not the browser's", () => {
+    // 22:00Z on 16 Sep = 06:00 on 17 Sep in Kuala Lumpur. A browser in UTC/Europe/US
+    // still says 16 Sep; the business is already on the 17th.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-16T22:00:00Z"));
+    try {
+      expect(slackDays(makeRow({ id: "x", so: 1, delivery_date: "2026-09-17" }))).toBe(0);
+      expect(slackDays(makeRow({ id: "y", so: 2, delivery_date: "2026-09-16" }))).toBe(-1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("completed sinks to the bottom; TBD / undated sit just above it", () => {
     expect(
       slackDays(makeRow({ id: "x", so: 1, status: "delivered", operation_stage: "delivered" })),

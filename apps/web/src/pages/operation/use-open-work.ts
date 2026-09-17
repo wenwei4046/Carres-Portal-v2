@@ -12,7 +12,9 @@ import type {
   OpsStaffMember,
   WorkItem,
 } from "@carres/shared";
+import { useAuth } from "@/lib/auth";
 import { useOperationWork } from "@/lib/queries";
+import { workFocusDay, type WorkFocus } from "./work/work-model";
 
 export interface WorkRow extends Omit<WorkItem, "module"> {
   source: OperationWorkItem;
@@ -34,6 +36,20 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
 export interface OpenWorkSet {
   items: WorkRow[];
   generatedOn: string;
+  /** My focus window (MASTER §5.1): `generatedOn` through my focus day. */
+  myFocus: WorkFocus | null;
+  /**
+   * THE ONE IDENTITY (HF-3, 2026-09-17): the signed-in account id. Work owner
+   * ids and staff `userId` are both account ids, so no email is ever matched —
+   * a staff email that differs from the login email is still the same person.
+   */
+  myUserId: string | null;
+  /** A safe response exists (possibly from before a failed refresh). */
+  hasData: boolean;
+  /** The latest refresh failed while an earlier response is still held. */
+  refreshFailed: boolean;
+  /** When the held response was received (ms), or null. */
+  lastUpdatedAt: number | null;
   complete: boolean;
   failedSources: string[];
   /** Health of every source that is not current, with its last good read. */
@@ -121,9 +137,21 @@ export function useOpenWorkSet(): OpenWorkSet {
     () => new Map(staff.map((member) => [member.user_id, member])),
     [staff],
   );
+  const myUserId = useAuth((s) => s.session?.user?.id ?? s.user?.id ?? null);
+  const generatedOn = query.data?.generatedOn ?? "";
+  const myFocus = useMemo((): WorkFocus | null => {
+    if (!generatedOn) return null;
+    const myDueIsos = items.filter((item) => item.ownerId === myUserId).map((item) => item.dueIso);
+    return { from: generatedOn, to: workFocusDay(generatedOn, myDueIsos) };
+  }, [generatedOn, items, myUserId]);
   return {
     items,
-    generatedOn: query.data?.generatedOn ?? "",
+    generatedOn,
+    myFocus,
+    myUserId,
+    hasData: Boolean(query.data),
+    refreshFailed: query.isError && Boolean(query.data),
+    lastUpdatedAt: query.data && query.dataUpdatedAt ? query.dataUpdatedAt : null,
     complete: query.data?.complete ?? false,
     failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
     unhealthySources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy"),
