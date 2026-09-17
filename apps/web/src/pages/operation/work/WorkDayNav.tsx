@@ -5,6 +5,8 @@ export interface WorkDayChoice {
   label: string;
   count: number;
   note?: string;
+  /** A public holiday: named, never counted, never chosen. */
+  holiday?: string;
 }
 
 export default function WorkDayNav({
@@ -19,6 +21,14 @@ export default function WorkDayNav({
   return (
     <nav aria-label="Working day" className="no-scrollbar flex overflow-x-auto border-b border-kit-slate-5 bg-white">
       {days.map((day) => {
+        if (day.holiday) {
+          return (
+            <div key={day.key} data-holiday={day.key} className="min-h-10 min-w-28 shrink-0 px-3 py-2 text-left">
+              <span className="block text-body font-medium text-kit-slate-11">{day.label}</span>
+              <span className="mt-1 block text-meta text-kit-slate-11">Public holiday · {day.holiday}</span>
+            </div>
+          );
+        }
         const selected = day.key === value;
         return (
           <button
