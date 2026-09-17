@@ -132,34 +132,36 @@ authoritative business rule and current roster:
 missing customer commitment       → responsible salesperson
 issue PO / confirm supplier date  → current PO Duty
 receive goods                     → current GRN Duty
-collect customer balance          → Payment ownership rule
-confirm delivery appointment      → Delivery ownership rule
+order/customer/delivery follow-up → Sales Order PIC, with Buddy cover
+collect customer balance          → Sales Order PIC, with Buddy cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
 employment/account eligibility facts only; **Workspace → Staff & Duties** is the ONE company-wide
-Duty assignment door. Every module references a Duty key and never stores its own staff list. The
-Shared Duty Resolver applies the active Primary holder and governed Buddy cover so absence changes
-who sees today's work without changing the underlying business record or rewriting its history. A
-manager may see or filter the resolved owner, but Work never creates a second assignment truth.
+Duty assignment door. An Owner Rule may reference a stable object owner such as the Sales Order PIC
+or a governed Duty key; modules never keep a second staff list. The shared resolver applies the
+governed Buddy cover so absence changes who sees today's work without changing the underlying
+business record or rewriting its history. A manager may see or filter the resolved owner, but Work
+never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
 
-**OWNER-APPROVED / LOCKED 2026-09-01; GLOBAL DUTY MODEL OVERWRITTEN 2026-09-03.** No page, module
-or API reads a rota table or calculates a Duty holder for itself. The same assignment, approval
-routing and Buddy-cover mechanism applies across the ERP; each kind of work still names its own
-Duty. The complete resolution chain is:
+**OWNER-APPROVED / LOCKED 2026-09-01; OVERWRITTEN 2026-09-17.** No page, module or API reads a
+rota table or calculates a Duty holder or object-owner cover for itself. The same owner-resolution,
+approval-routing and Buddy-cover mechanism applies across the ERP. Each action names an Owner Rule;
+that rule may resolve a stable object owner such as the Sales Order PIC or a governed Duty. The
+complete resolution chain is:
 
 ```
 People — individual staff identity, active/access, last working date and leave facts
-→ Workspace → Staff & Duties — Duty catalogue, one Primary holder and optional Buddy cover
-→ Shared Duty Resolver — date + active staff + leave/cover rules
+→ owning object or Workspace → Staff & Duties — normal PIC or Duty Primary and optional Buddy cover
+→ Shared Owner Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
 ```
 
 An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
-audit evidence preserves three distinct identities: the normal Primary owner, today's resolved
+audit evidence preserves three distinct identities: the normal PIC or Duty owner, today's resolved
 Cover (when one acts), and the actual person who completed/approved the work. Historical evidence
 never changes when a Duty holder changes later. The displayed owner/avatar is the resolver result,
 not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
@@ -177,9 +179,10 @@ The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
 | Payment exception | `Payment Approver` |
 | Stock adjustment | `Stock Adjustment Approver` |
 | Service Case decision | `Service Case Approver` |
-| Routine Delivery arrangement, customer contact, result and proof work | `Delivery Duty` — the engine's existing `delivery_duty` owner rule, given its assignment key by the owner ruling of 2026-09-13 |
+| Sales Order has no PIC and routine Delivery work must remain visible | `Delivery Duty` fallback only — never the routine owner |
 
-Each Duty has exactly one active Primary holder and may have one governed Buddy cover. When the
+Each Duty has exactly one active Primary holder and may have one governed Buddy cover. A Sales
+Order has one PIC and may resolve the same governed Buddy cover for absence. When the
 Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
 it does not rewrite the normal owner. Changing staff or approval ownership happens once in
 `Workspace → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
@@ -673,8 +676,9 @@ or correct its event.
 row's expanded panels · record a customer contact · record the delivery result · upload and
 review the proof · maintain the partner's rules in central Delivery Settings. (The SYSTEM issues
 the delivery order; `Request Delivery Order` is the one governed manual door.) Every routine act
-resolves its owner through the `delivery_duty` rule and the Shared Duty Resolver; the Loan offer
-and decision stay with the Customer Order.
+resolves to the linked Sales Order's PIC and today's governed Buddy cover. Only an order with no
+PIC falls back to `Delivery Duty`, where the unresolved work remains visible with the Staff &
+Duties correction door. The Loan offer and decision stay with the Customer Order.
 
 **SUMMARISES** — the customer's promised date and confirmed booking · what the order contains ·
 whether money holds it.
@@ -802,11 +806,12 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 
 ### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
 
-Workspace owns one Staff & Duties registry for every ERP module. Each work/approval type maps to
-its own duty (for example Delivery Duty, Storage Waiver Approver, Purchasing Approver); there is no
-universal ERP Manager owner. A duty has a primary holder and optional buddy cover. Resolution
-retains normal owner, today's cover and actual actor, so absence changes today's work without
-rewriting history. Reassignment is one Workspace change and never a module code change.
+Workspace owns one Staff & Duties registry for governed Duties and Buddy cover. Approval and
+specialist work maps to its own Duty (for example Storage Waiver Approver or Purchasing Approver);
+routine order, Delivery and collection work maps to the Sales Order PIC. Delivery Duty is only the
+no-PIC fallback. There is no universal ERP Manager owner. Resolution retains normal owner, today's
+cover and actual actor, so absence changes today's work without rewriting history. Reassignment is
+one governed owner change and never a module-local staff list.
 
 ---
 

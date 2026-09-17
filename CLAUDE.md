@@ -537,10 +537,11 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
 > describes one module, and every boundary defect found so far lived *between* two of them.
 
-> **GLOBAL DUTY LAW — OWNER-APPROVED 2026-09-03.** Every ERP action and approval resolves its
-> owner through the shared Staff & Duties system: duty rule → primary holder → today's buddy cover
-> → actual actor evidence. A module may name the duty it needs; it may never hard-code a person's
-> name, keep a second assignment list, or turn owner identity into action-sentence text.
+> **GLOBAL OWNER LAW — OWNER-APPROVED 2026-09-03; OVERWRITTEN 2026-09-17.** Every ERP action and
+> approval names an Owner Rule. That rule resolves either a stable object owner such as the Sales
+> Order PIC, or a governed Duty through Staff & Duties; today's Buddy cover may act without
+> replacing the normal owner, and actual actor evidence is retained. A module may never hard-code a
+> person's name, keep a second assignment list, or turn owner identity into action-sentence text.
 
 ## 8.1 · Modules
 
