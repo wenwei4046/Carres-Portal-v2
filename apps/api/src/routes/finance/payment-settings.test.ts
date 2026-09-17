@@ -348,9 +348,9 @@ describe("Collection timing (0486)", () => {
     });
     expect(res.status).toBe(403);
   });
-  it("both effective-date doors compare with today in Kuala Lumpur, not the UTC clock (0517)", () => {
+  it("both effective-date doors compare with today in Kuala Lumpur, not the UTC clock (0524)", () => {
     const mig = fs.readFileSync(
-      path.resolve(__dirname, "../../../../../supabase/migrations/0517_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql"),
+      path.resolve(__dirname, "../../../../../supabase/migrations/0524_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql"),
       "utf-8",
     );
     for (const door of ["payment_set_collection_timing", "payment_set_storage_rule"]) {

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0517_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql
+-- 0524_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql
 -- =============================================================================
 -- WHAT WAS WRONG
 --   payment_set_collection_timing and payment_set_storage_rule (0486) refuse
@@ -38,7 +38,7 @@ begin
     raise exception 'asking must start earlier than the payment deadline'
       using errcode = '22023', detail = 'ask_not_before_deadline';
   end if;
-  if p_effective_from is null or p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date then  -- 0517: KL today, not the UTC clock
+  if p_effective_from is null or p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date then  -- 0524: KL today, not the UTC clock
     raise exception 'the effective date must be today or later'
       using errcode = '22023', detail = 'bad_effective_from';
   end if;
@@ -83,7 +83,7 @@ begin
   if p_product_group not in ('mattress_bedframe', 'sofa') then
     raise exception 'unknown product group' using errcode = '22023', detail = 'bad_group';
   end if;
-  if p_effective_from is null or p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date then  -- 0517: KL today, not the UTC clock
+  if p_effective_from is null or p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date then  -- 0524: KL today, not the UTC clock
     raise exception 'the effective date must be today or later'
       using errcode = '22023', detail = 'bad_effective_from';
   end if;
