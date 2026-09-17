@@ -3,6 +3,7 @@ import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
 import Select from "@/components/kit/Select";
 import DutyActionDialog from "./DutyActionDialog";
+import { dutyRefusalSentence } from "./staff-duties-model";
 import { fmtDate } from "@/lib/fmt-date";
 import { useWorkspaceAssignDutyMutation } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
@@ -13,8 +14,9 @@ import type { OpsStaffMember } from "@carres/shared";
  *
  * One appended assignment — never an edit, never a delete. The form guides
  * early with the exact §4.4.1 sentences, then the SQL door rechecks every
- * fact: eligibility, overlap and the correction law are the server's, and a
- * refusal it returns is printed in its own words.
+ * fact: eligibility, overlap and the correction law are the server's. A
+ * refusal arrives as a CODE and is printed as the governed §4.4.1 sentence —
+ * never the database's own text.
  *
  * The holder list is whatever `/api/operation/staff?duty=` returned for THIS
  * duty. No name is written here: a duty the catalogue scopes to a role gets
@@ -67,9 +69,11 @@ export default function AssignHolderForm({
         /* react-query runs this only after the hook's own onSuccess has
            awaited invalidation — so the page closes onto a REFRESHED read,
            never onto a stale one it would have to correct a moment later. */
-        onSuccess: () => {
+        onSuccess: (written) => {
           const name =
-            staff.find((s) => s.user_id === holderId)?.name ?? holderId;
+            ((written ?? {}) as { holder_name?: string | null }).holder_name ??
+            staff.find((s) => s.user_id === holderId)?.name ??
+            holderId;
           onDone(`${name} holds ${duty.label} from ${fmtDate(effectiveFrom)}`);
           onClose();
         },
@@ -89,7 +93,15 @@ export default function AssignHolderForm({
       submitTestId="assign-submit"
       pending={assign.isPending}
       /* The browser's guiding sentence, else the server's own refusal. */
-      error={refusal ?? assign.error?.message ?? null}
+      error={
+        refusal ??
+        (assign.error
+          ? dutyRefusalSentence("assign", assign.error, {
+              duty: duty.label,
+              name: staff.find((s) => s.user_id === holderId)?.name ?? "This person",
+            })
+          : null)
+      }
       onSubmit={submit}
     >
       <Select

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKSPACE_DUTIES } from "@carres/shared";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
+import { ApiError } from "@/lib/api";
 
 /**
  * `Workspace → Staff & Duties` — the ONE duty assignment surface
@@ -176,6 +177,7 @@ function coveredGrn(): Duty {
       acting_user_name: "Shasha",
       actor_user_id: "u-shasha",
       is_cover: true,
+      cover_id: "cv-grn",
     },
     covers: [
       {
@@ -669,10 +671,8 @@ describe("assigning a holder", () => {
     });
   });
 
-  it("prints the server's own refusal and keeps every entered fact", () => {
-    state.assignError = new Error(
-      "Shasha cannot hold PO Duty. Choose an eligible active staff member.",
-    );
+  it("prints the server's refusal as its governed sentence and keeps every entered fact", () => {
+    state.assignError = new ApiError(422, "invalid_holder", { code: "invalid_holder" });
     openAssign();
     choose("assign-holder", "Shasha");
     pickDay("assign-effective-from", 10);
@@ -822,10 +822,8 @@ describe("adding cover", () => {
     });
   });
 
-  it("prints the server's own refusal and keeps every entered fact", () => {
-    state.coverError = new Error(
-      "PO Duty already has cover for these dates. Choose different dates.",
-    );
+  it("prints the server's refusal as its governed sentence and keeps every entered fact", () => {
+    state.coverError = new ApiError(422, "cover_overlap", { code: "cover_overlap" });
     openCover();
     choose("cover-acting", "Shasha");
     expect(
@@ -995,6 +993,7 @@ describe("a scheduled cover", () => {
         created_at: `${TODAY}T02:00:00Z`,
       },
     ];
+    po.scheduled_cover_id = "cv-future";
     return all;
   }
 
@@ -1077,3 +1076,155 @@ describe("the 390px catalogue cannot widen the portal", () => {
       .toHaveLength(0);
   });
 });
+
+// ── S2-A · data integrity ────────────────────────────────────────────────────
+
+describe("S2-A · the cover the detail shows is the resolver's own", () => {
+  it("shows the cover the resolver uses (cover_id) when two covers match today", () => {
+    const all = wholeCatalogue();
+    const grn = all.duties.find((d) => d.key === "grn_duty")!;
+    const older = { ...grn.covers[0]!, id: "cv-old", reason: "Old leave", acting_user_id: "u-other", acting_user_name: "Someone" };
+    grn.covers = [older, { ...grn.covers[0]!, reason: "Sick leave" }];
+    grn.resolution = { ...grn.resolution, cover_id: "cv-grn" };
+    state.duties = all;
+    draw("/operation?tab=staff-duties&duty=grn_duty");
+    const detail = screen.getByTestId("selected-duty-grn_duty");
+    expect(within(detail).getByText("Sick leave")).toBeVisible();
+    expect(within(detail).queryByText("Old leave")).toBeNull();
+    expect(within(detail).getByText("Shasha covering for Yu Jun")).toBeVisible();
+  });
+
+  it("names the acting person of a scheduled cover", () => {
+    const all = wholeCatalogue();
+    const po = all.duties.find((d) => d.key === "po_duty")!;
+    po.covers = [
+      {
+        id: "cv-future",
+        duty_key: "po_duty",
+        normal_user_id: "u-yu-jun",
+        normal_user_name: "Yu Jun",
+        acting_user_id: "u-shasha",
+        acting_user_name: "Shasha",
+        starts_on: plusDays(TODAY, 4),
+        ends_on: plusDays(TODAY, 6),
+        reason: "Training",
+        assigned_by_name: "Jess",
+        created_at: `${TODAY}T02:00:00Z`,
+      },
+    ];
+    po.scheduled_cover_id = "cv-future";
+    state.duties = all;
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const detail = screen.getByTestId("selected-duty-po_duty");
+    expect(within(detail).getByText("Shasha covering for Yu Jun")).toBeVisible();
+    expect(within(detail).getByText("Training")).toBeVisible();
+    expect(within(detail).queryByText("Acting today")).toBeNull();
+  });
+});
+
+describe("S2-A · a future cover the resolver will not use is not scheduled", () => {
+  it("says nothing about a future cover when the resolver named none", () => {
+    const all = wholeCatalogue();
+    const po = all.duties.find((d) => d.key === "po_duty")!;
+    po.covers = [
+      {
+        id: "cv-gone",
+        duty_key: "po_duty",
+        normal_user_id: "u-yu-jun",
+        normal_user_name: "Yu Jun",
+        acting_user_id: "u-khor-yee",
+        acting_user_name: "Khor Yee",
+        starts_on: plusDays(TODAY, 4),
+        ends_on: plusDays(TODAY, 6),
+        reason: "Training",
+        assigned_by_name: "Jess",
+        created_at: `${TODAY}T02:00:00Z`,
+      },
+    ];
+    po.scheduled_cover_id = null;
+    state.duties = all;
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const detail = screen.getByTestId("selected-duty-po_duty");
+    expect(within(detail).queryByText(/Khor Yee covering/)).toBeNull();
+    expect(within(screen.getByTestId("duty-catalogue-po_duty")).queryByText(/^Starts /)).toBeNull();
+  });
+});
+
+describe("S2-A · refusals are the governed sentence, never database text", () => {
+  const raw = "no one holds po_duty on 2026-09-20 — assign the duty first";
+  const refusal = (code: string) => new ApiError(422, raw, { error: code, code, message: raw });
+
+  it.each([
+    ["no_duty_holder", "PO Duty has no normal holder for all these dates. Assign the holder first."],
+    ["cover_overlap", "PO Duty already has cover for these dates. Choose different dates."],
+    ["cover_is_holder", "Choose another person to cover PO Duty."],
+    ["invalid_cover", "Shasha can no longer cover PO Duty. Choose another eligible staff member."],
+    ["invalid_dates", "Choose valid cover dates."],
+    ["not_duty_manager", "Duty assignments are set by the manager."],
+    ["unknown", "PO Duty could not be updated. Try again."],
+  ])("cover %s", (code, sentence) => {
+    state.coverError = refusal(code);
+    openCover();
+    choose("cover-acting", "Shasha");
+    expect(screen.getByTestId("cover-submit-error")).toHaveTextContent(sentence);
+    expect(document.body.textContent).not.toContain(raw);
+  });
+
+  it.each([
+    ["invalid_holder", "Shasha cannot hold PO Duty. Choose an eligible active staff member."],
+    ["self_assignment_refused", "Shasha cannot hold PO Duty. Choose an eligible active staff member."],
+    ["invalid_dates", "Choose when this holder starts."],
+    ["unknown", "PO Duty could not be updated. Try again."],
+  ])("assign %s", (code, sentence) => {
+    state.assignError = refusal(code);
+    openAssign();
+    choose("assign-holder", "Shasha");
+    expect(screen.getByTestId("assign-submit-error")).toHaveTextContent(sentence);
+    expect(document.body.textContent).not.toContain(raw);
+  });
+
+  it("a plain network failure is the unknown sentence, not its message", () => {
+    state.coverError = new Error("Failed to fetch");
+    openCover();
+    expect(screen.getByTestId("cover-submit-error")).toHaveTextContent(
+      "PO Duty could not be updated. Try again.",
+    );
+    expect(document.body.textContent).not.toContain("Failed to fetch");
+  });
+});
+
+describe("S2-A · the success sentence names the server's normal owner", () => {
+  it("uses the normal owner the door wrote for the cover dates, not today's holder", async () => {
+    openCover();
+    choose("cover-acting", "Shasha");
+    const from = pickDay("cover-from", 10);
+    const until = pickDay("cover-until", 12);
+    fireEvent.click(screen.getByTestId("cover-submit"));
+    act(() =>
+      coverMutate.mock.calls[0]![1].onSuccess({
+        normal_user_id: "u-khairul",
+        normal_user_name: "Aina",
+        acting_user_id: "u-shasha",
+        acting_user_name: "Shasha",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByText(`Shasha covers Aina for PO Duty, ${fmtDate(from)}–${fmtDate(until)}`),
+    ).toBeVisible();
+  });
+});
+
+describe("S2-A · one initials rule", () => {
+  it("Shasha is SH and Yu Jun is YJ on Staff & Duties", () => {
+    draw("/operation?tab=staff-duties&duty=storage_waiver_approver");
+    expect(screen.getByTestId("duty-avatar-normal")).toHaveTextContent(/^SH$/);
+    cleanupAndDraw("/operation?tab=staff-duties&duty=po_duty");
+    expect(screen.getByTestId("duty-avatar-normal")).toHaveTextContent(/^YJ$/);
+  });
+});
+
+function cleanupAndDraw(url: string) {
+  document.body.innerHTML = "";
+  draw(url);
+}

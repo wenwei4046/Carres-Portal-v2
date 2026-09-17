@@ -66,6 +66,7 @@ import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
 import GoodsMiniTable, { type GoodsMiniLine } from "../components/GoodsMiniTable";
 import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
+import { personInitials } from "@/lib/staff-avatar";
 
 /* ⭐ THE RAIL — Purchasing MASTER §9.3 (Jess, 2026-09-17). Facts that narrow
    the listing, and nothing that the four groups already say: no `All purchase
@@ -236,9 +237,7 @@ function OwnerBadge({
   name: string | null;
 }) {
   const label = name?.trim() || "PO Duty not assigned";
-  const initials = name
-    ? name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")
-    : "PO";
+  const initials = name?.trim() ? personInitials(name, "") : "PO";
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1.5"

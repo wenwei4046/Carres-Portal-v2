@@ -14,6 +14,8 @@ import { userClient } from "../../lib/supabase";
 
 const FIONA = "00000000-0000-4000-8000-00000000000f";
 const AINA = "00000000-0000-4000-8000-00000000000a";
+const KHOR = "00000000-0000-4000-8000-00000000000b";
+const SHARED = "00000000-0000-4000-8000-00000000000c";
 
 const rpc = vi.fn();
 const eq = vi.fn();
@@ -25,7 +27,11 @@ const from = vi.fn((table: string) => ({
             eq(col, val);
             return {
               order: async () => ({
-                data: [{ id: AINA, email: "aina@x", name: "Aina", status: "active", last_seen_at: null }],
+                data: [
+                  { id: AINA, email: "aina@x", name: "Aina", status: "active", staff_code: "CR004", last_seen_at: null },
+                  { id: KHOR, email: "khoryee@x", name: "Khor Yee", status: "disabled", staff_code: "CR003", last_seen_at: null },
+                  { id: SHARED, email: "operation@x", name: "Operations", status: "active", staff_code: null, last_seen_at: null },
+                ],
                 error: null,
               }),
             };
@@ -68,10 +74,17 @@ describe("GET /staff — the Staff & Duties pickers", () => {
       const res = await app().request(path);
       expect(res.status).toBe(200);
       const body = (await res.json()) as { staff: { name: string }[] };
-      expect(body.staff.map((s) => s.name)).toEqual(["Aina"]);
+      // A departed (disabled) account is never listed.
+      expect(body.staff.map((s) => s.name)).not.toContain("Khor Yee");
     }
     expect(eq).toHaveBeenCalledWith("role", "operation");
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("S2-A · a duty picker offers only active individual staff — never a departed or shared login", async () => {
+    const res = await app().request("/staff?duty=grn_duty");
+    const body = (await res.json()) as { staff: { name: string }[] };
+    expect(body.staff.map((s) => s.name)).toEqual(["Aina"]);
   });
 
   it("a caller who may not assign duties is refused by the database gate", async () => {

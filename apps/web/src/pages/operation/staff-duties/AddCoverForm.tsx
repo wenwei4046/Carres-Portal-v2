@@ -3,6 +3,7 @@ import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
 import Select from "@/components/kit/Select";
 import DutyActionDialog from "./DutyActionDialog";
+import { dutyRefusalSentence } from "./staff-duties-model";
 import { fmtDate } from "@/lib/fmt-date";
 import { useWorkspaceCoverDutyMutation } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
@@ -22,7 +23,8 @@ import type { OpsStaffMember } from "@carres/shared";
  *
  * The normal owner is not offered as their own cover. Everything else —
  * eligibility for each protected act, overlap, the company date boundary —
- * is the write door's, and its refusal is printed in its own words.
+ * is the write door's. Its refusal arrives as a CODE and is printed as the
+ * governed §4.4.1 sentence; the database's own text never reaches the page.
  */
 
 type Duty = WorkspaceDutiesResponse["duties"][number];
@@ -71,12 +73,20 @@ export default function AddCoverForm({
         /* Runs only after invalidation has been awaited, so the page closes
            onto the server's refreshed resolution — the browser never turns a
            cover on by itself. */
-        onSuccess: () => {
+        onSuccess: (written) => {
+          /* The names the DOOR wrote for these dates: the normal owner on the
+             cover's own days can differ from the holder the page shows today. */
+          const row = (written ?? {}) as {
+            normal_user_name?: string | null;
+            acting_user_name?: string | null;
+          };
           const acting =
+            row.acting_user_name ??
             eligible.find((s) => s.user_id === actingUserId)?.name ??
             actingUserId;
+          const normal = row.normal_user_name ?? normalOwner;
           onDone(
-            `${acting} covers ${normalOwner} for ${duty.label}, ${fmtDate(startsOn)}–${fmtDate(endsOn)}`,
+            `${acting} covers ${normal} for ${duty.label}, ${fmtDate(startsOn)}–${fmtDate(endsOn)}`,
           );
           onClose();
         },
@@ -95,7 +105,17 @@ export default function AddCoverForm({
       submitLabel="Add cover"
       submitTestId="cover-submit"
       pending={cover.isPending}
-      error={refusal ?? cover.error?.message ?? null}
+      error={
+        refusal ??
+        (cover.error
+          ? dutyRefusalSentence("cover", cover.error, {
+              duty: duty.label,
+              name:
+                eligible.find((s) => s.user_id === actingUserId)?.name ??
+                "This person",
+            })
+          : null)
+      }
       onSubmit={submit}
     >
       {/* Who is being covered FOR — a fact of this act, never a field. */}
