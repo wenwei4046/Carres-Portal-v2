@@ -118,3 +118,47 @@ export function workFocusDay(today: string, dueIsos: readonly (string | null)[])
 export function workLayoutFor(width: number): WorkLayout {
   return width >= 1104 ? "three" : width >= 768 ? "two" : "one";
 }
+
+/** Source words for Work source health — never the raw feed key. */
+export const WORK_SOURCE_LABEL: Record<OperationWorkModule, string> = {
+  orders: "Sales Orders",
+  purchasing: "Purchasing",
+  receiving: "Receiving",
+  delivery: "Delivery",
+  payment: "Payment",
+  issue_tracker: "Issue Tracker",
+};
+
+/** The focus window: from `generatedOn` through the focus day (`workFocusDay`). */
+export interface WorkFocus {
+  from: string;
+  to: string;
+}
+
+/** The focus list (MASTER §5.1): Missed, plus anything due from today through
+ *  the focus day — the same rule as My Work's `day=focus` list. */
+export function inWorkFocus(item: WorkRow, focus: WorkFocus | null): boolean {
+  if (item.timingBucket === "overdue") return true;
+  return focus !== null && item.dueIso !== null && item.dueIso >= focus.from && item.dueIso <= focus.to;
+}
+
+/**
+ * THE ONE RIGHT RAIL COUNT (Workspace MASTER §7.1, HF-3 2026-09-17). The badge
+ * and the panel both read this; My Work's focus list is the same predicate
+ * over the same person. Later days and `No working date` never count.
+ */
+export function myMissedAndToday(
+  items: readonly WorkRow[],
+  myUserId: string | null,
+  focus: WorkFocus | null,
+): { missed: number; today: number } {
+  let missed = 0;
+  let today = 0;
+  if (!myUserId) return { missed, today };
+  for (const item of items) {
+    if (item.ownerId !== myUserId || !inWorkFocus(item, focus)) continue;
+    if (item.timingBucket === "overdue") missed += 1;
+    else today += 1;
+  }
+  return { missed, today };
+}

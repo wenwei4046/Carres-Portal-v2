@@ -689,7 +689,7 @@ identity; it never changes the owner, due date or completion fact.
 |---|---|
 | My Work / Team Work use one server-composed open feed | Retain; make all admitted modules use the same transport contract and source health |
 | My Work defaults correctly and Team groups by normal owner | Retain; add complete cover/handover and unresolved-Duty evidence everywhere |
-| Right Rail reads the same cache and opens `when` filters | Retain; all supported filters must be URL-visible and use the same vocabulary |
+| Right Rail reads the same cache and opens `day` filters; since HF-3 (2026-09-17) the badge, the panel and My Work share one identity (the signed-in account id), one focus day (`workFocusDay`) and one `Missed` + `Today` count (`myMissedAndToday`); the badge accessible name is `My Work · {n} missed · {n} today`; loading keeps count placeholders and a failed refresh keeps the last-safe counts with `Last updated {time}` and source words | Retain; all supported filters must be URL-visible and use the same vocabulary |
 | Current main Work page has scope toggles and limited Rail-linked time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
 | Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
 | Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |

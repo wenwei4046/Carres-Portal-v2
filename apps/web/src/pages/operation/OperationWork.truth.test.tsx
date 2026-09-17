@@ -22,8 +22,9 @@ vi.mock("@/lib/queries", async () => {
   return { ...actual, useOperationWork: () => ({ ...workState, refetch }) };
 });
 vi.mock("@/lib/auth", () => ({
-  useAuth: (select: (state: { role: string; user: { email: string } }) => unknown) =>
-    select({ role: "operation", user: { email: "shasha@carres.test" } }),
+  // The one identity is the signed-in account id (HF-3).
+  useAuth: (select: (state: { role: string; user: { id: string; email: string } }) => unknown) =>
+    select({ role: "operation", user: { id: SH, email: "shasha@carres.test" } }),
 }));
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");

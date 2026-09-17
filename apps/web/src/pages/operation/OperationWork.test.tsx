@@ -31,8 +31,13 @@ vi.mock("@/lib/queries", async () => {
   };
 });
 vi.mock("@/lib/auth", () => ({
-  useAuth: (select: (state: { role: string; user: { email: string } }) => unknown) =>
-    select({ role: authState.role, user: { email: authState.email } }),
+  useAuth: (select: (state: { role: string; user: { id: string; email: string } }) => unknown) =>
+    select({
+      role: authState.role,
+      // The one identity is the signed-in account id (HF-3); these fixtures
+      // sign in by email, so the account id follows the email.
+      user: { id: authState.email.startsWith("yujun") ? YJ : SH, email: authState.email },
+    }),
 }));
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -50,7 +55,7 @@ function timing(actionOn: string | null, workingDaysLate = 0): OperationWorkItem
     missedAge: {
       state: "counted",
       workingDays: workingDaysLate,
-      basis: { calendarKey: "module+person", from: actionOn ?? "2026-09-06", to: "2026-09-06" },
+      basis: { calendarKey: "module+person", from: actionOn ?? "2026-09-07", to: "2026-09-07" },
     },
     eligibility: "eligible",
     noDateReason: actionOn === null ? "The owning rule has no working date" : null,
@@ -85,14 +90,14 @@ function item(overrides: Partial<OperationWorkItem> = {}): OperationWorkItem {
       acting: { userId: SH, name: "Shasha" },
       state: "primary",
     },
-    timing: timing("2026-09-06"),
+    timing: timing("2026-09-07"),
     communication: null,
     blocker: null,
     nextConsequence: null,
     interaction: { mode: "open_module", fallbackDestination: "/operation/orders/so/order-1" },
     destination: "/operation/orders/so/order-1",
-    observedAt: "2026-09-06T01:00:00.000Z",
-    sourceVersion: "2026-09-06T01:00:00.000Z",
+    observedAt: "2026-09-07T01:00:00.000Z",
+    sourceVersion: "2026-09-07T01:00:00.000Z",
     tone: "warning",
     locked: false,
     broken: false,
@@ -121,13 +126,13 @@ beforeEach(() => {
         { userId: SH, name: "Shasha", email: "shasha@carres.test" },
         { userId: YJ, name: "Yu Jun", email: "yujun@carres.test" },
       ],
-      generatedOn: "2026-09-06",
+      generatedOn: "2026-09-07",
       closureReceipt: null,
       sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
         key,
         state: "healthy" as const,
-        observedAt: "2026-09-06T01:00:00.000Z",
-        lastSuccessfulAt: "2026-09-06T01:00:00.000Z",
+        observedAt: "2026-09-07T01:00:00.000Z",
+        lastSuccessfulAt: "2026-09-07T01:00:00.000Z",
         errorLabel: null,
       })),
     },
@@ -160,7 +165,7 @@ describe("Operation Work — one server feed", () => {
         dutyKey: null,
         normal: { userId: SH, name: "Shasha" },
         activeCover: { userId: YJ, name: "Yu Jun" },
-        coverEvidence: { id: "cover-1", startsOn: "2026-09-06", endsOn: "2026-09-06" },
+        coverEvidence: { id: "cover-1", startsOn: "2026-09-07", endsOn: "2026-09-07" },
         acting: { userId: YJ, name: "Yu Jun" },
         state: "covered",
       },

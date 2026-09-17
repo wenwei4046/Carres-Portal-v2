@@ -130,7 +130,8 @@ function workResponse(items: OperationWorkItem[]): OperationWorkResponse {
     complete: true,
     items,
     staff: [{ userId: ME, name: "Me", email: "me@carres.com" }],
-    generatedOn: "2026-09-13",
+    // Mon 14 Sep — a working day, so the focus day is generatedOn itself.
+    generatedOn: "2026-09-14",
     closureReceipt: null,
     sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
       key,
@@ -282,14 +283,15 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
   });
 
   it("opens the exact My Work day and never exposes Team Work from the rail", async () => {
-    const todayItem = { ...MINE, id: "delivery:o10:delivery.confirm_date", timing: timing("2026-09-13", 0) };
+    const todayItem = { ...MINE, id: "delivery:o10:delivery.confirm_date", timing: timing("2026-09-14", 0) };
     state.work = workResponse([MINE, todayItem]);
     mount(client(), <TasksPanel />);
     const panel = await screen.findByTestId("my-work-panel");
-    expect(within(panel).getByRole("link", { name: "Open My Work · Missed · 1 action" }))
+    // The panel renders while loading (count placeholders), so wait for the counts.
+    expect(await within(panel).findByRole("link", { name: "Open My Work · Missed · 1 action" }))
       .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=missed");
     expect(within(panel).getByRole("link", { name: "Open My Work · Today · 1 action" }))
-      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-13");
+      .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-14");
     expect(panel).not.toHaveTextContent("Team Work");
   });
 
@@ -302,7 +304,10 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     state.work = response;
     mount(client(), <TasksPanel />);
     const panel = await screen.findByTestId("my-work-panel");
-    expect(panel).toHaveTextContent("My Work could not be refreshed · delivery");
+    await waitFor(() => expect(panel).toHaveTextContent("My Work could not be refreshed"));
+    // Source words, never the raw feed key (HF-3).
+    expect(panel).toHaveTextContent("Could not refresh Delivery");
+    expect(panel).not.toHaveTextContent("delivery");
     expect(panel).not.toHaveTextContent("No work due now");
     expect(within(panel).getByRole("link", { name: "Open My Work" })).toBeInTheDocument();
   });
