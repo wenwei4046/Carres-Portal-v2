@@ -244,7 +244,8 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
 /**
  * DEFAULT WIDTHS — Listing Standard 2026-09-16, measured on the rendered page:
  * each fixed fact column is its widest governed value + 16px padding (SO Date
- * `Wed, 30 Sep` 93 · Showroom `Sungai Buloh` 96 · PO No `2 Purchase Orders`
+ * `Wed, 00 May` 81.3px text in production Inter → 100; 96 cut `Wed, 19 A…`,
+ * measured signed-in 2026-09-17 · Showroom `Sungai Buloh` 96 · PO No `2 Purchase Orders`
  * 149 · DO No `No delivery order yet` 143), and the header's sort + filter
  * controls are the floor. Customer and Delivery Location are the flexible text
  * columns: a cut value opens whole (engine `overflowText`). The eight defaults
@@ -260,13 +261,13 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* The eight owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "SO Date", width: "96px", group: "Dates", on: true,
+  { key: "ordered", label: "SO Date", width: "100px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
   { key: "customer_delivery", label: "Requested Delivery Date", width: "128px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "192px", group: "Customer", on: true,
+  { key: "customer", label: "Customer", width: "188px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "delivery_location", label: "Delivery Location", width: "172px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },

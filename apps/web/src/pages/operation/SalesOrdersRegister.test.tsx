@@ -7,7 +7,7 @@
  * has. If the register ever returns to client-only search, the second test
  * here fails: the hook would never see the term.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,7 +16,7 @@ import SalesOrdersRegister from "./SalesOrdersRegister";
 import { fmtDate } from "@/lib/fmt-date";
 
 let listHookState: {
-  data: { orders: operationOrderListRow[] } | undefined;
+  data: { orders: operationOrderListRow[]; salesOrderTotal?: number | null } | undefined;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -1001,7 +1001,7 @@ describe("Sales Orders table correction", () => {
  */
 describe("Listing Standard 2026-09-16 · page-local", () => {
   it("counts sales orders by their document name, singular and filtered", async () => {
-    listHookState.data = { orders: [order({}), order({ id: "o-2", so: 1304, customer_name: "Wong Mei Ling" })] };
+    listHookState.data = { orders: [order({}), order({ id: "o-2", so: 1304, customer_name: "Wong Mei Ling" })], salesOrderTotal: 2 };
     mount();
     const footer = screen.getByTestId("grid-footer");
     expect(footer).toHaveTextContent(/^2 sales orders/);
@@ -1010,28 +1010,73 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
     expect(footer).not.toHaveTextContent(/\borders\b(?! )/);
   });
 
-  it("keeps the population in `{n} of {m}` when the SERVER answers a search", async () => {
+  /* ⭐ `{m}` IS THE SERVER'S COUNT (2026-09-17). Not `rows.length`, not a
+     number remembered from an earlier unsearched read. */
+  describe("the total is the server's count", () => {
     const wong = order({ id: "o-3", so: 1305, customer_name: "Wong Mei Ling" });
     const everyone = [order({}), order({ id: "o-2", so: 1304 }), wong];
-    /* The server answers a search with ONLY the match, so the rows alone can no
-       longer say how many sales orders there are. */
-    useOperationOrdersSpy.mockImplementation((...args: unknown[]) => {
-      const search = (args[0] as { search?: string } | undefined)?.search;
-      return { ...listHookState, data: { orders: search ? [wong] : everyone } };
+    const searchOf = (args: unknown[]) => (args[0] as { search?: string } | undefined)?.search;
+    const serverAnswered = (term: string) =>
+      waitFor(() => expect(useOperationOrdersSpy.mock.calls.some((c) => searchOf(c) === term)).toBe(true));
+    afterEach(() => useOperationOrdersSpy.mockImplementation((..._args: unknown[]) => listHookState));
+
+    it("a search answered BEFORE any unsearched load still says `of` the server total", async () => {
+      /* The unsearched read never arrives; only the searched answer does. */
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) =>
+        searchOf(args)
+          ? { ...listHookState, data: { orders: [wong], salesOrderTotal: 3 } }
+          : { ...listHookState, data: undefined });
+      mount();
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/));
     });
-    try {
+
+    it("an order created during a search moves the total on the next read", async () => {
+      let total = 3;
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) => ({
+        ...listHookState,
+        data: searchOf(args) ? { orders: [wong], salesOrderTotal: total } : { orders: everyone, salesOrderTotal: total },
+      }));
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const tree = () => (
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={["/operation/orders"]}>
+            <SalesOrdersRegister />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+      const view = render(tree());
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/));
+      /* Another operator creates an order; the list query is invalidated and re-read. */
+      total = 4;
+      view.rerender(tree());
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 4 sales orders/));
+    });
+
+    it("a limited read (the 500-row cap) is `{loaded} of {server total}`, not `{loaded}`", () => {
+      listHookState.data = { orders: everyone, salesOrderTotal: 612 };
+      mount();
+      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^3 of 612 sales orders/);
+    });
+
+    it.each([
+      ["null", null],
+      ["absent (older Worker)", undefined],
+    ])("an unknown total (%s) prints the count alone — never a guessed `of`", async (_label, unknown) => {
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) => ({
+        ...listHookState,
+        data: { orders: searchOf(args) ? [wong] : everyone, ...(unknown === undefined ? {} : { salesOrderTotal: unknown }) },
+      }));
       mount();
       expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^3 sales orders/);
       fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
-      /* Wait for the SERVER's answer, not the engine's instant local filter —
-         the local filter alone already reads `1 of 3`. */
-      await waitFor(() =>
-        expect(useOperationOrdersSpy.mock.calls.some((c) => (c[0] as { search?: string })?.search === "Wong")).toBe(true),
-      );
-      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/);
-    } finally {
-      useOperationOrdersSpy.mockImplementation((..._args: unknown[]) => listHookState);
-    }
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 sales order\b/));
+      expect(screen.getByTestId("grid-footer")).not.toHaveTextContent(" of ");
+    });
   });
 
   it("names a single ticked row in the singular", () => {

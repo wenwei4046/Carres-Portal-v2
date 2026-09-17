@@ -3138,6 +3138,13 @@ export interface opsRemarkEmbed {
 }
 export interface operationOrdersListResponse {
   orders: operationOrderListRow[];
+  /**
+   * Every Sales Order the caller may read in this stage/channel scope,
+   * rentals excluded, search NOT applied — counted by the server. `null` when
+   * the count could not be read; absent from an older Worker. Never derive it
+   * from `orders.length` (the list stops at 500 and a search replaces it).
+   */
+  salesOrderTotal?: number | null;
 }
 
 /** GET /api/operation/orders/:id — composed drawer payload (orders.ts §97). */

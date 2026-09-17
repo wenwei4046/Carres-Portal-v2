@@ -1353,18 +1353,15 @@ function DataGridInner<T>({
     !isLoading && errorState == null && renderList.length === 0 && noMatchMessage != null &&
     (rows.length > 0 || emptyMessage === noMatchMessage);
 
-  /* The row holding the Tab stop: the last row the operator focused while it
-     is still on screen, else the first row. */
-  const rovingRowKey = useMemo(() => {
-    let first: string | null = null;
-    for (const item of renderList) {
-      if (item.kind !== "row") continue;
-      const k = rowKey(item.row);
-      if (k === activeRowKey) return k;
-      first ??= k;
-    }
-    return first;
-  }, [renderList, activeRowKey, rowKey]);
+  /* Every data row's position in the FULL render list (group banners are not
+     rows). Keyboard movement counts in this list, never in the DOM, because a
+     virtual list only has a window of rows in the document. */
+  const rowPositions = useMemo(
+    () => renderList.flatMap((item, i) => (item.kind === "row" ? [i] : [])),
+    [renderList],
+  );
+  /** A row the keyboard moved to that may not be rendered yet (virtual list). */
+  const pendingRowFocus = useRef<string | null>(null);
 
   /* ⭐ A MATCH IS NEVER HIDDEN IN A COLLAPSED GROUP (owner ruling R1). While a
      search, column filter or page filter narrows the Register, every governed
@@ -1686,6 +1683,84 @@ function DataGridInner<T>({
     overscan: 14,
   });
   const virtualItems = canVirtualize ? rowVirtualizer.getVirtualItems() : [];
+
+  /* The row holding the Tab stop: the last row the operator focused while it
+     is RENDERED, else the first rendered row — a virtual grid scrolled away
+     from its active row still keeps exactly one Tab stop. */
+  const rovingRowKey = (() => {
+    const indices = canVirtualize ? virtualItems.map((vi) => vi.index) : rowPositions;
+    let first: string | null = null;
+    for (const i of indices) {
+      const item = renderList[i];
+      if (!item || item.kind !== "row") continue;
+      const k = rowKey(item.row);
+      if (k === activeRowKey) return k;
+      first ??= k;
+    }
+    return first;
+  })();
+
+  /* Put a focused row fully inside the viewport, below the sticky header.
+     The virtualizer places rows by an ESTIMATED height, so its own scroll can
+     leave the target just outside the view (measured 2026-09-17: 38px reference
+     rows against a 30px estimate — PageDown focused a row below the fold). */
+  const revealRow = (row: HTMLElement) => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const view = viewport.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    const header = viewport.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    const top = view.top + header;
+    if (r.top < top) viewport.scrollTop -= top - r.top;
+    else if (r.bottom > view.top + viewport.clientHeight) viewport.scrollTop += r.bottom - (view.top + viewport.clientHeight);
+  };
+
+  /* Finish a keyboard move once its target row is in the document. */
+  useEffect(() => {
+    const key = pendingRowFocus.current;
+    const viewport = scrollRef.current;
+    if (!key || !viewport) return;
+    const target = Array.from(viewport.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]"))
+      .find((tr) => tr.dataset.rowKey === key);
+    if (!target) return;
+    pendingRowFocus.current = null;
+    target.focus({ preventScroll: true });
+    revealRow(target);
+  });
+
+  const moveRowFocus = (fromIndex: number, keyName: string, rowEl: HTMLElement): boolean => {
+    const at = rowPositions.indexOf(fromIndex);
+    if (at < 0 || rowPositions.length === 0) return false;
+    const rowHeight = rowEl.getBoundingClientRect().height || 38;
+    const viewportHeight = scrollRef.current?.clientHeight ?? 0;
+    const page = viewportHeight > 0 ? Math.max(1, Math.floor(viewportHeight / rowHeight) - 1) : 10;
+    const last = rowPositions.length - 1;
+    const to =
+      keyName === "ArrowDown" ? at + 1
+        : keyName === "ArrowUp" ? at - 1
+          : keyName === "Home" ? 0
+            : keyName === "End" ? last
+              : keyName === "PageDown" ? Math.min(last, at + page)
+                : Math.max(0, at - page);
+    if (to < 0 || to > last || to === at) return keyName !== "ArrowDown" && keyName !== "ArrowUp";
+    const targetIndex = rowPositions[to]!;
+    const targetItem = renderList[targetIndex];
+    if (!targetItem || targetItem.kind !== "row") return false;
+    const targetKey = rowKey(targetItem.row);
+    pendingRowFocus.current = targetKey;
+    setActiveRowKey(targetKey);
+    if (canVirtualize) rowVirtualizer.scrollToIndex(targetIndex, { align: "auto" });
+    /* Already rendered (the usual case): focus now, and the browser scrolls it
+       into view. Otherwise the effect above focuses it after the window moves. */
+    const rendered = Array.from(scrollRef.current?.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]") ?? [])
+      .find((tr) => tr.dataset.rowKey === targetKey);
+    if (rendered) {
+      pendingRowFocus.current = null;
+      rendered.focus({ preventScroll: true });
+      revealRow(rendered);
+    }
+    return true;
+  };
   const padTop = virtualItems.length ? virtualItems[0]!.start : 0;
   const padBottom = virtualItems.length
     ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
@@ -1796,6 +1871,7 @@ function DataGridInner<T>({
              row menu a right-click does — from the row or from any control
              inside it. Controls inside a row keep their own keys. */
           data-row-nav=""
+          data-row-key={key}
           tabIndex={key === rovingRowKey ? 0 : -1}
           onFocus={(e) => {
             if (e.target === e.currentTarget) setActiveRowKey(key);
@@ -1819,15 +1895,10 @@ function DataGridInner<T>({
               return;
             }
             if (e.target !== tr) return;
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              const all = Array.from(
-                tr.closest("tbody")?.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]") ?? [],
-              );
-              const next = all[all.indexOf(tr) + (e.key === "ArrowDown" ? 1 : -1)];
-              if (next) {
-                e.preventDefault();
-                next.focus();
-              }
+            if (["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"].includes(e.key)) {
+              /* ↑/↓ one row · Home/End first/last · PageUp/PageDown one screen —
+                 counted in the FULL list, so a virtual window never ends the walk. */
+              if (moveRowFocus(idx, e.key, tr)) e.preventDefault();
             } else if (e.key === "Enter") {
               if (onRowDoubleClick) onRowDoubleClick(row);
               else onRowClick?.(row);
