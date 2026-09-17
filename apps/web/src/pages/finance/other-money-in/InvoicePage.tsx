@@ -29,6 +29,7 @@ import StatusPill from "@/components/kit/StatusPill";
 import Textarea from "@/components/kit/Textarea";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { toast } from "sonner";
+import { otherDebtorInvoiceDoc } from "@/lib/pdf/other-money-in-docs";
 import {
   useCancelInvoice,
   useMoneyInAccounts,
@@ -356,6 +357,21 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
   const liveReceipts = detail.receipts.filter((r) => r.status === "posted");
   const mayCancel = me.data?.mayCancel === true && inv.status === "issued";
   const owes = inv.status === "issued" && (inv.outstanding ?? 0) > 0;
+  const parties = useOtherDebtorParties();
+  const [printing, setPrinting] = useState(false);
+  const downloadPdf = async () => {
+    setPrinting(true);
+    try {
+      const doc = otherDebtorInvoiceDoc(detail, parties.data?.find((p) => p.party_id === inv.party_id));
+      if (!doc) return;
+      const { renderOtherDebtorInvoicePdf } = await import("@/lib/pdf/render");
+      window.open(URL.createObjectURL(await renderOtherDebtorInvoicePdf(doc)), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The invoice could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-auto p-4" data-testid="other-debtor-invoice-object">
@@ -367,6 +383,9 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
           <span className="text-strong">{otherDebtorInvoiceNumberWord(inv)}</span>
           <StatusPill tone={TONE[inv.status]}>{otherDebtorInvoiceStatusWord(inv.status)}</StatusPill>
           <span className="flex-1" />
+          <Button variant="neutral" loading={printing} disabled={parties.isLoading} onClick={downloadPdf}>
+            Download PDF
+          </Button>
           {owes && (
             <Button
               variant="primary"
