@@ -2754,12 +2754,12 @@ function SalesOrderWorkspaceBody() {
             <table className="w-full text-body" data-testid="document-goods">
               <thead>
                 <tr className="text-label text-base-500">
-                  <th className="py-1 pr-3 text-left font-medium">Category</th>
-                  <th className="py-1 pr-3 text-left font-medium">Unit ID</th>
-                  <th className="py-1 pr-3 text-left font-medium">SKU</th>
-                  <th className="py-1 pr-3 text-right font-medium">Qty</th>
-                  <th className="py-1 pr-3 text-left font-medium">Item</th>
-                  <th className="py-1 pr-3 text-left font-medium">Deliver To</th>
+                  <th className="py-2 pr-4 text-left font-medium align-top">Category</th>
+                  <th className="py-2 pr-4 text-left font-medium align-top">Unit ID</th>
+                  <th className="py-2 pr-4 text-left font-medium align-top">SKU</th>
+                  <th className="py-2 pr-4 text-right font-medium align-top whitespace-nowrap">Qty</th>
+                  <th className="py-2 pr-4 text-left font-medium align-top">Item</th>
+                  <th className="py-2 pr-4 text-left font-medium align-top">Deliver To</th>
                   {/* ⭐ THE MONEY COLUMNS RIDE THE RIGHT EDGE (approved Sales
                       Order detail composition, 2026-09-10). The six ruled
                       columns keep their ruled order and alignment; what the
@@ -2767,9 +2767,8 @@ function SalesOrderWorkspaceBody() {
                       read the commitment without opening the PDF beside it.
                       A free gift is a line at RM 0.00: visible as goods,
                       charged nothing, counted nowhere twice. */}
-                  <th className="py-1 text-right font-medium">
-                    <div>Unit price</div><div>Line total</div>
-                  </th>
+                  <th className="py-2 pr-4 text-right font-medium align-top whitespace-nowrap">Unit price</th>
+                  <th className="py-2 text-right font-medium align-top whitespace-nowrap">Line total</th>
                 </tr>
               </thead>
               <tbody>
@@ -2779,7 +2778,7 @@ function SalesOrderWorkspaceBody() {
                   const destinations = truth?.deliverTo ?? [];
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
-                    <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
+                    <td className="py-2 pr-4 align-top text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
                     {/* ⭐ THE SHORT-LINE WORDS ARE RULED, AND `Not allocated`
                         IS NOT ONE OF THEM (YH, 2026-09-01).
                         `COPY-STANDARD.md`:1755 lists `Not allocated` in its
@@ -2794,7 +2793,7 @@ function SalesOrderWorkspaceBody() {
                         is in flight; this one did not, so a slow read printed
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
-                    <td className="py-1.5 pr-3">
+                    <td className="py-2 pr-4 align-top">
                       {mode === "oldrev" ? (
                         <span className="text-meta">Not recorded in this revision</span>
                       ) : goodsTruthQ.isError ? (
@@ -2810,7 +2809,7 @@ function SalesOrderWorkspaceBody() {
                         (() => {
                           const [count, waiting] = unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty);
                           return (
-                            <div className="font-mono text-meta">
+                            <div className="text-meta">
                               <div>{count}</div>
                               <div className="mt-0.5 text-base-600">{waiting}</div>
                             </div>
@@ -2818,19 +2817,17 @@ function SalesOrderWorkspaceBody() {
                         })()
                       )}
                     </td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
-                    <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
+                    <td className="py-2 pr-4 align-top font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
+                    <td className="py-2 pr-4 align-top text-right tabular-nums">{r.qty}</td>
+                    <td className={`py-2 pr-4 align-top ${cjkClassName(r.name)}`}>
                       <div>{r.name}</div>
                       {liveLine && operationalConfig(liveLine).length > 0 && (
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">{mode === "oldrev" ? "Not recorded in this revision" : goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
-                      <div className="text-meta text-base-600">{fmtMoney(r.unitPrice)}</div>
-                      <div className="font-medium">{fmtMoney(r.total)}</div>
-                    </td>
+                    <td className="py-2 pr-4 align-top">{mode === "oldrev" ? "Not recorded in this revision" : goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-2 pr-4 align-top text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
+                    <td className="py-2 align-top text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
                   </tr>
                   );
                 })}
@@ -2861,10 +2858,10 @@ function SalesOrderWorkspaceBody() {
                   const size = a.attrs?.size ?? null;
                   return (
                   <tr key={`a-${i}`} className="border-t border-kit-slate-5">
-                    <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">Not recorded</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
+                    <td className="py-2 pr-4 align-top text-label font-semibold text-base-600">SERVICE</td>
+                    <td className="py-2 pr-4 align-top text-meta text-base-500">Not recorded</td>
+                    <td className="py-2 pr-4 align-top font-mono text-meta">{a.addon_key}</td>
+                    <td className="py-2 pr-4 align-top text-right tabular-nums">{a.qty}</td>
                     {/* ⭐ THE ROW CARRIES ITS OWN DOORS (YH, 2026-09-01). A
                         service was printed twice — here, and again in a
                         `Services` list below that repeated its name, size,
@@ -2878,7 +2875,7 @@ function SalesOrderWorkspaceBody() {
                         quiet line under the name — which is where a goods row
                         already puts its own configuration, so both row kinds
                         keep one shape. */}
-                    <td className={`py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
+                    <td className={`py-2 pr-4 align-top ${cjkClassName(serviceName)}`}>
                       <div>{serviceName}</div>
                       {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
                       {mode === "object" && orderId && (
@@ -2890,11 +2887,9 @@ function SalesOrderWorkspaceBody() {
                         />
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">Not recorded</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
-                      <div className="text-meta text-base-600">{fmtMoney(Number(a.unit_price ?? 0))}</div>
-                      <div className="font-medium">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</div>
-                    </td>
+                    <td className="py-2 pr-4 align-top">Not recorded</td>
+                    <td className="py-2 pr-4 align-top text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
+                    <td className="py-2 align-top text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
                   </tr>
                   );
                 })}

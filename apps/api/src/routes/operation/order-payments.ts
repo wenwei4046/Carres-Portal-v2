@@ -65,7 +65,7 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from("order_payments")
-    .select(PAYMENT_COLS)
+    .select(`${PAYMENT_COLS}, source_channel, source_metadata`)
     .eq("order_id", idCheck.data)
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false });
@@ -90,10 +90,20 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   }
 
   return c.json({
-    payments: rows.map((r) => ({
-      ...r,
-      recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
-    })),
+    payments: rows.map(({ source_channel, source_metadata, ...r }) => {
+      // Sale-time deposits keep their uploaded proof in source metadata (0476).
+      // Resolve that exact payment's evidence for both old and new deposits;
+      // never borrow the order's initial slip for a later collection.
+      const metadata = source_metadata as { payment_slip_url?: unknown } | null;
+      const originalSlip = source_channel === "order_create" && r.kind === "deposit"
+        && typeof metadata?.payment_slip_url === "string"
+        ? metadata.payment_slip_url.trim() : null;
+      return {
+        ...r,
+        receipt_url: r.receipt_url || originalSlip || null,
+        recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
+      };
+    }),
   });
 });
 
