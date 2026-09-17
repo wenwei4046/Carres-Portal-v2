@@ -1481,8 +1481,11 @@ facts, permissions, complete-record populations or task ownership.
    the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
    (disabled), the header `Hide column` / `Pin left` menu and drag, and pins both at a ≥768px
    canvas, identity alone below it. It replaces `stickyIdentity` on the page that sets it.
-   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6). Every other
-   Register is unchanged until its own round.
+   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6) — PR #1411,
+   merge `5b61f7fa`, live in production from `c6d8706e` (all five surfaces verified 2026-09-17
+   10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
+   round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
+   authenticated production walk of all four listings.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
