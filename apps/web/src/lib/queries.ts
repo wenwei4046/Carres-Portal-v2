@@ -4678,6 +4678,19 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** 0522 · R3 — the requester withdrew it before a decision. Optional so an
+   *  older API reads as not withdrawn. */
+  withdrawn_at?: string | null;
+  /** 0522 · R4 — set while the request is back with its requester. */
+  sent_back_at?: string | null;
+  sent_back_reason?: string | null;
+  submitted_at?: string | null;
+  round?: number | null;
+  /** D2 — the ONE server-resolved requester identity (Register, object,
+   *  search, export). Null = a shared login or an unnamed account: the
+   *  reader prints `Staff identity not recorded`. Register read only. */
+  requested_by_name?: string | null;
+  requested_by_user_id?: string | null;
   /** Card 04 — the STRUCTURED For fact, per purpose; null on other
    *  purposes and on pre-0401 history. */
   for_service_case_id: string | null;
@@ -4703,6 +4716,8 @@ export interface PurchaseRequestLineRow {
   po_id: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
+  /** D4 (0522) — who marked the line not going ahead; null before 0522. */
+  cancelled_by?: string | null;
   /** Derived by the server from the linked PO's posted receipt (the
    *  Observation Law) — never a button anywhere. */
   received?: boolean;
@@ -4747,6 +4762,8 @@ export interface PurchaseRequestLineRow {
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
+  /** R2 — the lines could not be read: every remainder is UNKNOWN, never 0. */
+  linesUnavailable?: boolean;
   /** Every PO the lines' lineage names — id → the actual po_no — plus the
    *  Card 06 issuance-completion fact: whether the CURRENT version has
    *  confirmed-sent evidence (`po_sends`, 0378). */
@@ -4800,6 +4817,10 @@ export interface ManualPurchaseDetailPayload {
    *  `null` when the record was written by a shared account and the reader
    *  states `Staff identity not recorded`. A person is never invented. */
   requested_by_name: string | null;
+  requested_by_user_id?: string | null;
+  /** R3 / R4 — what THIS caller may do to the round (the SQL doors decide). */
+  canWithdraw?: boolean;
+  canEditAndSendAgain?: boolean;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
@@ -4809,6 +4830,8 @@ export interface ManualPurchaseDetailPayload {
     id: string;
     po_no: string;
     placed_at: string | null;
+    /** D5 — the CURRENT version's marked-sent time; null = Not marked as sent. */
+    marked_sent_at?: string | null;
     po_delivery_date: string | null;
     /** Non-null ONLY when the promise ledger proves the supplier changed
      *  the date; absent change reads `Same as PO`. */
@@ -4909,7 +4932,7 @@ export function useDecidePurchaseRequest() {
   return useMutation({
     mutationFn: (input: {
       id: string;
-      decision: "approve" | "refuse";
+      decision: "approve" | "refuse" | "send_back";
       reason?: string | null;
       cuts?: Array<{ id: string; qty: number }> | null;
     }) =>
@@ -4924,6 +4947,45 @@ export function useDecidePurchaseRequest() {
           }),
         },
       ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+/** R3 · `Withdraw request` — the requester only, before any decision (0522). */
+export function useWithdrawManualPurchase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string }) =>
+      apiFetch<{ id: string; withdrawn: boolean }>(
+        `/api/operation/purchasing/requests/${input.id}/withdraw`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+/** R4 · `Edit and send again` — the SAME request, a new round (0522). */
+export function useResubmitManualPurchase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      destinationId: string;
+      requiredBy: string;
+      why: string | null;
+      serviceCaseId: string | null;
+      staffUserId: string | null;
+      subsidiaryName: string | null;
+      lines: Array<{ id: string | null; sku: string; qty: number; note: string | null }>;
+    }) => {
+      const { id, ...body } = input;
+      return apiFetch<{ id: string; round: number }>(
+        `/api/operation/purchasing/requests/${id}/resubmit`,
+        { method: "POST", body: JSON.stringify(body) },
+      );
+    },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
   });

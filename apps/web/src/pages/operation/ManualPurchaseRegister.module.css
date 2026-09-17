@@ -1,4 +1,29 @@
-/* Compatibility entry point for the shared purchasing register theme. */
+/* Manual Purchase — round 2 (owner rulings R2/R5, 2026-09-16). The page stops
+   composing the shared purchasing hex palette (`PurchasingRegister.module.css`,
+   still used by Purchase Orders): its Register colours come from DataGrid's
+   governed `palette="slate"`, exactly as SO Batch Purchase does. */
 .page {
-  composes: page from "./PurchasingRegister.module.css";
+  background: theme("colors.kit.canvas");
+  color: theme("colors.kit.slate.12");
+}
+
+/* Breakpoints measure the buying canvas, after both portal rails. Below 896px
+   the 240px rail floats over the Register instead of eating its width (and,
+   since S3, starts hidden unless this browser opened it before). */
+.canvas { container: manual-purchase / inline-size; }
+.rail { flex: none; }
+@container manual-purchase (width < 896px) {
+  .canvas .rail { position: absolute; inset-block: 0; left: 0; z-index: 30; }
+}
+/* Keep Clear, the duty holder and Issue PO reachable on the narrow canvas, and
+   let `+ Manual Purchase` shrink to its `+` so Search, Export and Columns stay
+   on screen. The words stay in the accessibility tree (visually hidden, inside
+   a `relative` button so nothing escapes to stretch the page). */
+@container manual-purchase (width < 640px) {
+  .canvas [data-testid="selection-bar"] > span:first-child { display: none; }
+  .canvas .create { padding-inline: 0.4375rem; }
+  .canvas .createWords {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
 }

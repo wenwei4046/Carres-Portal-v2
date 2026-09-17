@@ -513,10 +513,13 @@ export default function GoodsMiniTable({
               style={c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
-        {/* LEVEL ONE — the parent header's own treatment: 11px, grey, the
-            button family's uppercase tracking. The eye should not have to
-            learn a second header style eight pixels below the first. */}
-        <thead className="border-b border-base-200 bg-base-50">
+        {/* LEVEL ONE — the parent header's own treatment. ⭐ S5 (owner
+            follow-up 2026-09-16): the parent Registers moved to DataGrid's
+            `palette="slate"` header — slate-3 fill, slate-11 ink, 11px, 600,
+            NORMAL casing — so this child header follows them. The eye should
+            not have to learn a second header style eight pixels below the
+            first. */}
+        <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
           <tr className="divide-x divide-base-200">
             {/* THE HEADER ROW CARRIES NO CHECKBOX (owner ruling). Select-all is
                 the PARENT row's box — one whole-order switch, not two. */}
@@ -533,7 +536,7 @@ export default function GoodsMiniTable({
                    `01-design-tokens.md` has locked. Size, colour and case carry
                    the match — and the weight is 600, because §2.2 deleted 700
                    into 600 and the CSS module's own 700 predates that ruling. */
-                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
+                className="px-2 py-1.5 text-label font-semibold text-kit-slate-11"
               >
                 {c.label}
               </th>

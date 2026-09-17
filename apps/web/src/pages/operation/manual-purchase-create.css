@@ -60,7 +60,31 @@
   color: #26384a;
   letter-spacing: 0.02em;
 }
-@media (max-width: 640px) {
-  .mp-create-body, .mp-create-header, .mp-create-general { padding: 1rem; }
-  .mp-create-items { overflow-x: auto; }
+/* ⭐ D1 · THE FORM REFLOWS BY ITS OWN WIDTH, NOT THE DEVICE'S (2026-09-17).
+   Measured at 390px: the goods input was ~42px wide and Send sat past the
+   right edge of the header. Below 640px of form the item search takes a whole
+   row, Qty · Note · Remove sit under it with their own captions, and the
+   action pair moves from the header into a bar pinned to the bottom. */
+.mp-create-shell { container: mp-create / inline-size; }
+.mp-line-item, .mp-line-qty, .mp-line-note { display: block; }
+.mp-line-caption { display: none; }
+.mp-create-footer { display: none; }
+@container mp-create (width < 640px) {
+  /* Scoped under the shell so it outranks the button row's own `flex`. */
+  .mp-create-shell .mp-create-actions-header { display: none; }
+  .mp-create-footer {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    padding: 0.5rem 1rem;
+    background: #fff;
+    border-top: 1px solid #d0d7e0;
+  }
+  .mp-create-page { padding: 0.5rem; }
+  .mp-create-body { padding: 0.75rem; }
+  .mp-create-lines { grid-template-columns: 72px minmax(0, 1fr) !important; }
+  .mp-create-lines .mp-line-head { display: none; }
+  .mp-create-lines .mp-line-item { grid-column: 1 / -1; }
+  .mp-create-lines .mp-line-caption { display: block; margin-bottom: 2px; }
+  .mp-create-lines .mp-line-action { grid-column: 1 / -1; justify-self: end; }
 }

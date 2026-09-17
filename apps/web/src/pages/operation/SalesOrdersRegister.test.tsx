@@ -846,7 +846,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     for (const header of within(goods).getAllByRole("columnheader")) {
       expect(header.className).toContain("text-label");
-      expect(header.className).toContain("text-base-500");
+      /* S5 (2026-09-16): the shared child header follows the slate Register
+         header — slate-11 ink, 600, normal casing. */
+      expect(header.className).toContain("text-kit-slate-11");
+      expect(header.className).not.toContain("uppercase");
     }
     expect(within(goods).queryByRole("checkbox")).not.toBeInTheDocument();
     expect(within(goods).getAllByRole("rowgroup")[1].className).toContain("text-body");
