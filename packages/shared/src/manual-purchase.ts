@@ -105,6 +105,38 @@ export const MANUAL_PURCHASE_WORDS = {
    * `Requested Date` and `Needed By` stay retired.
    */
   colApproval: "Approval Status",
+  /** Round 2 (owner ruling R2, 2026-09-16) — the engine-derived Order By
+   *  column; missing setup reads `Not planned`. */
+  colOrderBy: "Order By",
+  notPlanned: "Not planned",
+  /**
+   * THE THREE REGISTER GROUPS (owner ruling R2, 2026-09-16) — table group
+   * headings, never rail rows or stored statuses. Membership is ONE
+   * arithmetic: `manualPurchaseGroupOf`.
+   */
+  groupNeedApproval: "Need approval",
+  groupToBuy: "To buy",
+  groupNoPurchaseNeeded: "No purchase needed",
+  groupNeedApprovalEmpty: "Nothing waiting for approval",
+  noMatch: "No Manual Purchases match these filters",
+  footerOne: "1 Manual Purchase",
+  footerMany: "Manual Purchases",
+  search: "Search Manual Purchases",
+  /**
+   * An APPROVED request whose remaining quantity could not be read. It stays
+   * in `To buy`, says so, and cannot be ticked — unknown is never zero and
+   * never complete (MASTER §9.2).
+   */
+  remainderNotChecked: "Remaining quantity not checked",
+  remainderNotCheckedWhy:
+    "The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.",
+  /** R3 / R4 — the requester's and approver's round controls. */
+  withdraw: "Withdraw request",
+  sendBack: "Send back",
+  editAndSendAgain: "Edit and send again",
+  sendAgain: "Send again for approval",
+  /** Who acts next on a sent-back request — the real requester. */
+  nextActorRequester: "Edit and send again",
   colRequestedBy: "Requested By",
   colProceedDate: "Proceed Date",
   colPoNo: "PO No",
@@ -189,8 +221,16 @@ export const MANUAL_PURCHASE_WORDS = {
   colFreeStock: "Free Stock",
   colAlreadyOnPo: "Already On PO",
   colStillNeeded: "Still Needed",
+  /**
+   * ⭐ D3 · A SKU REFERENCE IS NOT THIS REQUEST'S LINEAGE (Round 2). The free
+   * stock and open-PO figures describe the SKU across the whole business;
+   * this request's own POs are the `Purchase Orders` section. The sentence
+   * says so once, so `Still Needed 0` beside `Not ordered yet` stops reading
+   * as a contradiction. Reference stock never reduces the request.
+   */
+  skuReferenceNote:
+    "For each SKU across Carres — free stock and open purchase orders. This request's own purchase orders are listed below. Stock shown here does not reduce what this request asks for.",
   /** Approval — the decision facts and controls. */
-  noApprovalNeeded: "No approval needed",
   approve: "Approve",
   refuse: "Refuse",
   decisionReason: "Decision reason",
@@ -198,6 +238,15 @@ export const MANUAL_PURCHASE_WORDS = {
   colLineTotal: "Line Total",
   /** Purchase Orders — the exact lineage's date words (MASTER §9.3). */
   colPoIssued: "PO Issued",
+  /**
+   * ⭐ D5 · ONE MEANING PER WORD (Round 2, 2026-09-17). `PO Issued` on the
+   * Purchase Orders page is the CURRENT version's marked-sent date. This
+   * object used to print `purchase_orders.placed_at` under the same head — the
+   * date the document was CREATED, which is a different fact. It now prints
+   * the marked-sent date too, and a document nobody marked reads the governed
+   * `Not marked as sent` (§5.6) instead of a creation date wearing the word.
+   */
+  notMarkedAsSent: "Not marked as sent",
   colPoDeliveryDate: "PO Delivery Date",
   colSupplierDeliveryDate: "Supplier Delivery Date",
   sameAsPo: "Same as PO",
@@ -257,6 +306,10 @@ export const MANUAL_PURCHASE_HISTORY_WORDS = {
   refused: "Purchase refused",
   line_not_going_ahead: "Marked not going ahead",
   po_issued: "Purchase order issued",
+  /** Round 2 — every return round is kept (R4) and a withdrawal (R3). */
+  sent_back: "Sent back for changes",
+  resubmitted: "Sent again for approval",
+  withdrawn: "Withdrawn",
 } as const;
 
 export type ManualPurchaseHistoryKind = keyof typeof MANUAL_PURCHASE_HISTORY_WORDS;
@@ -275,6 +328,9 @@ export interface ManualPurchaseHistoryEvent {
   units?: number | null;
   requested_units?: number | null;
   approved_units?: number | null;
+  /** `resubmitted` — the round number and what changed, in plain words. */
+  round?: number | null;
+  changes?: string[] | null;
 }
 
 const unitsWord = (n: number) => `${n} unit${n === 1 ? "" : "s"}`;
@@ -306,6 +362,18 @@ export function manualPurchaseHistoryRecord(e: ManualPurchaseHistoryEvent): {
         title,
         detail: [[e.sku, e.reason].filter(Boolean).join(" — ")].filter((s) => s !== ""),
       };
+    case "sent_back":
+      return { title, detail: e.reason ? [e.reason] : [] };
+    case "resubmitted":
+      return {
+        title,
+        detail: [
+          ...(e.round != null ? [`Round ${e.round}`] : []),
+          ...(e.changes ?? []),
+        ],
+      };
+    case "withdrawn":
+      return { title, detail: [] };
     case "po_issued":
       return {
         title,
@@ -319,34 +387,46 @@ export function manualPurchaseHistoryRecord(e: ManualPurchaseHistoryEvent): {
 }
 
 /**
- * THE APPROVAL COLUMN'S FOUR ANSWERS (Card 04 §3.2) — the approval FACT,
- * never the request's whole status: `Need approval` while the configured
- * approver has not decided; `Approved` / `Refused` once somebody did;
- * `No approval needed` when the purpose's switch never asked.
+ * THE APPROVAL COLUMN'S FIVE ANSWERS (owner rulings 2026-09-16) — the approval
+ * FACT, never the request's whole status. `No approval needed` is retired:
+ * every Manual Purchase requires approval (R1). A historical row stored with
+ * `approval_required = false` and no decision reads `Need approval` — the safe
+ * side, and no row is backfilled.
  */
 export const MANUAL_PURCHASE_APPROVAL_WORDS = {
   need_approval: "Need approval",
   approved: "Approved",
   refused: "Refused",
-  not_needed: "No approval needed",
+  withdrawn: "Withdrawn",
+  sent_back: "Sent back for changes",
 } as const;
 
 export type ManualPurchaseApprovalKind = keyof typeof MANUAL_PURCHASE_APPROVAL_WORDS;
 
-/** ONE approval arithmetic over the stored decision facts (Law D). */
-export function manualPurchaseApprovalOf(r: {
-  approvalRequired: boolean;
+/** The stored decision facts one request carries. */
+export interface ManualPurchaseDecisionFacts {
   approvedAt: string | null;
   refusedAt: string | null;
-}): { kind: ManualPurchaseApprovalKind; label: string } {
+  /** R3 — absent on an older API: read as not withdrawn. */
+  withdrawnAt?: string | null;
+  /** R4 — set while the request is back with its requester. */
+  sentBackAt?: string | null;
+}
+
+/** ONE approval arithmetic over the stored decision facts (Law D). */
+export function manualPurchaseApprovalOf(
+  r: ManualPurchaseDecisionFacts,
+): { kind: ManualPurchaseApprovalKind; label: string } {
   const kind: ManualPurchaseApprovalKind =
-    r.refusedAt !== null
-      ? "refused"
-      : r.approvedAt !== null
-        ? "approved"
-        : r.approvalRequired
-          ? "need_approval"
-          : "not_needed";
+    r.withdrawnAt != null
+      ? "withdrawn"
+      : r.refusedAt !== null
+        ? "refused"
+        : r.approvedAt !== null
+          ? "approved"
+          : r.sentBackAt != null
+            ? "sent_back"
+            : "need_approval";
   return { kind, label: MANUAL_PURCHASE_APPROVAL_WORDS[kind] };
 }
 
@@ -356,6 +436,8 @@ export function manualPurchaseApprovalOf(r: {
  */
 export type ManualPurchaseStatusKind =
   | "waiting_approval"
+  | "sent_back"
+  | "withdrawn"
   | "waiting_sku"
   | "ready_to_order"
   | "ordered"
@@ -364,6 +446,8 @@ export type ManualPurchaseStatusKind =
 
 export const MANUAL_PURCHASE_STATUS_WORDS: Record<ManualPurchaseStatusKind, string> = {
   waiting_approval: "Waiting for approval",
+  sent_back: "Sent back for changes",
+  withdrawn: "Withdrawn",
   waiting_sku: "Waiting for the SKU",
   ready_to_order: "Ready to order",
   ordered: "Ordered",
@@ -372,10 +456,7 @@ export const MANUAL_PURCHASE_STATUS_WORDS: Record<ManualPurchaseStatusKind, stri
 };
 
 /** What the arithmetic reads about one request. All facts, no decisions. */
-export interface ManualPurchaseStatusInput {
-  approvalRequired: boolean;
-  approvedAt: string | null;
-  refusedAt: string | null;
+export interface ManualPurchaseStatusInput extends ManualPurchaseDecisionFacts {
   refuseReason: string | null;
   lines: Array<{
     qty: number;
@@ -403,14 +484,24 @@ export interface ManualPurchaseStatus {
  * THE one status arithmetic. Order of precedence:
  *   Not going ahead  — refused (with its required reason), or every line
  *                      cancelled (0321's door, reason required there too).
- *   Waiting for approval — the switch was ON at creation and nobody decided.
+ *   Withdrawn        — the requester took it back before a decision (R3).
+ *   Sent back for changes — the approver returned it; the requester acts (R4).
+ *   Waiting for approval — nobody has decided. Every request asks (R1).
  *   Arrived          — every live line's PO has a posted receipt (slice 3
  *                      feeds `received`; until then no row reaches it).
  *   Ordered          — every live line fully issued onto a PO.
- *   Ready to order   — everything else: approved, or never needed approval.
+ *   Ready to order   — everything else: approved with something left to buy.
  */
 export function manualPurchaseStatusOf(r: ManualPurchaseStatusInput): ManualPurchaseStatus {
   const live = r.lines.filter((l) => l.cancelledAt === null);
+
+  if (r.withdrawnAt != null) {
+    return {
+      kind: "withdrawn",
+      label: MANUAL_PURCHASE_STATUS_WORDS.withdrawn,
+      reasonLabel: null,
+    };
+  }
 
   if (r.refusedAt !== null) {
     return {
@@ -426,7 +517,15 @@ export function manualPurchaseStatusOf(r: ManualPurchaseStatusInput): ManualPurc
       reasonLabel: null,
     };
   }
-  if (r.approvalRequired && r.approvedAt === null) {
+  if (r.approvedAt === null && r.sentBackAt != null) {
+    return {
+      kind: "sent_back",
+      label: MANUAL_PURCHASE_STATUS_WORDS.sent_back,
+      reasonLabel: null,
+    };
+  }
+  /* R1 — every request waits for its approval; there is no exemption. */
+  if (r.approvedAt === null) {
     return {
       kind: "waiting_approval",
       label: MANUAL_PURCHASE_STATUS_WORDS.waiting_approval,
@@ -496,62 +595,28 @@ export function stillNeededOf(qty: number, free: number, alreadyOnPo: number): n
   return Math.max(0, qty - Math.max(0, free) - Math.max(0, alreadyOnPo));
 }
 
-// ─── The rail — PURCHASING CARD 06, owner correction 2026-08-29 ──────────────
+// ─── The rail and the groups — MANUAL PURCHASE ROUND 2 (owner rulings R2,
+//     2026-09-16; `docs/purchasing/MASTER.md` §9.2) ─────────────────────────
 
 /**
- * THE MANUAL PURCHASE RAIL CONTRACT (Card 06, superseding Card 03's
- * four-section shape; `docs/purchasing/MASTER.md` §9.2;
- * `docs/COPY-STANDARD.md`).
+ * THE MANUAL PURCHASE RAIL CONTRACT — five sections, in this exact order, on
+ * the shared 240px `FilterRail`:
  *
- * Seven sections, in this exact order, drawn on the shared 240px
- * `FilterRail` shell (Card 02-C; `docs/ui/MASTER.md` — LOCAL FILTER RAIL):
+ *   ORDER TIMING   earliest engine-derived Order By against the server date,
+ *                  counting ONLY requests that still have quantity to buy.
+ *   PURPOSE        the six governed purposes (compact dropdown).
+ *   PRODUCT        the Catalog categories (compact dropdown).
+ *   SUPPLIER       actual names, alphabetical (compact dropdown).
+ *   SETUP TO FIX   `Supplier not set` · `Production days not set` ·
+ *                  `Transit days not set` — only while an affected request
+ *                  exists.
  *
- *   WORK TO DO        the five concrete daily actions, all visible with
- *                     zero — an action LENS over the same server facts and
- *                     central Work identities, never a second Work Engine.
- *                     `Approve purchase` is submitted, undecided approval;
- *                     `Issue PO` is approved remaining demand; the other
- *                     three name their exact Catalog/Settings repair.
- *   TO ORDER          `All not ordered` — live quantity not yet fully
- *                     issued to a PO. (`Need approval` and `Ready to order`
- *                     retired into the action rows above, without
- *                     duplication.)
- *   ORDER TIMING      the request's earliest derived `Order By` against
- *                     today — a filter and fact, never an issue permission
- *                     gate; an authorised person may buy early.
- *   PURCHASE PURPOSE  the six approved purposes — `DEMAND_PURPOSES`, the one
- *                     creatable list. A retired historical value matches no
- *                     row and lives under `All purposes` only.
- *   PRODUCT           the CATALOG's categories — the same three-row authority
- *                     SO Batch Purchase draws, never SKU-text inference.
- *   SUPPLIER          actual names, dynamic and alphabetical — the demand
- *                     line's Catalog-derived supplier, never chosen by
- *                     Operation, never hardcoded, never a placeholder.
- *   SETUP TO FIX      the missing-configuration facts; the whole section
- *                     renders only while an affected request exists. The
- *                     owning action stays in `WORK TO DO`.
- *
- * The rail is NAVIGATION, not selection: no checkboxes, one filter per
- * section, sections combine with AND, each `All …` row clears only its own
- * section, and the empty filter is the permanent Register — ordered history
- * included. Banned rows stay banned (Card 06 §5): `Supplier not selected` ·
- * `No supplier` · `Not in catalog` · `Need price` · `Ordered` ·
- * `Part received` · `Received` · `Arrived` · `Cancelled` · `My drafts` ·
- * `Need correction` · `Queues` · every Safety-days row. Manual Purchase
- * never subtracts SO Safety days.
+ * ⛔ `WORK TO DO` and `TO ORDER / All not ordered` are RETIRED from this page.
+ * Central Work keeps its action identities; the Register's three groups say
+ * what is waiting, what is to buy and what needs nothing. A filter never
+ * grants action authority.
  */
 export const MANUAL_PURCHASE_RAIL = {
-  work: {
-    heading: "WORK TO DO",
-    actions: [
-      { key: "approve_purchase", word: "Approve purchase" },
-      { key: "issue_po", word: "Issue PO" },
-      { key: "check_supplier", word: "Check the supplier" },
-      { key: "add_production_days", word: "Add production days" },
-      { key: "add_transit_days", word: "Add transit days" },
-    ],
-  },
-  toOrder: { heading: "TO ORDER", all: "All not ordered" },
   timing: {
     heading: "ORDER TIMING",
     rows: [
@@ -560,22 +625,20 @@ export const MANUAL_PURCHASE_RAIL = {
       { state: "order_date_passed", word: "Order date passed" },
     ],
   },
-  purpose: { heading: "PURCHASE PURPOSE", all: "All purposes", rows: DEMAND_PURPOSES },
-  /** The Catalog category rows — SO Batch's own list, shared so the two rails
-   *  cannot drift (Law D). */
+  purpose: { heading: "PURPOSE", all: "All purposes", rows: DEMAND_PURPOSES },
+  /** The Catalog category rows — SO Batch's own list, shared (Law D). */
   product: SO_BATCH_RAIL.product,
   supplier: { heading: "SUPPLIER", all: "All suppliers" },
   setup: {
     heading: "SETUP TO FIX",
     rows: [
+      { key: "supplier_not_set", word: "Supplier not set" },
       { key: "production_days_not_set", word: "Production days not set" },
       { key: "transit_days_not_set", word: "Transit days not set" },
     ],
   },
 } as const;
 
-export type ManualPurchaseWorkKey =
-  (typeof MANUAL_PURCHASE_RAIL.work.actions)[number]["key"];
 export type ManualPurchaseTimingState =
   (typeof MANUAL_PURCHASE_RAIL.timing.rows)[number]["state"];
 export type ManualPurchaseSetupKey =
@@ -614,30 +677,85 @@ export function manualPurchaseTimingOf(
   return "order_date_passed";
 }
 
+/** The three governed Register groups (R2). Never a stored status. */
+export type ManualPurchaseGroup = "need-approval" | "to-buy" | "no-purchase-needed";
+
 /**
- * `All not ordered` — every request whose live quantity is not yet fully
- * issued (waiting states + ready), DERIVED REQUEST TRUTH
- * (`manualPurchaseStatusOf`), never a stored status. A fully Ordered/Arrived
- * request leaves the filter while staying in the Register; a refused /
- * fully-cancelled request (`Not going ahead`) is not awaiting ordering.
+ * ⭐ ONE REQUEST, EXACTLY ONE GROUP — owner ruling R2, 2026-09-16.
+ *
+ * ```
+ * Need approval       waiting for a decision, or sent back for changes
+ * To buy              APPROVED and quantity remains (incl. `Not planned`),
+ *                     or APPROVED and the remainder could not be read
+ * No purchase needed  refused · withdrawn · fully ordered/arrived ·
+ *                     approved with a confirmed remainder of 0
+ * ```
+ *
+ * The approval checks run FIRST, so a pending request never reaches `To buy`
+ * however much it asks for, and a refused one never stays in `Need approval`.
+ * `remainderKnown: false` is NOT zero: an approved request whose lines failed
+ * to load stays in `To buy`, says so, and refuses the tick.
  */
-export function manualPurchaseNotOrdered(status: ManualPurchaseStatusKind): boolean {
-  return (
-    status === "waiting_approval" ||
-    status === "waiting_sku" ||
-    status === "ready_to_order"
-  );
+export function manualPurchaseGroupOf(r: {
+  approval: ManualPurchaseApprovalKind;
+  status: ManualPurchaseStatusKind;
+  remainingQty: number;
+  remainderKnown: boolean;
+}): ManualPurchaseGroup {
+  if (r.approval === "need_approval" || r.approval === "sent_back") return "need-approval";
+  if (r.approval === "refused" || r.approval === "withdrawn") return "no-purchase-needed";
+  // Approved.
+  if (!r.remainderKnown) return "to-buy";
+  if (r.status === "not_going_ahead" || r.status === "ordered" || r.status === "arrived") {
+    return "no-purchase-needed";
+  }
+  return r.remainingQty > 0 ? "to-buy" : "no-purchase-needed";
 }
 
 /**
- * WHAT THE OPERATOR HAS PICKED — one slot per section; `null` / `false` is
- * that section's `All …`. Different sections combine with AND; clearing
- * every slot restores the complete permanent Register, Ordered records
- * included.
+ * THE ORDER BY CELL (R2): the date when the engine derived one; `Not planned`
+ * when the request still waits or is still to buy and no date can be derived
+ * (missing Supplier/Settings, or a historical row with no Delivery Date);
+ * blank when nothing is left to buy.
+ */
+export function manualPurchaseOrderByCell(
+  group: ManualPurchaseGroup,
+  orderBy: string | null,
+): { date: string | null; notPlanned: boolean } {
+  if (group === "no-purchase-needed") return { date: null, notPlanned: false };
+  return { date: orderBy, notPlanned: orderBy == null };
+}
+
+/**
+ * THE DEFAULT READING ORDER (R2). Inside `Need approval` and `To buy`:
+ * Order By ascending → `Not planned` → newest Proceed Date. Inside
+ * `No purchase needed`: newest Proceed Date. The DataGrid draws the groups;
+ * this orders the rows each group receives.
+ */
+export function compareManualPurchaseRows(
+  a: { group: ManualPurchaseGroup; orderBy: string | null; proceedDate: string },
+  b: { group: ManualPurchaseGroup; orderBy: string | null; proceedDate: string },
+): number {
+  const rank: Record<ManualPurchaseGroup, number> = {
+    "need-approval": 0,
+    "to-buy": 1,
+    "no-purchase-needed": 2,
+  };
+  if (a.group !== b.group) return rank[a.group] - rank[b.group];
+  if (a.group !== "no-purchase-needed") {
+    const ao = a.orderBy ?? "9999-12-31";
+    const bo = b.orderBy ?? "9999-12-31";
+    if (ao !== bo) return ao.localeCompare(bo);
+  }
+  return b.proceedDate.localeCompare(a.proceedDate);
+}
+
+/**
+ * WHAT THE OPERATOR HAS PICKED — one slot per section; `null` is that
+ * section's `All …`. Sections combine with AND; clearing every slot restores
+ * the complete permanent Register in its three groups.
  */
 export interface ManualPurchaseRailFilter {
-  work: ManualPurchaseWorkKey | null;
-  notOrderedOnly: boolean;
   timing: ManualPurchaseTimingState | null;
   purpose: DemandPurpose | null;
   product: SoBatchProductCategory | null;
@@ -646,8 +764,6 @@ export interface ManualPurchaseRailFilter {
 }
 
 export const MANUAL_PURCHASE_RAIL_CLEAR: ManualPurchaseRailFilter = {
-  work: null,
-  notOrderedOnly: false,
   timing: null,
   purpose: null,
   product: null,
@@ -655,33 +771,18 @@ export const MANUAL_PURCHASE_RAIL_CLEAR: ManualPurchaseRailFilter = {
   setup: null,
 };
 
-/**
- * One request's rail-relevant facts, projected once from the register read:
- * the derived status, the stored purpose, the CATALOG's categories on the
- * request's live lines (the API reads `product_models.category`; SKU text
- * never decides), the actual supplier names behind those lines (the
- * Catalog-derived `supplier_id` recorded at creation — 0323/0359 — which the
- * issuance walls carry onto any PO unchanged), the SERVER-derived earliest
- * `Order By` (Card 06 §3.3 — the browser performs no working-day
- * arithmetic), and the named configuration gaps. This file combines and
- * counts; it derives nothing new.
- */
+/** One request's rail-relevant facts, projected once from the register read. */
 export interface ManualPurchaseRailFacts {
   requestId: string;
-  status: ManualPurchaseStatusKind;
+  group: ManualPurchaseGroup;
   purpose: string;
   categories: ReadonlySet<ProductCategory>;
   suppliers: ReadonlySet<string>;
-  /** The request's earliest server-derived line Order By, or null. */
   orderBy: string | null;
+  /** Null when there is no Order By OR nothing is left to buy — ORDER TIMING
+   *  counts only requests with remaining quantity. */
   timing: ManualPurchaseTimingState | null;
-  /** `Approve purchase` — submitted and undecided approval. */
-  needsApproval: boolean;
-  /** `Issue PO` — approved remaining demand (`manualPurchaseSelectable`). */
-  issuableRemaining: boolean;
-  /** `Check the supplier` — a live line without its Catalog supplier. */
   supplierGap: boolean;
-  /** The exact missing Settings facts, from the server's own plan. */
   productionDaysMissing: boolean;
   transitDaysMissing: boolean;
 }
@@ -689,14 +790,13 @@ export interface ManualPurchaseRailFacts {
 export function manualPurchaseRailFacts(
   rows: readonly {
     requestId: string;
-    status: ManualPurchaseStatusKind;
+    group: ManualPurchaseGroup;
     purpose: string;
     remainingQty: number;
+    remainderKnown: boolean;
     lineCategories: readonly (ProductCategory | null | undefined)[];
     lineSupplierNames: readonly (string | null | undefined)[];
-    /** Per live line: the server's `order_by`, null where not derivable. */
     lineOrderBys: readonly (string | null | undefined)[];
-    /** A live line without a Catalog supplier relationship. */
     supplierGap: boolean;
     productionDaysMissing: boolean;
     transitDaysMissing: boolean;
@@ -705,9 +805,13 @@ export function manualPurchaseRailFacts(
 ): ManualPurchaseRailFacts[] {
   return rows.map((r) => {
     const orderBy = manualPurchaseOrderByOf(r.lineOrderBys);
+    /* ⭐ ORDER TIMING COUNTS ONLY WHAT IS STILL TO BUY (R2). A request with
+       nothing left, or one whose remainder could not be read, is not a buying
+       deadline — it is history or an unknown, and neither is "order today". */
+    const buying = r.group !== "no-purchase-needed" && r.remainderKnown && r.remainingQty > 0;
     return {
       requestId: r.requestId,
-      status: r.status,
+      group: r.group,
       purpose: r.purpose,
       categories: new Set(
         r.lineCategories.filter((c): c is ProductCategory => c != null),
@@ -716,9 +820,7 @@ export function manualPurchaseRailFacts(
         r.lineSupplierNames.filter((s): s is string => s != null && s !== ""),
       ),
       orderBy,
-      timing: manualPurchaseTimingOf(orderBy, todayIso),
-      needsApproval: r.status === "waiting_approval",
-      issuableRemaining: manualPurchaseSelectable(r.status, r.remainingQty),
+      timing: buying ? manualPurchaseTimingOf(orderBy, todayIso) : null,
       supplierGap: r.supplierGap,
       productionDaysMissing: r.productionDaysMissing,
       transitDaysMissing: r.transitDaysMissing,
@@ -726,91 +828,52 @@ export function manualPurchaseRailFacts(
   });
 }
 
-type ManualPurchaseRailSection =
-  | "work"
-  | "toOrder"
-  | "timing"
-  | "purpose"
-  | "product"
-  | "supplier"
-  | "setup";
+type ManualPurchaseRailSection = keyof ManualPurchaseRailFilter;
 
-/** One request against one `WORK TO DO` action — the lens's own mapping. */
-function hasWork(f: ManualPurchaseRailFacts, key: ManualPurchaseWorkKey): boolean {
+function hasSetup(f: ManualPurchaseRailFacts, key: ManualPurchaseSetupKey): boolean {
   switch (key) {
-    case "approve_purchase":
-      return f.needsApproval;
-    case "issue_po":
-      return f.issuableRemaining;
-    case "check_supplier":
+    case "supplier_not_set":
       return f.supplierGap;
-    case "add_production_days":
+    case "production_days_not_set":
       return f.productionDaysMissing;
-    case "add_transit_days":
+    case "transit_days_not_set":
       return f.transitDaysMissing;
   }
 }
 
-function hasSetup(f: ManualPurchaseRailFacts, key: ManualPurchaseSetupKey): boolean {
-  return key === "production_days_not_set"
-    ? f.productionDaysMissing
-    : f.transitDaysMissing;
-}
-
-/** Does this request pass every selected section — except, optionally, one? */
 function railMatches(
   f: ManualPurchaseRailFacts,
   filter: ManualPurchaseRailFilter,
   except?: ManualPurchaseRailSection,
 ): boolean {
-  if (except !== "work" && filter.work != null && !hasWork(f, filter.work)) {
-    return false;
-  }
-  if (
-    except !== "toOrder" &&
-    filter.notOrderedOnly &&
-    !manualPurchaseNotOrdered(f.status)
-  ) {
-    return false;
-  }
-  if (except !== "timing" && filter.timing != null && f.timing !== filter.timing) {
-    return false;
-  }
-  if (except !== "purpose" && filter.purpose != null && f.purpose !== filter.purpose) {
-    return false;
-  }
+  if (except !== "timing" && filter.timing != null && f.timing !== filter.timing) return false;
+  if (except !== "purpose" && filter.purpose != null && f.purpose !== filter.purpose) return false;
   if (except !== "product" && filter.product != null && !f.categories.has(filter.product)) {
     return false;
   }
   if (except !== "supplier" && filter.supplier != null && !f.suppliers.has(filter.supplier)) {
     return false;
   }
-  if (except !== "setup" && filter.setup != null && !hasSetup(f, filter.setup)) {
-    return false;
-  }
+  if (except !== "setup" && filter.setup != null && !hasSetup(f, filter.setup)) return false;
   return true;
 }
 
 /**
- * WHAT THE RAIL PRINTS (Card 06 §5). Every count is UNIQUE Manual Purchase
- * requests — never lines, SKU quantities, POs or notifications — and every
- * section's counts are computed under the OTHER sections' selections, so the
- * printed number predicts exactly the rows a click would show. The fixed rows
- * print their live count, zero included; a supplier row exists only while it
- * matches, except the selected supplier, which stays visible with `0`.
- * `SETUP TO FIX` renders only while an affected request exists.
+ * WHAT THE RAIL PRINTS. Every count is UNIQUE Manual Purchase requests,
+ * computed under the OTHER sections' selections, so the printed number
+ * predicts exactly the rows a click would show. The selected supplier stays
+ * visible with `0`. `SETUP TO FIX` renders only while an affected request
+ * exists.
  */
 export interface ManualPurchaseRailModel {
-  /** Requests passing every selected filter — what the Register shows. */
   visibleRequestIds: ReadonlySet<string>;
-  workCounts: Record<ManualPurchaseWorkKey, number>;
-  notOrderedCount: number;
   timingCounts: Record<ManualPurchaseTimingState, number>;
   purposeCounts: Record<DemandPurpose, number>;
   productCounts: Record<SoBatchProductCategory, number>;
-  /** Actual names, alphabetical. Never hardcoded, never a placeholder. */
   suppliers: Array<{ name: string; count: number }>;
   setupCounts: Record<ManualPurchaseSetupKey, number>;
+  /** Which setup rows exist at all — a row with nothing behind it is not drawn. */
+  setupRows: ManualPurchaseSetupKey[];
   setupExists: boolean;
 }
 
@@ -823,11 +886,6 @@ export function manualPurchaseRailModel(
     has: (f: ManualPurchaseRailFacts) => boolean,
   ) => facts.filter((f) => railMatches(f, filter, section) && has(f)).length;
 
-  const workCounts = {} as Record<ManualPurchaseWorkKey, number>;
-  for (const action of MANUAL_PURCHASE_RAIL.work.actions) {
-    workCounts[action.key] = count("work", (f) => hasWork(f, action.key));
-  }
-  const notOrderedCount = count("toOrder", (f) => manualPurchaseNotOrdered(f.status));
   const timingCounts = {} as Record<ManualPurchaseTimingState, number>;
   for (const row of MANUAL_PURCHASE_RAIL.timing.rows) {
     timingCounts[row.state] = count("timing", (f) => f.timing === row.state);
@@ -844,6 +902,9 @@ export function manualPurchaseRailModel(
   for (const row of MANUAL_PURCHASE_RAIL.setup.rows) {
     setupCounts[row.key] = count("setup", (f) => hasSetup(f, row.key));
   }
+  const setupRows = MANUAL_PURCHASE_RAIL.setup.rows
+    .map((row) => row.key)
+    .filter((key) => facts.some((f) => hasSetup(f, key)) || filter.setup === key);
 
   const supplierCounts = new Map<string, number>();
   for (const f of facts) {
@@ -852,9 +913,6 @@ export function manualPurchaseRailModel(
       supplierCounts.set(name, (supplierCounts.get(name) ?? 0) + 1);
     }
   }
-  /* The selected supplier stays visible with 0 while another section
-     temporarily removes its matches — a filter the operator cannot see is a
-     narrowing they cannot clear. */
   if (filter.supplier != null && !supplierCounts.has(filter.supplier)) {
     supplierCounts.set(filter.supplier, 0);
   }
@@ -863,8 +921,6 @@ export function manualPurchaseRailModel(
     visibleRequestIds: new Set(
       facts.filter((f) => railMatches(f, filter)).map((f) => f.requestId),
     ),
-    workCounts,
-    notOrderedCount,
     timingCounts,
     purposeCounts,
     productCounts,
@@ -872,29 +928,9 @@ export function manualPurchaseRailModel(
       .map(([name, n]) => ({ name, count: n }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     setupCounts,
-    /* Renders only while an affected request EXISTS AT ALL — the section's
-       existence is a page fact, not a filtered count. */
-    setupExists: facts.some(
-      (f) => f.productionDaysMissing || f.transitDaysMissing,
-    ),
+    setupRows,
+    setupExists: setupRows.length > 0,
   };
-}
-
-/**
- * THE WORK/TIMING LENS ORDER (Card 06 §6) — while a work or timing filter is
- * active the Register sorts earliest `Order By` first (null-dated rows last),
- * then newest Proceed Date, so the most urgent visible request is first. The
- * no-filter default stays newest Proceed Date first.
- */
-export function manualPurchaseWorkOrder<
-  T extends { orderBy: string | null; proceedDate: string },
->(rows: readonly T[]): T[] {
-  return [...rows].sort((a, b) => {
-    const ao = a.orderBy ?? "9999-12-31";
-    const bo = b.orderBy ?? "9999-12-31";
-    if (ao !== bo) return ao.localeCompare(bo);
-    return b.proceedDate.localeCompare(a.proceedDate);
-  });
 }
 
 /**
@@ -1041,35 +1077,34 @@ export function manualPurchaseSourceLine(f: {
 }
 
 /**
- * WHO MAY BE TICKED (Card 04 §3, Selection): ONLY a request whose derived
- * status is `Ready to order` with live remaining quantity. Need approval,
- * refused/withdrawn, fully ordered and arrived rows refuse the tick — the
- * same truth `manualPurchaseStatusOf` already derives, asked once.
+ * WHO MAY BE TICKED: ONLY an APPROVED request whose derived status is
+ * `Ready to order` with a CONFIRMED live remainder. A pending, sent-back,
+ * refused or withdrawn request refuses the tick, and so does an approved one
+ * whose remainder could not be read (unknown is never "go ahead").
  */
 export function manualPurchaseSelectable(
   status: ManualPurchaseStatusKind,
   remainingQty: number,
+  remainderKnown = true,
 ): boolean {
-  return status === "ready_to_order" && remainingQty > 0;
+  return status === "ready_to_order" && remainderKnown && remainingQty > 0;
 }
 
 /**
- * WHY THE TICK IS DEAD — the sentence a register prints beside a row that
- * `manualPurchaseSelectable` refuses; `null` when the row may be ticked.
- * Same two inputs as the gate, so the two can never disagree. The one extra
- * fact, `approvalKind`, exists for MPR-20260904-8935 (2026-09-04): an
- * approver cut every line to 0, so the status arithmetic derives
- * `Not going ahead` while the Approval Status column still says `Approved`.
- * That row sat greyed with nothing on screen saying why. `Not going ahead.`
- * beside `Approved` names the state but not the cause; `Approved at 0.` does.
- * The other kinds print their own status word, full stop.
+ * WHY THE TICK IS DEAD — the sentence beside a `To buy` row the tick refuses;
+ * `null` when it may be ticked, and `null` for rows whose group already says
+ * why (a pending request under `Need approval` does not repeat itself).
  */
 export function manualPurchaseNotSelectableReason(
   status: ManualPurchaseStatusKind,
   remainingQty: number,
   approvalKind?: ManualPurchaseApprovalKind,
+  remainderKnown = true,
 ): string | null {
-  if (manualPurchaseSelectable(status, remainingQty)) return null;
+  if (manualPurchaseSelectable(status, remainingQty, remainderKnown)) return null;
+  if (approvalKind === "approved" && !remainderKnown) {
+    return MANUAL_PURCHASE_WORDS.remainderNotChecked;
+  }
   const approvedAtZero =
     status === "ready_to_order" ||
     (status === "not_going_ahead" && approvalKind === "approved");

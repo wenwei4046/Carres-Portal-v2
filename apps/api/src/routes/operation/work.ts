@@ -72,6 +72,7 @@ import {
   type CollectionOutcomeRow,
 } from "@carres/shared/payment-collection-outcome";
 import { storageCheckDue } from "@carres/shared/payment-storage";
+import { todayIsoMYT } from "../../lib/today";
 import {
   latestEvidenceAtOf,
   proofReviewStateOf,
@@ -312,6 +313,9 @@ interface ManualPurchaseRegisterSource {
     approval_required: boolean;
     approved_at: string | null;
     refused_at: string | null;
+    /** 0522 — absent on an older API: read as not withdrawn / not sent back. */
+    withdrawn_at?: string | null;
+    sent_back_at?: string | null;
     refuse_reason: string | null;
     for_service_case_id: string | null;
     for_staff_user_id: string | null;
@@ -747,9 +751,10 @@ export function manualPurchaseWorkInputsFromRegister(
         supplierSummary: manualPurchaseSupplierSummary(supplierNames),
       }),
       status: manualPurchaseStatusOf({
-        approvalRequired: request.approval_required,
         approvedAt: request.approved_at,
         refusedAt: request.refused_at,
+        withdrawnAt: request.withdrawn_at ?? null,
+        sentBackAt: request.sent_back_at ?? null,
         refuseReason: request.refuse_reason,
         lines: lines.map((line) => ({
           qty: line.qty,
@@ -1091,10 +1096,6 @@ export function composeOperationWorkResponse(
   });
 }
 
-function malaysiaToday(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 function dutyResolution(
   payload: Record<string, unknown>,
   key: string,
@@ -1390,7 +1391,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readCollectionTimingRules(c),
       readProofFacts(c),
     ]);
-  const today = manual.todayIso ?? malaysiaToday();
+  const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
   // §12 gives overpayment review to the Payment Approver, never to Payment

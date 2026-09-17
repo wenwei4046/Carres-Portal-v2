@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
@@ -187,5 +189,20 @@ describe("GET /api/operation/dashboard", () => {
   it("returns 401 without Authorization header", async () => {
     const res = await app.fetch(new Request("http://t/api/operation/dashboard"), env);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("the dashboard's today is Kuala Lumpur's (0519)", () => {
+  it("the summary, the follow-up rollover and the ETA sweep no longer read the UTC clock", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0519_overdue_scans_and_effective_from_defaults_use_kl_today.sql"),
+      "utf-8",
+    );
+    const bodies = mig.slice(mig.indexOf("-- 1. Operation dashboard"));
+    expect(bodies).not.toContain("current_date");
+    for (const fn of ["operation_dashboard_summary", "ops_tasks_rollover_overdue", "supplier_claim_sweep_overdue"]) {
+      expect(bodies).toMatch(new RegExp(`function public\\.${fn}\\(\\)`, "i")); // 0125 shouts
+    }
+    expect(bodies.match(/\(timezone\('Asia\/Kuala_Lumpur', now\(\)\)\)::date/g)?.length).toBe(9);
   });
 });

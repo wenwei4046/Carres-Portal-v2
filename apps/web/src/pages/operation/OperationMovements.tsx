@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { appTodayIso } from "@/lib/fmt-date";
 import {
   useCatalog,
   useOperationMovements,
@@ -264,7 +265,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock-movements-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `stock-movements-${appTodayIso()}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();

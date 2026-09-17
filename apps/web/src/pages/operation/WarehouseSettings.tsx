@@ -69,7 +69,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import Input from "@/components/kit/Input";
 import PageShell from "@/components/kit/PageShell";
 import Select from "@/components/kit/Select";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 /** The rail's rows, in the card's order. Exported so the Settings Workspace
  *  builds its rail from this one list and the two can never disagree. */
@@ -1084,7 +1084,7 @@ function SpecialDatesSection({
 }) {
   const s = draft.special;
   const patch = (p: Partial<SpecialDraft>) => onChange({ ...s, ...p });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = appTodayIso();
   const upcoming = data.specialDates.filter((r) => r.onDate >= today);
   const past = data.specialDates.filter((r) => r.onDate < today);
 

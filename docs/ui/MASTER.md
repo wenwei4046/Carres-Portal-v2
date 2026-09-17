@@ -411,7 +411,12 @@ the whole reason the two components share a frame.
 - **LISTING STANDARD ENGINE POWERS — owner approved 2026-09-16, BUILT in `register/DataGrid`
   (PR #1396).** Default-on for every register unless marked opt-in:
   ```
-  KEYBOARD    a grid is ONE Tab stop (roving row); ↑/↓ row to row; Enter = what a double-click
+  KEYBOARD    a grid is ONE Tab stop (roving row, always a RENDERED row); ↑/↓ one row,
+              Home/End first/last, PageUp/PageDown one screen — counted in the FULL row list
+              (group banners and expansions skipped); a virtual list scrolls to the target,
+              focuses it and corrects the scroll so it sits wholly below the sticky header
+              (the virtualizer's 30px estimate vs 38px rows left it off-screen, measured
+              2026-09-17, PR follow-up to #1396); Enter = what a double-click
               opens; Space ticks; → / ← open and close the expansion; Shift+F10 or the Menu key
               opens the row menu from the row or any control in it; the menu (role menu,
               `Row actions`) takes focus, ↑/↓/Home/End move, Escape or Tab gives focus back.
@@ -1188,7 +1193,9 @@ the two never compete, and the current work week carries a subtle band** — a m
 day by shape and position, never by colour alone.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
-one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
+one neutral `Hide filters` panel-left button. **S3 (BUILT 2026-09-17, SO Batch Purchase and Manual
+Purchase, `useFilterRailOpen`):** below an 896px canvas the rail starts hidden unless this browser
+opened it before; a browser that hid it keeps it hidden at any width. Hiding removes the whole local rail and gives its width
 to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The
 Register toolbar then carries `Show filters`. Reopening restores the same filters and the browser
 remembers the open/closed choice. Use the Portal sidebar's governed panel-left icon family and
@@ -1609,6 +1616,13 @@ looks at this page: Search · `Export ▾` · Columns. Nothing else lives here.
                                     └────────────────────────┘
 ```
 
+**Engine capabilities for kinds ② and the governed groups — BUILT 2026-09-17 (Manual Purchase
+Round 2).** `DataGrid warning` draws kind ② between the toolbar and the table (`role="alert"`,
+amber-3 fill, amber-6 rule, amber-11 ink, 40px minimum) and costs zero height while absent; Manual
+Purchase's `Issue PO` refusal is its first caller. `fixedGroups[].emptyLabel` lets an always-open
+group state its emptiness beside the zero (`Need approval 0 · Nothing waiting for approval`). Both
+are opt-in; every other Register renders unchanged.
+
 **A ticked checkbox may never move the table.** The 2990 reference grows a new band on selection and
 pushes the rows down; at 77 rows that moves the row under the operator's cursor and the next tick
 lands on the wrong order. Selection therefore replaces the toolbar in place. **Only kind ② may add
@@ -1652,8 +1666,12 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
 
-**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY. Sales Orders, Delivery and Manual Purchase
-render byte-identically to what they rendered before.**
+**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY** for the reading order and record rows
+below. **S5 (owner follow-up 2026-09-16, BUILT 2026-09-17) changes the HEADER for every caller:**
+the child header follows DataGrid's `palette="slate"` header — slate-3 fill, slate-5 rule,
+slate-11 ink, 11px/600, NORMAL casing — so an expansion no longer shouts in uppercase grey under a
+slate parent. Sales Orders, SO Batch, Manual Purchase and Delivery expansions were re-rendered and
+their suites re-run after the change.
 
 The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
 That law holds. What changed is that the buying page may now ask for a second READING ORDER and for

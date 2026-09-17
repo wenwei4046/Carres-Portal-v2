@@ -74,11 +74,13 @@ const DEST = "cccccccc-0000-0000-0000-000000000001";
 const REQUESTS = [
   {
     id: REQ_A, req_no: "REQ-0001", purpose: "display", destination_id: DEST,
-    approval_required: true, approved_at: "2026-08-19T03:00:00Z", refused_at: null,
+    approval_required: true, approved_at: "2026-08-19T03:00:00Z" as string | null, refused_at: null,
   },
   {
+    /* R1 (2026-09-16): a stored `approval_required = false` is history, not
+       an exemption — this request is issuable because it WAS approved. */
     id: REQ_B, req_no: null, purpose: "display", destination_id: DEST,
-    approval_required: false, approved_at: null, refused_at: null,
+    approval_required: false, approved_at: "2026-08-19T03:05:00Z", refused_at: null,
   },
 ];
 
@@ -978,7 +980,19 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
             return tableStub([]);
         }
       }),
-      rpc: vi.fn(),
+      /* D2 — names resolve through the shared actor door (0390), exactly as
+         production does; every other RPC answers nothing. */
+      rpc: vi.fn(async (name: string) =>
+        name === "actor_display_names"
+          ? {
+              data: [
+                { id: U_JESS, name: "Jess" },
+                { id: U_SHARED, name: "Operation" },
+              ],
+              error: null,
+            }
+          : { data: null, error: null },
+      ),
     } as unknown as ReturnType<typeof userClient>;
   }
 
@@ -1010,6 +1024,8 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
         id: PO_D,
         po_no: PO_D, // the PO's id IS its number — no po_no column exists
         placed_at: "2026-08-29T03:05:00Z",
+        // D5 — no confirmed-sent mark on the current version: `Not marked as sent`.
+        marked_sent_at: null,
         // The ORIGINAL supplier-facing date is the one the ledger says we
         // held before the supplier moved it; the moved date is the change.
         po_delivery_date: "2026-09-01",
@@ -1323,7 +1339,7 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
     {
       id: REQ_B, req_no: "MPR-2", purpose: "ready_stock", destination_id: DEST,
       required_by: "2026-10-20",
-      approval_required: false, approved_at: null, refused_at: null,
+      approval_required: false, approved_at: "2026-08-19T03:05:00Z", refused_at: null,
     },
   ];
   const DATED_LINES = [

@@ -31,7 +31,7 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { lineCategory, resolvedCategory } from "@/lib/line-category";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
 import type { ReserveFreeUnit } from "./StockPickerGrid";
 
 /**
@@ -108,14 +108,14 @@ function addDays(iso: string | null, n: number): string | null {
 /** Whole-day diff from today (MYT-agnostic; date-only). */
 function daysFromToday(iso: string): number {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
-  const t = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  const t = new Date(`${appTodayIso()}T00:00:00`).getTime();
   return Math.round((d - t) / 86_400_000);
 }
 
 /** "day N since lent" for the at-customer row. */
 function dayN(loan: SofaLoanDto): number | null {
   if (!loan.loaned_at) return null;
-  const end = (loan.returned_at ?? new Date().toISOString()).slice(0, 10);
+  const end = loan.returned_at ? loan.returned_at.slice(0, 10) : appTodayIso();
   const a = new Date(`${end}T00:00:00`).getTime();
   const b = new Date(`${loan.loaned_at.slice(0, 10)}T00:00:00`).getTime();
   return Math.max(0, Math.round((a - b) / 86_400_000));

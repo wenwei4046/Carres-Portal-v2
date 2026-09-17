@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import {
   SN_CATEGORIES,
   SN_TYPES,
@@ -51,7 +52,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
   const [customerAddress, setCustomerAddress] = useState(prefill?.customerAddress ?? "");
   const [category, setCategory] = useState("");
   const [type, setType] = useState("");
-  const [requestDate, setRequestDate] = useState(todayISO());
+  const [requestDate, setRequestDate] = useState(appTodayIso());
   const [deadline, setDeadline] = useState("");
   const [whatHappened, setWhatHappened] = useState("");
   const [status, setStatus] = useState<"ongoing" | "closed">("ongoing");
@@ -138,7 +139,7 @@ export default function ServiceNoteModal({ mode, id, prefill, onClose, onSaved }
     setCustomerAddress(d.customerAddress ?? "");
     setCategory(d.category ?? "");
     setType(d.type ?? "");
-    setRequestDate(d.requestDate ?? todayISO());
+    setRequestDate(d.requestDate ?? appTodayIso());
     setDeadline(d.deadline ?? "");
     setWhatHappened(d.whatHappened ?? "");
     setStatus(d.status);
@@ -585,6 +586,3 @@ function SectionToggle({
 
 const inp = "w-full rounded border border-base-300 bg-white px-2.5 py-1.5 text-body text-base-900 focus:border-primary focus:outline-none";
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}

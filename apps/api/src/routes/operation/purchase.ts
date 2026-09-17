@@ -23,6 +23,7 @@ import {
 } from "../../lib/purchasing-settings";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 
 /**
@@ -52,7 +53,7 @@ const purchaseRouter = new Hono<AppEnv>();
 const PROCURABLE: ReadonlyArray<ProductCategory> = [...PURCHASING_CATEGORIES];
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoMYT();
 }
 
 /**

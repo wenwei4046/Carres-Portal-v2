@@ -10,6 +10,7 @@ import {
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageSkuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 
 /**
@@ -81,7 +82,7 @@ paymentStorageRouter.get("/", async (c) => {
         importedSof: (ctrl.storage_fee_sof as number | string | null) ?? null,
         skus,
         categories: await storageSkuCategories(sb, skus),
-        asOf: new Date().toISOString().slice(0, 10),
+        asOf: todayIsoMYT(),
         collectedAt: (ctrl.storage_collected_at as string | null) ?? null,
         waiverStatus: (ctrl.storage_waiver_status as string | null) ?? null,
       });

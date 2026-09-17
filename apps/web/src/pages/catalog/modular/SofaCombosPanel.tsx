@@ -16,6 +16,7 @@ import {
   resolveCompartmentPrice,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useCreateSofaCombo, useDeleteSofaCombo, useUpdateSofaCombo } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
 import { slotsSummary } from "../format";
@@ -478,7 +479,7 @@ function SofaComboEditor({
   });
   const [tier, setTier] = useState<FabricTierValue | "">(combo?.tier ?? "");
   const [effectiveFrom, setEffectiveFrom] = useState(
-    combo?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
+    combo?.effectiveFrom ?? appTodayIso(),
   );
   const [active, setActive] = useState(combo?.active ?? true);
   const [label, setLabel] = useState(combo?.label ?? "");

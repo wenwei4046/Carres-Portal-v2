@@ -16,6 +16,7 @@ import {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchOrderByAbsenceWord,
   soBatchOrderRemainingQty,
   compareSoBatchPlanning,
   defaultAllocations,
@@ -1159,7 +1160,7 @@ describe("soBatchOrderPlanning — groups by remaining demand, never by raw stat
   it("a Ready-Stock-only order with no PO needs no purchase", () => {
     const o = railOrder({ orderId: "rs", status: "blank", lines: [line({ orderLineId: "x", qty: 2, stockTaken: 2 })] });
     expect(soBatchOrderRemainingQty(o)).toBe(0);
-    expect(plan(o)).toEqual({ group: "no-purchase-needed", date: null, notPlanned: false, rank: 2 });
+    expect(plan(o)).toEqual({ group: "no-purchase-needed", date: null, notPlanned: false, absence: null, rank: 2 });
   });
 
   it("a fully ordered order needs no purchase", () => {
@@ -1169,28 +1170,54 @@ describe("soBatchOrderPlanning — groups by remaining demand, never by raw stat
   it("a partly bought order with a selectable leaf is To buy with its engine Order By", () => {
     const o = railOrder({ orderId: "p", status: "partial", lines: [line({ orderLineId: "x", qty: 3, pos: [{ poId: "PO-9", poLineId: null, qty: 1, destinationId: null }] })] });
     const r = plan(o, [row({ orderId: "p", orderBy: "2026-09-20" }), row({ id: "b2", orderId: "p", orderBy: "2026-09-18" })]);
-    expect(r).toEqual({ group: "to-buy", date: "2026-09-18", notPlanned: false, rank: 0 });
+    expect(r).toEqual({ group: "to-buy", date: "2026-09-18", notPlanned: false, absence: null, rank: 0 });
   });
 
   it("pool coverage without exact lineage never moves an order out of To buy", () => {
     const o = railOrder({ orderId: "pool", lines: [line({ orderLineId: "x", qty: 1 })] });
     const r = plan(o, [row({ orderId: "pool", fullyOnPo: true, orderBy: "2026-09-18" })]);
-    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: true, rank: 1 });
+    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: false, absence: "already_on_po", rank: 1 });
   });
 
-  it("unverified coverage and setup blockers stay in To buy as Not planned", () => {
+  /* ⭐ S1 — `Not planned` used to print for all three of these. Each test below
+     fails on the pre-S1 engine, which returned `notPlanned: true` and no
+     `absence` for every undated `To buy` order. */
+  it("S1: missing setup is the only Not planned", () => {
     const empty = railOrder({ orderId: "u" });
-    expect(plan(empty, [row({ orderId: "u", fullyOnPo: undefined })]).group).toBe("to-buy");
-    expect(plan(empty, [row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null })]))
-      .toEqual({ group: "to-buy", date: null, notPlanned: true, rank: 1 });
+    const r = plan(empty, [row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null })]);
+    expect(r).toEqual({ group: "to-buy", date: null, notPlanned: true, absence: "not_planned", rank: 1 });
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Not planned");
+  });
+
+  it("S1: a leaf another open PO covers reads Already on a PO", () => {
+    const empty = railOrder({ orderId: "c", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const r = plan(empty, [row({ orderId: "c", fullyOnPo: true })]);
+    expect(r.notPlanned).toBe(false);
+    expect(r.absence).toBe("already_on_po");
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Already on a PO");
+  });
+
+  it("S1: unverified coverage reads Coverage not checked, never Already on a PO", () => {
+    const empty = railOrder({ orderId: "u" });
+    const r = plan(empty, [row({ orderId: "u", fullyOnPo: undefined }), row({ id: "b2", orderId: "u", fullyOnPo: true })]);
+    expect(r.group).toBe("to-buy");
+    expect(r.notPlanned).toBe(false);
+    expect(r.absence).toBe("coverage_not_checked");
+    expect(soBatchOrderByAbsenceWord(r.absence!)).toBe("Coverage not checked");
+  });
+
+  it("S1: an eligible leaf with no derivable Order By is setup, Not planned", () => {
+    const empty = railOrder({ orderId: "e", lines: [line({ orderLineId: "x", qty: 2 })] });
+    const r = plan(empty, [row({ orderId: "e", orderBy: null })]);
+    expect(r.absence).toBe("not_planned");
   });
 
   it("orders selectable Order By ascending, then not planned, then SO No descending", () => {
     const items = [
-      { so: 10, plan: { group: "to-buy" as const, date: null, notPlanned: true, rank: 1 as const } },
-      { so: 11, plan: { group: "to-buy" as const, date: "2026-09-20", notPlanned: false, rank: 0 as const } },
-      { so: 12, plan: { group: "to-buy" as const, date: "2026-09-18", notPlanned: false, rank: 0 as const } },
-      { so: 13, plan: { group: "to-buy" as const, date: null, notPlanned: true, rank: 1 as const } },
+      { so: 10, plan: { group: "to-buy" as const, date: null, notPlanned: true, absence: "not_planned" as const, rank: 1 as const } },
+      { so: 11, plan: { group: "to-buy" as const, date: "2026-09-20", notPlanned: false, absence: null, rank: 0 as const } },
+      { so: 12, plan: { group: "to-buy" as const, date: "2026-09-18", notPlanned: false, absence: null, rank: 0 as const } },
+      { so: 13, plan: { group: "to-buy" as const, date: null, notPlanned: true, absence: "not_planned" as const, rank: 1 as const } },
     ];
     expect([...items].sort(compareSoBatchPlanning).map((i) => i.so)).toEqual([12, 11, 13, 10]);
   });

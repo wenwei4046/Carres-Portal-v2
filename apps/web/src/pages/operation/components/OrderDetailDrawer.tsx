@@ -110,7 +110,7 @@ import {
 } from "@/lib/queries";
 import { methodLabel, useManualMethods } from "@/lib/payment-methods";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
@@ -1625,7 +1625,7 @@ function DrawerBody({
   // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
   // Applies to BOTH the goods balance and the storage fee; the header rolls up
   // the red (blocking) ones into one HOLD DELIVERY status.
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const daysToDelivery =
     !order.delivery_date_tbd && order.delivery_date
       ? Math.round(
@@ -3935,7 +3935,7 @@ function DrawerBody({
                         const end =
                           form.draft.storage_to.trim() ||
                           form.draft.logistic_eta.trim() ||
-                          new Date().toISOString().slice(0, 10);
+                          appTodayIso();
                         const days = Math.max(
                           0,
                           Math.round(
@@ -5586,7 +5586,7 @@ function PaymentForm({
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(appTodayIso());
   // 0476 — the methods are the Settings → Payment list; a method switched off
   // there disappears here. Bank transfer is the default when it is Active.
   const { methods } = useManualMethods();
@@ -6029,7 +6029,7 @@ function StorageCard({
   exempt: boolean;
   delivered: boolean;
 }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const { draft, set } = form;
   const endSet = draft.storage_to.trim();
   const endEff = endSet || draft.logistic_eta.trim() || todayIso;

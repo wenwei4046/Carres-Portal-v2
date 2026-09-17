@@ -7,6 +7,7 @@ import type {
 } from "@carres/shared";
 import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
@@ -209,7 +210,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     }
     const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
     const tag = category === "all" ? "" : `${category}-`;
-    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`carres-skus-${tag}${appTodayIso()}.csv`, csv);
     toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
   }
 

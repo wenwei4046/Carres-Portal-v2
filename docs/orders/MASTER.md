@@ -212,7 +212,9 @@ sentences, no Priority).
 
 ```
 FILTERS    active search + header filters shown as conditions · one `Clear filters` clears both
-           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = unsearched population
+           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = the server's count
+           (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
+           unknown total → `{n} sales orders`, never a guessed `of`
 IDENTITY   SO No pinned and a door to the order
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
@@ -227,15 +229,22 @@ NARROW     toolbar wraps and stays usable · grid scrolls itself · no page side
 
 **Status — BUILT, [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396) (on the
 shared register of PR #1395).** The page runs `palette="slate"` and the responsive search; the
-page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 96 ·
-Requested Delivery Date 128 · Customer 192 · Delivery Location 172 · Showroom 100 · PO No 152 ·
+page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 100 ·
+Requested Delivery Date 128 · Customer 188 · Delivery Location 172 · Showroom 100 · PO No 152 ·
 DO No 144); Customer and Delivery Location open a cut value whole (engine `overflowText`). The
 error state is the kit error inside the work surface, so the toolbar and `New Sales Order` stay.
 Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No fully visible;
 1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
 200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
 search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
-returns `24 sales orders`. The production SHA is recorded on the PR. **Owed:** the authenticated
+returns `24 sales orders`. **Total follow-up (2026-09-17):** `{m}` is no longer the loaded rows or a
+remembered number — `GET /api/operation/orders` returns `salesOrderTotal`, one head-only exact count
+under the caller's RLS (same stage/channel, `source_system` null or not `rental`, search not
+applied), re-read with every list refresh (create/cancel invalidate the list). Rendered: fixture
+total 612 → `24 of 612` and, searching, `3 of 612`; total unknown → `24 sales orders` / `3 sales
+orders`. SO Date widened 96 → 100 after the signed-in production walk showed `Wed, 19 A…` (widest
+current-year date 81.3px). 🟡 A date from another year (`Wed, 28 May 2025`, 116px) needs 132px in
+both date columns and is still cut; resolving it without losing DO No at 1440 is owed. The production SHA is recorded on the PR. **Owed:** the authenticated
 owner walk in production (fixture evidence is not production evidence).
 
 ### The two-line cell law
