@@ -262,11 +262,15 @@ document both buying doors produce). The canonical invisible identity is
 rows carry a null `req_no`. Historical `REQ-####` / `MPR-YYYYMMDD-RRRR` values stay
 stored unchanged as legacy compatibility data — never displayed, never renumbered, and
 no operator-facing surface may consume them.
-**Approval — APPROVED / NOT BUILT (Jess, 2026-09-16).** Every Manual Purchase requires
-approval, whatever its purpose or amount. The decision door enforces this rule; no purpose
-or amount bypass is permitted. Retire `purchasing_purpose_approval` as an editable approval
-configuration and remove the `No approval needed` state from Manual Purchase. Build starts
-after SO Batch Round 1 (PR #1395) is merged.
+**Approval — APPROVED / LOCKED (Jess, 2026-09-16); BUILT in Manual Purchase Round 2, migration
+0522.** Every Manual Purchase requires approval, whatever its purpose or amount; no purpose or
+amount bypass exists. `purchasing_create_request` always stores `approval_required = true` and no
+longer reads `purchasing_purpose_approval`; `purchasing_set_purpose_approval` refuses with
+`approval_setting_retired` (the table's rows stay stored, unused). The issue path enforces it in SQL:
+`purchasing_demand_record_issue` refuses any Manual Purchase demand whose request is not approved,
+or is refused, withdrawn or sent back (`not_ready_to_order`), taking the request row FOR SHARE first.
+`No approval needed` is gone from every surface; a historical row stored with
+`approval_required = false` and no decision reads `Need approval`. No row was backfilled.
 
 An approved Display Request may route to Manual Purchase or Consignment Order; staff do not
 retype it.
@@ -862,8 +866,12 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   filters and rail filters cover both groups; while any narrowing is active every group opens, and
   clearing it returns the groups to the state the operator had before.
 - **R2 · Order By.** The column prints the engine's Order By — the earliest over exactly the
-  leaves the parent checkbox would tick; `Not planned` when remaining demand has no selectable date;
-  blank when nothing is left to buy. `To buy` reads selectable Order By ascending → `Not planned` →
+  leaves the parent checkbox would tick; blank when nothing is left to buy. An undated `To buy`
+  order says WHICH of three facts holds (S1, built 2026-09-17, `soBatchOrderPlanning().absence`):
+  `Not planned` only when a leaf is blocked by missing setup (or an eligible leaf has no derivable
+  date); `Coverage not checked` when whether an open PO covers a leaf could not be verified;
+  `Already on a PO` when another open PO covers the remaining leaf. Setup is named first; an
+  unverified leaf is named before a covered one, because unknown must never read as covered. `To buy` reads selectable Order By ascending → `Not planned` →
   SO No descending; `No purchase needed` reads SO No descending. Header sorting orders rows inside
   each group, never across them. No client calendar arithmetic is admitted.
 - **R3 · Columns** — see the column paragraph below; the saved layout key is
@@ -1021,7 +1029,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   shared purchasing responsive pattern already shipped on Purchase Orders. At 459px the Register
   keeps its full width, the page itself never scrolls sideways, each table scrolls inside its own
   box, and `Issue PO` stays on screen. At or above 896px of available canvas the rail stays in flow. The rail is never squeezed
-  below 240px and a governed label is never truncated.
+  below 240px and a governed label is never truncated. **S3 (built 2026-09-17, SO Batch and Manual
+  Purchase, `useFilterRailOpen`):** below 896px of canvas the rail STARTS hidden unless this browser
+  opened it before; a browser that hid it keeps it hidden at any width.
 - **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
   never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
   bottom action bar. The selected bar direction is
@@ -1600,10 +1610,11 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
-**APPROVED / NOT BUILT — Jess, 2026-09-16.** The approval, grouped Register, withdrawal
-and send-back rules below are approved. Build starts after SO Batch Round 1 (PR #1395)
-is merged. Every request requires approval, regardless of purpose or amount; the decision
-door enforces it. Per-purpose approval configuration is retired.
+**APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
+Every request requires approval, regardless of purpose or amount; the decision and issue doors
+enforce it. Per-purpose approval configuration is retired. The Register, rail, object rounds and
+the create form below describe the built page; fixture walks cover every state, and the
+authenticated owner walk remains owed.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
 `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
@@ -1771,7 +1782,22 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   searchable and shows in the goods table. `Supplier` is Card 03's Catalog-derived
   projection — one actual name or `{n} suppliers`, never `Supplier not selected`.
   `Deliver To` prints the governed destination, `Multiple` when several. `Requested By`
-  is the real staff name — never a shared account, role, email or `(you)`.
+  is the real staff name — never a shared account, role, email or `(you)`. **D2 (Round 2):** the
+  name is ONE server-resolved identity (`identityResolver` over the shared actor door, 0390) that
+  the Register, the object, search and export all read; a shared or robot login and an unnamed
+  account resolve to `Staff identity not recorded` on every surface.
+- **Built widths (measured 2026-09-17, rendered shell, Inter):** `Items` 180 (the longest live
+  model name is 18 characters; the sticky identity also fits beside the gutters at 390px) ·
+  `Order By` 112 · `Purpose` 150 · `Supplier` 140 (longest live supplier 17 characters) ·
+  `Approval Status` 188 (`Sent back for changes` pill 134px + requester avatar) · `Requested By`
+  124 · dates 112 · `Deliver To` 132 · `PO No` 144. Saved layout key
+  `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
+- **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
+  `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
+  `Send for approval` move from the shell header into a bar pinned to the bottom — exactly one pair
+  is displayed at any width. The Delivery Date picker's floor is the Purchasing Settings number
+  (0422), never a hard-coded 14 days. `Edit and send again` opens the same form on the returned
+  request, prefilled once, purpose locked, sending `Send again for approval`.
 
 **THE ROW EXPANSION IS THE SHARED GOODS TABLE — owner ruling 2026-09-11.** Manual
 Purchase and SO Batch Purchase draw ONE `GoodsMiniTable` and one Register engine, with the
@@ -1841,8 +1867,10 @@ condition vocabulary; the one difference is a business one.
 **Selection and PO Duty.** Selection replaces the top toolbar in place (UI MASTER §6.7),
 with Clear, the resolved PO Duty and Issue PO; no action bar below the table. An issue refusal
 uses the warning band between toolbar and table.
-Only requests whose derived status is `Ready to order` with
-live remaining quantity take the tick. With no selection there is NO PO Duty block,
+Only APPROVED requests whose derived status is `Ready to order` with a CONFIRMED live remaining
+quantity take the tick; an approved request whose remainder could not be read stays in `To buy`
+beside `Remaining quantity not checked` and refuses it (Round 2). A tick dies the moment a refetch
+makes its row unbuyable. With no selection there is NO PO Duty block,
 initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
 the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the resolved
 person, `Issue PO` — where the PO count is the same document partition the issue door
@@ -1880,7 +1908,10 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   the line (`No supplier yet` + the Catalog act) and may be filtered through `Supplier not set` under `SETUP TO FIX`.
 - **What We Already Have** — `SKU · Free Stock · Already On PO · Still Needed` per live SKU,
   through the one shared arithmetic (`stillNeededOf`) and the same stock/open-PO reads the
-  create workspace uses. Decision facts, not buttons and not Work rows.
+  create workspace uses. Decision facts, not buttons and not Work rows. **D3 (Round 2):** a
+  sentence above the table labels these figures a SKU REFERENCE across Carres, separate from this
+  request's own POs (the `Purchase Orders` section), and says reference stock never reduces the
+  request — so `Still Needed 0` beside `Not ordered yet` no longer reads as a contradiction.
 - **Approval** — always required and always present. `Need approval` + `{name} approves`
   for a viewer without the gate; or, for the actual approver only, one line per live SKU
   (`SKU · Requested Qty · Still Needed · Approved Qty · Transaction Cost · Line Total`) with
@@ -1893,14 +1924,33 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
 - **Withdraw request** — the requester may withdraw before an approval/refusal decision.
   Only while waiting for a decision, never after approval or when a PO exists.
   Store the real actor and server time. Show `Withdrawn` in `No purchase needed`; this is
-  not an undo of an approval or an issued PO.
+  not an undo of an approval or an issued PO. **Built (0522 `purchasing_withdraw_request`):**
+  `created_by` must be the caller (`not_requester`), no decision (`already_decided`,
+  `request_withdrawn`), no PO line or issued quantity (`request_ordered`); the object asks once
+  more before it acts. **PROPOSAL / NOT LAW — built interpretation, owner may narrow:** a
+  sent-back request is still undecided, so its requester may withdraw it too instead of leaving it
+  in `Need approval` for ever. Falsifier: the owner rules that a returned request must be edited or
+  refused, never withdrawn — then the door adds `sent_back_at is null` to its gate.
 - **Send back** — the approver may return a request with a required reason. Show
   `Sent back for changes` in `Need approval`. The requester uses `Edit and send again`
   to edit and resubmit the SAME request for approval. History retains every round, its
   changes, reason, actor and time; prior approval cannot authorise a changed submission.
   All transitions enforce current state and actor on the server, including concurrent actions.
+  **Built (0522):** `purchasing_decide_request` accepts `send_back` (reason required, no cuts);
+  `purchasing_resubmit_request` edits the SAME request — Deliver To, Delivery Date, the purpose's
+  For fact and its lines (kept by id, replaced when the SKU changes, removed lines marked not going
+  ahead with their actor) — keeps the purpose, clears approved quantities, increments `round` and
+  stamps `submitted_at`; the 0422 earliest-Delivery-Date floor applies again. Every send back,
+  resubmission and withdrawal is an append-only `purchase_request_events` row (actor, time,
+  reason, changes). Every decision door takes the request row FOR UPDATE and the issue door takes
+  it FOR SHARE, so a race has exactly one winner and the loser leaves in its own words
+  (`request_withdrawn` · `request_sent_back` · `already_decided` · `not_sent_back`). A refused
+  object re-reads itself so the winning fact replaces stale controls. A sent-back Register row
+  carries the REAL requester's avatar beside the fact, or `Staff identity not recorded`.
 - **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
-  `Ordered Qty` · `Still To Order` · `PO Issued` (`placed_at`) · `PO Delivery Date` (the
+  `Ordered Qty` · `Still To Order` · `PO Issued` (D5, Round 2: the CURRENT PO version's
+  marked-sent time — the same fact `PO Issued` means on Purchase Orders — or `Not marked as sent`;
+  never `placed_at`, which is the creation time) · `PO Delivery Date` (the
   ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
   it, else the issue-stamped date) · `Supplier Delivery Date` as `Not confirmed` until supplier
   evidence exists, `Same as PO` when the supplier confirms the PO date, or the supplier's changed
@@ -1909,8 +1959,11 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   that selected one (it would have 400'd the whole Register on first lineage).
 - **History** — the final section: `Today · Yesterday · Earlier`, the locked three-rank record
   grammar, stored facts only (`Purchase requested` · `Purchase approved` · `Purchase refused`
-  · `Marked not going ahead` · `Purchase order issued`). Every withdrawal, send-back and resubmission round is also preserved. New line
-  `not going ahead` writes store the actor. Real individual actor and actual
+  · `Marked not going ahead` · `Purchase order issued` · `Sent back for changes` ·
+  `Sent again for approval` (rank 3 `Round {n}` and what changed, e.g. `{sku} · Qty 1 → 4`) ·
+  `Withdrawn`). Every withdrawal, send-back and resubmission round is preserved. Line
+  `not going ahead` writes store the actor (`purchase_demands.cancelled_by`, 0522; D4); a line
+  cancelled before 0522 reads `Staff identity not recorded`. Real individual actor and actual
   server time; an event whose individual was never stored (line cancel, PO issue,
   shared-account creation) reads `Staff identity not recorded`; nothing infers that a supplier
   received a PO or that goods arrived.

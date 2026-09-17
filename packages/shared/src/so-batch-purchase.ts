@@ -1369,7 +1369,25 @@ export function soBatchOrderRemainingQty(order: Pick<SoBatchOrderRow, "lines">):
 export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]): {
   group: SoBatchRegisterGroup;
   date: string | null;
+  /** ONLY missing setup — the one fact `Not planned` names (S1). */
   notPlanned: boolean;
+  /**
+   * ⭐ S1 · THREE FACTS, THREE WORDS (owner follow-up, 2026-09-16). `Not
+   * planned` used to print for every undated `To buy` order, which covered
+   * three different truths with one word:
+   *
+   *   not_planned           a leaf is blocked by missing setup (no customer
+   *                         date, supplier, cost, production days, partner)
+   *   already_on_po         another open purchase order already covers the
+   *                         remaining leaf (`fullyOnPo === true`)
+   *   coverage_not_checked  whether an open PO covers it could not be
+   *                         verified (`fullyOnPo` absent)
+   *
+   * Null when the order has a date or nothing to buy. Precedence: setup is
+   * the operator's repair and is named first; an unverified leaf is named
+   * before a covered one, because unknown must never read as covered.
+   */
+  absence: SoBatchOrderByAbsence | null;
   rank: 0 | 1 | 2;
 } {
   const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
@@ -1379,8 +1397,41 @@ export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly Pu
     (r.fullyOnPo !== true && (r.toBuy ?? 0) > 0 && !isSelectableForOrder(r, order.status)));
   const toBuy = eligible.length > 0 || blockedOrUnverified || soBatchOrderRemainingQty(order) > 0;
   const date = dates[0] ?? null;
-  if (!toBuy) return { group: "no-purchase-needed", date: null, notPlanned: false, rank: 2 };
-  return { group: "to-buy", date, notPlanned: date == null, rank: date ? 0 : 1 };
+  if (!toBuy) {
+    return { group: "no-purchase-needed", date: null, notPlanned: false, absence: null, rank: 2 };
+  }
+  if (date) return { group: "to-buy", date, notPlanned: false, absence: null, rank: 0 };
+  const open = order.status === "ordered" ? [] : leaves;
+  const absence: SoBatchOrderByAbsence =
+    open.some((r) => !isPurchaseDemandTimingState(r.state)) || eligible.length > 0
+      ? "not_planned"
+      : open.some((r) => r.fullyOnPo !== true && r.fullyOnPo !== false)
+        ? "coverage_not_checked"
+        : open.some((r) => r.fullyOnPo === true)
+          ? "already_on_po"
+          : "not_planned";
+  return {
+    group: "to-buy",
+    date: null,
+    notPlanned: absence === "not_planned",
+    absence,
+    rank: 1,
+  };
+}
+
+/** Why a `To buy` order has no Order By (S1). */
+export type SoBatchOrderByAbsence = "not_planned" | "already_on_po" | "coverage_not_checked";
+
+/** The ONE word per absence — every word already governed in COPY-STANDARD. */
+export function soBatchOrderByAbsenceWord(absence: SoBatchOrderByAbsence): string {
+  switch (absence) {
+    case "not_planned":
+      return SO_BATCH_PURCHASE_WORDS.notPlanned;
+    case "already_on_po":
+      return SO_BATCH_PURCHASE_WORDS.toBuyAlreadyOnPo[0]!;
+    case "coverage_not_checked":
+      return SO_BATCH_PURCHASE_WORDS.toBuyNotChecked[0]!;
+  }
 }
 
 /** Default order inside a group: rank → Order By ascending → SO No descending. */

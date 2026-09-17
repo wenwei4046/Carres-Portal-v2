@@ -10,7 +10,7 @@
  * navigation rail is a WORKSPACE shape rather than a general one. When the kit
  * grows one, this file is what it replaces.
  */
-import type { ReactNode } from "react";
+import { useCallback, useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
 import Icon from "@/components/kit/Icon";
 
 export function RailGroup({
@@ -347,4 +347,58 @@ export function FilterRailSelect({
       </select>
     </div>
   );
+}
+
+/** Below this canvas width the 240px rail floats over the Register (the
+ *  shared purchasing responsive pattern) — and, since S3, starts hidden. */
+export const FILTER_RAIL_FLOAT_BELOW_PX = 896;
+
+/**
+ * ⭐ S3 · THE RAIL'S OPEN STATE, REMEMBERED PER BROWSER (owner follow-up
+ * 2026-09-16, SO Batch Purchase + Manual Purchase).
+ *
+ * On a canvas narrower than 896px the rail floats OVER the list, so opening
+ * it by default covered the very rows the operator came to read (measured at
+ * 390px: ~38px of list left). It therefore starts hidden there — unless this
+ * browser opened it before, which is a choice the page keeps.
+ *
+ *   stored "1"  the operator opened it       → open at any width
+ *   stored "0"  the operator hid it          → hidden at any width
+ *   nothing     never chosen                 → open on a wide canvas,
+ *                                              hidden below 896px
+ *
+ * Storage failures never break the page: the live state still works for the
+ * visit, and a blocked read counts as "never chosen".
+ */
+export function useFilterRailOpen(
+  storageKey: string,
+  canvasRef: RefObject<HTMLElement | null>,
+): [boolean, (open: boolean) => void] {
+  const [stored] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(storageKey);
+    } catch {
+      return null;
+    }
+  });
+  const [open, setOpen] = useState(stored !== "0");
+  useLayoutEffect(() => {
+    if (stored != null) return;
+    const width = canvasRef.current?.clientWidth ?? 0;
+    if (width > 0 && width < FILTER_RAIL_FLOAT_BELOW_PX) setOpen(false);
+    // Measured once, at mount: a later resize never overrides what is on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const setVisible = useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      try {
+        localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage may be unavailable in a locked-down browser.
+      }
+    },
+    [storageKey],
+  );
+  return [open, setVisible];
 }

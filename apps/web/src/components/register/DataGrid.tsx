@@ -189,7 +189,9 @@ export type DataGridProps<T> = {
   initialGroupBy?: string[];
   /** Governed groups reuse the same group rows without creating a fake data column. */
   fixedGroups?: {
-    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean }[];
+    /** `emptyLabel` — an always-open group with no rows says so beside its
+        zero (Manual Purchase round 2: `Nothing waiting for approval`). */
+    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean; emptyLabel?: string }[];
     groupOf: (row: T) => string;
     revealMatches?: boolean;
   };
@@ -327,6 +329,13 @@ export type DataGridProps<T> = {
    * loading. Omitted = unchanged (the page decides what a failure looks like).
    */
   errorState?: ReactNode;
+  /**
+   * ⭐ MESSAGE KIND ② — THE WARNING BAND (ui MASTER §6.7). A real business
+   * blocker, drawn between the toolbar and the table, costing zero height
+   * while absent. Manual Purchase round 2 (2026-09-17) is its first caller:
+   * an `Issue PO` refusal. Omitted = no band, byte-identical for every caller.
+   */
+  warning?: ReactNode;
   isLoading?: boolean;
   /**
    * Right-click row menu. Receives the row and returns the items to show.
@@ -582,6 +591,7 @@ function DataGridInner<T>({
   emptyMessage = "No data.",
   noMatchMessage,
   errorState,
+  warning,
   isLoading = false,
   contextMenu,
   expandable,
@@ -1266,7 +1276,7 @@ function DataGridInner<T>({
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
-    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean }
+    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean; emptyLabel?: string }
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
@@ -1277,7 +1287,7 @@ function DataGridInner<T>({
            records, so "nothing to buy" is stated rather than implied. */
         if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
         const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
-        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen },
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen, emptyLabel: group.emptyLabel },
           ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
       });
     }
@@ -1695,6 +1705,11 @@ function DataGridInner<T>({
               <span role="heading" aria-level={3} tabIndex={0} className={styles.fixedGroupLabel}>
                 {item.label}
                 <span className={styles.groupCount}>{item.count}</span>
+                {item.count === 0 && item.emptyLabel ? (
+                  <span className={styles.groupCount} data-testid={`grid-group-empty-${item.path}`}>
+                    {item.emptyLabel}
+                  </span>
+                ) : null}
               </span>
             ) : (
               <button
@@ -2402,6 +2417,16 @@ function DataGridInner<T>({
                 <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
               </button>
             ))}
+        </div>
+      )}
+
+      {warning != null && warning !== false && (
+        <div
+          className="flex min-h-10 flex-none items-center gap-2 border-b border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+          role="alert"
+          data-testid="grid-warning"
+        >
+          {warning}
         </div>
       )}
 
