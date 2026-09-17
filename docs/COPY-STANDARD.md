@@ -983,7 +983,6 @@ these copy retirements do not delete business facts or ban their words on other 
 | `Check quantity difference` | `Check quantity difference` | `Record the correct count` | `Count recorded` | `Every count matches.` |
 | `Close claim` | `Close claim` | `Close claim` | `Claim closed` | `No claim is finished and waiting.` |
 | `Approve the purchase` | `Approve {n} {model} for {purpose}` | `Approve` · `Refuse` | `Approved — {n} {model}` | `Nothing waiting for you.` |
-| `Decide what the customer gets` | `Decide what {customer} gets` | `Save what we are doing` | `Recorded` | `No claim is waiting for a decision.` |
 | `Decide what happens to the item` | `Decide what happens to {unit}` | `Save what happened` | `Recorded` | `No item is waiting.` |
 | `Late supplier goods` | `Ask {supplier} if the goods can arrive by {weekday, date}` | `Record supplier answer` | `Supplier answer recorded` | `No supplier delivery is late.` |
 | `Check the SKU` | `Check the SKU with {supplier}` | `Publish the SKU` | `SKU published` | `Every request has its product.` |
@@ -1736,80 +1735,56 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Previous` · `Next` | GRN Register footer page moves | One server page back / forward; disabled at the ends rather than hidden. |
 | `{date} — {n} expected supplier arrival(s)` | the rail Calendar day's aria sentence | The marker COUNT said in words — colour is never the only signal (owner correction 2026-09-06, second ruling). |
 
-### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
+### Supplier Claim decision words — owner boundary confirmed 2026-09-14
 
-These are **Loo's own spellings**, taken from his ruling of 2026-08-05 (the claim model in
-`docs/purchasing/MASTER.md` §6). They were ruled but never written down here, which is exactly
-the gap this file exists to close: a word that has been ruled and is not in the dictionary is a
-word the next chat re-invents.
+`docs/purchasing/MASTER.md` §7.3 and §9.5 own the stock-claim flow. A Supplier Claim starts
+from Stock/PO/receiving evidence, not a customer complaint or Service Case. The official
+Purchasing destination remains `Supplier Claims`; this boundary does not rename it.
 
-**A claim carries FOUR layers and they may never be collapsed:**
+Keep these facts separate:
 
+```text
+Stock / Receiving Problem → Supplier Response → Authorised Stock-Claim Decision → Execution
 ```
-Customer Problem → Supplier Response → Carres Resolution → Carres Execution
-```
 
-**The test that keeps them apart is his:** *can both be true at the same time?* **If yes, they
-are two fields, not one list.** The customer cancelled AND the mattress is destroyed — under
-one list the operator has to choose which truth to record, i.e. has to lie.
-
-| Word | Where | Why this word |
+| Word | Where | Meaning |
 |---|---|---|
-| `The Item` | claim section | What this claim is ABOUT — the reference object (`PO · SKU · Supplier · DO`). **Not on screen yet**: it is the Workspace layer's un-collapsible header. |
-| `Customer Resolution` | claim section + its picker | *What are we doing for the CUSTOMER?* **Live 2026-08-06.** |
-| `Item Outcome` | claim section + its picker | *What happened to THIS item?* **Live 2026-08-06** — it renamed `The goods`, which named the noun rather than the decision, and with a second decision beside it the two must read apart at a glance. |
-| `Supplier Response` | claim section | What the supplier said. **The screen still says `What {supplier} answered`** — that names the party, which this file otherwise asks for, so the rename waits for the Workspace layer rather than being taken in passing. |
-| `Next Action` | claim region | What is owed now. **Not on screen yet** — the region belongs to the Workspace layer. |
-| `What are we doing for the customer?` | under `Customer Resolution` | The section's own question, so the picker never has to be guessed at. |
-| `What happened to this item?` | under `Item Outcome` | Its twin. Two decisions, two questions, and a reader who can tell them apart without being told. |
-| `Save what we are doing` | the resolution's button | Parallel to `Save what happened` beside it — both name the record being written, not the thing decided. |
-| `Recorded {date}` | beside that button | A FACT: a resolution stays editable while the claim is open, so the screen says when the one on file was set. |
-| `Nothing recorded — this claim closed without one.` | closed claim, no resolution | A closed claim with a blank here is finished, not neglected. Never a bare `—`. Now also the closed-claim line under `Carres Execution`, which can be blank for the same reason. |
-| `Carres Execution` | claim section + its picker | *In what order do the goods move?* **Live 2026-09-01** (layer ④, migration 0409) — Loo's fourth layer, ruled 2026-08-05 and unbuilt until then. |
-| `In what order do the goods move?` | under `Carres Execution` | The section's own question, so the picker never has to be guessed at — the third of the set beside `What are we doing for the customer?` and `What happened to this item?` |
-| `Save how the goods move` | the execution's button | The third of the family with `Save what we are doing` and `Save what happened` — all three name the record being written, never the thing decided. |
+| `The Item` | Claim summary | Affected item, Unit where applicable, supplier and source PO/receipt |
+| `Supplier Response` | Claim communication | What the supplier actually answered; not Carres approval or completion |
+| `Authorised Outcome` | Claim decision | The permitted stock-claim result, with approver and reason |
+| `Item Outcome` | Claim execution summary | Actual goods result read from the owning Stock/receipt/return/repair record |
+| `Work` | Claim action context | Outstanding fact, resolved action owner and actual date |
+| `Recorded {date}` | Saved evidence/decision | When that fact was recorded; not proof that the goods moved |
+| `Close claim` | Claim action | Available only when the required stock-claim outcomes and evidence are complete |
 
-**`Customer Resolution` — the four options, and the one line each carries.** The line is a
-DEFINITION, never a consequence: consequences are `f(Resolution, Execution)` and Carres
-Execution is frozen-but-unbuilt, so a line naming stock, money or an outstanding quantity would
-be a guess wearing a screen's authority.
+`Customer Resolution` and `What are we doing for the customer?` do not introduce a Purchasing
+picker. Customer remedies belong to Service Case. If a related customer case is
+shown, its outcome is read-only with a link to Service; no customer case is required to operate a
+stock claim.
 
-| Option | The line under it |
-|---|---|
-| `Replace` | `The customer gets a NEW item.` |
-| `Repair` | `The SAME item is repaired and goes back to the SAME customer.` |
-| `Accept As-Is` | `The customer keeps this item as it is.` |
-| `No Replacement Required` | `Nothing more goes to the customer for this item.` |
+`Repair` in a supplier reply is an offer. An authorised repair decision is permission to execute.
+A repair completes only when the original Unit has been repaired, received back and inspected.
+Neither the offer nor the decision means completion. A replacement physical Unit has its own ID.
 
-**`Item Outcome` — the three, unchanged since 0299:** `Put back in stock` · `Returned to
-supplier` · `Written off`.
+`Put back in stock`, `Returned to supplier` and `Written off`, where used as historical result
+labels, describe physical facts; they are
+not shortcuts to perform those acts from the Claim. Stock's governed availability, handover and
+disposal rules determine the actual result.
 
-**Removed from the resolution list, and they do not go back**: `Return to Supplier` and
-`Write Off` (they answer what happened to the ITEM) · `Cancel Outstanding` (renamed
-`No Replacement Required`) · `Reject` · `Deliver Remaining` · `Replacement` ·
-`Return and Replace` (all four are SUPPLIER answers, not Carres decisions).
+Physical return and financial recovery are separate. `Collected` describes evidenced handover;
+required `Credit Note`/`Debit Note` evidence comes from Finance. A generic `Refund` choice must
+not conflate customer refund, supplier credit and supplier cash settlement. Payment owns customer
+refunds; Finance owns supplier financial processing.
 
-**`Repair` appears on BOTH the supplier's answer list and this one, and that is not a
-collision.** The supplier saying *"we will repair it"* is their answer; Carres deciding the
-customer gets a repair is our decision. They are different fields, they are allowed to
-disagree, and preserving that disagreement is the whole reason the layers are kept apart.
+A Claim's internal decision state uses the approved Purchasing wording `Carres decision missing`. It must not imply
+a mandatory customer Case owner. `Return` as a document-routing verb remains distinct from
+`Return to supplier` as a goods decision.
 
-> **`Refund` HAS NO ENTRY, and that is the ruling.** Supplier credit note? cash? offset
-> against future purchases? **The business meaning is not frozen and nobody may guess it.** It
-> is not built and it is not deleted. This row exists so the next chat does not read its
-> absence as an oversight and invent one.
-
-**Two collisions, both settled by law already in this file:**
-
-1. Loo spelt the waiting state `Waiting Internal Resolution`. **The dictionary already locked
-   `Case owner decision required`** (2026-07-27, in the exception-lifecycle row below) for the
-   same meaning. **The locked one wins** — one meaning, one word, and the older lock is the one
-   the rest of the portal's exception vocabulary is built around.
-2. **`Return` is a locked VERB** meaning *a record goes BACK to the party that produced it*
-   (the verb dictionary). **`Return to Supplier` is about GOODS**, and it is Loo's newer and
-   more specific ruling. **Both stand.** They are two senses of one spelling, exactly as
-   `Recovery` is: the verb is a record's move, the Item Outcome is a physical one, and neither
-   may be renamed to avoid the other.
+**REAL GAP / CONTRADICTION — owner review required.** The `Carres Execution` words below are live
+(0409) and name customer-leg movements (`Collect Defective Item`, `Replace First`, `Collect First`,
+`Exchange on Collection`). The 2026-09-14 boundary places customer remedy in Service Case and does
+not say whether these movement words stay on the stock Claim or move to the customer Case. They are
+kept unchanged until that ruling; do not extend them.
 
 **`Carres Execution` — the five, transcribed 2026-09-01 and built as layer ④ (migration 0409).**
 Loo ruled these on **2026-08-05**, the same day as the four resolutions above, and they sat in
@@ -1855,7 +1830,7 @@ One vocabulary for every module that waits on a supplier. Never invent a synonym
 | Group | The words |
 |---|---|
 | Receiving quantities | `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Pending Delivery Qty` |
-| Exception lifecycle | `Receiving exception created` · **`Call {supplier} — confirm what happens next`** · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Case owner decision required` · `Exception closed` |
+| Exception lifecycle | `Receiving exception created` · **`Call {supplier} — confirm what happens next`** · `Waiting supplier reply` · `Waiting goods arrival` · `Overdue goods arrival` · `Supplier cannot fulfil` · `Carres decision missing` · `Exception closed` |
 
 **`Contact supplier` is retired** (Loo, 2026-07-28). It was a SIXTH verb for behaviour the
 five already cover — reach the outside party, get an answer, record the outcome, which is

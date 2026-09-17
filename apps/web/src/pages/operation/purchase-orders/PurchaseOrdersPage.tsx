@@ -492,11 +492,11 @@ export default function PurchaseOrdersPage() {
      fell back narrower and measured 114 — re-measured signed-in) · SO No `Manual Purchase` 106px → 123 · Expected
      Delivery Date `Supplier changed from Wed, 30 Sep` ≈190px → 207. Supplier
      and Items are the flexible names: a cut value opens whole. Deliver To,
-     GRN No (same mono, 142) and PO Version scroll under the pinned date and
-     number. PO Version measured 219px for the retired 38-character
-     `Marked as sent · WhatsApp · Wed, 30 Sep` (→ 236); the approved
-     `PO sent to supplier · WhatsApp · Wed, 30 Sep` is 43 characters, scaled
-     ≈248px → 265 — NOT YET RE-MEASURED in the shell. */
+     GRN No (`GRN-20260904-0210`, one character longer: 133px → 150) and PO
+     Version scroll under the pinned date and number. PO Version measured 219px
+     for the retired 38-character `Marked as sent · WhatsApp · Wed, 30 Sep`
+     (→ 236); the approved `PO sent to supplier · WhatsApp · Wed, 30 Sep` is 43
+     characters, scaled ≈248px → 265 — NOT YET RE-MEASURED in the shell. */
   /* ⭐ THE NINE COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-17):
      PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
      Deliver To · GRN No · PO Version. Quantities, send confirmation and
@@ -627,7 +627,7 @@ export default function PurchaseOrdersPage() {
       key: "grn",
       chooserGroup: "Receiving",
       label: "GRN No",
-      width: 142,
+      width: 150,
       sortable: true,
       /* One GRN opens it in Receiving; several open this PO's receiving; none
          is blank. A Worker that sent no GRN list is not "no GRN". */

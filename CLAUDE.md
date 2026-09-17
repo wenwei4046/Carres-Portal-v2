@@ -66,8 +66,8 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
 | Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
-| Receiving | `docs/purchasing/MASTER.md` §5 | **APPROVED / LOCKED** | The same MASTER's Receiving gaps and owner boundaries |
-| Supplier Claims | `docs/purchasing/MASTER.md` §6 | **APPROVED / LOCKED** | The Service-Case workstream/entry-rule gap; keep Purchasing as supplier-response owner |
+| Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
+| Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
 | Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | The approved top-to-toe target; current implementation may lag |
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
@@ -537,10 +537,11 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
 > describes one module, and every boundary defect found so far lived *between* two of them.
 
-> **GLOBAL DUTY LAW — OWNER-APPROVED 2026-09-03.** Every ERP action and approval resolves its
-> owner through the shared Staff & Duties system: duty rule → primary holder → today's buddy cover
-> → actual actor evidence. A module may name the duty it needs; it may never hard-code a person's
-> name, keep a second assignment list, or turn owner identity into action-sentence text.
+> **GLOBAL OWNER LAW — OWNER-APPROVED 2026-09-03; OVERWRITTEN 2026-09-17.** Every ERP action and
+> approval names an Owner Rule. That rule resolves either a stable object owner such as the Sales
+> Order PIC, or a governed Duty through Staff & Duties; today's Buddy cover may act without
+> replacing the normal owner, and actual actor evidence is retained. A module may never hard-code a
+> person's name, keep a second assignment list, or turn owner identity into action-sentence text.
 
 ## 8.1 · Modules
 

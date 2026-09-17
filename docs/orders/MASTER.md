@@ -695,9 +695,9 @@ missing customer promise                 → responsible salesperson
 available goods to check/pack/handover   → governed Warehouse duty
 missing goods / issue PO                 → current PO Duty
 supplier date too late                   → current PO Duty contacts supplier
-Delivery Journey / partner arrangement   → governed Delivery ownership
-customer date/time confirmation          → assigned Partner or governed proxy owner
-collect customer money                   → Payment ownership rule
+Delivery Journey / partner arrangement   → Sales Order PIC, with Buddy cover
+customer date/time confirmation          → Sales Order PIC, with Buddy cover
+collect customer money                   → Sales Order PIC, with Buddy cover
 create Delivery Order                    → System
 ```
 
@@ -3248,16 +3248,17 @@ Owner** = the person or duty responsible for one current action, resolved automa
 action's Owner Rule and current roster/cover facts. **Case Owner** = the stable owner of a linked
 Service Case. These identities may coincide, but the system never treats them as one field.
 
-The Sales Order therefore does not have one universal action owner. Missing customer commitment
-work resolves to the responsible salesperson; Purchasing, Receiving, Payment and Delivery work
-resolves through those modules' governed duty/ownership rules. Owner identity is displayed
+The Sales Order does not turn its PIC into the owner of every cross-module act: Purchasing,
+Receiving and approval work retain their governed Duty rules. The PIC does own this order's
+Operation journey from the moment it arrives through delay decisions, logistics, delivery contact,
+delivery result/proof, loan return and ordinary collection. Missing customer commitment on an
+admitted legacy row remains with the responsible salesperson. Owner identity is displayed
 structurally and is not repeated inside every action sentence.
 
-**BUILT 2026-08-27 — the Action Owner Engine resolution.** The Card 9 registry
-(`packages/shared/src/work-engine.ts`) now carries a **structured `ownerRule` beside the prose**
-(`po_duty · salesperson · order_pic · payment_duty · delivery_duty · finance_duty · system`, plus
-the cross-module rules' own precise keys `grn_duty · claim_month_po_duty` recorded for the later
-feed wiring), and `workItemsForOrder` resolves the person per RULE instead of borrowing the PIC:
+The Action Owner Engine registry carries a structured `ownerRule` beside the prose. The approved
+target uses `order_pic` for the order's Operation, Delivery and ordinary collection work;
+`delivery_duty` remains only the no-PIC fallback. Purchasing, Receiving, approval and system rules
+keep their own precise keys, and `workItemsForOrder` resolves the person per rule:
 
 - **Purchasing's order-track work (`Issue PO` · `Confirm ready date`) lands on the month's
   PO-duty holder** (`ops_po_duty`, the one rostered duty that exists) — in the holder's My Work,
@@ -3269,23 +3270,22 @@ feed wiring), and `workItemsForOrder` resolves the person per RULE instead of bo
   falls back. Composed only for the rows nobody asked (`delivery_date` null AND
   `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
   order. The ladder never raises it, so no register cell or drawer headline changed.
-- **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
-  choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
-  is ours, and a partner has no login), today's run and its photo.
-- **`collect` records `collection_owner` as its rule** (payment/MASTER §10, owner ruling
-  2026-09-13): the Sales Order's ONE stable collection owner, the Responsible Delivery Operation,
-  established from the Delivery Duty holder when collection first became actionable (0489). It
-  never borrows the PIC; with nothing established the Delivery Duty word stands.
+- **The PIC owns the order's Operation journey from beginning to end** — delay decision, logistics
+  choice and calls, delivery date/time, today's result, proof, Failed Delivery next step, loan
+  return and ordinary collection. Delivery, Payment and Warehouse still own their business facts;
+  action ownership does not transfer those write boundaries.
+- **`collect` resolves to the same PIC** as the Sales Order's stable collection owner. A formal
+  handover changes the order responsibility and its append-only evidence together. Delivery Duty
+  appears only when the order has no PIC; it never replaces a valid PIC.
 - Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
   (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
   filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
   word.
 
-**Measured boundaries, reported not hidden:** no delivery-staff, finance or payment-duty roster
-fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
-the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
-unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
-what the shared Workspace Duty resolver already applies is not re-derived here.
+**Measured boundaries, reported not hidden:** a partner company without a personal login cannot
+own or close portal Work. The Sales Order PIC remains the normal owner; the PIC's Buddy cover is
+today's actor during absence and never rewrites history. An order with no PIC falls back to the
+Delivery Duty word until that exceptional owner is resolved.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -4825,8 +4825,9 @@ Exception plus a Reason, never a family of failure words.**
 
 **`Collect the loan item`** over **`Bring back {Unit ID} on the delivery day`** — blueprint card §7
 (owner-approved 2026-08-16; two-line grammar 2026-09-13) · trigger: a loan item is still out
-(`ops_sofa_loans`) and the delivery day has arrived · owner: the `delivery_duty` rule through the
-Shared Duty Resolver · due: the delivery day itself · completion: the loan row reads returned.
+(`ops_sofa_loans`) and the delivery day has arrived · owner: the Sales Order PIC, with Buddy cover
+when absent and Delivery Duty only when no PIC exists · due: the delivery day itself · completion:
+the loan row reads returned.
 Composed by the Work engine from the loan fact; it never blocks a delivery (Card 6's law is
 untouched). **THE LOAN OFFER IS A RECORD OF THIS MODULE (Delivery Blueprint, owner ruling
 2026-09-13):** Carres Operation offers the loan and records the customer's answer on the Sales

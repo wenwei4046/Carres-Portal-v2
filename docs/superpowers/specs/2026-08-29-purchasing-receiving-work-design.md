@@ -130,9 +130,10 @@ does not change the original official PO Delivery Date.
 
 ### Later defect
 
-A later observation enters through Service Case, not a second Receiving intake. An authorised
-supplier-responsible outcome creates the Supplier Claim workstream. Return or Repair is created only
-from the approved outcome.
+A later observation on accepted goods is reported from its Stock Unit or receipt as a
+source-linked Purchasing Supplier Claim, not a second Receiving intake and not a Service Case (owner
+ruling 2026-09-14; `purchasing/MASTER.md` §9.5). Return or Repair is created only from the
+authorised stock-claim outcome.
 
 ### Purchase Return
 
