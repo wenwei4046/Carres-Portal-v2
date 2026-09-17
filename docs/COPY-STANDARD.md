@@ -225,7 +225,11 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Issue current action | `Current Action` · `No current action` · `Waiting for triage rule` | Set next action · Follow up · Handle |
 | Issue action result | `Record result` | Save result · Mark done · Complete task |
 | Issue intake validation | `Choose what has a problem.` · `Choose what you saw.` · `Choose who found the issue.` · `Choose when the issue was found.` · `Find and choose the linked record.` · `Add the required proof.` | Required · Invalid · Complete all fields |
-| Issue result validation | `Choose what happened.` · `Add the evidence needed for this result.` · `This action has changed. Read the current action before recording a result.` | Save failed · Conflict · Try later |
+| Issue result validation | `Choose what happened.` · `Add the evidence needed for this result.` | Save failed · Conflict · Try later |
+| Issue stale action (owner ruling 2026-09-17, replaces `This action has changed. Read the current action before recording a result.`) | warning icon plus `Action changed · Review again` | Conflict · stale record · the long sentence |
+| Issue save definitely failed (owner ruling 2026-09-17) — the server answered with an error | `Issue not recorded · Try again` · `Result not recorded · Try again` | Save failed · Something went wrong · closing the dialog silently |
+| Issue save not confirmed (owner ruling 2026-09-17) — network error, timeout, no answer | warning icon plus `Not confirmed · Try again` | `Issue not recorded` or `Result not recorded` when the answer is uncertain |
+| Issue save refused (owner ruling 2026-09-17) | `Only {acting person} can record this.` · only when no acting person can be named: `You do not have access to record this result.` | `Only {Duty} can record this result.` (a Duty is not the person who acts) · Forbidden · Access denied |
 | Issue detail sections | `What is true` · `Linked records` · `Accountability` · `Money` · `Evidence & timeline` · `Review & learning` · `Related Issues & history` | Details · Activity · Notes as catch-all sections |
 | Issue report door | `Monthly report` | Report dashboard · Export issues |
 
