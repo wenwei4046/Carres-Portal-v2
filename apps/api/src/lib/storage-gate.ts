@@ -1,6 +1,7 @@
 import { storageHold } from "@carres/shared";
 
 import { storageSkuCategories } from "./sku-categories";
+import { todayIsoMYT } from "./today";
 
 /**
  * Collect-before-delivery gate (balance job — Jess 2026-06-23: collect the
@@ -56,7 +57,7 @@ export async function storageBlock(
       importedSof: control.storage_fee_sof ?? null,
       skus,
       categories: storageCats,
-      asOf: new Date().toISOString().slice(0, 10),
+      asOf: todayIsoMYT(),
       collectedAt: control.storage_collected_at ?? null,
       waiverStatus: control.storage_waiver_status ?? null,
     });

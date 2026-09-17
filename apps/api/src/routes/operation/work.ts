@@ -72,6 +72,7 @@ import {
   type CollectionOutcomeRow,
 } from "@carres/shared/payment-collection-outcome";
 import { storageCheckDue } from "@carres/shared/payment-storage";
+import { todayIsoMYT } from "../../lib/today";
 import {
   latestEvidenceAtOf,
   proofReviewStateOf,
@@ -1091,10 +1092,6 @@ export function composeOperationWorkResponse(
   });
 }
 
-function malaysiaToday(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 function dutyResolution(
   payload: Record<string, unknown>,
   key: string,
@@ -1390,7 +1387,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readCollectionTimingRules(c),
       readProofFacts(c),
     ]);
-  const today = manual.todayIso ?? malaysiaToday();
+  const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
   // §12 gives overpayment review to the Payment Approver, never to Payment
