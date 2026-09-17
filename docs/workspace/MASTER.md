@@ -1072,6 +1072,24 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
+- **Work truth hotfix HF-1 — DEPLOYED to production 2026-09-17 (`a48e5237`, PR #1400, includes YH's
+  UTC-safe `workWeek`); authenticated production read OWED.** Measured on `a5776c50`: at UTC+8 the day
+  strip read `Sun 13 Sept … Thu 17 Sept`, Malaysia Day was an ordinary `0` row, an empty day said
+  `Nothing assigned to you` while Friday held work, one module filter zeroed every other module, and
+  the panel count followed `window.innerWidth` (three panels in a ~950px Work area). Now: every day
+  label is `fmtDate`; holidays come from the shared `my-holidays.ts` as `Public holiday · {name}` with
+  no count and no button; the focus day is today when it is a working day, else the next working day
+  (Saturday only when something is due that Saturday), and the focus list also keeps work dated
+  between today and that day; empty states run failed source → no filter match → `No work on
+  {weekday, date}` with `Open Missed` / `Open {weekday, date}` → true empty; module counts ignore only
+  the module filter; panels follow the measured Work area. Proof: `OperationWork.truth.test.tsx`
+  9 red on main → 10/10 green; web gate 347 files / 4960 tests; CI verify success; deploy run
+  35202239240; carres-portal Pages, carres-pos Pages, erp, pos and the API Worker all report
+  `a48e5237`, and the erp bundle carries the new sentences and no longer carries `Some work could not
+  be loaded`. **Still open:** the signed-in read of `/operation?tab=work` and the four-viewport walk,
+  blocked only on a production sign-in in the verification browser. Work v4 layout and words remain
+  unbuilt (§5.1–5.5).
+
 - **Workspace Work composition — BUILT, repository-verified 2026-09-16; NOT production-verified.**
   Branch `build/work-ui` now renders the governed My Work / Team Work composition from the one v2
   server response, with working-day navigation, owner/module/cover filters, exact object selection,
