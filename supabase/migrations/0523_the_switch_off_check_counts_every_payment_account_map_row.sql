@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0516_the_switch_off_check_counts_every_payment_account_map_row.sql
+-- 0523_the_switch_off_check_counts_every_payment_account_map_row.sql
 -- =============================================================================
 -- WHAT WAS WRONG
 --   0515 refuses taking a money account out of use while a payment method
@@ -62,7 +62,7 @@ begin
       raise exception '% % is not at RM 0.00 in the ledger. It stays in use until it is.', p_code, v_old
         using errcode = 'P0001', detail = 'money_account_not_zero';
     end if;
-    -- 0515, widened by 0516: nor while ANY payment method still lands money
+    -- 0515, widened by 0523: nor while ANY payment method still lands money
     -- here, including the rows no screen shows (POS card, Stripe).
     select coalesce(m.label, case g.method when 'online' then 'Online payment'
                                            when 'card'   then 'Card'
@@ -93,7 +93,7 @@ end;
 $fn$;
 
 comment on function public.gl_money_account_update(text, text, boolean) is
-  '0512, 0515, 0516: renames a money account, or takes it in or out of use. Out of use is refused while its ledger total is not RM 0.00, or while any payment method row (manual or system, on or off) points at it. Finance or principal.';
+  '0512, 0515, 0523: renames a money account, or takes it in or out of use. Out of use is refused while its ledger total is not RM 0.00, or while any payment method row (manual or system, on or off) points at it. Finance or principal.';
 revoke all on function public.gl_money_account_update(text, text, boolean) from public, anon;
 grant execute on function public.gl_money_account_update(text, text, boolean) to authenticated;
 
@@ -125,7 +125,7 @@ begin
   -- 0515: a method goes on only while its money account is in use.
   if not v_old.active and p_active then
     v_acct := public.gl_account_for_payment_method(p_method, null);
-    -- 0516: wait for a Finance Settings save on this account, so the two
+    -- 0523: wait for a Finance Settings save on this account, so the two
     -- checks cannot pass side by side.
     perform 1 from public.gl_money_accounts where account_code = v_acct for share;
     if not public.gl_money_account_ok(v_acct) then
@@ -145,6 +145,6 @@ end;
 $fn$;
 
 comment on function public.payment_set_method_active(text, boolean) is
-  '0431, 0515, 0516: turns a payment method on or off. At least one stays on. Turning one on is refused while its money account is out of use. Manager gate (payment_settings_gate).';
+  '0431, 0515, 0523: turns a payment method on or off. At least one stays on. Turning one on is refused while its money account is out of use. Manager gate (payment_settings_gate).';
 revoke all on function public.payment_set_method_active(text, boolean) from public, anon;
 grant execute on function public.payment_set_method_active(text, boolean) to authenticated;

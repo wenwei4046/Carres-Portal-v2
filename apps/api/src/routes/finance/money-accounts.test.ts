@@ -159,9 +159,9 @@ describe("rename and take out of use", () => {
     expect(door).toContain("m.active");
     expect(door).toContain("Move % to another account first.");
     expect(door).toContain("detail = 'money_account_used_by_method'");
-    // 0516 widened it: every map row counts, not only active manual methods.
+    // 0523 widened it: every map row counts, not only active manual methods.
     const wide = fs.readFileSync(
-      path.resolve(__dirname, "../../../../../supabase/migrations/0516_the_switch_off_check_counts_every_payment_account_map_row.sql"),
+      path.resolve(__dirname, "../../../../../supabase/migrations/0523_the_switch_off_check_counts_every_payment_account_map_row.sql"),
       "utf-8",
     );
     expect(wide).toContain("left join public.payment_manual_methods m on m.method = g.method");

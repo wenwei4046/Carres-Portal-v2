@@ -8,7 +8,7 @@
  * account out of use here. The database picks the code (1121–1129 a bank,
  * 1131–1139 a holding account) and refuses taking an account out of use while
  * the ledger holds money in it or a payment method still lands money in it
- * (0515, 0516).
+ * (0515, 0523).
  *
  * Words: every label is an existing COPY-STANDARD word (Money account,
  * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the pay
