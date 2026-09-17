@@ -1,0 +1,230 @@
+== delivery-monitor-1440.txt: 8 changed lines
+    -WORK TO DO
+    +Work to do
+    -STATE
+    +State
+    -LOGISTICS
+    +Logistics
+    -DELIVERY STATUS
+    +Delivery status
+== delivery-monitor-390.txt: 0 changed lines
+== delivery-orders-1440.txt: 4 changed lines
+    -WORK TO DO
+    +Work to do
+    -DOCUMENT STATUS
+    +Document status
+== delivery-orders-390.txt: 0 changed lines
+== finance-ap-outstanding-1440.txt: 0 changed lines
+== finance-ap-outstanding-390.txt: 0 changed lines
+== finance-ar-1440.txt: 0 changed lines
+== finance-ar-390.txt: 0 changed lines
+== finance-bills-1440.txt: 0 changed lines
+== finance-bills-390.txt: 0 changed lines
+== finance-journal-1440.txt: 0 changed lines
+== finance-journal-390.txt: 0 changed lines
+== finance-other-debtor-parties-1440.txt: 0 changed lines
+== finance-other-debtor-parties-390.txt: 0 changed lines
+== finance-other-debtors-1440.txt: 0 changed lines
+== finance-other-debtors-390.txt: 0 changed lines
+== finance-other-receipts-1440.txt: 0 changed lines
+== finance-other-receipts-390.txt: 0 changed lines
+== finance-payment-vouchers-1440.txt: 0 changed lines
+== finance-payment-vouchers-390.txt: 0 changed lines
+== finance-reports-1440.txt: 0 changed lines
+== finance-reports-390.txt: 0 changed lines
+== finance-trial-balance-1440.txt: 0 changed lines
+== finance-trial-balance-390.txt: 0 changed lines
+== manual-purchase-1440.txt: 10 changed lines
+    -ORDER TIMING
+    +Order timing
+    -PURPOSE
+    +Purpose
+    -PRODUCT
+    +Product
+    -SUPPLIER
+    +Supplier
+    -SETUP TO FIX
+    +Setup to fix
+== manual-purchase-390.txt: 0 changed lines
+== payment-monitor-1440.txt: 0 changed lines
+== payment-monitor-390.txt: 0 changed lines
+== payment-records-1440.txt: 0 changed lines
+== payment-records-390.txt: 0 changed lines
+== purchase-orders-1440.txt: 54 changed lines
+    -SUPPLIER REPLY
+    -Supplier has not confirmed the PO date
+    +Supplier reply
+    +Date not confirmed
+    -Supplier Delivery Date changed
+    +Date changed
+    -Supplier delivery date passed
+    +Date passed
+    -RECEIVING
+    +Receiving
+    -SUPPLIER
+    +Supplier
+    -DELIVER TO
+    +Deliver To
+    -Not marked as sent
+    +Confirm PO sent to supplier
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    -Issued
+    +Sending not confirmed
+    +Waiting for goods from supplier
+    -Marked as sent · Email · Wed, 9 Sep
+    +PO sent to supplier · Email · Wed, 9 Sep
+    -Marked as sent · Email · Fri, 11 Sep
+    +PO sent to supplier · Email · Fri, 11 Sep
+    -Marked as sent · WhatsApp · Sat, 12 Sep
+    +PO sent to supplier · WhatsApp · Sat, 12 Sep
+    -Marked as sent · Email · Sun, 13 Sep
+    +PO sent to supplier · Email · Sun, 13 Sep
+== purchase-orders-390.txt: 40 changed lines
+    -Not marked as sent
+    +Confirm PO sent to supplier
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    +Sending not confirmed
+    -Not marked as sent
+    -Issued
+    +Sending not confirmed
+    +Waiting for goods from supplier
+    -Marked as sent · Email · Wed, 9 Sep
+    +PO sent to supplier · Email · Wed, 9 Sep
+    -Marked as sent · Email · Fri, 11 Sep
+    +PO sent to supplier · Email · Fri, 11 Sep
+    -Marked as sent · WhatsApp · Sat, 12 Sep
+    +PO sent to supplier · WhatsApp · Sat, 12 Sep
+    -Marked as sent · Email · Sun, 13 Sep
+    +PO sent to supplier · Email · Sun, 13 Sep
+    -Marked as sent · WhatsApp · Mon, 14 Sep
+    +PO sent to supplier · WhatsApp · Mon, 14 Sep
+    -Marked as sent · Email · Tue, 15 Sep
+    +PO sent to supplier · Email · Tue, 15 Sep
+    -Marked as sent · Email · Tue, 1 Sep
+    +PO sent to supplier · Email · Tue, 1 Sep
+    -Marked as sent · WhatsApp · Wed, 2 Sep
+    +PO sent to supplier · WhatsApp · Wed, 2 Sep
+    -Marked as sent · Email · Thu, 3 Sep
+    +PO sent to supplier · Email · Thu, 3 Sep
+    -Marked as sent · WhatsApp · Wed, 16 Sep
+    +PO sent to supplier · WhatsApp · Wed, 16 Sep
+    -Marked as sent · WhatsApp · Thu, 10 Sep
+    +PO sent to supplier · WhatsApp · Thu, 10 Sep
+== receiving-1440.txt: 6 changed lines
+    -CATEGORY
+    +Category
+    -SUPPLIER
+    +Supplier
+    -GOODS ARRIVED AT
+    +Goods arrived at
+== receiving-390.txt: 6 changed lines
+    -CATEGORY
+    +Category
+    -SUPPLIER
+    +Supplier
+    -GOODS ARRIVED AT
+    +Goods arrived at
+== sales-orders-1440.txt: 0 changed lines
+== sales-orders-390.txt: 0 changed lines
+== so-batch-1440.txt: 10 changed lines
+    -ORDER TIMING
+    +Order timing
+    -PRODUCT
+    +Product
+    -SUPPLIER
+    +Supplier
+    -REGION
+    +Region
+    -SETUP TO FIX
+    +Setup to fix
+== so-batch-390.txt: 0 changed lines
+== supplier-claims-1440.txt: 8 changed lines
+    -SUPPLIER
+    +Supplier
+    -PROBLEM
+    +Problem
+    -CLAIM STATUS
+    +Claim status
+    -SUPPLIER RESPONSE
+    +Supplier Response
+== supplier-claims-390.txt: 8 changed lines
+    -SUPPLIER
+    +Supplier
+    -PROBLEM
+    +Problem
+    -CLAIM STATUS
+    +Claim status
+    -SUPPLIER RESPONSE
+    +Supplier Response
+== warehouse-inbound-1440.txt: 5 changed lines
+    -ARRIVAL STATUS
+    +Arrival status
+    +Awaiting receipt
+    -DOCUMENT TYPE
+    +Document type
+== warehouse-inbound-390.txt: 0 changed lines
+== warehouse-inventory-1440.txt: 14 changed lines
+    -STOCK
+    +Stock
+    -WHO HAS IT
+    +Who has it
+    -OWNERSHIP
+    +Ownership
+    -SITE
+    +Site
+    -STOCK USE
+    +Stock use
+    -CATEGORY
+    +Category
+    -HISTORY
+    +History
+== warehouse-inventory-390.txt: 14 changed lines
+    -STOCK
+    +Stock
+    -WHO HAS IT
+    +Who has it
+    -OWNERSHIP
+    +Ownership
+    -SITE
+    +Site
+    -STOCK USE
+    +Stock use
+    -CATEGORY
+    +Category
+    -HISTORY
+    +History
+== warehouse-outbound-1440.txt: 7 changed lines
+    -PICKUP STATUS
+    +Pickup status
+    +Awaiting loading or driver confirmation
+    -DO NO
+    +DO No
+    -DO NO
+    +DO No
+== warehouse-outbound-390.txt: 4 changed lines
+    -DO NO
+    +DO No
+    -DO NO
+    +DO No
