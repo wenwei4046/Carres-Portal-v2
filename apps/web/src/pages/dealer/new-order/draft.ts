@@ -2,6 +2,7 @@ import {
   cartHasGoods,
   composeEmergencyContact,
   EMERGENCY_RELATIONSHIP_OTHER,
+  minDeliveryDateISO,
   ORDER_ENTRY_TABS,
   resolveFormTab,
   resolvePaymentMethods,
@@ -598,11 +599,9 @@ export function step3DateFirstIssue(
     return "Delivery date — ask the customer for the date, then pick it";
   }
   if (minLeadDays > 0) {
-    const min = new Date(today);
-    min.setDate(min.getDate() + minLeadDays);
-    const picked = new Date(d.delivery.date);
-    if (picked < new Date(min.toISOString().slice(0, 10))) {
-      return `Delivery — earliest date is ${min.toISOString().slice(0, 10)} (${minLeadDays}-day lead time)`;
+    const min = minDeliveryDateISO(minLeadDays, today);
+    if (d.delivery.date < min) {
+      return `Delivery — earliest date is ${min} (${minLeadDays}-day lead time)`;
     }
   }
   // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
@@ -612,7 +611,7 @@ export function step3DateFirstIssue(
   if (!d.delivery.proceedDate) {
     return "Proceed date — pick the day production should start";
   }
-  const todayIso = today.toISOString().slice(0, 10);
+  const todayIso = minDeliveryDateISO(0, today);
   if (d.delivery.proceedDate < todayIso) {
     return `Proceed date — can't be in the past (earliest ${todayIso})`;
   }
