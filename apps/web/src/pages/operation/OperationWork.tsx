@@ -211,7 +211,9 @@ export default function OperationWork() {
 
   const updateParam = (key: string, value: string | null) => setParams((before) => {
     const next = new URLSearchParams(before);
-    if (!value || value === "all") next.delete(key);
+    // `all` clears a filter, but on the day list it IS a day choice: dropping
+    // it would fall back to the focus list while `All` still shows every count.
+    if (!value || (value === "all" && key !== "day")) next.delete(key);
     else next.set(key, value);
     return next;
   }, { replace: true });

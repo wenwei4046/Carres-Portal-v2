@@ -258,4 +258,12 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     expect(screen.getByTestId("work-split-shell")).toHaveAttribute("data-layout", "two");
   });
+
+  it("10 · choosing All lists every open action, the same number All counts", () => {
+    workState.data = feed("2026-09-17", [item("2026-09-17"), item("2026-09-18"), item(null)]);
+    show();
+    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(1);
+    fireEvent.click(within(dayNav()).getByRole("button", { name: "All · 3 actions" }));
+    expect(within(screen.getByTestId("work-list")).getAllByRole("button", { name: /Ask customer/ })).toHaveLength(3);
+  });
 });
