@@ -3396,6 +3396,7 @@ payment voucher's Approve.
 | `Nothing is entered in the ledger until another finance approver approves it.` | The form's description. |
 | `You prepared this. Another finance approver approves it.` | Expanded row of your own prepared move. |
 | `{RM gross} from {account} · {RM} into {account} · Fee {RM}` · `Prepared · {when} · {name}` · `Approved · {when} · {name}` | Expanded row facts and history. |
+| `No reference` · `No note` · `No reason on file` · `Name not available` | Empty values in the Reference column and the expanded row (reused from Other debtors). |
 | `{n} money moves · {n} to approve` · `Search money moves…` · `Inspect money move` | Register footer, search placeholder, expand control. |
 | `No money move yet. Press New money move to record a bank transfer or a card payout.` | Empty state. |
 | `Money move prepared. A finance approver approves it next.` · `{MM No} approved.` · `Money move cancelled.` | Toasts. |
