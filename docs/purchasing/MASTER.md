@@ -2035,11 +2035,15 @@ Personal layouts: migration `0528` table `register_personal_layouts` — RLS SEL
 (`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from `authenticated`, writes only through
 `register_layout_save` / `register_layout_set_default` acting on `auth.uid()`; a shape check
 refuses any key but order/hidden/widths/sort; 10 per person per listing; one default. Routes
-`/api/operation/register-layouts` run as the caller. Measured in the shell at 1440 with the rail
-open (885px grid): PO Date 118 · PO No 132 · Supplier 128 · SO No 123 · Items 145 · Expected
-Delivery Date 207 exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 ·
-GRN No 132 · PO Version 236 scroll. The rail now uses the shared `useFilterRailOpen` (hidden by
-default below 896px). **Owed:** authenticated production walk.
+`/api/operation/register-layouts` run as the caller. Measured at 1440 with the rail open (885px
+grid), re-measured SIGNED-IN on production 2026-09-17 on `1c278f8c`: PO Date 118 · PO No 142
+(production's JetBrains Mono renders `PO-20260903-4316` at 125px; the fixture font measured 114
+and 132 cut 34 live rows) · Supplier 128 · SO No 123 · Items 135 · Expected Delivery Date 207
+exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 142 ·
+PO Version 236 scroll. Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
+footer `62 purchase orders`, layouts read 200, unauthenticated 401. The rail uses the shared
+`useFilterRailOpen` (hidden by default below 896px). **Owed:** saving a layout and pressing
+`Mark as sent` on production (the walk was read-only by instruction).
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.

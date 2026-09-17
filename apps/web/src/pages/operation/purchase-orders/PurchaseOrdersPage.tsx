@@ -481,10 +481,11 @@ export default function PurchaseOrdersPage() {
   /* Widths measured 2026-09-17 in the portal shell at 1440 with the rail open
      (Inter; 16px cell padding + 1px rule): the six judgement columns add up to
      the grid's 885px client width — PO Date `Wed, 28 May 25` 100px → 118 ·
-     PO No 114px → 132 · SO No `Manual Purchase` 106px → 123 · Expected
+     PO No 125px in production's JetBrains Mono → 142 (the fixture font
+     fell back narrower and measured 114 — re-measured signed-in) · SO No `Manual Purchase` 106px → 123 · Expected
      Delivery Date `Supplier changed from Wed, 30 Sep` ≈190px → 207. Supplier
      and Items are the flexible names: a cut value opens whole. Deliver To,
-     GRN No and PO Version (`Marked as sent · WhatsApp · Wed, 30 Sep` 219px →
+     GRN No (same mono, 142) and PO Version (`Marked as sent · WhatsApp · Wed, 30 Sep` 219px →
      236) scroll under the pinned date and number. */
   /* ⭐ THE NINE COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-17):
      PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
@@ -508,7 +509,7 @@ export default function PurchaseOrdersPage() {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 132,
+      width: 142,
       sortable: true,
       filterType: "numbering",
       accessor: (row) => (
@@ -570,7 +571,7 @@ export default function PurchaseOrdersPage() {
       key: "items",
       chooserGroup: "Goods",
       label: "Items",
-      width: 145,
+      width: 135,
       sortable: true,
       overflowText: (row) => itemsSummary(row.items),
       accessor: (row) => itemsSummary(row.items),
@@ -616,7 +617,7 @@ export default function PurchaseOrdersPage() {
       key: "grn",
       chooserGroup: "Receiving",
       label: "GRN No",
-      width: 132,
+      width: 142,
       sortable: true,
       /* One GRN opens it in Receiving; several open this PO's receiving; none
          is blank. A Worker that sent no GRN list is not "no GRN". */
