@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import { fail } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/today";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -136,8 +137,7 @@ async function enrichPosWithOrders(
     });
   }
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const today = new Date(todayIsoMYT() + "T00:00:00Z");
 
   function computeUrgency(orders: OrderEnrichment[]): PoUrgency {
     let minDaysAhead: number | null = null;
