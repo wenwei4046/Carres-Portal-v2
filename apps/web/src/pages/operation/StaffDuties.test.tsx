@@ -1122,6 +1122,34 @@ describe("S2-A · the cover the detail shows is the resolver's own", () => {
   });
 });
 
+describe("S2-A · a future cover the resolver will not use is not scheduled", () => {
+  it("says nothing about a future cover when the resolver named none", () => {
+    const all = wholeCatalogue();
+    const po = all.duties.find((d) => d.key === "po_duty")!;
+    po.covers = [
+      {
+        id: "cv-gone",
+        duty_key: "po_duty",
+        normal_user_id: "u-yu-jun",
+        normal_user_name: "Yu Jun",
+        acting_user_id: "u-khor-yee",
+        acting_user_name: "Khor Yee",
+        starts_on: plusDays(TODAY, 4),
+        ends_on: plusDays(TODAY, 6),
+        reason: "Training",
+        assigned_by_name: "Jess",
+        created_at: `${TODAY}T02:00:00Z`,
+      },
+    ];
+    po.scheduled_cover_id = null;
+    state.duties = all;
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    const detail = screen.getByTestId("selected-duty-po_duty");
+    expect(within(detail).queryByText(/Khor Yee covering/)).toBeNull();
+    expect(within(screen.getByTestId("duty-catalogue-po_duty")).queryByText(/^Starts /)).toBeNull();
+  });
+});
+
 describe("S2-A · refusals are the governed sentence, never database text", () => {
   const raw = "no one holds po_duty on 2026-09-20 — assign the duty first";
   const refusal = (code: string) => new ApiError(422, raw, { error: code, code, message: raw });

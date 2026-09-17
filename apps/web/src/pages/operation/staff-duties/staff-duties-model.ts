@@ -63,6 +63,11 @@ export function matchesDutySearch(duty: Duty, raw: string): boolean {
 /** The soonest cover starting after `today`, or null. Covers arrive newest
  *  first, so the soonest FUTURE one is the minimum, not the first row. */
 function nextScheduledCover(duty: Duty, today: string) {
+  /* When the API asked the resolver (S2-A), its answer is the only one: a
+     future cover it will not act through (a departed person's) is no news. */
+  if (duty.scheduled_cover_id !== undefined) {
+    return duty.covers.find((c) => c.id === duty.scheduled_cover_id) ?? null;
+  }
   return duty.covers
     .filter((c) => c.starts_on > today)
     .reduce<Duty["covers"][number] | null>(
