@@ -3447,7 +3447,7 @@ the page to pass its own.
 
 ---
 
-### Payment terms in days (migration 0529) — PROPOSAL — PENDING APPROVAL
+### Payment terms in days (migration 0530) — PROPOSAL — PENDING APPROVAL
 
 Owner ruling (YH, 17 Sep 2026): terms are set per supplier and per PO; the PO's win. The words
 below are **PROPOSAL — PENDING APPROVAL**. Pages: Operation → Purchasing Settings, Purchase

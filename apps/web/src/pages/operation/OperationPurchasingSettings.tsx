@@ -846,7 +846,7 @@ export default function OperationPurchasingSettings({
           </p>
         </section>
 
-        {/* ── Payment terms, per supplier (0529) ───────────────────────────
+        {/* ── Payment terms, per supplier (0530) ───────────────────────────
             Days after the bill date. A PO's own terms win over these; the
             bill form fills in the due date from whichever is set. Empty = not
             set, and nothing waits on it. */}

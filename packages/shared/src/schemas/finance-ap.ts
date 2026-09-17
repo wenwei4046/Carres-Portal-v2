@@ -24,7 +24,7 @@ const optText = (max: number) => z.string().max(max).nullable().optional();
 export const AP_FILE_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
 export const AP_FILE_MAX_BYTES = 20 * 1024 * 1024;
 
-// ── payment terms (0529) ────────────────────────────────────────────────────
+// ── payment terms (0530) ────────────────────────────────────────────────────
 /** Days, or null to clear. Owner ruling 17 Sep 2026: set per supplier and per PO. */
 export const termsDays = z.number().int().min(0).max(365).nullable();
 export const setTermsDaysInput = z.object({ days: termsDays }).strict();
@@ -292,7 +292,7 @@ export interface GrnCandidateRow {
   open_lines: number;
   open_qty: ApMoney;
   open_value_at_po_cost: ApMoney;
-  /** 0529 — the PO's own payment terms. Null = not set on the PO. */
+  /** 0530 — the PO's own payment terms. Null = not set on the PO. */
   po_terms_days: number | null;
 }
 
@@ -328,7 +328,7 @@ export interface ApCreditor {
   id: string;
   name: string;
   kind: string;
-  /** 0529 — days after the bill date the supplier is paid. Null = not set. */
+  /** 0530 — days after the bill date the supplier is paid. Null = not set. */
   terms_days: number | null;
 }
 

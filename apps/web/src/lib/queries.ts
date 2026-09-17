@@ -3391,7 +3391,7 @@ export interface operationPoListRow {
   so_refs: number[] | null;
   eta_date: string | null;
   official_delivery_date?: string | null;
-  /** 0529 — payment terms in days after the bill date. Null = not set. */
+  /** 0530 — payment terms in days after the bill date. Null = not set. */
   terms_days?: number | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
@@ -5208,12 +5208,12 @@ export function useSetSupplierTransitDays() {
   return usePurchasingSettingsMutation<PurchasingSetTransitDaysInput>("/transit-days");
 }
 
-/** 0529 — a supplier's payment terms in days (null clears). */
+/** 0530 — a supplier's payment terms in days (null clears). */
 export function useSetSupplierTermsDays() {
   return usePurchasingSettingsMutation<PurchasingSetSupplierTermsDaysInput>("/terms-days");
 }
 
-/** 0529 — a PO's own payment terms in days (null clears). */
+/** 0530 — a PO's own payment terms in days (null clears). */
 export function useSetPoTermsDays(poId: string) {
   const qc = useQueryClient();
   return useMutation({

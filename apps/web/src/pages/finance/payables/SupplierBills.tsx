@@ -489,7 +489,7 @@ function BillForm() {
   const [invoiceNo, setInvoiceNo] = useState("");
   const [billDate, setBillDate] = useState(appTodayIso());
   const [dueDate, setDueDate] = useState("");
-  // 0529 — the due date follows bill date + terms until the user types one.
+  // 0530 — the due date follows bill date + terms until the user types one.
   // A saved draft keeps what it has.
   const [dueTouched, setDueTouched] = useState(Boolean(id));
   // ponytail: the last picked GRN's PO; bills spanning two POs use that one's terms.

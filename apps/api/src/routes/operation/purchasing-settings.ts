@@ -136,7 +136,7 @@ purchasingSettingsRouter.put("/transit-days", requireOperationOrPrincipal, async
   return respondWithSettings(c);
 });
 
-/** PUT /terms-days — 0529, one supplier's payment terms (null clears). */
+/** PUT /terms-days — 0530, one supplier's payment terms (null clears). */
 purchasingSettingsRouter.put("/terms-days", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetSupplierTermsDaysInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);

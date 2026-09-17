@@ -408,7 +408,7 @@ describe("Purchase Orders Register", () => {
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
   });
 
-  it("saves the PO's payment terms, and blank clears them (0529)", () => {
+  it("saves the PO's payment terms, and blank clears them (0530)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const field = screen.getByLabelText("Terms (days)");
     const save = screen.getByTestId("po-terms-save");

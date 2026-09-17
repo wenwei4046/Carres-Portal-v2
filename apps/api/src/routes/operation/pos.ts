@@ -2257,7 +2257,7 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
 });
 
 // ----- PUT /:id/terms-days -----
-// 0529 — the PO's own payment terms. They win over the supplier's when the
+// 0530 — the PO's own payment terms. They win over the supplier's when the
 // bill form fills in a due date. Null clears them.
 operationPosRouter.put("/:id/terms-days", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, setTermsDaysInput);

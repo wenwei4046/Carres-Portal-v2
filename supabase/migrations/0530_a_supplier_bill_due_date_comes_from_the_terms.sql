@@ -1,4 +1,4 @@
--- 0529 — a supplier bill's due date comes from the PO's or the supplier's terms.
+-- 0530 — a supplier bill's due date comes from the PO's or the supplier's terms.
 --
 -- OWNER RULING (YH, 17 Sep 2026)
 --   Payment terms can be set per supplier AND per PO. The PO's terms win when

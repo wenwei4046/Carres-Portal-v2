@@ -203,7 +203,7 @@ payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_candidates", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
-  // 0529 — each GRN carries its PO's payment terms, so the bill form can fill
+  // 0530 — each GRN carries its PO's payment terms, so the bill form can fill
   // in the due date. One read for all the POs on the list.
   const rows = (data ?? []) as Array<{ po_id: string }>;
   const poIds = [...new Set(rows.map((r) => r.po_id))];

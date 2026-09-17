@@ -1229,7 +1229,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  * A supplier can confirm the original PO date or give a different date with a
  * reason. Both answers require evidence tied to the exact sent version.
  */
-/** 0529 — the PO's own payment terms. They win over the supplier's when a
+/** 0530 — the PO's own payment terms. They win over the supplier's when a
  *  bill's due date is filled in. Empty = not set; nothing waits on it. */
 function PoTermsBlock({ poId, saved }: { poId: string; saved: number | null }) {
   const [draft, setDraft] = useState(saved == null ? "" : String(saved));

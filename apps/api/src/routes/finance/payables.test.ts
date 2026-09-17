@@ -107,7 +107,7 @@ describe("GET readers", () => {
     expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_grn_candidates", { p_supplier_id: SUPPLIER_ID });
   });
 
-  it("GET /bills/grn-candidates adds each PO's payment terms (0529)", async () => {
+  it("GET /bills/grn-candidates adds each PO's payment terms (0530)", async () => {
     const inFn = vi.fn().mockResolvedValue({ data: [{ id: "PO-1", terms_days: 14 }], error: null });
     const sb = {
       rpc: vi.fn().mockResolvedValue({ data: [{ po_id: "PO-1" }, { po_id: "PO-2" }], error: null }),

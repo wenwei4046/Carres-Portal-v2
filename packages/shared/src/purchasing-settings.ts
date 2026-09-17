@@ -98,7 +98,7 @@ export interface PurchasingSupplierRow {
    * without one — a built, deployed supplier call that could never fire.
    */
   transitDays: number | null;
-  /** 0529 — payment terms in days after the bill date. Null = not set. */
+  /** 0530 — payment terms in days after the bill date. Null = not set. */
   termsDays?: number | null;
 }
 
@@ -582,7 +582,7 @@ export const purchasingSetTransitDaysInput = z
   .strict();
 export type PurchasingSetTransitDaysInput = z.infer<typeof purchasingSetTransitDaysInput>;
 
-/** 0529 — one supplier's payment terms in days; null clears it. */
+/** 0530 — one supplier's payment terms in days; null clears it. */
 export const purchasingSetSupplierTermsDaysInput = z
   .object({
     supplierId: z.string().uuid(),

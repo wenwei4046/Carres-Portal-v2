@@ -243,7 +243,7 @@ describe("Bill form — Convert GRN to bill", () => {
     for (const l of (w.body as { lines: Array<Record<string, unknown>> }).lines) expect(l).not.toHaveProperty("amount");
   });
 
-  it("fills the due date from the supplier's terms, then the PO's, and keeps a typed one (0529)", async () => {
+  it("fills the due date from the supplier's terms, then the PO's, and keeps a typed one (0530)", async () => {
     api.routes[`${B}/suppliers`] = { rows: [
       { id: SUP, name: "Lumen Sofa Works", kind: "supplier", terms_days: 30 },
     ] };
@@ -267,7 +267,7 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(screen.queryByTestId("due-from-terms")).toBeNull();
   });
 
-  it("leaves the due date empty when no terms are set (0529)", async () => {
+  it("leaves the due date empty when no terms are set (0530)", async () => {
     show("/finance/bills/new");
     await screen.findByRole("option", { name: "Lumen Sofa Works" });
     fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: SUP } });
