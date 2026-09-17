@@ -3493,3 +3493,11 @@ PO-only opt-in pilot in the Purchase Orders round. Exact Columns menu copy:
 `Expand all` · `Collapse all`. Reset returns to company defaults. Saved layouts belong only to
 one signed-in user, up to 10 per listing; their contents and responsive pinning follow UI MASTER
 §6.7. Other pages do not expose this capability until the owner accepts rollout.
+
+**Other money in: printed documents (PROPOSAL — PENDING APPROVAL, 17 Sep 2026).** The other
+debtor invoice and the other receipt pages each get `Download PDF` (already in this standard).
+New words: on the invoice PDF `INVOICE` · `INVOICE · CANCELLED` · `CANCELLED · {reason}` ·
+`Reg No` · `Due` · `Description` · `Amount (RM)` · `TOTAL DUE` · `Note: {narration}`; on the
+receipt PDF the right-hand signature line `Payer signature`; and the failure toasts
+`The invoice could not be opened — {error}` · `The receipt could not be opened — {error}`. A draft
+invoice has no number and no PDF.
