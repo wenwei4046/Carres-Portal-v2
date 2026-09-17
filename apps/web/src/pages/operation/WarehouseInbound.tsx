@@ -756,12 +756,13 @@ export default function WarehouseInbound() {
                 {dateControls}
               </div>
             )}
-            <FilterRailGroup title="ARRIVAL STATUS">
+            <FilterRailGroup title="Arrival status" icon="waiting">
               {INBOUND_STATUS_FILTERS.map(([value, label]) => (
                 <FilterRailRow
                   key={value}
                   label={label}
                   active={effectiveStatus === value}
+                  resets={value === "all"}
                   count={
                     q.isLoading || q.error
                       ? undefined
@@ -775,7 +776,7 @@ export default function WarehouseInbound() {
                 />
               ))}
             </FilterRailGroup>
-            <FilterRailGroup title="DOCUMENT TYPE">
+            <FilterRailGroup title="Document type" icon="order">
               {ARRIVAL_SOURCE_TYPES.map(([type, label]) => (
                 <FilterRailRow
                   key={type}
@@ -959,7 +960,7 @@ export default function WarehouseInbound() {
                       data-testid="inbound-page-previous"
                       disabled={page.offset === 0}
                       onClick={() => setOffset(Math.max(0, offset - page.limit))}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-9"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-11 disabled:bg-kit-slate-2"
                     >
                       Previous
                     </button>
@@ -968,7 +969,7 @@ export default function WarehouseInbound() {
                       data-testid="inbound-page-next"
                       disabled={to >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-9"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-11 disabled:bg-kit-slate-2"
                     >
                       Next
                     </button>

@@ -139,13 +139,15 @@ const queryData = {
 };
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts }: any) => (
+  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions }: any) => (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
+      data-group-labels={fixedGroups?.groups.map((g: any) => g.label).join(" | ")}
       data-leading={leadingColumns ? `${leadingColumns.date},${leadingColumns.identity}` : undefined}
       data-personal-layouts={personalLayouts ? "1" : undefined}
     >
+      <div data-testid="register-conditions">{(activeConditions ?? []).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-columns">{columns.filter((c: any) => !c.defaultHidden).map((c: any) => c.label).join(" | ")}</div>
       <div data-testid="register-search-index">{rows.flatMap((row: any) => columns.map((column: any) => column.searchValue?.(row) ?? "")).join(" ")}</div>
       {rows.map((row: any) => (
@@ -306,7 +308,11 @@ describe("Purchase Orders Register", () => {
   it("puts each PO in exactly one governed group, and a cancelled one is never lost", () => {
     renderPage();
     expect(screen.getByTestId("register-grid")).toHaveAttribute("data-groups", "not_marked_as_sent,issued,completed,cancelled");
-    // The current V2 has no mark (only V1 was marked): not Issued.
+    expect(screen.getByTestId("register-grid")).toHaveAttribute(
+      "data-group-labels",
+      "Confirm PO sent to supplier | Waiting for goods from supplier | Completed | Cancelled",
+    );
+    // The current V2 has no mark (only V1 was marked): Confirm PO sent to supplier.
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveAttribute("data-group", "not_marked_as_sent");
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toHaveAttribute("data-group", "cancelled");
     queryData.pos[0]!.sends[0]!.po_version = 2;
@@ -315,17 +321,21 @@ describe("Purchase Orders Register", () => {
     marked.unmount();
   });
 
-  it("the rail is SUPPLIER REPLY · RECEIVING · SUPPLIER · DELIVER TO — no All row, no DOCUMENT group", () => {
+  it("the rail is Supplier reply · Receiving · Supplier · Deliver To — no All row, no DOCUMENT group", () => {
     renderPage();
     const railEl = screen.getByTestId("po-filter-rail");
-    const headings = ["SUPPLIER REPLY", "RECEIVING", "SUPPLIER", "DELIVER TO"];
+    const headings = ["Supplier reply", "Receiving", "Supplier", "Deliver To"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
     for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled"]) {
       expect(railEl).not.toHaveTextContent(gone);
     }
     const rail = within(railEl);
-    for (const word of ["Supplier has not confirmed the PO date", "Supplier Delivery Date changed", "Supplier delivery date passed", "Partly received"]) {
+    for (const word of ["Date not confirmed", "Date changed", "Date passed", "Partly received"]) {
       expect(rail.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
+    }
+    // Inside the Supplier reply group the row says only what changed.
+    for (const long of ["Supplier has not confirmed the PO date", "Supplier Delivery Date changed", "Supplier delivery date passed"]) {
+      expect(railEl).not.toHaveTextContent(long);
     }
     expect(rail.getByRole("combobox", { name: "Supplier" })).toBeInTheDocument();
     expect(rail.getByRole("combobox", { name: "Deliver To" })).toBeInTheDocument();
@@ -335,17 +345,24 @@ describe("Purchase Orders Register", () => {
     renderPage();
     // V2 is not marked: it is nobody's supplier chase yet.
     const rail = within(screen.getByTestId("po-filter-rail"));
-    expect(within(rail.getByRole("button", { name: /Supplier has not confirmed the PO date/ })).getByText("0")).toBeInTheDocument();
+    expect(within(rail.getByRole("button", { name: /Date not confirmed/ })).getByText("0")).toBeInTheDocument();
+  });
+
+  it("an active supplier-reply condition outside the group uses the complete label", () => {
+    renderPage();
+    const railEl = screen.getByTestId("po-filter-rail");
+    fireEvent.click(within(railEl).getByRole("button", { name: /Date passed/ }));
+    expect(screen.getByTestId("register-conditions")).toHaveTextContent(/^Supplier delivery date passed$/);
   });
 
   it("a rail row or select narrows the list; the footer states n of m, never quantities", () => {
     renderPage();
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
     const rail = within(screen.getByTestId("po-filter-rail"));
-    fireEvent.click(rail.getByRole("button", { name: /Partly received/ }));
+    fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.queryByTestId("grid-row-PO-LEGACY")).not.toBeInTheDocument();
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
-    fireEvent.click(rail.getByRole("button", { name: /Partly received/ }));
+    fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
     // Both POs deliver to Carres Klang: the facet says so, and choosing it keeps both.
     const deliverTo = rail.getByRole("combobox", { name: "Deliver To" });
@@ -353,7 +370,7 @@ describe("Purchase Orders Register", () => {
     fireEvent.change(deliverTo, { target: { value: "Carres Klang" } });
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
     fireEvent.change(rail.getByRole("combobox", { name: "Supplier" }), { target: { value: "Hooka" } });
-    fireEvent.click(rail.getByRole("button", { name: /Partly received/ }));
+    fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
     expect(screen.getByTestId("register-grid")).not.toHaveTextContent("Order Qty");
   });
@@ -381,11 +398,11 @@ describe("Purchase Orders Register", () => {
 
   it("PO Version reads the CURRENT version and its sent mark only", () => {
     renderPage();
-    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("PO V2Not marked as sent");
+    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("PO V2Sending not confirmed");
     expect(screen.getByTestId("po-version-PO-20260828-4827")).not.toHaveTextContent("PO V1");
     queryData.pos[0]!.sends[0]!.po_version = 2;
     const marked = renderPage();
-    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO V2Marked as sent · WhatsApp · Thu, 27 Aug");
+    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO V2PO sent to supplier · WhatsApp · Thu, 27 Aug");
     marked.unmount();
   });
 

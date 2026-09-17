@@ -324,7 +324,7 @@ describe("the shape", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     const rail = screen.getByTestId("delivery-monitor-rail");
     expect(rail.className).toContain("w-[240px]");
-    for (const heading of ["WORK TO DO", "STATE", "LOGISTICS", "DELIVERY STATUS"]) {
+    for (const heading of ["Work to do", "State", "Logistics", "Delivery status"]) {
       expect(within(rail).getByText(heading)).toBeTruthy();
     }
     for (const gone of [
@@ -337,7 +337,7 @@ describe("the shape", () => {
       "All regions",
       "All logistics",
     ]) {
-      expect(within(rail).queryByText(gone)).toBeNull();
+      expect(within(rail).queryByText(new RegExp(`^${gone.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"))).toBeNull();
     }
     for (const row of [
       "All delivery work",

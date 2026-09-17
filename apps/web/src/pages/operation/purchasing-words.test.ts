@@ -219,14 +219,13 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
     ).toMatch(/supplier: "Supplier"/);
-    // Receiving names it as the FILTER RAIL group's title — the governed
-    // 240px FilterRail prints group headings uppercase (Card 02-C grammar),
-    // so the word moved to `SUPPLIER` but the law did not: it is `Supplier`,
+    // Receiving names it as the FILTER RAIL group's title — style C prints
+    // group titles in normal case (UI MASTER §6.7, 2026-09-17): `Supplier`,
     // never `Factory`.
     expect(
       visibleSource("pages/operation/OperationReceiving.tsx"),
       "Receiving must still call the facet Supplier",
-    ).toMatch(/FilterRailGroup title="SUPPLIER"/);
+    ).toMatch(/FilterRailGroup title="Supplier"/);
   });
 });
 
@@ -251,7 +250,10 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
       // The ONE knowing exception, named rather than regexed around: the
       // `Sent to Supplier` column (COPY-STANDARD) prints recorded
       // `confirmed_sent` evidence, which is an observed fact, not a claim.
-      .replace(/"Sent to Supplier"/g, " ");
+      .replace(/"Sent to Supplier"/g, " ")
+      // The approved act button (COPY-STANDARD, Jess 2026-09-17): the
+      // person's own statement that they sent it, never proof of receipt.
+      .replace(/PO sent to supplier/g, " ");
     expect(src, "the timeline may not say a message was sent").not.toMatch(/sent via/i);
     expect(src, "the timeline may not name a recipient it never reached").not.toMatch(
       /sent to /i,

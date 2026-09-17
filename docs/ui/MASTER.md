@@ -1521,7 +1521,19 @@ facts, permissions, complete-record populations or task ownership.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
-### Portal-wide listing readability — APPROVED / NOT BUILT (Jess, 2026-09-17)
+### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
+
+**Build record (SLICE 1, 2026-09-17).** Owner-approved Jess 2026-09-17. Shared `FilterRail` style C
+is the kit default (`workspace-rail.tsx`: required kit icon per group, collapse remembered per
+browser under `carres.filterRail.<rail>.<group>`, chosen value derived from the group's own rows
+or select, `resets` marks an `All …` row). `DataGrid` draws the slate listing surfaces on `.root`
+for every grid; `palette="slate"` now means only the ticked-row selection model. Body `--background`
+and `kit.canvas` are one token, #F7F8FA. `PurchasingRegister.module.css` (blue-grey theme) is
+deleted. Kit `FieldError` carries the 13px error voice with icon. Evidence: seeded before/after
+captures of 23 listings at 1440/390 with identical fixtures — page text changed only by approved
+words and heading casing; header 5.2:1, rail title 16.4:1, rail count 5.9:1; no page scroll at
+200% zoom; keyboard collapse/choose/clear verified. **OWED:** signed-in production walk.
+Not changed: Sales Order detail palette trial (`sales-order-detail-theme.css`, not a listing).
 
 This is the shared default for ALL Portal listings, not a PO visual pilot. It supersedes older
 listing typography, rail appearance and blue-grey surface prescriptions in this document.

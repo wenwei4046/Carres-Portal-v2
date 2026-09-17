@@ -292,7 +292,7 @@ export default function WarehouseStockRegister() {
             <span className="whitespace-normal break-words text-meta text-base-800">{u.holderName}</span>
           ) : (
             /* An absent holder stays absent instead of inventing an owner. */
-            <span className="text-meta text-base-400">Not recorded</span>
+            <span className="text-meta text-kit-slate-11">Not recorded</span>
           ),
       },
       {
@@ -403,7 +403,7 @@ export default function WarehouseStockRegister() {
           u.lastEventAt ? (
             <span className="text-meta text-base-700">{fmtDate(u.lastEventAt)}</span>
           ) : (
-            <span className="text-meta text-base-400">Not moved yet</span>
+            <span className="text-meta text-kit-slate-11">Not moved yet</span>
           ),
       },
     ],
@@ -431,29 +431,29 @@ export default function WarehouseStockRegister() {
       />}
       <div className="flex min-h-0 flex-1" data-testid="stock-register">
         {railOpen ? <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
-          <FilterRailGroup title="Stock">
+          <FilterRailGroup title="Stock" icon="order">
             {STOCK_VIEWS.map(([key, label]) => <FilterRailRow key={key} testId={key === "all" ? "rail-all-stock" : `rail-${key}`}
-              label={label} active={view === key} count={sourceReady ? allUnits.filter((u) => matchesView(u, key)).length : undefined}
+              label={label} active={view === key} resets={key === "all"} count={sourceReady ? allUnits.filter((u) => matchesView(u, key)).length : undefined}
               onClick={() => key === "all" ? clearAll() : setView(key)} />)}
           </FilterRailGroup>
           {sourceReady ? <>
-            <FilterRailGroup title="Who has it">{holders.map(([id, label]) => <FilterRailRow key={id} testId={`rail-holder-${id}`}
+            <FilterRailGroup title="Who has it" icon="people">{holders.map(([id, label]) => <FilterRailRow key={id} testId={`rail-holder-${id}`}
               label={label} active={holder === id} count={allUnits.filter((u) => isCurrentUnit(u) && (u.holderPartyId ?? "not-recorded") === id).length}
               onClick={() => setHolder(id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Ownership">{[...counts.ownership].map(([id, count]) => <FilterRailRow key={id} testId={`rail-ownership-${id}`}
+            <FilterRailGroup title="Ownership" icon="customer">{[...counts.ownership].map(([id, count]) => <FilterRailRow key={id} testId={`rail-ownership-${id}`}
               label={UNIT_OWNERSHIP_LABEL[id as keyof typeof UNIT_OWNERSHIP_LABEL] ?? id} count={count} active={sel.ownership === id}
               onClick={() => setRail("ownership", id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Site">{[...counts.site].map(([id, item]) => <FilterRailRow key={id} testId={`rail-site-${id}`}
+            <FilterRailGroup title="Site" icon="warehouse">{[...counts.site].map(([id, item]) => <FilterRailRow key={id} testId={`rail-site-${id}`}
               label={item.name} count={item.n} active={sel.site === id} onClick={() => setRail("site", id)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Stock use">{UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => <FilterRailRow key={a} testId={`rail-availability-${a}`}
+            <FilterRailGroup title="Stock use" icon="ready">{UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => <FilterRailRow key={a} testId={`rail-availability-${a}`}
               label={availabilityLabel(a)} count={counts.availability.get(a) ?? 0} active={sel.availability === a} onClick={() => setRail("availability", a)} />)}</FilterRailGroup>
-            <FilterRailGroup title="Category">{categoryKeys.map((key) => <FilterRailRow key={key} testId={`rail-category-${key}`}
+            <FilterRailGroup title="Category" icon="goods">{categoryKeys.map((key) => <FilterRailRow key={key} testId={`rail-category-${key}`}
               label={CATEGORY_LABEL[key] ?? key} count={counts.category.get(key) ?? 0} active={sel.category === key} onClick={() => setRail("category", key)} />)}
               {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? <FilterRailRow testId="rail-no-catalog" label={NO_CATALOG_LABEL}
                 count={counts.category.get(NO_CATALOG_KEY)} active={sel.category === NO_CATALOG_KEY} onClick={() => setRail("category", NO_CATALOG_KEY)} /> : null}
             </FilterRailGroup>
           </> : null}
-          <FilterRailGroup title="History"><FilterRailRow testId="rail-history" label="Delivered / history" active={view === "history"}
+          <FilterRailGroup title="History" icon="history"><FilterRailRow testId="rail-history" label="Delivered / history" active={view === "history"}
             count={sourceReady ? allUnits.filter((u) => !isCurrentUnit(u)).length : undefined} onClick={() => setView("history")} /></FilterRailGroup>
         </FilterRail> : null}
 

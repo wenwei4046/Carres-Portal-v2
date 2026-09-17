@@ -26,6 +26,7 @@ import {
   unpaidTotal,
   type ArAging,
 } from "./money-owed";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 /**
  * Finance → Dashboard. The layout it had before PR #1248 (owner ruling
@@ -301,7 +302,7 @@ function MonthEndPack({ today, goLive, ready }: { today: string; goLive: string 
     }
   };
   return <div className="mb-5 flex flex-wrap items-end justify-end gap-3" data-testid="dashboard-month-end-pack">
-    {failed && <p role="alert" className="text-body text-kit-red-11">The month-end pack could not be exported. Try again.</p>}
+    {failed && <FieldError>The month-end pack could not be exported. Try again.</FieldError>}
     <div className="w-40">
       <Select id="dashboard-pack-month" label="Month" value={month} onValueChange={setPicked}
         options={packMonths(today, goLive).map((m) => ({ value: m, label: fmtMonth(m) }))} />

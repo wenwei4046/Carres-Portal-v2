@@ -81,10 +81,10 @@ beforeEach(() => {
 });
 
 describe("an app that OPENED never completes Issue PO", () => {
-  it("a PO with only opens still reads as not marked as sent", () => {
+  it("a PO with only opens still reads Sending not confirmed", () => {
     renderIt(1, [opened]);
     expect(screen.getByTestId(`so-batch-evidence-${PO.id}`)).toHaveTextContent(
-      "PO-20260823-4041 · PO V1 · Not marked as sent",
+      "PO-20260823-4041 · PO V1 · Sending not confirmed",
     );
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
   });
@@ -106,7 +106,7 @@ describe("confirmed evidence is bound to ONE version", () => {
   it("Version 1 evidence completes Version 1", () => {
     renderIt(1, [sentV1, opened]);
     const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
-    expect(panel).toHaveTextContent("PO-20260823-4041 · PO V1 · Marked as sent");
+    expect(panel).toHaveTextContent("PO-20260823-4041 · PO V1 · PO sent to supplier");
     // A mark is a person's statement of sending — never a claim of receipt.
     expect(panel).not.toHaveTextContent("reached");
     expect(panel).toHaveTextContent("Hooka Purchasing Group");
@@ -116,7 +116,7 @@ describe("confirmed evidence is bound to ONE version", () => {
   it("⭐ Version 1 evidence does NOT complete Version 2", () => {
     renderIt(2, [sentV1, opened]);
     expect(screen.getByTestId(`so-batch-evidence-${PO.id}`)).toHaveTextContent(
-      "PO-20260823-4041 · PO V2 · Not marked as sent",
+      "PO-20260823-4041 · PO V2 · Sending not confirmed",
     );
     // The act is offered again, because the new document is unsent.
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe("persisted evidence survives a reload", () => {
     // No interaction at all — this is a fresh mount, exactly as a reload is.
     renderIt(1, [sentV1]);
     const panel = screen.getByTestId(`so-batch-evidence-${PO.id}`);
-    expect(panel).toHaveTextContent("Marked as sent");
+    expect(panel).toHaveTextContent("PO sent to supplier");
     expect(panel).toHaveTextContent("WhatsApp to Hooka Purchasing Group");
     expect(screen.queryByTestId("so-batch-evidence-confirm")).not.toBeInTheDocument();
   });
@@ -234,17 +234,17 @@ describe("the confirmation declares the version it is looking at", () => {
   });
 });
 
-describe("Mark as sent — only the person's press records it (Jess 2026-09-16/17)", () => {
-  it("names the act Mark as sent", () => {
+describe("PO sent to supplier — only the person's press records it (Jess 2026-09-16/17)", () => {
+  it("names the act PO sent to supplier", () => {
     renderIt(1);
-    expect(screen.getByTestId("so-batch-evidence-confirm")).toHaveTextContent(/^Mark as sent$/);
+    expect(screen.getByTestId("so-batch-evidence-confirm")).toHaveTextContent(/^PO sent to supplier$/);
   });
 
   it("after Open WhatsApp the area says what to do next, and records nothing", () => {
     renderIt(1);
     expect(screen.queryByTestId("po-send-prompt")).toBeNull();
     fireEvent.click(screen.getByTestId("po-open-whatsapp"));
-    expect(screen.getByTestId("po-send-prompt")).toHaveTextContent("Send the PDF, then press Mark as sent.");
+    expect(screen.getByTestId("po-send-prompt")).toHaveTextContent("Send the PDF, then press PO sent to supplier.");
     expect(apiFetch).not.toHaveBeenCalled();
   });
 

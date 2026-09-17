@@ -1,4 +1,8 @@
-/* Compatibility entry point for the shared purchasing register theme. */
+/* Purchase Orders — the page canvas only. Register surfaces come from the
+   shared DataGrid default (UI MASTER §6.7, Jess 2026-09-17); the retired
+   blue-grey purchasing theme is not composed, and no appearance rule is
+   copied here. */
 .page {
-  composes: page from "../PurchasingRegister.module.css";
+  background: theme("colors.kit.canvas");
+  color: theme("colors.kit.slate.12");
 }

@@ -33,7 +33,7 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.currentSend).toBeNull();
     expect(facts.filters).toContain("pdf_not_sent");
-    expect(facts.documentState).toBe("Not marked as sent");
+    expect(facts.documentState).toBe("Sending not confirmed");
   });
 
   it("a confirmed old version does not prove the current version reached the supplier", () => {
@@ -67,7 +67,7 @@ describe("Purchase Order Register authority", () => {
       sends: [],
     }, "2026-08-28");
 
-    expect(facts.sentToSupplier).toBe("Not marked as sent");
+    expect(facts.sentToSupplier).toBe("Sending not confirmed");
     expect(facts.latestConfirmedSend).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe("Purchase Order Register authority", () => {
     }, "2026-08-28");
     expect(facts.filters).toEqual(["completed"]);
     expect(facts.filters).not.toContain("pdf_not_sent");
-    expect(facts.sentToSupplier).toBe("Not marked as sent");
+    expect(facts.sentToSupplier).toBe("Sending not confirmed");
   });
 
   it("a revised PO whose latest version is unsent is BOTH not-sent and update-required — overlap, not exclusivity", () => {
@@ -203,7 +203,7 @@ describe("Purchase Orders listing groups and Expected Delivery Date", () => {
     poVersion: 1,
   };
 
-  it("classifies Cancelled → Completed → Issued → Not marked as sent, each PO once", () => {
+  it("classifies Cancelled → Completed → Waiting for goods from supplier → Confirm PO sent to supplier, each PO once", () => {
     const today = "2026-09-17";
     expect(purchaseOrderRegisterFacts({ ...base, status: "cancelled", sends: [marked] }, today).group).toBe("cancelled");
     expect(purchaseOrderRegisterFacts({ ...base, lines: [{ qty: 3, receivedQty: 3 }], sends: [marked] }, today).group).toBe("completed");
@@ -215,7 +215,7 @@ describe("Purchase Orders listing groups and Expected Delivery Date", () => {
     const facts = purchaseOrderRegisterFacts({ ...base, status: "received", lines: [{ qty: 3, receivedQty: 3 }] }, "2026-09-17");
     expect(facts.group).toBe("completed");
     expect(facts.currentSend).toBeNull();
-    expect(facts.sentToSupplier).toBe("Not marked as sent");
+    expect(facts.sentToSupplier).toBe("Sending not confirmed");
   });
 
   it("an earlier version's mark never marks the current version", () => {

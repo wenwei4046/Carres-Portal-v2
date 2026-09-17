@@ -30,6 +30,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { LoadFailed } from "../other-money-in/parts";
 import { useMoneyAccounts, useSaveMoneyAccount } from "./api";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const KIND_OPTIONS = [
   { value: "BANK", label: MONEY_ACCOUNT_KIND_WORD.BANK },
@@ -136,9 +137,9 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
           />
         )}
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {refusal}
-          </p>
+          </FieldError>
         )}
       </div>
     </Modal>

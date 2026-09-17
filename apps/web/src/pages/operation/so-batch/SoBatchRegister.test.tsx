@@ -908,10 +908,10 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     expect(rail().parentElement?.className).toContain("relative");
   });
 
-  it("renders REGION immediately after SUPPLIER", () => {
+  it("renders Region immediately after Supplier", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["ORDER TIMING", "PRODUCT", "SUPPLIER", "REGION", "SETUP TO FIX"];
+    const order = ["Order timing", "Product", "Supplier", "Region", "Setup to fix"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -934,7 +934,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     ]) {
       expect(text, word).toContain(word);
     }
-    expect(text).not.toContain("WORK TO DO");
+    expect(text.toLowerCase()).not.toContain("work to do");
     expect(text).not.toContain("Ask customer for a delivery date");
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
@@ -1189,7 +1189,7 @@ describe("the expansion — the ONE shared child table", () => {
     const second = rowFor("PO-20260821-2222");
     expect(second).toHaveTextContent("Ohana");
     expect(second).toHaveTextContent("AL Sungai Buloh");
-    expect(second).toHaveTextContent("Issued");
+    expect(second).toHaveTextContent("Waiting for goods from supplier");
     /* ⛔ A RECORD CARRIES NO CONTROL. Not a tick, not a destination editor. */
     expect(within(details).queryByRole("checkbox")).toBeNull();
     expect(within(details).queryByRole("combobox")).toBeNull();
@@ -1717,15 +1717,15 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     expect(within(within(box).getByTestId("goods-mini-table")).queryByRole("checkbox")).toBeNull();
-    /* And the record says WHY: fourteen documents, every one of them Issued. */
+    /* And the record says WHY: fourteen documents, every one of them Waiting for goods from supplier. */
     const details = within(box).getByTestId("po-details-table");
-    expect(within(details).getAllByText("Issued")).toHaveLength(14);
+    expect(within(details).getAllByText("Waiting for goods from supplier")).toHaveLength(14);
   });
 
   /**
    * FIXTURE B — the documents are NUMBERED and none has been sent. Nothing has
    * reached a supplier, so status stays `blank` and buying is legitimate. The
-   * record says so: fourteen rows, every one `Not marked as sent`.
+   * record says so: fourteen rows, every one `Sending not confirmed`.
    */
   it("allows the purchase when not one of the fourteen has been sent", async () => {
     renderRegister({
@@ -1736,7 +1736,7 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const details = within(box).getByTestId("po-details-table");
-    expect(within(details).getAllByText("Not marked as sent")).toHaveLength(14);
+    expect(within(details).getAllByText("Sending not confirmed")).toHaveLength(14);
     /* Fourteen document rows, one unit each — the whole evidence, not a sample. */
     expect(within(details).getAllByRole("row").filter((r) => r.dataset.row === "record"))
       .toHaveLength(14);

@@ -65,6 +65,7 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_PARTY = "none";
@@ -520,17 +521,17 @@ function ReceiptForm({
         </Facts>
 
         {fieldErrors.empty && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {fieldErrors.empty}
-          </p>
+          </FieldError>
         )}
         <p className="text-strong" data-testid="receipt-total">
           Total received {money(total)}
         </p>
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11" data-testid="receipt-refusal">
+          <FieldError testId="receipt-refusal">
             {refusal}
-          </p>
+          </FieldError>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

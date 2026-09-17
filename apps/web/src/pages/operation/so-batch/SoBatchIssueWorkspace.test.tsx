@@ -457,7 +457,7 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
   it("says what has not happened yet, naming the exact version", async () => {
     await reachEvidence();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · PO V2 · Not marked as sent",
+      "PO-2041 · PO V2 · Sending not confirmed",
     );
   });
 
@@ -472,11 +472,11 @@ describe("Issue PO stays open until the PDF actually reaches the supplier", () =
     expect(apiFetch).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "Not marked as sent",
+      "Sending not confirmed",
     );
   });
 
-  it("Mark as sent needs a channel and a recipient — prefilled from the Supplier Master", async () => {
+  it("PO sent to supplier needs a channel and a recipient — prefilled from the Supplier Master", async () => {
     await reachEvidence();
     /* The saved WhatsApp group is on file, so the recipient is already there. */
     expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveValue("https://chat.whatsapp.com/hooka");
@@ -732,7 +732,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       },
     ]);
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("PO V1 · Marked as sent"));
+    await waitFor(() => expect(panel).toHaveTextContent("PO V1 · PO sent to supplier"));
     expect(panel).toHaveTextContent("WhatsApp to Hooka Purchasing Group by Shasha");
   });
 
@@ -758,7 +758,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       2,
     );
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("PO V2 · Not marked as sent"));
+    await waitFor(() => expect(panel).toHaveTextContent("PO V2 · Sending not confirmed"));
     expect(screen.getByTestId("so-batch-evidence-confirm")).toBeInTheDocument();
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
       "PO V1 marked as sent · WhatsApp · Hooka Purchasing Group · Shasha",
@@ -778,7 +778,7 @@ describe("closure §8 · outbound evidence is read back, never remembered", () =
       },
     ]);
     const panel = await screen.findByTestId(`so-batch-evidence-${PO.id}`);
-    await waitFor(() => expect(panel).toHaveTextContent("Not marked as sent"));
+    await waitFor(() => expect(panel).toHaveTextContent("Sending not confirmed"));
     expect(screen.getByTestId(`so-batch-evidence-history-${PO.id}`)).toHaveTextContent(
       "Email opened · Li Ching",
     );

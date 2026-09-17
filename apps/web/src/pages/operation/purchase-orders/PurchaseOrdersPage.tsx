@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
+import type { IconName } from "@/components/kit/Icon";
 import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, useFilterRailOpen } from "../components/workspace-rail";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
 import {
@@ -71,20 +72,25 @@ import { personInitials } from "@/lib/staff-avatar";
 /* ⭐ THE RAIL — Purchasing MASTER §9.3 (Jess, 2026-09-17). Facts that narrow
    the listing, and nothing that the four groups already say: no `All purchase
    orders` row, no DOCUMENT group, no action sentence. SUPPLIER REPLY counts
-   only current versions marked as sent with goods still pending. */
-type RailRow = { key: PurchaseOrderRegisterFilter; label: string };
+   only current versions marked as sent with goods still pending. Inside the
+   `Supplier reply` group a row says only what changed (`Date not confirmed`);
+   anywhere outside that group context — the active-condition chip — the
+   complete supplier-date label is used (`chipLabel`). */
+type RailRow = { key: PurchaseOrderRegisterFilter; label: string; chipLabel?: string };
 
-const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
+const RAIL_GROUPS: Array<{ heading: string; icon: IconName; rows: RailRow[] }> = [
   {
-    heading: "SUPPLIER REPLY",
+    heading: "Supplier reply",
+    icon: "message",
     rows: [
-      { key: "supplier_date_missing", label: "Supplier has not confirmed the PO date" },
-      { key: "supplier_date_changed", label: "Supplier Delivery Date changed" },
-      { key: "supplier_date_passed", label: "Supplier delivery date passed" },
+      { key: "supplier_date_missing", label: "Date not confirmed", chipLabel: "Supplier has not confirmed the PO date" },
+      { key: "supplier_date_changed", label: "Date changed", chipLabel: "Supplier Delivery Date changed" },
+      { key: "supplier_date_passed", label: "Date passed", chipLabel: "Supplier delivery date passed" },
     ],
   },
   {
-    heading: "RECEIVING",
+    heading: "Receiving",
+    icon: "warehouse",
     rows: [{ key: "partly_received", label: "Partly received" }],
   },
 ];
@@ -94,8 +100,8 @@ const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
 /* The four governed groups, in display order: the two open headings first,
    then the collapsed history. Membership is the shared classifier's. */
 const PO_GROUPS = [
-  { key: "not_marked_as_sent", label: "Not marked as sent", alwaysOpen: true },
-  { key: "issued", label: "Issued", alwaysOpen: true },
+  { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
+  { key: "issued", label: "Waiting for goods from supplier", alwaysOpen: true },
   { key: "completed", label: "Completed", initiallyCollapsed: true },
   { key: "cancelled", label: "Cancelled", initiallyCollapsed: true },
 ] as const;
@@ -254,7 +260,7 @@ function OwnerBadge({
 }
 
 function Absence({ children = "Not recorded" }: { children?: string }) {
-  return <span className="text-kit-slate-9">{children}</span>;
+  return <span className="text-kit-slate-11">{children}</span>;
 }
 
 export default function PurchaseOrdersPage() {
@@ -386,7 +392,7 @@ export default function PurchaseOrdersPage() {
     return (
       <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
-        <div className="m-4 text-body text-kit-slate-9">Loading purchase orders…</div>
+        <div className="m-4 text-body text-kit-slate-11">Loading purchase orders…</div>
       </div>
     );
   }
@@ -462,8 +468,9 @@ export default function PurchaseOrdersPage() {
   };
   const supplierOptions = optionsOf((row) => row.supplierName);
   const deliverToOptions = optionsOf((row) => row.deliverTo);
+  const facetRow = RAIL_ROWS.find((r) => r.key === filter.facet);
   const activeConditions = [
-    ...(filter.facet ? [{ key: "facet", label: RAIL_ROWS.find((r) => r.key === filter.facet)?.label ?? filter.facet, onClear: () => setFilter((f) => ({ ...f, facet: null })) }] : []),
+    ...(filter.facet ? [{ key: "facet", label: facetRow?.chipLabel ?? facetRow?.label ?? filter.facet, onClear: () => setFilter((f) => ({ ...f, facet: null })) }] : []),
     ...(filter.supplier ? [{ key: "supplier", label: `Supplier: ${filter.supplier}`, onClear: () => setFilter((f) => ({ ...f, supplier: null })) }] : []),
     ...(filter.deliverTo ? [{ key: "deliverTo", label: `Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
   ];
@@ -484,8 +491,11 @@ export default function PurchaseOrdersPage() {
      fell back narrower and measured 114 — re-measured signed-in) · SO No `Manual Purchase` 106px → 123 · Expected
      Delivery Date `Supplier changed from Wed, 30 Sep` ≈190px → 207. Supplier
      and Items are the flexible names: a cut value opens whole. Deliver To,
-     GRN No (`GRN-20260904-0210`, one character longer: 133px → 150) and PO Version (`Marked as sent · WhatsApp · Wed, 30 Sep` 219px →
-     236) scroll under the pinned date and number. */
+     GRN No (`GRN-20260904-0210`, one character longer: 133px → 150) and PO
+     Version scroll under the pinned date and number. PO Version measured 219px
+     for the retired 38-character `Marked as sent · WhatsApp · Wed, 30 Sep`
+     (→ 236); the approved `PO sent to supplier · WhatsApp · Wed, 30 Sep` is 43
+     characters, scaled ≈248px → 265 — NOT YET RE-MEASURED in the shell. */
   /* ⭐ THE NINE COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-17):
      PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
      Deliver To · GRN No · PO Version. Quantities, send confirmation and
@@ -654,7 +664,7 @@ export default function PurchaseOrdersPage() {
       key: "current_version",
       chooserGroup: "Document",
       label: "PO Version",
-      width: 236,
+      width: 265,
       sortable: true,
       /* The CURRENT version only; earlier marks stay in Revisions. A mark is
          a person's statement of sending, never supplier receipt. */
@@ -695,7 +705,7 @@ export default function PurchaseOrdersPage() {
           testId="po-filter-rail"
         >
           {RAIL_GROUPS.map((group) => (
-            <FilterRailGroup key={group.heading} title={group.heading}>
+            <FilterRailGroup key={group.heading} title={group.heading} icon={group.icon}>
               {group.rows.map((item) => (
                 <FilterRailRow
                   key={item.key}
@@ -708,7 +718,7 @@ export default function PurchaseOrdersPage() {
               ))}
             </FilterRailGroup>
           ))}
-          <FilterRailGroup title="SUPPLIER">
+          <FilterRailGroup title="Supplier" icon="supplier">
             <FilterRailSelect
               label="Supplier"
               allLabel="All suppliers"
@@ -718,7 +728,7 @@ export default function PurchaseOrdersPage() {
               onChange={(supplier) => setFilter((f) => ({ ...f, supplier }))}
             />
           </FilterRailGroup>
-          <FilterRailGroup title="DELIVER TO">
+          <FilterRailGroup title="Deliver To" icon="delivery">
             <FilterRailSelect
               label="Deliver To"
               allLabel="All destinations"
@@ -809,8 +819,8 @@ function expectedLine(e: PurchaseOrderRegisterFacts["expected"]): string {
 function versionLine(row: RegisterRow): string {
   const mark = row.facts.currentSend;
   return mark
-    ? `Marked as sent · ${CHANNEL_WORD[mark.channel] ?? mark.channel} · ${fmtDate(mark.sentAt)}`
-    : "Not marked as sent";
+    ? `PO sent to supplier · ${CHANNEL_WORD[mark.channel] ?? mark.channel} · ${fmtDate(mark.sentAt)}`
+    : "Sending not confirmed";
 }
 
 /** The read-only expansion: `SKU · Item / configuration · Qty · Deliver To`. */
@@ -939,14 +949,14 @@ function PurchaseOrderObject({
       <PurchasingTabs />
       <header className="shrink-0 border-b border-kit-slate-5 bg-white px-4 pt-3">
         <div className="flex flex-wrap items-start gap-3">
-          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-9 hover:text-kit-slate-12" onClick={onBack}>
+          <button type="button" aria-label="Back to Purchase Orders" className="mt-1 text-kit-slate-11 hover:text-kit-slate-12" onClick={onBack}>
             <ArrowLeft size={18} />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-page font-semibold text-kit-slate-12">
               <span className="font-mono">{po.id}</span> · {row.supplierName}
             </h1>
-            <p className="text-meta text-kit-slate-9">PO V{row.facts.version} · {row.facts.operationStatus ?? row.facts.documentState}</p>
+            <p className="text-meta text-kit-slate-11">PO V{row.facts.version} · {row.facts.operationStatus ?? row.facts.documentState}</p>
           </div>
           <div className="ml-auto flex flex-wrap justify-end gap-2 max-[960px]:basis-full max-[960px]:pl-7" data-testid="po-object-actions">
             {po.status === "open" && mode === "read" ? (
@@ -1008,7 +1018,7 @@ function PurchaseOrderObject({
             <button
               key={item}
               type="button"
-              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-9 hover:text-kit-slate-12"}`}
+              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
               onClick={() => { setView(item); setMode("read"); }}
             >
               {item}
@@ -1037,7 +1047,7 @@ function PurchaseOrderObject({
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
                   <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : "Revise purchase order"}</h2>
-                  <p className="text-meta text-kit-slate-9">Check the official document beside these fields before you finish.</p>
+                  <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
               </div>
@@ -1269,7 +1279,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         {/* Keep horizontal scrolling inside the card's padded content. */}
         <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
-            <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
+            <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-11">
               <tr><th className="px-3 py-2.5 align-top text-left">SKU</th><th className="px-3 py-2.5 align-top text-left">Item</th><th className="px-3 py-2.5 align-top text-left">Unit ID</th><th className="px-3 py-2.5 align-top text-left">Source</th><th className="px-3 py-2.5 align-top text-left">Deliver To</th><th className="px-3 py-2.5 align-top text-left">Order Qty</th><th className="px-3 py-2.5 align-top text-left">Received Qty</th><th className="px-3 py-2.5 align-top text-left">Pending Delivery Qty</th></tr>
             </thead>
             <tbody>
@@ -1285,7 +1295,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
                   <td className="px-3 py-2.5 align-top text-left" data-testid={`po-line-units-${line.id}`}>{
-                    unitLoading ? <span className="text-kit-slate-9">Loading…</span>
+                    unitLoading ? <span className="text-kit-slate-11">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
                       ? <Absence>—</Absence>
@@ -1350,7 +1360,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
           <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
-            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
+            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Official document</div>
             <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
           </section>
         ) : (
@@ -1443,7 +1453,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
 
   return (
     <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-date">
-      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">
         SUPPLIER REPLY
       </div>
       <p className="mt-1 text-meta text-kit-slate-11">
@@ -1469,7 +1479,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           that); here it is history the operator can still open and check. */}
       {allReplies.length > 0 ? (
         <div className="mt-2" data-testid="po-supplier-reply-history">
-          <div className="text-label text-kit-slate-9">Reply history</div>
+          <div className="text-label text-kit-slate-11">Reply history</div>
           <ul className="mt-1 flex flex-col gap-0.5">
             {allReplies.map((p) => (
               <li key={`${p.recorded_at}:${p.new_date ?? p.about_date}`} className="text-meta text-kit-slate-11">
@@ -1493,7 +1503,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
       ) : null}
       {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Supplier Delivery Date</span>
+          <span className="text-label text-kit-slate-11">Supplier Delivery Date</span>
           <input
             type="date"
             value={date}
@@ -1514,7 +1524,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
                 0430 — only a LATER date asks why, and nothing is pre-chosen:
                 an earlier or matching date is not a delay and gets no delay
                 reason, silently or otherwise. */}
-            <span className="text-label text-kit-slate-9">Why has it moved?</span>
+            <span className="text-label text-kit-slate-11">Why has it moved?</span>
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -1527,7 +1537,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           </label>
         ) : null}
         <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Remarks</span>
+          <span className="text-label text-kit-slate-11">Remarks</span>
           <input
             type="text"
             value={remarks}
@@ -1538,7 +1548,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Channel</span>
+          <span className="text-label text-kit-slate-11">Channel</span>
           <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta">
             <option value="whatsapp">WhatsApp</option><option value="email">Email</option>
             <option value="phone">Phone</option><option value="in_person">In person</option>
@@ -1549,7 +1559,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           ["Reported by", reportedBy, setReportedBy],
         ] as const).map(([label, value, setValue]) => (
           <label key={label} className="flex flex-col gap-1">
-            <span className="text-label text-kit-slate-9">{label}</span>
+            <span className="text-label text-kit-slate-11">{label}</span>
             <input value={value} onChange={e => setValue(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
           </label>
         ))}
@@ -1557,7 +1567,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           paths={evidence ? [evidence] : []} onChange={paths => setEvidence(paths[paths.length - 1] ?? "")}
           label="Reply evidence" testId="po-supplier-reply-evidence" />
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Reported at</span>
+          <span className="text-label text-kit-slate-11">Reported at</span>
           <input type="datetime-local" value={reportedAt} onChange={e => setReportedAt(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
         </label>
         <button
@@ -1565,7 +1575,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           disabled={!ready}
           onClick={save}
           data-testid="po-supplier-date-save"
-          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
+          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-11"
         >
           {record.isPending ? "Recording..." : "Record supplier answer"}
         </button>
@@ -1594,7 +1604,7 @@ function replyAnswerWord(answer: string, reason: string | null | undefined): str
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-label text-kit-slate-9">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
+  return <div><dt className="text-label text-kit-slate-11">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
@@ -1602,11 +1612,11 @@ function ConnectionBlock({ title, empty, children, hasContent, loading, problem,
 }
 
 function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {
-  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-9">{secondary}</div></div>;
+  return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-11">{secondary}</div></div>;
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-9">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
+  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {
@@ -1628,15 +1638,15 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
   const problemCount = claims.length + returnRows.length;
   const problemLoading = claimsLoading || receivingLoading;
   const problemError = claimsError || receivingError;
-  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={row.source} detail={row.sourceSearch === "Not recorded" ? "No governed source is recorded" : row.sourceSearch} /><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
+  return <section className="mx-auto max-w-[1100px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">Order Route</h2><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4"><RouteNode title="Source" main={row.source} detail={row.sourceSearch === "Not recorded" ? "No governed source is recorded" : row.sourceSearch} /><RouteNode title="Purchase Order" main={row.id} detail={`PO V${row.facts.version} · ${row.facts.documentState}`} />{receivingError ? <RouteProblem title="Receiving" problem="The Receiving connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving} /> : <RouteNode title="Receiving" main={receivingLoading ? "Loading…" : receiving.length ? `${receiving.length} connected` : "None recorded"} detail={receivingLoading ? "Checking the receiving record" : receiving.map((receipt) => receipt.do_number ?? receipt.status).join(" · ") || "Receiving owns this fact"} />}{problemError ? <RouteProblem title="Claims and returns" problem="The claims and returns connection could not be loaded" action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }} /> : <RouteNode title="Claims and returns" main={problemLoading ? "Loading…" : problemCount ? `${problemCount} connected` : "None recorded"} detail={problemLoading ? "Checking the claim and receiving return records" : [...claims.map((claim) => claim.claim_no), ...returnRows.map(() => "Receiving return")].join(" · ") || "No connected problem record"} />}</div></section>;
 }
 
 function RouteNode({ title, main, detail }: { title: string; main: string; detail: string }) {
-  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-9">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div><div className="mt-1 text-meta text-kit-slate-9">{detail}</div></div>;
+  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div><div className="mt-1 text-meta text-kit-slate-11">{detail}</div></div>;
 }
 
 function RouteProblem({ title, problem, action, onRetry }: { title: string; problem: string; action: string; onRetry: () => void }) {
-  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-9">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
+  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label uppercase tracking-wide text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
@@ -1715,6 +1725,6 @@ function RevisionForm({
     const pickerDestinations = activeDestinations.some((destination) => destination.id === currentDestinationId) || !currentDestination
       ? activeDestinations
       : [currentDestination, ...activeDestinations];
-    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-9">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
+    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
   })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
 }

@@ -284,10 +284,10 @@ describe("PO Status — the fact that makes On PO legible", () => {
     expect(received.poStatus).toBe("Completed");
 
     const issued = base({ po: () => po({ status: "open", sentCurrentVersion: true }) })[0]!;
-    expect(issued.poStatus).toBe("Issued");
+    expect(issued.poStatus).toBe("Waiting for goods from supplier");
 
     const unsent = base({ po: () => po({ status: "open", sentCurrentVersion: false }) })[0]!;
-    expect(unsent.poStatus).toBe("Not marked as sent");
+    expect(unsent.poStatus).toBe("Sending not confirmed");
 
     /* ⛔ `Open` is never a Purchase Order status (COPY-STANDARD). */
     for (const r of [received, issued, unsent]) expect(r.poStatus).not.toBe("open");

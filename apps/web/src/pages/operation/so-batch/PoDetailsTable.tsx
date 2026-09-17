@@ -306,7 +306,7 @@ export function poDetailRowsForLine(input: {
 /** Governed absence — a muted sentence, never a bare dash without a reason. */
 function Absence({ children }: { children: string }) {
   return (
-    <span className="font-sans text-kit-slate-9" data-absence="true">
+    <span className="font-sans text-kit-slate-11" data-absence="true">
       {children}
     </span>
   );

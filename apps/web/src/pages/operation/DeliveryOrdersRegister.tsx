@@ -147,7 +147,7 @@ const ALL_STATUS = "__all__";
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
 function Absent({ children }: { children: string }) {
   return (
-    <span className="text-kit-slate-9" data-absence="true">
+    <span className="text-kit-slate-11" data-absence="true">
       {children}
     </span>
   );
@@ -953,7 +953,7 @@ export default function DeliveryOrdersRegister() {
             testId="delivery-orders-rail"
             onHide={() => setFilterRailVisible(false)}
           >
-            <FilterRailGroup title={DOR_COPY.railWork}>
+            <FilterRailGroup title={DOR_COPY.railWork} icon="flag">
               {DO_WORK_QUEUES.map((key) => (
                 <FilterRailRow
                   key={key}
@@ -973,7 +973,11 @@ export default function DeliveryOrdersRegister() {
                 still carries its live count - the number is why an operator
                 picks it. `All` clears the status condition ONLY; a picked
                 work queue survives, because they are two questions. */}
-            <FilterRailGroup title={DOR_COPY.railStatus}>
+            <FilterRailGroup
+              title={DOR_COPY.railStatus}
+              icon="order"
+              chosen={filters.status ? STATUS_LABEL[filters.status] : null}
+            >
               <Select
                 id="delivery-orders-status"
                 value={filters.status ?? ALL_STATUS}

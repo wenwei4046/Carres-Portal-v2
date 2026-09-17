@@ -48,6 +48,7 @@ import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { toast } from "sonner";
 import { useLedgerChart } from "./ledger-queries";
 import { useRecordManualJournal } from "./manual-journal-queries";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 /* ── the lines a person types ──────────────────────────────────────────────── */
 
@@ -305,7 +306,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
             Difference {rm(Math.abs(totals.difference))}
           </span>
         </p>
-        {refusal && <p role="alert" className="text-body text-kit-red-11" data-testid="journal-refusal">{refusal}</p>}
+        {refusal && <FieldError testId="journal-refusal">{refusal}</FieldError>}
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" disabled={gap !== null} onClick={askFirst}>

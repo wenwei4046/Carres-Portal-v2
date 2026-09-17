@@ -44,6 +44,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 /**
  * WAREHOUSE — OUTBOUND: one row = one dated pickup arrangement (one DO
@@ -192,7 +193,7 @@ export default function WarehouseOutboundWork() {
         searchValue: (c) => `DO No ${c.doNumber} ${c.source}`,
         accessor: (c) => (
           <div className="py-0.5 leading-[18px]">
-            <div className="text-label uppercase tracking-wide text-base-400">
+            <div className="text-label font-semibold text-kit-slate-11">
               DO No
             </div>
             <Link
@@ -479,12 +480,13 @@ export default function WarehouseOutboundWork() {
                 {dateControls}
               </div>
             )}
-            <FilterRailGroup title="PICKUP STATUS">
+            <FilterRailGroup title="Pickup status" icon="waiting">
               {STATUSES.map(([value, label]) => (
                 <FilterRailRow
                   key={value}
                   label={label}
                   active={effectiveView === value}
+                  resets={value === "all"}
                   count={
                     isLoading || error ? undefined : view.facets.view[value] ?? 0
                   }
@@ -497,7 +499,7 @@ export default function WarehouseOutboundWork() {
               ))}
             </FilterRailGroup>
             {siteNames.length > 1 && (
-              <FilterRailGroup title="SITE">
+              <FilterRailGroup title="Site" icon="warehouse">
                 {siteNames.map((name) => (
                   <FilterRailRow
                     key={name}
@@ -644,7 +646,7 @@ export default function WarehouseOutboundWork() {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-label uppercase tracking-wide text-base-400">{label}</div>
+      <div className="text-label font-semibold text-kit-slate-11">{label}</div>
       <div className="truncate text-base-800">{value}</div>
     </div>
   );
@@ -824,7 +826,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           </button>
         )}
       </div>}
-      {prepError && <p role="alert" className="mb-2 text-meta text-kit-red-11">{prepError}</p>}
+      {prepError && <div className="mb-2"><FieldError>{prepError}</FieldError></div>}
       {readyUnits.length > 0 && (
         <p className="mb-2 text-label text-base-500" data-testid="wo-receiver-consequence">
           Recording the load moves the accepted Units to {card.logisticsPartner}. Name the person
@@ -842,7 +844,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       )}
       <div className="overflow-x-auto"><table className="w-full border-collapse text-body">
         <thead>
-          <tr className="text-left text-label uppercase tracking-wide text-base-400">
+          <tr className="text-left text-label font-semibold text-kit-slate-11">
             <th className="py-1 pr-3 font-medium">Unit ID</th>
             <th className="py-1 pr-3 font-medium">Product</th>
             <th className="py-1 pr-3 font-medium">Scanned / Checked / Packed</th>

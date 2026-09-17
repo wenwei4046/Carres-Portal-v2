@@ -11,15 +11,19 @@
 
 .root {
   /* ── Carres token aliases — the ONE styling adaptation ── */
-  --c-paper: #ffffff; /* white surface (card) */
-  --c-cream: #f9fafb; /* base-50 band */
-  --c-ink: #1a1a1a; /* text primary */
+  /* PORTAL-WIDE LISTING READABILITY (UI MASTER §6.7, Jess 2026-09-17): every
+     listing is white with a slate-3 header band — the slate palette R5 first
+     gave SO Batch is now the default for every grid, never an opt-in. */
+  --c-paper: theme("colors.white"); /* white toolbar, rows, footer */
+  --c-cream: theme("colors.kit.slate.3"); /* header band + hover */
+  --c-ink: theme("colors.kit.slate.12"); /* main text */
   --c-burnt: #9a3d22; /* flame-dark */
   --c-orange: #c44d2b; /* flame */
   --c-festive-b: #dc2626; /* destructive red-600 */
-  --line: #e5e7eb; /* base-200 border */
-  --fg-muted: #6b7280; /* base-500 */
-  --fg-soft: #9ca3af; /* base-400 */
+  --line: theme("colors.kit.slate.5"); /* 1px separators */
+  --fg-muted: theme("colors.kit.slate.11"); /* secondary facts — never slate-9 */
+  --fg-soft: theme("colors.kit.slate.11");
+  --grid-expansion: theme("colors.kit.slate.2");
   --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
   --font-button: "Inter", "DM Sans", system-ui, sans-serif;
   /* Figures: Carres sets numerals with Inter + tabular-nums (no mono face). */
@@ -1021,70 +1025,73 @@ div:first-child > .columnsMenuGroup {
   border-color: theme("colors.kit.blue.9");
 }
 
-/* ── SLATE REGISTER PALETTE — owner ruling R5, 2026-09-16 ─────────────────
-   Opt-in (`palette="slate"`), SO Batch Purchase first. Radix steps through the
-   existing kit role names; no hex, no page canvas or control-border change. */
-.rootPaletteSlate {
-  --c-paper: theme("colors.white");
-  --c-cream: theme("colors.kit.slate.3");
-  --c-ink: theme("colors.kit.slate.12");
-  --line: theme("colors.kit.slate.5");
-  --fg-muted: theme("colors.kit.slate.11");
-  --fg-soft: theme("colors.kit.slate.11");
-  --grid-expansion: theme("colors.kit.slate.2");
-}
-.rootPaletteSlate .toolbar,
-.rootPaletteSlate .statusLine {
+/* ── LISTING SURFACES — the Portal default (UI MASTER §6.7, Jess 2026-09-17) ──
+   Born as the opt-in slate palette (owner ruling R5, 2026-09-16, SO Batch
+   first); every listing now reads this way. Radix steps through the kit role
+   names; no hex, and no page may copy these rules into its own stylesheet.
+   White toolbar/rows/footer · slate-3 header with slate-11 11px/600 normal
+   casing · 1px separators. `palette="slate"` keeps ONLY its selection model
+   (ticked rows in blue-3) further below. */
+.root .toolbar,
+.root .statusLine {
   background: theme("colors.white");
 }
-.rootPaletteSlate .statusLine {
+.root .statusLine {
   color: theme("colors.kit.slate.11");
   font-size: var(--fs-12);
+  letter-spacing: 0;
+  text-transform: none;
 }
-.rootPaletteSlate .thead,
-.rootPaletteSlate .th,
-.rootPaletteSlate .thead .stickyCell {
+.root .thead,
+.root .th,
+.root .thead .stickyCell {
   background: theme("colors.kit.slate.3");
 }
-.rootPaletteSlate .th {
+.root .th {
   color: theme("colors.kit.slate.11");
   font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
 }
-.rootPaletteSlate .sortArrow {
+.root .sortArrow {
   color: theme("colors.kit.slate.11");
 }
-.rootPaletteSlate .tr:hover,
-.rootPaletteSlate .tr:hover .stickyCell {
+.root .tr:hover,
+.root .tr:hover .stickyCell {
   background: theme("colors.kit.slate.3");
 }
-/* A ticked row is in the batch: blue-3 across the WHOLE row, pinned cells
-   included, and it outranks hover. An expanded row that is not ticked stays
-   white. */
+/* A single-selected row (no `palette`) keeps its blue-3 across pinned cells
+   while hovered, exactly as before this default moved to `.root`. */
+.root .trSelected .stickyCell,
+.root .trSelected:hover .stickyCell {
+  background: var(--kit-blue-3, #e8f3ff);
+}
+.root .trExpansion,
+.root .trExpansion:hover {
+  background: theme("colors.kit.slate.2") !important;
+}
+.root .toolbarIcon,
+.root .toolbarPill {
+  color: theme("colors.kit.slate.11");
+}
+.root .toolbarIcon svg,
+.root .toolbarPill svg {
+  stroke-width: 2;
+}
+.root button:focus-visible,
+.root input[type="checkbox"]:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: 1px;
+}
+/* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
+   row is in the batch — blue-3 across the WHOLE row, pinned cells included,
+   and it outranks hover. An expanded row that is not ticked stays white. */
 .rootPaletteSlate .trTicked,
 .rootPaletteSlate .trTicked .stickyCell,
 .rootPaletteSlate .trTicked:hover,
 .rootPaletteSlate .trTicked:hover .stickyCell {
   background: theme("colors.kit.blue.3");
-}
-.rootPaletteSlate .trExpansion,
-.rootPaletteSlate .trExpansion:hover {
-  background: theme("colors.kit.slate.2") !important;
-}
-.rootPaletteSlate .toolbarIcon,
-.rootPaletteSlate .toolbarPill {
-  color: theme("colors.kit.slate.11");
-}
-.rootPaletteSlate .toolbarIcon svg,
-.rootPaletteSlate .toolbarPill svg {
-  stroke-width: 2;
-}
-.rootPaletteSlate button:focus-visible,
-.rootPaletteSlate input[type="checkbox"]:focus-visible {
-  outline: 2px solid theme("colors.kit.blue.9");
-  outline-offset: 1px;
 }
 
 /* Governed group headings (fixedGroups): white band, 13px/600, 38px minimum,

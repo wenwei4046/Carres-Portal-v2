@@ -112,7 +112,7 @@ export default {
            * greys per page, maximum. Copy Linear: the chrome greys sit so
            * close to white the data always outweighs them. Runs on Purchase
            * Orders first; flows back portal-wide after she reviews it live. */
-          canvas: "#F7F8FA", // app background (Jess, 2026-08-02 — not a Radix step; her exact number)
+          canvas: "hsl(var(--background))", // THE one canvas token = #F7F8FA (Jess 2026-08-02; UI MASTER §6.7 2026-09-17) — body and every page read the same variable
           // `strip` retired the same day (Jess's polish: too many greys were
           // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {

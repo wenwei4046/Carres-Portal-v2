@@ -91,15 +91,15 @@ export const MONITOR_COPY = {
   emptySearch: "No matching deliveries.",
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
-  railWork: "WORK TO DO",
+  railWork: "Work to do",
   /** The three dropdowns own clear-this-one-condition word (2026-09-12).
    *  `All` alone would read as all of everything; each says WHAT it clears. */
   allStates: "All states",
   allPartners: "All",
   allStatuses: "All",
-  railState: "STATE",
-  railLogistics: "LOGISTICS",
-  railStatus: "DELIVERY STATUS",
+  railState: "State",
+  railLogistics: "Logistics",
+  railStatus: "Delivery status",
   allDeliveryWork: "All delivery work",
   noLogistics: "No logistics picked",
   /**

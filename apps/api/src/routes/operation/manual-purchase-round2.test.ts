@@ -439,7 +439,7 @@ describe("D4 / D5 / R3 / R4 · the object's facts", () => {
     expect(body.pos[0]?.marked_sent_at).toBe("2026-09-12T03:00:00Z");
   });
 
-  it("D5 · a current version nobody marked reads null (`Not marked as sent`)", async () => {
+  it("D5 · a current version nobody marked reads null (`Sending not confirmed`)", async () => {
     vi.mocked(userClient).mockReturnValue(
       detailSb({ po_sends: [{ po_id: PO, po_version: 1, kind: "confirmed_sent", sent_at: "2026-09-11T02:00:00Z" }] }),
     );
