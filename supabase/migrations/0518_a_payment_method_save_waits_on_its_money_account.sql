@@ -3,7 +3,7 @@
 -- 0515 made two checks face each other: Finance Settings refuses taking a
 -- money account out of use while a payment method still lands money in it,
 -- and Settings → Payment refuses pointing an active method at an account
--- that is out of use. 0516 made payment_set_method_active wait on the
+-- that is out of use. 0523 makes payment_set_method_active wait on the
 -- gl_money_accounts row (for share) so the two checks cannot both pass in
 -- the same instant. payment_method_save (0476) has the same check
 -- (gl_money_account_ok) and no wait: a manager saving a new method at 1133
@@ -14,7 +14,7 @@
 -- `for share` on the gl_money_accounts row. gl_money_account_update takes
 -- that row `for update` (0512), so whichever save arrives second waits for
 -- the first to commit, then re-reads. Lock order is the same as
--- payment_set_method_active (payment_manual_methods, then gl_money_accounts),
+-- payment_set_method_active after 0523 (payment_manual_methods, then gl_money_accounts),
 -- and gl_money_account_update never waits on payment_manual_methods, so no
 -- cycle. A null account matches no row and falls to the existing refusal.
 -- Nothing else changes: same sentences, errcodes, details and grants.
@@ -52,7 +52,7 @@ begin
   end if;
   -- 0518: wait for a Finance Settings save on this account, so this check and
   -- gl_money_account_update's switch-off check cannot pass side by side
-  -- (0516 gave payment_set_method_active the same wait).
+  -- (0523 gives payment_set_method_active the same wait).
   perform 1 from public.gl_money_accounts where account_code = p_account_code for share;
   if not public.gl_money_account_ok(p_account_code) then
     raise exception 'account % is not a money account — choose cash, a bank account or card and online settlement',
