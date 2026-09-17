@@ -181,6 +181,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** 0489 — the order's stable collection owner, per order; absent ⇒ the
    *  `collect` rule fails closed under the Delivery Duty word. */
   collectionOwnerFor?: (orderId: string) => WorkspaceDutyResolution | null;
+  /** Owner ruling 2026-09-17 — the order's responsible Operation person (the
+   *  individual it was dealt to, with buddy cover), from the SAME 0504 read.
+   *  Routine Delivery work is theirs; absent or unassigned ⇒ Delivery Duty. */
+  responsibleOperationFor?: (orderId: string) => WorkspaceDutyResolution | null;
   /** Logistics Partner names by id — `Call NETS`, never `Call logistics`,
    *  wherever the order names its company. */
   partnerNameById?: ReadonlyMap<string, string>;
@@ -276,6 +280,9 @@ export function projectSalesOrdersFromModuleFacts(input: {
         dutyResolutions: {
           ...input.dutyResolutions,
           ...(input.collectionOwnerFor?.(row.id) ? { collection_owner: input.collectionOwnerFor(row.id)! } : {}),
+          ...(input.responsibleOperationFor?.(row.id)
+            ? { responsible_operation: input.responsibleOperationFor(row.id)! }
+            : {}),
         },
         salespersonName: row.salespersons?.name ?? null,
         askDeliveryDate:
@@ -1179,25 +1186,31 @@ async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<I
  * quietly turn back into an ordinary balance.
  */
 /**
- * 0489 — establish, then read, the stable collection owner of every order
- * whose collection is actionable today. `establish` is idempotent (an order
- * that has an owner is never touched) and writes nothing when Delivery Duty
- * has no holder; `context` returns normal owner · today's cover · acting
- * person · history. Both are the ONE door; no owner is computed here.
+ * 0489/0504 — establish the stable collection owner of every order whose
+ * collection is actionable today, then read the responsible Operation person
+ * of every order that has collection OR routine Delivery work (owner ruling
+ * 2026-09-17). `establish` is idempotent and writes nothing for an order with
+ * no responsible person; `context` returns normal owner · today's cover ·
+ * acting person · history from `delivery_responsible_operation`. Both are the
+ * ONE door; no owner is computed here.
  */
 async function establishAndReadCollectionOwners(
   c: Context<AppEnv>,
-  orderIds: readonly string[],
+  establishIds: readonly string[],
+  readIds: readonly string[],
   today: string,
 ): Promise<Map<string, CollectionOwnerContextRow>> {
+  const orderIds = [...new Set([...establishIds, ...readIds])];
   if (orderIds.length === 0) return new Map();
   const sb = userClient(c.env, c.var.auth.jwt);
-  const established = await sb.rpc("payment_collection_owner_establish", {
-    p_order_ids: [...orderIds], p_on: today,
-  });
-  if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  if (establishIds.length > 0) {
+    const established = await sb.rpc("payment_collection_owner_establish", {
+      p_order_ids: [...establishIds], p_on: today,
+    });
+    if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  }
   const context = await sb.rpc("payment_collection_owner_context", {
-    p_order_ids: [...orderIds], p_on: today,
+    p_order_ids: orderIds, p_on: today,
   });
   if (context.error) throw new Error("Workspace collection-owner source could not be read");
   const rows = (context.data ?? []) as CollectionOwnerContextRow[];
@@ -1399,8 +1412,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
   const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
-  // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): every routine Delivery
-  // action resolves through the same shared resolver as PO Duty.
+  // Delivery Duty — since the owner ruling of 2026-09-17 only the fallback for
+  // an order with NO responsible Operation person (see below).
   const deliveryDuty = dutyResolution(duties, "delivery_duty", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
@@ -1419,27 +1432,39 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   }
   // 0489 — which orders' collection is actionable today is the projections'
   // own admission; a probe pass learns the set, the door establishes the
-  // owner for any newcomer (Delivery Duty holder today) and the read answers
-  // the same stable owner for every later pass.
+  // owner for any newcomer (the person the order was dealt to) and the read
+  // answers the same stable owner for every later pass.
   const actionable = new Set<string>();
   const probe = (orderId: string) => { actionable.add(orderId); return null; };
   projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
   projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
-  const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], today);
-  const collectionOwnerFor = (orderId: string) =>
-    collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
-  const orderItems = projectSalesOrdersFromModuleFacts({
+  const orderFacts = {
     orders: orders.orders,
     stock: stock.skus,
     staff: staff.staff,
     dutyResolutions,
-    collectionOwnerFor,
     partnerNameById: new Map((purchasingSettings.deliveryPartners ?? []).map((p) => [p.id, p.name])),
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
     timingRules,
     proofFacts,
+  };
+  // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
+  // Operation person. A probe pass per order learns which orders carry a
+  // `responsible_operation` item today, so the one read covers exactly them.
+  const deliveryOwned = orders.orders
+    .filter((row) =>
+      projectSalesOrdersFromModuleFacts({ ...orderFacts, orders: [row] })
+        .some((item) => item.owner.rule === "responsible_operation"))
+    .map((row) => row.id);
+  const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], deliveryOwned, today);
+  const collectionOwnerFor = (orderId: string) =>
+    collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
+  const orderItems = projectSalesOrdersFromModuleFacts({
+    ...orderFacts,
+    collectionOwnerFor,
+    responsibleOperationFor: collectionOwnerFor,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),
