@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0528 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN: bank transfers
+ * 0529 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN: bank transfers
  * and card payouts. Same harness as finance-approver-role.integration.test.ts:
  * one transaction, rolled back; identities through the request-claims GUC.
  *
@@ -19,7 +19,7 @@ const uid = (tail: string) => `dddddddd-0000-4000-8000-${HEX}${tail.padStart(7, 
 const U = { preparer: uid("1"), other: uid("2"), principal: uid("3"), operation: uid("4") };
 const POS = uid("a1");
 
-describe.skipIf(!URL)("money moves (real PostgreSQL, 0528)", () => {
+describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
   let db: pg.Client;
   let onDate = "";
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);

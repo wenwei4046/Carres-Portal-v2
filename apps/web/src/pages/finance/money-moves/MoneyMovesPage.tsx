@@ -1,5 +1,5 @@
 /**
- * Finance → Money moves, at `/finance/money-moves` (migration 0528).
+ * Finance → Money moves, at `/finance/money-moves` (migration 0529).
  *
  * Finance moving its own money: a bank transfer between two cash or bank
  * accounts, or a card payout from a card company's holding account into a

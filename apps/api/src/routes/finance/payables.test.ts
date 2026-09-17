@@ -307,7 +307,7 @@ describe("payment vouchers", () => {
     expect(await res.json()).toMatchObject({ code: "separation_of_duties" });
   });
 
-  it("approve by the checker: 403 checker_cannot_approve keeps the database's sentence (0528)", async () => {
+  it("approve by the checker: 403 checker_cannot_approve keeps the database's sentence (0529)", async () => {
     mockRpc({
       data: null,
       error: {

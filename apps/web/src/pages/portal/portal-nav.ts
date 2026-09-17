@@ -604,7 +604,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // other income or money against those invoices is an Other receipt.
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
-      // 0528 — Finance moving its own money: bank transfers and card payouts.
+      // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
       // The Finance Ledger — three rows, not one row with tabs: the Journal,
       // the Trial Balance and the Self-check are three different objects

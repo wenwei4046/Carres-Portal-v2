@@ -103,7 +103,7 @@ export default function FinanceApp() {
               other receipts. Finance only; customer money stays in Payments. */}
           <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />
           <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
-          {/* 0528 — bank transfers and card payouts between Finance's own accounts. */}
+          {/* 0529 — bank transfers and card payouts between Finance's own accounts. */}
           <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />

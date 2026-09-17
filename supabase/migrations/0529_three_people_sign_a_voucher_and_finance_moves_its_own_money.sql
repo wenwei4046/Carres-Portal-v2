@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0528_three_people_sign_a_voucher_and_finance_moves_its_own_money.sql
+-- 0529_three_people_sign_a_voucher_and_finance_moves_its_own_money.sql
 -- =============================================================================
 -- WHAT WAS WRONG
 --   A. The finance lead describes a payment voucher as three people: staff
@@ -17,7 +17,7 @@
 --   A. payment_voucher_approve refuses when the approver checked the voucher
 --      (42501, detail checker_cannot_approve). The body is the latest one,
 --      0484_a_supplier_can_be_paid_before_its_bill.sql, changed only where
---      marked 0528. A new constraint payment_vouchers_checker_is_not_approver
+--      marked 0529. A new constraint payment_vouchers_checker_is_not_approver
 --      says the same, NOT VALID: a voucher approved before today by its own
 --      checker stays as it is.
 --   B. public.gl_money_moves: one small document for both moves.
@@ -48,7 +48,7 @@ alter table public.payment_vouchers
   add constraint payment_vouchers_checker_is_not_approver
     check (approved_by is null or checked_by is null or approved_by <> checked_by) not valid;
 
--- Body from 0484. Changed only where marked 0528.
+-- Body from 0484. Changed only where marked 0529.
 create or replace function public.payment_voucher_approve(p_voucher_id uuid)
 returns uuid
 language plpgsql
@@ -92,7 +92,7 @@ begin
             hint = 'Ask another holder of the finance approver duty to approve it.';
   end if;
 
-  -- 0528: three people sign a payment out. The checker is not the approver.
+  -- 0529: three people sign a payment out. The checker is not the approver.
   if v_v.checked_by = v_me then
     raise exception
       'You checked payment voucher %, so somebody else must approve it. Three different people prepare, check and approve a payment.',
@@ -187,7 +187,7 @@ $fn$;
 -- allocate_formal_document_code callers (ARI GRN MPR PO PV RO RV SB TR) and
 -- hand-built numbers (SO DL DO INV CN IS QTY RA RC REQ RU SC). MM is free.
 insert into public.gl_doc_series (prefix, description) values
-  ('MM', 'Money move — a bank transfer or a card payout between Finance''s own money accounts (0528)');
+  ('MM', 'Money move — a bank transfer or a card payout between Finance''s own money accounts (0529)');
 
 create table public.gl_money_moves (
   id                 uuid primary key default gen_random_uuid(),
@@ -579,15 +579,15 @@ begin
    where n.nspname = 'public' and p.proname = 'payment_voucher_approve';
   if position('checker_cannot_approve' in v_src) = 0 or position('separation of duties' in v_src) = 0
      or position('v_v.advance_amount' in v_src) = 0 then
-    raise exception '0528 sanity: payment_voucher_approve lacks the checker rule, the preparer rule or the advance';
+    raise exception '0529 sanity: payment_voucher_approve lacks the checker rule, the preparer rule or the advance';
   end if;
   if not exists (select 1 from pg_constraint
                   where conname = 'payment_vouchers_checker_is_not_approver') then
-    raise exception '0528 sanity: the checker constraint is missing';
+    raise exception '0529 sanity: the checker constraint is missing';
   end if;
   if not exists (select 1 from public.gl_accounts
                   where code = '6500' and kind = 'EXPENSE' and is_active and not is_control) then
-    raise exception '0528 sanity: 6500 Bank and payment charges is not an active expense account';
+    raise exception '0529 sanity: 6500 Bank and payment charges is not an active expense account';
   end if;
   if has_function_privilege('anon', 'public.gl_money_move_create(text, date, text, text, numeric, numeric, text, text, uuid)', 'execute')
      or has_function_privilege('anon', 'public.gl_money_move_approve(uuid)', 'execute')
@@ -598,7 +598,7 @@ begin
      or has_table_privilege('authenticated', 'public.gl_money_moves', 'insert')
      or has_table_privilege('authenticated', 'public.gl_money_moves', 'update')
      or has_table_privilege('authenticated', 'public.gl_money_moves', 'delete') then
-    raise exception '0528 sanity: a money-move door or the table is open past its gate';
+    raise exception '0529 sanity: a money-move door or the table is open past its gate';
   end if;
   if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'public'
@@ -606,7 +606,7 @@ begin
                                   'gl_money_move_create', 'gl_money_move_approve',
                                   'gl_money_move_reverse', 'gl_money_move_list')
                 and not (p.prosecdef and p.proconfig @> array['search_path=public, pg_temp'])) then
-    raise exception '0528 sanity: a function lost security definer or its search_path';
+    raise exception '0529 sanity: a function lost security definer or its search_path';
   end if;
 end
 $sanity$;

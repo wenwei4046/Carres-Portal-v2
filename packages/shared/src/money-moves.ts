@@ -1,5 +1,5 @@
 /**
- * Money moves (migration 0528): Finance moving its own money.
+ * Money moves (migration 0529): Finance moving its own money.
  *
  *   · TRANSFER     cash or bank → another cash or bank account.
  *   · CARD_PAYOUT  a card company's holding account → a bank, less its fee.

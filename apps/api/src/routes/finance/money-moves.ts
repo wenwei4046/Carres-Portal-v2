@@ -8,7 +8,7 @@ import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * Finance · money moves (migration 0528): bank transfers and card payouts.
+ * Finance · money moves (migration 0529): bank transfers and card payouts.
  *
  * Mounted at `/api/finance/money-moves`, above the `/finance` catch-all. Each
  * call is ONE definer function that checks its caller; `requireFinance` is the

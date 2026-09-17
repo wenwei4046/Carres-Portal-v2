@@ -3376,7 +3376,7 @@ with where it appears.
 | `Advance` (picker label) · `Bill` · `Date` · `Amount` · `Reference` | Field labels in the Apply advance and Record money back modals. |
 | `Bill No` · `Supplier invoice` · `Draft bill` · `Loading bills…` · `The bills could not be loaded. Try again.` · `This supplier has no confirmed bill left to pay.` · `Choose the bank or cash account` · `Bank reference or cheque No` | Reused from 0477 — the Apply advance and Record money back modals and the knock-off table. |
 
-### Money moves and the three-person voucher (migration 0528)
+### Money moves and the three-person voucher (migration 0529)
 
 **PROPOSAL — PENDING APPROVAL.** Every word below is new. Page: `Money moves` at
 `/finance/money-moves` (Finance sidebar, after `Other receipts`), and one new refusal on the

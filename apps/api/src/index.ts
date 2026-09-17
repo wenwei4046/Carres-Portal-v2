@@ -288,7 +288,7 @@ api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance/ledger", financeLedgerRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
-// Bank transfers and card payouts (0528). Before the catch-all as well.
+// Bank transfers and card payouts (0529). Before the catch-all as well.
 api.route("/finance/money-moves", financeMoneyMovesRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);

@@ -1,5 +1,5 @@
 /**
- * Reads and writes for money moves (migration 0528). Every write refreshes
+ * Reads and writes for money moves (migration 0529). Every write refreshes
  * everything under ["finance"]: an approved move changes the ledger too.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
