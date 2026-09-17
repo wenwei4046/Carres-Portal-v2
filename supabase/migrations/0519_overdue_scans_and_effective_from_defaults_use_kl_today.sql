@@ -4,8 +4,8 @@
 -- Kuala Lumpur is eight hours ahead, so between 00:00 and 08:00 KL the
 -- database still thinks it is yesterday. Three live functions and five
 -- column defaults compared with that clock; every dated door since 0379
--- uses (timezone('Asia/Kuala_Lumpur', now()))::date. 0517 fixed the two Settings → Payment doors; this is the rest
--- the 0517 review found.
+-- uses (timezone('Asia/Kuala_Lumpur', now()))::date. 0524 fixes the two Settings → Payment doors; this is the rest
+-- that migration's review found.
 --
 -- 1. operation_dashboard_summary (0125): "today's deliveries" and "overdue
 --    orders" on the Operation dashboard, opened at any hour. Before 08:00 KL
