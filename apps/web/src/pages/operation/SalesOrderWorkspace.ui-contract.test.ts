@@ -1073,8 +1073,8 @@ describe("Sales Order object page — one form grammar", () => {
       expect(goods).toContain(`>${label}</th>`);
     }
     /* Numerals right-aligned and tabular, so a column of money reads as one. */
-    expect(goods).toContain('text-right font-medium align-top whitespace-nowrap">Unit price</th>');
-    expect(goods).toContain('text-right font-medium align-top whitespace-nowrap">Line total</th>');
+    expect(goods).toContain('text-right font-medium">Unit price</th>');
+    expect(goods).toContain('text-right font-medium">Line total</th>');
     expect(goods).toContain("{fmtMoney(r.unitPrice)}");
     expect(goods).toContain("{fmtMoney(r.total)}");
     /* A SERVICE row carries the same two columns off `order_addons`, so the
