@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
-  NO_DELIVERY_DUTY_HOLDER,
-  SET_HOLDER_DOOR,
+  ASSIGN_IN_SALES_ORDERS,
+  ASSIGN_IN_SALES_ORDERS_HREF,
+  NOBODY_ASSIGNED_TO_ORDER,
   type CollectionOwnerContextRow,
 } from "@carres/shared/payment-collection-owner";
 import { SectionCard } from "@/components/SectionPanel";
@@ -40,13 +41,9 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
       : ownerQ.isLoading ? <p>Loading…</p>
       : ownerQ.isError ? <p>Owner facts could not be loaded.</p>
       : !owner ? <>
-          <p className="text-kit-red-11" data-testid="collection-owner-none">{NO_DELIVERY_DUTY_HOLDER}</p>
+          <p className="text-kit-red-11" data-testid="collection-owner-none">{NOBODY_ASSIGNED_TO_ORDER}</p>
           <p className="text-label font-normal">
-            {/* 🔴 0504 — these words are now wrong and wait on the owner; see
-                NO_DELIVERY_DUTY_HOLDER. The owner is the Operation person this
-                order was dealt to, not a Delivery Duty holder. */}
-            The owner is set from the Delivery Duty holder when collection first becomes actionable.{" "}
-            <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">{SET_HOLDER_DOOR}</Link>
+            <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="underline underline-offset-2">{ASSIGN_IN_SALES_ORDERS}</Link>
           </p>
         </>
       : <OwnerFacts owner={owner} />}

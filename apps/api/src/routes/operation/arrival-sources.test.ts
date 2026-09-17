@@ -66,6 +66,39 @@ describe("source and Receiving ownership", () => {
     ).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
+  it("refuses a condition-failed collection without a governed observed reason", async () => {
+    const handover = {
+      key: id,
+      kind: "collection_refused",
+      unit_ids: [id],
+      party_id: id,
+      person: "NETS driver",
+      occurred_at: "2026-09-12T02:00:00.000Z",
+      evidence: "Mattress stayed with the customer",
+      collection_review: {
+        passed_conditions: [],
+        evidence_paths: [`${id}/actor/photo.jpg`],
+      },
+    };
+    const missing = await post(app(), `/sources/${id}/handover`, handover);
+    expect(missing.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+
+    const recorded = await post(app(), `/sources/${id}/handover`, {
+      ...handover,
+      collection_review: {
+        ...handover.collection_review,
+        failed_reason: "stain",
+      },
+    });
+    expect(recorded.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("arrival_source_handover", {
+      p_id: id,
+      p_input: expect.objectContaining({
+        collection_review: expect.objectContaining({ failed_reason: "stain" }),
+      }),
+    });
+  });
   it("source router offers no receipt writer", async () => {
     expect((await post(app(), `/sources/${id}/receive`, {})).status).toBe(404);
     expect(rpc).not.toHaveBeenCalled();

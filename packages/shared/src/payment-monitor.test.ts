@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   MONITOR_ACTION_WORD,
-  MONITOR_FILTERS,
-  monitorDelivery,
-  monitorFilterMatch,
-  monitorGoods,
-  monitorGoodsWord,
+  mondayOf,
+  monitorDeliveryDates,
   monitorStorage,
+  monitorStorageLines,
   monitorStorageWord,
-  monitorSummaries,
   paymentMonitorRows,
+  paymentPlanDay,
+  paymentWeekLineWord,
+  paymentWeekPlan,
   type MonitorStorageCase,
 } from "./payment-monitor";
 import type { InvoiceRegisterRow } from "./payment-invoice-register";
@@ -68,45 +68,6 @@ function row(over: {
 const TODAY = "2026-09-11";
 const OPTS = {};
 
-describe("Goods — Primary School English, and the exact item disclosure", () => {
-  it("every line ready → Goods ready", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 2, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "ready" } } }));
-    expect(monitorGoodsWord(g)).toBe("Goods ready");
-    expect(g.lines.map((l) => l.word)).toEqual(["Ready", "Ready"]);
-  });
-  it("some ready, the rest dated → `2 of 3 items ready · Last item arriving Mon, 21 Sep`", () => {
-    const g = monitorGoods(row({
-      lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }, { sku: "C", qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "ready", C: "waiting" }, line_etas: { C: "2026-09-21" } },
-    }));
-    expect(monitorGoodsWord(g)).toBe("2 of 3 items ready · Last item arriving Mon, 21 Sep");
-    expect(g.lines[2]).toMatchObject({ sku: "C", qty: 1, word: "Arriving Mon, 21 Sep", ready: false });
-  });
-  it("nothing ready but every line dated → Arriving {last date}", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
-      control: { line_etas: { A: "2026-09-15", B: "2026-09-21" } } }));
-    expect(monitorGoodsWord(g)).toBe("Arriving Mon, 21 Sep");
-  });
-  it("a waiting line without a date → Arrival not confirmed, even when others are dated", () => {
-    const g = monitorGoods(row({ lines: [{ sku: "A", qty: 1, unit_price: 1 }, { sku: "B", qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { A: "ready", B: "nopo" }, line_etas: { A: "2026-09-15" } } }));
-    expect(monitorGoodsWord(g)).toBe("Arrival not confirmed");
-    expect(g.lines[1]!.word).toBe("Arrival not confirmed");
-  });
-  it("lines without a SKU still read the ladder's per-SKU signals as the items", () => {
-    const g = monitorGoods(row({ lines: [{ qty: 1, unit_price: 1 }],
-      control: { line_stock_status: { "MS01-K": "ready" } } }));
-    expect(monitorGoodsWord(g)).toBe("Goods ready");
-    expect(g.lines.map((l) => l.sku)).toEqual(["MS01-K"]);
-  });
-  it("no signal at all → Arrival not confirmed; never a technical word", () => {
-    const word = monitorGoodsWord(monitorGoods(row()));
-    expect(word).toBe("Arrival not confirmed");
-    expect(word).not.toMatch(/Stock status|ETA|Yes|No\b/);
-  });
-});
-
 describe("Storage — the six ruled states", () => {
   const caseOf = (over: Partial<MonitorStorageCase> = {}): MonitorStorageCase => ({
     id: "c1", order_id: "o1", product_group: "mattress_bedframe", storage_start: "2026-09-01",
@@ -147,24 +108,47 @@ describe("Storage — the six ruled states", () => {
   });
 });
 
-describe("Customer delivery — the confirmed date, else the request, else none", () => {
-  it("confirmed → the day word, no note", () => {
-    expect(monitorDelivery(row({ control: { confirmed_date: "2026-09-18" } })))
-      .toEqual({ dateIso: "2026-09-18", confirmed: true, status: "confirmed", word: "Fri, 18 Sep", note: null });
+/* Owner ruling 2026-09-16 — the 72px listing never cuts a storage sentence:
+   the same words, on two lines. */
+describe("Storage on two lines — the same sentence, never a third line", () => {
+  const cases: Array<[Parameters<typeof monitorStorageLines>[0], string, string | null]> = [
+    [{ kind: "none" }, "No storage charge", null],
+    [{ kind: "free", untilIso: "2026-09-14" }, "Free until Mon, 14 Sep", null],
+    [{ kind: "approved_free", untilIso: "2026-09-21" }, "Free storage approved", "until Mon, 21 Sep"],
+    [{ kind: "request_pending", estimate: 150 }, "Free request waiting for approval", "Estimated charge RM 150.00"],
+    [{ kind: "charging", group: "Sofa", day: 29, soFar: 400 }, "Sofa · Day 29", "RM 400.00 so far"],
+    [{ kind: "invoice_unpaid", amount: 200 }, "Storage Invoice issued", "RM 200.00 not paid"],
+  ];
+  it.each(cases)("%o", (state, line1, line2) => {
+    const lines = monitorStorageLines(state, rm);
+    expect(lines).toEqual({ line1, line2 });
+    const joined = state.kind === "approved_free" ? `${line1} ${line2}` : line2 ? `${line1} · ${line2}` : line1;
+    expect(joined).toBe(monitorStorageWord(state, rm));
   });
-  it("requested only → the day word with `Not confirmed yet`", () => {
-    expect(monitorDelivery(row({ delivery_date: "2026-09-18" })).note).toBe("Not confirmed yet");
+});
+
+/* Owner ruling 2026-09-16 — `Customer delivery` is replaced by two columns.
+   The request is Sales' and survives Delivery's confirmation; the confirmed
+   day is Delivery's fact. */
+describe("Requested Delivery Date and Confirmed Delivery — two facts, never merged", () => {
+  it("the request stays after Delivery confirms a different day", () => {
+    const r = row({ delivery_date: "2026-09-18" });
+    r.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-21", confirmed_time: "2 PM to 5 PM" }];
+    expect(monitorDeliveryDates(r)).toEqual({
+      requested: { iso: "2026-09-18", tbd: false },
+      confirmed: { dateIso: "2026-09-21", time: "2 PM to 5 PM" },
+    });
   });
-  it("no date → No delivery date, never a Logistics ETA", () => {
-    expect(monitorDelivery(row()).word).toBe("No delivery date");
+  it("a customer who is not sure keeps that flag; nothing is confirmed", () => {
+    expect(monitorDeliveryDates(row({ delivery_date: null, delivery_date_tbd: true }))).toEqual({
+      requested: { iso: null, tbd: true },
+      confirmed: { dateIso: null, time: null },
+    });
   });
-  /* ⭐ ONE READ, ONE ANSWER (Law D, 2026-09-14). The Monitor used to flatten
-     `delivery_date_tbd` into `No delivery date` while the collection workspace
-     the row opens called the same order `Customer not sure`. Both now read
-     `invoiceCustomerDelivery`, so the row and the page cannot disagree. */
-  it("customer not sure is its own state, and it is the SAME word the workspace prints", () => {
-    const r = monitorDelivery(row({ delivery_date: "2026-09-18", delivery_date_tbd: true }));
-    expect(r).toMatchObject({ status: "customer_not_sure", word: "Customer not sure", dateIso: null });
+  it("a day agreed without a time is confirmed with no time", () => {
+    const r = row({ delivery_date: "2026-09-18" });
+    r.orders!.ops_delivery_arrangements = [{ leg: 0, confirmed_date: "2026-09-18", confirmed_time: null }];
+    expect(monitorDeliveryDates(r).confirmed).toEqual({ dateIso: "2026-09-18", time: null });
   });
 });
 
@@ -287,44 +271,99 @@ describe("the row set — one row per SO that still needs money", () => {
   });
 });
 
-describe("filters are facts, and summaries name the work", () => {
+describe("the week plan — a view of the shared Work Engine (owner ruling 2026-09-16)", () => {
   const ready = { line_stock_status: { A: "ready" } };
   const rows = paymentMonitorRows({
     invoices: [
-      row({ id: "late", order_id: "late", so: 1, control: { ...ready, confirmed_date: "2026-09-10" } }),
-      row({ id: "today", order_id: "today", so: 3, control: { ...ready, confirmed_date: "2026-09-14" } }),
-      row({ id: "wait", order_id: "wait", so: 4, control: { confirmed_date: "2026-09-30" } }),
-      row({ id: "storage-s", order_id: "st", so: 6, kind: "sales", paid: 1000, control: { ...ready, confirmed_date: "2026-09-30" } }),
-      row({ id: "storage-p", order_id: "st", so: 6, kind: "storage", amount: 200, paid: 1000, control: { ...ready, confirmed_date: "2026-09-30" } }),
-      row({ id: "promise", order_id: "pr", so: 7, control: { ...ready, confirmed_date: "2026-09-30" } }),
-    ], cases: [], requests: [], todayIso: TODAY, opts: OPTS,
-    promisedByOrder: new Map([["pr", TODAY]]),
+      row({ id: "a", order_id: "oa", so: 1, control: { ...ready, confirmed_date: "2026-09-30" } }),
+      row({ id: "b", order_id: "ob", so: 2, control: { ...ready, confirmed_date: "2026-09-30" } }),
+      row({ id: "c", order_id: "oc", so: 3, control: { ...ready, confirmed_date: "2026-09-30" } }),
+      // One order, two issued invoices — still ONE customer to ask.
+      row({ id: "d1", order_id: "od", so: 4, control: { ...ready, confirmed_date: "2026-09-30" } }),
+      row({ id: "d2", order_id: "od", so: 4, kind: "storage", amount: 200, control: { ...ready, confirmed_date: "2026-09-30" } }),
+    ], cases: [], requests: [], todayIso: "2026-09-15", opts: OPTS,
   });
-  const pick = (key: Parameters<typeof monitorFilterMatch>[1]) =>
-    rows.filter((r) => monitorFilterMatch(r, key)).map((r) => r.so);
+  const item = (objectId: string, ruleKey: string, actionOn: string | null) =>
+    ({ ruleKey, object: { id: objectId }, timing: { actionOn } });
+  const ask = "payment.collect_customer_balance";
+  const promise = "payment.missed_promise";
+  const storage = "payment.send_storage_invoice";
+  const noHolidays = new Set<string>();
+  const words = (d: { lines: Parameters<typeof paymentWeekLineWord>[0][] }) => d.lines.map(paymentWeekLineWord);
 
-  it("has the seven ruled filters, in order, and they are not tabs", () => {
-    expect(MONITOR_FILTERS.map((f) => f.label)).toEqual([
-      "Needs attention", "Ask customer today", "Promised today", "Should have been paid",
-      "Waiting for goods", "Storage payments", "All unpaid",
-    ]);
+  it("shows Monday to Friday of the week, and marks only today as Today", () => {
+    const plan = paymentWeekPlan({ items: [], rows, todayIso: "2026-09-15", weekOfIso: "2026-09-15", holidays: noHolidays });
+    expect(plan.days.map((d) => d.iso)).toEqual(["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"]);
+    expect(plan.days.filter((d) => d.isToday).map((d) => d.iso)).toEqual(["2026-09-15"]);
+    expect(plan.days.every((d) => d.lines.length === 0)).toBe(true);
   });
-  it("each filter answers its own fact", () => {
-    expect(pick("needs_attention")).toEqual([1, 6, 7, 3]);
-    expect(pick("ask_today")).toEqual([3]);
-    expect(pick("promised_today")).toEqual([7]);
-    expect(pick("should_have_paid")).toEqual([1]);
-    expect(pick("waiting_goods")).toEqual([4]);
-    expect(pick("storage_payments")).toEqual([6]);
-    expect(pick("all_unpaid")).toHaveLength(5);
+
+  it("counts orders per kind of work on the item's own day, in the ruled words", () => {
+    const plan = paymentWeekPlan({
+      items: [
+        item("a", ask, "2026-09-17"), item("b", ask, "2026-09-17"),
+        item("d1", ask, "2026-09-17"), item("d2", ask, "2026-09-17"),
+        item("d2", storage, "2026-09-18"),
+      ],
+      rows, todayIso: "2026-09-15", weekOfIso: "2026-09-15", holidays: noHolidays,
+    });
+    const thu = plan.days[3]!;
+    expect(words(thu)).toEqual(["Ask 3 customers to pay"]);
+    expect([...thu.orderIds].sort()).toEqual(["oa", "ob", "od"]);
+    expect(words(plan.days[4]!)).toEqual(["Collect 1 storage payment"]);
   });
-  it("summaries are sentences that name the work — never `8 open · 2 late`", () => {
-    expect(monitorSummaries(rows)).toEqual([
-      "2 customer balances need collection today",
-      "1 payment should have been received already",
-      "1 storage payment needs collection",
-    ]);
-    expect(monitorSummaries([])).toEqual(["Nothing needs collection today"]);
-    for (const s of monitorSummaries(rows)) expect(s).not.toMatch(/\bopen\b|·/);
+
+  it("open earlier work is counted ONCE on today, keeps its original day, and its old day still lists it", () => {
+    const plan = paymentWeekPlan({
+      items: [item("a", promise, "2026-09-11"), item("b", promise, "2026-09-14"), item("c", ask, "2026-09-15")],
+      rows, todayIso: "2026-09-15", weekOfIso: "2026-09-15", holidays: noHolidays,
+    });
+    const [mon, tue] = plan.days;
+    expect(words(tue!)).toEqual(["Ask 1 customer to pay", "Check 2 promised payments"]);
+    expect(tue!.carried).toEqual({ count: 2, sinceIso: "2026-09-11" });
+    expect(mon!.lines).toEqual([]);
+    expect(mon!.countedOnPlanDay).toBe(1);
+    expect(mon!.orderIds).toEqual(["ob"]);
+    const total = plan.days.reduce((n, d) => n + d.lines.reduce((m, l) => m + l.count, 0), 0);
+    expect(total).toBe(3);
+  });
+
+  it("another week counts only its own days — earlier open work stays on today", () => {
+    const items = [item("a", promise, "2026-09-11"), item("b", ask, "2026-09-22")];
+    const next = paymentWeekPlan({ items, rows, todayIso: "2026-09-15", weekOfIso: "2026-09-22", holidays: noHolidays });
+    expect(next.days.some((d) => d.isToday)).toBe(false);
+    expect(words(next.days[1]!)).toEqual(["Ask 1 customer to pay"]);
+    const last = paymentWeekPlan({ items, rows, todayIso: "2026-09-15", weekOfIso: "2026-09-08", holidays: noHolidays });
+    expect(last.days.every((d) => d.lines.length === 0)).toBe(true);
+    expect(last.days[4]!.countedOnPlanDay).toBe(1);
+  });
+
+  it("a holiday today is never Today: the work moves to the next working day and the holiday is named", () => {
+    const plan = paymentWeekPlan({
+      items: [item("a", ask, "2026-09-15")],
+      rows, todayIso: "2026-09-16", weekOfIso: "2026-09-16",
+      holidays: new Set(["2026-09-16"]), holidayName: () => "Malaysia Day",
+    });
+    expect(plan.planDayIso).toBe("2026-09-17");
+    expect(plan.days.some((d) => d.isToday)).toBe(false);
+    expect(plan.days[2]!.holiday).toBe("Malaysia Day");
+    expect(words(plan.days[3]!)).toEqual(["Ask 1 customer to pay"]);
+    expect(plan.days[3]!.carried).toEqual({ count: 1, sinceIso: "2026-09-15" });
+  });
+
+  it("on a weekend nothing is Today and the plan day is Monday", () => {
+    expect(paymentPlanDay("2026-09-19", noHolidays)).toBe("2026-09-21");
+    expect(mondayOf("2026-09-20")).toBe("2026-09-14");
+    const plan = paymentWeekPlan({ items: [], rows, todayIso: "2026-09-19", weekOfIso: "2026-09-21", holidays: noHolidays });
+    expect(plan.days.some((d) => d.isToday)).toBe(false);
+    expect(plan.days[0]!.isPlanDay).toBe(true);
+  });
+
+  it("an item with no day, an unknown rule, or no Monitor row is never counted", () => {
+    const plan = paymentWeekPlan({
+      items: [item("a", ask, null), item("b", "payment.review_overpayment", "2026-09-15"), item("zzz", ask, "2026-09-15")],
+      rows, todayIso: "2026-09-15", weekOfIso: "2026-09-15", holidays: noHolidays,
+    });
+    expect(plan.days.every((d) => d.lines.length === 0 && d.orderIds.length === 0)).toBe(true);
   });
 });

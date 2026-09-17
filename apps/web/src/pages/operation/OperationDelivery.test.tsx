@@ -1580,7 +1580,10 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
   it("the assignment act is also one right-click away — and Edit Delivery is nowhere", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    const count = (name: string) => screen.queryAllByRole("button", { name }).length;
+    /* A row-menu act is a `menuitem` (keyboard row menu, 2026-09-16); the
+       sheet's own doors are buttons. Both are counted. */
+    const count = (name: string) =>
+      screen.queryAllByRole("button", { name }).length + screen.queryAllByRole("menuitem", { name }).length;
     const assignsOnSheet = count("Assign logistics");
 
     /* A row nobody carries: the menu adds the governed assignment door. */

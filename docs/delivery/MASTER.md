@@ -74,6 +74,19 @@ customer/item match.
 - Pass → `Accept collection`; custody transfers only when the item is loaded and acknowledged.
 - Fail → `Do not collect — condition failed`; select factual reason, capture evidence and leave
   the item with the customer. Operation decides and communicates the policy outcome.
+- The factual reason is one governed observation: stain, liquid/odour, pest evidence,
+  saliva/unsanitary condition, tear/burn/cut, customer damage, wrong item, or unsafe/unwrapped.
+  It is recorded with the doorstep photos before departure. A refusal never creates a Warehouse
+  receipt, changes the Unit holder or moves Stock. The linked Service Case remains the sole place
+  for responsibility, fee, remedy, formal outcome and customer communication.
+
+**BUILT 2026-09-16 (Delivery boundary correction):** the Outbound handover door requires the
+governed observed reason and doorstep photos for `Do not collect — condition failed`, stores the
+reason in the append-only source event and shows it in History beside the exact Units. Migration
+0516 prevents a direct event write from omitting or inventing the reason. The existing `Service
+Case` door opens the linked Case. This correction does not claim the separate Service-owned urgent
+Work projection: it needs Service's own assessment/outcome completion fact and must be composed by
+the Service lane, not guessed by Delivery.
 - Logistics never promises refund/exchange, waives a condition, or debates eligibility.
 - A potentially contaminated item accepted in error is marked for Warehouse quarantine.
 
@@ -752,6 +765,12 @@ delivery` only when the DO carries `cod_instruction` from an approval granted be
 shipment's goods (`tripLinesOf`, the same derivation the DO page and the print path run); a
 service moves no Unit and is never a shortage. `Arriving after the requested date` comes from
 `deliveryArrivalStateOf`, the shared arrival reading; Delivery computes no arrival of its own.
+**Payment reads the same (2026-09-16).** `monitorGoodsOf`, the `Items, Services & Stock` panel and
+the two-line cell are shared with the Payment Monitor, which prints this cell for the whole Sales
+Order; and Delivery's confirmed day (DO → arrangement → confirmed booking, the customer leg) is the
+day Payment's collection clock and its Work item anchor on (`invoiceConfirmedDelivery`). A
+`Save confirmed delivery` therefore starts the collection clock; Delivery keeps sole write
+ownership of the date.
 
 **Chooser columns, off by default:** `State` · `Expected arrival` · `Accessories & services` ·
 `Confirmed Time` · `Building` · `Phone`. Sortable, filterable and exported. `Actions` and `Edit

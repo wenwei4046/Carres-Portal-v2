@@ -46,13 +46,16 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer, X } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
+import Button from "@/components/kit/Button";
+import Popover from "@/components/kit/Popover";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
@@ -67,6 +70,14 @@ export type DataGridColumn<T> = {
   label: string;
   /** Deliberate two-line presentation; label remains the accessible/export/filter name. */
   headerLines?: readonly [string, string];
+  /**
+   * ⭐ A CUT VALUE OPENS WHOLE (Listing Standard, owner approved 2026-09-16).
+   * Opt-in per column: the engine prints this string on one line and, ONLY
+   * when the cell actually cuts it, turns it into a kit `Popover` trigger that
+   * opens the full value by click or keyboard. A `title` hover alone is not a
+   * way to read a value. When set, it replaces `accessor` for the cell.
+   */
+  overflowText?: (row: T) => string;
   accessor: (row: T) => ReactNode;
   /** default width in px */
   width?: number;
@@ -176,6 +187,12 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** Governed groups reuse the same group rows without creating a fake data column. */
+  fixedGroups?: {
+    groups: readonly { key: string; label: string; initiallyCollapsed?: boolean; alwaysOpen?: boolean }[];
+    groupOf: (row: T) => string;
+    revealMatches?: boolean;
+  };
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
@@ -211,6 +228,14 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Opt-in Radix slate register palette (SO Batch first, owner ruling R5
+      2026-09-16): white toolbar/rows/footer, slate-3 header, blue-3 ticked
+      rows including pinned cells, slate-2 expansion. Omitted = unchanged. */
+  palette?: "slate";
+  /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
+      readable box when the toolbar has room, an icon that opens when narrow,
+      and an active query plus its clear control always visible. */
+  searchPresentation?: "icon" | "responsive";
   /** Keep frequent controls labelled while the container has room. */
   labelledToolbar?: boolean;
   /** Let a page's date/context controls wrap without clipping; retains icon controls. */
@@ -294,6 +319,14 @@ export type DataGridProps<T> = {
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
+  /** Optional truthful no-match state with a complete reset action. */
+  noMatchMessage?: string;
+  /**
+   * A failed read, drawn INSIDE the work surface (Listing Standard 2026-09-16).
+   * The toolbar stays — a page's create action does not depend on the list
+   * loading. Omitted = unchanged (the page decides what a failure looks like).
+   */
+  errorState?: ReactNode;
   isLoading?: boolean;
   /**
    * Right-click row menu. Receives the row and returns the items to show.
@@ -514,6 +547,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  fixedGroups,
   rowKey,
   searchPlaceholder = "Search…",
   exportName,
@@ -526,6 +560,8 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  palette,
+  searchPresentation = "icon",
   labelledToolbar = false,
   wrapToolbar = false,
   toolbar,
@@ -544,6 +580,8 @@ function DataGridInner<T>({
   rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
+  noMatchMessage,
+  errorState,
   isLoading = false,
   contextMenu,
   expandable,
@@ -588,14 +626,24 @@ function DataGridInner<T>({
   );
 
   const [search, setSearch] = useState(initialSearch);
+  /** Listing Standard 2026-09-16: below a 768px canvas a row checkbox gets a
+   *  40×40 hit area (its column widens to 40 so the target is not shared). */
+  const [narrowCanvas, setNarrowCanvas] = useState(false);
+  /** The ONE row that holds the grid's Tab stop (roving tabindex). */
+  const [activeRowKey, setActiveRowKey] = useState<string | null>(null);
+  /** A keyboard-opened row menu may be followed by the browser's own
+   *  `contextmenu` event for the same key press; that one is ignored. */
+  const keyboardMenuAt = useRef(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(fixedGroups?.groups.filter((g) => g.initiallyCollapsed).map((g) => g.key)));
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
   /** Right-click row menu — anchor point + the menu items resolved at open time. */
   const [rowCtx, setRowCtx] = useState<{
     x: number;
     y: number;
     items: DataGridContextMenuItem[];
+    /** Opened from the keyboard: focus returns here when it closes. */
+    returnFocus?: HTMLElement | null;
   } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [groupZoneActive, setGroupZoneActive] = useState(false);
@@ -643,6 +691,7 @@ function DataGridInner<T>({
      dropdown has its own scrollable value list (maxHeight 320 / overflow auto). */
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchIconRef = useRef<HTMLButtonElement>(null);
 
   // Refocus search when parent bumps focusSearchNonce ("Find" button).
   useEffect(() => {
@@ -673,7 +722,10 @@ function DataGridInner<T>({
     if (!rowCtx) return;
     const close = () => setRowCtx(null);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        rowCtx.returnFocus?.focus({ preventScroll: true });
+      }
     };
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
@@ -905,8 +957,8 @@ function DataGridInner<T>({
       synthetic.push({
         key: "__select__",
         label: "",
-        width: 30,
-        minWidth: 30,
+        width: narrowCanvas ? 40 : 30,
+        minWidth: narrowCanvas ? 40 : 30,
         sortable: false,
         groupable: false,
         accessor: () => null,
@@ -931,7 +983,7 @@ function DataGridInner<T>({
       });
     }
     return synthetic.length ? [...synthetic, ...base] : base;
-  }, [columns, layout.order, effectiveHidden, expandable, selectable]);
+  }, [columns, layout.order, effectiveHidden, expandable, selectable, narrowCanvas]);
 
   /**
    * ⭐ STICKY IDENTITY — which columns pin, and how far from the left edge.
@@ -1214,10 +1266,21 @@ function DataGridInner<T>({
   // ── Group rendering ───────────────────────────────────────────────
   // Multi-level groups produced as a flat list of render instructions.
   type Render =
-    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean }
+    | { kind: "group"; level: number; path: string; label: string; count: number; collapsed: boolean; alwaysOpen?: boolean }
     | { kind: "row"; row: T };
 
   const renderList: Render[] = useMemo(() => {
+    if (fixedGroups) {
+      return fixedGroups.groups.flatMap((group): Render[] => {
+        const members = sortedRows.filter((row) => fixedGroups.groupOf(row) === group.key);
+        /* The always-open group keeps its heading at 0 while the Register has
+           records, so "nothing to buy" is stated rather than implied. */
+        if (members.length === 0 && !(group.alwaysOpen && sortedRows.length > 0)) return [];
+        const collapsed = !group.alwaysOpen && collapsedGroups.has(group.key);
+        return [{ kind: "group", level: 0, path: group.key, label: group.label, count: members.length, collapsed, alwaysOpen: group.alwaysOpen },
+          ...(collapsed ? [] : members.map((row) => ({ kind: "row" as const, row })))];
+      });
+    }
     if (layout.groupBy.length === 0) return sortedRows.map((row) => ({ kind: "row" as const, row }));
 
     const out: Render[] = [];
@@ -1271,7 +1334,48 @@ function DataGridInner<T>({
     };
     walk(root, 0, "");
     return out;
-  }, [sortedRows, layout.groupBy, columns, collapsedGroups]);
+  }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
+
+  /* The no-match state carries its own complete `Clear filters`; the condition
+     strip above it then keeps its removable chips but not a second, identical
+     button (one act, one control on screen). */
+  const noMatchShowing =
+    !isLoading && errorState == null && renderList.length === 0 && noMatchMessage != null &&
+    (rows.length > 0 || emptyMessage === noMatchMessage);
+
+  /* The row holding the Tab stop: the last row the operator focused while it
+     is still on screen, else the first row. */
+  const rovingRowKey = useMemo(() => {
+    let first: string | null = null;
+    for (const item of renderList) {
+      if (item.kind !== "row") continue;
+      const k = rowKey(item.row);
+      if (k === activeRowKey) return k;
+      first ??= k;
+    }
+    return first;
+  }, [renderList, activeRowKey, rowKey]);
+
+  /* ⭐ A MATCH IS NEVER HIDDEN IN A COLLAPSED GROUP (owner ruling R1). While a
+     search, column filter or page filter narrows the Register, every governed
+     group opens once; the operator may still close one. Clearing the
+     narrowing puts back the open/closed state the operator had before it. */
+  const fixedGroupReveal = fixedGroups != null &&
+    (fixedGroups.revealMatches === true || debouncedSearch.trim() !== "" || filteredRows.length !== rows.length);
+  const collapsedBeforeReveal = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!fixedGroups) return;
+    if (fixedGroupReveal) {
+      setCollapsedGroups((prev) => {
+        collapsedBeforeReveal.current = prev;
+        return new Set();
+      });
+    } else if (collapsedBeforeReveal.current) {
+      setCollapsedGroups(collapsedBeforeReveal.current);
+      collapsedBeforeReveal.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixedGroupReveal]);
 
   // ── Column DnD (reorder) ──────────────────────────────────────────
   const onDragStartHeader = (e: DragEvent<HTMLTableCellElement>, key: string) => {
@@ -1529,7 +1633,12 @@ function DataGridInner<T>({
   useEffect(() => {
     const viewport = scrollRef.current;
     if (!viewport || typeof ResizeObserver === "undefined") return;
-    const measure = () => setEmptyViewportWidth(viewport.clientWidth);
+    const measure = () => {
+      setEmptyViewportWidth(viewport.clientWidth);
+      /* The CANVAS decides, not the device: a register squeezed below 768px
+         inside a wide window is a touch-sized target problem all the same. */
+      setNarrowCanvas(viewport.clientWidth > 0 && viewport.clientWidth < 768);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(viewport);
@@ -1558,7 +1667,7 @@ function DataGridInner<T>({
   }, [revealKey, expandedRows, renderList]);
   const VIRTUAL_THRESHOLD = 25;
   const canVirtualize =
-    !isLoading && !embedded && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
+    !isLoading && !embedded && !fixedGroups && groupedCount === 0 && !expandable && renderList.length > VIRTUAL_THRESHOLD;
   const rowVirtualizer = useVirtualizer({
     enabled: canVirtualize,
     count: canVirtualize ? renderList.length : 0,
@@ -1575,9 +1684,41 @@ function DataGridInner<T>({
   /* One grid row (group banner OR data row + optional expansion). Extracted so
      the normal path and the virtualized window render through the same code. */
   const renderGridRow = (item: Render, idx: number) => {
+    if (item.kind === "group" && fixedGroups) {
+      /* Governed groups: the always-open group is a HEADING, never a control;
+         a collapsible group is a real button announcing its state. Both stay
+         pinned to the visible left edge while the sheet scrolls sideways. */
+      return (
+        <tr key={`g-${item.path}`} className={`${styles.groupRow} ${styles.fixedGroupRow}`} data-testid={`grid-group-${item.path}`}>
+          <td className={styles.groupRowCell} colSpan={totalCols || 1}>
+            {item.alwaysOpen ? (
+              <span role="heading" aria-level={3} tabIndex={0} className={styles.fixedGroupLabel}>
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.fixedGroupLabel} ${styles.fixedGroupToggle}`}
+                aria-expanded={!item.collapsed}
+                data-testid={`grid-group-toggle-${item.path}`}
+                onClick={() => toggleGroup(item.path)}
+              >
+                <ChevronRight size={14} strokeWidth={2} aria-hidden className={item.collapsed ? undefined : styles.fixedGroupChevronOpen} />
+                {item.label}
+                <span className={styles.groupCount}>{item.count}</span>
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+    }
     if (item.kind === "group") {
       return (
-        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => toggleGroup(item.path)}>
+        <tr key={`g-${item.path}`} className={styles.groupRow} onClick={() => { if (!item.alwaysOpen) toggleGroup(item.path); }}
+          tabIndex={item.alwaysOpen ? undefined : 0}
+          aria-expanded={!item.collapsed}
+          onKeyDown={(event) => { if (!item.alwaysOpen && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); toggleGroup(item.path); } }}>
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
@@ -1599,7 +1740,11 @@ function DataGridInner<T>({
         <tr
           data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
-          className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
+          className={`${styles.tr} ${
+            palette === "slate"
+              ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
+              : selectedKey === key ? styles.trSelected : ""
+          }`}
           style={{
             ...rowStyle?.(row),
             ...(selectable || onRowClick || expandKey != null ? { cursor: "pointer" } : {}),
@@ -1619,11 +1764,67 @@ function DataGridInner<T>({
           onDoubleClick={() => onRowDoubleClick?.(row)}
           onContextMenu={(e) => {
             if (!contextMenu) return;
+            if (performance.now() - keyboardMenuAt.current < 500) {
+              e.preventDefault();
+              return;
+            }
             const items = contextMenu(row);
             if (!items || items.length === 0) return;
             e.preventDefault();
             setSelectedKey(key);
             setRowCtx({ x: e.clientX, y: e.clientY, items });
+          }}
+          /* ⭐ ONE TAB STOP, ARROWS BETWEEN ROWS (Listing Standard 2026-09-16).
+             The grid is one stop in the page's Tab order; ↑/↓ move row to row,
+             Enter opens what a double-click opens, Space ticks, → / ← open and
+             close the expansion, and Shift+F10 or the Menu key opens the same
+             row menu a right-click does — from the row or from any control
+             inside it. Controls inside a row keep their own keys. */
+          data-row-nav=""
+          tabIndex={key === rovingRowKey ? 0 : -1}
+          onFocus={(e) => {
+            if (e.target === e.currentTarget) setActiveRowKey(key);
+          }}
+          onKeyDown={(e) => {
+            const tr = e.currentTarget;
+            if (contextMenu && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+              const items = contextMenu(row);
+              if (!items || items.length === 0) return;
+              e.preventDefault();
+              e.stopPropagation();
+              keyboardMenuAt.current = performance.now();
+              const origin = (e.target as HTMLElement).getBoundingClientRect();
+              setSelectedKey(key);
+              setRowCtx({
+                x: Math.round(origin.left + 8),
+                y: Math.round(origin.bottom),
+                items,
+                returnFocus: e.target as HTMLElement,
+              });
+              return;
+            }
+            if (e.target !== tr) return;
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              const all = Array.from(
+                tr.closest("tbody")?.querySelectorAll<HTMLTableRowElement>("tr[data-row-nav]") ?? [],
+              );
+              const next = all[all.indexOf(tr) + (e.key === "ArrowDown" ? 1 : -1)];
+              if (next) {
+                e.preventDefault();
+                next.focus();
+              }
+            } else if (e.key === "Enter") {
+              if (onRowDoubleClick) onRowDoubleClick(row);
+              else onRowClick?.(row);
+            } else if (e.key === " " && selectable && (selectable.isSelectable?.(row as never) ?? true)) {
+              e.preventDefault();
+              selectable.onToggle(key);
+            } else if (expandable && expandKey != null && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+              if ((e.key === "ArrowRight") !== isExpanded) {
+                e.preventDefault();
+                toggleExpand(expandKey);
+              }
+            }
           }}
         >
           {visibleColumns.map((col) => {
@@ -1633,9 +1834,17 @@ function DataGridInner<T>({
                 <td
                   key={col.key}
                   className={`${styles.td}${pinClass(col.key)}`}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
+                  style={{
+                    width: w,
+                    maxWidth: w,
+                    padding: narrowCanvas ? 0 : "4px 6px",
+                    textAlign: "center",
+                    ...(narrowCanvas ? { overflow: "visible" } : {}),
+                    ...pinStyle(col.key),
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <label className={narrowCanvas ? styles.checkHitNarrow : styles.checkHit}>
                   <input
                     type="checkbox"
                     aria-label="Select row"
@@ -1649,6 +1858,7 @@ function DataGridInner<T>({
                     }}
                     onChange={() => selectable.onToggle(key)}
                   />
+                  </label>
                 </td>
               );
             }
@@ -1713,7 +1923,9 @@ function DataGridInner<T>({
                system stops mixing blanks and dashes. 0 / false / JSX elements
                are preserved (a real 0 must show as 0); synthetic columns
                (__expand__ / __select__) render nothing, not a dash. */
-            const content = col.accessor(row);
+            const content = col.overflowText
+              ? <OverflowText text={col.overflowText(row)} label={col.label} />
+              : col.accessor(row);
             const isEmpty = content == null || content === "";
             const wrapClass = col.wrap ? ` ${styles.tdWrap}` : "";
             /* ⭐ TRIGGER COLUMN — the arrow and the content are ONE expansion
@@ -1788,7 +2000,7 @@ function DataGridInner<T>({
           })}
         </tr>
         {isExpanded && expandable && (
-          <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
+          <tr className={`${styles.tr} ${styles.trExpansion}`} style={{ background: "var(--grid-expansion, var(--c-cream))" }}>
             {/* The gutter, kept EMPTY beside the child rows — the indent IS
                 the parent-child link (owner ruling 2026-08-15). */}
             {expansionGutter.map((key) => (
@@ -1826,6 +2038,8 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        palette === "slate" ? styles.rootPaletteSlate : null,
+        searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
         labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
@@ -1842,7 +2056,70 @@ function DataGridInner<T>({
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
-        {!embedded && (
+        {!embedded && searchPresentation === "responsive" ? (
+          /* R4 (owner ruling 2026-09-16): both forms are rendered and the
+             TOOLBAR's own width chooses (container query), so a narrow canvas
+             inside a wide window still gets the icon. An active query keeps
+             the box and its clear control on screen at every width. */
+          <>
+            <button
+              ref={searchIconRef}
+              type="button"
+              aria-label="Search"
+              title="Search"
+              data-testid="search-icon"
+              data-hidden={searchOpen || search !== "" ? "true" : undefined}
+              className={`${styles.toolbarIcon} ${styles.searchResponsiveIcon}`}
+              onClick={() => {
+                setSearchOpen(true);
+                requestAnimationFrame(() => searchRef.current?.focus());
+              }}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+            </button>
+            <div
+              className={`${styles.searchWrap} ${styles.searchResponsiveBox}`}
+              data-testid="search-box"
+              data-active={searchOpen || search !== "" ? "true" : undefined}
+            >
+              <Search size={14} strokeWidth={2} aria-hidden />
+              <input
+                ref={searchRef}
+                className={styles.searchInput}
+                type="search"
+                aria-label="Search"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearch("");
+                    setSearchOpen(false);
+                    requestAnimationFrame(() => {
+                      if (searchIconRef.current && getComputedStyle(searchIconRef.current).display !== "none") searchIconRef.current.focus();
+                    });
+                  }
+                }}
+                onBlur={() => { if (!search) setSearchOpen(false); }}
+              />
+              {search !== "" && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  data-testid="search-clear"
+                  className={styles.searchClear}
+                  onClick={() => {
+                    setSearch("");
+                    searchRef.current?.focus();
+                  }}
+                >
+                  <X size={14} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </div>
+          </>
+        ) : !embedded && (
           isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
@@ -2025,10 +2302,10 @@ function DataGridInner<T>({
                     type="button"
                     className={styles.columnsMenuReset}
                     onClick={resetColumns}
-                    title="Reset to defaults"
+                    title="Reset columns"
                   >
                     <RotateCcw size={12} strokeWidth={1.75} aria-hidden />
-                    <span>Reset</span>
+                    <span>Reset columns</span>
                   </button>
                 </header>
                 <div className={styles.columnsMenuBody}>
@@ -2178,7 +2455,14 @@ function DataGridInner<T>({
               }),
           })),
         ];
-        const chips = [...(activeConditions ?? []), ...columnChips];
+        /* Listing Standard 2026-09-16: with the governed Register search, an
+           active query IS a condition — listed here and cleared by the same
+           `Clear filters` (which also returns a server search to the whole
+           population through `onSearchChange`). */
+        const searchChips = searchPresentation === "responsive" && search.trim() !== ""
+          ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
+          : [];
+        const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
         if (chips.length === 0) return null;
         return (
           <div className={styles.conditionBar} data-testid="active-conditions">
@@ -2199,11 +2483,13 @@ function DataGridInner<T>({
                 </button>
               </span>
             ))}
+            {!noMatchShowing && (
             <button
               type="button"
               className={styles.conditionClear}
               data-testid="clear-filters"
               onClick={() => {
+                if (searchPresentation === "responsive") setSearch("");
                 setFilters({});
                 setDateFilters({});
                 setNumberFilters({});
@@ -2213,6 +2499,7 @@ function DataGridInner<T>({
             >
               Clear filters
             </button>
+            )}
           </div>
         );
       })()}
@@ -2365,18 +2652,25 @@ function DataGridInner<T>({
           </thead>
           <tbody className={styles.tbody}>
             {isLoading && <SkeletonRows cols={totalCols || 1} rows={12} />}
-            {!isLoading && renderList.length === 0 && (
+            {!isLoading && errorState != null && (
               <tr>
                 <td colSpan={totalCols || 1} style={{ padding: 0 }}>
-                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{emptyMessage}</div>
+                  <div data-testid="grid-error" style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{errorState}</div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && errorState == null && renderList.length === 0 && (
+              <tr>
+                <td colSpan={totalCols || 1} style={{ padding: 0 }}>
+                  <div className={styles.empty} style={{ position: "sticky", left: 0, width: emptyViewportWidth, boxSizing: "border-box", whiteSpace: "normal" }}>{noMatchShowing ? <>{noMatchMessage}<Button variant="neutral" size="md" onClick={() => { setSearch(""); setFilters({}); setDateFilters({}); setNumberFilters({}); setDateRangeFilters({}); onClearConditions?.(); }}>Clear filters</Button></> : emptyMessage}</div>
                 </td>
               </tr>
             )}
             {/* Small / grouped / expandable lists: render every row (unchanged). */}
-            {!isLoading && !canVirtualize && renderList.map((item, idx) => renderGridRow(item, idx))}
+            {!isLoading && errorState == null && !canVirtualize && renderList.map((item, idx) => renderGridRow(item, idx))}
             {/* Large flat lists: windowed — only the visible slice is in the DOM,
                with spacer rows reserving the scroll height above and below. */}
-            {!isLoading && canVirtualize && (
+            {!isLoading && errorState == null && canVirtualize && (
               <>
                 {padTop > 0 && (
                   <tr aria-hidden="true">
@@ -2425,7 +2719,9 @@ function DataGridInner<T>({
         <div className={styles.statusLine} data-testid={isReference ? "grid-footer" : undefined}>
           {isLoading
             ? <span>Loading…</span>
-            : statusSummary
+            : errorState != null
+              ? null
+              : statusSummary
               ? statusSummary(sortedRows, selectedVisibleRows)
               : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
@@ -2743,15 +3039,40 @@ function DataGridInner<T>({
       {rowCtx && (
         <div
           className={styles.contextMenu}
+          role="menu"
+          aria-label="Row actions"
           style={{ top: rowCtx.y, left: rowCtx.x }}
           onClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
+          ref={(el) => {
+            /* The menu takes focus when it opens, so the keyboard lands on
+               its first act — never somewhere down the page. */
+            if (el && !el.contains(document.activeElement)) {
+              el.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus({ preventScroll: true });
+            }
+          }}
+          onKeyDown={(e) => {
+            const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitem]"));
+            const at = items.indexOf(document.activeElement as HTMLButtonElement);
+            const go = (i: number) => items[(i + items.length) % items.length]?.focus({ preventScroll: true });
+            if (e.key === "ArrowDown") { e.preventDefault(); go(at + 1); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); go(at - 1); }
+            else if (e.key === "Home") { e.preventDefault(); go(0); }
+            else if (e.key === "End") { e.preventDefault(); go(items.length - 1); }
+            else if (e.key === "Tab") {
+              e.preventDefault();
+              setRowCtx(null);
+              rowCtx.returnFocus?.focus({ preventScroll: true });
+            }
+          }}
         >
           {rowCtx.items.map((it, i) => {
-            if (it.divider) return <div key={`d-${i}`} className={styles.contextMenuDivider} />;
+            if (it.divider) return <div key={`d-${i}`} role="separator" className={styles.contextMenuDivider} />;
             return (
               <button
                 key={`i-${i}-${it.label}`}
+                type="button"
+                role="menuitem"
                 className={`${styles.contextMenuItem} ${it.danger ? styles.contextMenuDanger : ""}`}
                 onClick={() => {
                   // Close before firing — handlers may navigate or open
@@ -2767,6 +3088,51 @@ function DataGridInner<T>({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One line of text that, only when the cell cuts it, becomes a kit Popover
+ * trigger showing the whole value (Listing Standard 2026-09-16). Measured on
+ * the element itself, so resizing a column turns the door on or off.
+ */
+function OverflowText({ text, label }: { text: string; label: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setCut(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, cut]);
+  const line = (
+    <span ref={ref} className={styles.overflowText}>
+      {text}
+    </span>
+  );
+  if (!cut) return line;
+  return (
+    <Popover
+      label={label}
+      trigger={
+        <button
+          type="button"
+          className={styles.overflowTrigger}
+          aria-label={`${label}: ${text}`}
+          data-testid="cell-overflow"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {line}
+        </button>
+      }
+    >
+      <p className="max-w-[320px] whitespace-normal break-words text-body text-kit-slate-12">{text}</p>
+    </Popover>
   );
 }
 

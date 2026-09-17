@@ -11,6 +11,10 @@ import {
 } from "./delivery-proof";
 
 describe("Proof and its review — Delivery MASTER §6.1 (0489)", () => {
+  const requestEvidence = {
+    sourceVersion: "2026-09-16T01:00:00.000Z",
+    idempotencyKey: "00000000-0000-4000-8000-000000000001",
+  };
   it("the three review words are the MASTER's, and each key spells its word", () => {
     expect(PROOF_DECISIONS.map((d) => d.label)).toEqual([
       "Proof Accepted",
@@ -22,13 +26,23 @@ describe("Proof and its review — Delivery MASTER §6.1 (0489)", () => {
   });
 
   it("a decision that asks for more, or refuses, must say why; acceptance needs no reason", () => {
-    expect(proofReviewInput.safeParse({ decision: "accepted" }).success).toBe(true);
-    expect(proofReviewInput.safeParse({ decision: "rejected", reason: " " }).success).toBe(false);
-    expect(proofReviewInput.safeParse({ decision: "more_required" }).success).toBe(false);
+    expect(proofReviewInput.safeParse({
+      decision: "accepted",
+      sourceVersion: "2026-09-16T01:00:00.000Z",
+      idempotencyKey: "00000000-0000-4000-8000-000000000001",
+    }).success).toBe(true);
+    expect(proofReviewInput.safeParse({ ...requestEvidence, decision: "rejected", reason: " " }).success).toBe(false);
+    expect(proofReviewInput.safeParse({ ...requestEvidence, decision: "more_required" }).success).toBe(false);
     expect(
-      proofReviewInput.safeParse({ decision: "rejected", reason: "Photo shows the lobby, not the goods" }).success,
+      proofReviewInput.safeParse({ ...requestEvidence, decision: "rejected", reason: "Photo shows the lobby, not the goods" }).success,
     ).toBe(true);
-    expect(proofReviewInput.safeParse({ decision: "approved" }).success).toBe(false);
+    expect(proofReviewInput.safeParse({ ...requestEvidence, decision: "approved" }).success).toBe(false);
+  });
+
+  it("requires the exact evidence version and one retry key", () => {
+    expect(proofReviewInput.safeParse({ decision: "accepted" }).success).toBe(false);
+    expect(proofReviewInput.safeParse({ ...requestEvidence, sourceVersion: "yesterday", decision: "accepted" }).success).toBe(false);
+    expect(proofReviewInput.safeParse({ ...requestEvidence, idempotencyKey: "retry", decision: "accepted" }).success).toBe(false);
   });
 
   it("evidence is a photo, a video or a document, at least one file per act", () => {

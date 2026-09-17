@@ -25,6 +25,7 @@ import {
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
+import Checkbox from "@/components/kit/Checkbox";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 
 /**
@@ -472,6 +473,7 @@ function ReceivingMode({
   /** ONE key per Session entry — the idempotency contract (0426): a retried
    *  uncertain Save returns the first posting, never a second GRN. */
   const [saveKey] = useState(() => crypto.randomUUID());
+  const [confirmedInput, setConfirmedInput] = useState<string | null>(null);
 
   /** The governed Units still expected, grouped by the LINE they were born
    *  for (0442 `po_line_id`) — two lines of one SKU are two lines. */
@@ -592,13 +594,20 @@ function ReceivingMode({
 
   /** THE RECEIVING BUTTON LAW — one shared copy (COPY-STANDARD): the button
    *  names the FIRST missing fact, top to bottom. */
+  // Confirmation belongs to this exact draft. Editing any receipt fact or
+  // evidence invalidates it; retrying an unchanged failed save retains it.
+  const inputSnapshot = JSON.stringify({
+    doNumber, doFilePath, goodsReceivedAt, actualSiteId, note,
+    arrivalEvidence, extraLines, lineViews, unitStates,
+  });
+  const resultsConfirmed = confirmedInput === inputSnapshot;
   const blocker = receivingSaveBlocker({
     doNumber,
     doFilePath,
     counted,
     overCounted,
     claimProblems,
-  });
+  }) ?? (resultsConfirmed ? null : "Save — confirm receiving results");
 
   function submit() {
     if (blocker || !doFilePath || save.isPending) return;
@@ -672,6 +681,10 @@ function ReceivingMode({
           {po.id}
         </span>
       </div>
+      <p className="mt-2 text-body text-kit-amber-11" role="status">
+        {resultsConfirmed ? "Receiving results confirmed. Not saved yet."
+          : "Prefilled results are not confirmed. Check the goods before saving."}
+      </p>
 
       {/* 2 · Receiving Details */}
       <Section title="Receiving Details">
@@ -1012,6 +1025,7 @@ function ReceivingMode({
 
       {/* 5 · Receiving Summary (live) + 6 · what saving will do */}
       <Section title="Receiving Summary">
+        <p className="mb-2 text-meta text-kit-slate-11">Proposed results · not saved</p>
         <Prop label="Received Qty">
           <span className="tabular-nums" data-testid="live-received-qty">
             {lineViews.reduce((s, v) => s + v.receivedNow, 0)}
@@ -1035,6 +1049,13 @@ function ReceivingMode({
           extra goods never become available stock. A claim opens only when a
           recorded issue needs one.
         </div>
+        <Checkbox
+          id="receiving-results-confirmed"
+          label="I checked the goods and confirm these receiving results."
+          checked={resultsConfirmed}
+          disabled={save.isPending}
+          onCheckedChange={(checked) => setConfirmedInput(checked ? inputSnapshot : null)}
+        />
       </Section>
 
       {err && (

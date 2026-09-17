@@ -138,6 +138,10 @@
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
 .toolbar {
+  /* Never shrink: a wrapped toolbar inside the fixed-height register column
+     was squeezed below its own rows and its last row slid under the table
+     header (390px, measured 2026-09-16). */
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -576,6 +580,12 @@ div:first-child > .columnsMenuGroup {
   background: var(--c-orange);
   opacity: 0.4;
 }
+/* The last column's handle stays inside the table: straddling the edge by 3px
+   gave every register that exactly fills its width a phantom sideways scroll
+   (measured 2026-09-16: grid 1140 · scroll 1143, the only overflowing node). */
+.th:last-child > .resizeHandle {
+  right: 0;
+}
 
 .tbody {
   background: var(--c-paper);
@@ -953,4 +963,267 @@ div:first-child > .columnsMenuGroup {
 .headerLines {
   white-space: nowrap;
   line-height: inherit;
+}
+
+/* ── RESPONSIVE REGISTER SEARCH — owner ruling R4, 2026-09-16 ─────────────
+   Opt-in (`searchPresentation="responsive"`), adopted on SO Batch first. The
+   toolbar's OWN width decides, never the device: with room the search box is
+   always readable; narrow, an icon opens it. An active query keeps the box and
+   its clear control visible at every width. Selection still replaces the
+   toolbar in place. */
+.rootSearchResponsive .toolbar {
+  container: grid-toolbar / inline-size;
+}
+.searchResponsiveBox {
+  display: none;
+  /* 340 = the governed placeholder (274px at 12px Inter) + icon, gaps, clear. */
+  flex: 0 1 340px;
+  min-width: 0;
+  width: auto;
+  height: 28px;
+  box-sizing: border-box;
+}
+.searchResponsiveBox[data-active="true"] {
+  display: inline-flex;
+  min-width: 132px;
+}
+.searchResponsiveIcon[data-hidden="true"] {
+  display: none;
+}
+@container grid-toolbar (min-width: 520px) {
+  .searchResponsiveBox {
+    display: inline-flex;
+    min-width: 160px;
+  }
+  .searchResponsiveIcon {
+    display: none;
+  }
+}
+.searchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.searchClear:hover {
+  background: var(--c-cream);
+  color: var(--c-ink);
+}
+.searchWrap:focus-within {
+  border-color: theme("colors.kit.blue.9");
+}
+
+/* ── SLATE REGISTER PALETTE — owner ruling R5, 2026-09-16 ─────────────────
+   Opt-in (`palette="slate"`), SO Batch Purchase first. Radix steps through the
+   existing kit role names; no hex, no page canvas or control-border change. */
+.rootPaletteSlate {
+  --c-paper: theme("colors.white");
+  --c-cream: theme("colors.kit.slate.3");
+  --c-ink: theme("colors.kit.slate.12");
+  --line: theme("colors.kit.slate.5");
+  --fg-muted: theme("colors.kit.slate.11");
+  --fg-soft: theme("colors.kit.slate.11");
+  --grid-expansion: theme("colors.kit.slate.2");
+}
+.rootPaletteSlate .toolbar,
+.rootPaletteSlate .statusLine {
+  background: theme("colors.white");
+}
+.rootPaletteSlate .statusLine {
+  color: theme("colors.kit.slate.11");
+  font-size: var(--fs-12);
+}
+.rootPaletteSlate .thead,
+.rootPaletteSlate .th,
+.rootPaletteSlate .thead .stickyCell {
+  background: theme("colors.kit.slate.3");
+}
+.rootPaletteSlate .th {
+  color: theme("colors.kit.slate.11");
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.rootPaletteSlate .sortArrow {
+  color: theme("colors.kit.slate.11");
+}
+.rootPaletteSlate .tr:hover,
+.rootPaletteSlate .tr:hover .stickyCell {
+  background: theme("colors.kit.slate.3");
+}
+/* A ticked row is in the batch: blue-3 across the WHOLE row, pinned cells
+   included, and it outranks hover. An expanded row that is not ticked stays
+   white. */
+.rootPaletteSlate .trTicked,
+.rootPaletteSlate .trTicked .stickyCell,
+.rootPaletteSlate .trTicked:hover,
+.rootPaletteSlate .trTicked:hover .stickyCell {
+  background: theme("colors.kit.blue.3");
+}
+.rootPaletteSlate .trExpansion,
+.rootPaletteSlate .trExpansion:hover {
+  background: theme("colors.kit.slate.2") !important;
+}
+.rootPaletteSlate .toolbarIcon,
+.rootPaletteSlate .toolbarPill {
+  color: theme("colors.kit.slate.11");
+}
+.rootPaletteSlate .toolbarIcon svg,
+.rootPaletteSlate .toolbarPill svg {
+  stroke-width: 2;
+}
+.rootPaletteSlate button:focus-visible,
+.rootPaletteSlate input[type="checkbox"]:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: 1px;
+}
+
+/* Governed group headings (fixedGroups): white band, 13px/600, 38px minimum,
+   the label vertically centred and pinned to the visible left edge. */
+.fixedGroupRow,
+.fixedGroupRow:hover {
+  background: theme("colors.white");
+  cursor: default;
+}
+.fixedGroupRow .groupRowCell {
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0;
+  vertical-align: middle;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: theme("colors.kit.slate.12");
+}
+.fixedGroupLabel {
+  position: sticky;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  font: inherit;
+  color: inherit;
+}
+.fixedGroupLabel .groupCount {
+  margin-left: 2px;
+  font-weight: 400;
+  color: theme("colors.kit.slate.11");
+}
+.fixedGroupToggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.fixedGroupToggle:hover {
+  background: theme("colors.kit.slate.3");
+}
+.fixedGroupToggle svg {
+  color: theme("colors.kit.slate.11");
+  transition: transform 120ms ease;
+}
+.fixedGroupChevronOpen {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fixedGroupToggle svg {
+    transition: none;
+  }
+}
+/* A wrapped text column stays on the row's centre line while it is one line
+   long, so it never sits 4px above its neighbours. */
+.rootPaletteSlate .tdWrap {
+  vertical-align: middle;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* Measured 2026-09-16: blue-11 link ink on a blue-3 ticked row is 4.25:1,
+   under AA for 13px text. Inside a ticked row a link keeps its underline and
+   takes slate-12 ink (≈15:1) instead of dropping below the contrast floor. */
+.rootPaletteSlate .trTicked :global(.text-kit-blue-11) {
+  color: theme("colors.kit.slate.12");
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── LISTING STANDARD 2026-09-16 — shared keyboard, touch and overflow ───── */
+/* The condition strip never shrinks under the table either. */
+.conditionBar {
+  flex: none;
+}
+/* A focused row shows a ring the pinned cells cannot paint over. */
+.tr:focus {
+  outline: none;
+}
+.tr:focus-visible > td {
+  box-shadow: inset 0 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.tr:focus-visible > td:first-child {
+  box-shadow: inset 2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.tr:focus-visible > td:last-child {
+  box-shadow: inset -2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
+}
+.fixedGroupLabel:focus-visible,
+.contextMenuItem:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
+}
+.contextMenuItem:focus {
+  background: var(--c-cream);
+}
+.checkHit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Below a 768px canvas: a 40×40 target around the row checkbox. */
+.checkHitNarrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: -1px 0;
+  cursor: pointer;
+}
+.overflowText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overflowTrigger {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.overflowTrigger:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
 }

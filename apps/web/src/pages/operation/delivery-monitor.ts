@@ -865,57 +865,16 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        the document page and the print path run (Law D), and a row with no
        document yet is the whole order by that function's own rule. */
     const lines = tripLinesOf(row.o.order_lines ?? [], doc?.trip_groups);
-    const physical = lines
-      .map((l, index) => ({ index, sku: l.sku, qty: l.qty }))
-      .filter((l) => lineKind(l.sku) !== "service");
-    const units = row.o.allocated_units ?? [];
-    const readiness = deliveryStockReadinessOf(physical, units);
-    const totalQty = physical.reduce((sum, l) => sum + Number(l.qty || 0), 0);
-    const shortByLineIndex = new Map<number, number>();
-    lineShortagesOf(physical, units).forEach((s, i) => {
-      shortByLineIndex.set(physical[i]!.index, s.shortQty);
+    const goods = monitorGoodsOf({
+      o: row.o,
+      lines,
+      leg: row.leg,
+      requestedIso: row.customerDeliveryIso,
+      todayIso: input.todayIso,
+      holidays,
+      addonNameByKey: input.addonNameByKey,
     });
-    const items: MonitorGoodsLine[] = [];
-    const extras: MonitorExtraLine[] = [];
-    lines.forEach((line, index) => {
-      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(line.sku.trim().toUpperCase())) return;
-      const kind = lineKind(line.sku);
-      const entry: MonitorGoodsLine = {
-        key: line.id ?? `${line.sku}-${index}`,
-        lineId: line.id ?? null,
-        sku: line.sku,
-        name: lineName(line),
-        category: goodsCategoryWordOf(line),
-        qty: line.qty,
-        shortQty: shortByLineIndex.get(index) ?? 0,
-        receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units, row.o.incoming_units),
-      };
-      /* `unknown` is a physical thing nobody recognised — it travels on the
-         truck, so it belongs with the MAIN goods, never buried under the
-         pillows (line-category's own D9 ruling). */
-      if (kind === "core" || kind === "unknown") items.push(entry);
-      else if (kind === "service") extras.push({ ...entry, kind: "service", shortQty: 0 });
-      else extras.push({ ...entry, kind: "accessory" });
-    });
-    for (const [index, addon] of (row.o.order_addons ?? []).entries()) {
-      const key = addon.addon_key ?? "";
-      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(key.toUpperCase())) continue;
-      extras.push({
-        key: `addon-${index}-${key}`,
-        lineId: null,
-        sku: key,
-        name: addonName(key, input.addonNameByKey),
-        category: "Service",
-        qty: addon.qty,
-        shortQty: 0,
-        kind: "service",
-      });
-    }
-    if ((row.o.delivery_stair_items ?? 0) > 0) extras.push({
-      key: "stair-carry", lineId: null, sku: "STAIR_CARRY", category: "Service", kind: "service",
-      name: MONITOR_COPY.stairCarry(row.o.delivery_stair_items!, row.o.delivery_floor ?? null),
-      qty: row.o.delivery_stair_items!, shortQty: 0,
-    });
+    const { readiness, items, extras } = goods;
     const contactDueIso = row.contactDueIso;
     /* The arrangement is COMPLETE only with a day AND a window on it. */
     const booked = row.confirmedIso !== null && row.confirmedTime !== null;
@@ -958,14 +917,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       extras,
       siteAccess: siteAccessOf(row.o),
       readiness,
-      arrival: deliveryArrivalStateOf({
-        arrivals: row.o.po_arrivals ?? [],
-        readiness,
-        todayIso: input.todayIso,
-        /* The arrival-check clock counts on the same holidays as every other
-           Carres clock — handed in, never read from a second source. */
-        holidays,
-      }),
+      arrival: goods.arrival,
       contactDueIso,
       /* ⭐ A DATE WITHOUT AN AGREED TIME IS NOT A BOOKING (owner ruling
          2026-09-11). A customer who has been given a day but no window has not
@@ -981,19 +933,105 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         contactDueIso !== null && contactDueIso < input.todayIso && !booked && !settled,
       scope: row,
       payment: monitorPaymentOf(row.o),
-      stock: monitorStockOf({
-        readiness,
-        totalQty,
-        arrival: deliveryArrivalStateOf({
-          arrivals: row.o.po_arrivals ?? [],
-          readiness,
-          todayIso: input.todayIso,
-          holidays,
-        }),
-        requestedIso: row.customerDeliveryIso,
-      }),
+      stock: goods.stock,
     };
   });
+}
+
+/**
+ * ⭐ THE GOODS, THE STOCK AND THE ARRIVAL OF ONE SHIPMENT — the ONE arithmetic
+ * behind `Items & Stock` and the `Items, Services & Stock` panel (§8.3 · §8.5).
+ *
+ * Extracted from `buildDeliveryMonitorCards` unchanged (Payment Monitor Card
+ * 02, 2026-09-16) so a surface that is not Delivery — the Payment Monitor —
+ * reads Ready / Not ready over the SAME register rows, the same shortage and
+ * the same arrival reader, rather than keeping a second opinion about whether
+ * the goods are in. `lines` is the shipment's goods: a Delivery row passes its
+ * trip's lines; an order with no Delivery row passes the whole order.
+ */
+export function monitorGoodsOf(input: {
+  o: DeliveryScopeRow["o"];
+  lines: DeliveryScopeRow["o"]["order_lines"];
+  leg: number | null;
+  requestedIso: string | null;
+  todayIso: string;
+  holidays: ReadonlySet<string>;
+  addonNameByKey?: Map<string, string>;
+}): {
+  readiness: DeliveryStockReadiness;
+  arrival: DeliveryArrivalState;
+  stock: MonitorStock;
+  items: MonitorGoodsLine[];
+  extras: MonitorExtraLine[];
+} {
+  const row = { o: input.o, leg: input.leg };
+  const lines = input.lines ?? [];
+  const physical = lines
+    .map((l, index) => ({ index, sku: l.sku, qty: l.qty }))
+    .filter((l) => lineKind(l.sku) !== "service");
+  const units = row.o.allocated_units ?? [];
+  const readiness = deliveryStockReadinessOf(physical, units);
+  const totalQty = physical.reduce((sum, l) => sum + Number(l.qty || 0), 0);
+  const shortByLineIndex = new Map<number, number>();
+  lineShortagesOf(physical, units).forEach((s, i) => {
+    shortByLineIndex.set(physical[i]!.index, s.shortQty);
+  });
+  const items: MonitorGoodsLine[] = [];
+  const extras: MonitorExtraLine[] = [];
+  lines.forEach((line, index) => {
+    if (SERVER_EXCLUSIVE_ADDON_KEYS.has(line.sku.trim().toUpperCase())) return;
+    const kind = lineKind(line.sku);
+    const entry: MonitorGoodsLine = {
+      key: line.id ?? `${line.sku}-${index}`,
+      lineId: line.id ?? null,
+      sku: line.sku,
+      name: lineName(line),
+      category: goodsCategoryWordOf(line),
+      qty: line.qty,
+      shortQty: shortByLineIndex.get(index) ?? 0,
+      receivedQty: row.leg != null ? null : receivedForBoundLine(line.id, line.qty, row.o.allocated_units, row.o.incoming_units),
+    };
+    /* `unknown` is a physical thing nobody recognised — it travels on the
+       truck, so it belongs with the MAIN goods, never buried under the
+       pillows (line-category's own D9 ruling). */
+    if (kind === "core" || kind === "unknown") items.push(entry);
+    else if (kind === "service") extras.push({ ...entry, kind: "service", shortQty: 0 });
+    else extras.push({ ...entry, kind: "accessory" });
+  });
+  for (const [index, addon] of (row.o.order_addons ?? []).entries()) {
+    const key = addon.addon_key ?? "";
+    if (SERVER_EXCLUSIVE_ADDON_KEYS.has(key.toUpperCase())) continue;
+    extras.push({
+      key: `addon-${index}-${key}`,
+      lineId: null,
+      sku: key,
+      name: addonName(key, input.addonNameByKey),
+      category: "Service",
+      qty: addon.qty,
+      shortQty: 0,
+      kind: "service",
+    });
+  }
+  if ((row.o.delivery_stair_items ?? 0) > 0) extras.push({
+    key: "stair-carry", lineId: null, sku: "STAIR_CARRY", category: "Service", kind: "service",
+    name: MONITOR_COPY.stairCarry(row.o.delivery_stair_items!, row.o.delivery_floor ?? null),
+    qty: row.o.delivery_stair_items!, shortQty: 0,
+  });
+  const arrival = deliveryArrivalStateOf({
+    arrivals: row.o.po_arrivals ?? [],
+    readiness,
+    todayIso: input.todayIso,
+    /* The arrival-check clock counts on the same holidays as every other
+       Carres clock — handed in, never read from a second source. */
+    holidays: input.holidays,
+  });
+  return {
+    readiness,
+    arrival,
+    stock: monitorStockOf({ readiness, totalQty, arrival, requestedIso: input.requestedIso }),
+    items,
+    extras,
+  };
 }
 
 /**

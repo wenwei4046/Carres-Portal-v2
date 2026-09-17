@@ -58,9 +58,23 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
     <article
       data-testid={`ws-card-${card.id}`}
       data-direction={card.direction}
-      /* 1px border · 10px corner · NO decorative shadow. The surface says one
-         thing only, and it is not date agreement: `overdue`. */
-      className={`min-w-0 rounded-card border ${cardSurfaceClassOf(card)}`}
+      /* 1px border · 10px corner (`rounded-card`) · NO decorative shadow. The
+         surface says one thing only, and it is not date agreement: `overdue`.
+
+         The 140px floor is a RHYTHM, not a box: it keeps a one-line card and a
+         four-line card close enough in height that a column scans as a stack
+         of days rather than a ragged pile, and `min-h` never caps growth — a
+         card with eleven product lines is eleven product lines tall. */
+      /* `relative` is CONTAINMENT, not decoration. The receipt arithmetic
+         carries a visually-hidden `sr-only` label, and `sr-only` is
+         `position:absolute`. With no positioned ancestor it resolves against
+         the INITIAL containing block, so on a 1440px calendar canvas the last
+         column's hidden label landed at x=1441 and stretched the DOCUMENT to
+         1442px — the whole portal, sidebar included, scrolled sideways behind
+         a calendar that was supposed to scroll inside its own frame. Measured
+         at 703×704, 2026-09-16. The label is contained here instead of being
+         removed: it is what a screen reader reads out for the arithmetic. */
+      className={`relative flex min-h-[140px] min-w-0 flex-col rounded-card border ${cardSurfaceClassOf(card)}`}
       aria-label={`${party} · ${refs.primary.ref}`}
     >
       {/* ── 1 · HEADER — 8px/12px padding, 4px gaps, and it WRAPS.
@@ -70,23 +84,32 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
       {/* The hairline under the header is what gives the card a head and a
           body once the surface is white — without a tint doing that job, the
           party and the references ran together as one block. */}
-      <header className="flex flex-wrap items-center gap-1 border-b border-kit-slate-5 px-3 py-2">
-        {/* `flex-[1_1_6rem]` rather than `flex-1`: the name keeps a readable
-            floor, so in a narrow date column the PILL AND DOOR wrap to the
-            next line as a unit instead of the party name being squeezed into
-            a two-character gutter. The name is the identity — it gets the
-            room, and nothing is ever clipped. */}
+      <header className="flex flex-wrap items-center gap-1 border-b border-kit-slate-5 p-3">
+        {/* `flex-[1_1_5rem]` rather than `flex-1`: the name keeps a readable
+            floor, so when a column really is too narrow the PILL AND DOOR wrap
+            to the next line as a unit instead of the party name being squeezed
+            into a two-character gutter. The name is the identity — it gets the
+            room, and nothing is ever clipped.
+
+            MEASURED 2026-09-16, and the reason the floor is 5rem and not 6:
+            at the governed 240px column the header has 197px of content width,
+            and a 6rem floor needed 96 + 4 + 98 = 198. One pixel over put the
+            date pill and the door on a SECOND LINE in every card, 24px taller
+            each, when the header is specified as one line — party, date
+            agreement, door. 5rem still holds ten characters before the name
+            wraps its own words, and a genuinely long pill still pushes the
+            pair down as designed. */}
         {card.detailHref ? (
           <Link
             to={card.detailHref}
-            className="min-w-0 flex-[1_1_6rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
+            className="min-w-0 flex-[1_1_5rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9"
             data-testid="ws-card-party"
           >
             {party}
           </Link>
         ) : (
           <span
-            className="min-w-0 flex-[1_1_6rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12"
+            className="min-w-0 flex-[1_1_5rem] break-words [overflow-wrap:anywhere] text-body font-semibold leading-5 text-kit-slate-12"
             data-testid="ws-card-party"
           >
             {party}

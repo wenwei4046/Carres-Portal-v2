@@ -16,6 +16,7 @@ vi.mock("@/lib/queries", () => {
     useLaterDeliveryRequests: () => ({ ...answered, data: { requests: [] } }),
     usePaymentSettings: () => ({ ...answered, data: { collection_timing: [], bank_accounts: [] } }),
     useOperationWork: () => ({ data: undefined }),
+    useOperationOrders: () => ({ data: undefined, isSuccess: true, isError: false }),
     useCatalog: () => ({ data: undefined }),
     useVoidPayment: () => ({ mutate: vi.fn(), isPending: false }),
     // The Payments object offers `Correct allocation` only to the Payment

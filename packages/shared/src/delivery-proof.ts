@@ -26,6 +26,8 @@ export const proofReviewInput = z
     attemptId: z.string().uuid().nullish(),
     decision: z.enum(PROOF_DECISION_KEYS),
     reason: z.string().trim().max(1000).nullish(),
+    sourceVersion: z.string().datetime(),
+    idempotencyKey: z.string().uuid(),
   })
   .refine((v) => v.decision === "accepted" || Boolean(v.reason && v.reason.trim()), {
     message: "Say why more proof is needed, or why it is rejected.",

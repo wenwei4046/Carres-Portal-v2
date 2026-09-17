@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, it, expect, afterAll, beforeAll, beforeEach, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
+import { readyStockDatabase } from "../../test/ready-stock-reservation-database";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import {
@@ -288,7 +289,7 @@ type Tbl = ReturnType<typeof TABLES>;
 /** Records every question asked, and every write attempted. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const CHAIN = [
-    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit",
+    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit", "range",
   ];
   const writes: { table: string; kind: string }[] = [];
   const filters: { table: string; method: string; col: unknown; val: unknown }[] = [];
@@ -457,6 +458,12 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
     expect(demands).not.toMatch(/operation_create_po|purchasing_issue_pos_batch/);
     expect(demands).not.toMatch(/\.(insert|update|upsert|delete)\(/);
     expect(demands).not.toMatch(/router\.post\(/);
+  });
+
+  it("carries the server Order By fact and gives refused planning no invented date", async () => {
+    const { rows } = await rowsOf();
+    expect(rows.find((r) => r.state === "safety_days_full")?.orderBy).toBe(TODAY);
+    expect(rows.find((r) => r.state === "no_production_days")?.orderBy).toBeNull();
   });
 
   it("the arithmetic on the wire is the engine's own, not a second count", async () => {
@@ -1332,6 +1339,47 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
        ROW is the only thing keeping the order visible. */
     expect(rows.find((r) => r.lineIds.includes("l10"))).toBeUndefined();
   });
+
+  it.each(["ops_stock_items", "ops_stock_pool_usage", "ops_activity_log"])("refuses an unknown coverage result when %s is unavailable", async (table) => {
+    const t: Record<string, { data: unknown; error: unknown }> = registerTables();
+    t.ops_stock_pool_usage = { data: [{ item_id: "unit-1", sku: "B1201S-Q", qty: 1, ref: "SO-1212" }], error: null };
+    t[table] = { data: null, error: { message: "unavailable" } };
+    const { res } = await getDemands(t);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: "stock_coverage_unavailable" });
+  });
+
+  it.each(["release", "reassign"])("%s returns modern reserved demand while usage remains", async (action) => {
+    const t: Record<string, { data: unknown; error: unknown }> = registerTables();
+    const db = await readyStockDatabase();
+    const orderId = "11111111-1111-4111-8111-111111111111";
+    const lineId = "22222222-2222-4222-8222-222222222222";
+    const itemId = "33333333-3333-4333-8333-333333333333";
+    try {
+      await db.exec(`insert into orders values ('${orderId}',1212);
+        insert into order_lines values ('${lineId}','${orderId}','B1201S-Q',1);
+        insert into ops_stock_items(id,unit_code,sku,status,condition) values
+          ('${itemId}','U1-001','B1201S-Q','free','new');
+        select ops_stock_pool_draw('SO-1212','used_instead_of_ordering',null,'${itemId}',null,null,null,'${lineId}');`);
+      const snapshot = async () => {
+        const units = (await db.query<Record<string, unknown>>("select * from ops_stock_items where reserved_order_line_id is not null and status in ('reserved','sold')")).rows;
+        t.ops_stock_items = { data: units.map((u) => ({ ...u, reserved_order_line_id: u.reserved_order_line_id === lineId ? "l10" : u.reserved_order_line_id })), error: null };
+        t.ops_stock_pool_usage = { data: (await db.query("select * from ops_stock_pool_usage")).rows, error: null };
+        t.ops_activity_log = { data: (await db.query("select * from ops_activity_log where action='stock_reserve'")).rows, error: null };
+        return rowsOf(t);
+      };
+      const before = await snapshot();
+      expect(registerRow(before.body, "o5")!.lines.find((l) => l.orderLineId === "l10")!.stockTaken).toBe(1);
+      const usage = t.ops_stock_pool_usage.data;
+      await db.exec(action === "release" ? `select ops_stock_release('${itemId}')` : `select ops_stock_reassign('${itemId}','SO-1207')`);
+      const after = await snapshot();
+      expect(t.ops_stock_pool_usage.data).toEqual(usage);
+      expect((await db.query<{ reserved_order_line_id: string | null }>("select reserved_order_line_id from ops_stock_items")).rows[0].reserved_order_line_id).toBeNull();
+      expect(registerRow(after.body, "o5")!.lines.find((l) => l.orderLineId === "l10")!.stockTaken).toBe(0);
+      expect(after.rows.find((r) => r.lineIds.includes("l10"))).toMatchObject({ toBuy: 1 });
+    } finally { await db.close(); }
+
+  }, 30_000);
 
   it("the wire schema parses the whole payload, registerRows included", async () => {
     const { res } = await getDemands(registerTables());

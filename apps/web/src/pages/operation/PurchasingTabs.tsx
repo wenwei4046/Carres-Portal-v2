@@ -77,7 +77,7 @@ type PurchasingPage =
  *  page that still renders may not lose the word it prints. */
 const PAGE_WORD: Record<PurchasingPage, string> = {
   /* Reachable by direct URL only since 2026-08-22 — no rail row, same word. */
-  "purchase-demands": "Purchase Demands",
+  "purchase-demands": "SO Batch Purchase",
   "to-order": "SO Batch Purchase",
   "manual-purchase": "Manual Purchase",
   "purchase-orders": "Purchase Orders",

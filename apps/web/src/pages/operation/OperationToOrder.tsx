@@ -8,6 +8,7 @@ import {
   type SoBatchSelection,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import Button from "@/components/kit/Button";
 import SoBatchRegister from "./so-batch/SoBatchRegister";
 import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
 
@@ -53,12 +54,9 @@ export default function OperationToOrder() {
    * cannot support.
    */
   const q = useQuery<SoBatchPurchaseResponse>({
-    queryKey: [...QUERY_KEY, scopeSo] as const,
+    queryKey: QUERY_KEY,
     queryFn: async () => {
-      const path =
-        scopeSo && scopeSo.trim() !== ""
-          ? `/api/operation/purchase/demands?so=${encodeURIComponent(scopeSo)}`
-          : "/api/operation/purchase/demands";
+      const path = "/api/operation/purchase/demands";
       return soBatchPurchaseResponseSchema.parse(
         await apiFetch<unknown>(path),
       ) as SoBatchPurchaseResponse;
@@ -75,7 +73,12 @@ export default function OperationToOrder() {
     );
   }, [selections, data]);
 
-  const backToBuying = useCallback(() => setSelections(null), []);
+  /* Returning also re-reads the list: a tick whose line was bought in the
+     meantime must drop rather than survive into a second Issue PO. */
+  const backToBuying = useCallback(() => {
+    setSelections(null);
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  }, [queryClient]);
   const finish = useCallback(() => {
     setSelections(null);
     void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -88,13 +91,12 @@ export default function OperationToOrder() {
         {(q.error as Error | undefined)?.message ? (
           <p className="text-meta text-kit-slate-11">{(q.error as Error).message}</p>
         ) : null}
-        <button
-          type="button"
-          className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+        <Button
+          variant="neutral" size="md"
           onClick={() => void q.refetch()}
         >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -114,22 +116,29 @@ export default function OperationToOrder() {
     safetyDays: 14,
   };
 
-  if (selections && documents.length > 0 && data) {
-    return (
-      <SoBatchIssueWorkspace
-        documents={documents}
-        destinations={data.destinations}
-        onBack={backToBuying}
-        onDone={finish}
-      />
-    );
-  }
-
+  /* ⭐ BACK TO BUYING KEEPS THE OPERATOR'S PLACE — owner ruling R8,
+     2026-09-16. The Register stays MOUNTED (hidden) behind the Issue
+     workspace, so its search, rail filters, open groups, ticks and scroll
+     position are exactly where the operator left them. Unmounting it made
+     every return start again from the top of an unfiltered list. */
+  const issuing = selections != null && documents.length > 0 && data != null;
   return (
-    <SoBatchRegister
-      data={data ?? empty}
-      isLoading={q.isLoading}
-      onIssue={setSelections}
-    />
+    <>
+      {issuing && (
+        <SoBatchIssueWorkspace
+          documents={documents}
+          destinations={data.destinations}
+          onBack={backToBuying}
+          onDone={finish}
+        />
+      )}
+      <SoBatchRegister
+        data={data ?? empty}
+        isLoading={q.isLoading}
+        hidden={issuing}
+        initialSearch={scopeSo ? `SO-${scopeSo.replace(/^SO-/i, "")}` : undefined}
+        onIssue={setSelections}
+      />
+    </>
   );
 }

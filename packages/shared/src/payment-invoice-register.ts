@@ -91,8 +91,28 @@ export interface InvoiceRegisterRow {
     ops_order_control: Array<{
       balance: number | string | null;
       confirmed_date: string | null;
+      /** The D1 booking overlay (0277). Only `confirmed` makes its date a
+       *  confirmed delivery — Delivery's own `bookingDayOf` rule. Absent on a
+       *  row read before this field rode the wire: the date stands alone. */
+      booking_stage?: string | null;
+      confirmed_time_slot?: string | null;
       line_etas: Record<string, string> | null;
       line_stock_status: Record<string, string> | null;
+    }>;
+    /** Delivery's own arrangement per leg (0386) — leg 0 an ordinary order,
+     *  1…n a Journey. The record Delivery's `Save confirmed delivery` writes. */
+    ops_delivery_arrangements?: Array<{
+      leg: number;
+      confirmed_date: string | null;
+      confirmed_time: string | null;
+    }>;
+    /** Delivery Orders per leg — the issued snapshot outranks everything. */
+    ops_delivery_orders?: Array<{
+      leg: number;
+      delivery_date: string | null;
+      time_slot: string | null;
+      voided_at: string | null;
+      issued_at?: string | null;
     }>;
   } | null;
 }
@@ -242,6 +262,47 @@ export function soRemaining(
   };
 }
 
+/**
+ * ⭐ THE CONFIRMED DELIVERY IS DELIVERY'S FACT (Law D, Payment Monitor Card 02,
+ * 2026-09-16). Payment used to read `ops_order_control.confirmed_date` alone,
+ * but Delivery's `Save confirmed delivery` writes `ops_delivery_arrangements`
+ * and never touches that column — so a day Delivery had agreed with the
+ * customer never started Payment's collection clock or its Work item.
+ *
+ * This is Delivery's own ladder (`confirmedDeliveryOf`), for the leg that
+ * reaches the customer (the highest leg; 0 on an ordinary order):
+ *
+ *   the live Delivery Order's day and window
+ *   → Delivery's arrangement
+ *   → the booking overlay, only while its stage is `confirmed`
+ *
+ * A day without a time is still a confirmed DAY for the clock; `time` is null
+ * and the listing says `No time agreed`, exactly as Delivery does.
+ */
+export function invoiceConfirmedDelivery(row: InvoiceRegisterRow): {
+  dateIso: string | null;
+  time: string | null;
+} {
+  const order = row.orders;
+  const docs = (order?.ops_delivery_orders ?? []).filter((d) => !d.voided_at);
+  const arrangements = order?.ops_delivery_arrangements ?? [];
+  const leg = Math.max(0, ...docs.map((d) => d.leg ?? 0), ...arrangements.map((a) => a.leg ?? 0));
+  const doc = docs
+    .filter((d) => (d.leg ?? 0) === leg && d.delivery_date && ISO_DATE.test(d.delivery_date.slice(0, 10)))
+    .sort((a, b) => (b.issued_at ?? "").localeCompare(a.issued_at ?? ""))[0];
+  if (doc) return { dateIso: doc.delivery_date!.slice(0, 10), time: doc.time_slot ?? null };
+  const arrangement = arrangements.find((a) => (a.leg ?? 0) === leg);
+  const arranged = arrangement?.confirmed_date?.slice(0, 10) ?? null;
+  if (arranged && ISO_DATE.test(arranged)) return { dateIso: arranged, time: arrangement!.confirmed_time ?? null };
+  const ctrl = ctrlOf(row);
+  const booked = ctrl?.confirmed_date?.slice(0, 10) ?? null;
+  const stageAllows = ctrl?.booking_stage === undefined || ctrl.booking_stage === "confirmed";
+  if (booked && ISO_DATE.test(booked) && stageAllows) {
+    return { dateIso: booked, time: ctrl?.confirmed_time_slot ?? null };
+  }
+  return { dateIso: null, time: null };
+}
+
 /** The Customer Delivery cell fact: the customer-confirmed day, else the
  *  requested day, else the honest absence. */
 export type CustomerDeliveryStatus = "confirmed" | "requested" | "customer_not_sure" | "no_date";
@@ -260,8 +321,8 @@ export function invoiceCustomerDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;
   word: CustomerDeliveryStatus;
 } {
-  const confirmed = ctrlOf(row)?.confirmed_date ?? null;
-  if (confirmed && ISO_DATE.test(confirmed)) return { dateIso: confirmed, word: "confirmed" };
+  const confirmed = invoiceConfirmedDelivery(row).dateIso;
+  if (confirmed) return { dateIso: confirmed, word: "confirmed" };
   const order = row.orders;
   if (order?.delivery_date_tbd) return { dateIso: null, word: "customer_not_sure" };
   const requested = order?.delivery_date ?? null;
@@ -314,7 +375,7 @@ export function invoicePaymentTiming(
   const goods = invoiceGoodsFacts(row);
   const clock = collectionClock(
     {
-      confirmedDateIso: ctrlOf(row)?.confirmed_date ?? null,
+      confirmedDateIso: invoiceConfirmedDelivery(row).dateIso,
       promisedDateIso: row.orders?.delivery_date_tbd ? null : row.orders?.delivery_date ?? null,
     },
     todayIso,

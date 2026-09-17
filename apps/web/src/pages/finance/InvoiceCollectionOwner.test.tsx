@@ -19,10 +19,14 @@ vi.mock("@/lib/api", () => ({
     if (init?.method === "POST") { state.posts.push({ url, body: JSON.parse(init.body ?? "{}") }); return { handover: { id: "h" } }; }
     if (url.startsWith("/api/finance/collection-owner")) return { owner: state.owner };
     if (url.startsWith("/api/operation/workspace-duties")) return { can_assign: state.canAssign, duties: [] };
-    if (url.startsWith("/api/operation/work")) return { items: [], staff: [
+    if (url.startsWith("/api/operation/work")) return { contractVersion: 2, complete: true, items: [], staff: [
       { userId: "u-shasha", name: "Shasha", email: "shasha@carres.com" },
       { userId: "u-yujun", name: "Yu Jun", email: "yujun@carres.com" },
-    ], generatedOn: "2026-09-13" };
+    ], generatedOn: "2026-09-13", closureReceipt: null,
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+        key, state: "healthy", observedAt: "2026-09-13T01:00:00.000Z", lastSuccessfulAt: "2026-09-13T01:00:00.000Z", errorLabel: null,
+      })),
+    };
     return {};
   }),
 }));
@@ -59,11 +63,12 @@ describe("Collection owner", () => {
     expect(screen.getByTestId("collection-owner-history")).toHaveTextContent("Established · Shasha");
   });
 
-  it("nobody established → the governed Delivery sentence and the Staff & Duties door, never a blank", async () => {
+  it("nobody established → nobody is assigned to this order, with the Sales Orders door — never Delivery Duty, never a blank", async () => {
     state.owner = null;
     show();
-    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody holds Delivery Duty.");
-    expect(screen.getByRole("link", { name: "Set the holder in Workspace → Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
+    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody is assigned to this order.");
+    expect(screen.getByRole("link", { name: "Assign it in Sales Orders → Team" })).toHaveAttribute("href", "/operation/orders");
+    expect(screen.queryByText(/Delivery Duty|Staff & Duties/)).not.toBeInTheDocument();
   });
 
   it("the handover door exists only for someone the Staff & Duties gate admits", async () => {

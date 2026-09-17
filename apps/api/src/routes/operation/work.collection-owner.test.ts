@@ -95,14 +95,15 @@ describe("one stable normal owner", () => {
   it("page reload → same normal owner (the projection is deterministic over the same owner fact)", () => {
     const first = projectPaymentCollectionWork({ invoices: [invoice()], ownerFor: ownerOf(rows, "2026-09-08"), today: "2026-09-08" });
     const again = projectPaymentCollectionWork({ invoices: [invoice()], ownerFor: ownerOf(rows, "2026-09-08"), today: "2026-09-08" });
-    expect(again).toEqual(first);
+    expect(again.map(({ observedAt: _observedAt, sourceVersion: _sourceVersion, ...work }) => work))
+      .toEqual(first.map(({ observedAt: _observedAt, sourceVersion: _sourceVersion, ...work }) => work));
     expect(again[0]?.owner.normal).toEqual(SHASHA);
   });
 
   it("collection date changes → no silent owner rotation", () => {
     const [before] = projectPaymentCollectionWork({ invoices: [invoice({ confirmed: "2026-09-09" })], ownerFor: ownerOf(rows, "2026-09-08"), today: "2026-09-08" });
     const [after] = projectPaymentCollectionWork({ invoices: [invoice({ confirmed: "2026-09-10" })], ownerFor: ownerOf(rows, "2026-09-08"), today: "2026-09-08" });
-    expect(before?.timing.dueOn).not.toBe(after?.timing.dueOn);
+    expect(before?.timing.actionOn).not.toBe(after?.timing.actionOn);
     expect(after?.owner.normal).toEqual(SHASHA);
     expect(after?.owner.acting).toEqual(SHASHA);
   });

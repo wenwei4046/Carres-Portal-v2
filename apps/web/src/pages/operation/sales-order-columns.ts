@@ -242,6 +242,15 @@ const date = (v: string | null | undefined, absent: string) => (v ? fmtDate(v) :
 const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
 
 /**
+ * DEFAULT WIDTHS — Listing Standard 2026-09-16, measured on the rendered page:
+ * each fixed fact column is its widest governed value + 16px padding (SO Date
+ * `Wed, 30 Sep` 93 · Showroom `Sungai Buloh` 96 · PO No `2 Purchase Orders`
+ * 149 · DO No `No delivery order yet` 143), and the header's sort + filter
+ * controls are the floor. Customer and Delivery Location are the flexible text
+ * columns: a cut value opens whole (engine `overflowText`). The eight defaults
+ * plus the gutter render 1135px (each cell adds its 1px rule), inside the 1140px grid at a 1440 window, so
+ * DO No is fully visible.
+ *
  * THE CATALOG — the eight owner-ruled defaults in their order, everything else
  * hidden. Hidden columns are sized to their own longest live value plus the
  * kit's `px-2`, and every one of them is off by default, so none of them can
@@ -251,23 +260,23 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* The eight owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "SO Date", width: "104px", group: "Dates", on: true,
+  { key: "ordered", label: "SO Date", width: "96px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
   { key: "customer_delivery", label: "Requested Delivery Date", width: "128px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "208px", group: "Customer", on: true,
+  { key: "customer", label: "Customer", width: "192px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "delivery_location", label: "Delivery Location", width: "184px", group: "Customer", on: true,
+  { key: "delivery_location", label: "Delivery Location", width: "172px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
   /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
      Sales-ownership fact the order already carries (`outlets.name`) — it is
      the same declaration that has always been in this catalog, promoted to a
      default. No new writer, no new query, no new fact. */
-  { key: "showroom", label: "Showroom", width: "112px", group: "Sales ownership", on: true,
+  { key: "showroom", label: "Showroom", width: "100px", group: "Sales ownership", on: true,
     text: (r) => showroomShort(r.o.outlets?.name) || NOT_RECORDED },
-  { key: "po_number", label: "PO No", width: "156px", group: "Document", on: true,
+  { key: "po_number", label: "PO No", width: "152px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
   { key: "do_number", label: "DO No", width: "144px", group: "Document", on: true,
     text: (r) =>
