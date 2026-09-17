@@ -135,12 +135,14 @@ function RecordIssueModal({ open, onOpenChange }: { open: boolean; onOpenChange:
   const canNext = (step !== 2 || ["foundByName","observedOn","affectedObject","linkLabel","impact"].every((k) => form[k]?.trim())) && (step !== 3 || Boolean(form.evidence));
   // The last step submits, so it is held to the same completeness as every other step.
   const canRecord = ["action","recipient","result","dueOn"].every((k) => form[k]?.trim());
-  return <Modal open={open} onOpenChange={onOpenChange} title="Record issue" description="Choose facts. The system writes the official English." footer={<div className="flex justify-between gap-2">{step > 0 && <Button variant="ghost" onClick={() => setStep((s) => s-1)}>Back</Button>}{step < pages.length-1 ? <Button variant="primary" disabled={!canNext} onClick={() => setStep((s) => s+1)}>Next</Button> : <Button variant="primary" disabled={!canRecord} loading={save.isPending} onClick={submit}>Record issue</Button>}</div>}><FailureMessage failure={failure} />{pages[step]}</Modal>;
+  return <Modal open={open} onOpenChange={(value) => { if (!value) setFailure(null); onOpenChange(value); }} title="Record issue" description="Choose facts. The system writes the official English." footer={<div className="flex justify-between gap-2">{step > 0 && <Button variant="ghost" onClick={() => setStep((s) => s-1)}>Back</Button>}{step < pages.length-1 ? <Button variant="primary" disabled={!canNext} onClick={() => setStep((s) => s+1)}>Next</Button> : <Button variant="primary" disabled={!canRecord} loading={save.isPending} onClick={submit}>Record issue</Button>}</div>}><FailureMessage failure={failure} />{pages[step]}</Modal>;
 }
 
 function IssueWorkspace({ row, onClose }: { row: IssueRow | null; onClose: () => void }) {
   const qc = useQueryClient(); const action = currentAction(row); const [recording, setRecording] = useState(false); const [resultCode, setResultCode] = useState(""); const [result, setResult] = useState("");
   const [failure, setFailure] = useState<Failure | null>(null); const inFlight = useRef(false);
+  // A different Issue starts clean: no earlier sentence or half-recorded result carries over.
+  useEffect(() => { setFailure(null); setRecording(false); setResultCode(""); setResult(""); }, [row?.id]);
   const saveResult = useMutation({
     mutationFn: () => apiFetch(`/api/ops/issues/${row?.id}/actions/${action?.id}/result`, { method: "POST", body: JSON.stringify({ resultCode, result }), signal: saveSignal() }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["issues"] }); setFailure(null); setRecording(false); onClose(); },
