@@ -110,19 +110,22 @@ business-open days and public-holiday/special-date rules. The Shared Duty Resolv
 person calendar with the module calendar for the resolved actor; Staff & Duties displays that result
 but does not become a second People calendar editor.
 
-Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing
-Approver, Delivery Charge Approver, Stock Adjustment Approver, Service Case Approver and, since
-the owner ruling of 2026-09-13, **Delivery Duty** (`delivery_duty`). There is no fake `ERP Owner`.
+Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing Approver, Delivery
+Charge Approver, Stock Adjustment Approver, Service Case Approver and the fallback-only Delivery
+Duty. There is no fake `ERP Owner`.
 
-**`Delivery Duty` is the assignment key of an owner rule the Work Engine already carried**
-(`ownerRule: "delivery_duty"`), not a new Delivery-local duty system: routine Delivery
-arrangement, customer contact, proxy recording, result recording on behalf of a partner and proof
-review all resolve through it and the Shared Duty Resolver. Its Primary holder and Buddy cover are
-configured only here. When no active holder or cover resolves, the action stays visible under its
-duty word and the surface prints the governed configuration failure with its door, `Nobody holds
-Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`; the protected act refuses with
-the same sentence. No action is routed to an Operations Superuser by default and Delivery Settings
-never holds a roster or an owner list (`../delivery/MASTER.md` §13.1).
+**Routine Delivery work belongs to the Sales Order's PIC** (owner ruling 2026-09-17). When an
+order enters Operations, `ops_order_control.assigned_staff` names the one normal owner for its
+order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
+that PIC's governed Buddy cover when the PIC is absent without changing the normal owner. Delivery
+Duty is no longer the routine owner. It remains only the explicit fallback when a Sales Order has
+no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
+and `Set the holder in Workspace → Staff & Duties`. Delivery Settings never holds a roster or a
+second owner list (`../delivery/MASTER.md` §13.1).
+
+**Reason for the ruling:** the PIC sweep shares open orders between the two active operators,
+Shasha and Yu Jun, at roughly 50/50. A single Delivery Duty instead left 101 routine Delivery
+actions unowned in production and broke the one-person customer/order follow-through.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
 list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
@@ -796,13 +799,15 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Purchasing · `purchasing.confirm_balance_delivery_date` | Short receipt left goods owing · balance promise | PO Duty | Opens with short receipt; Calls calendar owns filing | Balance promise for line exists |
 | Receiving · `receiving.check_in` | Promised goods lack a posted session · check in the arrival | GRN Duty | Promised arrival day | Receiving Session posted · stock/issue facts continue from Receiving |
 | Warehouse · `warehouse.outbound_handover` | **Not admitted:** dated pickup has Units not handed over · exact receiver/proof result | Requires governed personal NETS operator or admitted Site queue; neither is currently built | Scheduled Site handover date on Warehouse calendar | Every required Unit has accepted handover evidence · admission waits for governed owner/acceptance |
-| Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Governed Delivery proxy rule | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
-| Delivery · `assign_logistics` | Delivery required with no company · company selected | Delivery Duty | 3 delivery working days before promise | Delivery company recorded · booking action may open |
-| Delivery · `confirm_delivery_date` | Company assigned but customer date/slot unconfirmed · evidenced booking | Delivery Duty | Configured call days before promise | Confirmed date and slot with evidence |
-| Delivery · `deliver_today` | Confirmed delivery is today without result · result recorded | Delivery Duty | Confirmed delivery date | Delivery attempt result exists · proof/recovery follows result |
-| Delivery · `upload_delivery_photo` | Delivered result lacks file · proof file recorded | Delivery Duty | 1 delivery working day after delivery | File exists · proof review may open |
-| Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Delivery Duty | 1 delivery working day after delivery | Review newer than latest file exists |
-| Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Delivery Duty | Delivery day | Loan row is returned |
+| Delivery · `arrange_new_delivery_date` | Approved delay requires a reachable new booking · confirmed date/slot | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Same Office working day as delay decision | Customer-confirmed reachable booking exists |
+| Delivery · `assign_logistics` | Delivery required with no company · company selected | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 3 delivery working days before promise | Delivery company recorded · booking action may open |
+| Delivery · `confirm_delivery_date` | Company assigned but customer date/slot unconfirmed · evidenced booking | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Configured call days before promise | Confirmed date and slot with evidence |
+| Delivery · `deliver_today` | Confirmed delivery is today without result · result recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Confirmed delivery date | Delivery attempt result exists · proof/recovery follows result |
+| Delivery · `upload_delivery_photo` | Delivered result lacks file · proof file recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | File exists · proof review may open |
+| Delivery · `upload_signed_delivery_order` | Delivered result lacks the signed Delivery Order · signed file recorded | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Signed Delivery Order exists · proof review may open |
+| Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Review newer than latest file exists |
+| Delivery · `failed_delivery_next_step` | Failed Delivery has no recorded next step · named recovery fact | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Same Delivery working day | Named next fact exists · delivery planning continues |
+| Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | Delivery day | Loan row is returned |
 | Payment · `payment.collect_customer_balance` / `payment.missed_promise` | Issued Invoice remains owing when collection is actionable · payment obtained | Stable Collection Owner; active cover acts | Collection deadline or customer's promised day | Atomic allocations reduce Invoice/order outstanding to RM 0 |
 | Payment · `payment.send_storage_invoice` | Live Storage Invoice remains unpaid · invoice sent and money collected | Stable Collection Owner | Shared collection deadline, else `No date` | Live storage owing is RM 0 |
 | Payment · `payment.review_overpayment` | Money exceeds live obligations · allocation or approved refund decision | Payment Approver Duty | Governed `No date` | Overpaid amount is RM 0 or approved refund covers it |
@@ -1189,10 +1194,11 @@ honest Work for admitted modules.
   current central Work endpoint is Operation-only and has neither Site-queue routing nor personal
   acceptance facts. Naming Carres staff, `NETS` or a shared warehouse login would violate section 3.
 - Delivery-owned arrangement, company assignment, customer booking, delivery-day result, proof and
-  loan-return actions now retain Delivery as their module in the shared engine. Their stable object
-  is the Delivery scope until a Delivery Order exists, then the exact DO where the result/proof act
-  belongs; the server supplies the Delivery editor/DO door. The source Sales Order remains linked
-  context and is no longer presented as the universal owner of those actions.
+  loan-return actions retain Delivery as their owning module in the shared engine. Their stable
+  object is the Delivery scope until a Delivery Order exists, then the exact DO where the
+  result/proof act belongs; the server supplies the Delivery editor/DO door. Ownership of the
+  business fact remains with Delivery while responsibility for the action resolves to the linked
+  Sales Order PIC and today's Buddy cover, with Delivery Duty only when that order has no PIC.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
@@ -1255,7 +1261,8 @@ honest Work for admitted modules.
 
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
-3. Remove legacy PIC/duty fallbacks.
+3. Remove legacy PIC/duty fallbacks except the explicit no-PIC Delivery Duty fallback governed in
+   sections 4 and 6.
 4. Add permission-scoped Warehouse Site queues and personal operator acceptance/resolution, then
    admit physical Outbound actions; never turn Monitor events into actions.
 5. Define a routine Service Case owner rule/Duty (separate from approval) and decide whether its
