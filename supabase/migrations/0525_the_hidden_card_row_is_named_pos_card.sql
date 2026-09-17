@@ -17,6 +17,16 @@
 -- as 0523 wrote them. Run it after 0523.
 -- Nothing else changes: payment_set_method_active, tables, rows, grants and
 -- RLS are not touched.
+--
+-- A correction to 0518's header, which cannot be edited. It says
+-- payment_method_save locks in the same order as payment_set_method_active.
+-- It does not. payment_method_save takes the money account for share first,
+-- then the method row for update. payment_set_method_active (0523) takes the
+-- method row for update first, then the money account for share. This still
+-- cannot deadlock: both take only for share on the account, and two for
+-- share locks never wait on each other. gl_money_account_update takes the
+-- account for update but never locks payment_manual_methods, so no cycle
+-- can form. Only the comment was wrong; no code needs to change.
 
 create or replace function public.gl_money_account_update(p_code text, p_name text, p_is_active boolean)
 returns text
