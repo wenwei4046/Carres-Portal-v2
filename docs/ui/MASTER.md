@@ -1532,8 +1532,12 @@ and `kit.canvas` are one token, #F7F8FA. `PurchasingRegister.module.css` (blue-g
 deleted. Kit `FieldError` carries the 13px error voice with icon. Evidence: seeded before/after
 captures of 23 listings at 1440/390 with identical fixtures — page text changed only by approved
 words and heading casing; header 5.2:1, rail title 16.4:1, rail count 5.9:1; no page scroll at
-200% zoom; keyboard collapse/choose/clear verified. **OWED:** signed-in production walk.
-Not changed: Sales Order detail palette trial (`sales-order-detail-theme.css`, not a listing).
+200% zoom; keyboard collapse/choose/clear verified. **SHIPPED:** PR #1426 → `8209ce8c`, deploy run
+35244605132 converged ERP/POS Pages + Worker on that SHA; the served bundle carries
+`--background: 220 23% 97.5%`, `carres.filterRail` and `Confirm PO sent to supplier`. Evidence branch
+`evidence/slice1-listing-readability`. **OWED:** signed-in production walk of the listings.
+Not changed (not listings, still carry blue-grey `#b9c9d8`): Sales Order detail palette trial
+(`sales-order-detail-theme.css`) and the Manual Purchase create header (`.mp-create-header`).
 
 This is the shared default for ALL Portal listings, not a PO visual pilot. It supersedes older
 listing typography, rail appearance and blue-grey surface prescriptions in this document.
