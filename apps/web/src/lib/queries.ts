@@ -3994,6 +3994,8 @@ export interface ReceivingDutyContext {
   acting_user_name: string | null;
   actor_user_id: string | null;
   is_cover: boolean;
+  /** The cover row the resolver is acting through today (0425), when any. */
+  cover_id?: string | null;
   is_superuser: boolean;
   allowed: boolean;
   source: "assignment" | "not_assigned";
@@ -4037,6 +4039,8 @@ export interface WorkspaceDutiesResponse {
     };
     assignments: WorkspaceDutyAssignment[];
     covers: WorkspaceDutyCover[];
+    /** The next cover the resolver will act through on its first day (S2-A). */
+    scheduled_cover_id?: string | null;
   }>;
 }
 

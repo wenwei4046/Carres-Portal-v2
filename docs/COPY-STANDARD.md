@@ -216,6 +216,7 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Duty write success | `{name} holds {Duty} from {date}` · `{acting person} covers {normal owner} for {Duty}, {from}–{until}` | Saved · Updated successfully |
 | Duty validation | `Choose a holder.` · `Choose when this holder starts.` · `Choose who will cover this duty.` · `Choose valid cover dates.` | Required · Invalid date · Error |
 | Duty conflict | `{Duty} already has a holder for these dates. Choose different dates.` · `{Duty} already has cover for these dates. Choose different dates.` | Conflict · Overlap found |
+| Duty refusal | `{name} cannot hold {Duty}. Choose an eligible active staff member.` · `Choose another person to cover {Duty}.` · `{Duty} has no normal holder for all these dates. Assign the holder first.` · `{name} can no longer cover {Duty}. Choose another eligible staff member.` · `{Duty} could not be updated. Try again.` (by write-door code, workspace/MASTER.md §4.4.1) | the database's own sentence · Invalid · Error · Something went wrong |
 | Issue Register purpose | `Every issue stays for facts, money and learning.` | Issue dashboard · Problem inbox |
 | Issue search | `Search issues…` | Search Service Notes… |
 | Issue true empty | `No issues recorded` | All clear · `0 issues` while loading/failed |
@@ -3410,7 +3411,7 @@ this file keeps its meaning; a word with a second meaning says so here.
 | | `Codes 1121 to 1129 are all used. Take an account out of use, or ask for a new range.` (a holding account: `1131 to 1139`) | The database picks the code, and every code for that kind is taken. |
 | | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
-| Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
+| Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | Database log text only (detail `invalid_holder` / `invalid_cover`). The page prints `{name} cannot hold Finance Approver. Choose an eligible active staff member.` or `{name} can no longer cover Finance Approver. Choose another eligible staff member.` (workspace/MASTER.md §4.4.1). |
 | Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. Since 0523 it counts every payment method row, on or off, and the two rows no screen shows: `{method}` is then `Online payment` (Stripe, the existing word) or `POS card` (POS credit, debit and instalment money; **APPROVED — YH, 17 Sep 2026**; since 0525). |
 | Refusal (database, 0515) | `{code} {name} is out of use. Move {method} to another account first.` | **APPROVED — YH, 16 Sep 2026.** The same rule from the other side: turning a payment method on while its account is out of use. Built only from the approved sentence above. Used on Settings → Payment → Payment methods (the Active switch). |
 

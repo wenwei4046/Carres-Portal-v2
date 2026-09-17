@@ -17,6 +17,7 @@ import {
 import { SectionCard } from "@/components/SectionPanel";
 import { useHrPeople } from "@/lib/queries";
 import HrPersonDrawer from "./HrPersonDrawer";
+import { personInitials } from "@/lib/staff-avatar";
 
 /**
  * People (HR-P4, migration 0269) — one row per human who has a CRnnn code.
@@ -79,7 +80,7 @@ function PersonRow({
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-label font-semibold text-base-600">
-          {p.name.slice(0, 2).toUpperCase()}
+          {personInitials(p.name, "")}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-body font-semibold leading-tight text-base-900">

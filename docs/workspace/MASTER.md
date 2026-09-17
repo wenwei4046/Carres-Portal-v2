@@ -223,20 +223,24 @@ history.
 
 #### 4.4.1 · Staff & Duties validation and refusal copy
 
-| Condition | Exact sentence |
-|---|---|
-| Holder missing | `Choose a holder.` |
-| Assignment start missing | `Choose when this holder starts.` |
-| Assignment end before start | `Until must be on or after Effective from.` |
-| Ineligible/inactive holder | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
-| Conflicting primary period | `{Duty} already has a holder for these dates. Choose different dates.` |
-| Cover person missing | `Choose who will cover this duty.` |
-| Cover is normal holder | `Choose another person to cover {Duty}.` |
-| Cover dates missing/reversed | `Choose valid cover dates.` |
-| No normal owner for whole cover period | `{Duty} has no normal holder for all these dates. Assign the holder first.` |
-| Conflicting cover | `{Duty} already has cover for these dates. Choose different dates.` |
-| Eligibility changed before save | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
-| Unknown failure | `{Duty} could not be updated. Try again.` |
+| Condition | Write-door code | Exact sentence |
+|---|---|---|
+| Holder missing | (form) | `Choose a holder.` |
+| Assignment start missing | `invalid_dates` on assign | `Choose when this holder starts.` |
+| Assignment end before start | (form) | `Until must be on or after Effective from.` |
+| Ineligible/inactive holder, or a manager naming themself | `invalid_holder` · `self_assignment_refused` | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
+| Conflicting primary period | (newest assignment wins; no refusal today) | `{Duty} already has a holder for these dates. Choose different dates.` |
+| Cover person missing | (form) | `Choose who will cover this duty.` |
+| Cover is normal holder | `cover_is_holder` | `Choose another person to cover {Duty}.` |
+| Cover dates missing/reversed | `invalid_dates` on cover | `Choose valid cover dates.` |
+| No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no normal holder for all these dates. Assign the holder first.` |
+| Conflicting cover | `cover_overlap` | `{Duty} already has cover for these dates. Choose different dates.` |
+| Eligibility changed before save | `invalid_cover` | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
+| Caller is not a duty manager | `not_duty_manager` | `Duty assignments are set by the manager.` |
+| Unknown failure | `unknown` (any other error, a network failure included) | `{Duty} could not be updated. Try again.` |
+
+The API returns only the code; the page maps it to the sentence above and never renders the
+database's or the network's own text.
 
 Client validation may guide early, but the server returns the same business refusal and remains
 authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
@@ -270,7 +274,7 @@ originating Duty after a modal closes.
 | Current page stacks Assign Holder, Add Cover and History under every Duty in a 720px document | Replace with one compact catalogue and one selected-duty detail/action surface |
 | Server `can_assign` correctly hides write forms from non-managers | Retain; separate readable facts from authorised actions |
 | Current staff picker reads Operation staff but the Blueprint roster is Yu Jun and Shasha | Enforce active/eligible source facts at read and write; never revive Khor Yee or admit external Warehouse accounts |
-| Current cover form does not explain capability eligibility or visible overlap recovery | Add pre-confirmation facts and governed conflict/correction handling; writer remains authoritative |
+| Cover overlap and whole-period holder are refused by the writer (0532); ending/replacing a cover has no governed act yet | Build the append-only end/replace-cover act with reason/actor/time (§4.4) |
 | Current page has loading/read-error and immutable history evidence | Retain; add no-match, catalogue-failure, scheduled-cover and write-success/refusal contracts |
 | Current layout has no search/filter, selected Duty or narrow-screen contract | Build the §4.2/§4.5 composition and verify at 1440, 1024 and 390px |
 
@@ -1134,7 +1138,7 @@ honest Work for admitted modules.
   Built behaviour: catalogue rows equal `WORKSPACE_DUTIES.length` (12, including Finance Approver);
   an unknown `duty` key is corrected with history-replace; readers receive `Duty assignments are set
   by the manager.` and zero write controls; `Assign holder` and `Add cover` are focused kit `Modal`
-  acts with §4.4.1 sentences, server refusals printed verbatim, no optimistic owner change, and
+  acts with §4.4.1 sentences, no optimistic owner change, and
   `Add cover` absent while nobody holds the Duty; an empty catalogue renders the read-failure
   sentence; history uses event / who-when / note ranks with no controls.
   Repository gates: CI `verify` green on the merged head; Staff & Duties suites 99/99; full web
@@ -1160,6 +1164,20 @@ honest Work for admitted modules.
   Duties, Team Work and one protected module door; live assign/cover success, refusal, overlap, race
   and company-date-boundary behaviour; write-door refusal of departed, disabled, external Warehouse
   and same-as-holder people. §4.7 stays open until those run.
+- **Staff & Duties data integrity (S2-A) — migration 0532.** The cover door takes a per-Duty
+  advisory lock, refuses an overlap with any cover whose acting person is still active
+  (`cover_overlap`) and requires ONE active normal holder for every day of the cover
+  (`no_duty_holder`); the holder as their own cover is `cover_is_holder`. `workspace_duty_normal_on`
+  is the one holder arithmetic the resolver and the door share: a disabled holder resolves
+  `not_assigned` (an older assignment is never revived) and a disabled acting person's cover is
+  ignored, so Khor Yee is never resolved. The API returns refusal codes only, names the normal owner
+  the door wrote in the cover success sentence, and exposes `scheduled_cover_id` asked of the
+  resolver on the next cover's first day; the detail shows the resolver's cover by `cover_id` /
+  `scheduled_cover_id` with `{acting} covering for {normal}`, dates and reason. Duty pickers list
+  active individuals only (a `staff_code`, as 0504 requires); shared logins and disabled accounts are
+  not offered. Staff avatars use the one `personInitials` rule (`Shasha → SH`, `Yu Jun → YJ`) on
+  Staff & Duties, Purchase Orders, HR People and Principal Accounts. Real-PostgreSQL proof:
+  `duty-cover-integrity.integration.test.ts` red on 0531, green on 0532.
 - Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
