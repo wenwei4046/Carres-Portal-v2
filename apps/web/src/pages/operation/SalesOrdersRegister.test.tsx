@@ -620,8 +620,8 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     );
     const business = headers.filter(Boolean);
     expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
-      "SO No",
       "SO Date",
+      "SO No",
       "Requested Delivery Date",
       "Customer",
       "Delivery Location",
@@ -783,7 +783,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  it("starts under SO No with a separate bordered child and 12px vertical gaps", () => {
+  it("starts under SO Date, the first column, with a separate bordered child and 12px vertical gaps", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
@@ -975,22 +975,24 @@ describe("Sales Orders table correction", () => {
     expect(screen.getByText("Today")).toBeInTheDocument();
   });
 
-  it("preserves saved widths and optional/reordered columns while aligning to SO No", () => {
+  it("preserves saved widths and optional columns, but a saved order cannot move SO Date · SO No off the front", () => {
     const saved = {
       order: ["customer", "so", "ordered", "customer_delivery", "delivery_location", "showroom", "po_number", "do_number", "phone"],
       widths: { customer: 288, customer_delivery: 240 },
       hidden: [], groupBy: [], sort: null,
     };
-    localStorage.setItem("carres.salesOrders.register.v4.anon", JSON.stringify(saved));
+    localStorage.setItem("carres.salesOrders.register.v5.anon", JSON.stringify(saved));
     mount();
+    const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
+    expect(business.slice(0, 3)).toEqual(["SO Date", "SO No", "Customer"]);
     expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
     expect(screen.getByRole("button", { name: "Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
-      "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__", "grid-expansion-gutter-customer",
+      "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__",
     ]);
-    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v4.anon")!).widths).toEqual(saved.widths);
+    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v5.anon")!).widths).toEqual(saved.widths);
   });
 });
 

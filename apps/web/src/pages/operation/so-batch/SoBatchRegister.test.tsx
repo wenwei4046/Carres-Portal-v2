@@ -329,12 +329,13 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
  * where the goods land, and finally the documents.
  */
 describe("the approved columns, in the approved reading order", () => {
+  /* Date first, then identity (purchasing MASTER §9.1, Jess 2026-09-17). */
   const APPROVED = [
+    "Proceed Date",
     "SO No",
     "Order By",
     "Customer",
     "Supplier",
-    "Proceed Date",
     "Requested Delivery Date",
     "Delivery Location",
     "Deliver To",
@@ -342,7 +343,7 @@ describe("the approved columns, in the approved reading order", () => {
     "PO Delivery Date",
   ];
 
-  it("draws exactly the nine business columns, identity first and documents last", () => {
+  it("draws exactly the ten business columns, date then identity first and documents last", () => {
     const { container } = renderRegister();
     const heads = [...container.querySelectorAll("thead th")]
       .map((el) => el.textContent ?? "")
@@ -389,12 +390,18 @@ describe("the approved columns, in the approved reading order", () => {
   });
 
   it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v5"');
-    expect(source()).not.toContain("register.v1");
+    expect(source()).toContain('"carres.soBatchPurchase.register.v6"');
+    expect(source()).not.toContain('"carres.soBatchPurchase.register.v5"');
   });
 
-  it("`SO No` is the explicit sticky identity", () => {
-    expect(source()).toContain('stickyIdentity={{ columnKey: "soNo" }}');
+  it("reads Proceed Date · SO No first, both pinned on a wide canvas (§6.7 rule 2)", () => {
+    const { container } = renderRegister();
+    const heads = [...container.querySelectorAll<HTMLElement>("thead th")];
+    const data = heads.filter((th) => th.title);
+    expect(data.slice(0, 3).map((th) => th.title)).toEqual(["Proceed Date", "SO No", "Order By"]);
+    expect(data[0]!.style.left).not.toBe("");
+    expect(data[1]!.style.left).not.toBe("");
+    expect(data[2]!.style.left).toBe("");
   });
 });
 

@@ -571,8 +571,9 @@ export default function SalesOrdersRegister() {
      2026-08-18) retires the duplicate `Promised` column and brings every
      saved layout back to the ruled eight — a browser that had hidden
      `DO No` or opened `Promised` would otherwise replay that layout
-     forever on the one machine that matters. */
-  const storageKey = `carres.salesOrders.register.v4.${role ?? "anon"}`;
+     forever on the one machine that matters. v5 (Jess 2026-09-17) puts
+     `SO Date` before `SO No`; a v4 order saved identity-first is retired. */
+  const storageKey = `carres.salesOrders.register.v5.${role ?? "anon"}`;
 
   /* ── SELECTION — the REGISTER LAW's clause: ticks feed Export and nothing
      else. Header checkbox = select all visible / clear (the engine says which). */
@@ -627,7 +628,7 @@ export default function SalesOrdersRegister() {
   );
 
   const expandable = useMemo(
-    () => ({ alignToColumn: "so", renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
+    () => ({ alignToColumn: "ordered", renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
     [],
   );
 
@@ -690,11 +691,11 @@ export default function SalesOrdersRegister() {
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
             groupBanner={false}
-            /* Optional columns may widen the sheet (MASTER §0.1), so the row's
-               identity pins: ☐ · ▸ · SO No stay against the left edge while
-               the rest scrolls under them. An engine capability, never a
-               page-local hack (`docs/ui/MASTER.md` §4). */
-            stickyIdentity
+            /* Date first, then identity (ui MASTER §6.7 rule 2): ☐ · ▸ ·
+               SO Date · SO No stay against the left edge at a canvas ≥768px
+               while the rest scrolls under them; below it SO No pins alone.
+               Neither can be hidden or moved. An engine capability. */
+            leadingColumns={{ date: "ordered", identity: "so" }}
             chooserGroupOrder={[
               "Document",
               "Customer",

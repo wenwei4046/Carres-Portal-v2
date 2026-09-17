@@ -1477,6 +1477,12 @@ facts, permissions, complete-record populations or task ownership.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
    GRN Date is record creation; physical `Goods received on` remains in detail.
    DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
+   **Engine — BUILT 2026-09-17:** `DataGrid leadingColumns={{ date, identity }}` (opt-in) forces
+   the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
+   (disabled), the header `Hide column` / `Pin left` menu and drag, and pins both at a ≥768px
+   canvas, identity alone below it. It replaces `stickyIdentity` on the page that sets it.
+   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6). Every other
+   Register is unchanged until its own round.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.

@@ -311,6 +311,21 @@ export type DataGridProps<T> = {
    */
   stickyIdentity?: boolean | { columnKey: string | readonly string[] };
   /**
+   * ⭐ DATE FIRST, THEN IDENTITY (ui MASTER §6.7 rule 2, Jess 2026-09-17).
+   * OPTIONAL, default OFF.
+   *
+   * The listing begins with its own record date, then its document number or
+   * business identity. With this set the engine — not the page, not a saved
+   * layout — guarantees it:
+   *   · the two columns always lead, in that order, whatever order a browser
+   *     saved and wherever a header is dragged;
+   *   · neither can be hidden (Columns chooser, header menu, saved `hidden`);
+   *   · a canvas ≥768px pins both; a narrower canvas pins the identity alone,
+   *     so a phone keeps WHICH record without spending half its width on dates.
+   * When set it replaces `stickyIdentity`. Omitted = every register unchanged.
+   */
+  leadingColumns?: { date: string; identity: string };
+  /**
    * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
    * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
    * every cell carries one primary fact and one supporting line. Omitted =
@@ -586,6 +601,7 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  leadingColumns,
   rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
@@ -910,8 +926,14 @@ function DataGridInner<T>({
     setLayout((l) => ({ ...l, hidden: [], order: [], widths: {} }));
     setColumnsMenuOpen(false);
   }, [setLayout]);
+  /** The date and identity a `leadingColumns` listing may never lose. */
+  const leadingKeys = useMemo(
+    () => (leadingColumns ? [leadingColumns.date, leadingColumns.identity] : []),
+    [leadingColumns?.date, leadingColumns?.identity],
+  );
   const toggleColumn = useCallback(
     (colKey: string) => {
+      if (leadingKeys.includes(colKey)) return;
       setLayout((l) => {
         /* If we're still on the pristine-defaults overlay (no explicit
          choices yet) materialize the current set of hidden keys before
@@ -927,7 +949,7 @@ function DataGridInner<T>({
         return { ...l, hidden };
       });
     },
-    [columns, setLayout],
+    [columns, setLayout, leadingKeys],
   );
 
   // ── Resolve visible/ordered columns ───────────────────────────────
@@ -944,19 +966,27 @@ function DataGridInner<T>({
      memo so the Columns popover can read the same set without recomputing. */
   const effectiveHidden = useMemo(() => {
     const pristineLayout = layout.order.length === 0 && layout.hidden.length === 0;
-    return pristineLayout
+    const hidden = pristineLayout
       ? new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key))
       : new Set(layout.hidden);
-  }, [columns, layout.order, layout.hidden]);
+    // A saved `hidden` from before the ruling cannot take the date or identity away.
+    for (const k of leadingKeys) hidden.delete(k);
+    return hidden;
+  }, [columns, layout.order, layout.hidden, leadingKeys]);
 
   const visibleColumns = useMemo(() => {
     const byKey = new Map(columns.map((c) => [c.key, c]));
-    const order = layout.order.length
+    const savedOrder = layout.order.length
       ? [
           ...layout.order.filter((k) => byKey.has(k)),
           ...columns.filter((c) => !layout.order.includes(c.key)).map((c) => c.key),
         ]
       : columns.map((c) => c.key);
+    /* Date, then identity, lead whatever a browser saved or a drag produced. */
+    const leading = leadingKeys.filter((k) => byKey.has(k));
+    const order = leading.length
+      ? [...leading, ...savedOrder.filter((k) => !leading.includes(k))]
+      : savedOrder;
     const base = order
       .filter((k) => !effectiveHidden.has(k))
       .map((k) => byKey.get(k)!)
@@ -993,7 +1023,7 @@ function DataGridInner<T>({
       });
     }
     return synthetic.length ? [...synthetic, ...base] : base;
-  }, [columns, layout.order, effectiveHidden, expandable, selectable, narrowCanvas]);
+  }, [columns, layout.order, effectiveHidden, expandable, selectable, narrowCanvas, leadingKeys]);
 
   /**
    * ⭐ STICKY IDENTITY — which columns pin, and how far from the left edge.
@@ -1007,7 +1037,12 @@ function DataGridInner<T>({
    */
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
-    if (!stickyIdentity) return m;
+    /* Date-first listings: both lead and pin on a canvas ≥768px; below it the
+       identity pins alone and the date scrolls under it like any other fact. */
+    const pinRule: DataGridProps<T>["stickyIdentity"] = leadingColumns
+      ? { columnKey: narrowCanvas ? [leadingColumns.identity] : [leadingColumns.date, leadingColumns.identity] }
+      : stickyIdentity;
+    if (!pinRule) return m;
     /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
        2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
        `Call NETS — confirm delivery date` with no customer attached to it, so
@@ -1016,10 +1051,10 @@ function DataGridInner<T>({
        between them would leave a gap the rows slide through, so the run stops
        at the first column that is not named. */
     const named =
-      typeof stickyIdentity === "object"
-        ? Array.isArray(stickyIdentity.columnKey)
-          ? stickyIdentity.columnKey
-          : [stickyIdentity.columnKey as string]
+      typeof pinRule === "object"
+        ? Array.isArray(pinRule.columnKey)
+          ? pinRule.columnKey
+          : [pinRule.columnKey as string]
         : null;
     let left = 0;
     let pinned = 0;
@@ -1052,7 +1087,7 @@ function DataGridInner<T>({
       if (pinned > 0) break;
     }
     return m;
-  }, [stickyIdentity, visibleColumns, layout.widths]);
+  }, [stickyIdentity, leadingColumns, narrowCanvas, visibleColumns, layout.widths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -2405,6 +2440,8 @@ function DataGridInner<T>({
                         <input
                           type="checkbox"
                           checked={!effectiveHidden.has(c.key)}
+                          /* The listing's date and identity always show (§6.7 rule 2). */
+                          disabled={leadingKeys.includes(c.key)}
                           onChange={() => toggleColumn(c.key)}
                         />
                         <span>{c.label || c.key}</span>
@@ -2635,7 +2672,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={`${styles.table}${typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey) ? ` ${styles.tablePinnedBlock}` : ""}`}>
+        <table className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}
@@ -2682,7 +2719,7 @@ function DataGridInner<T>({
                       dropTarget === col.key ? styles.thDragOver : ""
                     }${pinClass(col.key)}`}
                     style={style}
-                    draggable
+                    draggable={!leadingKeys.includes(col.key)}
                     onDragStart={(e) => onDragStartHeader(e, col.key)}
                     onDragOver={(e) => onDragOverHeader(e, col.key)}
                     onDragLeave={() => setDropTarget(null)}
@@ -2831,24 +2868,30 @@ function DataGridInner<T>({
           const grouped = layout.groupBy.includes(ctx.colKey);
           return (
             <div className={styles.ctxMenu} style={{ top: ctx.y, left: ctx.x }} onClick={(e) => e.stopPropagation()}>
-              <button
-                className={styles.ctxItem}
-                onClick={() => {
-                  hideColumn(ctx.colKey);
-                  setCtx(null);
-                }}
-              >
-                Hide column
-              </button>
-              <button
-                className={styles.ctxItem}
-                onClick={() => {
-                  pinLeft(ctx.colKey);
-                  setCtx(null);
-                }}
-              >
-                Pin left
-              </button>
+              {/* The date and identity of a date-first listing can be neither
+                  hidden nor moved, so neither act is offered on them. */}
+              {!leadingKeys.includes(ctx.colKey) && (
+                <>
+                  <button
+                    className={styles.ctxItem}
+                    onClick={() => {
+                      hideColumn(ctx.colKey);
+                      setCtx(null);
+                    }}
+                  >
+                    Hide column
+                  </button>
+                  <button
+                    className={styles.ctxItem}
+                    onClick={() => {
+                      pinLeft(ctx.colKey);
+                      setCtx(null);
+                    }}
+                  >
+                    Pin left
+                  </button>
+                </>
+              )}
               <button
                 className={styles.ctxItem}
                 onClick={() => {
