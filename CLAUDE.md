@@ -66,8 +66,8 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
 | Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
-| Receiving | `docs/purchasing/MASTER.md` §5 | **APPROVED / LOCKED** | The same MASTER's Receiving gaps and owner boundaries |
-| Supplier Claims | `docs/purchasing/MASTER.md` §6 | **APPROVED / LOCKED** | The Service-Case workstream/entry-rule gap; keep Purchasing as supplier-response owner |
+| Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
+| Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
 | Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | The approved top-to-toe target; current implementation may lag |
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |

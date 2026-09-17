@@ -729,33 +729,36 @@ do not chase payment for goods you cannot deliver).
 ## 3.8 · SUPPLIER CLAIM
 
 **OWNS**
-- The **claim workstream** — opened under one Service Case when evidence indicates supplier
-  responsibility, bound to its PO line, SKU and supplier forever.
+- The **stock/product Supplier Claim** — owned by Purchasing and opened from the affected
+  Stock Unit, PO line or receipt evidence, bound to its supplier and item/source. It does not
+  originate from Service Case and has no mandatory Service Case parent (owner ruling 2026-09-14).
 - What we asked, what the supplier answered, **Carres' own resolution**, and the item's outcome.
-- The claim's own money: what the supplier owes us, completed on **external evidence** (their
-  credit-note or debit-note number), never a tick-box.
+- The supplier recovery obligation and its outstanding evidence. Finance owns credit/debit-note,
+  settlement and payment facts; the Claim reads/links that external evidence, never a second
+  financial ledger or a completion tick-box.
 
-**ACTIONS** — ask the supplier · record their answer · decide the customer resolution · decide
+**ACTIONS** — ask the supplier · record their answer · authorise the stock-claim resolution · decide
 the item outcome · split a claim · close it.
 
-**SUMMARISES** — its parent Service Case · the purchase order · the receiving or downstream
+**SUMMARISES** — a related customer Service Case, if any · the purchase order · the receiving or downstream
 event that found the problem · the customer order waiting on the goods, when applicable.
 
 **LINKS TO** — Service Case · Receiving · Purchasing · Stock · the customer order.
 
 > **A claim has no independent create button.** Staff report the problem where they discover it;
-> the system opens or links one Service Case and, when supplier responsibility is in scope,
-> creates the Supplier Claim workstream for Purchasing. `Supplier Claims` is Purchasing's work
-> view of those workstreams, not a second case register and not a second intake form.
+> stock/supplier problems open a source-linked Purchasing Claim directly. Service Case handles
+> customer complaints separately and is not a Claim creation or approval route. `Supplier Claims`
+> is the stock-claim Register; related customer context is a read-only link.
 
 ---
 
 ## 3.9 · SERVICE
 
 **OWNS**
-- The **case** — the one parent record for a customer-affecting problem that requires evidence,
-  remedy, communication or follow-up, whether first found by Customer Care, Delivery, Warehouse,
-  Receiving, Purchasing or Finance.
+- The **case** — the customer complaint/service-request record, reported by the customer or
+  recorded by staff on the customer's behalf. It owns the customer remedy and communication.
+  A receiving/stock supplier problem belongs to Purchasing Claim; merely affecting a customer
+  order does not turn it into a Service Case (owner clarification 2026-09-14).
 - The shared evidence, affected item/order/document links, parties, Work, decisions, deadlines,
   history and completion evidence.
 
@@ -773,7 +776,9 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 > evidence, another owner, later follow-up, investigation, hold, remedy or recovery, staff press
 > `Report Problem` on the record already in front of them. The system decides whether the facts
 > require a Service Case, an Operational Issue, an owning-module exception, or linked records;
-> staff do not choose a module or document type first.
+> staff do not choose a module or document type first. A stock/receiving supplier-goods problem
+> is reported from its Stock Unit, PO line or Goods Receipt as a source-linked Purchasing Supplier
+> Claim; it never needs a Service Case.
 >
 > **A customer-facing case is finished when the CUSTOMER is, and all required internal or
 > external outcomes are complete** — never merely when a dropdown changes.
@@ -967,10 +972,10 @@ remainder, supplier commitment and `Deliver To`; Receiving owns the physical rec
 then owns Unit custody/location. The Sales Order reads risk and connected documents but cannot mark
 goods ordered or received.
 
-**④ Supplier Claim entrance — RESOLVED FROM AUTHORITY 2026-08-22.**
-There is one problem intake through Service Case or the authoritative receiving exception. The
-system creates the Purchasing claim workstream when supplier responsibility is in scope.
-`Supplier Claims` is the Purchasing work view, not a second intake.
+**④ Supplier Claim entrance — OWNER-APPROVED 2026-09-14.**
+Purchasing controls stock/product supplier claims. Stock Unit, PO line and receiving evidence
+provide the source; a Service Case is neither the origin nor a prerequisite. Customer complaints
+and remedies stay in Service. Related records may link without transferring authority.
 
 **⑤ Is Orders V1 migrated, or replaced?**
 This document is the blueprint either way. **Which one it is changes nothing above and

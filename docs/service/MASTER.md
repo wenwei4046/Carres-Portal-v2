@@ -16,9 +16,15 @@
 # §1 · Overview
 
 ### MISSION
-A customer-affecting problem needs coordinated follow-up. Record it once where it is discovered,
-preserve the evidence, route each owner its Work, generate the necessary execution documents, and
-finish only when the customer and required outcomes are complete.
+Service Case is Carres' customer complaint/service-request record, reported by the customer or
+recorded by staff on the customer's behalf (owner clarification 2026-09-14). It owns customer
+communication, investigation, remedy and follow-up. Record the customer problem once where it is
+reported, preserve the evidence, route each owner its Work, generate the necessary execution
+documents, and finish only when the customer and required outcomes are complete.
+
+Receiving and stock supplier-goods problems go directly to the Purchasing Supplier Claim
+(`docs/purchasing/MASTER.md` §7.3, §9.5). An affected Sales Order alone does not require a
+Service Case.
 
 ### FIRST-DAY OPERATOR LAW — OWNER-RULED 2026-08-14
 
@@ -42,24 +48,31 @@ member on their first working day must be able to complete the next correct acti
 **Live: ONE case on file**, opened 2026-06-16, before the intake wizard existed.
 
 ### THE BOUNDARY THAT MATTERS
-**The Service Case is the parent problem record; it is not a replacement for transactional
-documents.** Supplier Claim, Warehouse Work, Delivery Work and Finance Work are role-specific
-workstreams under the Case. Purchase Return, Delivery Return, replacement Delivery Order,
-refund and credit/debit note remain the owning modules' formal stock, custody or money records.
-Staff never create one merely because they are trying to report a problem.
+**The Service Case is the parent customer-problem record; it is not a replacement for
+transactional documents.** Warehouse Work, Delivery Work and Finance Work are role-specific
+workstreams under the Case. **Purchasing Supplier Claims are independent stock claims (owner
+ruling 2026-09-14):** they originate from Stock Unit, PO line or Goods Receipt evidence, never
+from a Service Case, and need no Case parent. A Case may link a related stock claim and read its
+progress; it cannot create, approve or close it. Purchase Return, Delivery Return, replacement
+Delivery Order, refund and credit/debit note remain the owning modules' formal stock, custody or
+money records. Staff never create one merely because they are trying to report a problem.
 
 ## §1.1 · One intake, many in-context doors
 
-**Owner-ruling, 2026-08-14.** Staff report a problem from the record already in front of them:
+**Owner-ruling, 2026-08-14; intake scope clarified 2026-09-14.** Staff report a customer
+complaint/service request, including one recorded on the customer's behalf, from the record
+already in front of them:
 
 | Where the problem is found | Intake door | What the system carries into the Case |
 |---|---|---|
 | Customer / Sales Order | `Report Problem` | customer, order, affected lines and promise |
 | Delivery Order / Delivery event | `Report Problem` | DO, visit/result, Logistics Partner, custody and proof |
-| Warehouse Work / stock item | `Report Problem` | warehouse, unit/batch, location and current custody |
-| PO / Receiving | `Report Problem` | supplier, PO line, receipt, SKU/batch and rejected quantity |
 | Invoice / Payment / Refund | `Report Problem` | customer-money record and the disputed amount/status |
 | No source document can be found | `Service Cases → New Case` | manually captured party/item facts, followed by later linking |
+
+Stock and receiving issue doors belong to their owning modules. A stock/product supplier problem
+found at Stock, PO or Goods Receipt routes directly to a source-linked Purchasing Supplier Claim
+without creating a Service Case.
 
 Every door calls the same Case intake authority. It opens a new Case or links the source to an
 existing Case after duplicate matching when customer remedy/communication is required. A pure
@@ -68,19 +81,20 @@ an Operational Issue instead; an owning-module exception remains with its factua
 incident may link both records when an internal failure also harmed a customer. The operator
 reports facts and evidence; the operator
 does **not** choose `Supplier Claim`, `Purchase Return`, `Delivery Return` or `Refund` as the
-intake type.
+intake type, and Service intake never creates a Purchasing stock claim.
 
 **Department destinations are Work views, not duplicate registers:**
 
-- `Purchasing → Supplier Claims` shows Case workstreams assigned to Purchasing.
 - Delivery Work shows Case workstreams requiring arrangement, collection, return or proof.
 - Warehouse Work shows Case workstreams requiring inspection, repair, packing, quarantine,
   handover or returned-goods receipt.
-- Finance Work shows Case workstreams requiring refund, collection adjustment or supplier
-  credit/debit evidence.
+- Finance Work shows Case workstreams requiring refund or collection adjustment.
 
 Updates made in a department view write back to the same Case timeline and evidence set. No team
 rekeys the complaint, pictures, video, item or history.
+
+`Purchasing → Supplier Claims` is Purchasing's independent stock-claim Register, not a Case work
+view. When a related stock claim exists, the Case shows a read-only link to its progress.
 
 ### DOCUMENT DECISION AND PRINT CONTROL
 
@@ -90,10 +104,14 @@ The system derives documents from an approved outcome plus execution facts. Exam
 |---|---|
 | Customer goods physically return to Carres | Delivery Return / customer collection record |
 | Replacement goods leave Carres | replacement Delivery Order |
-| Goods physically return to supplier | Purchase Return |
 | Customer money is reversed or compensated | Finance refund / credit record |
-| Supplier owes Carres money | Supplier Claim completed with external credit/debit-note evidence |
 | Inspection, repair, packing or transport only | Work instruction; no stock/money document |
+
+Supplier recovery is not derived from a Case outcome. Where returned goods need supplier recovery,
+Purchasing opens the stock claim from the Stock/receipt evidence; any Purchase Return, supplier
+collection or replacement receipt follows that authorised stock-claim outcome, and Finance owns
+any credit note. Customer remedy and supplier recovery are separate: an authorised customer
+exchange is not held for a supplier reply.
 
 Every governed Service Case decision routes to the `Service Case Approver` Duty through the one
 Shared Duty Resolver. Service Settings stores the Duty key only; it never stores a manager's name
@@ -115,7 +133,9 @@ Service Case lifecycle.
 
 - Operation triages remotely from the customer's WhatsApp description, photos and video.
 - When evidence indicates a supplier/manufacturing fault and an on-site visit is necessary, the
-  Supplier owns and performs that visit; Purchasing coordinates it as Supplier Claim Work.
+  Supplier owns and performs that visit as supplier assessment within the customer Case journey.
+  It does not create a Purchasing stock claim; an independently sourced stock claim may be linked
+  for context.
 - When the problem concerns assembly or installation, the responsible Logistics Partner owns and
   performs the correction; Delivery coordinates it as Delivery Work.
 - Warehouse inspects only when the goods physically reach a Carres warehouse. That receipt and
@@ -244,6 +264,6 @@ fact. Any potentially contaminated item accepted in error goes to quarantine, ne
 
 | What | Why it is not built |
 |---|---|
-| **A service case raising a supplier claim** | Approved as the long-term architecture (Receiving and Service are two entrances to ONE claim engine, as SAP, Oracle and Dynamics all do it). **Blocked**: a claim is keyed to a PO line, and the entry rule plus the refurbish door must be settled together. |
+| **Read-only links from a Case to related Purchasing stock claims** | APPROVED / NOT BUILT (owner ruling 2026-09-14). A Case displays related stock-claim progress when relevant; Service intake never creates, approves or closes a stock claim. |
 | **`opened_at` becoming read-only after day one** | The deadline derives from it and the edit modal lets anyone change it, so moving `Opened` moves the deadline silently. Bounded today at one case. Approved fix: read-only, or log the change as an SLA event. |
 | **A sweep for abandoned intake uploads** | Evidence uploads against a client-minted draft id land before the case exists — they must. An abandoned wizard orphans them. Approved fix is a `draft/` sweep, **not** a move-on-create: a mover adds a failure mode between *bytes uploaded* and *case filed*. |
