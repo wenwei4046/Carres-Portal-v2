@@ -19,6 +19,7 @@ import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
 import operationBadgesRouter from "./routes/operation/badges";
+import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
 // `Jump to…` — the document half of the ONE global navigate-only command
 // surface (ui/MASTER, APPROVED / LOCKED 2026-08-11). Read-only, no create.
@@ -200,6 +201,8 @@ api.route("/account", accountRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
+// 0528 — personal saved column layouts (Purchase Orders pilot), own rows only.
+api.route("/operation/register-layouts", registerLayoutsRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/jump", jumpRouter);
 api.route("/operation/movements", operationMovementsRouter);
