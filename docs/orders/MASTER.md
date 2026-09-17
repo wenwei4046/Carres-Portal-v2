@@ -1558,6 +1558,9 @@ the amendment machinery, the goods truth and the Order Route architecture are un
     invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent. Saved `orders.approval_code` is the at-sale reference;
     `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
     saved method/months under `Payment details recorded at sale`, separate from transactions.
+    These saved details use a three-column `Method · Reference · Slip` table with the same
+    table styling as the transaction ledger, for every saved payment method. Existing wording,
+    missing-value labels and evidence notes stay unchanged; no transaction fields are inferred.
     No payment amount, paid date or collector is inferred from the order's cumulative Paid or
     current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that
     individual transactions are unavailable. A saved reference/slip with zero Paid flags the

@@ -66,14 +66,27 @@ export default function PaymentLedger({ orderId, saved }: {
   const capture = hasSavedEvidence && saved ? (
     <div className="mb-3 text-body" data-testid="so-payment-saved">
       <p className="font-medium">Payment details recorded at sale</p>
-      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
-        <dt>Method</dt><dd data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</dd>
-        <dt>Reference</dt><dd className="break-words font-mono text-meta">{saved.reference || "Not recorded"}</dd>
-        <dt>Slip</dt><dd>{saved.slip ? (
-          <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
-            className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
-        ) : "Not recorded"}</dd>
-      </dl>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-body" aria-label="Payment details recorded at sale">
+          <thead>
+            <tr className="text-label text-base-500">
+              <th scope="col" className="py-2 pr-4 text-left font-medium align-top">Method</th>
+              <th scope="col" className="py-2 pr-4 text-left font-medium align-top">Reference</th>
+              <th scope="col" className="py-2 text-left font-medium align-top">Slip</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-kit-slate-5">
+              <td className="py-2 pr-4 align-top" data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</td>
+              <td className="py-2 pr-4 align-top break-words font-mono text-meta">{saved.reference || "Not recorded"}</td>
+              <td className="py-2 align-top">{saved.slip ? (
+                <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
+                  className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
+              ) : "Not recorded"}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   ) : null;
   if (q.isLoading || q.isPending) return <>{capture}<Loading label="Opening the payments" /></>;
