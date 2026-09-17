@@ -69,7 +69,9 @@ const MODULE_LABEL: Record<OperationWorkModule, string> = {
 
 /** Timing is metadata. Object, problem, and action keep their own ranks. */
 function supportingLine(i: WorkRow): string {
-  if (i.timingBucket === "overdue" && i.dueIso) {
+  // A missed age the server could not count (an owner calendar is not set up)
+  // is never printed as `0` — MASTER §5.4 forbids inventing missed age.
+  if (i.timingBucket === "overdue" && i.dueIso && i.source.timing.missedAge.state === "counted") {
     return `Required ${fmtDate(i.dueIso)} · ${i.workingDaysLate} working ${i.workingDaysLate === 1 ? "day" : "days"} missed`;
   }
   return i.dueIso ? `Required ${fmtDate(i.dueIso)}` : "No working date";
