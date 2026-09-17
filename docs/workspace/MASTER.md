@@ -315,27 +315,32 @@ governed working day; an authorised holiday operation remains on the named holid
 working week remains visible and choosing a day narrows Panel 2 to that day. The opening focus list
 does not create a second occurrence or count.
 
+**OWNER APPROVED — Work v4, 2026-09-17.** This section, §§5.2–5.5 and §5.8 carry the v4 rulings;
+the reference review surface is https://claude.ai/artifact/HcREkf3UTPj35gYj339mCA (v4). Its
+records, people, dates and simulated saves remain fixtures and are not authority.
+
 ```text
-┌ WORKING DAY / MODULE ┬ ACTIONS ───────────────┬ SELECTED ACTION ─────────────┐
-│ Missed      {count}  │ MISSED                  │ {object} · {module}          │
-│ Mon, {date} {count}  │ {fact or problem}      │ {recipient, when applicable} │
-│ Tue, {date} {count}  │ {specific action}      │                              │
-│ Wed, {date} {count}  │ {recipient/context}    │ CURRENT FACT                 │
-│ {holiday name}       │ {timing/state}         │ {fact or problem}            │
-│ Thu, {date} {count}  │                        │                              │
-│ Fri, {date} {count}  │ THU, {date}             │ ACTION                       │
-│ Sat, {date} {count}  │                        │ {specific action}            │
-│ No working date      │                        │                              │
-│             {count}  │                        │ REQUIRED RESULT              │
-│                      │                        │ {required result}            │
-│ All          {count} │                        │                              │
-│ Sales Orders {count} │                        │ FINISH WHEN                  │
-│ Purchasing   {count} │                        │ {completion statement}       │
-│ Receiving    {count} │                        │                              │
-│ Delivery     {count} │                        │ {module action when admitted}│
-│ Payment      {count} │                        │                              │
-│ Issue Tracker{count} │                        │ [Open {object}]              │
-└──────────────────────┴────────────────────────┴──────────────────────────────┘
+┌ WORKING DAY ─────────┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
+│ Missed      {count}  │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
+│ Mon, {date} {count}  │▌{object} · {module}         │ {recipient, when applicable} │
+│ Tue, {date} {count}  │▌{fact}                      │                              │
+│ {holiday name}       │▌{action} · {contact} {when} │ CURRENT FACT                 │
+│ Thu, {date} {count}  │ MISSED                      │ {fact or problem}            │
+│ Fri, {date} {count}  │ {object} · {module}         │                              │
+│ Sat, {date} {count}  │ {fact}                      │ ACTION                       │
+│ No working date      │ {action} · {contact} {when} │ {specific action}            │
+│             {count}  │ Blocked by {dependency}     │                              │
+│                      │ THU, {date}                 │ COMMUNICATION (when admitted)│
+│ MODULE               │ {object} · {module}         │ [Open WhatsApp group]        │
+│ All modules  {count} │ {fact}                      │ [Copy message]               │
+│ Sales Orders {count} │ {action} · {contact} {when} │                              │
+│ Purchasing   {count} │                             │ REQUIRED RESULT · FINISH WHEN│
+│ Receiving    {count} │                             │ {module action when admitted}│
+│ Delivery     {count} │                             │                              │
+│ Payment      {count} │                             │ [Open {object}]              │
+│ Issue Tracker{count} │                             │                              │
+└──────────────────────┴─────────────────────────────┴──────────────────────────────┘
+▌ = thin red row edge of a broken commitment (no row badge)
 ```
 
 Panel 1 chooses the working day and module. Panel 2 lists the matching authorised actions; on first
@@ -353,13 +358,30 @@ There is no invented `Saturday Duty`. A separate preparation action may appear o
 its owning module generates that action. A public holiday remains visible and is named; normal work advances by
 the source calendar, while an authorised holiday operation remains on the holiday and says so.
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
-today. Broken commitment remains the highest attention fact on the affected row; it is not another
-weekday bucket.
+today.
+
+Panel 1 has two groups with two different count scopes:
+
+- **`WORKING DAY`** counts the whole selected week, one row per day: `Missed`, the governed
+  weekdays, Saturday only when an admitted action remains there, and `No working date`. A public
+  holiday row is named and carries no ordinary work.
+- **`MODULE`** opens with `All modules`, then each admitted module. It counts only the occurrences
+  currently in the Panel 2 list (on first open: `Missed` plus the selected day). `All modules` always
+  equals the number of Panel 2 rows, and the module rows sum to `All modules`.
+
+The Panel 2 heading is `Missed {n} · {weekday, date} {n}` on first open; when a single day is
+selected it is `{weekday, date} {n}`. Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
+`MISSED` → the selected day. A broken commitment is shown in the `BROKEN COMMITMENT` group with a red
+group heading and a thin red row edge; the row carries no badge, and its accessible name still says
+`Broken commitment`. It still counts under its own working day in Panel 1 (for example `Missed`) and
+is never counted twice. There is no `Blocked` group: a blocked occurrence stays in its own group
+(`BROKEN COMMITMENT`, `MISSED` or its day), keeps its date and missed age, and prints `Blocked by {dependency}`, so blocked
+missed work is never hidden.
 
 Every action belongs to exactly one working-day count. Once its governed action day is before today,
 it moves into `Missed`; the row retains and prints the original required date, but that occurrence is
-not counted again under the past weekday. `All`, module and owner totals count the same occurrence
-once. Day selection never creates a second copy.
+not counted again under the past weekday. Module and owner totals count the same occurrence once.
+Day selection never creates a second copy.
 
 Team Work uses the same three panels and week. It is visible to the whole Operation team: Principal,
 Operation and Jess. Visibility does not grant new module data or action permission. Panel 1
@@ -410,13 +432,13 @@ result is `More proof is required`.
 
 ### 5.2 · Work-item presentation contract
 
-Each visible item uses the approved two-line action grammar beneath structured object metadata:
+Each visible item uses the approved three-line row grammar (owner ruling 2026-09-17):
 
 ```text
-OBJECT LABEL · MODULE OR SITE CONTEXT          metadata/header
-FACT OR PROBLEM                               line 1
-ACTION · RECIPIENT (when applicable)          line 2
-WORKING DAY / MISSED AGE · exceptional state  metadata/footer
+OBJECT LABEL · MODULE OR SITE CONTEXT                       line 1
+FACT OR PROBLEM                                             line 2
+ACTION · CONTACT (when applicable) · TIMING / MISSED AGE    line 3
+Blocked by {dependency} · exceptional state (only when true) wraps below
 ```
 
 - Object identity belongs in the item header and is not repeated in the action.
@@ -435,10 +457,15 @@ WORKING DAY / MISSED AGE · exceptional state  metadata/footer
   the source rule that closes the occurrence. `FINISH WHEN` uses a third, operator-safe completion
   statement bound to that predicate. These may coincide in simple cases but the UI never assumes
   they are interchangeable and never exposes schema/table language.
-- Communication is a read-only structured source-owned block in Panel 3: recipient, channel, actual
-  sent evidence and reply state when the source truly supplies them. It is absent for
-  non-communication work. Workspace does not copy or store a second conversation. Module-owned
-  preparation/send controls remain in the owning module; opening WhatsApp is not sent evidence.
+- Communication is a structured source-owned `COMMUNICATION` block in Panel 3: recipient, channel,
+  actual sent evidence and reply state when the source truly supplies them. It is absent for
+  non-communication work. Workspace does not copy or store a second conversation. Where the owning
+  module admits them, Panel 3 renders that module's own `Open WhatsApp group`, `Open WhatsApp` or
+  `Copy message` control with the module's label law (COPY-STANDARD: the word follows the door the
+  click opens) and the module's message text; Workspace never writes its own message or label.
+  Opening WhatsApp or copying a message is never sent evidence and records nothing. A result control
+  such as `Record supplier answer` appears only after that module's supplier-reply rule is admitted
+  as an embedded action (§5.1).
 - Avatar initials are a chip with the full current name on hover, focus and tap. Departed people may
   appear only in historical evidence.
 
@@ -513,7 +540,8 @@ defaults, hard-coded people/calendars, independent source calls or a copied muta
 Search matches the authorised open set by object number/label, customer, supplier, recipient,
 problem and action. It never broadens permission scope and never searches a separately cached copy.
 
-Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
+The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
+or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
 Saturday when generated · `No working date`), `Module`, `Owner` (Team only), `Waiting for reply` where sourced, `Covered`,
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
 `Missed`. Multiple filters combine and every active filter is
@@ -525,8 +553,8 @@ The Module filter lists only currently admitted projections: `Sales Orders` · `
 `Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
 `Claims` do not appear until their admission gates and live projection close.
 
-Default ordering inside a working day is broken commitment, module-governed materiality, oldest
-opened occurrence, then object label. Users may narrow
+Panel 2 group order is `BROKEN COMMITMENT` → `MISSED` → selected day (§5.1). Default ordering inside
+a group is module-governed materiality, oldest opened occurrence, then object label. Users may narrow
 the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
 the same group and item grammar; zero matches is not the same as zero work.
 
@@ -544,7 +572,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
 | Calendar read failed | Say working days could not be loaded, preserve safe dated facts and hide invented missed age; never treat failure as zero |
 | No eligible actor that day | Keep the action on its authoritative day · `Nobody works {date} for {Duty}.` · `Set cover in Workspace → Staff & Duties`; do not falsely say the Duty has no holder |
-| Blocked | Name the dependency and the door that can resolve it; retain original working day and missed age |
+| Blocked | Stays in its own working-day group (no `Blocked` group) · `Blocked by {dependency}` plus the door that can resolve it; retain original working day and missed age; the `Blocked` filter narrows to these rows |
 | Not assigned | Group under the governed Duty word · `Nobody holds {Duty}` · `Set the holder in Workspace → Staff & Duties` |
 | Covered | Preserve normal owner and effective cover evidence; My Work routes to today's acting person |
 | Source delayed | Preserve last safe observation and say `Could not refresh {source}` with time |
@@ -554,20 +582,20 @@ the same group and item grammar; zero matches is not the same as zero work.
 
 ### 5.5 · Responsive and accessibility contract
 
-- Work uses the existing 50px Page Header. At three-panel width it has one 45px Work Toolbar; at
-  two-panel width its controls may wrap into a second 45px row because working day and module have
-  moved out of Panel 1; below 768px they use the single-panel control stack. It creates no second
-  title, breadcrumb, KPI band or card header. The controls contain `My Work · Team Work`, Search,
-  applied filters, `Clear all` when narrowed and the Filters door; freshness is a read fact, not a
-  manual business action.
+- Work uses the existing 50px Page Header. At three-panel and 768–1103px widths it has one 45px
+  Work Toolbar whose controls may wrap into a second 45px row when the canvas is narrow; below 768px
+  they use the single-panel control stack. It creates no second title, breadcrumb, KPI band or card
+  header. The controls contain `My Work · Team Work`, Search, applied filters, `Clear all` when
+  narrowed and the toolbar `Filters` door; freshness is a read fact, not a manual business action.
 - Breakpoints use the available Work canvas after the global shell, not the browser width. At
   **1104px or wider**, show all three panels: Panel 1 is the governed 240px `FilterRail`; Panel 2 is
   360px; Panel 3 takes the remainder and never falls below 500px. The full composition may use up
   to the governed 1280px content width. Straight 1px `slate-5` dividers separate panels; the shell
   has no card radius, shadow or gutters between panels.
-- From **768px through 1103px**, collapse Panel 1 into toolbar controls. Panel 2 is 340px and never
-  below 320px; Panel 3 consumes the remainder and never below 420px. If both minima cannot be met,
-  use the single-panel transition instead of squeezing text.
+- From **768px through 1103px** of Work canvas, show Panel 1 plus one work column. With no job
+  chosen the column is the Panel 2 list. Choosing a job replaces the column with that job's Panel 3
+  detail and moves focus to `Back to work`; `Back to work` restores the list and returns focus to the
+  same row (or the next visible row when it closed). Panel 1 stays visible throughout.
 - Below **768px**, show one panel at a time. Working day is a horizontally scrollable selector above
   the list and module/owner live in kit Select controls. Selecting an action replaces the list with
   full-width detail. Browser and visible `Back to work` restore week, day, module, owner, filters,
@@ -580,9 +608,10 @@ the same group and item grammar; zero matches is not the same as zero work.
   row gap and 36px minimum rows. Selected rows use `blue-3` plus the straight 2px `blue-9` inset
   marker; hover is `slate-3`. Counts are neutral, right-aligned and tabular. Long governed labels
   wrap; the rail never truncates them.
-- Panel 2 has a 44px heading and selectable action rows with 12px vertical / 16px horizontal
-  padding, 4px internal gaps and 1px `slate-5` dividers. A row is at least 88px but grows to show the
-  complete object, fact/problem, action, recipient and timing state. Selection uses the same
+- Panel 2 has a 44px heading and selectable action rows with 1px `slate-5` dividers. A row is at
+  least 64px and grows for long text; it never truncates. Its lines are object · module, then
+  fact/problem, then action with contact and timing (§5.2); `Blocked by {dependency}` wraps below
+  when true. A broken-commitment row adds only the thin red edge. Selection uses the same
   `blue-3` + 2px inset marker; hover remains grey. Work items are rows, never individual Cards.
   An admitted embedded row alone may carry the neutral `Do it here`; ordinary module-door and
   read-only rows carry no repeated mode badge.
@@ -600,16 +629,18 @@ the same group and item grammar; zero matches is not the same as zero work.
 - Every item wraps rather than truncating problem, action, recipient, required result or working-day
   state. No horizontal owner board or hidden completion text is permitted.
 - Keyboard order follows scope → search → working day → module/owner → filters → items → selected
-  detail. From a selected `embedded` row, `Enter` moves focus to the first form field. For
-  `open_module`, `Enter` opens the owning object. `O` opens the owning object only while focus is in
+  detail. From a selected row, `Enter` moves focus into the right panel: the first form field of an
+  `embedded` action, otherwise the first control of the brief. `O` opens the owning object only while focus is in
   the Work list/detail navigation, never while typing in an input; the shortcut is discoverable in
   the object-door tooltip and accessible help. Every item has one descriptive
   accessible name combining object, problem and action. Hover evidence is also available by focus
   and tap; colour, initials and icon alone never carry meaning. Focus returns to the invoking row
   after Back; when that occurrence closed, it moves to the next visible row and announces the change.
-  A confirmed completion leaves an inline source receipt where the row was, including on mobile;
-  it has no timer and remains until dismissal or the next meaningful list action. Panel 3 moves to
-  the next occurrence and never displays the previous occurrence's receipt as if it belonged there.
+  After a confirmed completion the row becomes an inline source receipt where the row was, including
+  on mobile; it has no timer and remains until dismissal or the next meaningful list action. The next
+  row is selected, keyboard focus stays on that row in the list, and Panel 3 shows the next
+  occurrence, never the previous occurrence's receipt as if it belonged there. From the selected row,
+  `Enter` moves focus into the right panel; `O` opens the owning object.
 - Acceptance captures and measures 1440×900, 1180×820, 820×900 and 390×844. It records actual
   canvas/panel widths, overflow, focus order and wrapped action content; a screenshot without those
   measurements is not responsive proof.
@@ -688,6 +719,17 @@ Work is ready for owner acceptance only when all are demonstrable:
   due/late fact and exact owning door without repeating owner/object in sentence prose;
 - first open shows `Missed` followed by the actual current or next eligible governed weekday/date,
   names a public holiday and never duplicates an occurrence or hides the complete working week;
+- `WORKING DAY` counts the whole week; `All modules` equals the Panel 2 row count and the module rows
+  sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
+- Panel 2 orders `BROKEN COMMITMENT` → `MISSED` → selected day; a broken commitment has a red group
+  heading and red row edge with no badge and still counts once under its own working day; a blocked
+  job stays in its own group with `Blocked by {dependency}`;
+- rows are at least 64px and never truncate; after a confirmed completion the receipt stays in place,
+  the next row is selected with focus on it, `Enter` moves into Panel 3 and `O` opens the object;
+- at a 768–1103px canvas Panel 1 plus one work column shows; choosing a job replaces the column and
+  `Back to work` returns focus to the same row;
+- a communication job renders only the owning module's `Open WhatsApp group` / `Open WhatsApp` /
+  `Copy message` controls and records nothing when they are used;
 - each occurrence's interaction mode is explicit; an embedded action uses the owning component/API,
   refuses stale source versions, is idempotent, preserves permission/cover evidence and disappears
   only after the refreshed feed proves its completion predicate;
