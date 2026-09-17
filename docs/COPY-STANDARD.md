@@ -225,7 +225,11 @@ These words govern the three destinations under the left-bar `WORKSPACE` section
 | Issue current action | `Current Action` · `No current action` · `Waiting for triage rule` | Set next action · Follow up · Handle |
 | Issue action result | `Record result` | Save result · Mark done · Complete task |
 | Issue intake validation | `Choose what has a problem.` · `Choose what you saw.` · `Choose who found the issue.` · `Choose when the issue was found.` · `Find and choose the linked record.` · `Add the required proof.` | Required · Invalid · Complete all fields |
-| Issue result validation | `Choose what happened.` · `Add the evidence needed for this result.` · `This action has changed. Read the current action before recording a result.` | Save failed · Conflict · Try later |
+| Issue result validation | `Choose what happened.` · `Add the evidence needed for this result.` | Save failed · Conflict · Try later |
+| Issue stale action (owner ruling 2026-09-17, replaces `This action has changed. Read the current action before recording a result.`) | warning icon plus `Action changed · Review again` | Conflict · stale record · the long sentence |
+| Issue save definitely failed (owner ruling 2026-09-17) — the server answered with an error | `Issue not recorded · Try again` · `Result not recorded · Try again` | Save failed · Something went wrong · closing the dialog silently |
+| Issue save not confirmed (owner ruling 2026-09-17) — network error, timeout, no answer | warning icon plus `Not confirmed · Try again` | `Issue not recorded` or `Result not recorded` when the answer is uncertain |
+| Issue save refused (owner ruling 2026-09-17) | `Only {acting person} can record this.` · only when no acting person can be named: `You do not have access to record this result.` | `Only {Duty} can record this result.` (a Duty is not the person who acts) · Forbidden · Access denied |
 | Issue detail sections | `What is true` · `Linked records` · `Accountability` · `Money` · `Evidence & timeline` · `Review & learning` · `Related Issues & history` | Details · Activity · Notes as catch-all sections |
 | Issue report door | `Monthly report` | Report dashboard · Export issues |
 
@@ -3434,7 +3438,7 @@ this file keeps its meaning; a word with a second meaning says so here.
 | | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
 | Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
-| Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. Since 0523 it counts every payment method row, on or off, and the two rows no screen shows: `{method}` is then `Online payment` (Stripe, the existing word) or `Card` (POS card, **PROPOSAL — PENDING APPROVAL**). |
+| Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. Since 0523 it counts every payment method row, on or off, and the two rows no screen shows: `{method}` is then `Online payment` (Stripe, the existing word) or `POS card` (POS credit, debit and instalment money; **APPROVED — YH, 17 Sep 2026**; since 0525). |
 | Refusal (database, 0515) | `{code} {name} is out of use. Move {method} to another account first.` | **APPROVED — YH, 16 Sep 2026.** The same rule from the other side: turning a payment method on while its account is out of use. Built only from the approved sentence above. Used on Settings → Payment → Payment methods (the Active switch). |
 
 An empty list would show the grid's default `No data.`, which the Empty-state pattern bans. The

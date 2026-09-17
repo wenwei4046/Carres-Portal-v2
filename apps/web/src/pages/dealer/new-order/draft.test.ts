@@ -575,6 +575,21 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
     expect(step3DateFirstIssue(d, 14, TODAY)).toContain("past");
   });
+
+  // 17 Sep 2026 — the gate counted from the UTC day. Before 08:00 in KL that is
+  // still yesterday, so a 3-day lead said 19 Sep and a proceed date of 16 Sep
+  // passed as "today".
+  it("counts from today in Kuala Lumpur, not the UTC day", () => {
+    const klMorning = new Date("2026-09-16T23:00:00Z"); // 07:00 Thu 17 Sep in KL
+    const d = validDraft();
+    d.delivery.date = "2026-09-19";
+    d.delivery.proceedDate = "2026-09-17";
+    expect(step3DateFirstIssue(d, 3, klMorning)).toContain("earliest date is 2026-09-20");
+    d.delivery.date = "2026-09-20";
+    expect(step3DateValid(d, 3, klMorning)).toBe(true);
+    d.delivery.proceedDate = "2026-09-16";
+    expect(step3DateFirstIssue(d, 3, klMorning)).toContain("can't be in the past (earliest 2026-09-17)");
+  });
 });
 
 describe("step3Valid — Submit gate", () => {
