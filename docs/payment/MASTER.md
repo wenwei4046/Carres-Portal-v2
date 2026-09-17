@@ -280,10 +280,12 @@ continues from recorded money unless Finance explicitly raises an open Finance E
 ### Payment Records
 
 `Payment Records` is the only permanent incoming-customer-money listing — one row per actual
-Payment transaction. Default columns, `Receipt No` sticky:
+**Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
+
+Payment transaction. Default columns (Paid date then Receipt No, pinned per §6.7):
 
 ```text
-Receipt No | Paid date | Customer | SO No | Amount received | Method
+Paid date | Receipt No | Customer | SO No | Amount received | Method
 ```
 
 No Goods, arrival, Storage, delivery or timing here; no redundant `Recorded`; no required Invoice

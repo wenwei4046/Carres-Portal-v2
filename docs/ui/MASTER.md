@@ -565,12 +565,12 @@ gone."* It binds every object detail in the portal; it is not re-argued per modu
 **Remembered: whether a rail or a panel is collapsed.** Shipped and measured —
 `OrderDetailDrawer.tsx:2000` reads `ops-drawer-rail` from `localStorage`, and panel open/closed
 persists by panel title (`:656-673`).
-**Register column preferences are personal.** Width, order and visibility may persist in the
-staff browser without changing anyone else's governed default. `Columns → Reset columns`
-restores the page's default columns, order and widths only; it does not clear filters or records.
-Cross-device account synchronisation is deferred. This Register rule does not add column
-customisation to object-detail goods tables; those retain their own governed capabilities. Measured gap: kit `DataTable` still persists no
-column shape (`OperationOrdersControl.test.tsx`) — **APPROVED TARGET / NOT BUILT** there.
+**Register column preferences are personal — APPROVED / NOT BUILT (Jess, 2026-09-17).**
+Purchase Orders pilots account-saved layouts under §6.7: up to 10 named layouts per listing,
+readable and changeable only by the signed-in owner. Save order, widths, visibility and sort;
+never search, filters or group expansion. Other listings keep their current behavior until owner
+acceptance of the pilot. This does not add customisation to object-detail goods tables.
+Measured gap: kit `DataTable` still persists no column shape (`OperationOrdersControl.test.tsx`); that capability remains APPROVED TARGET / NOT BUILT there.
 
 
 ---
@@ -1305,7 +1305,7 @@ compact destination header / work toolbar
 
 breathing gap
 
-  ▸ | SO No | SO Date | Requested Delivery Date | Customer |
+  ▸ | SO Date | SO No | Requested Delivery Date | Customer |
     | Delivery Location | Showroom | PO No | DO No
 ```
 
@@ -1466,15 +1466,32 @@ facts, permissions, complete-record populations or task ownership.
    header filters narrow the list. Clear all three together; preserve permissions and the
    page's governed base population. Footer shows filtered versus total records (`5 of 62`).
    Grouping/collapse is presentation, not a filter, and does not reduce the total.
-2. **Identity.** Keep the identity visible during horizontal scrolling and make it open the
-   object: Sales Orders/SO Batch `SO No`, Manual Purchase `Items`, Purchase Orders `PO No`.
-   Personal column changes must not hide or move this identity out of its fixed position.
+2. **Date and identity — APPROVED / NOT BUILT (Jess, 2026-09-17).** Every listing begins
+   with its own record date, then its document number/business identity. Canvas ≥768px pins
+   both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
+   layout changes. Identity opens the object. Mappings: Sales Orders `SO Date · SO No`;
+   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · Items`;
+   Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
+   Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
+   Other listings use their governed record date and identity, without inventing date facts.
+   PO Date is the PO issue/document date represented in its number, not the sent-mark date.
+   GRN Date is record creation; physical `Goods received on` remains in detail.
+   DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
-4. **Personal columns.** Reuse Columns for resize/reorder/visibility and `Reset columns`.
-   Keep browser persistence for now, isolated from other people's defaults. Account-level
-   cross-device persistence is deferred. Reset restores column shape only, not filters/data.
+4. **Personal columns — APPROVED / NOT BUILT (Jess, 2026-09-17).** DataGrid provides an
+   opt-in capability; only Purchase Orders enables the pilot, in its implementation round.
+   Columns offers show/hide, `Save layout as…` (name), `Load layout`, `Set as my default`,
+   `Reset columns`, `Best fit`, `Expand all` and `Collapse all`.
+   Save per signed-in user, up to 10 layouts per listing; enforce ownership on reads and writes.
+   Persist column order, widths, visibility and sort only. Never persist search, filters or group
+   open/closed state in a layout. Personal layouts never alter company defaults or another user's
+   view. Reset columns restores the company layout, leaving search, filters and records unchanged.
+   Date and identity cannot be hidden or moved from their leading positions; responsive pinning
+   follows rule 2 (both ≥768px, identity alone below768px). Expand/collapse respects mandatory-open
+   group headings and does not change filtering or totals. Other pages remain unchanged until
+   the owner accepts the PO pilot and authorizes rollout.
 5. **Actions.** Essential actions remain discoverable on the object opened via identity.
    Right-click is a shortcut, not the sole door. Pages with batch actions replace the toolbar
    with their selection actions; do not invent batch actions on read-only registers.
@@ -1491,18 +1508,20 @@ facts, permissions, complete-record populations or task ownership.
 **Different jobs, shared interaction:** Sales Orders remains the complete customer-transaction
 register governed by Orders MASTER, not a purchasing work queue. SO Batch uses `To buy` /
 `No purchase needed`. Manual Purchase uses `Need approval` / `To buy` / `No purchase needed`.
-Purchase Orders' proposed four-group arrangement must use one mutually exclusive classifier:
-Cancelled first, Completed next, then current-version confirmed-send evidence for remaining work.
-Its module-specific copy and display proposal are reconciled in Purchasing MASTER before build.
+Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Not marked as sent`,
+`Issued`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
+→ unmarked. Receiving remains a formal GRN register, not a work queue.
 
 **Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `Mark as sent`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
 not proof that no external send happened. Completed legacy documents must not become resend work
 solely because a send record is absent. Purchasing MASTER owns the full send/version contract.
 
-**Adoption order:** SO Batch establishes shared capabilities; Manual Purchase reuses them;
-Sales Orders gets a separately agreed audit/proposal and Claude task; Purchase Orders follows its
-agreed module proposal. No parallel reimplementation of the shared engine. Record built, merged,
-deployed and rendered verification separately; approval alone is not implementation evidence.
+**Adoption order — Jess, 2026-09-17:** merge this documentation PR → Sales Orders small patch
+(search totals, long-list keyboard navigation, two pinned columns and SO Date first) → Manual
+Purchase Round 2 (Proceed Date first) → Purchase Orders (nine columns, groups, sending marks and
+personal saved-layout pilot). Coordinate shared engine ownership. Account layouts roll out to
+other listings only after owner acceptance of the PO pilot. These rulings are APPROVED / NOT BUILT;
+record implementation, merge, deployment and rendered verification separately.
 
 
 **This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain
