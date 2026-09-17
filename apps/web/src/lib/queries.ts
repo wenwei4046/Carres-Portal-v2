@@ -227,6 +227,7 @@ import {
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetTransitDaysInput,
+  type PurchasingSetSupplierTermsDaysInput,
   type PurchasingSetWorkWeekInput,
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
@@ -3390,6 +3391,8 @@ export interface operationPoListRow {
   so_refs: number[] | null;
   eta_date: string | null;
   official_delivery_date?: string | null;
+  /** 0529 — payment terms in days after the bill date. Null = not set. */
+  terms_days?: number | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
    *  after a supplier answered. It is NOT `eta_date`, which is our own
@@ -5203,6 +5206,24 @@ export function useSetSupplierWorkWeek() {
 /** The lorry leg — 0318's write door, finally given a screen (2026-09-09). */
 export function useSetSupplierTransitDays() {
   return usePurchasingSettingsMutation<PurchasingSetTransitDaysInput>("/transit-days");
+}
+
+/** 0529 — a supplier's payment terms in days (null clears). */
+export function useSetSupplierTermsDays() {
+  return usePurchasingSettingsMutation<PurchasingSetSupplierTermsDaysInput>("/terms-days");
+}
+
+/** 0529 — a PO's own payment terms in days (null clears). */
+export function useSetPoTermsDays(poId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (days: number | null) =>
+      apiFetch<{ ok: true }>(`/api/operation/pos/${encodeURIComponent(poId)}/terms-days`, {
+        method: "PUT",
+        body: JSON.stringify({ days }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["operation", "pos"] }),
+  });
 }
 
 export function useCreatePurchasingDestination() {

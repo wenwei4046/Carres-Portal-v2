@@ -150,7 +150,7 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
 payablesRouter.get("/suppliers", requireFinance, async (c) => {
   const { data, error } = await sb(c)
     .from("suppliers")
-    .select("id, name, kind")
+    .select("id, name, kind, terms_days")
     .order("name", { ascending: true });
   if (error) return pgFail(c, error);
   return c.json({ rows: data ?? [] });
@@ -203,7 +203,17 @@ payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
   if (!f.ok) return badId(c, "supplier");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_candidates", { p_supplier_id: f.value });
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  // 0529 — each GRN carries its PO's payment terms, so the bill form can fill
+  // in the due date. One read for all the POs on the list.
+  const rows = (data ?? []) as Array<{ po_id: string }>;
+  const poIds = [...new Set(rows.map((r) => r.po_id))];
+  const terms = new Map<string, number | null>();
+  if (poIds.length) {
+    const po = await sb(c).from("purchase_orders").select("id, terms_days").in("id", poIds);
+    if (po.error) return pgFail(c, po.error);
+    for (const p of po.data ?? []) terms.set(p.id as string, (p.terms_days as number | null) ?? null);
+  }
+  return c.json({ rows: rows.map((r) => ({ ...r, po_terms_days: terms.get(r.po_id) ?? null })) });
 });
 
 payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {

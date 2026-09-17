@@ -107,6 +107,23 @@ describe("GET readers", () => {
     expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_grn_candidates", { p_supplier_id: SUPPLIER_ID });
   });
 
+  it("GET /bills/grn-candidates adds each PO's payment terms (0529)", async () => {
+    const inFn = vi.fn().mockResolvedValue({ data: [{ id: "PO-1", terms_days: 14 }], error: null });
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: [{ po_id: "PO-1" }, { po_id: "PO-2" }], error: null }),
+      from: vi.fn(() => ({ select: () => ({ in: inFn }) })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await call("/bills/grn-candidates");
+    expect(sb.from).toHaveBeenCalledWith("purchase_orders");
+    expect(inFn).toHaveBeenCalledWith("id", ["PO-1", "PO-2"]);
+    expect(await res.json()).toEqual({ rows: [
+      { po_id: "PO-1", po_terms_days: 14 },
+      { po_id: "PO-2", po_terms_days: null },
+    ] });
+  });
+
   it("GET /outstanding with no filter asks for every supplier", async () => {
     const sb = mockRpc({ data: [], error: null });
     await call("/outstanding");
@@ -149,7 +166,7 @@ describe("GET readers", () => {
     const res = await call("/suppliers");
     expect(res.status).toBe(200);
     expect(from).toHaveBeenCalledWith("suppliers");
-    expect(select).toHaveBeenCalledWith("id, name, kind");
+    expect(select).toHaveBeenCalledWith("id, name, kind, terms_days");
   });
 });
 

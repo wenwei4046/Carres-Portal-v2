@@ -98,6 +98,8 @@ export interface PurchasingSupplierRow {
    * without one — a built, deployed supplier call that could never fire.
    */
   transitDays: number | null;
+  /** 0529 — payment terms in days after the bill date. Null = not set. */
+  termsDays?: number | null;
 }
 
 /** One edit: who, when, and what it was before. */
@@ -437,6 +439,7 @@ export const purchasingSettingsResponseSchema = z.object({
       categories: z.array(purchasingCategorySchema),
       offDays: z.array(z.number().int().min(0).max(6)).nullable(),
       transitDays: z.number().int().min(0).max(60).nullable(),
+      termsDays: z.number().int().min(0).nullable().optional(),
     }),
   ),
   productionDays: z.array(
@@ -578,6 +581,15 @@ export const purchasingSetTransitDaysInput = z
   })
   .strict();
 export type PurchasingSetTransitDaysInput = z.infer<typeof purchasingSetTransitDaysInput>;
+
+/** 0529 — one supplier's payment terms in days; null clears it. */
+export const purchasingSetSupplierTermsDaysInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    days: z.number().int().min(0).max(365).nullable(),
+  })
+  .strict();
+export type PurchasingSetSupplierTermsDaysInput = z.infer<typeof purchasingSetSupplierTermsDaysInput>;
 
 export const purchasingSetWorkWeekInput = z
   .object({

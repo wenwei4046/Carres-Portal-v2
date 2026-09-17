@@ -114,7 +114,7 @@ export async function loadPurchasingSettings(
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name, kind, cat_covered"),
+    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
     sb
       .from("purchasing_supplier_settings")
@@ -185,6 +185,7 @@ export async function loadPurchasingSettings(
   }
 
   const nameById = new Map<string, string>();
+  const termsById = new Map<string, number | null>();
   const factoryPickupSupplierIds: string[] = [];
   /* 0477 — Finance's other creditors (a landlord, an advertiser) share the
      table. They make nothing, so they never get a Settings row, even if a
@@ -192,6 +193,7 @@ export async function loadPurchasingSettings(
   const otherCreditorIds = new Set<string>();
   for (const row of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
     nameById.set(row.id as string, (row.name as string | null) ?? "");
+    termsById.set(row.id as string, (row.terms_days as number | null) ?? null);
     if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
     if (isOtherCreditor(row)) otherCreditorIds.add(row.id as string);
   }
@@ -204,6 +206,7 @@ export async function loadPurchasingSettings(
       categories: [...cats].sort(),
       offDays: offDaysBySupplier.get(id) ?? null,
       transitDays: transitBySupplier.get(id) ?? null,
+      termsDays: termsById.get(id) ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

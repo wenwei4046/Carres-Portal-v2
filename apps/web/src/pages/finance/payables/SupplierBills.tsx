@@ -9,6 +9,7 @@ import type {
   SupplierBillDraftInput,
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
+import { defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
@@ -488,6 +489,11 @@ function BillForm() {
   const [invoiceNo, setInvoiceNo] = useState("");
   const [billDate, setBillDate] = useState(appTodayIso());
   const [dueDate, setDueDate] = useState("");
+  // 0529 — the due date follows bill date + terms until the user types one.
+  // A saved draft keeps what it has.
+  const [dueTouched, setDueTouched] = useState(Boolean(id));
+  // ponytail: the last picked GRN's PO; bills spanning two POs use that one's terms.
+  const [poTermsDays, setPoTermsDays] = useState<number | null>(null);
   const [apAccount, setApAccount] = useState("");
   const [narration, setNarration] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
@@ -523,6 +529,10 @@ function BillForm() {
   }, [id, loaded, existing.data]);
 
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
+  const suggestedDue = defaultBillDueDate(billDate, poTermsDays, supplier?.terms_days) ?? "";
+  useEffect(() => {
+    if (!dueTouched) setDueDate(suggestedDue);
+  }, [dueTouched, suggestedDue]);
   const lineAccounts = (accounts.data ?? []).filter((a) => a.for_bill_line);
   const apAccounts = (accounts.data ?? []).filter((a) => a.for_ap);
   const total = cents(lines.reduce((s, l) => s + (lineAmount(l) ?? 0), 0));
@@ -600,7 +610,14 @@ function BillForm() {
               <label className="block">
                 Due date
                 <input aria-label="Due date" type="date" className={`${fieldCls} mt-1`} value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)} />
+                  onChange={(e) => { setDueTouched(true); setDueDate(e.target.value); }} />
+                {!dueTouched && suggestedDue !== "" && (
+                  <span className="text-meta text-base-500" data-testid="due-from-terms">
+                    {poTermsDays != null
+                      ? `Bill date + ${poTermsDays} days, from the PO's terms`
+                      : `Bill date + ${supplier?.terms_days} days, from the supplier's terms`}
+                  </span>
+                )}
               </label>
               <label className="block">
                 Payables account
@@ -660,8 +677,9 @@ function BillForm() {
         supplierId={supplierId || null}
         poId={params.get("po")}
         onClose={() => setGrnOpen(false)}
-        onPick={(picked, supplierOfGrn) => {
+        onPick={(picked, supplierOfGrn, poTerms) => {
           if (!supplierId) setSupplierId(supplierOfGrn);
+          setPoTermsDays(poTerms);
           setLines((before) => [...before.filter((l) => lineAmount(l) !== null || l.description !== ""), ...picked]);
           setGrnOpen(false);
         }}
@@ -752,7 +770,7 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
   supplierId: string | null;
   poId: string | null;
   onClose: () => void;
-  onPick: (lines: LineDraft[], supplierId: string) => void;
+  onPick: (lines: LineDraft[], supplierId: string, poTermsDays: number | null) => void;
 }) {
   const candidates = useGrnCandidates(supplierId, open);
   const [busy, setBusy] = useState<string | null>(null);
@@ -778,7 +796,7 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
           openQty: num(l.open_qty),
         }));
       if (picked.length === 0) toast.error("Everything on that GRN is already billed.");
-      else onPick(picked, g.supplier_id);
+      else onPick(picked, g.supplier_id, g.po_terms_days ?? null);
     } catch (e) {
       toast.error(refusal(e));
     } finally {

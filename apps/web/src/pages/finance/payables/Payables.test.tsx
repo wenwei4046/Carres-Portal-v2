@@ -243,6 +243,37 @@ describe("Bill form — Convert GRN to bill", () => {
     for (const l of (w.body as { lines: Array<Record<string, unknown>> }).lines) expect(l).not.toHaveProperty("amount");
   });
 
+  it("fills the due date from the supplier's terms, then the PO's, and keeps a typed one (0529)", async () => {
+    api.routes[`${B}/suppliers`] = { rows: [
+      { id: SUP, name: "Lumen Sofa Works", kind: "supplier", terms_days: 30 },
+    ] };
+    const grn = api.routes[`${B}/bills/grn-candidates`] as { rows: Array<Record<string, unknown>> };
+    api.routes[`${B}/bills/grn-candidates`] = { rows: grn.rows.map((r) => ({ ...r, po_terms_days: 14 })) };
+    show("/finance/bills/new");
+    await screen.findByRole("option", { name: "Lumen Sofa Works" });
+    fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: SUP } });
+    fireEvent.change(screen.getByLabelText("Bill date"), { target: { value: "2026-09-10" } });
+    await waitFor(() => expect(screen.getByLabelText("Due date")).toHaveValue("2026-10-10"));
+    expect(screen.getByTestId("due-from-terms")).toHaveTextContent("from the supplier's terms");
+
+    fireEvent.click(screen.getByTestId("convert-grn"));
+    fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
+    await waitFor(() => expect(screen.getByLabelText("Due date")).toHaveValue("2026-09-24"));
+    expect(screen.getByTestId("due-from-terms")).toHaveTextContent("from the PO's terms");
+
+    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2026-09-30" } });
+    fireEvent.change(screen.getByLabelText("Bill date"), { target: { value: "2026-09-11" } });
+    expect(screen.getByLabelText("Due date")).toHaveValue("2026-09-30");
+    expect(screen.queryByTestId("due-from-terms")).toBeNull();
+  });
+
+  it("leaves the due date empty when no terms are set (0529)", async () => {
+    show("/finance/bills/new");
+    await screen.findByRole("option", { name: "Lumen Sofa Works" });
+    fireEvent.change(screen.getByLabelText("Supplier"), { target: { value: SUP } });
+    expect(screen.getByLabelText("Due date")).toHaveValue("");
+  });
+
   it("a typed line for an other creditor sends the account and the amount", async () => {
     show(`/finance/bills/new?supplier=${LANDLORD}`);
     await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LANDLORD));
