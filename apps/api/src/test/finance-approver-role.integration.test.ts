@@ -37,6 +37,7 @@ const U = {
   financeChecker: uid("4"), // finance, no duty — checks it
   principal: uid("5"), // principal, no position
   disabledFinanceApprover: uid("6"), // finance, holds the duty, account disabled
+  financeHolder: uid("7"), // finance, no duty — named in Staff & Duties by one case
 };
 const POS = { approver: uid("a1"), plain: uid("a2") };
 const NOBODY = uid("f1"); // a document id that does not exist
@@ -84,6 +85,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
       [U.financeChecker, "finance", POS.plain, "active"],
       [U.principal, "principal", null, "active"],
       [U.disabledFinanceApprover, "finance", POS.approver, "disabled"],
+      [U.financeHolder, "finance", POS.plain, "active"],
     ];
     for (const [id, role, position, status] of people) {
       const email = `it-fa-${role}-${id.slice(-4)}-${RUN}@carres.test`;
@@ -182,17 +184,30 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
   }
 
   it("once Staff & Duties names a finance approver, that person approves and the HR tick stops counting", async () => {
-    const r = await withStaffAndDuties(U.financeChecker, null, async () => {
-      const answers = [await approver(U.financeChecker), await approver(U.financeApprover), await approver(U.principal)];
+    // 0528: the holder is not the checker, who may never approve
+    const r = await withStaffAndDuties(U.financeHolder, null, async () => {
+      const answers = [await approver(U.financeHolder), await approver(U.financeApprover), await approver(U.principal)];
       await actAs(U.financeApprover);
       const byTick = await attempt("select public.payment_voucher_approve($1)", [voucherId]);
-      await actAs(U.financeChecker);
+      await actAs(U.financeHolder);
       const byHolder = await attempt("select public.payment_voucher_approve($1)", [voucherId]);
       return { answers, byTick, byHolder };
     });
     expect(r.answers).toEqual([true, false, true]);
     expect(r.byTick).toEqual({ ok: false, detail: "not_finance_approver" });
     expect(r.byHolder.ok).toBe(true);
+  });
+
+  it("the checker holding the approver duty still cannot approve what they checked (0528)", async () => {
+    const r = await withStaffAndDuties(U.financeChecker, null, async () => {
+      await actAs(U.financeChecker);
+      return {
+        answer: await approver(U.financeChecker),
+        byChecker: await attempt("select public.payment_voucher_approve($1)", [voucherId]),
+      };
+    });
+    expect(r.answer).toBe(true);
+    expect(r.byChecker).toEqual({ ok: false, detail: "checker_cannot_approve" });
   });
 
   it("today's buddy cover approves in the holder's place, and separation of duties still applies to them", async () => {
