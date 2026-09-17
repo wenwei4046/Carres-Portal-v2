@@ -1469,7 +1469,6 @@ describe("the object never issues (Card 05)", () => {
   it("a request cut by its approver and fully issued reads Ordered, not Ready to order", () => {
     expect(
       manualPurchaseStatusOf({
-        approvalRequired: true,
         approvedAt: "2026-08-30T02:00:00Z",
         refusedAt: null,
         refuseReason: null,
@@ -1487,7 +1486,6 @@ describe("the object never issues (Card 05)", () => {
   it("a line cut to zero does not hold the whole request open", () => {
     expect(
       manualPurchaseStatusOf({
-        approvalRequired: true,
         approvedAt: "2026-08-30T02:00:00Z",
         refusedAt: null,
         refuseReason: null,
@@ -1502,7 +1500,6 @@ describe("the object never issues (Card 05)", () => {
   it("a request whose every line was cut to zero is not going ahead", () => {
     expect(
       manualPurchaseStatusOf({
-        approvalRequired: true,
         approvedAt: "2026-08-30T02:00:00Z",
         refusedAt: null,
         refuseReason: null,

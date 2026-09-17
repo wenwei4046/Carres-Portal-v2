@@ -70,7 +70,8 @@
 .mp-line-caption { display: none; }
 .mp-create-footer { display: none; }
 @container mp-create (width < 640px) {
-  .mp-create-actions-header { display: none; }
+  /* Scoped under the shell so it outranks the button row's own `flex`. */
+  .mp-create-shell .mp-create-actions-header { display: none; }
   .mp-create-footer {
     display: flex;
     flex: none;
@@ -81,9 +82,9 @@
   }
   .mp-create-page { padding: 0.5rem; }
   .mp-create-body { padding: 0.75rem; }
-  .mp-create-lines { grid-template-columns: 72px minmax(0, 1fr) auto !important; }
+  .mp-create-lines { grid-template-columns: 72px minmax(0, 1fr) !important; }
   .mp-create-lines .mp-line-head { display: none; }
   .mp-create-lines .mp-line-item { grid-column: 1 / -1; }
   .mp-create-lines .mp-line-caption { display: block; margin-bottom: 2px; }
-  .mp-create-lines .mp-line-action { align-self: end; }
+  .mp-create-lines .mp-line-action { grid-column: 1 / -1; justify-self: end; }
 }

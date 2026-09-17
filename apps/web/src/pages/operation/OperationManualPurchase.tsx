@@ -708,7 +708,11 @@ export default function OperationManualPurchase() {
         key: "items",
         label: MW.colItems,
         wrap: true,
-        width: 220,
+        /* Sized to the CATALOG, not the fixture (measured 2026-09-17): the
+           longest live model name is 18 characters, so 180px holds a name and
+           its size on one line and `{first} + {n} more` on two — and the
+           sticky identity still fits beside the gutters on a 390px phone. */
+        width: 180,
         minWidth: 120,
         sortable: true,
         chooserGroup: "Request",
@@ -786,7 +790,10 @@ export default function OperationManualPurchase() {
         key: "approval",
         label: MW.colApproval,
         headerLines: ["Approval", "Status"],
-        width: 176,
+        /* Measured 2026-09-17 in the rendered shell: the `Sent back for
+           changes` pill is 134px, the requester avatar 24px + 6px gap, plus
+           16px padding and the rule — 181px. Narrower clipped the pill. */
+        width: 188,
         minWidth: 112,
         sortable: true,
         chooserGroup: "Request",
@@ -1148,14 +1155,18 @@ export default function OperationManualPurchase() {
                     <Icon name="panelToggle" />
                   </button>
                 )}
+                {/* Below a 640px canvas the pill keeps its `+` and its full
+                    accessible name, and gives the words' width back to the
+                    toolbar (measured at 390px: the words pushed Columns off
+                    the edge). `ManualPurchaseRegister.module.css`. */}
                 <button
                   type="button"
                   onClick={() => setMode("create")}
                   data-testid="manual-purchase-new-request"
-                  className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+                  className={`${registerStyles.create} relative inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90`}
                 >
                   <Plus size={14} strokeWidth={2.25} aria-hidden />
-                  <span><span className="sr-only">{MW.newRequest.slice(0, 2)}</span>{MW.newRequest.slice(2)}</span>
+                  <span className={registerStyles.createWords}><span className="sr-only">{MW.newRequest.slice(0, 2)}</span>{MW.newRequest.slice(2)}</span>
                 </button>
               </>
             }
@@ -2993,6 +3004,12 @@ function ManualPurchaseObject({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
       });
+      /* R4 · A LOST RACE RE-READS THE REQUEST (walk, 2026-09-17). The door
+         refused because somebody else's act landed first; leaving Approve on
+         screen invites a second click against a request that is already
+         withdrawn, sent back or decided. The re-read replaces the controls
+         with the fact that won. */
+      void q.refetch();
     }
   }
 
@@ -3118,6 +3135,7 @@ function ManualPurchaseObject({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
       });
+      void q.refetch();
     }
   }
   const approverLine = manualPurchaseApproverLine(d.approvers.map((a) => a.name));

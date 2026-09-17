@@ -15,7 +15,15 @@
 @container manual-purchase (width < 896px) {
   .canvas .rail { position: absolute; inset-block: 0; left: 0; z-index: 30; }
 }
-/* Keep Clear, the duty holder and Issue PO reachable on the narrow canvas. */
+/* Keep Clear, the duty holder and Issue PO reachable on the narrow canvas, and
+   let `+ Manual Purchase` shrink to its `+` so Search, Export and Columns stay
+   on screen. The words stay in the accessibility tree (visually hidden, inside
+   a `relative` button so nothing escapes to stretch the page). */
 @container manual-purchase (width < 640px) {
   .canvas [data-testid="selection-bar"] > span:first-child { display: none; }
+  .canvas .create { padding-inline: 0.4375rem; }
+  .canvas .createWords {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
 }

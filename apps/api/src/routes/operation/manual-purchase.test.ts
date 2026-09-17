@@ -74,7 +74,7 @@ const DEST = "cccccccc-0000-0000-0000-000000000001";
 const REQUESTS = [
   {
     id: REQ_A, req_no: "REQ-0001", purpose: "display", destination_id: DEST,
-    approval_required: true, approved_at: "2026-08-19T03:00:00Z", refused_at: null,
+    approval_required: true, approved_at: "2026-08-19T03:00:00Z" as string | null, refused_at: null,
   },
   {
     /* R1 (2026-09-16): a stored `approval_required = false` is history, not
