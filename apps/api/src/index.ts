@@ -79,7 +79,6 @@ import partnerPickupsBatchRouter from "./routes/partner/pickups-batch";
 import partnerPodRouter from "./routes/partner/pod";
 import pickupEventsRouter from "./routes/pickup-events/print";
 import financePaymentsRouter from "./routes/finance/payments";
-import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
 import collectionOwnerRouter from "./routes/finance/collection-owner";
@@ -269,7 +268,6 @@ api.route("/partner/pickups", partnerPickupsBatchRouter);
 api.route("/partner/pod", partnerPodRouter);
 api.route("/pickup-events", pickupEventsRouter);
 api.route("/finance/payments", financePaymentsRouter);
-api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
 // 0489 — one Sales Order keeps one collection owner (owner ruling 2026-09-13).
