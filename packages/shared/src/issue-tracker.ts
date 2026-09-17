@@ -121,6 +121,8 @@ export function projectIssueActionWork(input: {
 }
 
 export const createIssueInputSchema = z.object({
+  /** 0526 — one request records at most one Issue; a retry answers with the first. */
+  requestId: z.string().uuid(),
   intake: issueIntakeSchema,
   sourceModule: z.string().min(1),
   materiality: z.enum(["routine", "significant", "critical"]).default("routine"),

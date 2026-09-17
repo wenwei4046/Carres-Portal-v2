@@ -332,7 +332,10 @@ Every Issue row includes:
 9. party response/date;
 10. current required result.
 
-Confirmed, awaiting response and disputed Issues are separate report sections. An allegation never
+Confirmed, awaiting response and disputed Issues are separate report sections, and one party row
+lands in exactly one (HF-2, 2026-09-17): the party disagrees → Disputed, whatever the finding;
+otherwise a confirmed or contributing fault → Confirmed; otherwise not yet confirmed → Waiting. Only
+Issues observed inside the chosen month (`?month=YYYY-MM`) count. An allegation never
 enters confirmed totals. Disagreement never deletes evidence: preserve Carres finding, evidence
 sent/date, party response/date and final reviewed outcome.
 
@@ -475,7 +478,7 @@ They never type an arbitrary action, required result or due date to make intake 
 opens a complete evidence-check action owned by Issue Triage Duty.
 
 Creation is atomic: Issue identity, typed links, intake facts, evidence references and first governed
-action either persist together or not at all. An uncertain response reconciles by request/Issue
+action either persist together or not at all (BUILT 2026-09-17: `issue_record_issue`, 0526, keyed by the client `request_id`). An uncertain response reconciles by request/Issue
 identity before retry; it cannot create a duplicate incident. Success opens the new Issue workspace.
 
 `Record result` shows the exact action being completed and only its governed result choices. Each
@@ -498,9 +501,15 @@ replaces the occurrence. There is no generic `Save result`, free-text-only compl
 | No governed action rule can be derived | `The next action could not be worked out. Ask an Issue Tracker reviewer to check the rules.` |
 | Result choice missing | `Choose what happened.` |
 | Result evidence missing | `Add the evidence needed for this result.` |
-| Action already changed/completed | `This action has changed. Read the current action before recording a result.` |
-| Create/result uncertain | `The result is being checked. Do not record it again.` |
-| Unknown save failure | `The issue could not be recorded. Check the answers and try again.` |
+| Action already changed/completed (404) | warning icon plus `Action changed · Review again` |
+| Create/result uncertain — network error, timeout, no answer | warning icon plus `Not confirmed · Try again`; never `not recorded`. A retry of the same answers reuses the request id, so it cannot record a second Issue |
+| Create refused by the server with an error | `Issue not recorded · Try again` |
+| Result refused by the server with an error | `Result not recorded · Try again` |
+| Permission refused (403) | `Only {acting person} can record this.`; only when no acting person can be named: `You do not have access to record this result.` Never `Only {Duty} can record this result.` — a Duty is not the person who acts |
+
+Owner ruling 2026-09-17 (HF-2). A 400/422 shows the sentence of the first wrong step and opens that
+step. Every sentence appears inside the open dialog, takes focus and keeps every answer; the submit
+button accepts one request at a time.
 
 The page focuses the first invalid governed answer and preserves all valid answers/files. A raw
 database, validation-library or status-code sentence never reaches the operator.
@@ -536,7 +545,7 @@ single-column, touch-safe and resumable. Hover evidence is also accessible by fo
 | Current list has no governed loading, error, true-empty or no-match treatment and prints `0 issues` before source health | Add explicit source-aware states; failed/unknown is never zero |
 | Current views are local state; search and structured filters are absent | Use one authorised query contract with URL-visible view/search/filters |
 | Current eight-column table relies on horizontal overflow | Preserve desktop reference table; use vertical rows below 1024px |
-| Current row says `Set next action` when no occurrence exists | Replace with exact lifecycle/configuration fact; no generic action invention |
+| Current row says `No current action` when no occurrence exists (HF-2, 2026-09-17) | Replace with exact lifecycle/configuration fact; no generic action invention |
 | Current detail is one wide modal with three simplified accountability cards | Use the governed object-detail reading order and keep all distinct identities/evidence |
 | Current intake asks for free-form linked identity/date facts and lets reporter choose action, required result and due | Make typed object/date/evidence controls and system-derived action/due law authoritative |
 | Current proof choice can save without actual evidence attachment | Require governed file/evidence record where the chosen branch says proof exists |
