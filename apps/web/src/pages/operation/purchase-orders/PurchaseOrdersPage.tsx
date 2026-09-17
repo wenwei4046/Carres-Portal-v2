@@ -1112,18 +1112,17 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <SupplierDateBlock key={`${row.id}:${row.facts.version}`} row={row} onSaved={onSupplierDateSaved} />
       </Block>
       <Block title="Goods lines">
-        {/* The table bleeds to the card edge so its own scroller, not the
-            card, is what moves sideways. */}
-        <div className="-mx-4 -mb-3 overflow-x-auto">
+        {/* Keep horizontal scrolling inside the card's padded content. */}
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
-              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Unit ID</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Order Qty</th><th className="px-3 text-right">Received Qty</th><th className="px-3 text-right">Pending Delivery Qty</th></tr>
+              <tr><th className="px-3 py-2.5 align-top text-left">SKU</th><th className="px-3 py-2.5 align-top text-left">Item</th><th className="px-3 py-2.5 align-top text-left">Unit ID</th><th className="px-3 py-2.5 align-top text-left">Source</th><th className="px-3 py-2.5 align-top text-left">Deliver To</th><th className="px-3 py-2.5 align-top text-left">Order Qty</th><th className="px-3 py-2.5 align-top text-left">Received Qty</th><th className="px-3 py-2.5 align-top text-left">Pending Delivery Qty</th></tr>
             </thead>
             <tbody>
               {po.purchase_order_lines.map((line) => (
                 <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
-                  <td className="px-3 font-mono">{line.sku}</td>
-                  <td className="px-3">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
+                  <td className="px-3 py-2.5 align-top text-left whitespace-nowrap font-mono">{line.sku}</td>
+                  <td className="px-3 py-2.5 align-top text-left">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
                   {/* The Units are the line's own rows: one permanent Unit ID
                       per physical piece, born with the official PO and bound
                       to this line (0442/0443). A quantity line has none by
@@ -1131,18 +1130,18 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       integrity failure, never an ordinary empty state. They
                       used to sit in a card of their own at the bottom of the
                       page, cut off from the line (YH, 2026-09-04). */}
-                  <td className="px-3 py-1.5 align-top" data-testid={`po-line-units-${line.id}`}>{
+                  <td className="px-3 py-2.5 align-top text-left" data-testid={`po-line-units-${line.id}`}>{
                     unitLoading ? <span className="text-kit-slate-9">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
                     : line.identity_mode === "quantity"
                       ? <Absence>—</Absence>
                     : unitsOf(line).length
-                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
+                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="whitespace-nowrap rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
                       ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
                   }</td>
-                  <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => {
+                  <td className="px-3 py-2.5 align-top text-left">{line.governed_sources?.length ? line.governed_sources.map((source) => {
                     /* Card 08 §3.5 — several Manual Purchases behind one
                        document stay apart by business facts, never by a
                        number: the purpose and Proceed Date join the label
@@ -1155,14 +1154,14 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                       : source.reference;
                     return source.qty == null ? label : `${label} ×${source.qty}`;
                   }).join(" · ") : <Absence />}</td>
-                  <td className="px-3">{
+                  <td className="px-3 py-2.5 align-top text-left">{
                     line.destination_id
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />
                       : row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo
                   }</td>
-                  <td className="px-3 text-right tabular-nums">{line.qty}</td>
-                  <td className="px-3 text-right tabular-nums">{line.received_qty}</td>
-                  <td className="px-3 text-right tabular-nums">{Math.max(0, line.qty - line.received_qty)}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.qty}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{line.received_qty}</td>
+                  <td className="px-3 py-2.5 align-top text-left tabular-nums">{Math.max(0, line.qty - line.received_qty)}</td>
                 </tr>
               ))}
             </tbody>
