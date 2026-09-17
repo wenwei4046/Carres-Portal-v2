@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { supabase } from "@/lib/supabase";
 import {
   useAttachDoMutation,
@@ -70,7 +71,7 @@ function deliveryOrderNumber(
   if (existing) return existing;
   return docNumber({
     prefix: "DO",
-    date: new Date().toISOString().slice(0, 10),
+    date: appTodayIso(),
     seed: order.id,
     digits: 4,
   });

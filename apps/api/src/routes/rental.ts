@@ -43,6 +43,7 @@ import { parseJsonBody, fail } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
 import { stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
+import { todayIsoMYT } from "../lib/today";
 import type { AppEnv } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -1120,8 +1121,9 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
     .filter((r) => r.status === "paid")
     .reduce((a, r) => a + num(r.paid_amount), 0);
   const contract = Math.round(num(ag.monthly_fee) * num(ag.term_months) * 100) / 100;
-  const today = new Date().toISOString().slice(0, 10);
-  /** Whole days between a due date and today, floored at 0. UTC both sides. */
+  const today = todayIsoMYT();
+  /** Whole days between a due date and today, floored at 0. Both are calendar
+   *  days in Kuala Lumpur; the `Z` suffix only makes the subtraction DST-free. */
   const daysLate = (due: string): number =>
     Math.max(0, Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000));
 
@@ -1895,7 +1897,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
     .eq("agreement_id", ag.id)
     .neq("status", "paid")
     .gte("seq", 2)
-    .gt("due_date", new Date().toISOString().slice(0, 10))
+    .gt("due_date", todayIsoMYT())
     .order("seq")
     .limit(1)
     .maybeSingle();

@@ -7,6 +7,7 @@ import {
   type DeliveryGroupKey,
 } from "@carres/shared";
 import { loadBookingContext } from "./booking-context";
+import { todayIsoMYT } from "./today";
 
 /**
  * SLICE 2 · AUTOMATIC DELIVERY ORDER ISSUANCE
@@ -56,12 +57,7 @@ export type DeliveryOrderAttempt =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | { outcome: "error"; body: any; status: any };
 
-/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
- *  is already tomorrow in Klang, and the document's DDMMYY segment means the
- *  day it was issued IN KLANG, not in Greenwich. */
-export function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
+export { todayIsoMYT };
 
 /**
  * Issue this order's delivery order if — and only if — every requirement is

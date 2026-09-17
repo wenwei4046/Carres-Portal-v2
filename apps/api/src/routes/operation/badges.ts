@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
 
 /**
@@ -66,7 +67,7 @@ operationBadgesRouter.get("/", async (c) => {
   const procurementSince = seenMap.get(PROCUREMENT_KEY) ?? EPOCH;
   const lpRejectedSince = seenMap.get(LP_REJECTED_KEY) ?? EPOCH;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoMYT();
 
   const [ordersRes, procurementRes, snRes, lpRejectedRes] = await Promise.all([
     sb

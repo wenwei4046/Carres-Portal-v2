@@ -45,6 +45,7 @@ import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-gu
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import { chunk } from "../../lib/purchase-demand-read";
@@ -1567,7 +1568,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
     skus: lines.map((l) => String(l.sku)),
     categories: storageCats,
-    asOf: new Date().toISOString().slice(0, 10),
+    asOf: todayIsoMYT(),
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });
@@ -1778,7 +1779,7 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
         confirmedAt: ctrl?.customer_confirmed_at ?? null,
       },
     },
-    new Date().toISOString().slice(0, 10),
+    todayIsoMYT(),
     opts,
     leads,
   );

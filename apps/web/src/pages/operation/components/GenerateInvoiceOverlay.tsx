@@ -24,6 +24,7 @@ import { FileText, Mail, MessageCircle, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { rmAmount, salutationOf } from "@/lib/wa-templates";
@@ -152,7 +153,7 @@ export default function GenerateInvoiceOverlay({
     return {
       doc_title: imported ? "PAYMENT REQUEST" : undefined,
       invoice_no: imported ? `SO-${so}` : (effectiveNo ?? "DRAFT"),
-      issue_date: (issued?.issued_at ?? new Date().toISOString()).slice(0, 10),
+      issue_date: issued?.issued_at ? issued.issued_at.slice(0, 10) : appTodayIso(),
       order_id: orderId,
       order_code: `SO-${so}`,
       customer: {

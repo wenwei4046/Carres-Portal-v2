@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
@@ -156,6 +158,19 @@ describe("the payment method registry (0476)", () => {
     }), env);
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("payment_set_method_active", { p_method: "grab_pay", p_active: false });
+  });
+  it("a method save waits on its money account row before the account check (0518)", async () => {
+    // The refusal and the wait live in the database door, so a curl round the API meets them too.
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0518_a_payment_method_save_waits_on_its_money_account.sql"),
+      "utf-8",
+    );
+    const door = mig.slice(mig.indexOf("function public.payment_method_save"), mig.indexOf("grant execute on function public.payment_method_save"));
+    const wait = door.indexOf("from public.gl_money_accounts where account_code = p_account_code for share");
+    const check = door.indexOf("if not public.gl_money_account_ok(p_account_code) then");
+    expect(wait).toBeGreaterThan(0);
+    expect(check).toBeGreaterThan(wait);
+    expect(door).toContain("detail = 'account_not_money'");
   });
 });
 
@@ -345,5 +360,17 @@ describe("Collection timing (0486)", () => {
       askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "x",
     });
     expect(res.status).toBe(403);
+  });
+  it("both effective-date doors compare with today in Kuala Lumpur, not the UTC clock (0524)", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0524_the_effective_date_is_checked_against_today_in_kuala_lumpur.sql"),
+      "utf-8",
+    );
+    for (const door of ["payment_set_collection_timing", "payment_set_storage_rule"]) {
+      const body = mig.slice(mig.indexOf(`function public.${door}`), mig.indexOf(`grant execute on function public.${door}`));
+      expect(body).toContain("p_effective_from < (timezone('Asia/Kuala_Lumpur', now()))::date");
+      expect(body).not.toContain("< current_date");
+      expect(body).toContain("detail = 'bad_effective_from'");
+    }
   });
 });

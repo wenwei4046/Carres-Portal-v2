@@ -485,7 +485,7 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
       carres_action:    parsed.carresAction    ?? null,
       what_affected:    parsed.whatAffected    ?? null,
       incurred_charges: parsed.incurredCharges ?? null,
-      opened_at:        parsed.openedAt        ?? new Date().toISOString().slice(0, 10),
+      opened_at:        parsed.openedAt        ?? todayIsoMYT(),
       created_by:       c.var.auth.id,
 
       // S1 (0285) — the guided intake's answers. `priority` is NOT here and
