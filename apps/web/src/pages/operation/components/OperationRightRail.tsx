@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
-import { useAuth } from "@/lib/auth";
 import { useActiveOrder } from "@/lib/active-order";
 import CalendarPanel from "./rail/CalendarPanel";
 import TasksPanel from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
 import GlobalActivity from "./GlobalActivity";
 import { useOpenWorkSet } from "../use-open-work";
+import { myMissedAndToday } from "../work/work-model";
 
 /**
  * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
@@ -39,17 +39,19 @@ export default function OperationRightRail() {
   const [active, setActive] = useState<Panel | null>(null);
   const activeOrderId = useActiveOrder((s) => s.orderId);
 
-  const { items } = useOpenWorkSet();
-  const myId = useAuth((s) => s.session)?.user?.id ?? null;
-  const myWork = myId ? items.filter((item) => item.ownerId === myId) : [];
-  const myOverdue = myWork.filter((item) => item.timingBucket === "overdue").length;
+  const { items, myUserId, focusDay, hasData } = useOpenWorkSet();
+  // ONE count (Workspace MASTER §7.1): the same Missed + focus-day number the
+  // panel prints and My Work's focus list holds. Later days never count, and
+  // no response yet means no number — never `0`.
+  const { missed, today } = myMissedAndToday(items, myUserId, focusDay);
 
-  // Per-tab badge: Tasks = my open follow-ups (red when any overdue).
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {
-    if (key === "tasks" && myWork.length > 0)
-      return { n: myWork.length, tone: myOverdue > 0 ? "bg-danger" : "bg-base-700" };
+    if (key === "tasks" && hasData && missed + today > 0)
+      return { n: missed + today, tone: missed > 0 ? "bg-danger" : "bg-base-700" };
     return null;
   };
+  const nameFor = (tab: (typeof TABS)[number]): string =>
+    tab.key === "tasks" && hasData ? `My Work · ${missed} missed · ${today} today` : tab.label;
 
   return (
     <div className="flex h-screen sticky top-0">
@@ -97,7 +99,7 @@ export default function OperationRightRail() {
               type="button"
               onClick={() => setActive(isActive ? null : t.key)}
               title={t.label}
-              aria-label={t.label}
+              aria-label={nameFor(t)}
               className={`relative w-9 h-9 rounded-full grid place-items-center transition-colors ${
                 isActive ? t.active : "text-base-500 hover:bg-hovertint"
               }`}

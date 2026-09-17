@@ -46,6 +46,43 @@ function searchText(item: WorkRow): string {
     .toLocaleLowerCase();
 }
 
+/** Source words for Work source health — never the raw feed key. */
+export const WORK_SOURCE_LABEL: Record<OperationWorkModule, string> = {
+  orders: "Sales Orders",
+  purchasing: "Purchasing",
+  receiving: "Receiving",
+  delivery: "Delivery",
+  payment: "Payment",
+  issue_tracker: "Issue Tracker",
+};
+
+/** The focus list (Workspace MASTER §5.1): Missed, then the focus day. */
+export function inWorkFocus(item: WorkRow, focusDay: string): boolean {
+  return item.timingBucket === "overdue" || (focusDay !== "" && item.dueIso === focusDay);
+}
+
+/**
+ * THE ONE RIGHT RAIL COUNT (Workspace MASTER §7.1, HF-3 2026-09-17). The badge
+ * and the panel both read this; the Work page's focus list is the same
+ * predicate (`inWorkFocus`) over the same person. Later days and `No working
+ * date` never count.
+ */
+export function myMissedAndToday(
+  items: readonly WorkRow[],
+  myUserId: string | null,
+  focusDay: string,
+): { missed: number; today: number } {
+  let missed = 0;
+  let today = 0;
+  if (!myUserId) return { missed, today };
+  for (const item of items) {
+    if (item.ownerId !== myUserId || !inWorkFocus(item, focusDay)) continue;
+    if (item.timingBucket === "overdue") missed += 1;
+    else today += 1;
+  }
+  return { missed, today };
+}
+
 export function filterWork(items: readonly WorkRow[], filters: WorkFilters): WorkRow[] {
   const query = filters.search.trim().toLocaleLowerCase();
   return items.filter((item) => {

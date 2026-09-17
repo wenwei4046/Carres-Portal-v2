@@ -5,12 +5,14 @@
  * server contract once; Work and Quick Rail consume this same cached query.
  */
 import { useMemo } from "react";
-import type {
-  OperationWorkItem,
-  OperationWorkModule,
-  OpsStaffMember,
-  WorkItem,
+import {
+  workFocusDay,
+  type OperationWorkItem,
+  type OperationWorkModule,
+  type OpsStaffMember,
+  type WorkItem,
 } from "@carres/shared";
+import { useAuth } from "@/lib/auth";
 import { useOperationWork } from "@/lib/queries";
 
 export interface WorkRow extends Omit<WorkItem, "module"> {
@@ -33,8 +35,24 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
 export interface OpenWorkSet {
   items: WorkRow[];
   generatedOn: string;
+  /** Workspace MASTER §5.1: `generatedOn` if a working day, else the next one. */
+  focusDay: string;
+  /**
+   * THE ONE IDENTITY (HF-3, 2026-09-17): the signed-in account id. Work owner
+   * ids and staff `userId` are both account ids, so no email is ever matched —
+   * a staff email that differs from the login email is still the same person.
+   */
+  myUserId: string | null;
   complete: boolean;
   failedSources: string[];
+  /** Non-healthy sources with their last successful observation. */
+  sourceHealth: { key: OperationWorkModule; lastSuccessfulAt: string | null }[];
+  /** A safe response exists (possibly from before a failed refresh). */
+  hasData: boolean;
+  /** The latest refresh failed while an earlier response is still held. */
+  refreshFailed: boolean;
+  /** When the held response was received (ms), or null. */
+  lastUpdatedAt: number | null;
   staff: OpsStaffMember[];
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
@@ -118,11 +136,21 @@ export function useOpenWorkSet(): OpenWorkSet {
     () => new Map(staff.map((member) => [member.user_id, member])),
     [staff],
   );
+  const myUserId = useAuth((s) => s.session?.user?.id ?? s.user?.id ?? null);
+  const generatedOn = query.data?.generatedOn ?? "";
+  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn) : ""), [generatedOn]);
+  const unhealthy = (query.data?.sources ?? []).filter((source) => source.state !== "healthy");
   return {
     items,
-    generatedOn: query.data?.generatedOn ?? "",
+    generatedOn,
+    focusDay,
+    myUserId,
     complete: query.data?.complete ?? false,
-    failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
+    sourceHealth: unhealthy.map((source) => ({ key: source.key, lastSuccessfulAt: source.lastSuccessfulAt })),
+    hasData: Boolean(query.data),
+    refreshFailed: query.isError && Boolean(query.data),
+    lastUpdatedAt: query.data && query.dataUpdatedAt ? query.dataUpdatedAt : null,
+    failedSources: unhealthy.map((source) => source.key),
     staff,
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),

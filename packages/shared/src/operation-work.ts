@@ -1,5 +1,28 @@
 import { z } from "zod";
 import { WORK_RULES, type WorkItem } from "./work-engine";
+import { isWorkingDay, type IsoDate } from "./working-days";
+import { myHolidaySet } from "./my-holidays";
+
+/**
+ * THE FOCUS DAY — Workspace MASTER §5.1 (owner ruling 2026-09-16/17).
+ *
+ * My Work's focus list and the Right Rail's `Today` count are the SAME day:
+ * `generatedOn` when it is a working day, otherwise the next working day
+ * (shared working-day engine + the Malaysia holiday calendar). On Malaysia Day
+ * (Wed 16 Sep 2026) the focus day is Thu 17 Sep. One function, so the rail,
+ * the panel and the Work page can never hold two opinions about "today".
+ */
+export function workFocusDay(
+  generatedOn: IsoDate,
+  holidays: ReadonlySet<IsoDate> = myHolidaySet(),
+): IsoDate {
+  let day = generatedOn.slice(0, 10);
+  for (let step = 0; step < 31 && !isWorkingDay(day, { holidays }); step += 1) {
+    const [y, m, d] = day.split("-").map(Number) as [number, number, number];
+    day = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  }
+  return day;
+}
 
 export const operationWorkModuleSchema = z.enum([
   "orders",

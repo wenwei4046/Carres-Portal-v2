@@ -33,9 +33,8 @@ import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
-import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
-import { filterWork, workSections, type WorkWhen } from "./work/work-model";
+import { filterWork, inWorkFocus, workSections, type WorkWhen } from "./work/work-model";
 import WorkSplitShell from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkDayNav from "./work/WorkDayNav";
@@ -159,9 +158,8 @@ export default function OperationWork() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const authEmail = useAuth((s) => s.user?.email ?? null);
-
-  const { items: allItems, generatedOn, complete, failedSources, staff, staffById, loading, error, retry } = useOpenWorkSet();
+  // One identity and one focus day, shared with the Right Rail (HF-3).
+  const { items: allItems, generatedOn, focusDay, myUserId, complete, failedSources, staffById, loading, error, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -186,12 +184,6 @@ export default function OperationWork() {
     else next.set(key, value);
     return next;
   }, { replace: true });
-
-  const myUserId = useMemo(() => {
-    if (!authEmail) return null;
-    const me = staff.find((s) => s.email.toLowerCase() === authEmail.toLowerCase());
-    return me?.user_id ?? null;
-  }, [staff, authEmail]);
 
   /** My Work — only the signed-in person's actions. */
   const mineAll = useMemo(
@@ -271,7 +263,7 @@ export default function OperationWork() {
     if (day === "all") return true;
     if (day === "missed") return item.timingBucket === "overdue";
     if (day === "no_date") return item.dueIso === null;
-    if (day === "focus") return item.timingBucket === "overdue" || item.dueIso === generatedOn;
+    if (day === "focus") return inWorkFocus(item, focusDay);
     return item.dueIso === day;
   });
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
@@ -435,9 +427,9 @@ export default function OperationWork() {
                 <button
                   key={key}
                   type="button"
-                  aria-pressed={day === key || (day === "focus" && key === generatedOn)}
+                  aria-pressed={day === key || (day === "focus" && key === focusDay)}
                   onClick={() => updateParam("day", key)}
-                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${day === key || (day === "focus" && key === generatedOn) ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
+                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${day === key || (day === "focus" && key === focusDay) ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
                 >
                   <span>{label}</span><span>{count} actions</span>
                 </button>
@@ -464,7 +456,7 @@ export default function OperationWork() {
         {layout !== "three" ? (
           <WorkDayNav
             days={dayChoices}
-            value={day === "focus" ? generatedOn : day}
+            value={day === "focus" ? focusDay : day}
             onChange={(key) => updateParam("day", key)}
           />
         ) : null}
