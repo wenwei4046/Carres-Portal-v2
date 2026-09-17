@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { filterWork, workSections } from "./work-model";
+import { filterWork, workSections, workWeek } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -70,5 +70,32 @@ describe("Work presentation model", () => {
     ];
     expect(filterWork(rows, { search: "", when: "later", module: "all", covered: false }).map((item) => item.id)).toEqual(["later"]);
     expect(filterWork(rows, { search: "", when: "all", module: "all", covered: true }).map((item) => item.id)).toEqual(["none"]);
+  });
+});
+
+describe("workWeek — the day strip in a Kuala Lumpur browser", () => {
+  const MON_TO_FRI = ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"];
+  const savedTz = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = "Asia/Kuala_Lumpur";
+  });
+  afterAll(() => {
+    if (savedTz === undefined) delete process.env.TZ;
+    else process.env.TZ = savedTz;
+  });
+
+  it("runs on the UTC+8 clock", () => {
+    expect(new Date("2026-09-17T00:00:00").getTimezoneOffset()).toBe(-480);
+  });
+
+  it("shows Monday to Friday for a Thursday, a Monday and a Sunday", () => {
+    expect(workWeek("2026-09-17", [])).toEqual(MON_TO_FRI);
+    expect(workWeek("2026-09-14", [])).toEqual(MON_TO_FRI);
+    expect(workWeek("2026-09-20", [])).toEqual(MON_TO_FRI);
+  });
+
+  it("adds Saturday only when something is due that day", () => {
+    expect(workWeek("2026-09-17", ["2026-09-19"])).toEqual([...MON_TO_FRI, "2026-09-19"]);
+    expect(workWeek("2026-09-17", ["2026-09-18", null])).toEqual(MON_TO_FRI);
   });
 });

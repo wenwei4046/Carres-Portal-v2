@@ -35,7 +35,7 @@ import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
-import { filterWork, workSections, type WorkWhen } from "./work/work-model";
+import { filterWork, workSections, workWeek, type WorkWhen } from "./work/work-model";
 import WorkSplitShell from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkDayNav from "./work/WorkDayNav";
@@ -276,23 +276,10 @@ export default function OperationWork() {
   });
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
-  const workingDays = useMemo(() => {
-    if (!generatedOn) return [];
-    const current = new Date(`${generatedOn}T00:00:00`);
-    const weekday = current.getDay();
-    const monday = new Date(current);
-    monday.setDate(current.getDate() - ((weekday + 6) % 7));
-    const dates = Array.from({ length: 5 }, (_, index) => {
-      const value = new Date(monday);
-      value.setDate(monday.getDate() + index);
-      return value.toISOString().slice(0, 10);
-    });
-    const saturday = new Date(monday);
-    saturday.setDate(monday.getDate() + 5);
-    const saturdayIso = saturday.toISOString().slice(0, 10);
-    if (beforeDay.some((item) => item.dueIso === saturdayIso)) dates.push(saturdayIso);
-    return dates;
-  }, [beforeDay, generatedOn]);
+  const workingDays = useMemo(
+    () => (generatedOn ? workWeek(generatedOn, beforeDay.map((item) => item.dueIso)) : []),
+    [beforeDay, generatedOn],
+  );
   const dayChoices = useMemo(() => [
     { key: "missed", label: "Missed", count: beforeDay.filter((item) => item.timingBucket === "overdue").length },
     ...workingDays.map((date) => ({
