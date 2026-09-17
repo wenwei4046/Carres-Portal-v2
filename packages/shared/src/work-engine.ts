@@ -60,9 +60,9 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *   payment_approver  the effective Payment Approver resolution from Workspace
  *                  — §12 gives void, reallocation and overpayment review to
  *                  this duty and to nobody else; unresolved fails closed
- *   delivery_duty  the effective Delivery Duty resolution from Workspace
- *                  (Delivery MASTER §13.1, 2026-09-13); unresolved fails
- *                  closed — the duty word stands, never the PIC
+ *   delivery_duty  the effective Delivery Duty resolution from Workspace;
+ *                  since 2026-09-17 this is only the fallback for Delivery
+ *                  work whose Sales Order has no PIC
  *   warehouse_duty §6 gives the storage check to Warehouse and names no duty;
  *                  no warehouse roster fact exists, so the word stands — the
  *                  same measured-boundary rule finance_duty follows
@@ -160,9 +160,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "assign_logistics",
     module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
-    owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1); choosing the company is Delivery's arrangement act",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("assign_logistics"),
     dueRule: "3 working days before the promised date, delivery week + MY holidays",
     completionFact: "a company recorded (orders.delivery_partners / ops_assigned_logistic)",
@@ -171,9 +170,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "confirm_delivery_date",
     module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
-    owner:
-      "Delivery Duty — the holder calls the partner or the customer (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line names the partner)",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("confirm_delivery_date"),
     dueRule:
       "logistics_call_working_days (3 — Card 3's ruling) before the promised date, delivery week + MY holidays",
@@ -203,9 +201,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "deliver_today",
     module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
-    owner:
-      "Delivery Duty — the holder watches today's run reach its result (Delivery MASTER §13.1)",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("deliver_today"),
     dueRule: "the confirmed date itself",
     completionFact:
@@ -215,9 +212,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "upload_delivery_photo",
     module: "delivery",
     trigger: "delivered with no photo on file",
-    owner:
-      "Delivery Duty — the proof arrives on the order's WhatsApp thread; filing it is the arrangement owner's act (Delivery MASTER §6)",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("upload_delivery_photo"),
     dueRule: "1 working day after the delivery, delivery week + MY holidays",
     completionFact: "a photo in the ledger (ops_order_control.delivery_photos, 0280)",
@@ -242,9 +238,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger:
       "a delivered or partially delivered result with a file on record that no review has judged yet (a newer upload reopens the question)",
-    owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1)",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("check_delivery_proof"),
     dueRule: "1 working day after the delivery, delivery week + MY holidays — the same clock as the upload it judges",
     completionFact:
@@ -254,9 +249,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "collect_loan_item",
     module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
-    owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1, §14.2)",
-    ownerRule: "delivery_duty",
+    owner: "the Sales Order PIC; Buddy cover acts while the PIC is absent; Delivery Duty is fallback only when the order has no PIC",
+    ownerRule: "order_pic",
     action: orderActionQueue("collect_loan_item"),
     dueRule: "the delivery day itself (confirmed date, else the recorded delivery)",
     completionFact: "the loan row reads returned (ops_sofa_loans.status, 0209/0217)",
@@ -329,7 +323,7 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "payment.collect_customer_balance",
     module: "payment",
     trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
-    owner: "the Responsible Delivery Operation — the Delivery Duty holder on the first actionable day, kept as the order's stable collection owner (0489); Buddy cover may act without replacing normal ownership",
+    owner: "the Sales Order PIC, kept as the order's stable collection owner (0504); Buddy cover may act without replacing normal ownership",
     ownerRule: "collection_owner",
     action: "Ask customer to pay",
     dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
@@ -362,7 +356,7 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "payment.missed_promise",
     module: "payment",
     trigger: "the customer promised to pay on a named day, that day has passed and the balance is still outstanding",
-    owner: "the Responsible Delivery Operation — the Delivery Duty holder on the first actionable day, kept as the order's stable collection owner (0489); Buddy cover may act without replacing normal ownership",
+    owner: "the Sales Order PIC, kept as the order's stable collection owner (0504); Buddy cover may act without replacing normal ownership",
     ownerRule: "collection_owner",
     action: "Ask customer to pay",
     dueRule: "the day the customer promised, on the OFFICE calendar",
@@ -378,7 +372,7 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
     key: "payment.send_storage_invoice",
     module: "payment",
     trigger: "an issued Storage or Additional Storage Invoice is live and its money has not been received",
-    owner: "the Responsible Delivery Operation — the same stable collection owner as the ordinary balance, established from the Delivery Duty holder (owner ruling 2026-09-13)",
+    owner: "the Sales Order PIC — the same stable collection owner as the ordinary balance (0504)",
     ownerRule: "collection_owner",
     action: "Send the invoice and collect payment",
     dueRule: "the shared collection clock's deadline for the order's delivery, else no date",
@@ -638,6 +632,8 @@ export interface OrderWorkContext {
   picName: string | null;
   /** The PIC's account id — My Work filters on the resolved id. */
   picUserId?: string | null;
+  /** The governed PIC answer including today's Buddy cover. */
+  orderPicResolution?: WorkspaceDutyResolution | null;
   /** One-release legacy PO-duty input. New callers supply `dutyResolutions`.
    *  Absent/null = the duty word stands; it never falls back to PIC. */
   poDuty?: { userId: string; name: string | null } | null;
@@ -891,14 +887,36 @@ export function workItemsForOrder(
       case "finance_duty":
         return directOwner("finance_duty", null, "Finance");
       case "collection_owner":
-        // The order's stable collection owner (0489) rides in per order; no
-        // owner yet (no Delivery Duty holder on the first actionable day) →
-        // the Delivery Duty word stands, never the PIC.
-        return dutyOwner("collection_owner", "delivery_duty", "Delivery Duty");
+        // The order's stable collection owner (0504) rides in per order and
+        // is the Sales Order PIC with today's cover kept separate.
+        return dutyOwner("collection_owner", "delivery_duty", "Not assigned");
+      case "order_pic": {
+        const resolution = ctx.orderPicResolution;
+        if (resolution?.actingPerson) {
+          return {
+            ownerRule: "order_pic",
+            ownerDutyKey: null,
+            normalOwner: resolution.normalOwner,
+            activeCover: resolution.activeCover,
+            actingPerson: resolution.actingPerson,
+            ownerState: resolution.state,
+            ownerName: resolution.actingPerson.name,
+            ownerUserId: resolution.actingPerson.userId,
+          };
+        }
+        if (resolution && rule?.module === "delivery") {
+          return dutyOwner("delivery_duty", "delivery_duty", "Delivery Duty");
+        }
+        if (resolution) return directOwner("order_pic", null, "Operations");
+        if (rule?.module === "delivery" && !pic) {
+          return dutyOwner("delivery_duty", "delivery_duty", "Delivery Duty");
+        }
+        return directOwner("order_pic", pic, pic ? undefined : "Operations");
+      }
       case "system":
         return directOwner("system", null, "System");
       default:
-        // order_pic — and any unregistered key fails safe to the same.
+        // Any unregistered key fails safe to the order PIC.
         return directOwner("order_pic", pic, pic ? undefined : "Operations");
     }
   };

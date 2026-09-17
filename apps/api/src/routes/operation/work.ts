@@ -262,6 +262,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
     });
     const picId = control?.assigned_staff ?? null;
     const pic = picId ? staff.get(picId) : null;
+    const picResolution = input.collectionOwnerFor?.(row.id) ?? null;
     const poDates = (row.order_supplier_threads ?? [])
       .map((thread) => thread.purchase_orders?.placed_at ?? null)
       .filter((date): date is string => Boolean(date))
@@ -273,9 +274,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
         so: row.so,
         picName: pic?.name ?? pic?.email ?? null,
         picUserId: picId,
+        orderPicResolution: picResolution,
         dutyResolutions: {
           ...input.dutyResolutions,
-          ...(input.collectionOwnerFor?.(row.id) ? { collection_owner: input.collectionOwnerFor(row.id)! } : {}),
+          ...(picResolution ? { collection_owner: picResolution } : {}),
         },
         salespersonName: row.salespersons?.name ?? null,
         askDeliveryDate:
@@ -509,7 +511,7 @@ export function projectPaymentCollectionWork(input: {
       ownerState: owner?.state ?? "not_assigned",
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
-      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Not assigned" }),
       tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
@@ -550,8 +552,7 @@ export function projectStorageInvoiceWork(input: {
   today: string;
   timingRules?: readonly CollectionTimingRule[] | null;
   /** 0489 — the SAME stable collection owner the ordinary balance uses
-   *  (owner ruling 2026-09-13). Absent or unassigned ⇒ the Delivery Duty
-   *  word stands; never the PIC. */
+   *  (0504). Absent or unassigned remains visibly not assigned. */
   ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
@@ -581,7 +582,7 @@ export function projectStorageInvoiceWork(input: {
       ownerState: owner?.state ?? "not_assigned",
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
-      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Not assigned" }),
       tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
@@ -1187,17 +1188,20 @@ async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<I
  */
 async function establishAndReadCollectionOwners(
   c: Context<AppEnv>,
-  orderIds: readonly string[],
+  establishOrderIds: readonly string[],
+  readOrderIds: readonly string[],
   today: string,
 ): Promise<Map<string, CollectionOwnerContextRow>> {
-  if (orderIds.length === 0) return new Map();
+  if (readOrderIds.length === 0) return new Map();
   const sb = userClient(c.env, c.var.auth.jwt);
-  const established = await sb.rpc("payment_collection_owner_establish", {
-    p_order_ids: [...orderIds], p_on: today,
-  });
-  if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  if (establishOrderIds.length > 0) {
+    const established = await sb.rpc("payment_collection_owner_establish", {
+      p_order_ids: [...establishOrderIds], p_on: today,
+    });
+    if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  }
   const context = await sb.rpc("payment_collection_owner_context", {
-    p_order_ids: [...orderIds], p_on: today,
+    p_order_ids: [...readOrderIds], p_on: today,
   });
   if (context.error) throw new Error("Workspace collection-owner source could not be read");
   const rows = (context.data ?? []) as CollectionOwnerContextRow[];
@@ -1399,8 +1403,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
   const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
-  // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): every routine Delivery
-  // action resolves through the same shared resolver as PO Duty.
+  // Delivery Duty is retained only as the no-PIC fallback for Delivery work.
   const deliveryDuty = dutyResolution(duties, "delivery_duty", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
@@ -1419,13 +1422,18 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   }
   // 0489 — which orders' collection is actionable today is the projections'
   // own admission; a probe pass learns the set, the door establishes the
-  // owner for any newcomer (Delivery Duty holder today) and the read answers
+  // owner for any newcomer and the read answers
   // the same stable owner for every later pass.
   const actionable = new Set<string>();
   const probe = (orderId: string) => { actionable.add(orderId); return null; };
   projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
   projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
-  const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], today);
+  const ownerRows = await establishAndReadCollectionOwners(
+    c,
+    [...actionable],
+    orders.orders.map((order) => order.id),
+    today,
+  );
   const collectionOwnerFor = (orderId: string) =>
     collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
   const orderItems = projectSalesOrdersFromModuleFacts({

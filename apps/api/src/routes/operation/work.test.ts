@@ -561,6 +561,16 @@ describe("operation Work response composition", () => {
           assignmentId: "assignment-3",
         },
       },
+      collectionOwnerFor: () => ({
+        dutyKey: "delivery_duty",
+        onDate: "2026-09-06",
+        normalOwner: { userId: "pic-1", name: "Order PIC" },
+        buddy: { userId: "cover-1", name: "PIC Cover" },
+        activeCover: { userId: "cover-1", name: "PIC Cover" },
+        actingPerson: { userId: "cover-1", name: "PIC Cover" },
+        state: "covered",
+        assignmentId: null,
+      }),
       today: "2026-09-06",
       safetyDays: 3,
     });
@@ -569,6 +579,8 @@ describe("operation Work response composition", () => {
       .toBe("po-1");
     expect(items.find((item) => item.ruleKey === "ask_delivery_date")?.owner.acting?.name)
       .toBe("Shasha");
+    expect(items.find((item) => item.ruleKey === "assign_logistics")?.owner)
+      .toMatchObject({ rule: "order_pic", normal: { userId: "pic-1" }, acting: { userId: "cover-1" } });
   });
 
   it("gate convergence: an unpaid storage PAPER keeps the money work open on a goods-paid SO, and full payment closes it", () => {
