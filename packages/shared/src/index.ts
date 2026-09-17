@@ -581,8 +581,6 @@ export {
   bankStatementsListQuery,
   reconciliationCreateInput,
   cashflowSeriesQuery,
-  monthlyPlQuery,
-  topSkusQuery,
   refundApplyInput,
   type PaymentMethod,
   type FinanceTopupApproveInput,
@@ -600,8 +598,6 @@ export {
   type BankStatementsListQuery,
   type ReconciliationCreateInput,
   type CashflowSeriesQuery,
-  type MonthlyPlQuery,
-  type TopSkusQuery,
   type RefundApplyInput,
 } from "./schemas/finance";
 
