@@ -1521,23 +1521,52 @@ facts, permissions, complete-record populations or task ownership.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
+### Portal-wide listing readability — APPROVED / NOT BUILT (Jess, 2026-09-17)
+
+This is the shared default for ALL Portal listings, not a PO visual pilot. It supersedes older
+listing typography, rail appearance and blue-grey surface prescriptions in this document.
+Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
+
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+  expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
+  leave that space empty. Icons supplement labels and come from the existing kit. Each group
+  remains single-choice; no new multi-select. Preserve each page's filter content and control type:
+  an existing dropdown remains a dropdown inside its group. Collapse does not clear a filter.
+- **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
+  heading, divider and text treatment; preserve their content, date meaning and behavior.
+  Sales Orders has no local filter rail; do not add one for visual consistency.
+- **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
+  form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
+  cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for
+  meaningful text. No opacity reduction or italics for helper text. Critical states stay legible.
+- **Surfaces:** white toolbar, rail, table and footer; slate-3 header, slate-11 11px/600 normal
+  casing; 1px separators. One canvas token resolves to #F7F8FA. Retire blue-grey register themes
+  and #F3F4F6 body background; do not copy literal colors into page styles.
+- **Scope:** Sales Orders; SO Batch, Manual Purchase, Purchase Orders, Receiving, Supplier Claims;
+  Delivery Monitor and Delivery Orders; Warehouse Inbound, Inventory, Outbound; Payment Monitor,
+  Payment Records and every Finance listing. Other Portal listings follow this same contract.
+- **Verification:** inventory all listing routes and shared/legacy/custom rails. Capture each page
+  before and after at 1440/390; test long labels, keyboard expand/choose/clear, 200% zoom and actual
+  contrast. Active zero-count filters remain readable and removable; unknown is not zero.
+  Any unintended content/behavior change is a defect. This appearance rollout does not approve
+  Receiving's pending date-filter/workflow proposals or change business permissions and arithmetic.
+
 **Different jobs, shared interaction:** Sales Orders remains the complete customer-transaction
 register governed by Orders MASTER, not a purchasing work queue. SO Batch uses `To buy` /
 `No purchase needed`. Manual Purchase uses `Need approval` / `To buy` / `No purchase needed`.
-Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Not marked as sent`,
-`Issued`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
+Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Confirm PO sent to supplier`,
+`Waiting for goods from supplier`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
 → unmarked. Receiving remains a formal GRN register, not a work queue.
 
-**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `Mark as sent`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
+**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `PO sent to supplier`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
 not proof that no external send happened. Completed legacy documents must not become resend work
 solely because a send record is absent. Purchasing MASTER owns the full send/version contract.
 
-**Adoption order — Jess, 2026-09-17:** merge this documentation PR → Sales Orders small patch
-(search totals, long-list keyboard navigation, two pinned columns and SO Date first) → Manual
-Purchase Round 2 (Proceed Date first) → Purchase Orders (nine columns, groups, sending marks and
-personal saved-layout pilot). Coordinate shared engine ownership. Account layouts roll out to
-other listings only after owner acceptance of the PO pilot. These rulings are APPROVED / NOT BUILT;
-record implementation, merge, deployment and rendered verification separately.
+**Adoption order — Jess, 2026-09-17:** merge the documentation update, then wait for PR #1419
+to merge, then open a fresh Claude task with the updated Slice 1 handoff. Slice 1 covers PO copy
+and Portal-wide readability, not a visual pilot. An open PR editing FilterRail, DataGrid or
+register CSS is a build stop: report the overlap before implementation. Personal saved-layout
+rollout remains subject to separate owner acceptance. Approval is not build/deployment evidence.
 
 
 **This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain

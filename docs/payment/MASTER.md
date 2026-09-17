@@ -1,5 +1,11 @@
 # PAYMENT — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--approved--not-built-jess-2026-09-17).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > **APPROVED / LOCKED by Jess, 2026-09-03; navigation, Monitor, Payment Records, collection
 > timing, storage days and the DO boundary re-ruled by the owner 2026-09-12.** This is the only
 > Payment Blueprint. It completely overwrites the former routine Refund, Bank Matching and storage

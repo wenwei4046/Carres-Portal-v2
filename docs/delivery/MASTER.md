@@ -1,5 +1,11 @@
 # DELIVERY — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--approved--not-built-jess-2026-09-17).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > **The only Delivery authority.** Overwrite it when re-ruled; Git is the archive.
 > **Owner-approved complete Blueprint, 2026-09-13**, closing the 2026-09-12 to 09-13 owner
 > corrections on the 2026-08-14 Blueprint. Sections 1 to 15 are the one current operating model.
