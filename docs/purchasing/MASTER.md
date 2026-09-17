@@ -2057,7 +2057,7 @@ refuses any key but order/hidden/widths/sort; 10 per person per listing; one def
 grid), re-measured SIGNED-IN on production 2026-09-17 on `1c278f8c`: PO Date 118 · PO No 142
 (production's JetBrains Mono renders `PO-20260903-4316` at 125px; the fixture font measured 114
 and 132 cut 34 live rows) · Supplier 128 · SO No 123 · Items 135 · Expected Delivery Date 207
-exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 142 ·
+exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 150 (`GRN-20260904-0210` renders 133px) ·
 PO Version 236 scroll. Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
 footer `62 purchase orders`, layouts read 200, unauthenticated 401. The rail uses the shared
 `useFilterRailOpen` (hidden by default below 896px). **Owed:** saving a layout and pressing
