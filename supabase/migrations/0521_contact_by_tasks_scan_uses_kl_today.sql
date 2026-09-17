@@ -9,8 +9,8 @@
 -- and an order that was delivered yesterday KL still qualified.
 --
 -- Body replayed as it is on main with only those two comparisons changed to
--- (timezone('Asia/Kuala_Lumpur', now()))::date, the same spelling 0517, 0519
--- and 0520 use. Same signature, same SECURITY DEFINER, same search_path.
+-- (timezone('Asia/Kuala_Lumpur', now()))::date, the same spelling 0519, 0520
+-- and 0524 use. Same signature, same SECURITY DEFINER, same search_path.
 -- create or replace keeps the cron-only grants (0197 revoked public,
 -- authenticated and anon), and the revokes are replayed below anyway.
 -- Left alone: due_at = delivery_date::timestamptz (midnight UTC = 08:00 KL on
