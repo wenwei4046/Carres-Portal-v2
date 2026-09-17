@@ -1024,7 +1024,7 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
         id: PO_D,
         po_no: PO_D, // the PO's id IS its number — no po_no column exists
         placed_at: "2026-08-29T03:05:00Z",
-        // D5 — no confirmed-sent mark on the current version: `Not marked as sent`.
+        // D5 — no confirmed-sent mark on the current version: `Sending not confirmed`.
         marked_sent_at: null,
         // The ORIGINAL supplier-facing date is the one the ledger says we
         // held before the supplier moved it; the moved date is the change.

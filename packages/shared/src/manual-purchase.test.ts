@@ -54,11 +54,11 @@ describe("Round 2 · the rail words and order", () => {
       "supplier",
       "setup",
     ]);
-    expect(MANUAL_PURCHASE_RAIL.timing.heading).toBe("ORDER TIMING");
-    expect(MANUAL_PURCHASE_RAIL.purpose.heading).toBe("PURPOSE");
-    expect(MANUAL_PURCHASE_RAIL.product.heading).toBe("PRODUCT");
-    expect(MANUAL_PURCHASE_RAIL.supplier.heading).toBe("SUPPLIER");
-    expect(MANUAL_PURCHASE_RAIL.setup.heading).toBe("SETUP TO FIX");
+    expect(MANUAL_PURCHASE_RAIL.timing.heading).toBe("Order timing");
+    expect(MANUAL_PURCHASE_RAIL.purpose.heading).toBe("Purpose");
+    expect(MANUAL_PURCHASE_RAIL.product.heading).toBe("Product");
+    expect(MANUAL_PURCHASE_RAIL.supplier.heading).toBe("Supplier");
+    expect(MANUAL_PURCHASE_RAIL.setup.heading).toBe("Setup to fix");
   });
 
   it("ORDER TIMING holds the three timing rows, in order", () => {
@@ -95,7 +95,7 @@ describe("Round 2 · the rail words and order", () => {
   });
 
   it("carries none of the retired or banned rows", () => {
-    const words = JSON.stringify(MANUAL_PURCHASE_RAIL);
+    const words = JSON.stringify(MANUAL_PURCHASE_RAIL).toLowerCase();
     for (const banned of [
       "WORK TO DO",
       "TO ORDER",
@@ -109,7 +109,7 @@ describe("Round 2 · the rail words and order", () => {
       "Need approval",
       "Ready to order",
     ]) {
-      expect(words).not.toContain(banned);
+      expect(words).not.toContain(banned.toLowerCase());
     }
   });
 });

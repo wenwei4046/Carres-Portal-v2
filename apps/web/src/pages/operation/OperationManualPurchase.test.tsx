@@ -502,11 +502,11 @@ describe("Card 03 · the left filter rail", () => {
     const rail = screen.getByTestId("manual-purchase-rail");
     const text = rail.textContent ?? "";
     const expected = [
-      "ORDER TIMING",
+      "Order timing",
       "Can order early",
       "Order date reached",
       "Order date passed",
-      "PURPOSE",
+      "Purpose",
       "All purposes",
       "Ready Stock",
       "Showroom Display",
@@ -514,18 +514,18 @@ describe("Card 03 · the left filter rail", () => {
       "Internal Staff Purchase",
       "Subsidiary Purchase",
       "Other Purchase",
-      "PRODUCT",
+      "Product",
       "All products",
       "Mattress",
       "Bedframe",
       "Sofa",
-      "SUPPLIER",
+      "Supplier",
       "All suppliers",
       "Hooka",
       "Office Co",
       "Ohana",
       // Only the setup row with an affected request (REQ-0002's transit gap).
-      "SETUP TO FIX",
+      "Setup to fix",
       "Transit days not set",
     ];
     let cursor = -1;
@@ -536,7 +536,7 @@ describe("Card 03 · the left filter rail", () => {
     }
     // R2 — retired from this page.
     for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set"]) {
-      expect(text, retired).not.toContain(retired);
+      expect(text.toLowerCase(), retired).not.toContain(retired.toLowerCase());
     }
   });
 
@@ -3091,7 +3091,7 @@ describe("Round 2 · the object's rounds", () => {
       fmtDate("2026-09-02T03:00:00Z", { time: true }),
     );
     expect(screen.getByTestId("mp-object-po-issued-0")).not.toHaveTextContent(fmtDate("2026-09-01"));
-    expect(screen.getByTestId("mp-object-po-issued-1")).toHaveTextContent("Not marked as sent");
+    expect(screen.getByTestId("mp-object-po-issued-1")).toHaveTextContent("Sending not confirmed");
   });
 });
 

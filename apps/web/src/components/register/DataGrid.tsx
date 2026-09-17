@@ -251,9 +251,10 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
-  /** Opt-in Radix slate register palette (SO Batch first, owner ruling R5
-      2026-09-16): white toolbar/rows/footer, slate-3 header, blue-3 ticked
-      rows including pinned cells, slate-2 expansion. Omitted = unchanged. */
+  /** Opt-in TICKED-ROW selection model (SO Batch first, owner ruling R5
+      2026-09-16): blue-3 ticked rows including pinned cells instead of the
+      single clicked-row highlight. The slate surfaces it first carried are
+      every grid's default since UI MASTER §6.7 (Jess 2026-09-17). */
   palette?: "slate";
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,

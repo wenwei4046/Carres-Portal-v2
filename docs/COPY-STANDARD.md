@@ -952,11 +952,14 @@ Expansion: `SKU · Item / configuration · Qty · Deliver To` (read-only).
 
 | Rail group | Visible rows |
 |---|---|
-| `SUPPLIER REPLY` | `Supplier has not confirmed the PO date` · `Supplier Delivery Date changed` · `Supplier delivery date passed` |
-| `RECEIVING` | `Partly received` |
-| `SUPPLIER` | Supplier facts |
-| `DELIVER TO` | Destination facts |
+| `Supplier reply` | `Date not confirmed` · `Date changed` · `Date passed` |
+| `Receiving` | `Partly received` |
+| `Supplier` | Supplier facts |
+| `Deliver To` | Destination facts |
 
+Inside the `Supplier reply` group the short rows are used. Outside that group context — including
+active-condition chips — use the complete labels `Supplier has not confirmed the PO date` ·
+`Supplier Delivery Date changed` · `Supplier delivery date passed`.
 Supplier-reply conditions require the current version marked as sent and goods pending.
 Retire on this listing: `PO Issued`, separate `Sent to Supplier`, `Source`, separate
 `Supplier Delivery Date` / `PO Delivery Date`, `Same as PO`, `Not confirmed` as arrival cell copy,
@@ -2454,7 +2457,7 @@ LEAVES when its outcome is recorded. A status is what the PO currently is.
 
 **`Open` is never a visible Purchase Order status.** Register groups are
 `Confirm PO sent to supplier`, `Waiting for goods from supplier`, `Completed`, `Cancelled`.
-These revised labels are APPROVED / NOT BUILT (Jess, 2026-09-17). Existing internal state keys
+These revised labels are BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17). Existing internal state keys
 are not renamed merely to change display copy. There is no `Acknowledged` state; a sending
 confirmation does not prove supplier receipt, reading or acceptance.
 
@@ -3505,7 +3508,7 @@ receipt PDF the right-hand signature line `Payer signature`; and the failure toa
 `The invoice could not be opened — {error}` · `The receipt could not be opened — {error}`. A draft
 invoice has no number and no PDF.
 
-### PO copy and Portal-wide readability — APPROVED / NOT BUILT (Jess, 2026-09-17)
+### PO copy and Portal-wide readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17)
 
 Canonical PO group labels: `Confirm PO sent to supplier` · `Waiting for goods from supplier` ·
 `Completed` · `Cancelled`. Button: `PO sent to supplier`. PO Version supporting line:

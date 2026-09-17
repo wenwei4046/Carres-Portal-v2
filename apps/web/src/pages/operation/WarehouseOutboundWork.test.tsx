@@ -209,7 +209,7 @@ describe("Warehouse Outbound — the unified Register", () => {
       expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
     );
     const rail = screen.getByTestId("wo-rail");
-    expect(within(rail).getByText("PICKUP STATUS")).toBeInTheDocument();
+    expect(within(rail).getByText("Pickup status")).toBeInTheDocument();
     expect(within(rail).getByTestId("wo-view-open")).toBeInTheDocument();
     expect(within(rail).getByTestId("wo-view-loaded")).toBeInTheDocument();
     // One Site today — the group never renders as a dead one-option control.

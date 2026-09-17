@@ -244,9 +244,9 @@ export const MANUAL_PURCHASE_WORDS = {
    * object used to print `purchase_orders.placed_at` under the same head — the
    * date the document was CREATED, which is a different fact. It now prints
    * the marked-sent date too, and a document nobody marked reads the governed
-   * `Not marked as sent` (§5.6) instead of a creation date wearing the word.
+   * `Sending not confirmed` (§5.6) instead of a creation date wearing the word.
    */
-  notMarkedAsSent: "Not marked as sent",
+  notMarkedAsSent: "Sending not confirmed",
   colPoDeliveryDate: "PO Delivery Date",
   colSupplierDeliveryDate: "Supplier Delivery Date",
   sameAsPo: "Same as PO",
@@ -618,19 +618,19 @@ export function stillNeededOf(qty: number, free: number, alreadyOnPo: number): n
  */
 export const MANUAL_PURCHASE_RAIL = {
   timing: {
-    heading: "ORDER TIMING",
+    heading: "Order timing",
     rows: [
       { state: "can_order_early", word: "Can order early" },
       { state: "order_date_reached", word: "Order date reached" },
       { state: "order_date_passed", word: "Order date passed" },
     ],
   },
-  purpose: { heading: "PURPOSE", all: "All purposes", rows: DEMAND_PURPOSES },
+  purpose: { heading: "Purpose", all: "All purposes", rows: DEMAND_PURPOSES },
   /** The Catalog category rows — SO Batch's own list, shared (Law D). */
   product: SO_BATCH_RAIL.product,
-  supplier: { heading: "SUPPLIER", all: "All suppliers" },
+  supplier: { heading: "Supplier", all: "All suppliers" },
   setup: {
-    heading: "SETUP TO FIX",
+    heading: "Setup to fix",
     rows: [
       { key: "supplier_not_set", word: "Supplier not set" },
       { key: "production_days_not_set", word: "Production days not set" },

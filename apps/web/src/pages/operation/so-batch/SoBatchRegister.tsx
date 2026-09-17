@@ -936,7 +936,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               `ORDER TIMING`, the section that answers what to buy today. The
               outstanding arithmetic behind it is untouched and still governs
               the tick and the Ready Stock door. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading} icon="date">
             {SO_BATCH_RAIL.timing.states.map((s) => (
               <FilterRailRow
                 key={s}
@@ -958,7 +958,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               rows wrote, so `All …` still clears only its own section and
               sections still combine with AND. The counts ride in the option
               text; `TO ORDER` and `ORDER TIMING` keep their visible rows. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.product.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.product.heading} icon="goods">
             {/* The CATALOG's categories, never SKU-text inference. `All
                 products` is the section's clear — and where the uncommon
                 categories live. */}
@@ -980,7 +980,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading} icon="supplier">
             {/* Actual names from the Register's own supplier projection —
                 dynamic, alphabetical, never hardcoded. A name with no match
                 under the other filters drops off; the SELECTED name stays,
@@ -998,7 +998,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               onChange={(supplier) => setFilter((prev) => ({ ...prev, supplier }))}
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.region.heading} icon="delivery">
             {/* ⭐ REGION JOINS PRODUCT AND SUPPLIER (owner correction
                 2026-09-11). It is the third FACT list on this rail and it grows
                 with the business — every outstation state Carres delivers to
@@ -1023,7 +1023,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
           {rail.setupExists && (
-            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading}>
+            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading} icon="settings">
               {SO_BATCH_RAIL.setup.states.map((s) => (
                 <FilterRailRow
                   key={s}

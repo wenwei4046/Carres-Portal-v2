@@ -11,7 +11,7 @@ import type { PoTemplateData } from "@/lib/pdf/types";
  * migrations 0377 · 0378; send wording Jess 2026-09-16/17).
  *
  * Without a WhatsApp API the Portal cannot see a PDF leave. Staff send it
- * externally, then press `Mark as sent`. The mark is that person's statement
+ * externally, then press `PO sent to supplier`. The mark is that person's statement
  * of sending — never proof the supplier received, read or accepted it.
  *
  * ── THE ONE DISTINCTION THIS COMPONENT EXISTS TO HOLD ───────────────────────
@@ -22,7 +22,7 @@ import type { PoTemplateData } from "@/lib/pdf/types";
  * interrupted, and never paste the file. That exact sequence is how a purchase
  * order used to go missing while the Portal said it was sent.
  *
- * `Mark as sent` is the ACT. It is deliberately not a tick-box: a
+ * `PO sent to supplier` is the ACT. It is deliberately not a tick-box: a
  * tick-box says "I say so", while a recipient is a fact anybody can check
  * against the supplier later.
  *
@@ -304,8 +304,8 @@ export default function PoIssueEvidence({
     <div className="flex h-full flex-col" data-testid={`so-batch-evidence-${po.id}`}>
       <h2 className="text-body font-semibold">
         {confirmed
-          ? `${po.id} · PO V${version} · Marked as sent`
-          : `${po.id} · PO V${version} · Not marked as sent`}
+          ? `${po.id} · PO V${version} · PO sent to supplier`
+          : `${po.id} · PO V${version} · Sending not confirmed`}
       </h2>
       {confirmed ? (
         <p className="mt-0.5 text-meta text-kit-slate-11">
@@ -316,7 +316,7 @@ export default function PoIssueEvidence({
       ) : opened ? (
         /* Opening a channel records nothing; it only earns the reminder. */
         <p className="mt-0.5 text-meta text-kit-slate-11" role="status" data-testid="po-send-prompt">
-          Send the PDF, then press Mark as sent.
+          Send the PDF, then press PO sent to supplier.
         </p>
       ) : null}
 
@@ -428,7 +428,7 @@ export default function PoIssueEvidence({
             disabled={!ready}
             onClick={() => void confirm()}
           >
-            Mark as sent
+            PO sent to supplier
           </button>
         )}
       </div>

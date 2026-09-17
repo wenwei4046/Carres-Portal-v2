@@ -177,7 +177,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).toBeNull();
     // The five timing rows; `SETUP TO FIX` hides while its count is zero.
     expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
-    expect(rail.textContent).not.toContain("SETUP TO FIX");
+    expect(rail.textContent?.toLowerCase()).not.toContain("setup to fix");
     expect(await screen.findByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
@@ -235,7 +235,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · PO V1 · Not marked as sent",
+      "PO-2041 · PO V1 · Sending not confirmed",
     );
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real

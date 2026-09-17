@@ -1,7 +1,7 @@
 # PURCHASING — MASTER
 
-**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
-[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--approved--not-built-jess-2026-09-17).
+**All listing appearance — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
 control types, special schedules and business behavior; no page-local appearance specification.
 
@@ -391,7 +391,7 @@ remain. PR #1105 carries the dependent application and deployment proof.
 
 ### 5.6 Issue means the PDF was actually sent
 
-**Sending evidence is built; revised visible copy is APPROVED / NOT BUILT (Jess, 2026-09-17).**
+**Sending evidence is built; revised visible copy BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17).**
 The shared communication area records version, channel, recipient, actor and time. The new button
 is `PO sent to supplier`; the new missing-confirmation line is `Sending not confirmed`.
 Recipient prefills from Supplier Master channel data (group link/chat number or email), never
@@ -499,7 +499,7 @@ Completed
 Cancelled
 ```
 
-**Group classification is built; revised labels APPROVED / NOT BUILT (Jess, 2026-09-17)** (`purchaseOrderRegisterFacts().group`;
+**Group classification is built; revised labels BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17)** (`purchaseOrderRegisterFacts().group`;
 a line read that returned no quantity is `quantitiesKnown: false`, never zero, never Completed
 unless the stored status is `received`). Evaluate in this order so each PO belongs
 to exactly one group: `Cancelled` → `Completed` → `Waiting for goods from supplier` (current version marked as sent
@@ -2046,10 +2046,10 @@ grid), re-measured SIGNED-IN on production 2026-09-17 on `1c278f8c`: PO Date 118
 (production's JetBrains Mono renders `PO-20260903-4316` at 125px; the fixture font measured 114
 and 132 cut 34 live rows) · Supplier 128 · SO No 123 · Items 135 · Expected Delivery Date 207
 exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 142 ·
-PO Version 236 scroll. Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
+PO Version 265 scroll (widened from 236 for `PO sent to supplier · {channel} · {date}`, SLICE 1 — scaled, re-measure signed in). Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
 footer `62 purchase orders`, layouts read 200, unauthenticated 401. The rail uses the shared
 `useFilterRailOpen` (hidden by default below 896px). **Owed:** saving a layout and pressing
-`Mark as sent` on production (the walk was read-only by instruction).
+`PO sent to supplier` on production (the walk was read-only by instruction).
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
@@ -2070,7 +2070,7 @@ Receiving progress belongs to Warehouse Inbound / Receiving and PO detail, not t
 - `PO Version`: first line `PO V{n}`; second line `PO sent to supplier · {channel} · {date}` or
   `Sending not confirmed` for the CURRENT version. Earlier marks remain in Revisions.
 
-**Groups — APPROVED / NOT BUILT, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
+**Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
 `Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
 (current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs once.
 A failed/unknown quantity read is never zero or Completed; completed legacy POs without a mark
@@ -2078,7 +2078,7 @@ stay Completed. Search/filters cover all groups and reveal matching collapsed gr
 Default order: unmarked by PO Delivery Date ascending; Waiting for goods from supplier by Expected Delivery Date ascending;
 Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
 
-**Rail — APPROVED / NOT BUILT, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
+**Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
 `Date changed`, `Date passed`, using existing current-version sent/pending predicates.
 `Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
 Use complete supplier-date labels outside the group context, including active-condition chips.

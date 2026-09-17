@@ -51,6 +51,7 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const TONE = { draft: "neutral", issued: "info", cancelled: "neutral" } as const;
 
@@ -262,9 +263,9 @@ function InvoiceForm({
             accountPlaceholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
           {fieldErrors.lines && (
-            <p role="alert" className="text-meta text-kit-red-11">
+            <FieldError>
               {fieldErrors.lines}
-            </p>
+            </FieldError>
           )}
           <p className="text-strong mt-2" data-testid="invoice-total">
             Total {money(total)}
@@ -272,9 +273,9 @@ function InvoiceForm({
         </Facts>
 
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11" data-testid="invoice-refusal">
+          <FieldError testId="invoice-refusal">
             {refusal}
-          </p>
+          </FieldError>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

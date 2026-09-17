@@ -255,7 +255,7 @@ export default function WarehouseWorkspace({
           className="border-t border-kit-slate-5 bg-white px-3 py-2"
           data-testid="ws-undated"
         >
-          <summary className="cursor-pointer text-meta text-kit-slate-11 marker:text-kit-slate-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9">
+          <summary className="cursor-pointer text-meta text-kit-slate-11 marker:text-kit-slate-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kit-blue-9">
             {undatedSummaryWordOf(stranded.length)}
           </summary>
           <ul className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto" data-testid="ws-undated-list">

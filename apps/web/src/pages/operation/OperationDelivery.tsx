@@ -224,7 +224,7 @@ function requestedText(r: DeliveryMonitorCard): string {
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
 function Absent({ children }: { children: string }) {
   return (
-    <span className="text-kit-slate-9" data-absence="true">
+    <span className="text-kit-slate-11" data-absence="true">
       {children}
     </span>
   );
@@ -320,14 +320,14 @@ function ArrivalCell({ card }: { card: DeliveryMonitorCard }) {
         ) : (
           /* With NO date there is nothing to be compact about: the governed
              absence IS the content, and the three absences are three words. */
-          <span className={`truncate ${exception ? "text-kit-amber-11" : "text-kit-slate-9"}`}>
+          <span className={`truncate ${exception ? "text-kit-amber-11" : "text-kit-slate-11"}`}>
             {arrivalNoteOf(state)}
           </span>
         )}
       </span>
       {original ? (
         /* The ORIGINAL stays as context — never deleted, never the headline. */
-        <span className="block truncate text-label text-kit-slate-9">
+        <span className="block truncate text-label text-kit-slate-11">
           {fmtDate(original)}
         </span>
       ) : null}
@@ -555,7 +555,7 @@ function MonitorWorkCard({
     <div className="flex items-baseline justify-between gap-3">
       <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
       <span
-        className={`min-w-0 truncate text-body ${muted ? "text-kit-slate-9" : "text-kit-slate-12"}`}
+        className={`min-w-0 truncate text-body ${muted ? "text-kit-slate-11" : "text-kit-slate-12"}`}
         {...(muted ? { "data-absence": "true" } : {})}
       >
         {value}
@@ -1718,7 +1718,7 @@ export default function OperationDelivery() {
             need every pixel, and the strip's own aria-label carries the same
             fact for a reader who cannot see the row. */}
         {isPhone ? null : (
-          <span className="my-auto shrink-0 pl-2 text-label text-kit-slate-9">
+          <span className="my-auto shrink-0 pl-2 text-label text-kit-slate-11">
             {MONITOR_COPY.contactWeekScope}
           </span>
         )}
@@ -1767,13 +1767,14 @@ export default function OperationDelivery() {
           exactly the side effect the two tabs replaced. Clicking one there is
           still possible from the tab itself, one click away. */}
       {calendarMode ? null : (
-        <FilterRailGroup title={MONITOR_COPY.railWork}>
+        <FilterRailGroup title={MONITOR_COPY.railWork} icon="flag">
           {MONITOR_WORK_VIEWS.map((key) => (
             <FilterRailRow
               key={key}
               label={MONITOR_VIEW_LABEL[key]}
               count={rails.work[key]}
               active={view === key}
+              resets={key === "all"}
               onClick={() => pickView(key)}
               testId={`delivery-monitor-work-${key}`}
             />
@@ -1786,7 +1787,11 @@ export default function OperationDelivery() {
           STATUS under it the rail carried 1152px of filters in a 421px box.
           The groups, their words and their counts are UNCHANGED; only the
           control changed, and the two months above it do not move. */}
-      <FilterRailGroup title={MONITOR_COPY.railState}>
+      <FilterRailGroup
+        title={MONITOR_COPY.railState}
+        icon="customer"
+        chosen={region == null ? null : (rails.regions.find((o) => o.key === region)?.label ?? region)}
+      >
         <RailPicker
           id="delivery-monitor-region"
           label={MONITOR_COPY.railState}
@@ -1797,7 +1802,11 @@ export default function OperationDelivery() {
           onPick={(next) => setParam("region", next)}
         />
       </FilterRailGroup>
-      <FilterRailGroup title={MONITOR_COPY.railLogistics}>
+      <FilterRailGroup
+        title={MONITOR_COPY.railLogistics}
+        icon="delivery"
+        chosen={logistics == null ? null : (rails.logistics.find((o) => o.key === logistics)?.label ?? logistics)}
+      >
         <RailPicker
           id="delivery-monitor-logistics"
           label={MONITOR_COPY.railLogistics}
@@ -1808,7 +1817,11 @@ export default function OperationDelivery() {
           onPick={(next) => setParam("logistics", next)}
         />
       </FilterRailGroup>
-      <FilterRailGroup title={MONITOR_COPY.railStatus}>
+      <FilterRailGroup
+        title={MONITOR_COPY.railStatus}
+        icon="waiting"
+        chosen={status == null ? null : MONITOR_STATUS_LABEL[status]}
+      >
         <RailPicker
           id="delivery-monitor-status"
           label={MONITOR_COPY.railStatus}
@@ -1830,7 +1843,7 @@ export default function OperationDelivery() {
   const dayCards = (iso: string) => {
     const list = byDay.get(iso) ?? [];
     if (list.length === 0) {
-      return <div className="px-2 py-3 text-body text-kit-slate-9">{MONITOR_COPY.emptyDay}</div>;
+      return <div className="px-2 py-3 text-body text-kit-slate-11">{MONITOR_COPY.emptyDay}</div>;
     }
     return (
       <div className="flex flex-col gap-1.5 p-1.5">
@@ -2015,7 +2028,7 @@ export default function OperationDelivery() {
               {/* THE CALENDAR'S OWN BOUNDARY, stated rather than discovered:
                   an unconfirmed delivery is not here, it is in the chase. */}
               <div
-                className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-label text-kit-slate-9"
+                className="shrink-0 border-b border-kit-slate-5 bg-white px-3 py-1 text-label text-kit-slate-11"
                 data-testid="delivery-monitor-calendar-scope"
               >
                 <div className="text-kit-slate-11" data-testid="delivery-monitor-schedule-split">{scheduleSplitSentence(scheduleCounts)}</div>
@@ -2111,7 +2124,7 @@ export default function OperationDelivery() {
                   aria-busy={isLoading}
                 >
                   {phoneRows.length === 0 ? (
-                    <div className="px-1 py-3 text-body text-kit-slate-9">
+                    <div className="px-1 py-3 text-body text-kit-slate-11">
                       {cards.length === 0 ? MONITOR_COPY.emptyList : MONITOR_COPY.emptySearch}
                     </div>
                   ) : (

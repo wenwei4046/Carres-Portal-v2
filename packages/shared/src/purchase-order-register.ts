@@ -68,8 +68,11 @@ export interface PurchaseOrderRegisterInput {
   sends: readonly PurchaseOrderRegisterSend[];
 }
 
-/** The four listing groups, classified Cancelled → Completed → Issued →
- *  Not marked as sent so each PO belongs to exactly one (MASTER §5.8). */
+/** The four listing groups, classified Cancelled → Completed → Waiting for
+ *  goods from supplier → Confirm PO sent to supplier so each PO belongs to
+ *  exactly one (MASTER §5.8). The keys are internal state names; the visible
+ *  headings are `Confirm PO sent to supplier` (`not_marked_as_sent`) and
+ *  `Waiting for goods from supplier` (`issued`). */
 export type PurchaseOrderRegisterGroup = "not_marked_as_sent" | "issued" | "completed" | "cancelled";
 
 export interface PurchaseOrderExpectedDelivery {
@@ -88,11 +91,11 @@ export interface PurchaseOrderRegisterFacts {
   quantities: { ordered: number; received: number; open: number };
   currentSend: PurchaseOrderRegisterSend | null;
   latestConfirmedSend: PurchaseOrderRegisterSend | null;
-  /** The latest PO version with a sent mark — `PO V{n}`, or `Not marked as
-   *  sent` when no version was ever marked. A PO that received goods without a
+  /** The latest PO version with a sent mark — `PO V{n}`, or `Sending not
+   *  confirmed` when no version was ever marked. A PO that received goods without a
    *  mark stays honestly unmarked; missing evidence is never fabricated. */
   sentToSupplier: string;
-  documentState: "Not marked as sent" | "Issued" | "Completed" | "Cancelled";
+  documentState: "Sending not confirmed" | "Waiting for goods from supplier" | "Completed" | "Cancelled";
   group: PurchaseOrderRegisterGroup;
   expected: PurchaseOrderExpectedDelivery;
   operationStatus: PurchaseOrderOperationStatus | null;
@@ -195,14 +198,14 @@ export function purchaseOrderRegisterFacts(
     quantities: { ordered, received, open },
     currentSend,
     latestConfirmedSend,
-    sentToSupplier: supplierVersion == null ? "Not marked as sent" : `PO V${supplierVersion}`,
+    sentToSupplier: supplierVersion == null ? "Sending not confirmed" : `PO V${supplierVersion}`,
     documentState: cancelled
       ? "Cancelled"
       : completed
         ? "Completed"
         : currentSend
-          ? "Issued"
-          : "Not marked as sent",
+          ? "Waiting for goods from supplier"
+          : "Sending not confirmed",
     group,
     expected,
     operationStatus,

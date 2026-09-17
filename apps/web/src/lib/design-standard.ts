@@ -50,7 +50,7 @@ export const COLOR = {
   // citation sits inside an EXPORTED string, and D0.6 may change no exported
   // value — so it is neutralised here and corrected by D3 with the hex.
   surface: { hex: "#FFFFFF", use: "content background, panels, rows", class: "bg-white" },
-  canvas:  { hex: "#F3F4F6", use: "page canvas behind white panels — v4 §11a COOL neutral (warm #F0EFE9 retired)", cssVar: "--background", class: "bg-background" },
+  canvas:  { hex: "#F7F8FA", use: "the ONE page canvas behind white panels — UI MASTER §6.7 (Jess 2026-09-17); #F3F4F6 retired", cssVar: "--background", class: "bg-background" },
 
   // Brand + selection. ⚠️ STALE: `flame` below is described as a PRIMARY
   // ACTION colour; UI-KIT 2026-07-27 §3.4 keeps the flame in exactly one

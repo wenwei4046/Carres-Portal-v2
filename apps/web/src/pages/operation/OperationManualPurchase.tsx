@@ -1037,7 +1037,7 @@ export default function OperationManualPurchase() {
           onHide={() => setFilterRailVisible(false)}
           className={registerStyles.rail}
         >
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading} icon="date">
             {/* Counts only requests with quantity still to buy — a filter and
                 a fact, never an issue permission gate. */}
             {MANUAL_PURCHASE_RAIL.timing.rows.map((row) => (
@@ -1056,7 +1056,7 @@ export default function OperationManualPurchase() {
               />
             ))}
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading} icon="order">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.purpose.heading}
               allLabel={MANUAL_PURCHASE_RAIL.purpose.all}
@@ -1075,7 +1075,7 @@ export default function OperationManualPurchase() {
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading} icon="goods">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.product.heading}
               allLabel={MANUAL_PURCHASE_RAIL.product.all}
@@ -1094,7 +1094,7 @@ export default function OperationManualPurchase() {
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading} icon="supplier">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.supplier.heading}
               allLabel={MANUAL_PURCHASE_RAIL.supplier.all}
@@ -1111,7 +1111,7 @@ export default function OperationManualPurchase() {
           {/* Only while an affected request exists, and only the rows that
               have one: fixing the setup stays in Catalog / Settings. */}
           {rail.setupExists && (
-            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading}>
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading} icon="settings">
               {MANUAL_PURCHASE_RAIL.setup.rows
                 .filter((row) => rail.setupRows.includes(row.key))
                 .map((row) => (
@@ -3292,14 +3292,14 @@ function ManualPurchaseObject({
               {lines.map((l, i) => (
                 <tr
                   key={l.id}
-                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-base-400" : ""}`}
+                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-kit-slate-11" : ""}`}
                   data-testid={`mp-object-item-${i}`}
                 >
                   <td className="px-2 py-2 font-mono">{l.sku}</td>
                   <td className="px-2 py-2">
                     {l.item_label ?? l.sku}
                     {l.cancelled_at ? (
-                      <span className="block text-label text-base-400">
+                      <span className="block text-label text-kit-slate-11">
                         {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
                         {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
                       </span>

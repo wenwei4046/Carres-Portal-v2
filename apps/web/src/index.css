@@ -16,7 +16,7 @@
     --dial-red: #e24b4a;    --dial-red-soft: #fcebeb;
     --dial-green: #639922;  --dial-green-soft: #eaf3de;
     --dial-check: #3b6d11;
-    --background: 220 14% 96%;         /* #F3F4F6 — v4 §11a COOL neutral canvas (warm retired) */
+    --background: 220 23% 97.5%;       /* #F7F8FA — the ONE canvas (UI MASTER §6.7, Jess 2026-09-17); #F3F4F6 retired */
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */

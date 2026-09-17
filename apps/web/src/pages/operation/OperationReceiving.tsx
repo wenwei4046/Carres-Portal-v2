@@ -35,7 +35,6 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 // — the same approved light slate blue-grey table header as SO Batch
 // Purchase / Manual Purchase / Purchase Orders, so one colour means
 // "section header" everywhere in Operations (manual-purchase-create.css).
-import styles from "./PurchasingRegister.module.css";
 
 /**
  * OperationReceiving — the ONE Receiving destination
@@ -256,7 +255,7 @@ export default function OperationReceiving() {
               {fmtDate(r.supplier_delivery_date)}
             </span>
           ) : (
-            <span className="text-body text-kit-slate-9">Not confirmed</span>
+            <span className="text-body text-kit-slate-11">Not confirmed</span>
           ),
       },
       {
@@ -526,7 +525,7 @@ export default function OperationReceiving() {
 
   return (
     <div
-      className={`${styles.page} flex min-h-0 flex-1 flex-col`}
+      className="flex min-h-0 flex-1 flex-col bg-kit-canvas text-kit-slate-12"
       data-testid="receiving-page"
     >
       <PurchasingTabs />
@@ -594,7 +593,7 @@ export default function OperationReceiving() {
               the shared ladder's order — no `Any`, no `All …`, no invented
               category. Counts speak for the COMPLETE filtered result set;
               re-clicking the active row clears the section. */}
-          <FilterRailGroup title="CATEGORY">
+          <FilterRailGroup title="Category" icon="goods">
             {categoryRows.map((word) => (
               <FilterRailRow
                 key={word}
@@ -608,7 +607,7 @@ export default function OperationReceiving() {
           </FilterRailGroup>
 
           {/* The suppliers actually present in Receiving records. */}
-          <FilterRailGroup title="SUPPLIER">
+          <FilterRailGroup title="Supplier" icon="supplier">
             {supplierNames.map((name) => (
               <FilterRailRow
                 key={name}
@@ -623,7 +622,7 @@ export default function OperationReceiving() {
 
           {/* The receiving locations actually present in the records —
               where the goods PHYSICALLY arrived. */}
-          <FilterRailGroup title="GOODS ARRIVED AT">
+          <FilterRailGroup title="Goods arrived at" icon="warehouse">
             {siteNames.map((name) => (
               <FilterRailRow
                 key={name}
@@ -648,7 +647,7 @@ export default function OperationReceiving() {
               setParams(next, { replace: true });
             }}
             data-testid="rail-clear-filters"
-            className="self-start rounded-control px-2 py-1.5 text-left text-body text-kit-blue-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9"
+            className="self-start rounded-control px-2 py-1.5 text-left text-body text-kit-blue-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2"
           >
             Clear filters
           </button>
@@ -725,7 +724,7 @@ export default function OperationReceiving() {
                       onClick={() =>
                         setOffset(Math.max(0, offset - page.limit))
                       }
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Previous
                     </button>
@@ -734,7 +733,7 @@ export default function OperationReceiving() {
                       data-testid="grn-page-next"
                       disabled={to >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Next
                     </button>

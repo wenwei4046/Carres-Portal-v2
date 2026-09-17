@@ -7,7 +7,7 @@ conversation (not a fork). Verify main and open PRs before implementation. Anoth
 editing FilterRail, DataGrid or register CSS is a STOP: report the overlap before proceeding.
 This handoff does not start Receiving's pending workflow work or expand personal layouts beyond PO.
 
-Authority: [UI MASTER §6.7](../ui/MASTER.md#portal-wide-listing-readability--approved--not-built-jess-2026-09-17),
+Authority: [UI MASTER §6.7](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed),
 [Purchasing MASTER §5.6/§5.8/§9.3](../purchasing/MASTER.md), [COPY-STANDARD](../COPY-STANDARD.md).
 
 ## SLICE 1 — Purchase Orders wording + PORTAL-WIDE listing readability

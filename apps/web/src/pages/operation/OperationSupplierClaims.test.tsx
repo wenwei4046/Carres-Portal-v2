@@ -126,7 +126,7 @@ describe("Supplier Claims factual Register and owning object", () => {
     expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1002");
     fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
     await waitFor(() => expect(screen.queryByTestId("claim-object")).not.toBeInTheDocument());
-    expect(screen.getByText("PO: PO-other")).toBeInTheDocument();
+    expect(screen.getByTestId("claims-rail-source")).toHaveTextContent("PO: PO-other");
   });
   it("does not drop a named Claim while loading", () => {
     claimsQuery.mockReturnValue({ isLoading: true });

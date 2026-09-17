@@ -4727,7 +4727,7 @@ export interface ManualPurchaseDetailPayload {
     id: string;
     po_no: string;
     placed_at: string | null;
-    /** D5 — the CURRENT version's marked-sent time; null = Not marked as sent. */
+    /** D5 — the CURRENT version's marked-sent time; null = Sending not confirmed. */
     marked_sent_at?: string | null;
     po_delivery_date: string | null;
     /** Non-null ONLY when the promise ledger proves the supplier changed

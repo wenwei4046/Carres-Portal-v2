@@ -13,6 +13,7 @@ import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 export function accountLabel(a: Pick<MoneyInAccountOption, "code" | "name">): string {
   return `${a.code} · ${a.name}`;
@@ -213,9 +214,9 @@ export function CancelWithReason({
           }}
         />
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {refusal}
-          </p>
+          </FieldError>
         )}
       </div>
     </Modal>

@@ -14,6 +14,7 @@
  * height budget.
  */
 import type { ReactNode } from "react";
+import Icon from "./Icon";
 
 export default function FieldFrame({
   id,
@@ -42,9 +43,7 @@ export default function FieldFrame({
       )}
       {children}
       {error ? (
-        <p id={`${id}-msg`} role="alert" className="text-meta text-kit-red-11">
-          {error}
-        </p>
+        <FieldError id={`${id}-msg`}>{error}</FieldError>
       ) : (
         hint && (
           <p id={`${id}-msg`} className="text-meta text-kit-slate-11">
@@ -53,5 +52,40 @@ export default function FieldFrame({
         )
       )}
     </div>
+  );
+}
+
+/**
+ * The ONE error voice for an input error or a save failure (UI MASTER §6.7,
+ * Jess 2026-09-17): 13px, error colour, text AND icon — colour alone never
+ * carries it. Block by default; `inline` for a message that sits in a row.
+ */
+export function FieldError({
+  id,
+  children,
+  testId,
+  inline = false,
+  alert = true,
+}: {
+  id?: string;
+  children: ReactNode;
+  testId?: string;
+  inline?: boolean;
+  /** `false` for a standing validation fact that must not be announced. */
+  alert?: boolean;
+}) {
+  const Tag = inline ? "span" : "p";
+  return (
+    <Tag
+      id={id}
+      role={alert ? "alert" : undefined}
+      data-testid={testId}
+      className={`${inline ? "inline-flex" : "flex"} items-start gap-1.5 text-body text-kit-red-11`}
+    >
+      <span className="mt-0.5 shrink-0">
+        <Icon name="late" size={14} />
+      </span>
+      <span className="min-w-0 break-words">{children}</span>
+    </Tag>
   );
 }
