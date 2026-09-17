@@ -343,7 +343,29 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   // search (`?search=`, above) is what makes the cap safe: a match beyond the
   // first page is FOUND by asking, never scrolled for.
   q = q.order("placed_at", { ascending: false }).limit(500);
-  const { data, error } = await q;
+
+  /* ⭐ THE REGISTER'S TOTAL IS A COUNT, NEVER THE ROWS IT HAPPENED TO LOAD
+     (Listing Standard follow-up, 2026-09-17). `{n} of {m} sales orders` needs
+     `m` = every Sales Order the caller may read in this stage/channel scope —
+     rentals excluded exactly as the Register excludes them, and the SEARCH
+     NOT applied, so a search answered first still has its denominator. The
+     list above stops at 500 rows and a search replaces the rows, so neither
+     `rows.length` nor a remembered number is the total. Same RLS client, one
+     head-only exact count. A failed count is `null` (unknown) — the page then
+     prints no `of` rather than guess. */
+  let totalQ = sb
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["place", "proceed_order", "delivered"])
+    .or("source_system.is.null,source_system.neq.rental");
+  if (stage === "placed") totalQ = totalQ.eq("status", "place");
+  else if (stage !== "all") totalQ = totalQ.eq("operation_stage", stage);
+  if (channel === "dealers") totalQ = totalQ.is("outlet_id", null);
+  if (channel === "showrooms") totalQ = totalQ.not("outlet_id", "is", null);
+
+  const [{ data, error }, totalRes] = await Promise.all([q, totalQ]);
+  const salesOrderTotal =
+    totalRes && !totalRes.error && typeof totalRes.count === "number" ? totalRes.count : null;
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
@@ -683,6 +705,7 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
       incoming_units: incomingByOrder.get(o.id ?? "") ?? [],
     })),
+    salesOrderTotal,
   });
 });
 

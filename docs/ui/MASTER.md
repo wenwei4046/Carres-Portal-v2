@@ -411,7 +411,12 @@ the whole reason the two components share a frame.
 - **LISTING STANDARD ENGINE POWERS — owner approved 2026-09-16, BUILT in `register/DataGrid`
   (PR #1396).** Default-on for every register unless marked opt-in:
   ```
-  KEYBOARD    a grid is ONE Tab stop (roving row); ↑/↓ row to row; Enter = what a double-click
+  KEYBOARD    a grid is ONE Tab stop (roving row, always a RENDERED row); ↑/↓ one row,
+              Home/End first/last, PageUp/PageDown one screen — counted in the FULL row list
+              (group banners and expansions skipped); a virtual list scrolls to the target,
+              focuses it and corrects the scroll so it sits wholly below the sticky header
+              (the virtualizer's 30px estimate vs 38px rows left it off-screen, measured
+              2026-09-17, PR follow-up to #1396); Enter = what a double-click
               opens; Space ticks; → / ← open and close the expansion; Shift+F10 or the Menu key
               opens the row menu from the row or any control in it; the menu (role menu,
               `Row actions`) takes focus, ↑/↓/Home/End move, Escape or Tab gives focus back.

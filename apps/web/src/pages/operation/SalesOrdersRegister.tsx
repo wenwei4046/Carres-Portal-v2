@@ -41,7 +41,7 @@
 // ruling), full-bleed as SO-4 shipped it. The engine owns the toolbar, search,
 // filters, chooser and footer; ListPageShell would wrap a second chrome
 // around the one the engine already draws.
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -520,7 +520,7 @@ export default function SalesOrdersRegister() {
      naming which Sales Order the dialog is about. */
   const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
-  const { data, isLoading, isError, isPlaceholderData, refetch } = useOperationOrders(
+  const { data, isLoading, isError, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
   );
   /* ▸ D4 · EACH ORDER CARRIES ITS OWN DELIVERY ORDERS NOW.
@@ -552,13 +552,11 @@ export default function SalesOrdersRegister() {
     () => [...all].sort((a, b) => b.ordered.localeCompare(a.ordered)),
     [all],
   );
-  /* `{n} of {m}` — `m` is the register's population, not the server's search
-     answer. A server search REPLACES the rows, so without this a search for
-     `kimmy` read `3 sales orders` as if nothing had been narrowed. The last
-     unsearched count is remembered; placeholder data is never a population. */
-  const populationRef = useRef<number | null>(null);
-  if (!serverSearch && data && !isPlaceholderData) populationRef.current = rows.length;
-  const population = serverSearch ? (populationRef.current ?? rows.length) : rows.length;
+  /* `{n} of {m}` — `m` is the SERVER's count of the Sales Orders this user may
+     read (rentals excluded, search not applied), carried on every list answer,
+     so a search answered before any unsearched load still has it and a created
+     or cancelled order moves it on the next read. Unknown → `null` → no `of`. */
+  const population = typeof data?.salesOrderTotal === "number" ? data.salesOrderTotal : null;
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
      for Finance/Principal); the chooser opens every column either way.
@@ -803,7 +801,8 @@ function RegisterResultSummary({
 }: {
   filtered: RegisterRow[];
   selected: RegisterRow[];
-  total: number;
+  /** The server's authoritative total; `null` when unknown. */
+  total: number | null;
 }) {
   const scope = selected.length > 0 ? selected : filtered;
   const counts = new Map<string, number>();
@@ -818,9 +817,10 @@ function RegisterResultSummary({
   /* Listing Standard 2026-09-16: the footer names the document —
      `{n} of {m} sales orders`, singular `1 sales order`. */
   const salesOrders = (n: number) => (n === 1 ? "sales order" : "sales orders");
+  /* An unknown total prints the count alone — never a guessed `of`. */
   const countWord = selected.length > 0
     ? `${selected.length} selected ${salesOrders(selected.length)}`
-    : filtered.length === total
+    : total == null || filtered.length === total
       ? `${filtered.length} ${salesOrders(filtered.length)}`
       : `${filtered.length} of ${total} ${salesOrders(total)}`;
   // A quantity breakdown must account for every counted line, including

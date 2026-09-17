@@ -90,6 +90,71 @@ describe("GET /api/operation/orders", () => {
     expect(limit).toHaveBeenCalledWith(500);
   });
 
+  /* ⭐ `{n} of {m}` needs the SERVER's count of the permitted scope — not the
+     500-row page, not the search answer. */
+  describe("salesOrderTotal — the Register's authoritative total", () => {
+    function mockWithCount(opts: { rows: unknown[]; count: number | null; countError?: unknown }) {
+      const calls: Array<{ head: boolean; method: string; args: unknown[] }> = [];
+      const from = vi.fn(() => {
+        let head = false;
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn((_cols: string, o?: { count?: string; head?: boolean }) => {
+          head = Boolean(o?.head);
+          calls.push({ head, method: "select", args: [_cols, o] });
+          return chain;
+        });
+        for (const m of ["in", "eq", "ilike", "or", "not", "is", "order", "limit", "range"])
+          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ head, method: m, args }); return chain; });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(head ? { count: opts.count, error: opts.countError ?? null, data: null } : { data: opts.rows, error: null });
+        return chain;
+      });
+      vi.mocked(userClient).mockReturnValue({ from } as never);
+      return calls;
+    }
+    const get = async (qs = "") => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request(`http://t/api/operation/orders${qs}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+      expect(res.status).toBe(200);
+      return (await res.json()) as { orders: unknown[]; salesOrderTotal: number | null };
+    };
+
+    it("answers a search with the UNSEARCHED total, counted head-only and without rentals", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 612 });
+      const body = await get("?search=Tan");
+      expect(body.orders).toHaveLength(1);
+      expect(body.salesOrderTotal).toBe(612);
+      const countCalls = calls.filter((c) => c.head);
+      expect(countCalls.find((c) => c.method === "select")?.args[1]).toEqual({ count: "exact", head: true });
+      expect(countCalls).toContainEqual({ head: true, method: "in", args: ["status", ["place", "proceed_order", "delivered"]] });
+      expect(countCalls).toContainEqual({ head: true, method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
+      /* The search narrows the rows, never the total. */
+      expect(countCalls.some((c) => c.method === "or" && String(c.args[0]).includes("customer_name"))).toBe(false);
+    });
+
+    it("reports a total larger than the 500-row page it returns", async () => {
+      mockWithCount({ rows: Array.from({ length: 500 }, (_, i) => ({ ...ORDER_ROW, id: `o-${i}`, so: 5000 + i })), count: 612 });
+      const body = await get();
+      expect(body.orders).toHaveLength(500);
+      expect(body.salesOrderTotal).toBe(612);
+    });
+
+    it("narrows the total by the same stage and channel as the list", async () => {
+      const calls = mockWithCount({ rows: [], count: 3 });
+      await get("?stage=placed&channel=showrooms");
+      const countCalls = calls.filter((c) => c.head);
+      expect(countCalls).toContainEqual({ head: true, method: "eq", args: ["status", "place"] });
+      expect(countCalls).toContainEqual({ head: true, method: "not", args: ["outlet_id", "is", null] });
+    });
+
+    it("says UNKNOWN (null), never a guess, when the count cannot be read", async () => {
+      mockWithCount({ rows: [ORDER_ROW], count: null, countError: { message: "timeout" } });
+      const body = await get();
+      expect(body.orders).toHaveLength(1);
+      expect(body.salesOrderTotal).toBeNull();
+    });
+  });
+
   it.each(["4001", "SO-4001", "so-4001", "SO 4001"])("finds the order number entered as %s", async (search) => {
     const { or } = mockOrdersList([]);
     const jwt = await makeJwt("operation");

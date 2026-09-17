@@ -212,7 +212,9 @@ sentences, no Priority).
 
 ```
 FILTERS    active search + header filters shown as conditions · one `Clear filters` clears both
-           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = unsearched population
+           footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = the server's count
+           (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
+           unknown total → `{n} sales orders`, never a guessed `of`
 IDENTITY   SO No pinned and a door to the order
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
@@ -235,7 +237,12 @@ Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No ful
 1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
 200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
 search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
-returns `24 sales orders`. The production SHA is recorded on the PR. **Owed:** the authenticated
+returns `24 sales orders`. **Total follow-up (2026-09-17):** `{m}` is no longer the loaded rows or a
+remembered number — `GET /api/operation/orders` returns `salesOrderTotal`, one head-only exact count
+under the caller's RLS (same stage/channel, `source_system` null or not `rental`, search not
+applied), re-read with every list refresh (create/cancel invalidate the list). Rendered: fixture
+total 612 → `24 of 612` and, searching, `3 of 612`; total unknown → `24 sales orders` / `3 sales
+orders`. The production SHA is recorded on the PR. **Owed:** the authenticated
 owner walk in production (fixture evidence is not production evidence).
 
 ### The two-line cell law
