@@ -105,6 +105,37 @@ Draft  →  review business impact  →  commit the exact file  →  merge-ready
 - **Never retype a migration during apply.** Execute the exact reviewed repository file.
 - **An applied migration missing from the repository is a P0**, not a tidy-up. Push first,
   review second.
+- **Apply only through `apply_migration`, named exactly as the file's basename.** It writes the
+  tracker row (`statements[1]` = the file text, so `md5(statements[1])` = `md5` of the file). The
+  MCP `execute_sql` connection is READ-ONLY and cannot apply anything. A migration pasted into the
+  SQL editor or run with `psql` writes no tracker row. Its giveaway: this repository is checked out
+  with `core.autocrlf=true`, so a working-copy apply leaves `\r\n` in `prosrc`. Compare bodies
+  with `md5(replace(prosrc, chr(13), ''))`.
+- **A rolled-back probe on production is ONE `do` statement sent through `apply_migration`:**
+  `execute $f$<exact file>$f$`, then the assertions and negative controls, then
+  `raise exception 'PROBE_ROLLBACK %', <results>`. One statement is atomic, so the exception
+  undoes everything and no tracker row is written. Name it `probe_<nnnn>_rolled_back_do_not_track`.
+  Afterwards, re-read to prove nothing persisted.
+- **Backfilling the tracker for a migration that is live but untracked.** Never re-run the file
+  (a later migration may have replaced its bodies, and `create table` fails on a second run).
+  1. **Prove every effect live:** each function's CR-normalised `md5(prosrc)` equals the file's
+     body, or a LATER file's body when that file replaces it. Tables, columns, indexes, triggers,
+     policies, constraints and grants must exist, or be absent where the file drops them. A
+     guarded rewrite (0500/0503 style) counts as applied when no function is still on its source
+     hash.
+  2. **Anything not proven is NOT APPLIED.** Probe it, then apply the exact file.
+  3. **Insert the rows in ONE `apply_migration`** named
+     `tracker_backfill_rows_for_applied_untracked_<first>_to_<last>`. It only inserts into
+     `supabase_migrations.schema_migrations`, `where not exists` by name. Each row:
+     - `version` is a 14-digit value that no real apply can produce (e.g. `YYYYMMDD0000NN`, in
+       file order).
+     - `name` is the file basename.
+     - `created_by` is `'tracker_backfill'`.
+     - `statements` is ONE marker line, never SQL: `-- TRACKER BACKFILL <date> — applied outside
+       the tracker; effects reconciled live. No SQL ran under this row. file=<path> md5=<md5>
+       git_blob=<sha>`.
+  4. **Record the evidence** in the PR that lands the next change. First done 2026-09-17 for 36
+     files (`0461`–`0524`).
 
 ---
 

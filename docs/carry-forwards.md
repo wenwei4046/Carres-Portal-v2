@@ -141,24 +141,38 @@ each owner should take the one-line change with a test.
   real one in `Settings → Warehouse → Warehouse Details`. A blank line is honest; an operator
   description printed as a delivery address is not. **Falsifier / next step:** the real Klang
   address is typed into Warehouse Details, and one PO PDF is re-rendered to prove `Deliver To`.
-- `0454-issue-action-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-09. NOT THIS
-  LANE'S.** `supabase/migrations/0454_an_issue_action_has_one_identity_and_one_result.sql` landed
-  on `main` in PR #1189 and is **absent from `supabase_migrations.schema_migrations`** (measured
-  twice, 2026-09-09 17:35 and 18:35 MYT). It is either unapplied or SQL-editor-applied without a
-  tracker row — the second is the recurring `0318`/`0319`, `0348`/`0349` pattern. Found because
-  it collided with this card's `0454`, which was renumbered to `0456`/`0457` and whose two
-  tracker rows were renamed to match. **Falsifier / next step:** the Issue Tracker lane applies it
-  through the governed path, or confirms its objects are live and inserts the tracker row.
-- `0461-to-0469-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-10. NOT THIS
-  LANE'S.** Nine migrations are on `main` and **absent from `supabase_migrations.schema_migrations`**
-  (measured 2026-09-10 while applying the SO Batch Ready Stock work): `0461`–`0468`, the Finance
-  ledger set, plus `0469_a_reversal_and_its_contra_are_both_counted`. The tracker's numeric tail
-  is `0458` while the repository's is `0472`. This is the same shape as the `0454` scar above and
-  is nine times larger. Found because the Ready Stock lane had to establish which of its own
-  dependencies were live: `0442`/`0443`/`0444`/`0453` ARE applied, which is what `0471` stands on,
-  so nothing here was blocked and **nothing here was touched.** **Falsifier / next step:** the
-  Finance lane applies them through the governed path, or confirms their objects are live and
-  inserts the tracker rows. Until then any reader of the tracker tail will under-count by nine.
+- ~~`merged-migrations-absent-from-the-tracker`~~ — **CLOSED 2026-09-17.**
+  - **`0454`:** now tracked (`20260913032213`).
+  - **`0516`, `0517`:** were NOT applied. Both were probed in rollback, then applied from the exact
+    files (`20260917085808`, `20260917085832`); `md5(statements[1])` equals each file. While
+    `0517` was missing, `POST /delivery-orders/:id/proof-review` called a 6-argument door that
+    production did not have.
+  - **The other 36** (`0461`–`0469`, `0475`–`0479`, `0481`, `0482`, `0484`, `0485`, `0500`,
+    `0502`, `0503`, `0506`–`0508`, `0510`–`0515`, `0518`–`0521`, `0523`, `0524`) were proven live
+    object by object and given tracker rows through the §5 backfill standard in
+    `docs/ENGINEERING.md`. No file was re-run.
+  - **Cause:** the untracked files carry CRLF in `prosrc`, so they were applied from a Windows
+    working copy, outside `apply_migration`.
+- `null-role-gates-left-untouched-by-the-0500-and-0503-guards` — **OPEN, 2026-09-17, NOT THIS
+  LANE'S.** `0500` and `0503` rewrite a function's role gate only when its live body matches the
+  hash the rewrite was derived from. Measured on production:
+  - **Rewritten:** `0500` rewrote 54 functions, `0503` rewrote 9, and none is still on its source
+    hash.
+  - **Skipped:** 35 functions had drifted and were skipped by design.
+  - **Still NULL-blind:** a text scan shows about 24 of the skipped ones still gate with
+    `app_role() not in (...)` / `<>` and no null test, e.g. `sales_order_withdraw_attribution`,
+    `delivery_settings_gate`, `correction_work_close`, `finance_dashboard_summary`,
+    `finance_monthly_pl`, `hr_set_reports_to`, `ops_stock_reassign`, `ops_stock_release`,
+    `partner_accept_pickup`, `lp_reject_order`. A signed-in account with no active role may still
+    pass those gates.
+  - **Falsifier / next step:** for each one, read the live `prosrc`, write the null-safe gate
+    against THAT body in a new migration, and prove a no-role caller is refused.
+- `delivery-proof-review-production-walk-owed` — **OWED, 2026-09-17.** `0517` is live and was proven
+  in a rolled-back probe as a principal: `P0002` for an unknown DO, `22023` for a missing retry
+  key, and the old 4-argument door gone. The authenticated browser walk was not done: the
+  in-app browser held no signed-in session. **Next step:** open `DO-130926-3223`, the one DO with
+  proof and no review, record Proof Accepted, and confirm one `delivery_proof_reviews` row with
+  `source_version` and `idempotency_key` set.
 - `kit-blue-9-is-used-as-a-css-variable-and-never-defined` — **OPEN, 2026-09-11, NOT THIS LANE'S,
   found in passing while fixing the same mistake inside `ReadyStockPanel.tsx`.** The kit palette is
   a TAILWIND colour scale (`tailwind.config.ts` → `theme.extend.colors.kit`), not a set of CSS
