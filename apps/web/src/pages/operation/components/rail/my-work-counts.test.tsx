@@ -230,6 +230,8 @@ describe("HF-3 · one count definition", () => {
     ["a working day", "2026-09-17", WEEK, [1, 1]],
     // Wed 16 Sep is Malaysia Day: the focus day is Thu 17 Sep.
     ["a public holiday", "2026-09-16", WEEK.map((i) => i.object.label === "SO-1301" ? item(1301, "2026-09-15", 1) : i), [1, 1]],
+    // Sat 19 Sep with nothing due that Saturday: the focus day is Mon 21 Sep.
+    ["a Saturday with nothing due", "2026-09-19", [item(1301, "2026-09-17", 2), item(1306, "2026-09-21"), item(1303, "2026-09-24"), item(1304, null)], [1, 1]],
   ] as const)("2 · badge = panel Missed + Today = Work focus list on %s", async (_label, generatedOn, items, expected) => {
     net.work = response([...items], { generatedOn });
     const qc = client();

@@ -5,15 +5,15 @@
  * server contract once; Work and Quick Rail consume this same cached query.
  */
 import { useMemo } from "react";
-import {
-  workFocusDay,
-  type OperationWorkItem,
-  type OperationWorkModule,
-  type OpsStaffMember,
-  type WorkItem,
+import type {
+  OperationWorkItem,
+  OperationWorkModule,
+  OpsStaffMember,
+  WorkItem,
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { useOperationWork } from "@/lib/queries";
+import { workFocusDay, type WorkFocus } from "./work/work-model";
 
 export interface WorkRow extends Omit<WorkItem, "module"> {
   source: OperationWorkItem;
@@ -35,8 +35,8 @@ export interface WorkRow extends Omit<WorkItem, "module"> {
 export interface OpenWorkSet {
   items: WorkRow[];
   generatedOn: string;
-  /** Workspace MASTER §5.1: `generatedOn` if a working day, else the next one. */
-  focusDay: string;
+  /** My focus window (MASTER §5.1): `generatedOn` through my focus day. */
+  myFocus: WorkFocus | null;
   /**
    * THE ONE IDENTITY (HF-3, 2026-09-17): the signed-in account id. Work owner
    * ids and staff `userId` are both account ids, so no email is ever matched —
@@ -138,12 +138,16 @@ export function useOpenWorkSet(): OpenWorkSet {
   );
   const myUserId = useAuth((s) => s.session?.user?.id ?? s.user?.id ?? null);
   const generatedOn = query.data?.generatedOn ?? "";
-  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn) : ""), [generatedOn]);
+  const myFocus = useMemo((): WorkFocus | null => {
+    if (!generatedOn) return null;
+    const myDueIsos = items.filter((item) => item.ownerId === myUserId).map((item) => item.dueIso);
+    return { from: generatedOn, to: workFocusDay(generatedOn, myDueIsos) };
+  }, [generatedOn, items, myUserId]);
   const unhealthy = (query.data?.sources ?? []).filter((source) => source.state !== "healthy");
   return {
     items,
     generatedOn,
-    focusDay,
+    myFocus,
     myUserId,
     complete: query.data?.complete ?? false,
     sourceHealth: unhealthy.map((source) => ({ key: source.key, lastSuccessfulAt: source.lastSuccessfulAt })),

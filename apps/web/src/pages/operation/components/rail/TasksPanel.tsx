@@ -31,12 +31,12 @@ function lastUpdated(at: string | number | null): string | null {
  */
 export default function TasksPanel() {
   const {
-    items, myUserId, focusDay, sourceHealth, hasData, refreshFailed, lastUpdatedAt, error, retry,
+    items, myUserId, myFocus, sourceHealth, hasData, refreshFailed, lastUpdatedAt, error, retry,
   } = useOpenWorkSet();
-  const { missed, today } = myMissedAndToday(items, myUserId, focusDay);
+  const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
   const rows = [
     { label: "Missed", count: missed, href: "/operation?tab=work&scope=mine&day=missed", danger: true },
-    { label: "Today", count: today, href: `/operation?tab=work&scope=mine&day=${focusDay}`, danger: false },
+    { label: "Today", count: today, href: `/operation?tab=work&scope=mine&day=${myFocus?.to ?? ""}`, danger: false },
   ];
 
   const openMyWork = (

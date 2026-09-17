@@ -1,4 +1,7 @@
 import type { OperationWorkModule } from "@carres/shared";
+import { myHolidaySet } from "@carres/shared/my-holidays";
+import { isWorkingDay } from "@carres/shared/working-days";
+import { addDaysIso } from "@/lib/excel-date-filter";
 import type { WorkRow } from "../use-open-work";
 
 export type WorkWhen = "all" | "broken" | "overdue" | "today" | "later" | "no_date";
@@ -56,9 +59,40 @@ export const WORK_SOURCE_LABEL: Record<OperationWorkModule, string> = {
   issue_tracker: "Issue Tracker",
 };
 
-/** The focus list (Workspace MASTER §5.1): Missed, then the focus day. */
-export function inWorkFocus(item: WorkRow, focusDay: string): boolean {
-  return item.timingBucket === "overdue" || (focusDay !== "" && item.dueIso === focusDay);
+/** The shared Malaysia holiday calendar — the same one Payment reads. */
+const WORK_HOLIDAYS = myHolidaySet();
+
+/** A day the focus list may open on: not Sunday, not a public holiday, and a
+ *  Saturday only when something is due that Saturday (Work MASTER §5.4). */
+function isWorkDay(iso: string, dueIsos: readonly (string | null)[]): boolean {
+  if (!isWorkingDay(iso, { holidays: WORK_HOLIDAYS })) return false;
+  if (new Date(`${iso}T00:00:00Z`).getUTCDay() === 6) return dueIsos.includes(iso);
+  return true;
+}
+
+/** The focus day (MASTER §5.1): today when today is a working day, otherwise
+ *  the next working day. Counted in UTC, like `workWeek`. The SAME function
+ *  as HF-1 (#1400) — one definition for My Work and the Right Rail. */
+export function workFocusDay(today: string, dueIsos: readonly (string | null)[]): string {
+  let day = today;
+  for (let step = 0; step < 31; step += 1) {
+    if (isWorkDay(day, dueIsos)) return day;
+    day = addDaysIso(day, 1);
+  }
+  return today;
+}
+
+/** The focus window: from `generatedOn` through the focus day. */
+export interface WorkFocus {
+  from: string;
+  to: string;
+}
+
+/** The focus list (MASTER §5.1): Missed, plus anything due from today through
+ *  the focus day (work dated on today's holiday or Sunday is never hidden). */
+export function inWorkFocus(item: WorkRow, focus: WorkFocus | null): boolean {
+  if (item.timingBucket === "overdue") return true;
+  return focus !== null && item.dueIso !== null && item.dueIso >= focus.from && item.dueIso <= focus.to;
 }
 
 /**
@@ -70,13 +104,13 @@ export function inWorkFocus(item: WorkRow, focusDay: string): boolean {
 export function myMissedAndToday(
   items: readonly WorkRow[],
   myUserId: string | null,
-  focusDay: string,
+  focus: WorkFocus | null,
 ): { missed: number; today: number } {
   let missed = 0;
   let today = 0;
   if (!myUserId) return { missed, today };
   for (const item of items) {
-    if (item.ownerId !== myUserId || !inWorkFocus(item, focusDay)) continue;
+    if (item.ownerId !== myUserId || !inWorkFocus(item, focus)) continue;
     if (item.timingBucket === "overdue") missed += 1;
     else today += 1;
   }

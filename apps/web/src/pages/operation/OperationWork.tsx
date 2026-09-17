@@ -34,7 +34,7 @@ import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
-import { filterWork, inWorkFocus, workSections, type WorkWhen } from "./work/work-model";
+import { filterWork, inWorkFocus, workFocusDay, workSections, type WorkWhen } from "./work/work-model";
 import WorkSplitShell from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkDayNav from "./work/WorkDayNav";
@@ -159,7 +159,7 @@ export default function OperationWork() {
   }, []);
 
   // One identity and one focus day, shared with the Right Rail (HF-3).
-  const { items: allItems, generatedOn, focusDay, myUserId, complete, failedSources, staffById, loading, error, retry } = useOpenWorkSet();
+  const { items: allItems, generatedOn, myUserId, complete, failedSources, staffById, loading, error, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -259,11 +259,14 @@ export default function OperationWork() {
   const beforeDay = activeView === "mine"
     ? mine
     : visibleTeamGroups.flatMap((group) => group.items);
+  const dueIsos = useMemo(() => beforeDay.map((item) => item.dueIso), [beforeDay]);
+  /** MASTER §5.1: today when it is a working day, else the next working day. */
+  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
   const visible = beforeDay.filter((item) => {
     if (day === "all") return true;
     if (day === "missed") return item.timingBucket === "overdue";
     if (day === "no_date") return item.dueIso === null;
-    if (day === "focus") return inWorkFocus(item, focusDay);
+    if (day === "focus") return inWorkFocus(item, focusDay ? { from: generatedOn, to: focusDay } : null);
     return item.dueIso === day;
   });
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;

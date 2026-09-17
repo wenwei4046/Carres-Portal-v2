@@ -39,11 +39,11 @@ export default function OperationRightRail() {
   const [active, setActive] = useState<Panel | null>(null);
   const activeOrderId = useActiveOrder((s) => s.orderId);
 
-  const { items, myUserId, focusDay, hasData } = useOpenWorkSet();
+  const { items, myUserId, myFocus, hasData } = useOpenWorkSet();
   // ONE count (Workspace MASTER §7.1): the same Missed + focus-day number the
   // panel prints and My Work's focus list holds. Later days never count, and
   // no response yet means no number — never `0`.
-  const { missed, today } = myMissedAndToday(items, myUserId, focusDay);
+  const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
 
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {
     if (key === "tasks" && hasData && missed + today > 0)
