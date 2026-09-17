@@ -8,7 +8,7 @@ import {
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import MonthCalendar from "@/components/kit/MonthCalendar";
 import { SectionCard } from "@/components/SectionPanel";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 
 /**
@@ -104,7 +104,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
   const visible = filter === "all" ? entries : entries.filter((e) => e.kind === filter);
   const safeDate = ISO_DATE.test(selectedDateIso)
     ? selectedDateIso
-    : new Date().toISOString().slice(0, 10);
+    : appTodayIso();
   const monday = weekMondayOf(safeDate);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => isoAddDays(monday, i)), [monday]);
   const byDay = useMemo(() => {

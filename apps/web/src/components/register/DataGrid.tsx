@@ -53,6 +53,7 @@ import {
 } from "react";
 import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -1573,7 +1574,7 @@ function DataGridInner<T>({
       // clean the storageKey down to something legible (strip dg-/pr-g- prefixes,
       // -v1 / layout suffixes, dashes→spaces). A YYYY-MM-DD date is appended so
       // repeated exports are self-dating and don't silently overwrite.
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = appTodayIso();
       XLSX.writeFile(wb, `${stem} ${stamp}.xlsx`);
     },
     [deriveTable],

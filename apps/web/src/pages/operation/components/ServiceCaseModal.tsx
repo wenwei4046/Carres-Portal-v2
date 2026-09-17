@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import {
   CASE_REPORTERS,
   caseFollowUpPlan,
@@ -67,7 +68,7 @@ export default function ServiceCaseModal({
   const [carresAction, setCarresAction]       = useState("");
   const [whatAffected, setWhatAffected]       = useState("");
   const [incurredCharges, setIncurredCharges] = useState("");
-  const [openedAt, setOpenedAt] = useState(today());
+  const [openedAt, setOpenedAt] = useState(appTodayIso());
 
   // lookup state
   const [lookupTerm, setLookupTerm] = useState("");
@@ -89,7 +90,7 @@ export default function ServiceCaseModal({
     setCarresAction(d.carresAction ?? "");
     setWhatAffected(d.whatAffected ?? "");
     setIncurredCharges(d.incurredCharges ?? "");
-    setOpenedAt(d.openedAt ?? today());
+    setOpenedAt(d.openedAt ?? appTodayIso());
   }, [existingQ.data]);
 
   // default status to first config status on create
@@ -436,10 +437,6 @@ function IntakeRow({ label, value }: { label: string; value: string | null }) {
 function reporterLabel(key: string | null | undefined): string {
   if (!key) return "—";
   return CASE_REPORTERS.find((r) => r.key === key)?.label ?? key;
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 /** The create-mode lookup hands back the SO as a string ("SO-1147"); the link
