@@ -23,7 +23,7 @@
  * shared form and write contract. The selected action stays in Workspace;
  * only its explicit owning-object door navigates away.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { orderActionLines, workspaceDutyLabelOf, type OperationWorkModule } from "@carres/shared";
@@ -35,8 +35,16 @@ import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
-import { filterWork, workSections, workWeek, type WorkWhen } from "./work/work-model";
-import WorkSplitShell from "./work/WorkSplitShell";
+import {
+  filterWork,
+  workFocusDay,
+  workHoliday,
+  workLayoutFor,
+  workSections,
+  workWeek,
+  type WorkWhen,
+} from "./work/work-model";
+import WorkSplitShell, { type WorkLayout } from "./work/WorkSplitShell";
 import WorkActionPanel from "./work/WorkActionPanel";
 import WorkDayNav from "./work/WorkDayNav";
 
@@ -80,6 +88,12 @@ function deliveryLines(item: WorkRow): { act: string; result: string | null } | 
       ? orderActionLines("deliver_today", { deliveryDate: fmtDate(item.dueIso) }).act
       : item.action;
   return { act, result: item.requiredResult || null };
+}
+
+/** Team Work's owner group: the normal owner, a named person, or the duty. */
+function ownerGroupKey(i: WorkRow): string {
+  return i.normalOwnerId ??
+    (i.ownerName ? `person:${i.ownerName}` : `duty:${i.ownerDuty ?? "No owner yet"}`);
 }
 
 function WorkRowButton({
@@ -147,21 +161,36 @@ function WorkRowButton({
 export default function OperationWork() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [layout, setLayout] = useState<"three" | "two" | "one">(() => {
-    if (typeof window === "undefined") return "three";
-    return window.innerWidth >= 1104 ? "three" : window.innerWidth >= 768 ? "two" : "one";
-  });
+  const workAreaRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<WorkLayout>(() =>
+    typeof window === "undefined" ? "three" : workLayoutFor(window.innerWidth),
+  );
   const [activePanel, setActivePanel] = useState<"list" | "detail">("list");
 
-  useEffect(() => {
-    const measure = () => setLayout(window.innerWidth >= 1104 ? "three" : window.innerWidth >= 768 ? "two" : "one");
+  // The Work AREA decides the panels, not the window: with the portal sidebar
+  // open a 1280px window leaves ~950px, which cannot hold 1100px of panels.
+  // A width of 0 means the area is not laid out yet — the window is the only
+  // honest estimate until it is.
+  useLayoutEffect(() => {
+    const area = workAreaRef.current;
+    if (!area) return;
+    const measure = () => {
+      const width = area.getBoundingClientRect().width;
+      setLayout(workLayoutFor(width > 0 ? width : window.innerWidth));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
 
   const authEmail = useAuth((s) => s.user?.email ?? null);
 
-  const { items: allItems, generatedOn, complete, failedSources, staff, staffById, loading, error, retry } = useOpenWorkSet();
+  const { items: allItems, generatedOn, unhealthySources, staff, staffById, loading, error, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -209,11 +238,7 @@ export default function OperationWork() {
   const teamGroups = useMemo(() => {
     const byOwner = new Map<string, WorkRow[]>();
     for (const i of filteredTeamItems) {
-      const key =
-        i.normalOwnerId ??
-        (i.ownerName
-          ? `person:${i.ownerName}`
-          : `duty:${i.ownerDuty ?? "No owner yet"}`);
+      const key = ownerGroupKey(i);
       const list = byOwner.get(key) ?? [];
       list.push(i);
       byOwner.set(key, list);
@@ -267,29 +292,99 @@ export default function OperationWork() {
   const beforeDay = activeView === "mine"
     ? mine
     : visibleTeamGroups.flatMap((group) => group.items);
-  const visible = beforeDay.filter((item) => {
+  const dueIsos = useMemo(() => beforeDay.map((item) => item.dueIso), [beforeDay]);
+  /** MASTER §5.1: today when it is a working day, else the next working day. */
+  const focusDay = useMemo(() => (generatedOn ? workFocusDay(generatedOn, dueIsos) : ""), [dueIsos, generatedOn]);
+  const selectedDay = day === "focus" ? focusDay : day;
+  const inDay = (item: WorkRow) => {
     if (day === "all") return true;
-    if (day === "missed") return item.timingBucket === "overdue";
+    if (item.timingBucket === "overdue") return day === "missed" || day === "focus";
+    if (day === "missed") return false;
     if (day === "no_date") return item.dueIso === null;
-    if (day === "focus") return item.timingBucket === "overdue" || item.dueIso === generatedOn;
+    // The focus list also holds anything due between today and the focus day
+    // (work dated on today's holiday or Sunday), so opening on the next
+    // working day never hides it.
+    if (day === "focus") return item.dueIso !== null && item.dueIso >= generatedOn && item.dueIso <= focusDay;
     return item.dueIso === day;
-  });
+  };
+  const visible = beforeDay.filter(inDay);
   const lateCount = visible.filter((i) => i.timingBucket === "overdue").length;
 
+  /** Module counts ignore the module filter and nothing else: scope · owner ·
+   *  search · the other filters · the current list. With all modules they add
+   *  up to the rows in the list. */
+  const moduleCountRows = (activeView === "mine"
+    ? filterWork(mineAll, { ...filters, module: "all" })
+    : filterWork(allItems, { ...filters, module: "all" }).filter((item) => !ownerFocus || ownerGroupKey(item) === ownerFocus)
+  ).filter(inDay);
+
   const workingDays = useMemo(
-    () => (generatedOn ? workWeek(generatedOn, beforeDay.map((item) => item.dueIso)) : []),
-    [beforeDay, generatedOn],
+    () => (focusDay ? workWeek(focusDay, dueIsos) : []),
+    [dueIsos, focusDay],
   );
   const dayChoices = useMemo(() => [
     { key: "missed", label: "Missed", count: beforeDay.filter((item) => item.timingBucket === "overdue").length },
-    ...workingDays.map((date) => ({
-      key: date,
-      label: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${date}T00:00:00`)),
-      count: beforeDay.filter((item) => item.dueIso === date && item.timingBucket !== "overdue").length,
-    })),
+    ...workingDays.map((date) => {
+      const holiday = workHoliday(date);
+      return {
+        key: date,
+        label: fmtDate(date),
+        count: beforeDay.filter((item) => item.dueIso === date && item.timingBucket !== "overdue").length,
+        ...(holiday ? { holiday } : {}),
+      };
+    }),
     { key: "no_date", label: "No working date", count: beforeDay.filter((item) => item.dueIso === null).length },
     { key: "all", label: "All", count: beforeDay.length },
   ], [beforeDay, workingDays]);
+
+  /* The four empty states, checked in order (HF-1, owner ruling 2026-09-17):
+     a failed source · filters with no match · an empty day while other work
+     is open · nothing open at all. Zero matches is never zero work. */
+  const filtersActive = Boolean(search) || when !== "all" || moduleFilter !== "all" || covered
+    || (activeView === "team" && Boolean(ownerFocus));
+  const missedCount = dayChoices[0]!.count;
+  const emptyDoor: { key: string; label: string } | null = (() => {
+    if (missedCount > 0 && day !== "missed") return { key: "missed", label: "Open Missed" };
+    const nextDate = beforeDay
+      .filter((item) => item.timingBucket !== "overdue" && item.dueIso !== null && item.dueIso !== selectedDay)
+      .map((item) => item.dueIso as string)
+      .sort()[0];
+    return nextDate ? { key: nextDate, label: `Open ${fmtDate(nextDate)}` } : null;
+  })();
+  const emptyState: "failed" | "no_match" | "day" | "clear" = unhealthySources.length > 0
+    ? "failed"
+    : filtersActive && beforeDay.length === 0
+      ? "no_match"
+      : beforeDay.length > 0
+        ? "day"
+        : "clear";
+  const clearFilters = () => setParams((before) => {
+    const next = new URLSearchParams(before);
+    for (const key of ["q", "when", "module", "covered", "owner", "selected"]) next.delete(key);
+    return next;
+  }, { replace: true });
+  const emptyButton = "mt-3 px-3 py-1.5 rounded-md border border-base-200 bg-white text-body text-base-700";
+  const emptyBody = emptyState === "failed" ? null : (
+    <div className="text-body text-base-400 py-8" data-testid="work-empty">
+      {emptyState === "no_match" ? (
+        <>
+          <p>No work matches these filters</p>
+          <button type="button" onClick={clearFilters} className={emptyButton}>Clear filters</button>
+        </>
+      ) : emptyState === "day" ? (
+        <>
+          {/^\d{4}-\d{2}-\d{2}$/.test(selectedDay) ? <p>No work on {fmtDate(selectedDay)}</p> : null}
+          {emptyDoor ? (
+            <button type="button" onClick={() => updateParam("day", emptyDoor.key)} className={emptyButton}>
+              {emptyDoor.label}
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <p>{activeView === "mine" ? "Nothing assigned to you" : "No open work — every track is clear."}</p>
+      )}
+    </div>
+  );
 
   const selectedId = params.get("selected");
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
@@ -411,6 +506,7 @@ export default function OperationWork() {
         </div>
       }
     >
+      <div ref={workAreaRef} data-testid="work-area" className="flex min-h-0 min-w-0 flex-1 flex-col">
       <WorkSplitShell
         layout={layout}
         activePanel={activePanel}
@@ -418,15 +514,20 @@ export default function OperationWork() {
           <div className="p-3">
             <p className="text-label font-semibold text-kit-slate-12">Working day</p>
             <div className="mt-2 flex flex-col gap-1">
-              {dayChoices.map(({ key, label, count }) => (
+              {dayChoices.map((choice) => "holiday" in choice && choice.holiday ? (
+                <div key={choice.key} data-holiday={choice.key} className="flex min-h-8 flex-col justify-center px-2 py-1 text-body text-kit-slate-11">
+                  <span>{choice.label}</span>
+                  <span className="text-meta">Public holiday · {choice.holiday}</span>
+                </div>
+              ) : (
                 <button
-                  key={key}
+                  key={choice.key}
                   type="button"
-                  aria-pressed={day === key || (day === "focus" && key === generatedOn)}
-                  onClick={() => updateParam("day", key)}
-                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${day === key || (day === "focus" && key === generatedOn) ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
+                  aria-pressed={selectedDay === choice.key}
+                  onClick={() => updateParam("day", choice.key)}
+                  className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${selectedDay === choice.key ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
                 >
-                  <span>{label}</span><span>{count} actions</span>
+                  <span>{choice.label}</span><span>{choice.count} actions</span>
                 </button>
               ))}
             </div>
@@ -441,7 +542,7 @@ export default function OperationWork() {
                   className={`flex min-h-8 items-center justify-between rounded-control px-2 text-left text-body ${moduleFilter === module ? "bg-kit-blue-3 font-medium text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3"}`}
                 >
                   <span>{MODULE_LABEL[module]}</span>
-                  <span>{visible.filter((item) => item.module === module).length}</span>
+                  <span>{moduleCountRows.filter((item) => item.module === module).length}</span>
                 </button>
               ))}
             </div>
@@ -451,14 +552,23 @@ export default function OperationWork() {
         {layout !== "three" ? (
           <WorkDayNav
             days={dayChoices}
-            value={day === "focus" ? generatedOn : day}
+            value={selectedDay}
             onChange={(key) => updateParam("day", key)}
           />
         ) : null}
         <div className="px-4 py-3">
-        {!loading && !error && failedSources.length > 0 ? (
-          <div className="mb-3 border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status">
-            Some work could not be loaded · {failedSources.join(", ")}
+        {!loading && !error && unhealthySources.length > 0 ? (
+          <div className="mb-3 border border-kit-amber-6 bg-kit-amber-3 px-3 py-2 text-body text-kit-amber-11" role="status" data-testid="work-source-failed">
+            {unhealthySources.map((source) => (
+              <p key={source.key}>
+                Could not refresh {MODULE_LABEL[source.key]}
+                {source.lastSuccessfulAt
+                  ? ` · Last updated ${fmtDate(source.lastSuccessfulAt) === fmtDate(generatedOn)
+                    ? fmtDate(source.lastSuccessfulAt, { timeOnly: true })
+                    : fmtDate(source.lastSuccessfulAt, { time: true })}`
+                  : ""}
+              </p>
+            ))}
           </div>
         ) : null}
         {loading ? (
@@ -480,13 +590,7 @@ export default function OperationWork() {
           </div>
         ) : activeView === "mine" ? (
           displayMyGroups.length === 0 ? (
-            <div className="text-body text-base-400 py-8" data-testid="work-empty">
-              {!complete
-                ? "Some work could not be loaded."
-                : search || when !== "all" || moduleFilter !== "all" || covered
-                ? "No work matches these filters."
-                : "Nothing assigned to you"}
-            </div>
+            emptyBody
           ) : (
             displayMyGroups.map((g) => (
               <section key={g.key} className="mb-5" data-testid={`work-section-${g.key}`}>
@@ -506,13 +610,7 @@ export default function OperationWork() {
             ))
           )
         ) : displayTeamGroups.length === 0 ? (
-          <div className="text-body text-base-400 py-8" data-testid="work-empty">
-            {!complete
-              ? "Some work could not be loaded."
-              : search || when !== "all" || moduleFilter !== "all" || covered || ownerFocus
-              ? "No work matches these filters."
-              : "No open work — every track is clear."}
-          </div>
+          emptyBody
         ) : (
           displayTeamGroups.map((g) => (
             <section key={g.key} className="mb-5" data-testid={`work-owner-group-${g.key}`}>
@@ -575,6 +673,7 @@ export default function OperationWork() {
           <div className="p-6 text-body text-kit-slate-11">Select work to see what to do.</div>
         )}
       />
+      </div>
     </ListPageShell>
   );
 }

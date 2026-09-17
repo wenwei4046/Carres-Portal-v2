@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
-import { filterWork, workSections, workWeek } from "./work-model";
+import { filterWork, workFocusDay, workHoliday, workLayoutFor, workSections, workWeek } from "./work-model";
 
 function row(overrides: Partial<WorkRow> = {}): WorkRow {
   return {
@@ -97,5 +97,32 @@ describe("workWeek — the day strip in a Kuala Lumpur browser", () => {
   it("adds Saturday only when something is due that day", () => {
     expect(workWeek("2026-09-17", ["2026-09-19"])).toEqual([...MON_TO_FRI, "2026-09-19"]);
     expect(workWeek("2026-09-17", ["2026-09-18", null])).toEqual(MON_TO_FRI);
+  });
+});
+
+describe("workFocusDay — the day the focus list opens on", () => {
+  it("keeps a working today", () => {
+    expect(workFocusDay("2026-09-17", [])).toBe("2026-09-17");
+  });
+
+  it("moves a public holiday to the next working day", () => {
+    expect(workHoliday("2026-09-16")).toBe("Malaysia Day");
+    expect(workFocusDay("2026-09-16", [])).toBe("2026-09-17");
+  });
+
+  it("moves Sunday to Monday, and Saturday to Monday unless work is due that Saturday", () => {
+    expect(workFocusDay("2026-09-20", [])).toBe("2026-09-21");
+    expect(workFocusDay("2026-09-19", [])).toBe("2026-09-21");
+    expect(workFocusDay("2026-09-19", ["2026-09-19"])).toBe("2026-09-19");
+  });
+});
+
+describe("workLayoutFor — panels follow the Work area width", () => {
+  it("uses three panels from 1104px, two from 768px, else one", () => {
+    expect(workLayoutFor(1104)).toBe("three");
+    expect(workLayoutFor(1103)).toBe("two");
+    expect(workLayoutFor(950)).toBe("two");
+    expect(workLayoutFor(768)).toBe("two");
+    expect(workLayoutFor(767)).toBe("one");
   });
 });

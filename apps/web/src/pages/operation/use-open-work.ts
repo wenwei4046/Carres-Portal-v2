@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import type {
   OperationWorkItem,
   OperationWorkModule,
+  OperationWorkSourceHealth,
   OpsStaffMember,
   WorkItem,
 } from "@carres/shared";
@@ -35,6 +36,8 @@ export interface OpenWorkSet {
   generatedOn: string;
   complete: boolean;
   failedSources: string[];
+  /** Health of every source that is not current, with its last good read. */
+  unhealthySources: OperationWorkSourceHealth[];
   staff: OpsStaffMember[];
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
@@ -123,6 +126,7 @@ export function useOpenWorkSet(): OpenWorkSet {
     generatedOn: query.data?.generatedOn ?? "",
     complete: query.data?.complete ?? false,
     failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
+    unhealthySources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy"),
     staff,
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),
