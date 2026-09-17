@@ -189,10 +189,12 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
+**Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
+
 The approved default columns remain:
 
 ```
-SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
+SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
 
 **Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
@@ -767,7 +769,7 @@ read only as implementation history.
 ## Register
 
 - The default business columns are exactly, in order:
-  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
+  `SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
   (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
@@ -1282,7 +1284,7 @@ query.**
 ### Register
 
 - **The default columns are exactly EIGHT**, in order:
-  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
+  `SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
   This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
   order already carries (`outlets.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer

@@ -386,8 +386,8 @@ remain. PR #1105 carries the dependent application and deployment proof.
 ### 5.6 Issue means the PDF was actually sent
 
 **APPROVED / NOT BUILT — Jess, 2026-09-16.** Implement this wording and grouping in the
-Purchase Orders round, after SO Batch Round 1 and Manual Purchase Round 2. Do not change the
-running SO Batch build or create a separate implementation task for this ruling.
+Purchase Orders round after the Sales Orders small patch and Manual Purchase Round 2 (Jess, 2026-09-17). Coordinate shared-file ownership
+with running lanes; no separate task for the shared sending wording.
 
 Without a WhatsApp API the Portal cannot observe whether a PO was sent. Staff actually send the
 PDF externally, then press `Mark as sent` in the one shared communication area (`PoIssueEvidence`)
@@ -1149,12 +1149,10 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns, exactly and in this reading order — owner ruling R3, 2026-09-16:** SO No · Order By ·
-Customer · Supplier · Proceed Date · Requested Delivery Date · Delivery Location · Deliver To · PO No ·
-PO Delivery Date. The row is read the way the work is read — which order, by when it must be
-bought, whose, who supplies it, when it arrived, when the customer wants it, where it goes, where
-the goods land, and finally the documents. Supplier sits beside Customer because it names who to
-buy from; a multi-supplier order still answers exactly what to buy from each in its Goods expansion. `SO No` is the identity and stays sticky during horizontal scrolling. `Proceed Date`
+**Columns — APPROVED / NOT BUILT, date-first owner ruling 2026-09-17:** Proceed Date · SO No · Order By ·
+Customer · Supplier · Requested Delivery Date · Delivery Location · Deliver To · PO No ·
+PO Delivery Date. Read the actual Proceed Date first, then identity, buying deadline and the remaining facts. Supplier sits beside Customer because it names who to
+buy from; a multi-supplier order still answers exactly what to buy from each in its Goods expansion. `Proceed Date` and `SO No` pin at canvas ≥768px; below768px only `SO No` pins. `Proceed Date`
 reads `orders.proceeded_at`: the actual date Sales handed the complete order to Operations. It
 never reads `orders.proceed_date`, the planned production-start date. The saved column layout key
 is `…register.v5` for the R3 order, because a stored arrangement would otherwise pin a returning
@@ -1721,14 +1719,15 @@ Use earliest Order By first for pending/buying work, undated `Not planned` after
 then newest Proceed Date; the lower history group uses newest Proceed Date. Header sorting
 acts within groups. Search, column filters and export retain accurate source values.
 
-**Columns, exactly in this order:**
+**Columns — APPROVED / NOT BUILT (Jess, 2026-09-17), exactly in this order:**
 
 ```text
-Items · Order By · Purpose · Supplier · Approval Status · Requested By ·
-Proceed Date · Delivery Date · Deliver To · PO No
+Proceed Date · Items · Order By · Purpose · Supplier · Approval Status · Requested By ·
+Delivery Date · Deliver To · PO No
 ```
 
-`Items` is the sticky business identity and single-click entrance to the object. Use the same
+`Proceed Date` and `Items` are pinned at canvas ≥768px; below that only `Items` is pinned.
+`Items` is the business identity and single-click entrance to the object. Use the same
 responsive search, palette and measured column-width rules as SO Batch Purchase. Content
 sets default width; a complete two-line header and its controls set the minimum. Reuse the
 shared implementation; do not introduce a separate Manual Purchase palette or guessed widths.
@@ -2011,66 +2010,57 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
-**Send wording and groups — APPROVED / NOT BUILT (Jess, 2026-09-16).** Build in the Purchase
-Orders round after SO Batch Round 1 and Manual Purchase Round 2. One table displays
-`Not marked as sent` · `Issued` · `Completed` · `Cancelled`, with Completed and Cancelled
-collapsed by default. Membership uses §5.8's priority: Cancelled, then Completed, then Issued
-for a marked current version with goods pending, otherwise Not marked as sent. Completed
-records never re-enter the unmarked group merely because historical sending was not recorded.
+**APPROVED / NOT BUILT — Jess, 2026-09-17.** Build after the documentation PR, Sales Orders small patch and Manual Purchase Round 2.
+Purchase Orders pilots personal saved layouts in this same round; enable the shared DataGrid
+capability here only. Follow UI MASTER §4.1/§6.7: owner-private, per-account, up to 10 layouts
+per listing, saving order/widths/visibility/sort but not search/filters/group state. Other pages
+retain current layout persistence until owner acceptance and rollout approval.
+Reuse shared capabilities and coordinate shared-file ownership with running lanes.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
-PO; source is approved demand.
-**Left rail — OWNER-CORRECTED 2026-08-31 (Card 07):** the open 240px rail has no visible generic
-`Filters` title. It uses business groups and the existing filter truth/counts:
+PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
+Receiving progress belongs to Warehouse Inbound / Receiving and PO detail, not this listing.
 
-```text
-PURCHASE ORDERS
-  All purchase orders
+**Columns, exactly in order:** `PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date
+· Deliver To · GRN No · PO Version`. Pin date and number at canvas ≥768px; below that pin PO No only.
+- `PO Date`: PO issue/document date represented in the PO number, never the sending confirmation
+  date. Read authoritative record data; do not invent dates for legacy records.
+- `SO No`: one SO number opens Sales Orders; several show `{n} SOs`; Manual Purchase source shows
+  `Manual Purchase`. Keep old CR/TCF references searchable without a Source column.
+- `Items`: one item name, otherwise `{first item} + {n} more`; full goods available in expansion.
+- `Expected Delivery Date`: first line is the evidenced supplier date if present, otherwise the
+  original PO Delivery Date. Supporting line: `Not confirmed by supplier`, `Confirmed by supplier`,
+  or `Supplier changed from {date}`. Unknown original is `Not recorded`, never fabricated.
+  The original PO Delivery Date is immutable. Supplier evidence remains version-aware.
+- `GRN No`: one number opens Receiving; several show `{n} GRNs`; no GRN is blank.
+- `PO Version`: first line `PO V{n}`; second line `Marked as sent · {channel} · {date}` or
+  `Not marked as sent` for the CURRENT version. Earlier marks remain in Revisions.
 
-DOCUMENT
-  Not marked as sent
-  Version changed
-  Send the new version to supplier   ← line 2 of the same row/count
+**Groups:** display `Not marked as sent` and `Issued` as open headings, then `Completed` and
+`Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Issued
+(current version marked as sent with goods pending) → Not marked as sent. Each PO occurs once.
+A failed/unknown quantity read is never zero or Completed; completed legacy POs without a mark
+stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
+Default order: unmarked by PO Delivery Date ascending; Issued by Expected Delivery Date ascending;
+Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
 
-SUPPLIER REPLY
-  Supplier has not confirmed the PO date
-  Supplier delivery date passed
+**Rail:** SUPPLIER REPLY (`Supplier has not confirmed the PO date` · `Supplier Delivery Date
+changed` · `Supplier delivery date passed`), only for current-version marked documents with goods
+pending; RECEIVING (`Partly received`); SUPPLIER; DELIVER TO. No All purchase orders row,
+DOCUMENT group or action sentence. Preserve authoritative facet predicates and counts.
 
-RECEIVING
-  Partly received
-  Completed
-```
+**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Deliver To`.
+**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
+**Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
+retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
+pending. Removing their listing columns does not remove evidence, validation or workflow guards.
 
-The version row is one `supplier_update_required` filter, not two rows. Its fact and action are
-deliberate separate lines; the em dash and the ambiguous phrase `supplier update required` never
-render. Grouping changes no population, filter key, count, permission or completion fact.
-**Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
-commitment. `PO Delivery Date` is the original official supplier-facing date on the PO and therefore
-is never described as missing merely because the supplier has not replied. `Supplier Delivery Date`
-reads `Not confirmed` until supplier-answer evidence exists, `Same as PO` when the supplier confirms
-the PO date, and the supplier's actual date when it differs. `Not confirmed` is a cell fact; it
-becomes a rail/work condition only after the current PO version has confirmed-sent evidence and
-Pending Delivery Qty is above zero. `Goods received on` belongs to Receiving and never substitutes
-for any of these dates.
-**Columns — APPROVED 2026-09-04, in this order:** PO No, PO Issued, Supplier, Source, Deliver To,
-PO Delivery Date, Supplier Delivery Date, Order Qty, Received Qty,
-Pending Delivery Qty, PO Version, Sent to Supplier. The Register lists authoritative facts only:
-no `Work` column, no action sentence, no owner avatar or duty holder on any row — actions live in
-My Work, Team Work, the Purchase Order detail and Order Route, unchanged.
-**Quantity facts:** `Order Qty` is the total on the current PO. `Received Qty` is the correct and
-accepted quantity posted through Receiving. `Pending Delivery Qty` = Order Qty − Received Qty,
-pieces of goods, never a money balance; damaged, wrong and extra goods are separate receiving
-facts and never reduce it. The footer totals use these same three words.
-**PO Version fact:** the current OFFICIAL document version, printed `PO V1` · `PO V2` · `PO V3` —
-never `Version 1`, `Current Version` or `PDF Version 1`, and never the WhatsApp/email copy.
-**Sent to Supplier fact:** show the exact version staff marked as sent, channel and date
-(`PO V1` / `WhatsApp · Thu, 4 Sep`). If the CURRENT version has no mark, show
-`Not marked as sent`; preserve earlier version/channel/time evidence as earlier history rather
-than suggesting the current version was sent. Completed legacy records with no mark show the
-same absence in their cell while remaining Completed. `PO Version` beside the marked-version
-fact makes a mismatch visible. `Mark as sent` records version, channel, recipient, actor and
-time; it never asserts supplier receipt, reading or acceptance. Opening/downloading proves
-none of those facts.
+**Sending, all shared surfaces:** `Mark as sent` records current version, channel, recipient, actor
+and time. After Open WhatsApp / Open email show `Send the PDF, then press Mark as sent.` in the
+same communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent,
+the person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
+automatically marks sending. Never claim supplier receipt, reading or acceptance.
+
 **BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** migration `0428`
 preserves an immutable original PO date and requires an append-only current-version reply with
 channel/evidence/reporter/recorder/time and shared duty/cover. Production rollback verification
@@ -2149,7 +2139,7 @@ Warehouse submits count                (or Operation enters goods directly)
   actually present in the Receiving result set, in the shared display order (`Mattress` ·
   `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
   protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
-  table's `Goods received on` column owns detailed date filtering. Re-clicking the active row
+  table's `GRN Date` column owns detailed creation-date filtering; physical `Goods received on` stays in detail. Re-clicking the active row
   clears its section. Category comes from the governed catalog truth through the ONE shared
   ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
   never derives its own category from SKU text.
@@ -2159,12 +2149,13 @@ Warehouse submits count                (or Operation enters goods directly)
   result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
   `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
   filters, Columns and Export stay; a changed filter or search term returns to page 1.
-- **Register columns** lead with identity and the arrival story: `GRN No` · `Supplier Delivery
-  Date` (the linked PO's governed supplier answer — the same date the Calendar filters by;
-  `Not confirmed` while no evidenced reply exists) · `Goods received on` · `PO/CO No` ·
-  `Supplier` · `Product` (the GRN paper's own line words — `product_skus.variant`, else the
-  SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` · `Status`, with `Supplier DO No.`
-  and the damaged/wrong/extra quantity facts behind them.
+- **Register columns — APPROVED / NOT BUILT (Jess, 2026-09-17):** `GRN Date · GRN No ·
+  Supplier Delivery Date · PO/CO No · Supplier · Product · Deliver To · Goods arrived at ·
+  Received Qty · Status`, followed by Supplier DO No. and damaged/wrong/extra quantities.
+  GRN Date is record creation, distinct from physical Goods received on, which stays in detail.
+  Supplier Delivery Date remains the evidenced linked-PO date used by the calendar; absent evidence
+  reads Not confirmed. Product retains GRN paper line words. Pin date and GRN No at canvas ≥768px,
+  GRN No alone below768. Other Receiving audit proposals are not approved by this date-first ruling.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`
