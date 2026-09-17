@@ -159,6 +159,19 @@ describe("the payment method registry (0476)", () => {
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("payment_set_method_active", { p_method: "grab_pay", p_active: false });
   });
+  it("a method save waits on its money account row before the account check (0518)", async () => {
+    // The refusal and the wait live in the database door, so a curl round the API meets them too.
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0518_a_payment_method_save_waits_on_its_money_account.sql"),
+      "utf-8",
+    );
+    const door = mig.slice(mig.indexOf("function public.payment_method_save"), mig.indexOf("grant execute on function public.payment_method_save"));
+    const wait = door.indexOf("from public.gl_money_accounts where account_code = p_account_code for share");
+    const check = door.indexOf("if not public.gl_money_account_ok(p_account_code) then");
+    expect(wait).toBeGreaterThan(0);
+    expect(check).toBeGreaterThan(wait);
+    expect(door).toContain("detail = 'account_not_money'");
+  });
 });
 
 describe("payment templates (0435)", () => {
