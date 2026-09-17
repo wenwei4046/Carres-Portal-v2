@@ -423,7 +423,7 @@ describe("the rail model — unique-SO counts that cross-update between sections
    * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY.
    *
    * It is what makes the two scopes legible on screen: fourteen `Completed`
-   * documents and fourteen `Not sent to supplier` ones are opposite
+   * documents and fourteen `Not marked as sent` ones are opposite
    * situations wearing the same `On PO 14`.
    */
   /**
@@ -496,7 +496,7 @@ describe("the rail model — unique-SO counts that cross-update between sections
       expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: true }))
         .toBe("Issued");
       expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: false }))
-        .toBe("Not sent to supplier");
+        .toBe("Not marked as sent");
     });
 
     it("⛔ never says the raw word — COPY-STANDARD bans the bare word as a PO status", () => {

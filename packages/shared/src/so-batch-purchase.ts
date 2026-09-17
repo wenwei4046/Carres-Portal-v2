@@ -572,7 +572,7 @@ export function soBatchPoDocumentState(
   po: Pick<SoBatchOrderPoFact, "status" | "sentCurrentVersion">,
 ): PurchaseOrderRegisterFacts["documentState"] {
   if (po.status === "received") return "Completed";
-  return po.sentCurrentVersion ? "Issued" : "Not sent to supplier";
+  return po.sentCurrentVersion ? "Issued" : "Not marked as sent";
 }
 
 /** One linked purchase order, through `po_line_sources` lineage ONLY. */

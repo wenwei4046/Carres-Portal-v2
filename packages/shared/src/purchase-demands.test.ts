@@ -585,7 +585,7 @@ describe("the buying facts the row now carries", () => {
   it("every trigger names its owner rule and its completion fact", () => {
     const buyRule: [string, string] = [
       "Current PO Duty",
-      "Current PO version reached supplier with evidence",
+      "Current PO version marked as sent",
     ];
     const expected: Record<string, [string, string]> = {
       can_order_early: buyRule,

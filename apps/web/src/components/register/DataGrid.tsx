@@ -51,7 +51,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
@@ -163,6 +163,27 @@ export type DataGridColumn<T> = {
    * loss. Opt-in; omitted = the single-line contract every register has.
    */
   wrap?: boolean;
+};
+
+/** What a personal saved layout holds — and ONLY this (ui MASTER §6.7 rule 4):
+ *  column order, widths, visibility and sort. Never search, filters or group
+ *  open/closed state. */
+export type DataGridSavedLayout = {
+  order: string[];
+  hidden: string[];
+  widths: Record<string, number>;
+  sort: { key: string; dir: "asc" | "desc" } | null;
+};
+
+export type DataGridPersonalLayouts = {
+  /** The signed-in person's own layouts for this listing. */
+  layouts: readonly { id: string; name: string; layout: DataGridSavedLayout; isDefault: boolean }[];
+  /** Most layouts one person may keep for this listing. */
+  limit: number;
+  /** Save under a name; an existing name is replaced. Rejects with the
+   *  sentence to show when the save is refused. */
+  onSave: (name: string, layout: DataGridSavedLayout) => Promise<void>;
+  onSetDefault: (id: string) => Promise<void>;
 };
 
 /** A single entry in a row's right-click context menu. `divider: true`
@@ -325,6 +346,17 @@ export type DataGridProps<T> = {
    * When set it replaces `stickyIdentity`. Omitted = every register unchanged.
    */
   leadingColumns?: { date: string; identity: string };
+  /**
+   * ⭐ PERSONAL SAVED LAYOUTS — ui MASTER §6.7 rule 4 (Jess 2026-09-17).
+   * OPTIONAL, default OFF; Purchase Orders is the only pilot.
+   *
+   * The Columns menu gains `Save layout as…` · `Load layout` ·
+   * `Set as my default` · `Reset columns` · `Best fit` · `Expand all` ·
+   * `Collapse all`. The page owns storage (per signed-in user, server-side);
+   * the engine owns what a layout contains. The person's default is applied
+   * once when their layouts first arrive. Omitted = the menu is unchanged.
+   */
+  personalLayouts?: DataGridPersonalLayouts;
   /**
    * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
    * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
@@ -602,6 +634,7 @@ function DataGridInner<T>({
   collapseAllNonce,
   stickyIdentity = false,
   leadingColumns,
+  personalLayouts,
   rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
@@ -923,9 +956,11 @@ function DataGridInner<T>({
      clears hidden + order + widths (preserving groupBy + sort so search
      state survives). toggleColumn flips a column's presence in `hidden`. */
   const resetColumns = useCallback(() => {
-    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {} }));
+    /* With personal layouts, `Reset columns` returns to the COMPANY layout,
+       which includes its default order of rows (no header sort). */
+    setLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, ...(personalLayouts ? { sort: null } : {}) }));
     setColumnsMenuOpen(false);
-  }, [setLayout]);
+  }, [setLayout, personalLayouts]);
   /** The date and identity a `leadingColumns` listing may never lose. */
   const leadingKeys = useMemo(
     () => (leadingColumns ? [leadingColumns.date, leadingColumns.identity] : []),
@@ -1660,6 +1695,106 @@ function DataGridInner<T>({
       else n.add(path);
       return n;
     });
+
+  // ── Personal saved layouts (opt-in; ui MASTER §6.7 rule 4) ─────────
+  const [layoutPanel, setLayoutPanel] = useState<null | "save" | "load" | "default">(null);
+  const [layoutName, setLayoutName] = useState("");
+  const [layoutProblem, setLayoutProblem] = useState<string | null>(null);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  /** The current arrangement, in exactly the governed shape — nothing more. */
+  const currentSavedLayout = (): DataGridSavedLayout => {
+    const byKey = new Set(columns.map((c) => c.key));
+    const saved = layout.order.length
+      ? [...layout.order.filter((k) => byKey.has(k)), ...columns.filter((c) => !layout.order.includes(c.key)).map((c) => c.key)]
+      : columns.map((c) => c.key);
+    const order = [...leadingKeys.filter((k) => byKey.has(k)), ...saved.filter((k) => !leadingKeys.includes(k))];
+    return {
+      order,
+      hidden: columns.filter((c) => effectiveHidden.has(c.key)).map((c) => c.key),
+      widths: { ...layout.widths },
+      sort: layout.sort,
+    };
+  };
+  const applySavedLayout = useCallback(
+    (saved: DataGridSavedLayout) =>
+      setLayout((l) => ({
+        ...l,
+        order: [...saved.order],
+        /* A saved layout can never hide the listing's date or identity. */
+        hidden: saved.hidden.filter((k) => !leadingKeys.includes(k)),
+        widths: { ...saved.widths },
+        sort: saved.sort,
+      })),
+    [setLayout, leadingKeys],
+  );
+  /* The person's default arrives with their layouts: apply it once. */
+  const defaultApplied = useRef(false);
+  useEffect(() => {
+    if (defaultApplied.current || !personalLayouts || personalLayouts.layouts.length === 0) return;
+    defaultApplied.current = true;
+    const mine = personalLayouts.layouts.find((l) => l.isDefault);
+    if (mine) applySavedLayout(mine.layout);
+  }, [personalLayouts, applySavedLayout]);
+
+  const saveLayoutAs = async () => {
+    if (!personalLayouts) return;
+    const name = layoutName.trim();
+    if (!name || layoutBusy) return;
+    setLayoutBusy(true);
+    setLayoutProblem(null);
+    try {
+      await personalLayouts.onSave(name, currentSavedLayout());
+      setLayoutName("");
+      setLayoutPanel(null);
+    } catch (e) {
+      setLayoutProblem((e as Error).message || "The layout could not be saved");
+    } finally {
+      setLayoutBusy(false);
+    }
+  };
+  const setMyDefault = async (id: string) => {
+    if (!personalLayouts || layoutBusy) return;
+    setLayoutBusy(true);
+    setLayoutProblem(null);
+    try {
+      await personalLayouts.onSetDefault(id);
+      setLayoutPanel(null);
+    } catch (e) {
+      setLayoutProblem((e as Error).message || "The default could not be saved");
+    } finally {
+      setLayoutBusy(false);
+    }
+  };
+  /** Best fit: every visible column takes its widest cell text, and never
+   *  less than its complete header plus the sort and filter controls. */
+  const bestFit = () => {
+    const { rows: cells } = deriveTable(sortedRows);
+    const data = visibleColumns.filter((c) => !c.key.startsWith("__"));
+    setLayout((l) => {
+      const widths = { ...l.widths };
+      data.forEach((col, i) => {
+        const header = col.headerLines
+          ? Math.max(col.headerLines[0].length, col.headerLines[1].length)
+          : col.label.length;
+        let longest = 0;
+        for (const row of cells) longest = Math.max(longest, (row[i] ?? "").length);
+        const fit = Math.round(Math.max(header * 6.5 + 46, longest * 7 + 17, col.minWidth ?? 40));
+        widths[col.key] = Math.min(420, fit);
+      });
+      return { ...l, widths };
+    });
+  };
+  const expandAll = () => {
+    if (expandable) setExpandedRows(new Set(sortedRows.map(expansionId)));
+    setCollapsedGroups(new Set());
+  };
+  /** Collapse all never closes a group that must stay open. */
+  const collapseAll = () => {
+    setExpandedRows(new Set());
+    if (fixedGroups) {
+      setCollapsedGroups(new Set(fixedGroups.groups.filter((g) => !g.alwaysOpen).map((g) => g.key)));
+    }
+  };
 
   // ── Render ────────────────────────────────────────────────────────
   const totalCols = visibleColumns.length;
@@ -2409,7 +2544,7 @@ function DataGridInner<T>({
               <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
               <div
                 ref={columnsMenuRef}
-                className={styles.columnsMenu}
+                className={`${styles.columnsMenu}${personalLayouts ? ` ${styles.columnsMenuWithLayouts}` : ""}`}
                 style={
                   columnsMenuPos
                     ? { position: "fixed", top: columnsMenuPos.top, right: columnsMenuPos.right }
@@ -2419,6 +2554,7 @@ function DataGridInner<T>({
               >
                 <header className={styles.columnsMenuHeader}>
                   <span>Columns ({visibleDataColumnCount})</span>
+                  {!personalLayouts && (
                   <button
                     type="button"
                     className={styles.columnsMenuReset}
@@ -2428,7 +2564,71 @@ function DataGridInner<T>({
                     <RotateCcw size={12} strokeWidth={1.75} aria-hidden />
                     <span>Reset columns</span>
                   </button>
+                  )}
                 </header>
+                {personalLayouts && (
+                  <div className={styles.layoutActions} data-testid="personal-layout-actions">
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "save"}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "save" ? null : "save"); }}>
+                      Save layout as…
+                    </button>
+                    {layoutPanel === "save" && (
+                      <form className={styles.layoutPanel} onSubmit={(e) => { e.preventDefault(); void saveLayoutAs(); }}>
+                        <label className={styles.layoutField}>
+                          <span>Layout name</span>
+                          <input
+                            autoFocus
+                            maxLength={60}
+                            value={layoutName}
+                            onChange={(e) => setLayoutName(e.target.value)}
+                          />
+                        </label>
+                        <Button variant="neutral" size="sm" type="submit" disabled={layoutName.trim() === "" || layoutBusy}>
+                          Save
+                        </Button>
+                      </form>
+                    )}
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "load"}
+                      disabled={personalLayouts.layouts.length === 0}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "load" ? null : "load"); }}>
+                      Load layout
+                    </button>
+                    {layoutPanel === "load" && (
+                      <div className={styles.layoutPanel} role="group" aria-label="Load layout">
+                        {personalLayouts.layouts.map((saved) => (
+                          <button key={saved.id} type="button" className={styles.layoutChoice}
+                            onClick={() => { applySavedLayout(saved.layout); setLayoutPanel(null); setColumnsMenuOpen(false); }}>
+                            {saved.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button type="button" className={styles.layoutAction} aria-expanded={layoutPanel === "default"}
+                      disabled={personalLayouts.layouts.length === 0}
+                      onClick={() => { setLayoutProblem(null); setLayoutPanel(layoutPanel === "default" ? null : "default"); }}>
+                      Set as my default
+                    </button>
+                    {layoutPanel === "default" && (
+                      <div className={styles.layoutPanel} role="group" aria-label="Set as my default">
+                        {personalLayouts.layouts.map((saved) => (
+                          <button key={saved.id} type="button" className={styles.layoutChoice}
+                            aria-pressed={saved.isDefault} disabled={layoutBusy}
+                            onClick={() => void setMyDefault(saved.id)}>
+                            <span>{saved.name}</span>
+                            {saved.isDefault ? <Check size={12} strokeWidth={2} aria-hidden /> : null}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {layoutProblem && (
+                      <p role="alert" className={styles.layoutProblem} data-testid="personal-layout-problem">{layoutProblem}</p>
+                    )}
+                    <button type="button" className={styles.layoutAction} onClick={resetColumns}>Reset columns</button>
+                    <button type="button" className={styles.layoutAction} onClick={bestFit}>Best fit</button>
+                    <button type="button" className={styles.layoutAction} onClick={expandAll}>Expand all</button>
+                    <button type="button" className={styles.layoutAction} onClick={collapseAll}>Collapse all</button>
+                  </div>
+                )}
                 <div className={styles.columnsMenuBody}>
                   {(() => {
                     /* STAGE 1 engine extension (Law 13) — the GROUPED chooser.

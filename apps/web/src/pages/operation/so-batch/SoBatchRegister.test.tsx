@@ -1725,7 +1725,7 @@ describe("fourteen documents on a one-unit line", () => {
   /**
    * FIXTURE B — the documents are NUMBERED and none has been sent. Nothing has
    * reached a supplier, so status stays `blank` and buying is legitimate. The
-   * record says so: fourteen rows, every one `Not sent to supplier`.
+   * record says so: fourteen rows, every one `Not marked as sent`.
    */
   it("allows the purchase when not one of the fourteen has been sent", async () => {
     renderRegister({
@@ -1736,7 +1736,7 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const details = within(box).getByTestId("po-details-table");
-    expect(within(details).getAllByText("Not sent to supplier")).toHaveLength(14);
+    expect(within(details).getAllByText("Not marked as sent")).toHaveLength(14);
     /* Fourteen document rows, one unit each — the whole evidence, not a sample. */
     expect(within(details).getAllByRole("row").filter((r) => r.dataset.row === "record"))
       .toHaveLength(14);

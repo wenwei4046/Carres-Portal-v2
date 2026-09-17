@@ -1481,12 +1481,22 @@ facts, permissions, complete-record populations or task ownership.
    the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
    (disabled), the header `Hide column` / `Pin left` menu and drag, and pins both at a ≥768px
    canvas, identity alone below it. It replaces `stickyIdentity` on the page that sets it.
-   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6). Every other
-   Register is unchanged until its own round.
+   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6) — PR #1411,
+   merge `5b61f7fa`, live in production from `c6d8706e` (all five surfaces verified 2026-09-17
+   10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
+   round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
+   authenticated production walk of all four listings.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
-4. **Personal columns — APPROVED / NOT BUILT (Jess, 2026-09-17).** DataGrid provides an
+4. **Personal columns — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, PO pilot only.**
+   Engine: `DataGrid personalLayouts={{ layouts, limit, onSave, onSetDefault }}` (opt-in; the
+   page owns storage, the engine owns the shape `DataGridSavedLayout = order · hidden · widths ·
+   sort`). The seven actions sit above the column list in that order; `Save layout as…` asks for a
+   `Layout name`; the person's default applies once when their layouts arrive; `Reset columns`
+   also clears the header sort; `Best fit` sizes each visible column to its longest cell text and
+   its full header; `Collapse all` never closes an always-open group. Storage: migration 0528
+   (Purchasing MASTER §9.3). DataGrid provides an
    opt-in capability; only Purchase Orders enables the pilot, in its implementation round.
    Columns offers show/hide, `Save layout as…` (name), `Load layout`, `Set as my default`,
    `Reset columns`, `Best fit`, `Expand all` and `Collapse all`.
@@ -1787,4 +1797,4 @@ gone. `components/ConnectedSections` composes it into a stack of sections.
 | **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
 | **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
 | **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
-| **Layout memory** | Refused as a kit-wide default. Sales Orders preserves its existing role-scoped browser layout key by owner ruling; no other page inherits that exception. |
+| **Layout memory** | Refused as a kit-wide default. Browser layout keys stay per page. Server-side personal saved layouts exist only on Purchase Orders (§6.7 rule 4, BUILT 2026-09-17); rollout to other listings waits for owner acceptance of that pilot. |

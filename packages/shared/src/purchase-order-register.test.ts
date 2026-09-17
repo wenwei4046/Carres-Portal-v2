@@ -33,7 +33,7 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.currentSend).toBeNull();
     expect(facts.filters).toContain("pdf_not_sent");
-    expect(facts.documentState).toBe("Not sent to supplier");
+    expect(facts.documentState).toBe("Not marked as sent");
   });
 
   it("a confirmed old version does not prove the current version reached the supplier", () => {
@@ -67,7 +67,7 @@ describe("Purchase Order Register authority", () => {
       sends: [],
     }, "2026-08-28");
 
-    expect(facts.sentToSupplier).toBe("Not sent");
+    expect(facts.sentToSupplier).toBe("Not marked as sent");
     expect(facts.latestConfirmedSend).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe("Purchase Order Register authority", () => {
     }, "2026-08-28");
     expect(facts.filters).toEqual(["completed"]);
     expect(facts.filters).not.toContain("pdf_not_sent");
-    expect(facts.sentToSupplier).toBe("Not sent");
+    expect(facts.sentToSupplier).toBe("Not marked as sent");
   });
 
   it("a revised PO whose latest version is unsent is BOTH not-sent and update-required — overlap, not exclusivity", () => {
@@ -190,5 +190,74 @@ describe("shared supplier reply Work", () => {
     const input = { ...base, sends: [sent], supplierDate: "2026-09-05" };
     expect(purchaseOrderReplyWorkItems(input, owner, "2026-09-09", new Set(["2026-09-07"]))[0]).toMatchObject({ dueIso: "2026-09-08", ruleKey: "purchasing.supplier_date_passed" });
     expect(input.supplierDate).toBe("2026-09-05");
+  });
+});
+
+/* ── Purchasing MASTER §5.8 / §9.3 (Jess, 2026-09-17) ─────────────────────── */
+describe("Purchase Orders listing groups and Expected Delivery Date", () => {
+  const marked = {
+    kind: "confirmed_sent" as const,
+    channel: "whatsapp",
+    recipient: "https://chat.whatsapp.com/hooka",
+    sentAt: "2026-09-01T09:00:00Z",
+    poVersion: 1,
+  };
+
+  it("classifies Cancelled → Completed → Issued → Not marked as sent, each PO once", () => {
+    const today = "2026-09-17";
+    expect(purchaseOrderRegisterFacts({ ...base, status: "cancelled", sends: [marked] }, today).group).toBe("cancelled");
+    expect(purchaseOrderRegisterFacts({ ...base, lines: [{ qty: 3, receivedQty: 3 }], sends: [marked] }, today).group).toBe("completed");
+    expect(purchaseOrderRegisterFacts({ ...base, sends: [marked] }, today).group).toBe("issued");
+    expect(purchaseOrderRegisterFacts(base, today).group).toBe("not_marked_as_sent");
+  });
+
+  it("a completed legacy PO without a mark stays Completed, and says it is not marked", () => {
+    const facts = purchaseOrderRegisterFacts({ ...base, status: "received", lines: [{ qty: 3, receivedQty: 3 }] }, "2026-09-17");
+    expect(facts.group).toBe("completed");
+    expect(facts.currentSend).toBeNull();
+    expect(facts.sentToSupplier).toBe("Not marked as sent");
+  });
+
+  it("an earlier version's mark never marks the current version", () => {
+    const facts = purchaseOrderRegisterFacts({ ...base, version: 2, sends: [marked] }, "2026-09-17");
+    expect(facts.group).toBe("not_marked_as_sent");
+    expect(facts.sentToSupplier).toBe("PO V1");
+  });
+
+  it("a failed quantity read is never zero and never Completed", () => {
+    for (const lines of [null, [{ qty: 3, receivedQty: null }], [{ qty: null, receivedQty: 0 }]]) {
+      const facts = purchaseOrderRegisterFacts({ ...base, lines, sends: [marked] }, "2026-09-17");
+      expect(facts.quantitiesKnown).toBe(false);
+      expect(facts.group).toBe("issued");
+      expect(facts.filters).not.toContain("completed");
+      expect(facts.filters).not.toContain("partly_received");
+      // An unknown balance raises no supplier chase it cannot justify.
+      expect(facts.filters).not.toContain("supplier_date_missing");
+    }
+    // The authoritative received status still completes it.
+    expect(purchaseOrderRegisterFacts({ ...base, status: "received", lines: null }, "2026-09-17").group).toBe("completed");
+  });
+
+  it("Expected Delivery Date: supplier's evidenced date first, else the original, else unknown", () => {
+    const today = "2026-09-17";
+    expect(purchaseOrderRegisterFacts({ ...base, originalDate: "2026-09-25", sends: [marked] }, today).expected)
+      .toEqual({ date: "2026-09-25", supplier: "not_confirmed", changedFrom: null });
+    expect(purchaseOrderRegisterFacts({ ...base, originalDate: "2026-09-25", supplierDate: "2026-09-25", sends: [marked] }, today).expected)
+      .toEqual({ date: "2026-09-25", supplier: "confirmed", changedFrom: null });
+    expect(purchaseOrderRegisterFacts({ ...base, originalDate: "2026-09-25", supplierDate: "2026-10-02", sends: [marked] }, today).expected)
+      .toEqual({ date: "2026-10-02", supplier: "changed", changedFrom: "2026-09-25" });
+    expect(purchaseOrderRegisterFacts({ ...base, originalDate: null, sends: [marked] }, today).expected)
+      .toEqual({ date: null, supplier: "not_confirmed", changedFrom: null });
+  });
+
+  it("Supplier Delivery Date changed is a SUPPLIER REPLY facet for marked, pending POs only", () => {
+    const today = "2026-09-17";
+    const changed = { ...base, originalDate: "2026-09-25", supplierDate: "2026-10-02" };
+    expect(purchaseOrderRegisterFacts({ ...changed, sends: [marked] }, today).filters).toContain("supplier_date_changed");
+    expect(purchaseOrderRegisterFacts(changed, today).filters).not.toContain("supplier_date_changed");
+    expect(purchaseOrderRegisterFacts({ ...changed, sends: [marked], lines: [{ qty: 3, receivedQty: 3 }] }, today).filters)
+      .not.toContain("supplier_date_changed");
+    expect(purchaseOrderRegisterFacts({ ...base, originalDate: "2026-09-25", supplierDate: "2026-09-25", sends: [marked] }, today).filters)
+      .not.toContain("supplier_date_changed");
   });
 });

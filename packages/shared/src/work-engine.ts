@@ -308,12 +308,12 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "manual_purchase.issue_po",
     module: "purchasing",
-    trigger: "approved Manual Purchase demand remains uncovered or its current PO version has not reached the supplier",
+    trigger: "approved Manual Purchase demand remains uncovered or its current PO version is not marked as sent",
     owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "po_duty",
     action: "Issue PO",
     dueRule: "no later than the request's Order By date on the OFFICE calendar",
-    completionFact: "confirmed-sent evidence for every linked current PO version (po_sends)",
+    completionFact: "a sent mark for every linked current PO version (po_sends)",
   },
   {
     key: "purchasing.confirm_ready_date",
@@ -477,7 +477,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   resolve_payment_exception: "The payment exception is cleared with evidence",
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
-  "manual_purchase.issue_po": "Every linked current PO version has confirmed-send evidence",
+  "manual_purchase.issue_po": "Every linked current PO version marked as sent",
   "purchasing.confirm_ready_date": "A standing supplier promise is recorded",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",

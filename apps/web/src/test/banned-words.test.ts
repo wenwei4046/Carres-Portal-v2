@@ -85,7 +85,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
     );
     itSaysNoBannedWord(
       join(PAGES, "operation", "components", "PoIssueEvidence.tsx"),
-      { minStrings: 20, expectString: "Record the PDF sent" },
+      { minStrings: 20, expectString: "Mark as sent" },
     );
   });
 

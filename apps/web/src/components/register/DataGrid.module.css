@@ -1227,3 +1227,87 @@ div:first-child > .columnsMenuGroup {
   outline: 2px solid theme("colors.kit.blue.9");
   outline-offset: -2px;
 }
+
+/* ── Personal saved layouts (opt-in, ui MASTER §6.7 rule 4) ───────────────
+   The Columns menu's own action list: text rows in the menu's existing type,
+   a panel under the row that opened it, and the refusal as a two-tone line. */
+.layoutActions {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.layoutAction,
+.layoutChoice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-12);
+  text-align: left;
+  cursor: pointer;
+}
+.layoutAction:hover:not(:disabled),
+.layoutChoice:hover:not(:disabled) {
+  background: var(--c-cream);
+}
+.layoutAction:focus-visible,
+.layoutChoice:focus-visible {
+  outline: 2px solid theme("colors.kit.blue.9");
+  outline-offset: -2px;
+}
+.layoutAction:disabled,
+.layoutChoice:disabled {
+  color: var(--fg-muted);
+  cursor: default;
+}
+.layoutChoice {
+  padding-left: 24px;
+}
+.layoutPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px 8px;
+}
+.layoutChoice + .layoutChoice {
+  margin-top: -6px;
+}
+.layoutField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--fg-muted);
+  font-size: var(--fs-11);
+}
+.layoutField input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--c-ink);
+  font-size: var(--fs-12);
+}
+.layoutProblem {
+  margin: 0;
+  padding: 4px 12px;
+  color: theme("colors.kit.red.11");
+  font-size: var(--fs-11);
+}
+/* With the layout actions the menu needs more height; the column list keeps
+   its own scroll so the actions never scroll away. */
+.columnsMenuWithLayouts {
+  width: 260px;
+  max-height: min(600px, calc(100vh - 120px));
+}
+.columnsMenuWithLayouts .columnsMenuBody {
+  flex: 1 1 auto;
+  min-height: 96px;
+}
