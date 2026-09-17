@@ -3498,5 +3498,6 @@ one signed-in user, up to 10 per listing; their contents and responsive pinning 
 debtor invoice and the other receipt pages each get `Download PDF` (already in this standard).
 New words: on the invoice PDF `INVOICE` · `INVOICE · CANCELLED` · `CANCELLED · {reason}` ·
 `Reg No` · `Due` · `Description` · `Amount (RM)` · `TOTAL DUE` · `Note: {narration}`; on the
-receipt PDF the right-hand signature line `Payer signature`; and the failure toast
-`The invoice could not be opened — {error}`. A draft invoice has no number and no PDF.
+receipt PDF the right-hand signature line `Payer signature`; and the failure toasts
+`The invoice could not be opened — {error}` · `The receipt could not be opened — {error}`. A draft
+invoice has no number and no PDF.
