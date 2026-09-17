@@ -17,7 +17,7 @@
 --   1. gl_money_account_update (0515 body): the refusal now counts EVERY
 --      gl_payment_account_map row that points at the account, on or off,
 --      manual or system. Same sentence, same detail. A system row is named
---      by its screen word: 'online' -> Online payment, 'card' -> Card.
+--      by its screen word: 'online' -> Online payment, 'card' -> POS card.
 --   2. payment_set_method_active (0515 body): takes a share lock on the
 --      gl_money_accounts row before its check, so "turn the method on" and
 --      "take the account out of use" cannot both pass at the same moment
@@ -65,7 +65,7 @@ begin
     -- 0515, widened by 0523: nor while ANY payment method still lands money
     -- here, including the rows no screen shows (POS card, Stripe).
     select coalesce(m.label, case g.method when 'online' then 'Online payment'
-                                           when 'card'   then 'Card'
+                                           when 'card'   then 'POS card'
                                            else g.method end)
       into v_method
       from public.gl_payment_account_map g

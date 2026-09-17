@@ -166,6 +166,9 @@ describe("rename and take out of use", () => {
     );
     expect(wide).toContain("left join public.payment_manual_methods m on m.method = g.method");
     expect(wide).not.toContain("and m.active");
+    // The two rows no screen shows print their approved screen words (COPY-STANDARD, 17 Sep).
+    expect(wide).toContain("when 'online' then 'Online payment'");
+    expect(wide).toContain("when 'card'   then 'POS card'");
   });
 
   it("an unknown code is 404", async () => {
