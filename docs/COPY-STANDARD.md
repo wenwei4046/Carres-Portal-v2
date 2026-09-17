@@ -912,14 +912,15 @@ Orders round (after Sales Orders small patch and Manual Purchase Round 2, Jess 2
 
 | Where | Exact wording |
 |---|---|
-| Current-version sending confirmation button | `Mark as sent` |
-| Current-version sent mark absent: group, filter and cell | `Not marked as sent` |
+| Current-version sending confirmation button | `PO sent to supplier` |
+| Current-version sent mark absent: group | `Confirm PO sent to supplier` |
+| Current-version sent mark absent: cell | `Sending not confirmed` |
 | Shared completion sentence | `Current PO version marked as sent` |
 
-Retired for this PO fact: `Record the PDF sent`, `PDF not sent`, `Not sent`,
+Retired for this PO fact: `Not marked as sent`, `Mark as sent`, `Record the PDF sent`, `PDF not sent`, `Not sent`,
 `Not sent to supplier`, and `Current PO version reached supplier with evidence`.
-Classify groups in priority order: Cancelled → Completed → Issued (current version marked,
-goods pending) → Not marked as sent. A completed PO missing a mark remains Completed.
+Classify groups in priority order: Cancelled → Completed → Waiting for goods from supplier (current version marked,
+goods pending) → Confirm PO sent to supplier. A completed PO missing a mark remains Completed.
 Preserve older version sending evidence without claiming the current version is marked.
 Never claim supplier receipt, reading or acceptance from a sent mark. Staff send externally
 before marking; the Portal cannot observe WhatsApp sending without an API.
@@ -938,14 +939,14 @@ Deliver To · GRN No · PO Version`.
 | Supplier reply missing / confirmed / changed | `Not confirmed by supplier` · `Confirmed by supplier` · `Supplier changed from {date}` |
 | Unknown original date | `Not recorded` |
 | Current version | `PO V{n}` |
-| Current version sending evidence, supporting line | `Marked as sent · {channel} · {date}` / `Not marked as sent` |
+| Current version sending evidence, supporting line | `PO sent to supplier · {channel} · {date}` / `Sending not confirmed` |
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
 | Manual source in SO No column | `Manual Purchase` |
 | Goods summary | one item name / `{first item} + {n} more` |
-| Shared send-area prompt after opening channel | `Send the PDF, then press Mark as sent.` |
+| Shared send-area prompt after opening channel | `Send the PDF, then press PO sent to supplier.` |
 | Footer | `{n} purchase orders` · `{n} of {m} purchase orders` · `1 purchase order` |
 
-Groups: `Not marked as sent` · `Issued` · `Completed` · `Cancelled`; membership and sorting are
+Groups: `Confirm PO sent to supplier` · `Waiting for goods from supplier` · `Completed` · `Cancelled`; membership and sorting are
 owned by Purchasing MASTER §9.3. No quantity totals in the PO listing footer.
 Expansion: `SKU · Item / configuration · Qty · Deliver To` (read-only).
 
@@ -1034,7 +1035,7 @@ interchangeable:
 
 | Word | Exact fact |
 |---|---|
-| `PO Issued` | when Carres issued the supplier commitment; sits beside `PO No` |
+| `PO Issued` | current-version marked-sent time in legacy lineage surfaces; not a Purchase Orders register column |
 | `PO Delivery Date` | the original official supplier-facing date on the PO |
 | `Supplier Delivery Date` | the supplier's answer to the PO date: `Not confirmed` before evidenced supplier reply; `Same as PO` after the supplier confirms the PO date; otherwise the different date supplied by the supplier |
 | `Goods received on` | the physical arrival date and time; never keyed/submitted/posted time. Owner correction 2026-09-06 — the retired spelling `Goods Received At` may not appear. |
@@ -1175,7 +1176,7 @@ connector line.
 | The actionable goods table | `SKU` · `Item` · `Qty` · `Ready Stock` · **`Ordered Qty`** · `To buy` · `Deliver To` · `Supplier` · `Category`. **`Ordered Qty`, NOT `On PO`** — that head means *how many an OPEN purchase order still covers*, and this figure is the exact `po_line_sources` lineage: every non-cancelled document, `Completed` ones included, never netted by what has arrived. It is the HISTORICAL ordered quantity, and `On PO` would have said *still on order* about goods already in the warehouse. `Ordered Qty` is the dictionary's own word for it, used by Manual Purchase's purchase-order lineage table for the same relationship — beside `Already On PO` for the effective coverage it is not. **It is a QUANTITY**, and a door to the details — never a stack of PO numbers, which made one item row fourteen lines tall. A line no document has ever carried reads `Not ordered yet`; a line the shelf fully answered reads `—`. **`Unit ID` and `PO Delivery Date` are absent here** — both describe a document's goods, and on an unbought row they printed an absence in the width of a real answer. **`Deliver To` on a covered line states the document LINE's own destination**, never the parent document's where the line records one. |
 | The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
 | The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
-| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Issued`** · **`Not marked as sent`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
+| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Waiting for goods from supplier`** · **`Sending not confirmed`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
 | A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
 | HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
 | `To buy` — a figure ONLY where the page offers the buy | `To buy` means *what is left to buy*, so on a row the register does not offer it prints the governed absence `—` and the row says which state it is in. **Covered** (the engine's `fullyOnPo`): `—` · **`Already on a PO`** · **`Nothing to buy here`**, titled `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` — the door's own words (`purchasingRefusal("already_on_po")`) at cell width, so the operator meets ONE sentence, not two. **Not checked** (no flag in the payload): `—` · **`Coverage not checked`**, titled `Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.` — unknown is not yes, and a page may not describe an eligibility nobody verified. **The engine's covering quantity is never printed under this head**: it is a covering quantity, not a purchasing one, and the customer's `Qty` and the historical `Ordered Qty` carry the facts two columns away. Notes are WRITTEN as short lines, never left to wrap — the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
@@ -1213,7 +1214,7 @@ connector line.
 | The Approval facts | `Need approval` + `{name} approves` · `Approved` / `Refused` / `Withdrawn` / `Sent back for changes` + the real actor and date/time, and (approved) quantity per line, (refused / sent back) the reason. Requester, sent back: `Edit and send again`. Requester, before a decision: `Withdraw request`, asked once more with `Cancel` · `Withdraw request`. |
 | The approver's decision line | `SKU` · `Requested Qty` · `Still Needed` · `Approved Qty` (prefilled from Still Needed, whole 0..Requested) · `Transaction Cost` · `Line Total` — read-only approval evidence, never an Operation price control |
 | The decision controls | `Approve` (primary) · `Send back` · `Refuse` · `Decision reason` (required for Send back and Refuse). Requester: `Withdraw request` before decision; `Edit and send again` after return. |
-| The Purchase Orders lineage heads | `PO No` · `Ordered Qty` · `Still To Order` · `PO Issued` · `PO Delivery Date` · `Supplier Delivery Date`; supplier answer reads `Not confirmed` · `Same as PO` · the changed date; no lineage reads `Not ordered yet`. **D5 — ONE MEANING PER WORD (Round 2, 2026-09-17):** `PO Issued` here is the CURRENT PO version's marked-sent date and time — the same fact the Purchase Orders page prints under `PO Issued` — and a version nobody marked reads `Not marked as sent`. It is never `purchase_orders.placed_at` (the creation time). |
+| The Purchase Orders lineage heads | `PO No` · `Ordered Qty` · `Still To Order` · `PO Issued` · `PO Delivery Date` · `Supplier Delivery Date`; supplier answer reads `Not confirmed` · `Same as PO` · the changed date; no lineage reads `Not ordered yet`. **D5 — ONE MEANING PER WORD (Round 2, 2026-09-17):** `PO Issued` here is the CURRENT PO version's marked-sent date and time — the current-version sending evidence retained on the Purchase Orders page — and a version nobody marked reads `Sending not confirmed`. It is never `purchase_orders.placed_at` (the creation time). |
 | The History titles (stored facts only) | `Purchase requested` · `Purchase approved` · `Purchase refused` · `Marked not going ahead` · `Purchase order issued` · `Sent back for changes` · `Sent again for approval` · `Withdrawn` — three-rank grammar, grouped `Today · Yesterday · Earlier`; an event with no stored individual reads `Staff identity not recorded`. Rank 3 of a resubmission: `Round {n}` and each change — `{sku} · Qty {old} → {new}` · `{sku} added · Qty {n}` · `{sku} removed` · `Deliver To: {old} → {new}` · `Delivery Date: {old} → {new}` · `What is this for? {new}` · `For changed`. A line removed while editing is stored with the reason `Removed before sending again`. |
 | The object's loading / failure states | `Opening the Manual Purchase` · `This Manual Purchase could not be opened` + `Try again` |
 | The round refusals — Round 2, two lines, fact then act | `This request was withdrawn.` + `Raise a new request if the goods are still needed.` — `This request was sent back for changes.` + `Wait for the requester to edit it and send it again.` — `Only the person who asked for this purchase may do this.` + `Ask {requester} to do it.` — `This request was not sent back for changes.` + `Reload the Manual Purchase to see where it is now.` — `This request already has a purchase order.` + `Reload the Manual Purchase. It can no longer be withdrawn.` — `The request has no items.` + `Add at least one item, then send it again.` — `The Delivery Date is missing.` + `Pick a Delivery Date, then send it again.` |
@@ -1342,7 +1343,7 @@ and its recipient/channel/actor/time evidence exists. This is not proof of suppl
 
 `Send PO`, `Prepare PO` and `Draft PO` remain banned action names. In normal sentences, use the full
 object and recipient: `Issue the purchase order to Hooka`. Inside the formal issue surface, the
-completion control says `Mark as sent`; it records the person's confirmation for the exact
+completion control says `PO sent to supplier`; it records the person's confirmation for the exact
 version, not a second business action or proof that the supplier received/read/accepted it.
 
 **RETIRED, and it is not in the table above because it is no longer an action**
@@ -2436,29 +2437,26 @@ section.** `docs/purchasing/MASTER.md` owns what the actions DO,
 `docs/purchasing/MASTER.md` owns where the facts sit — neither respells a word.
 
 **A Purchase Order and a customer order are different subjects, but neither uses a vague visible
-`Open` status.** A numbered PO whose PDF has not been sent shows the concrete fact `The PO PDF has
-not been sent`; it is not called `Draft`, `Prepared` or `Pending`.
+`Open` status.** A numbered PO without a current-version sending confirmation shows `Sending not confirmed`; it is not called `Draft`, `Prepared` or `Pending`.
 
 **Action ≠ Status. They may never be mixed.** An action is something a person does and it
 LEAVES when its outcome is recorded. A status is what the PO currently is.
 
-### The five Operation Status labels — the ONLY five
+### Operation facts and current sending labels
 
 | # | Label | Means |
 |---|---|---|
-| 1 | **`Issued`** | the current formal PO PDF was actually sent to the supplier and outbound evidence exists |
+| 1 | **`Waiting for goods from supplier`** | current-version sending is recorded and goods remain pending |
 | 2 | **`In Production`** | supplier fulfilment is underway |
 | 3 | **`Receiving`** | physical goods receipt has started |
 | 4 | **`Completed`** | the PO is fully received and no remaining purchasing action exists |
 | 5 | **`Cancelled`** | the PO will no longer be fulfilled |
 
-**`Open` is never a Purchase Order status.** The word for a PO that has been issued is
-`Issued`. (`Open` also reads as "not yet finished", which is a different fact and is what
-`Receiving` says.)
-
-There is no `Acknowledged` state. Once Carres sends the PDF, the order is `Issued`; supplier
-silence changes nothing. Model/fabric unavailable, delay, quantity change and price change are
-later concrete exceptions.
+**`Open` is never a visible Purchase Order status.** Register groups are
+`Confirm PO sent to supplier`, `Waiting for goods from supplier`, `Completed`, `Cancelled`.
+These revised labels are APPROVED / NOT BUILT (Jess, 2026-09-17). Existing internal state keys
+are not renamed merely to change display copy. There is no `Acknowledged` state; a sending
+confirmation does not prove supplier receipt, reading or acceptance.
 
 **Supplier Status is a SEPARATE axis** — what the factory and the logistics company report.
 It is never merged into the five above, and it is not Purchasing's to redefine: two external
@@ -2485,7 +2483,7 @@ Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is ban
 | Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
 | Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
 | The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
-| Current version sending evidence, inside PO Version on the listing | **`Marked as sent · {channel} · {date}`** / **`Not marked as sent`** | Supplier Has · No current PDF |
+| Current version sending evidence, inside PO Version on the listing | **`PO sent to supplier · {channel} · {date}`** / **`Sending not confirmed`** | Supplier Has · No current PDF |
 
 The three quantity words above remain in PO detail and receiving progress, not PO listing columns
 or its footer. Damaged, wrong and extra goods never reduce `Pending Delivery Qty`.
@@ -2557,7 +2555,7 @@ invoice, credit, settlement and payment amounts belong to Finance. An export is 
 second editable truth.
 
 **Outbound channel is evidence, not a lifecycle status.** WhatsApp and Email may vary by supplier.
-`Issued` is complete only when the current PDF version was actually sent and the Portal records
+The recorded-send condition is complete only when staff confirm sending the current PDF version and the Portal records
 recipient, channel, actor and time. Opening WhatsApp/email is not proof. Supplier silence does not
 create an `Acknowledged` state.
 
@@ -3506,3 +3504,15 @@ New words: on the invoice PDF `INVOICE` · `INVOICE · CANCELLED` · `CANCELLED 
 receipt PDF the right-hand signature line `Payer signature`; and the failure toasts
 `The invoice could not be opened — {error}` · `The receipt could not be opened — {error}`. A draft
 invoice has no number and no PDF.
+
+### PO copy and Portal-wide readability — APPROVED / NOT BUILT (Jess, 2026-09-17)
+
+Canonical PO group labels: `Confirm PO sent to supplier` · `Waiting for goods from supplier` ·
+`Completed` · `Cancelled`. Button: `PO sent to supplier`. PO Version supporting line:
+`Sending not confirmed` or `PO sent to supplier · {channel} · {date}`. Channel is recorded data,
+never hardcoded WhatsApp. Shared completion: `Current PO version marked as sent`.
+`Waiting for goods from supplier` is an exact approved exception, not permission for vague Waiting.
+Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`; outside that group
+use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
+UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
+No page-local copies of its appearance rules; this does not authorize new business copy.

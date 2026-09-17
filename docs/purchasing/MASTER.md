@@ -1,5 +1,11 @@
 # PURCHASING — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--approved--not-built-jess-2026-09-17).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29**
 Lane: **PLAN COMPLETE**
 
@@ -385,23 +391,23 @@ remain. PR #1105 carries the dependent application and deployment proof.
 
 ### 5.6 Issue means the PDF was actually sent
 
-**APPROVED (Jess, 2026-09-16) · BUILT 2026-09-17 in the Purchase Orders round.** The shared
-`PoIssueEvidence` now says `{PO No} · PO V{n} · Marked as sent` / `Not marked as sent`, the act is
-`Mark as sent`, `Send the PDF, then press Mark as sent.` appears only after Open WhatsApp / Open
-email, and the recipient prefills from the Supplier Master for the chosen channel (group link or
-chat number; email address) or is typed — never the supplier name. Shared completion wording is
-`Current PO version marked as sent`.
+**Sending evidence is built; revised visible copy is APPROVED / NOT BUILT (Jess, 2026-09-17).**
+The shared communication area records version, channel, recipient, actor and time. The new button
+is `PO sent to supplier`; the new missing-confirmation line is `Sending not confirmed`.
+Recipient prefills from Supplier Master channel data (group link/chat number or email), never
+from the supplier name. Shared completion wording remains `Current PO version marked as sent`.
 
 Without a WhatsApp API the Portal cannot observe whether a PO was sent. Staff actually send the
-PDF externally, then press `Mark as sent` in the one shared communication area (`PoIssueEvidence`)
+PDF externally, then press `PO sent to supplier` in the one shared communication area (`PoIssueEvidence`)
 used by SO Batch, Manual Purchase and Purchase Orders. The mark records the exact rendered PO
 version, channel, recipient, real actor and server time. Opening WhatsApp/email, downloading or
 previewing a PDF does not mark it as sent. The mark is the person's statement of sending, never
 proof that the supplier received, read or accepted it. Missing evidence does not prove no send.
 
-A current version without a sent mark reads `Not marked as sent` in its group, rail and cell.
+A current version without a sent mark has group `Confirm PO sent to supplier` and cell
+`Sending not confirmed`. A sent mark does not prove supplier receipt, reading or acceptance.
 The current-version mark satisfies the recorded-send completion condition; pending goods then
-read `Issued`, even while the supplier is silent. There is no `Acknowledged` status. Before
+read `Waiting for goods from supplier`, even while the supplier is silent. There is no `Acknowledged` status. Before
 resending, staff check the external conversation to avoid duplicating an unrecorded send.
 The build's shared completion sentence is `Current PO version marked as sent`.
 
@@ -483,8 +489,8 @@ does not decide it.
 The operator sees facts, not a vague workflow:
 
 ```text
-Not marked as sent
-Issued
+Confirm PO sent to supplier
+Waiting for goods from supplier
 Supplier has not confirmed the PO date
 Supplier Delivery Date changed
 Supplier delivery date passed
@@ -493,13 +499,13 @@ Completed
 Cancelled
 ```
 
-**Group classification — APPROVED · BUILT 2026-09-17** (`purchaseOrderRegisterFacts().group`;
+**Group classification is built; revised labels APPROVED / NOT BUILT (Jess, 2026-09-17)** (`purchaseOrderRegisterFacts().group`;
 a line read that returned no quantity is `quantitiesKnown: false`, never zero, never Completed
 unless the stored status is `received`). Evaluate in this order so each PO belongs
-to exactly one group: `Cancelled` → `Completed` → `Issued` (current version marked as sent
-and goods still pending) → `Not marked as sent`. Reuse the authoritative cancellation,
+to exactly one group: `Cancelled` → `Completed` → `Waiting for goods from supplier` (current version marked as sent
+and goods still pending) → `Confirm PO sent to supplier`. Reuse the authoritative cancellation,
 completion and quantity facts; an unknown read is never silently zero. A completed PO without
-a sent mark stays in `Completed`; its cell may still say `Not marked as sent`.
+a sent mark stays in `Completed`; its cell may still say `Sending not confirmed`.
 
 Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
@@ -806,7 +812,7 @@ summary. Action ownership uses structured avatar metadata.
   fitted.
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
   `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
-  (`Mark as sent`) are drawn by ONE component on every surface that chases a document. Two
+  (`PO sent to supplier`) are drawn by ONE component on every surface that chases a document. Two
   sets of send controls on one object is two accounts of what happened to it.
 - **`Download PDF` HANDS OVER A PDF.** Never a link to the JSON payload behind it: a page that
   shows an API response as if it were a document teaches the operator that the document is
@@ -1489,10 +1495,10 @@ refusal is untouched underneath**. The demand itself is never hidden: `Qty`, `Re
 The other duplication — an order whose own lineage already covers what it required — is refused by
 the `ordered` half of `isSelectableForOrder`, and that is untouched.
 
-**`PO Status` is the column that reconciles the two scopes** — `Completed` · `Issued` ·
-`Not marked as sent`, the same `documentState` vocabulary the Purchase Orders register prints
+**`PO Status` is the column that reconciles the two scopes** — `Completed` · `Waiting for goods from supplier` ·
+`Sending not confirmed`, the same `documentState` vocabulary the Purchase Orders register prints
 (`soBatchPoDocumentState`, narrowed to the two facts this register carries). Fourteen `Completed`
-documents beside `To buy 1` and fourteen `Not marked as sent` ones beside the same figure are
+documents beside `To buy 1` and fourteen `Sending not confirmed` ones beside the same figure are
 opposite situations, and before this column a reader could not see which they were looking at.
 **`Open` is never a Purchase Order status** and the raw database value never reaches the screen.
 
@@ -1960,7 +1966,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   carries the REAL requester's avatar beside the fact, or `Staff identity not recorded`.
 - **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
   `Ordered Qty` · `Still To Order` · `PO Issued` (D5, Round 2: the CURRENT PO version's
-  marked-sent time — the same fact `PO Issued` means on Purchase Orders — or `Not marked as sent`;
+  marked-sent time — the current-version sending evidence retained on Purchase Orders — or `Sending not confirmed`;
   never `placed_at`, which is the creation time) · `PO Delivery Date` (the
   ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
   it, else the issue-stamped date) · `Supplier Delivery Date` as `Not confirmed` until supplier
@@ -2057,21 +2063,23 @@ Receiving progress belongs to Warehouse Inbound / Receiving and PO detail, not t
   or `Supplier changed from {date}`. Unknown original is `Not recorded`, never fabricated.
   The original PO Delivery Date is immutable. Supplier evidence remains version-aware.
 - `GRN No`: one number opens Receiving; several show `{n} GRNs`; no GRN is blank.
-- `PO Version`: first line `PO V{n}`; second line `Marked as sent · {channel} · {date}` or
-  `Not marked as sent` for the CURRENT version. Earlier marks remain in Revisions.
+- `PO Version`: first line `PO V{n}`; second line `PO sent to supplier · {channel} · {date}` or
+  `Sending not confirmed` for the CURRENT version. Earlier marks remain in Revisions.
 
-**Groups:** display `Not marked as sent` and `Issued` as open headings, then `Completed` and
-`Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Issued
-(current version marked as sent with goods pending) → Not marked as sent. Each PO occurs once.
+**Groups — APPROVED / NOT BUILT, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
+`Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
+(current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs once.
 A failed/unknown quantity read is never zero or Completed; completed legacy POs without a mark
 stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
-Default order: unmarked by PO Delivery Date ascending; Issued by Expected Delivery Date ascending;
+Default order: unmarked by PO Delivery Date ascending; Waiting for goods from supplier by Expected Delivery Date ascending;
 Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
 
-**Rail:** SUPPLIER REPLY (`Supplier has not confirmed the PO date` · `Supplier Delivery Date
-changed` · `Supplier delivery date passed`), only for current-version marked documents with goods
-pending; RECEIVING (`Partly received`); SUPPLIER; DELIVER TO. No All purchase orders row,
-DOCUMENT group or action sentence. Preserve authoritative facet predicates and counts.
+**Rail — APPROVED / NOT BUILT, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
+`Date changed`, `Date passed`, using existing current-version sent/pending predicates.
+`Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
+Use complete supplier-date labels outside the group context, including active-condition chips.
+No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
+Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
 **Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Deliver To`.
 **Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
@@ -2079,8 +2087,8 @@ DOCUMENT group or action sentence. Preserve authoritative facet predicates and c
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
 
-**Sending, all shared surfaces:** `Mark as sent` records current version, channel, recipient, actor
-and time. After Open WhatsApp / Open email show `Send the PDF, then press Mark as sent.` in the
+**Sending, all shared surfaces:** `PO sent to supplier` records current version, channel, recipient, actor
+and time. After Open WhatsApp / Open email show `Send the PDF, then press PO sent to supplier.` in the
 same communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent,
 the person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
 automatically marks sending. Never claim supplier receipt, reading or acceptance.
