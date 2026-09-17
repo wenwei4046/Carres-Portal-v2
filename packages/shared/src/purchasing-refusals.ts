@@ -117,6 +117,43 @@ export function purchasingRefusal(
           "the requested quantity",
         )}.`,
       };
+    /* ── ROUND 2 (owner rulings R3/R4, 2026-09-16, migration 0522) — the four
+       round doors race on one request and the loser is refused BY NAME. */
+    case "request_withdrawn":
+      return {
+        wrong: "This request was withdrawn.",
+        todo: "Raise a new request if the goods are still needed.",
+      };
+    case "request_sent_back":
+      return {
+        wrong: "This request was sent back for changes.",
+        todo: "Wait for the requester to edit it and send it again.",
+      };
+    case "not_requester":
+      return {
+        wrong: "Only the person who asked for this purchase may do this.",
+        todo: `Ask ${some(facts.actor, "the requester")} to do it.`,
+      };
+    case "not_sent_back":
+      return {
+        wrong: "This request was not sent back for changes.",
+        todo: "Reload the Manual Purchase to see where it is now.",
+      };
+    case "request_already_ordered":
+      return {
+        wrong: "This request already has a purchase order.",
+        todo: "Reload the Manual Purchase. It can no longer be withdrawn.",
+      };
+    case "lines_required":
+      return {
+        wrong: "The request has no items.",
+        todo: "Add at least one item, then send it again.",
+      };
+    case "delivery_date_required":
+      return {
+        wrong: "The Delivery Date is missing.",
+        todo: "Pick a Delivery Date, then send it again.",
+      };
     case "decision_not_recorded":
       return {
         wrong: "The decision was not recorded.",
@@ -441,6 +478,13 @@ export const PURCHASING_REFUSAL_CODES = [
   "reason_required",
   "invalid_cut_qty",
   "decision_not_recorded",
+  "request_withdrawn",
+  "request_sent_back",
+  "not_requester",
+  "not_sent_back",
+  "request_already_ordered",
+  "lines_required",
+  "delivery_date_required",
   "supplier_price_changed",
   "stale_catalog_cost",
   "expected_cost_required",

@@ -16,6 +16,7 @@ import {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchOrderByAbsenceWord,
   compareSoBatchPlanning,
   soBatchOrderSupplierNames,
   soBatchRailFacts,
@@ -46,6 +47,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
   FilterRailSelect,
+  useFilterRailOpen,
 } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
@@ -330,22 +332,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
    * cross-updated against the other sections so the printed number predicts
    * the rows a click would show. This file picks; it never counts. */
   const [filter, setFilter] = useState<SoBatchRailFilter>(SO_BATCH_RAIL_CLEAR);
-  const [filterRailOpen, setFilterRailOpen] = useState(() => {
-    try {
-      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
-    } catch {
-      return true;
-    }
-  });
-  const setFilterRailVisible = useCallback((open: boolean) => {
-    setFilterRailOpen(open);
-    try {
-      localStorage.setItem(FILTER_RAIL_STORAGE_KEY, open ? "1" : "0");
-    } catch {
-      // Storage may be unavailable in a locked-down browser; the live state
-      // still works for this visit.
-    }
-  }, []);
+  /* S3 — below an 896px canvas the rail starts hidden unless this browser
+     opened it before (`useFilterRailOpen`). */
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
   const shown = useMemo(
@@ -647,13 +637,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           const fact = orderByFacts.get(o.orderId)!;
           return (
             <span className="tabular-nums" data-testid={`so-batch-order-by-${o.orderId}`}>
-              {fact.date ? fmtDate(fact.date) : fact.notPlanned ? <Absent>{W.notPlanned}</Absent> : ""}
+              {/* S1 — `Not planned` is missing setup ONLY; a covered leaf and an
+                  unverified one each say their own governed fact. */}
+              {fact.date ? fmtDate(fact.date) : fact.absence ? <Absent>{soBatchOrderByAbsenceWord(fact.absence)}</Absent> : ""}
             </span>
           );
         },
         dateValue: (o) => orderByFacts.get(o.orderId)?.date ?? null,
         sortFn: compareOrderBy,
-        exportValue: (o) => { const f = orderByFacts.get(o.orderId)!; return f.date ?? (f.notPlanned ? W.notPlanned : ""); },
+        exportValue: (o) => { const f = orderByFacts.get(o.orderId)!; return f.date ?? (f.absence ? soBatchOrderByAbsenceWord(f.absence) : ""); },
       },
       {
         key: "customer",
@@ -917,7 +909,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
       <PurchasingTabs />
       {/* `relative` is what lets the rail LEAVE the flow on a narrow window —
           see the rail's own class below. */}
-      <div className={`${styles.canvas} relative flex min-h-0 flex-1 overflow-hidden`}>
+      <div ref={canvasRef} className={`${styles.canvas} relative flex min-h-0 flex-1 overflow-hidden`}>
         {/* Card 02-C — the readable 240px shell. Navigation, not batch
             selection: no rail row carries a checkbox, one filter per section,
             sections combine, and the fixed rows print their live count, zero

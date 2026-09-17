@@ -437,7 +437,8 @@ describe("operation Work response composition", () => {
         destination_id: "destination-1",
         why: "Printer toner",
         approval_required: false,
-        approved_at: null,
+        /* R1 — the stored switch is history; approval is what makes it buyable. */
+        approved_at: "2026-09-01T02:00:00Z",
         refused_at: null,
         refuse_reason: null,
         for_service_case_id: null,
