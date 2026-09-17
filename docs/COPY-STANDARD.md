@@ -903,7 +903,7 @@ values are `Mattress` · `Bedframe` · `Sofa`. Selecting a category reveals its 
 this form because it belongs to the Purchase Order.
 
 **PO send wording — APPROVED / NOT BUILT (Jess, 2026-09-16).** Implement in the Purchase
-Orders round after SO Batch Round 1 and Manual Purchase Round 2, through the shared
+Orders round (after Sales Orders small patch and Manual Purchase Round 2, Jess 2026-09-17), through the shared
 `PoIssueEvidence` component on all three PO-sending surfaces; no separate build task.
 
 | Where | Exact wording |
@@ -920,27 +920,44 @@ Preserve older version sending evidence without claiming the current version is 
 Never claim supplier receipt, reading or acceptance from a sent mark. Staff send externally
 before marking; the Portal cannot observe WhatsApp sending without an API.
 
-**PURCHASE ORDERS LEFT RAIL — owner corrections 2026-08-31 / 2026-09-04 (Card 07).** The visible
-rail never calls itself `Filters`; that is the UI mechanism, not the business meaning. Exact groups
-and rows:
+**PURCHASE ORDERS REGISTER — APPROVED / NOT BUILT (Jess, 2026-09-17).**
 
-| Group | Visible rows |
+Columns, exactly: `PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
+Deliver To · GRN No · PO Version`.
+
+| Fact | Exact copy |
 |---|---|
-| `PURCHASE ORDERS` | `All purchase orders` |
-| `DOCUMENT` | `Not marked as sent` · one two-line row: `Version changed` then `Send the new version to supplier` |
-| `SUPPLIER REPLY` | `Supplier has not confirmed the PO date` · `Supplier delivery date passed` |
-| `RECEIVING` | `Partly received` · `Completed` |
+| PO document issue date (not sent-mark date) | `PO Date` |
+| GRN creation date; physical arrival stays in detail | `GRN Date` |
+| DO issue date | `DO Date` |
+| Combined arrival-date column | `Expected Delivery Date` |
+| Supplier reply missing / confirmed / changed | `Not confirmed by supplier` · `Confirmed by supplier` · `Supplier changed from {date}` |
+| Unknown original date | `Not recorded` |
+| Current version | `PO V{n}` |
+| Current version sending evidence, supporting line | `Marked as sent · {channel} · {date}` / `Not marked as sent` |
+| Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
+| Manual source in SO No column | `Manual Purchase` |
+| Goods summary | one item name / `{first item} + {n} more` |
+| Shared send-area prompt after opening channel | `Send the PDF, then press Mark as sent.` |
+| Footer | `{n} purchase orders` · `{n} of {m} purchase orders` · `1 purchase order` |
 
-The version wording is ONE selectable row and ONE count. The two lines are intentional fact/action
-ranks, not a wrapped sentence. Never render `Version changed — supplier update required`, its em
-dash, or the ambiguous phrase `supplier update required`; it sounds like Supplier master data must
-be edited. The row only filters; the actual send still completes through current-version
-confirmed-sent evidence.
+Groups: `Not marked as sent` · `Issued` · `Completed` · `Cancelled`; membership and sorting are
+owned by Purchasing MASTER §9.3. No quantity totals in the PO listing footer.
+Expansion: `SKU · Item / configuration · Qty · Deliver To` (read-only).
 
-`Not confirmed` may appear as the `Supplier Delivery Date` cell fact before a reply exists. The
-`Supplier has not confirmed the PO date` rail/work condition starts only after the current PO
-version has confirmed-sent evidence, Pending Delivery Qty is above zero and no evidenced supplier
-answer exists for that version. Never tell staff to chase a supplier before Carres sent the PO.
+| Rail group | Visible rows |
+|---|---|
+| `SUPPLIER REPLY` | `Supplier has not confirmed the PO date` · `Supplier Delivery Date changed` · `Supplier delivery date passed` |
+| `RECEIVING` | `Partly received` |
+| `SUPPLIER` | Supplier facts |
+| `DELIVER TO` | Destination facts |
+
+Supplier-reply conditions require the current version marked as sent and goods pending.
+Retire on this listing: `PO Issued`, separate `Sent to Supplier`, `Source`, separate
+`Supplier Delivery Date` / `PO Delivery Date`, `Same as PO`, `Not confirmed` as arrival cell copy,
+`PDF not sent`, `All purchase orders`, `DOCUMENT` and `Send the new version to supplier` rail text.
+Original dates, quantities, sources and version/send evidence remain authoritative in detail;
+these copy retirements do not delete business facts or ban their words on other governed surfaces.
 
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
@@ -975,7 +992,7 @@ sidebar page. Existing implementation constants do not override these approved p
 | Search | `Search Sales Order, customer, SKU or supplier…` |
 | Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
-| Register columns (owner ruling R3 2026-09-16 — exactly, in this order) | `SO No` · `Order By` · `Customer` · `Supplier` · `Proceed Date` · `Requested Delivery Date` · `Delivery Location` · `Deliver To` · `PO No` · `PO Delivery Date` |
+| Register columns (owner ruling R3 2026-09-16 — exactly, in this order) | `Proceed Date` · `SO No` · `Order By` · `Customer` · `Supplier` · `Requested Delivery Date` · `Delivery Location` · `Deliver To` · `PO No` · `PO Delivery Date` |
 | Table group headings (ruling R1 2026-09-16) | `To buy` (heading, count beside it) · `No purchase needed` (disclosure button, count beside it) |
 | Order By absence (ruling R2, split by S1 — BUILT 2026-09-17) | Three facts, three words, blank when nothing is left to buy: `Not planned` — ONLY missing setup blocks the date · `Already on a PO` — another open PO covers the remaining demand · `Coverage not checked` — whether an open PO covers it could not be verified. Never one word for all three. |
 | Footer (ruling R6) | `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order` — one total, nothing else |
@@ -1170,7 +1187,7 @@ connector line.
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — APPROVED 2026-09-16, BUILT Round 2 | `Items` · `Order By` · `Purpose` · `Supplier` · `Approval Status` · `Requested By` · `Proceed Date` · `Delivery Date` · `Deliver To` · `PO No`. `Items` is sticky and opens the object. `Order By` is engine-derived; missing setup reads `Not planned`; blank in `No purchase needed`. No request-number column. Search placeholder `Search Manual Purchases`; a failed read `Manual Purchases could not be loaded` + `Try again`. |
+| The register columns — APPROVED / NOT BUILT, date-first change, Jess 2026-09-17 | `Proceed Date` · `Items` · `Order By` · `Purpose` · `Supplier` · `Approval Status` · `Requested By` · `Delivery Date` · `Deliver To` · `PO No`. `Items` opens the object; Proceed Date and Items pin per UI MASTER §6.7. `Order By` is engine-derived; missing setup reads `Not planned`; blank in `No purchase needed`. No request-number column. Search placeholder `Search Manual Purchases`; a failed read `Manual Purchases could not be loaded` + `Try again`. |
 | Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Never apply SO Safety days. |
 | Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
 | The Approval Status facts | `Need approval` · `Approved` · `Refused` · `Withdrawn` · `Sent back for changes` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A `To buy` row's own selectability explanation may still appear, computed from the same facts the tick reads: `Approved at 0. Nothing to order.` · `Remaining quantity not checked` (title: `The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.`). A `Sent back for changes` row carries the real requester's initials avatar, title `{name} · Edit and send again`, or `Staff identity not recorded`. `No approval needed` is RETIRED (R1). |
@@ -2114,7 +2131,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | Opening a Monitor row | the chevron **`Show payment details`**; the row opens below itself; its sections **`Money · Delivery Dates · Items, Services & Stock · Storage · What to do · Collection owner · Invoice · Related Payments · Communication History`**; its doors **`Statement · Print · Create payment link · Record payment`** | Show items · Open workspace · Details |
 | The collection owner section (workspace) | **`Collection owner`** · **`Normal owner: {name}`** · **`Today's cover: {name} · until {day}`** / **`No cover today`** · **`Acting today: {name}`** · **`Responsible Delivery Operation · since {day}`** / **`Handed over · since {day}`** · **`Hand over collection`** (principal/manager) · **`New owner`** · **`Reason`** · **`Effective from`** · **`Previous owner: {name}`** · history lines **`Established · …`** / **`Handed over · {from} → {to} · {reason} · by {who} · {when} · effective from {day}`** · **`Owner facts are Operation's.`** (Finance) | Assign · Reassign · Owner · PIC · Payment Duty |
 | Communication History entries | sent messages (**`Payment message sent`** …) and recorded results (**`Customer will pay on a date · promised {day}`** · **`Customer did not answer`** …) with **`Next: {sentence}`**; empty **`No messages or results recorded yet.`** | Notes · Log · Activity |
-| Payment Records columns, in order | **`Receipt No · Paid date · Customer · SO No · Amount received · Method`** | Amount · Paid Date · Recorded |
+| Payment Records columns, in order | **`Paid date · Receipt No · Customer · SO No · Amount received · Method`** | Amount · Paid Date · Recorded |
 | The exception beside the receipt | **`VOIDED`** · **`RM {x} needs review`** | Overpaid · Duplicate? · Recorded |
 | Payment Records footer | **`{n} payments · RM {x} received`** | — |
 | Printing selected documents | **`Print {n} receipts`** (one: `Print 1 receipt`) | Export receipts · Download |
@@ -2450,7 +2467,7 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
-### The Purchase Orders Register words — owner ruling 2026-09-04 (overwrites the 2026-08-22 Work column)
+### Purchase Orders detail quantities and Register version evidence
 
 **The Register has NO `Work` column.** A Register lists documents and authoritative facts; actions
 live in My Work, Team Work, the Purchase Order detail and Order Route (the shared UI law in
@@ -2464,10 +2481,10 @@ Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is ban
 | Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
 | Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
 | The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
-| The latest PO version with `confirmed_sent` evidence, channel · date as the evidence line; else `Not marked as sent` | **`Sent to Supplier`** | Supplier Has · No current PDF |
+| Current version sending evidence, inside PO Version on the listing | **`Marked as sent · {channel} · {date}`** / **`Not marked as sent`** | Supplier Has · No current PDF |
 
-The footer totals speak the same three quantity words. Damaged, wrong and extra goods are separate
-receiving facts and never reduce `Pending Delivery Qty`.
+The three quantity words above remain in PO detail and receiving progress, not PO listing columns
+or its footer. Damaged, wrong and extra goods never reduce `Pending Delivery Qty`.
 
 The structured work sentences survive unchanged where actions live — My Work, Team Work, the PO
 detail's work card and Order Route:
@@ -2862,7 +2879,7 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `An uploaded file records what the driver sent. It is not proof accepted and not a successful delivery.` | the one sentence at the top of every attachment viewer. An upload is evidence of an upload — the portal never lets a count read as a verdict | **RULED 2026-09-11** |
 | `Not recorded` | `Driver submission` when the ledger never reached the screen. An UNKNOWN is printed as an unknown, never as a reassuring `0` | **REUSED 2026-09-11** |
 | `Showing only:` | the label opening the register's active-condition strip above the table; each live condition is a removable chip and `Clear filters` removes them all | **RULED 2026-09-11** |
-| `Reset columns` | Register Columns menu: restores the page's default visible columns, order and widths; leaves filters, permissions and records unchanged. Browser-personal preferences now; account sync deferred. | **BUILT 2026-09-17 — shared DataGrid, PR #1396** |
+| `Reset columns` | Register Columns menu: restores the page's default visible columns, order and widths; leaves filters, permissions and records unchanged. Purchase Orders per-account extension is APPROVED / NOT BUILT; other pages retain existing persistence. | **BUILT 2026-09-17 — shared DataGrid, PR #1396** |
 | `Search: {query}` | the governed Register search's chip in the `Showing only:` strip; its ✕ and `Clear filters` both empty the search (and a server search returns to the whole register) | **BUILT 2026-09-17 — shared DataGrid, PR #1396** |
 | `Row actions` | accessible name of the row menu opened by right-click, the Menu key or Shift+F10 (never drawn) | **BUILT 2026-09-17 — shared DataGrid, PR #1396** |
 | `{column}: {full value}` | accessible name of a cut cell that opens its whole value in a Popover (never drawn) | **BUILT 2026-09-17 — shared DataGrid, PR #1396** |
@@ -3417,7 +3434,7 @@ this file keeps its meaning; a word with a second meaning says so here.
 | | `That money account is not on the list.` | No account has that code. The API says it too, for a code that is not four digits. |
 | | `{code} {name} is not at RM 0.00 in the ledger. It stays in use until it is.` | Taking an account out of use while the ledger still holds money in it. |
 | Refusal (database, Staff & Duties, 0514) | `the Finance Approver must be an active Finance user` | A manager names a holder or a cover for `Finance Approver` who is not an active Finance user. |
-| Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. Since 0523 it counts every payment method row, on or off, and the two rows no screen shows: `{method}` is then `Online payment` (Stripe, the existing word) or `Card` (POS card, **PROPOSAL — PENDING APPROVAL**). |
+| Refusal (database, 0515) | `{method} still uses {code} {name}. Move {method} to another account first.` | **APPROVED — YH picked this wording on 15 Sep 2026.** Taking an account out of use while a payment method still puts its money there. Used on Finance Settings. Since 0523 it counts every payment method row, on or off, and the two rows no screen shows: `{method}` is then `Online payment` (Stripe, the existing word) or `POS card` (POS credit, debit and instalment money; **APPROVED — YH, 17 Sep 2026**; since 0525). |
 | Refusal (database, 0515) | `{code} {name} is out of use. Move {method} to another account first.` | **APPROVED — YH, 16 Sep 2026.** The same rule from the other side: turning a payment method on while its account is out of use. Built only from the approved sentence above. Used on Settings → Payment → Payment methods (the Active switch). |
 
 An empty list would show the grid's default `No data.`, which the Empty-state pattern bans. The
@@ -3455,3 +3472,20 @@ Before merging a UI change:
 Warehouse receiving summary: **Physical arrived Qty {n}** is physical arrival, separate from accepted **Received Qty {n}**. **Loading** opens the owning exact-Unit loading workspace. **Back to Outbound** returns to the preserved register.
 
 Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver confirmation.** distinguishes the Warehouse act from the driver's act. **Loading and driver confirmation recorded.** requires both facts. **Loading evidence is still missing.** names the separate evidence gap. **Open Delivery Order** opens the owning DO. A refused scan stays visible: **{Unit ID} is not a Unit this delivery order requires. Check the label and scan the required Unit.** or **{Unit ID} was already loaded. Scan a Unit still to load.** The entered ID remains available for correction or retry.
+
+### Date-first listing contract — APPROVED / NOT BUILT (Jess, 2026-09-17)
+
+Exact leading columns: Sales Orders `SO Date · SO No`; SO Batch `Proceed Date · SO No`;
+Manual Purchase `Proceed Date · Items`; Purchase Orders `PO Date · PO No`;
+Receiving `GRN Date · GRN No`; Delivery Orders `DO Date · DO No`;
+Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity alone below768px.
+Date-first adoption: Sales Orders small patch → Manual Purchase Round 2 → Purchase Orders.
+Personal saved layouts pilot on Purchase Orders only; rollout requires owner acceptance.
+
+### Personal column layouts — APPROVED / NOT BUILT (Jess, 2026-09-17)
+
+PO-only opt-in pilot in the Purchase Orders round. Exact Columns menu copy:
+`Save layout as…` · `Load layout` · `Set as my default` · `Reset columns` · `Best fit` ·
+`Expand all` · `Collapse all`. Reset returns to company defaults. Saved layouts belong only to
+one signed-in user, up to 10 per listing; their contents and responsive pinning follow UI MASTER
+§6.7. Other pages do not expose this capability until the owner accepts rollout.

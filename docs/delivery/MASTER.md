@@ -1256,7 +1256,9 @@ select-all over the visible filtered rows, the in-place same-height selection to
 showing THIS TRIP's goods lines read-only (the one `trip_groups` derivation), sticky `DO No`
 identity, search, governed per-column filters, Export, Columns and the fixed 32px footer.
 
-- **Default columns, in order:** `DO No` · `DO date` · `SO No` · `Customer` · `Status` ·
+**Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
+
+- **Default columns, in order:** `DO Date` · `DO No` · `SO No` · `Customer` · `Status` ·
   `Requested Delivery Date` · `Confirmed Delivery` · `Confirmed Time` · `Logistics` · `Delivery
   Location` · `Driver submission`. Off by default: `Goods` · `Created`. `Requested Delivery Date`
   opens no editor here; `SO No` opens the Sales Order and `DO No` the Delivery Order. `Assign

@@ -68,11 +68,13 @@ export function cartHasGoods(
   return categories.some((c) => !c || !attached.includes(c));
 }
 
-/** Formats `today + n days` as an ISO yyyy-mm-dd string. Used by the wizard
- *  Step 3 date picker's `min` attribute + the validity checks in draft.ts. */
+/** Today in Kuala Lumpur plus `leadDays`, as yyyy-mm-dd. Used by the wizard
+ *  Step 3 date picker's `min` attribute + the validity checks in draft.ts.
+ *  Malaysia is UTC+8 with no daylight saving, so moving the instant forward
+ *  8 hours makes its UTC date the KL date, whatever the machine's timezone. */
 export function minDeliveryDateISO(leadDays: number, today: Date = new Date()): string {
-  const d = new Date(today);
-  d.setDate(d.getDate() + leadDays);
+  const d = new Date(today.getTime() + 8 * 3_600_000);
+  d.setUTCDate(d.getUTCDate() + leadDays);
   return d.toISOString().slice(0, 10);
 }
 

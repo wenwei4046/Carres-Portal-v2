@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import type {
   OperationWorkItem,
   OperationWorkModule,
+  OperationWorkSourceHealth,
   OpsStaffMember,
   WorkItem,
 } from "@carres/shared";
@@ -43,16 +44,16 @@ export interface OpenWorkSet {
    * a staff email that differs from the login email is still the same person.
    */
   myUserId: string | null;
-  complete: boolean;
-  failedSources: string[];
-  /** Non-healthy sources with their last successful observation. */
-  sourceHealth: { key: OperationWorkModule; lastSuccessfulAt: string | null }[];
   /** A safe response exists (possibly from before a failed refresh). */
   hasData: boolean;
   /** The latest refresh failed while an earlier response is still held. */
   refreshFailed: boolean;
   /** When the held response was received (ms), or null. */
   lastUpdatedAt: number | null;
+  complete: boolean;
+  failedSources: string[];
+  /** Health of every source that is not current, with its last good read. */
+  unhealthySources: OperationWorkSourceHealth[];
   staff: OpsStaffMember[];
   staffById: Map<string, OpsStaffMember>;
   loading: boolean;
@@ -143,18 +144,17 @@ export function useOpenWorkSet(): OpenWorkSet {
     const myDueIsos = items.filter((item) => item.ownerId === myUserId).map((item) => item.dueIso);
     return { from: generatedOn, to: workFocusDay(generatedOn, myDueIsos) };
   }, [generatedOn, items, myUserId]);
-  const unhealthy = (query.data?.sources ?? []).filter((source) => source.state !== "healthy");
   return {
     items,
     generatedOn,
     myFocus,
     myUserId,
-    complete: query.data?.complete ?? false,
-    sourceHealth: unhealthy.map((source) => ({ key: source.key, lastSuccessfulAt: source.lastSuccessfulAt })),
     hasData: Boolean(query.data),
     refreshFailed: query.isError && Boolean(query.data),
     lastUpdatedAt: query.data && query.dataUpdatedAt ? query.dataUpdatedAt : null,
-    failedSources: unhealthy.map((source) => source.key),
+    complete: query.data?.complete ?? false,
+    failedSources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy").map((source) => source.key),
+    unhealthySources: (query.data?.sources ?? []).filter((source) => source.state !== "healthy"),
     staff,
     staffById,
     loading: !query.isError && (query.isLoading || !query.data),

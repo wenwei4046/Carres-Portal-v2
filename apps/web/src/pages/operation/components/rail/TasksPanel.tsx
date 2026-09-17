@@ -31,7 +31,7 @@ function lastUpdated(at: string | number | null): string | null {
  */
 export default function TasksPanel() {
   const {
-    items, myUserId, myFocus, sourceHealth, hasData, refreshFailed, lastUpdatedAt, error, retry,
+    items, myUserId, myFocus, unhealthySources, hasData, refreshFailed, lastUpdatedAt, error, retry,
   } = useOpenWorkSet();
   const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
   const rows = [
@@ -81,7 +81,7 @@ export default function TasksPanel() {
     );
   }
 
-  const healthy = !refreshFailed && sourceHealth.length === 0;
+  const healthy = !refreshFailed && unhealthySources.length === 0;
   const counted = rows.filter((row) => row.count > 0);
 
   return (
@@ -94,7 +94,7 @@ export default function TasksPanel() {
               <span className="block text-base-500">{lastUpdated(lastUpdatedAt)}</span>
             ) : null}
           </p>
-          {sourceHealth.map((source) => (
+          {unhealthySources.map((source) => (
             <p key={source.key}>
               <span>{`Could not refresh ${WORK_SOURCE_LABEL[source.key]}`}</span>
               {source.lastSuccessfulAt ? (
