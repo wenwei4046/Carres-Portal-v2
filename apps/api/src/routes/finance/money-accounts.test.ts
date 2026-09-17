@@ -166,6 +166,14 @@ describe("rename and take out of use", () => {
     );
     expect(wide).toContain("left join public.payment_manual_methods m on m.method = g.method");
     expect(wide).not.toContain("and m.active");
+    // 0525 renames the hidden card row to its approved screen word (COPY-STANDARD, YH 17 Sep).
+    const named = fs.readFileSync(
+      path.resolve(__dirname, "../../../../../supabase/migrations/0525_the_hidden_card_row_is_named_pos_card.sql"),
+      "utf-8",
+    );
+    expect(named).toContain("when 'card'   then 'POS card'");
+    expect(named).toContain("when 'online' then 'Online payment'");
+    expect(named).not.toContain("then 'Card'");
   });
 
   it("an unknown code is 404", async () => {
