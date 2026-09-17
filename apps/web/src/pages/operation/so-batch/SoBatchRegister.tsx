@@ -103,7 +103,8 @@ import GoodsMiniTable, {
    one. The key is the only thing that retires a saved layout. */
 /* v5 — owner ruling R3 2026-09-16 moved Supplier beside Customer. Only THIS
    register's saved layout is retired; no other page's key moves. */
-const STORAGE_KEY = "carres.soBatchPurchase.register.v5";
+/* v6 — date-first ruling (Jess 2026-09-17): Proceed Date · SO No lead and pin. */
+const STORAGE_KEY = "carres.soBatchPurchase.register.v6";
 /* R7 widths, MEASURED 2026-09-16 in the rendered portal (Inter, real header
    chrome): a column's default width is its content (cell padding 16 + rule 1 +
    the longest governed value — a cross-year date is 99px, `No delivery date
@@ -595,7 +596,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        /* THE IDENTITY — explicitly sticky, so horizontal scrolling never
+        /* THE RECORD DATE leads (ui MASTER §6.7 rule 2, Jess 2026-09-17): the
+           actual hand-off to Operations, `orders.proceeded_at`. */
+        key: "proceededAt",
+        label: W.colProceedDate,
+        width: 120, minWidth: 118,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-proceed-${o.orderId}`}>
+            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
+          </span>
+        ),
+        dateValue: (o) => o.proceededAt,
+        filterType: "date",
+        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
+        exportValue: (o) => o.proceededAt ?? "",
+      },
+      {
+        /* THE IDENTITY — pinned with the date, so horizontal scrolling never
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
@@ -689,22 +708,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName ?? "")].join(" "),
         filterValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
         exportValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
-      },
-      {
-        key: "proceededAt",
-        label: W.colProceedDate,
-        width: 120, minWidth: 118,
-        sortable: true,
-        chooserGroup: "Order",
-        accessor: (o) => (
-          <span data-testid={`so-batch-proceed-${o.orderId}`}>
-            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
-          </span>
-        ),
-        dateValue: (o) => o.proceededAt,
-        filterType: "date",
-        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
-        exportValue: (o) => o.proceededAt ?? "",
       },
       {
         key: "requestedDelivery",
@@ -1126,7 +1129,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
                 groupOf: (o) => orderByFacts.get(o.orderId)!.group,
                 revealMatches: Object.values(filter).some((value) => value != null && value !== false),
               }}
-              stickyIdentity={{ columnKey: "soNo" }}
+              leadingColumns={{ date: "proceededAt", identity: "soNo" }}
               chooserGroupOrder={["Order", "Documents", "Buying"]}
               onRowDoubleClick={openOrder}
               contextMenu={rowMenu}

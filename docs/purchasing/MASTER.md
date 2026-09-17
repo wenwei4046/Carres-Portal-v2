@@ -1149,14 +1149,17 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — APPROVED / NOT BUILT, date-first owner ruling 2026-09-17:** Proceed Date · SO No · Order By ·
+**Columns — APPROVED, date-first owner ruling 2026-09-17 · BUILT 2026-09-17:** Proceed Date · SO No · Order By ·
 Customer · Supplier · Requested Delivery Date · Delivery Location · Deliver To · PO No ·
 PO Delivery Date. Read the actual Proceed Date first, then identity, buying deadline and the remaining facts. Supplier sits beside Customer because it names who to
 buy from; a multi-supplier order still answers exactly what to buy from each in its Goods expansion. `Proceed Date` and `SO No` pin at canvas ≥768px; below768px only `SO No` pins. `Proceed Date`
 reads `orders.proceeded_at`: the actual date Sales handed the complete order to Operations. It
 never reads `orders.proceed_date`, the planned production-start date. The saved column layout key
-is `…register.v5` for the R3 order, because a stored arrangement would otherwise pin a returning
-operator to the retired order.
+is `…register.v6` for the date-first order, because a stored arrangement would otherwise pin a
+returning operator to the retired order; the engine's `leadingColumns` also refuses to let any saved
+layout hide or move the pair. Rendered at 1440 in the shell with the rail open (885px grid):
+Proceed Date · SO No pinned, Order By · Customer · Supplier · Requested Delivery Date fully visible,
+no cut value; Delivery Location onward scrolls under the pinned pair.
 
 - **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
   `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
@@ -1719,14 +1722,18 @@ Use earliest Order By first for pending/buying work, undated `Not planned` after
 then newest Proceed Date; the lower history group uses newest Proceed Date. Header sorting
 acts within groups. Search, column filters and export retain accurate source values.
 
-**Columns — APPROVED / NOT BUILT (Jess, 2026-09-17), exactly in this order:**
+**Columns — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, exactly in this order:**
 
 ```text
 Proceed Date · Items · Order By · Purpose · Supplier · Approval Status · Requested By ·
 Delivery Date · Deliver To · PO No
 ```
 
-`Proceed Date` and `Items` are pinned at canvas ≥768px; below that only `Items` is pinned.
+`Proceed Date` and `Items` are pinned at canvas ≥768px; below that only `Items` is pinned
+(engine `leadingColumns`, layout key `carres.manualPurchase.register.v6`). Rendered at 1440 in the
+shell with the rail open (900px grid): Proceed Date · Items · Order By · Purpose · Supplier fully
+visible, no cut value; Approval Status onward scrolls. 🟡 Approval Status was visible before the date
+joined and is now 50px past the edge; the group headings still state `Need approval`.
 `Items` is the business identity and single-click entrance to the object. Use the same
 responsive search, palette and measured column-width rules as SO Batch Purchase. Content
 sets default width; a complete two-line header and its controls set the minimum. Reuse the

@@ -189,13 +189,22 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
+**Date-first listing — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below 768px; neither can be hidden or moved (engine `leadingColumns`, layout key `…register.v5`). Personal account layouts remain PO-only until owner acceptance.
 
-The approved default columns remain:
+The approved default columns:
 
 ```
 SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
+
+**Widths re-measured for the date-first order (rendered shell fixture, 1440, Inter, 2026-09-17):**
+SO Date 118 (another year `Wed, 28 May 25` needs 117 — the 🟡 cross-year cut is closed) · SO No 80 ·
+Requested Delivery Date 120 (amber `No delivery date` needs 119) · Customer 170 · Delivery Location 160
+(`Sungai Buloh, Selangor`; the longest live `Port Dickson, Negeri Sembilan` opens whole) · Showroom 118
+(longest live outlet `Kota Damansara` needs 117; 100 cut it) · PO No 152 · DO No 144. Total with the
+gutter 1125px = the grid's client width at 1440 when the vertical scrollbar is drawn; every default is
+fully visible and nothing scrolls sideways. 1180: both pinned, the rest scrolls under. 820 / 720 (200% of
+1440) / 390: SO No pins alone at 72px, SO Date scrolls under it, no page sideways scroll.
 
 **Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
 Order was created (`orders.placed_at`). It is one read-only fact and uses that exact label in the
@@ -217,7 +226,7 @@ FILTERS    active search + header filters shown as conditions · one `Clear filt
            footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = the server's count
            (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
            unknown total → `{n} sales orders`, never a guessed `of`
-IDENTITY   SO No pinned and a door to the order
+IDENTITY   SO Date · SO No lead and pin (SO No alone below 768px); SO No is a door to the order
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
@@ -231,23 +240,18 @@ NARROW     toolbar wraps and stays usable · grid scrolls itself · no page side
 
 **Status — BUILT, [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396) (on the
 shared register of PR #1395).** The page runs `palette="slate"` and the responsive search; the
-page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 100 ·
-Requested Delivery Date 128 · Customer 188 · Delivery Location 172 · Showroom 100 · PO No 152 ·
-DO No 144); Customer and Delivery Location open a cut value whole (engine `overflowText`). The
-error state is the kit error inside the work surface, so the toolbar and `New Sales Order` stay.
-Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No fully visible;
-1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
-200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
+page-local hex theme is deleted. Default widths are content-measured (current values in the
+date-first block above); Customer and Delivery Location open a cut value whole (engine
+`overflowText`). The error state is the kit error inside the work surface, so the toolbar and
+`New Sales Order` stay. Keyboard: one Tab stop, ↓/End, Shift+F10 menu, Escape back, Enter opens the order;
 search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
 returns `24 sales orders`. **Total follow-up (2026-09-17):** `{m}` is no longer the loaded rows or a
 remembered number — `GET /api/operation/orders` returns `salesOrderTotal`, one head-only exact count
 under the caller's RLS (same stage/channel, `source_system` null or not `rental`, search not
 applied), re-read with every list refresh (create/cancel invalidate the list). Rendered: fixture
 total 612 → `24 of 612` and, searching, `3 of 612`; total unknown → `24 sales orders` / `3 sales
-orders`. SO Date widened 96 → 100 after the signed-in production walk showed `Wed, 19 A…` (widest
-current-year date 81.3px). 🟡 A date from another year (`Wed, 28 May 2025`, 116px) needs 132px in
-both date columns and is still cut; resolving it without losing DO No at 1440 is owed. The production SHA is recorded on the PR. **Owed:** the authenticated
-owner walk in production (fixture evidence is not production evidence).
+orders`. The production SHA is recorded on the PR. **Owed:** the authenticated owner walk in
+production of the date-first order (fixture evidence is not production evidence).
 
 ### The two-line cell law
 

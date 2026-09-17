@@ -1706,13 +1706,13 @@ describe("R2 · the ten columns, in the approved order", () => {
       .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
       .filter((t) => t !== "");
     expect(heads).toEqual([
+      "Proceed Date",
       "Items",
       "Order By",
       "Purpose",
       "Supplier",
       "Approval Status",
       "Requested By",
-      "Proceed Date",
       "Delivery Date",
       "Deliver To",
       "PO No",
@@ -1737,11 +1737,16 @@ describe("R2 · the ten columns, in the approved order", () => {
     }
   });
 
-  it("the sticky identity is `Items` — the column the entrance lives on", async () => {
+  it("Proceed Date · Items lead and BOTH pin on a wide canvas — the entrance lives on Items", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
     expect(entrance).toHaveTextContent("Ohana 2 Seater");
-    expect(entrance.closest("td")?.className ?? "").toMatch(/sticky|Sticky/);
+    const itemsCell = entrance.closest("td")!;
+    expect(itemsCell.className).toMatch(/sticky|Sticky/);
+    const dateCell = itemsCell.previousElementSibling as HTMLElement;
+    expect(dateCell.className).toMatch(/sticky|Sticky/);
+    expect(dateCell.style.left).not.toBe("");
+    expect((itemsCell.nextElementSibling as HTMLElement).style.left).toBe("");
   });
 
   it("R2 default order: waiting · Order By · Not planned · history newest first", async () => {

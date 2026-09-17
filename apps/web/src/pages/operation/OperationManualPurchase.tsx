@@ -705,6 +705,24 @@ export default function OperationManualPurchase() {
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
       {
+        /* The record date leads (ui MASTER §6.7 rule 2, Jess 2026-09-17). */
+        key: "proceed_date",
+        label: MW.colProceedDate,
+        headerLines: ["Proceed", "Date"],
+        width: 112,
+        minWidth: 94,
+        sortable: true,
+        chooserGroup: "Request",
+        filterType: "date",
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => (
+          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
+        ),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        exportValue: (r) => r.proceedDate.slice(0, 10),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
+      },
+      {
         key: "items",
         label: MW.colItems,
         wrap: true,
@@ -847,23 +865,6 @@ export default function OperationManualPurchase() {
         searchValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
         filterValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
         exportValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
-      },
-      {
-        key: "proceed_date",
-        label: MW.colProceedDate,
-        headerLines: ["Proceed", "Date"],
-        width: 112,
-        minWidth: 94,
-        sortable: true,
-        chooserGroup: "Request",
-        filterType: "date",
-        dateValue: (r) => r.proceedDate,
-        accessor: (r) => (
-          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
-        ),
-        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        exportValue: (r) => r.proceedDate.slice(0, 10),
-        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
       },
       {
         key: "delivery_date",
@@ -1174,8 +1175,9 @@ export default function OperationManualPurchase() {
             columns={columns}
             onFilteredRowsChange={setGridRows}
             /* v5 — round 2 changed the column set and order, so a saved v4
-               layout must not replay the old nine columns over the new ten. */
-            storageKey="carres.manualPurchase.register.v5"
+               layout must not replay the old nine columns over the new ten.
+               v6 — Proceed Date · Items lead and pin (Jess 2026-09-17). */
+            storageKey="carres.manualPurchase.register.v6"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
             exportName="Manual Purchase"
@@ -1216,7 +1218,7 @@ export default function OperationManualPurchase() {
               groupOf: (r) => r.group,
               revealMatches: activeConditions.length > 0,
             }}
-            stickyIdentity={{ columnKey: "items" }}
+            leadingColumns={{ date: "proceed_date", identity: "items" }}
             chooserGroupOrder={["Request", "Buying", "Documents"]}
             onRowDoubleClick={openRequest}
             contextMenu={rowMenu}
