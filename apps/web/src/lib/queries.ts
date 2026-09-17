@@ -3563,10 +3563,15 @@ export interface operationPoListRow {
   sources?: Array<{
     kind: "sales_order" | "manual_purchase";
     reference: string;
+    /** A sales_order source's order id, so one SO number opens its order. */
+    order_id?: string | null;
     request_id?: string | null;
     purpose?: string | null;
     proceed_date?: string | null;
   }>;
+  /** Posted receipts of this PO (`warehouse_receipts` with a GRN number),
+   *  oldest first. Absent on an older Worker — treat as unknown, not none. */
+  grns?: Array<{ id: string; grn_no: string }>;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
@@ -5135,6 +5140,51 @@ export function useRecordSupplierDate(poId: string | null) {
  * What LEFT Carres (0312) — one POST per send. The REVISION comes back from
  * the server: a send mints one only when the document changed since the last.
  */
+/**
+ * Personal saved column layouts (0528; ui MASTER §6.7 rule 4). Purchase Orders
+ * is the only pilot listing. Reads and writes run as the signed-in person.
+ */
+export type RegisterLayoutListing = "purchase_orders";
+export interface RegisterLayoutRow {
+  id: string;
+  name: string;
+  layout: { order: string[]; hidden: string[]; widths: Record<string, number>; sort: { key: string; dir: "asc" | "desc" } | null };
+  is_default: boolean;
+}
+export function useRegisterLayouts(listing: RegisterLayoutListing) {
+  return useQuery({
+    queryKey: ["register-layouts", listing],
+    queryFn: () =>
+      apiFetch<{ layouts: RegisterLayoutRow[]; limit: number }>(
+        `/api/operation/register-layouts?listing=${listing}`,
+      ),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+export function useSaveRegisterLayout(listing: RegisterLayoutListing) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; layout: RegisterLayoutRow["layout"] }) =>
+      apiFetch<{ layout: RegisterLayoutRow }>("/api/operation/register-layouts", {
+        method: "POST",
+        body: JSON.stringify({ listing, ...input }),
+      }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["register-layouts", listing] }),
+  });
+}
+export function useSetDefaultRegisterLayout(listing: RegisterLayoutListing) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ layout: RegisterLayoutRow }>(
+        `/api/operation/register-layouts/${encodeURIComponent(id)}/default`,
+        { method: "POST" },
+      ),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["register-layouts", listing] }),
+  });
+}
+
 export function useRecordSend(poId: string | null) {
   const qc = useQueryClient();
   return useMutation({

@@ -6,9 +6,13 @@ import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
 
 /**
- * WHAT ACTUALLY REACHED THE SUPPLIER
- * (CARD-2026-08-22-purchasing-02 §5.3; `docs/purchasing/MASTER.md` §5.6;
- * migrations 0377 · 0378).
+ * WHAT A PERSON MARKED AS SENT
+ * (CARD-2026-08-22-purchasing-02 §5.3; `docs/purchasing/MASTER.md` §5.6 / §9.3;
+ * migrations 0377 · 0378; send wording Jess 2026-09-16/17).
+ *
+ * Without a WhatsApp API the Portal cannot see a PDF leave. Staff send it
+ * externally, then press `Mark as sent`. The mark is that person's statement
+ * of sending — never proof the supplier received, read or accepted it.
  *
  * ── THE ONE DISTINCTION THIS COMPONENT EXISTS TO HOLD ───────────────────────
  *
@@ -18,7 +22,7 @@ import type { PoTemplateData } from "@/lib/pdf/types";
  * interrupted, and never paste the file. That exact sequence is how a purchase
  * order used to go missing while the Portal said it was sent.
  *
- * `Record the PDF sent` is the ACT. It is deliberately not a tick-box: a
+ * `Mark as sent` is the ACT. It is deliberately not a tick-box: a
  * tick-box says "I say so", while a recipient is a fact anybody can check
  * against the supplier later.
  *
@@ -185,7 +189,11 @@ export default function PoIssueEvidence({
   onConfirmed: () => void;
 }) {
   const [channel, setChannel] = useState<SendChannel>("whatsapp");
-  const [recipient, setRecipient] = useState("");
+  /* `null` until the person types: the recipient then prefills from the
+     Supplier Master record for the chosen channel (group link or chat number
+     for WhatsApp, address for email). It is never the supplier's name. */
+  const [typedRecipient, setTypedRecipient] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState<string | null>(null);
@@ -203,6 +211,13 @@ export default function PoIssueEvidence({
     () => evidence.filter((e) => e !== confirmed),
     [evidence, confirmed],
   );
+  const prefill =
+    channel === "whatsapp"
+      ? po.whatsappGroupUrl?.trim() || po.contact?.trim() || ""
+      : channel === "email"
+        ? po.contactEmail?.trim() || ""
+        : "";
+  const recipient = typedRecipient ?? prefill;
   const ready = recipient.trim().length > 0 && !saving && !confirmed;
   const wa = doors?.whatsapp ?? null;
 
@@ -289,16 +304,21 @@ export default function PoIssueEvidence({
     <div className="flex h-full flex-col" data-testid={`so-batch-evidence-${po.id}`}>
       <h2 className="text-body font-semibold">
         {confirmed
-          ? `${po.id} · Version ${version} reached ${supplier}`
-          : `${po.id} · Version ${version} has not reached ${supplier}`}
+          ? `${po.id} · PO V${version} · Marked as sent`
+          : `${po.id} · PO V${version} · Not marked as sent`}
       </h2>
-      <p className="mt-0.5 text-meta text-kit-slate-11">
-        {confirmed
-          ? `${CHANNEL_WORD[confirmed.channel] ?? confirmed.channel}${
-              confirmed.recipient ? ` to ${confirmed.recipient}` : ""
-            }${sendActorContext(confirmed)} · ${fmtDate(confirmed.sent_at, { time: true })}`
-          : `Open the ${CHANNEL_WORD[channel]} group and send this PDF`}
-      </p>
+      {confirmed ? (
+        <p className="mt-0.5 text-meta text-kit-slate-11">
+          {`${CHANNEL_WORD[confirmed.channel] ?? confirmed.channel}${
+            confirmed.recipient ? ` to ${confirmed.recipient}` : ""
+          }${sendActorContext(confirmed)} · ${fmtDate(confirmed.sent_at, { time: true })}`}
+        </p>
+      ) : opened ? (
+        /* Opening a channel records nothing; it only earns the reminder. */
+        <p className="mt-0.5 text-meta text-kit-slate-11" role="status" data-testid="po-send-prompt">
+          Send the PDF, then press Mark as sent.
+        </p>
+      ) : null}
 
       {/* ── THE ONE COMMUNICATION AREA (closure §7) ─────────────────────
           Every door out of the Portal for this document lives here. They OPEN
@@ -311,7 +331,7 @@ export default function PoIssueEvidence({
             href={wa.url}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => onOpened?.("whatsapp")}
+            onClick={() => { setOpened(true); setChannel("whatsapp"); onOpened?.("whatsapp"); }}
           >
             {wa.isGroup ? "Open WhatsApp group" : "Open WhatsApp"}
           </a>
@@ -327,7 +347,7 @@ export default function PoIssueEvidence({
             data-testid="po-open-email"
             className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 px-2.5 text-meta font-medium"
             href={doors.mailto}
-            onClick={() => onOpened?.("email")}
+            onClick={() => { setOpened(true); setChannel("email"); onOpened?.("email"); }}
           >
             Open email
           </a>
@@ -388,10 +408,9 @@ export default function PoIssueEvidence({
           <input
             className="h-7 min-w-[200px] rounded-control border border-kit-slate-6 px-1.5 text-meta"
             data-testid="so-batch-evidence-recipient"
-            placeholder="Hooka Purchasing Group"
             value={confirmed ? (confirmed.recipient ?? "") : recipient}
             disabled={!!confirmed}
-            onChange={(e) => setRecipient(e.target.value)}
+            onChange={(e) => setTypedRecipient(e.target.value)}
           />
         </label>
         {error ? (
@@ -409,7 +428,7 @@ export default function PoIssueEvidence({
             disabled={!ready}
             onClick={() => void confirm()}
           >
-            Record the PDF sent
+            Mark as sent
           </button>
         )}
       </div>
@@ -429,8 +448,8 @@ export default function PoIssueEvidence({
                   proof that the current document reached the supplier — which
                   is the whole point of a revision (0378; closure §8). */}
               {e.kind === "confirmed_sent"
-                ? `Version ${e.po_version ?? "?"} sent to ${e.recipient ?? "supplier"} by ${
-                    CHANNEL_WORD[e.channel] ?? e.channel
+                ? `PO V${e.po_version ?? "?"} marked as sent · ${CHANNEL_WORD[e.channel] ?? e.channel}${
+                    e.recipient ? ` · ${e.recipient}` : ""
                   }${e.sent_by_name ? ` · ${e.sent_by_name}` : ""}`
                 : `${CHANNEL_WORD[e.channel] ?? e.channel} opened${
                     e.sent_by_name ? ` · ${e.sent_by_name}` : ""

@@ -385,9 +385,12 @@ remain. PR #1105 carries the dependent application and deployment proof.
 
 ### 5.6 Issue means the PDF was actually sent
 
-**APPROVED / NOT BUILT — Jess, 2026-09-16.** Implement this wording and grouping in the
-Purchase Orders round after the Sales Orders small patch and Manual Purchase Round 2 (Jess, 2026-09-17). Coordinate shared-file ownership
-with running lanes; no separate task for the shared sending wording.
+**APPROVED (Jess, 2026-09-16) · BUILT 2026-09-17 in the Purchase Orders round.** The shared
+`PoIssueEvidence` now says `{PO No} · PO V{n} · Marked as sent` / `Not marked as sent`, the act is
+`Mark as sent`, `Send the PDF, then press Mark as sent.` appears only after Open WhatsApp / Open
+email, and the recipient prefills from the Supplier Master for the chosen channel (group link or
+chat number; email address) or is typed — never the supplier name. Shared completion wording is
+`Current PO version marked as sent`.
 
 Without a WhatsApp API the Portal cannot observe whether a PO was sent. Staff actually send the
 PDF externally, then press `Mark as sent` in the one shared communication area (`PoIssueEvidence`)
@@ -490,7 +493,9 @@ Completed
 Cancelled
 ```
 
-**Group classification — APPROVED / NOT BUILT.** Evaluate in this order so each PO belongs
+**Group classification — APPROVED · BUILT 2026-09-17** (`purchaseOrderRegisterFacts().group`;
+a line read that returned no quantity is `quantitiesKnown: false`, never zero, never Completed
+unless the stored status is `received`). Evaluate in this order so each PO belongs
 to exactly one group: `Cancelled` → `Completed` → `Issued` (current version marked as sent
 and goods still pending) → `Not marked as sent`. Reuse the authoritative cancellation,
 completion and quantity facts; an unknown read is never silently zero. A completed PO without
@@ -2017,12 +2022,24 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
-**APPROVED / NOT BUILT — Jess, 2026-09-17.** Build after the documentation PR, Sales Orders small patch and Manual Purchase Round 2.
-Purchase Orders pilots personal saved layouts in this same round; enable the shared DataGrid
-capability here only. Follow UI MASTER §4.1/§6.7: owner-private, per-account, up to 10 layouts
-per listing, saving order/widths/visibility/sort but not search/filters/group state. Other pages
-retain current layout persistence until owner acceptance and rollout approval.
-Reuse shared capabilities and coordinate shared-file ownership with running lanes.
+**APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots personal saved
+layouts; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
+owner-private, per-account, up to 10 layouts per listing, saving order/widths/visibility/sort but
+not search/filters/group state. Other pages retain current layout persistence until owner
+acceptance and rollout approval.
+
+**Build record (2026-09-17).** Layout key `carres.purchaseOrders.register.v2`; `leadingColumns`
+pins `PO Date · PO No` (PO No alone below 768px). `GET /api/operation/pos` now carries each PO's
+numbered GRNs (`warehouse_receipts.grn_no`, drafts excluded) and each SO source's `order_id`.
+Personal layouts: migration `0528` table `register_personal_layouts` — RLS SELECT own rows only
+(`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from `authenticated`, writes only through
+`register_layout_save` / `register_layout_set_default` acting on `auth.uid()`; a shape check
+refuses any key but order/hidden/widths/sort; 10 per person per listing; one default. Routes
+`/api/operation/register-layouts` run as the caller. Measured in the shell at 1440 with the rail
+open (885px grid): PO Date 118 · PO No 132 · Supplier 128 · SO No 123 · Items 145 · Expected
+Delivery Date 207 exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 ·
+GRN No 132 · PO Version 236 scroll. The rail now uses the shared `useFilterRailOpen` (hidden by
+default below 896px). **Owed:** authenticated production walk.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.

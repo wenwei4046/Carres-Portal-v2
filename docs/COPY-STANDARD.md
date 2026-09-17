@@ -906,7 +906,7 @@ values are `Mattress` · `Bedframe` · `Sofa`. Selecting a category reveals its 
 `Production Days`; never show or save one generic supplier lead time. A PO date never appears in
 this form because it belongs to the Purchase Order.
 
-**PO send wording — APPROVED / NOT BUILT (Jess, 2026-09-16).** Implement in the Purchase
+**PO send wording — APPROVED (Jess, 2026-09-16) · BUILT 2026-09-17 in `PoIssueEvidence`.** Implement in the Purchase
 Orders round (after Sales Orders small patch and Manual Purchase Round 2, Jess 2026-09-17), through the shared
 `PoIssueEvidence` component on all three PO-sending surfaces; no separate build task.
 
@@ -924,7 +924,7 @@ Preserve older version sending evidence without claiming the current version is 
 Never claim supplier receipt, reading or acceptance from a sent mark. Staff send externally
 before marking; the Portal cannot observe WhatsApp sending without an API.
 
-**PURCHASE ORDERS REGISTER — APPROVED / NOT BUILT (Jess, 2026-09-17).**
+**PURCHASE ORDERS REGISTER — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.**
 
 Columns, exactly: `PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
 Deliver To · GRN No · PO Version`.
@@ -3477,7 +3477,7 @@ Warehouse receiving summary: **Physical arrived Qty {n}** is physical arrival, s
 
 Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver confirmation.** distinguishes the Warehouse act from the driver's act. **Loading and driver confirmation recorded.** requires both facts. **Loading evidence is still missing.** names the separate evidence gap. **Open Delivery Order** opens the owning DO. A refused scan stays visible: **{Unit ID} is not a Unit this delivery order requires. Check the label and scan the required Unit.** or **{Unit ID} was already loaded. Scan a Unit still to load.** The entered ID remains available for correction or retry.
 
-### Date-first listing contract — APPROVED / NOT BUILT (Jess, 2026-09-17)
+### Date-first listing contract — APPROVED (Jess, 2026-09-17) · BUILT on Sales Orders, SO Batch, Manual Purchase and Purchase Orders 2026-09-17
 
 Exact leading columns: Sales Orders `SO Date · SO No`; SO Batch `Proceed Date · SO No`;
 Manual Purchase `Proceed Date · Items`; Purchase Orders `PO Date · PO No`;
@@ -3486,10 +3486,15 @@ Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity
 Date-first adoption: Sales Orders small patch → Manual Purchase Round 2 → Purchase Orders.
 Personal saved layouts pilot on Purchase Orders only; rollout requires owner acceptance.
 
-### Personal column layouts — APPROVED / NOT BUILT (Jess, 2026-09-17)
+### Personal column layouts — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, Purchase Orders only
 
 PO-only opt-in pilot in the Purchase Orders round. Exact Columns menu copy:
 `Save layout as…` · `Load layout` · `Set as my default` · `Reset columns` · `Best fit` ·
 `Expand all` · `Collapse all`. Reset returns to company defaults. Saved layouts belong only to
 one signed-in user, up to 10 per listing; their contents and responsive pinning follow UI MASTER
 §6.7. Other pages do not expose this capability until the owner accepts rollout.
+
+Supporting copy (BUILT 2026-09-17): the name field `Layout name` and its button `Save`; the
+refusals `You can keep 10 layouts. Save under an existing name to replace one.` ·
+`The layout could not be saved. Try again.` · `Your default could not be saved. Try again.`
+Purchase Orders rail: `All suppliers` · `All destinations`; row disclosure hover `Show goods`.

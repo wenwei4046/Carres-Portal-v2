@@ -340,6 +340,8 @@ export default function GoodsMiniTable({
   showPoDeliveryDate = false,
   showPoNo = false,
   showUnitId = true,
+  showCategory = true,
+  itemHeading,
   onPoClick,
   onOpenPoDetails,
 }: {
@@ -414,6 +416,13 @@ export default function GoodsMiniTable({
    * MASTER rather than fake a read.
    */
   showUnitId?: boolean;
+  /**
+   * Purchase Orders (MASTER §9.3, Jess 2026-09-17) reads the ordered goods as
+   * exactly `SKU · Item / configuration · Qty · Deliver To`: it omits Category
+   * and names the item column for what it shows. Every other caller keeps both.
+   */
+  showCategory?: boolean;
+  itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
@@ -440,7 +449,7 @@ export default function GoodsMiniTable({
     deliverTo: { ...CHILD_COLUMNS[2] },
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
-    item: { ...CHILD_COLUMNS[5] },
+    item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -456,6 +465,7 @@ export default function GoodsMiniTable({
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     unit: showUnitId,
+    category: showCategory,
     supplier: showSupplier,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,

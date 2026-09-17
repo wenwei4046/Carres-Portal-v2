@@ -2,10 +2,10 @@
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, useFilterRailOpen } from "../components/workspace-rail";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
@@ -25,11 +25,12 @@ import {
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
 } from "@carres/shared";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   DataGrid,
   type DataGridColumn,
   type DataGridContextMenuItem,
+  type DataGridPersonalLayouts,
 } from "@/components/register/DataGrid";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import { apiFetch } from "@/lib/api";
@@ -52,7 +53,10 @@ import {
   usePoReceiving,
   useRecordSend,
   useRecordSupplierDate,
+  useRegisterLayouts,
   useRevisePo,
+  useSaveRegisterLayout,
+  useSetDefaultRegisterLayout,
   useWorkspaceDuties,
   type operationPoListRow,
   type SupplierRow,
@@ -60,51 +64,47 @@ import {
 import { workspaceDutyActor } from "../workspace-duty-owner";
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
+import GoodsMiniTable, { type GoodsMiniLine } from "../components/GoodsMiniTable";
+import { lineConfigBits } from "../../dealer/new-order/special-addons-picker";
 
-// Card 07 (owner correction 2026-08-31): the rail explains the business
-// dimension, never the UI mechanism — grouped rows, no visible `Filters`
-// heading. `action` renders a deliberate second line (fact, then the act),
-// not a wrapped sentence; the row stays ONE button with ONE count on the
-// same `supplier_update_required` key.
-type RailRow = { key: PurchaseOrderRegisterFilter; label: string; action?: string };
+/* ⭐ THE RAIL — Purchasing MASTER §9.3 (Jess, 2026-09-17). Facts that narrow
+   the listing, and nothing that the four groups already say: no `All purchase
+   orders` row, no DOCUMENT group, no action sentence. SUPPLIER REPLY counts
+   only current versions marked as sent with goods still pending. */
+type RailRow = { key: PurchaseOrderRegisterFilter; label: string };
 
 const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
-  {
-    heading: "DOCUMENT",
-    rows: [
-      { key: "pdf_not_sent", label: "PDF not sent" },
-      {
-        key: "supplier_update_required",
-        label: "Version changed",
-        action: "Send the new version to supplier",
-      },
-    ],
-  },
   {
     heading: "SUPPLIER REPLY",
     rows: [
       { key: "supplier_date_missing", label: "Supplier has not confirmed the PO date" },
+      { key: "supplier_date_changed", label: "Supplier Delivery Date changed" },
       { key: "supplier_date_passed", label: "Supplier delivery date passed" },
     ],
   },
   {
     heading: "RECEIVING",
-    rows: [
-      { key: "partly_received", label: "Partly received" },
-      { key: "completed", label: "Completed" },
-    ],
-  },
-  /* A cancelled purchase order is kept, never deleted — so there must be a way
-     to look at one. Until 2026-09-01 the only door was the `PO Issued` funnel,
-     which offered document states on a column of timestamps (defect 27). The
-     funnel is a date filter now, so the state gets a row of its own. */
-  {
-    heading: "DOCUMENT STATE",
-    rows: [{ key: "cancelled", label: "Cancelled" }],
+    rows: [{ key: "partly_received", label: "Partly received" }],
   },
 ];
 
 const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
+
+/* The four governed groups, in display order: the two open headings first,
+   then the collapsed history. Membership is the shared classifier's. */
+const PO_GROUPS = [
+  { key: "not_marked_as_sent", label: "Not marked as sent", alwaysOpen: true },
+  { key: "issued", label: "Issued", alwaysOpen: true },
+  { key: "completed", label: "Completed", initiallyCollapsed: true },
+  { key: "cancelled", label: "Cancelled", initiallyCollapsed: true },
+] as const;
+
+type RailFilter = {
+  facet: PurchaseOrderRegisterFilter | null;
+  supplier: string | null;
+  deliverTo: string | null;
+};
+const RAIL_CLEAR: RailFilter = { facet: null, supplier: null, deliverTo: null };
 
 type RegisterRow = {
   id: string;
@@ -115,10 +115,58 @@ type RegisterRow = {
   sourceSearch: string;
   deliverTo: string;
   supplierDate: string | null;
+  /** `PO Date` — the issue/document date the PO number carries. */
+  poDate: string | null;
+  soSources: Array<{ reference: string; orderId: string | null }>;
+  hasManualSource: boolean;
+  items: string[];
   input: PurchaseOrderRegisterInput;
   facts: PurchaseOrderRegisterFacts;
   work: ReturnType<typeof purchaseOrderWork>;
 };
+
+/**
+ * `PO Date` (ui MASTER §6.7 rule 2): the document date the number itself
+ * carries (`PO-YYYYMMDD-NNNN`), never the sent-mark date. A number without a
+ * date (legacy) falls back to the stored placement date; nothing is invented.
+ */
+export function poDateOf(po: Pick<operationPoListRow, "id" | "placed_at">): string | null {
+  const m = /^PO-(\d{4})(\d{2})(\d{2})-/.exec(po.id);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (!po.placed_at) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date(po.placed_at));
+}
+
+/** One name per distinct item, in line order: `Cody · King`, else the SKU. */
+function itemNamesOf(po: operationPoListRow): string[] {
+  const names: string[] = [];
+  for (const line of po.purchase_order_lines ?? []) {
+    const name = [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku;
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/** `{first item} + {n} more` (COPY-STANDARD, Purchase Orders register). */
+function itemsSummary(names: readonly string[]): string {
+  if (names.length === 0) return "";
+  return names.length === 1 ? names[0]! : `${names[0]} + ${names.length - 1} more`;
+}
+
+/* Default reading order per group (MASTER §9.3): not marked by PO Delivery
+   Date, Issued by Expected Delivery Date, history newest PO Date first.
+   An unknown date sorts after every known one — explicit, never invented. */
+const GROUP_RANK: Record<string, number> = { not_marked_as_sent: 0, issued: 1, completed: 2, cancelled: 3 };
+function compareDefault(a: RegisterRow, b: RegisterRow): number {
+  const ga = a.facts.group;
+  const gb = b.facts.group;
+  if (ga !== gb) return GROUP_RANK[ga]! - GROUP_RANK[gb]!;
+  const asc = (x: string | null, y: string | null) =>
+    x === y ? 0 : x == null ? 1 : y == null ? -1 : x.localeCompare(y);
+  if (ga === "not_marked_as_sent") return asc(a.po.official_delivery_date ?? null, b.po.official_delivery_date ?? null) || a.id.localeCompare(b.id);
+  if (ga === "issued") return asc(a.facts.expected.date, b.facts.expected.date) || a.id.localeCompare(b.id);
+  return asc(b.poDate, a.poDate) || b.id.localeCompare(a.id);
+}
 
 function todayMYT(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
@@ -158,11 +206,15 @@ function toRegisterInput(po: operationPoListRow, supplierName: string): Purchase
     status: po.status,
     version: po.version ?? 1,
     supplierDate: supplierDateOf(po),
+    originalDate: po.official_delivery_date ?? null,
     expectedReadyDate: po.expected_ready_date ?? null,
-    lines: po.purchase_order_lines.map((line) => ({
-      qty: line.qty,
-      receivedQty: line.received_qty,
-    })),
+    /* A missing line read stays unknown — never zero, never Completed. */
+    lines: Array.isArray(po.purchase_order_lines)
+      ? po.purchase_order_lines.map((line) => ({
+          qty: line.qty ?? null,
+          receivedQty: line.received_qty ?? null,
+        }))
+      : null,
     sends: (po.sends ?? []).map((send) => ({
       kind: send.kind ?? null,
       channel: send.channel,
@@ -213,22 +265,39 @@ export default function PurchaseOrdersPage() {
   const dutyQ = useWorkspaceDuties();
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
   const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<PurchaseOrderRegisterFilter | null>(null);
-  const [railOpen, setRailOpen] = useState(() => {
-    try {
-      return localStorage.getItem("carres.purchaseOrders.filterRail") !== "0";
-    } catch {
-      return true;
-    }
-  });
-  const setRailVisible = (open: boolean) => {
-    setRailOpen(open);
-    try {
-      localStorage.setItem("carres.purchaseOrders.filterRail", open ? "1" : "0");
-    } catch {
-      // The toggle still works when browser storage is unavailable.
-    }
-  };
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<RailFilter>(RAIL_CLEAR);
+  /* The personal saved-layout pilot (ui MASTER §6.7 rule 4). A failed read
+     leaves the Columns menu without saved layouts; the register still works. */
+  const layoutsQ = useRegisterLayouts("purchase_orders");
+  const saveLayout = useSaveRegisterLayout("purchase_orders");
+  const setDefaultLayout = useSetDefaultRegisterLayout("purchase_orders");
+  const personalLayouts = useMemo<DataGridPersonalLayouts>(() => ({
+    layouts: (layoutsQ.data?.layouts ?? []).map((l) => ({ id: l.id, name: l.name, layout: l.layout, isDefault: l.is_default })),
+    limit: layoutsQ.data?.limit ?? 10,
+    onSave: async (name, layout) => {
+      try {
+        await saveLayout.mutateAsync({ name, layout });
+      } catch (e) {
+        const code = (e as { body?: { code?: string } }).body?.code;
+        throw new Error(code === "register_layout_limit"
+          ? "You can keep 10 layouts. Save under an existing name to replace one."
+          : "The layout could not be saved. Try again.");
+      }
+    },
+    onSetDefault: async (id) => {
+      try {
+        await setDefaultLayout.mutateAsync(id);
+      } catch {
+        throw new Error("Your default could not be saved. Try again.");
+      }
+    },
+  }), [layoutsQ.data, saveLayout, setDefaultLayout]);
+  /* The shared purchasing rail law (S3): a remembered choice wins; with none,
+     the rail starts hidden on a canvas narrower than 896px, where it would
+     float over the very rows the operator came to read. */
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   const today = todayMYT();
 
@@ -270,11 +339,17 @@ export default function PurchaseOrdersPage() {
         sourceSearch: source.search,
         deliverTo: destinationName(po),
         supplierDate: supplierDateOf(po),
+        poDate: poDateOf(po),
+        soSources: (po.sources ?? [])
+          .filter((s) => s.kind === "sales_order")
+          .map((s) => ({ reference: s.reference, orderId: s.order_id ?? null })),
+        hasManualSource: (po.sources ?? []).some((s) => s.kind === "manual_purchase"),
+        items: itemNamesOf(po),
         input,
         facts,
         work: purchaseOrderWork(input, facts),
       };
-    });
+    }).sort(compareDefault);
   }, [destinations, posQ.data, suppliers, today, warehouses]);
 
   /* ⛔ A DECORATIVE BADGE MAY NOT BLANK THE REGISTER (YH, 2026-09-01, defect 14).
@@ -288,7 +363,7 @@ export default function PurchaseOrdersPage() {
   const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
   if (requiredReadError) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
         <div className="m-4 max-w-[720px]">
           <ReadProblem
@@ -310,7 +385,7 @@ export default function PurchaseOrdersPage() {
   const requiredReadLoading = posQ.isLoading || suppliersQ.isLoading || warehouseQ.isLoading;
   if (requiredReadLoading) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
         <div className="m-4 text-body text-kit-slate-9">Loading purchase orders…</div>
       </div>
@@ -329,7 +404,7 @@ export default function PurchaseOrdersPage() {
   const selected = allRows.find((row) => row.id.toUpperCase() === selectedPoId) ?? null;
   if (selectedPoId && !selected) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+      <div ref={canvasRef} className="flex h-full min-h-0 flex-col bg-kit-canvas">
         <PurchasingTabs />
         <div className="m-4 max-w-[720px]" data-testid="po-not-found">
           <ReadProblem
@@ -369,12 +444,30 @@ export default function PurchaseOrdersPage() {
     );
   }
 
-  const visibleRows = filter
-    ? allRows.filter((row) => row.facts.filters.includes(filter))
-    : allRows;
+  const matchesRail = (row: RegisterRow, rail: RailFilter) =>
+    (rail.facet == null || row.facts.filters.includes(rail.facet)) &&
+    (rail.supplier == null || row.supplierName === rail.supplier) &&
+    (rail.deliverTo == null || row.deliverTo === rail.deliverTo);
+  const visibleRows = allRows.filter((row) => matchesRail(row, filter));
+  /* Counts describe the whole register, so a facet's number never depends on
+     which other facet happens to be open. */
   const counts = new Map(
     RAIL_ROWS.map(({ key }) => [key, allRows.filter((row) => row.facts.filters.includes(key)).length]),
   );
+  const optionsOf = (valueOf: (row: RegisterRow) => string) => {
+    const tally = new Map<string, number>();
+    for (const row of allRows) tally.set(valueOf(row), (tally.get(valueOf(row)) ?? 0) + 1);
+    return [...tally.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([value, count]) => ({ value, label: value, count }));
+  };
+  const supplierOptions = optionsOf((row) => row.supplierName);
+  const deliverToOptions = optionsOf((row) => row.deliverTo);
+  const activeConditions = [
+    ...(filter.facet ? [{ key: "facet", label: RAIL_ROWS.find((r) => r.key === filter.facet)?.label ?? filter.facet, onClear: () => setFilter((f) => ({ ...f, facet: null })) }] : []),
+    ...(filter.supplier ? [{ key: "supplier", label: `Supplier: ${filter.supplier}`, onClear: () => setFilter((f) => ({ ...f, supplier: null })) }] : []),
+    ...(filter.deliverTo ? [{ key: "deliverTo", label: `Deliver To: ${filter.deliverTo}`, onClear: () => setFilter((f) => ({ ...f, deliverTo: null })) }] : []),
+  ];
   const openObject = (row: RegisterRow) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
@@ -382,20 +475,42 @@ export default function PurchaseOrdersPage() {
       return next;
     });
   };
+  const link = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+  const supporting = "text-[11px] leading-4 text-kit-slate-11";
 
+  /* Widths measured 2026-09-17 in the portal shell at 1440 with the rail open
+     (Inter; 16px cell padding + 1px rule): the six judgement columns add up to
+     the grid's 885px client width — PO Date `Wed, 28 May 25` 100px → 118 ·
+     PO No 114px → 132 · SO No `Manual Purchase` 106px → 123 · Expected
+     Delivery Date `Supplier changed from Wed, 30 Sep` ≈190px → 207. Supplier
+     and Items are the flexible names: a cut value opens whole. Deliver To,
+     GRN No and PO Version (`Marked as sent · WhatsApp · Wed, 30 Sep` 219px →
+     236) scroll under the pinned date and number. */
+  /* ⭐ THE NINE COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-17):
+     PO Date · PO No · Supplier · SO No · Items · Expected Delivery Date ·
+     Deliver To · GRN No · PO Version. Quantities, send confirmation and
+     receiving progress live in PO detail and Receiving. */
   const columns: Array<DataGridColumn<RegisterRow>> = [
     {
-      /* ⛔ EVERY COLUMN NAMES ITS GROUP (YH, 2026-09-01, defect 39).
-         `chooserGroupOrder` asked the grid for five business groups while NO
-         column declared a `chooserGroup`, so the grid short-circuited to a flat
-         list: the Columns popover showed 13 ungrouped checkboxes, and the next
-         reader believed the grouping shipped. A prop that orders nothing is
-         worse than no prop. */
+      key: "po_date",
+      chooserGroup: "Document",
+      label: "PO Date",
+      width: 118,
+      sortable: true,
+      accessor: (row) => (row.poDate ? <span className="tabular-nums">{fmtDate(row.poDate)}</span> : <Absence />),
+      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
+      exportValue: (row) => row.poDate ?? "Not recorded",
+      dateValue: (row) => row.poDate,
+      filterType: "date",
+      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
+    },
+    {
       key: "po",
       chooserGroup: "Document",
       label: "PO No",
-      width: 182,
+      width: 132,
       sortable: true,
+      filterType: "numbering",
       accessor: (row) => (
         <button
           type="button"
@@ -405,191 +520,153 @@ export default function PurchaseOrdersPage() {
           {row.id}
         </button>
       ),
-      searchValue: (row) => row.id,
+      /* The document states stay findable by typing them (defect 27). */
+      searchValue: (row) => `${row.id} ${row.facts.documentState}`,
       filterValue: (row) => row.id,
-    },
-    {
-      key: "issued",
-      chooserGroup: "Document",
-      label: "PO Issued",
-      width: 174,
-      sortable: true,
-      accessor: (row) => row.facts.currentSend
-        ? fmtDate(row.facts.currentSend.sentAt, { time: true })
-        : <Absence>Not sent</Absence>,
-      /* ⭐ ONE COLUMN, ONE FACT (defect 27). The funnel used to offer Issued /
-         Not sent to supplier / Completed / Cancelled — words that appear
-         NOWHERE in the column being filtered, on a column of timestamps. So an
-         operator could not narrow the register to POs issued this month, which
-         is the commonest thing anyone asks of an issue date.
-
-         The state words stay in SEARCH, where they cost nothing and someone
-         typing "cancelled" still finds what they meant; the FUNNEL is a date
-         filter, matching what the column actually shows. The states that were
-         only reachable through the old funnel now have the rail's own
-         `Cancelled` row and `PDF not sent` / `Completed` above it. */
-      searchValue: (row) => row.facts.documentState,
-      filterValue: (row) =>
-        row.facts.currentSend ? row.facts.currentSend.sentAt : "Not sent",
-      dateValue: (row) => row.facts.currentSend?.sentAt ?? null,
-      filterType: "date",
-      sortFn: (a, b) =>
-        (a.facts.currentSend?.sentAt ?? "").localeCompare(b.facts.currentSend?.sentAt ?? ""),
+      exportValue: (row) => row.id,
     },
     {
       key: "supplier",
       chooserGroup: "Supplier",
       label: "Supplier",
-      width: 150,
+      width: 128,
       sortable: true,
+      overflowText: (row) => row.supplierName,
       accessor: (row) => row.supplierName,
       searchValue: (row) => row.supplierName,
       filterValue: (row) => row.supplierName,
     },
     {
-      key: "source",
+      key: "so",
       chooserGroup: "Supplier",
-      label: "Source",
-      width: 164,
+      label: "SO No",
+      width: 123,
       sortable: true,
-      accessor: (row) => row.source === "Not recorded" ? <Absence /> : row.source,
-      searchValue: (row) => row.sourceSearch,
-      filterValue: (row) => row.source,
+      accessor: (row) => {
+        if (row.soSources.length === 1) {
+          const [only] = row.soSources;
+          return only!.orderId ? (
+            <button
+              type="button"
+              className={link}
+              onClick={(event) => { event.stopPropagation(); navigate(`/operation/orders/so/${only!.orderId}`); }}
+            >
+              {only!.reference}
+            </button>
+          ) : only!.reference;
+        }
+        if (row.soSources.length > 1) return `${row.soSources.length} SOs`;
+        return row.hasManualSource ? "Manual Purchase" : null;
+      },
+      /* Every governed reference and the legacy CR/TCF mirrors stay
+         searchable, without a Source column. */
+      searchValue: (row) => [row.sourceSearch, row.po.so ?? "", ...(row.po.so_refs ?? [])].join(" "),
+      filterValue: (row) =>
+        row.soSources.length === 1 ? row.soSources[0]!.reference
+          : row.soSources.length > 1 ? `${row.soSources.length} SOs`
+            : row.hasManualSource ? "Manual Purchase" : "",
+    },
+    {
+      key: "items",
+      chooserGroup: "Goods",
+      label: "Items",
+      width: 145,
+      sortable: true,
+      overflowText: (row) => itemsSummary(row.items),
+      accessor: (row) => itemsSummary(row.items),
+      searchValue: (row) => [...row.items, ...(row.po.purchase_order_lines ?? []).map((line) => line.sku)].join(" "),
+      filterValue: (row) => itemsSummary(row.items),
+    },
+    {
+      key: "expected_delivery",
+      chooserGroup: "Goods",
+      label: "Expected Delivery Date",
+      headerLines: ["Expected", "Delivery Date"],
+      width: 207,
+      sortable: true,
+      /* Line 1 the supplier's evidenced date, else the original PO Delivery
+         Date; line 2 says which it is. An unknown original is never made up. */
+      accessor: (row) => {
+        const e = row.facts.expected;
+        return (
+          <span className="flex flex-col leading-4" data-testid={`po-expected-${row.id}`}>
+            <span className="tabular-nums">{e.date ? fmtDate(e.date) : <Absence />}</span>
+            <span className={supporting}>{expectedLine(e)}</span>
+          </span>
+        );
+      },
+      searchValue: (row) => `${row.facts.expected.date ? fmtDate(row.facts.expected.date) : "Not recorded"} ${expectedLine(row.facts.expected)}`,
+      filterValue: (row) => expectedLine(row.facts.expected),
+      exportValue: (row) => `${row.facts.expected.date ?? "Not recorded"} · ${expectedLine(row.facts.expected)}`,
+      dateValue: (row) => row.facts.expected.date,
+      filterType: "date",
+      sortFn: (a, b) => (a.facts.expected.date ?? "9999").localeCompare(b.facts.expected.date ?? "9999"),
     },
     {
       key: "deliver_to",
       chooserGroup: "Receiving",
       label: "Deliver To",
-      width: 160,
+      width: 118,
       sortable: true,
       accessor: (row) => row.deliverTo === "Not recorded" ? <Absence /> : row.deliverTo,
       searchValue: (row) => row.deliverTo,
       filterValue: (row) => row.deliverTo,
     },
     {
-      key: "po_delivery_date",
-      chooserGroup: "Goods",
-      label: "PO Delivery Date",
-      width: 150,
+      key: "grn",
+      chooserGroup: "Receiving",
+      label: "GRN No",
+      width: 132,
       sortable: true,
-      accessor: (row) => row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : <Absence />,
-      searchValue: (row) => row.po.official_delivery_date ?? "Not recorded",
-      filterValue: (row) => row.po.official_delivery_date ?? "Not recorded",
-      dateValue: (row) => row.po.official_delivery_date,
-      filterType: "date",
-      /* ⛔ A DATE COLUMN SORTS BY DATE (defect 26). Without this the grid falls
-         back to comparing the RENDERED text — and these render as "Wed, 12
-         Aug", so the register sorted alphabetically by WEEKDAY NAME: every
-         "Fri, …" together, then "Mon, …", then "Sat, …". "Which POs land
-         first" is the register's main question, and the header that promises
-         to answer it produced a meaningless order that still looked plausible,
-         because dates do increase inside each weekday block. ISO, so the
-         string comparison IS the chronological one. */
-      sortFn: (a, b) => (a.po.official_delivery_date ?? "").localeCompare(b.po.official_delivery_date ?? ""),
+      /* One GRN opens it in Receiving; several open this PO's receiving; none
+         is blank. A Worker that sent no GRN list is not "no GRN". */
+      accessor: (row) => {
+        const grns = row.po.grns;
+        if (!grns || grns.length === 0) return <span />;
+        if (grns.length === 1) {
+          return (
+            <button
+              type="button"
+              className={`${link} font-mono`}
+              onClick={(event) => { event.stopPropagation(); navigate(`/operation?tab=receiving&session=${encodeURIComponent(grns[0]!.id)}`); }}
+            >
+              {grns[0]!.grn_no}
+            </button>
+          );
+        }
+        return (
+          <button
+            type="button"
+            className={link}
+            onClick={(event) => { event.stopPropagation(); navigate(`/operation?tab=receiving&po=${encodeURIComponent(row.id)}`); }}
+          >
+            {grns.length} GRNs
+          </button>
+        );
+      },
+      searchValue: (row) => (row.po.grns ?? []).map((g) => g.grn_no).join(" "),
+      filterValue: (row) => {
+        const grns = row.po.grns ?? [];
+        return grns.length === 1 ? grns[0]!.grn_no : grns.length > 1 ? `${grns.length} GRNs` : "";
+      },
     },
-    {
-      key: "supplier_delivery_date",
-      chooserGroup: "Goods",
-      label: "Supplier Delivery Date",
-      width: 166,
-      sortable: true,
-      /* ⛔ NO PROMISE ON FILE IS NOT A CONFIRMED DATE (YH, 2026-09-01).
-         The test was `!row.supplierDate || row.supplierDate === row.po.official_delivery_date`,
-         and the first half turned "the supplier has said nothing" into "the
-         supplier confirmed our date" — asserted on the same row whose Work
-         column says the date is MISSING. A buyer skips the chase call; a
-         manager reads a factory promise that does not exist. It also broke the
-         column's own date filter, because the shown value had no date behind
-         it. Absence first, THEN the equality. */
-      accessor: (row) =>
-        !row.supplierDate
-          ? <Absence>Not confirmed</Absence>
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : fmtDate(row.supplierDate),
-      searchValue: (row) =>
-        !row.supplierDate
-          ? "Not confirmed"
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : row.supplierDate,
-      filterValue: (row) =>
-        !row.supplierDate
-          ? "Not confirmed"
-          : row.supplierDate === row.po.official_delivery_date
-            ? "Same as PO"
-            : row.supplierDate,
-      /* The real date, always — a row that prints `Same as PO` still HAS one,
-         and hiding it from the filter made the column's own funnel lie too. */
-      dateValue: (row) => row.supplierDate,
-      filterType: "date",
-      sortFn: (a, b) => (a.supplierDate ?? "").localeCompare(b.supplierDate ?? ""),
-    },
-    /* The quantity words are the plain receiving facts an inexperienced reader
-       can act on: `Order Qty` is what the current PO says, `Received Qty` is
-       what Receiving posted as correct and accepted, `Pending Delivery Qty` is
-       their difference — pieces of goods, never money. `Open Balance` read as
-       an amount owed and is retired. */
-    ...(["ordered", "received", "open"] as const).map((key): DataGridColumn<RegisterRow> => ({
-      key,
-      label: key === "open" ? "Pending Delivery Qty" : key === "received" ? "Received Qty" : "Order Qty",
-      width: key === "open" ? 152 : 110,
-      align: "right",
-      sortable: true,
-      chooserGroup: "Goods",
-      accessor: (row) => row.facts.quantities[key],
-      searchValue: (row) => String(row.facts.quantities[key]),
-      filterValue: (row) => String(row.facts.quantities[key]),
-      numberValue: (row) => row.facts.quantities[key],
-      filterType: "number",
-      footerTotal: (rows) => rows.reduce((sum, row) => sum + row.facts.quantities[key], 0),
-    })),
     {
       key: "current_version",
       chooserGroup: "Document",
       label: "PO Version",
-      width: 138,
+      width: 236,
       sortable: true,
-      /* `PO V{n}` is the current OFFICIAL document version — never the
-         WhatsApp or email copy. The quieter second line is the document's
-         state, a fact, never an instruction. */
+      /* The CURRENT version only; earlier marks stay in Revisions. A mark is
+         a person's statement of sending, never supplier receipt. */
       accessor: (row) => (
-        <span className="flex flex-col leading-4">
+        <span className="flex flex-col leading-4" data-testid={`po-version-${row.id}`}>
           <span>PO V{row.facts.version}</span>
-          <span className="text-[11px] text-kit-slate-9">
-            {row.facts.operationStatus ?? row.facts.documentState}
-          </span>
+          <span className={supporting}>{versionLine(row)}</span>
         </span>
       ),
-      searchValue: (row) => `PO V${row.facts.version} ${row.facts.operationStatus ?? row.facts.documentState}`,
+      searchValue: (row) => `PO V${row.facts.version} ${versionLine(row)}`,
       filterValue: (row) => `PO V${row.facts.version}`,
-    },
-    {
-      key: "supplier_has",
-      chooserGroup: "Document",
-      label: "Sent to Supplier",
-      width: 148,
-      sortable: true,
-      /* The latest PO version with confirmed-send evidence, beside the current
-         PO Version so a mismatch (`PO V2` vs `PO V1`) is visible at a glance.
-         The second line is the evidence — channel and date — never an
-         instruction. Only `confirmed_sent` counts: opening or downloading the
-         PDF proves nothing, and a legacy PO without a send record stays
-         honestly `Not sent`. */
-      accessor: (row) => row.facts.latestConfirmedSend ? (
-        <span className="flex flex-col leading-4">
-          <span>{row.facts.sentToSupplier}</span>
-          <span className="text-[11px] text-kit-slate-9">
-            {CHANNEL_WORD[row.facts.latestConfirmedSend.channel] ?? row.facts.latestConfirmedSend.channel}
-            {" · "}
-            {fmtDate(row.facts.latestConfirmedSend.sentAt)}
-          </span>
-        </span>
-      ) : <Absence>Not sent</Absence>,
-      searchValue: (row) => row.facts.latestConfirmedSend
-        ? `${row.facts.sentToSupplier} ${CHANNEL_WORD[row.facts.latestConfirmedSend.channel] ?? row.facts.latestConfirmedSend.channel}`
-        : "Not sent",
-      filterValue: (row) => row.facts.sentToSupplier,
+      exportValue: (row) => `PO V${row.facts.version} · ${versionLine(row)}`,
     },
   ];
 
@@ -607,7 +684,7 @@ export default function PurchaseOrdersPage() {
   ];
 
   return (
-    <div className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
+    <div ref={canvasRef} className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {railOpen && (
@@ -617,30 +694,40 @@ export default function PurchaseOrdersPage() {
           ariaLabel="Purchase order filters"
           testId="po-filter-rail"
         >
-          <FilterRailGroup title="PURCHASE ORDERS">
-            <FilterRailRow
-              label="All purchase orders"
-              count={allRows.length}
-              active={filter == null}
-              onClick={() => setFilter(null)}
-              testId="po-filter-all"
-            />
-          </FilterRailGroup>
           {RAIL_GROUPS.map((group) => (
             <FilterRailGroup key={group.heading} title={group.heading}>
               {group.rows.map((item) => (
                 <FilterRailRow
                   key={item.key}
                   label={item.label}
-                  supportingText={item.action}
                   count={counts.get(item.key) ?? 0}
-                  active={filter === item.key}
-                  onClick={() => setFilter(filter === item.key ? null : item.key)}
+                  active={filter.facet === item.key}
+                  onClick={() => setFilter((f) => ({ ...f, facet: f.facet === item.key ? null : item.key }))}
                   testId={`po-filter-${item.key}`}
                 />
               ))}
             </FilterRailGroup>
           ))}
+          <FilterRailGroup title="SUPPLIER">
+            <FilterRailSelect
+              label="Supplier"
+              allLabel="All suppliers"
+              testId="po-supplier-select"
+              value={filter.supplier}
+              options={supplierOptions}
+              onChange={(supplier) => setFilter((f) => ({ ...f, supplier }))}
+            />
+          </FilterRailGroup>
+          <FilterRailGroup title="DELIVER TO">
+            <FilterRailSelect
+              label="Deliver To"
+              allLabel="All destinations"
+              testId="po-deliver-to-select"
+              value={filter.deliverTo}
+              options={deliverToOptions}
+              onChange={(deliverTo) => setFilter((f) => ({ ...f, deliverTo }))}
+            />
+          </FilterRailGroup>
         </FilterRail>
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
@@ -652,23 +739,39 @@ export default function PurchaseOrdersPage() {
           ) : null}
             <DataGrid<RegisterRow>
               appearance="reference"
+              palette="slate"
+              searchPresentation="responsive"
               rows={visibleRows}
               columns={columns}
-              storageKey="carres.purchaseOrders.register.v1"
+              /* v2 — the nine-column date-first register replaces v1's twelve. */
+              storageKey="carres.purchaseOrders.register.v2"
               rowKey={(row) => row.id}
+              rowTestId={(row) => `grid-row-${row.id}`}
               exportName="Purchase Orders"
               searchPlaceholder="Search purchase orders…"
               isLoading={posQ.isLoading}
-              emptyMessage={filter ? "No purchase orders match this filter." : "No purchase orders yet."}
-              /* 0430 — the pinned identity is PO NO BY NAME, not "whatever
-                 column the saved layout happens to put first": a reordered
-                 chooser layout must never unpin the number the operator
-                 navigates by while scrolling the wide register. */
-              stickyIdentity={{ columnKey: "po" }}
+              emptyMessage={allRows.length === 0 ? "No purchase orders yet" : "No purchase orders match these filters"}
+              noMatchMessage="No purchase orders match these filters"
+              activeConditions={activeConditions}
+              onClearConditions={() => setFilter(RAIL_CLEAR)}
+              leadingColumns={{ date: "po_date", identity: "po" }}
+              personalLayouts={personalLayouts}
               groupBanner={false}
+              fixedGroups={{
+                groups: PO_GROUPS,
+                groupOf: (row) => row.facts.group,
+                revealMatches: activeConditions.length > 0,
+              }}
               chooserGroupOrder={["Document", "Supplier", "Goods", "Receiving"]}
               onRowDoubleClick={openObject}
               contextMenu={contextMenu}
+              expandTitle="Show goods"
+              expandable={{
+                flush: true,
+                alignToColumn: "po_date",
+                testId: (row) => `po-expand-${row.id}`,
+                renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
+              }}
               toolbarStart={!railOpen && (
                 <button
                   type="button"
@@ -681,15 +784,66 @@ export default function PurchaseOrdersPage() {
                   <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
                 </button>
               )}
-              statusSummary={(filtered) => {
-                const ordered = filtered.reduce((sum, row) => sum + row.facts.quantities.ordered, 0);
-                const received = filtered.reduce((sum, row) => sum + row.facts.quantities.received, 0);
-                const open = filtered.reduce((sum, row) => sum + row.facts.quantities.open, 0);
-                return <span>{filtered.length} purchase orders · Order Qty {ordered} · Received Qty {received} · Pending Delivery Qty {open}</span>;
-              }}
+              /* One total, including collapsed groups; no quantity totals. */
+              statusSummary={(filtered) => (
+                <span data-testid="po-footer">
+                  {filtered.length === allRows.length
+                    ? allRows.length === 1 ? "1 purchase order" : `${allRows.length} purchase orders`
+                    : `${filtered.length} of ${allRows.length} purchase orders`}
+                </span>
+              )}
             />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Line 2 of Expected Delivery Date — the COPY-STANDARD's three readings. */
+function expectedLine(e: PurchaseOrderRegisterFacts["expected"]): string {
+  if (e.supplier === "changed") return `Supplier changed from ${e.changedFrom ? fmtDate(e.changedFrom) : "Not recorded"}`;
+  return e.supplier === "confirmed" ? "Confirmed by supplier" : "Not confirmed by supplier";
+}
+
+/** Line 2 of PO Version — the CURRENT version's sent mark, or its absence. */
+function versionLine(row: RegisterRow): string {
+  const mark = row.facts.currentSend;
+  return mark
+    ? `Marked as sent · ${CHANNEL_WORD[mark.channel] ?? mark.channel} · ${fmtDate(mark.sentAt)}`
+    : "Not marked as sent";
+}
+
+/** The read-only expansion: `SKU · Item / configuration · Qty · Deliver To`. */
+function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: Array<{ id: string; name: string }> }) {
+  const lines: GoodsMiniLine[] = (row.po.purchase_order_lines ?? []).map((line) => {
+    const destination = line.destination_id
+      ? destinations.find((d) => d.id === line.destination_id)?.name ?? null
+      : row.deliverTo === "Not recorded" ? null : row.deliverTo;
+    const config = lineConfigBits(line.attrs as Record<string, unknown> | null | undefined).join(" · ");
+    return {
+      key: line.id,
+      category: "",
+      unitIds: [],
+      unitAbsence: "",
+      deliverTo: destination ? [destination] : [],
+      deliverToAbsence: "Not recorded",
+      sku: line.sku,
+      qty: line.qty,
+      item: [line.model_name, line.size].filter(Boolean).join(" · ") || line.sku,
+      itemDetail: config || undefined,
+      selectable: false,
+    };
+  });
+  return (
+    <div className="px-2 py-3" data-testid={`po-goods-${row.id}`}>
+      <GoodsMiniTable
+        label={`Goods on ${row.id}`}
+        lines={lines}
+        identityFirst
+        showUnitId={false}
+        showCategory={false}
+        itemHeading="Item / configuration"
+      />
     </div>
   );
 }
@@ -1100,13 +1254,13 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Supplier" value={row.supplierName} />
           <Fact label="Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={row.source} />
-          <Fact label="PO Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
           <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
           {/* Same law as the register column: absence FIRST, then equality.
               `Same as PO` is a claim about what the supplier said. */}
           <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not confirmed" : row.supplierDate === row.po.official_delivery_date ? "Same as PO" : fmtDate(row.supplierDate)} />
-          <Fact label="PO Version" value={`PO V${row.facts.version}`} />
-          <Fact label="Sent to Supplier" value={row.facts.sentToSupplier} />
+          {/* The CURRENT version and its sent mark, in the register's own words;
+              earlier versions' marks stay in Revisions (MASTER §9.3). */}
+          <Fact label="PO Version" value={`PO V${row.facts.version} · ${versionLine(row)}`} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
         <SupplierDateBlock key={`${row.id}:${row.facts.version}`} row={row} onSaved={onSupplierDateSaved} />

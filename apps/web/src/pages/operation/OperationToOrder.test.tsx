@@ -235,7 +235,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · Version 1 has not reached Hooka",
+      "PO-2041 · PO V1 · Not marked as sent",
     );
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real
@@ -309,7 +309,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await screen.findByTestId("so-batch-issue-workspace");
     fireEvent.click(screen.getByTestId("so-batch-issue-create"));
     await screen.findByTestId("so-batch-evidence-PO-2041");
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("Version 3");
+    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
 
     apiFetch.mockClear();
     fireEvent.change(screen.getByTestId("so-batch-evidence-recipient"), {

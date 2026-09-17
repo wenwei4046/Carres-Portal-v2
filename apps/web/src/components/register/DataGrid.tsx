@@ -2544,7 +2544,7 @@ function DataGridInner<T>({
               <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
               <div
                 ref={columnsMenuRef}
-                className={styles.columnsMenu}
+                className={`${styles.columnsMenu}${personalLayouts ? ` ${styles.columnsMenuWithLayouts}` : ""}`}
                 style={
                   columnsMenuPos
                     ? { position: "fixed", top: columnsMenuPos.top, right: columnsMenuPos.right }
