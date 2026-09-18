@@ -12,10 +12,6 @@ export type DepartmentType = (typeof DEPARTMENT_TYPES)[number];
 /** Showroom and Dealer name one outlet or dealer; Subscription and Office are one each. */
 export const departmentNeedsId = (t: DepartmentType) => t === "SHOWROOM" || t === "DEALER";
 
-/** Office has expenses only. */
-export const departmentAllowedOn = (t: DepartmentType, accountKind: string) =>
-  !(t === "OFFICE" && accountKind === "INCOME");
-
 /** Optional department on a document line (snake_case and camelCase wires). */
 export const lineDepartmentFields = {
   departmentType: z.enum(DEPARTMENT_TYPES).nullable().optional(),
@@ -48,12 +44,3 @@ export const departmentRpcArgs = (v: { departmentType?: DepartmentType; departme
   p_department_type: v.departmentType ?? null,
   p_department_id: v.departmentId ?? null,
 });
-
-/** Does a stored line match the filter? */
-export const departmentMatches = (
-  line: { department_type: string | null; department_id: string | null },
-  f: { departmentType?: DepartmentType; departmentId?: string },
-) =>
-  f.departmentType === undefined ||
-  (line.department_type === f.departmentType &&
-    (f.departmentId === undefined || line.department_id === f.departmentId));
