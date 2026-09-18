@@ -1470,12 +1470,16 @@ facts, permissions, complete-record populations or task ownership.
    with its own record date, then its document number/business identity. Canvas ≥768px pins
    both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
    layout changes. Identity opens the object. Mappings: Sales Orders `SO Date · SO No`;
-   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · Items`;
-   Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
+   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · Items` (`Manual Purchase No.`
+   pending, Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
+   Supplier Claims `Reported · Supplier Claim No.`;
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
    Other listings use their governed record date and identity, without inventing date facts.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
-   GRN Date is record creation; physical `Goods received on` remains in detail.
+   GRN Date is record creation; physical `Goods received on` is its own Receiving column (owner
+   ruling 2026-09-18). Full per-page column orders live in the module MASTERs (Purchasing §9.1–9.5);
+   every listing reads date → identity → customer/supplier → goods → quantity → other facts →
+   later progress and linked documents.
    DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
    **Engine — BUILT 2026-09-17:** `DataGrid leadingColumns={{ date, identity }}` (opt-in) forces
    the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser

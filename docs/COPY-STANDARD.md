@@ -1000,7 +1000,7 @@ sidebar page. Existing implementation constants do not override these approved p
 | Search | `Search Sales Order, customer, SKU or supplier…` |
 | Rail headings | `ORDER TIMING` · `PRODUCT` · `SUPPLIER` · `REGION` · `SETUP TO FIX` |
 | Empty state | `No proceeded Sales Orders.` |
-| Register columns (owner ruling R3 2026-09-16 — exactly, in this order) | `Proceed Date` · `SO No` · `Order By` · `Customer` · `Supplier` · `Requested Delivery Date` · `Delivery Location` · `Deliver To` · `PO No` · `PO Delivery Date` |
+| Register columns (owner ruling 2026-09-18 — exactly, in this order; overwrites R3 2026-09-16) | `Proceed Date` · `SO No` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date` |
 | Table group headings (ruling R1 2026-09-16) | `To buy` (heading, count beside it) · `No purchase needed` (disclosure button, count beside it) |
 | Order By absence (ruling R2, split by S1 — BUILT 2026-09-17) | Three facts, three words, blank when nothing is left to buy: `Not planned` — ONLY missing setup blocks the date · `Already on a PO` — another open PO covers the remaining demand · `Coverage not checked` — whether an open PO covers it could not be verified. Never one word for all three. |
 | Footer (ruling R6) | `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order` — one total, nothing else |
@@ -1195,7 +1195,7 @@ connector line.
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — APPROVED / NOT BUILT, date-first change, Jess 2026-09-17 | `Proceed Date` · `Items` · `Order By` · `Purpose` · `Supplier` · `Approval Status` · `Requested By` · `Delivery Date` · `Deliver To` · `PO No`. `Items` opens the object; Proceed Date and Items pin per UI MASTER §6.7. `Order By` is engine-derived; missing setup reads `Not planned`; blank in `No purchase needed`. No request-number column. Search placeholder `Search Manual Purchases`; a failed read `Manual Purchases could not be loaded` + `Try again`. |
+| The register columns — owner ruling 2026-09-18, NOT BUILT (overwrites 2026-09-17) | `Proceed Date` · `Manual Purchase No.` (**pending** — the retired `MPR` number, Purchasing §9.2; until confirmed the identity stays `Items`) · `Approval Status` · `Purpose` · `Requested By` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Delivery Date`. Customer columns stay blank for purposes with no customer; never invented. Earlier notes still valid: Proceed Date and Items pin per UI MASTER §6.7. `Order By` is engine-derived; missing setup reads `Not planned`; blank in `No purchase needed`. No request-number column. Search placeholder `Search Manual Purchases`; a failed read `Manual Purchases could not be loaded` + `Try again`. |
 | Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Never apply SO Safety days. |
 | Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
 | The Approval Status facts | `Need approval` · `Approved` · `Refused` · `Withdrawn` · `Sent back for changes` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A `To buy` row's own selectability explanation may still appear, computed from the same facts the tick reads: `Approved at 0. Nothing to order.` · `Remaining quantity not checked` (title: `The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.`). A `Sent back for changes` row carries the real requester's initials avatar, title `{name} · Edit and send again`, or `Staff identity not recorded`. `No approval needed` is RETIRED (R1). |
@@ -1709,7 +1709,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 
 | Word | Where | Why this word |
 |---|---|---|
-| `Goods arrived at` | Receiving Details field · Register column · rail heading `GOODS ARRIVED AT` | Where the goods PHYSICALLY arrived. It never overwrites `Deliver To` (where the PO instructed the supplier to deliver) — the instruction and the physical truth are two facts, both preserved. **Owner correction 2026-09-06:** the retired labels `Actual Site`, `Delivery Location` and `Goods Received At` may not appear on Receiving surfaces; `Delivery Location` stays reserved for the CUSTOMER's delivery address. |
+| `Goods arrived at` | Receiving Details field · Register column · rail heading `GOODS ARRIVED AT` | Where the goods PHYSICALLY arrived — a warehouse, showroom or any other real site, never assumed to be a warehouse. It never overwrites `Supplier Deliver To` (where the PO instructed the supplier to deliver; `Deliver To` on other surfaces) — the instruction and the physical truth are two facts, both preserved. **Owner correction 2026-09-06:** the retired labels `Actual Site`, `Delivery Location` and `Goods Received At` may not appear on Receiving surfaces; `Delivery Location` stays reserved for the CUSTOMER's delivery address. |
 | `Extra Qty` | Receiving Summary · Register column | Goods that were not on the source PO/CO, recorded SEPARATELY. Extra goods never enter Inventory and never alter ordered/pending-delivery arithmetic. |
 | `Extra goods` | session section | The section that records `Extra Qty` lines. First check whether the goods belong to another PO or CO. |
 | `Arrival evidence` | Receiving Details field | Photo AND video of the physical arrival — beside, never instead of, the `Signed DO photo`. |
@@ -1731,9 +1731,9 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
 | `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
 | `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
-| `PO/CO No` | GRN Register column | The receiving's exact source — a Purchase Order or a consignment CO — through one column; the one Receiving engine serves both (owner correction 2026-09-06, second ruling). |
+| `SO No / Manual Purchase / CO No / RO No` · `PO No` | GRN Register columns (owner ruling 2026-09-18; overwrites the single `PO/CO No` column) | The first shows the receipt's actual linked source — the SO No, `Manual Purchase`, the CO No or the RO No (repair returns come back through Receiving) — blank when none; `PO No` is its own column, blank for a CO or RO receipt with no PO. The one Receiving engine serves all of them. |
 | `Supplier Delivery Date` | GRN Register column | The SAME governed word as the Purchase Orders register (the evidenced supplier answer — see the Purchasing date dictionary). `Not confirmed` while no evidenced reply exists. |
-| `Product` | GRN Register column | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
+| `Items` | GRN Register column (owner ruling 2026-09-18; was `Product`) | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
 | `Showing {from}–{to} of {total}` | GRN Register footer | Server-side pagination speaks for the WHOLE filtered result set (owner correction 2026-09-06, second ruling) — never `{n} loaded` over an unknown remainder. |
 | `Previous` · `Next` | GRN Register footer page moves | One server page back / forward; disabled at the ends rather than hidden. |
 | `{date} — {n} expected supplier arrival(s)` | the rail Calendar day's aria sentence | The marker COUNT said in words — colour is never the only signal (owner correction 2026-09-06, second ruling). |
@@ -1821,14 +1821,19 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | Supplier Claims footer | `{N} Supplier Claims` · `1 Supplier Claim` · `{n} of {N} Supplier Claims` | Claim count only; no quantity total |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
-### SO Batch Purchase / Manual Purchase column words — OWNER RULING (Jess, 2026-09-18) · NOT BUILT
+### SO Batch Purchase / Manual Purchase / Receiving column words — OWNER RULING (Jess, 2026-09-18) · NOT BUILT
+
+Full column orders live in Purchasing MASTER §9.1, §9.2 and §9.4. Every Purchasing listing reads:
+date → number/identity → customer or supplier → goods → this document's quantity → other facts →
+later progress and linked documents.
 
 | Column | Meaning |
 |---|---|
 | `PO Safety Days` | The governed Safety-days fact for buying this order in time (see `Safety days`); replaces the `Order By` column position. `buffer` never reaches a screen |
 | `Customer Requested Delivery Date` | The date the customer asked for delivery (was `Requested Delivery Date` on these two lists) |
 | `Customer Delivery Location` | Where the customer's goods go (was `Delivery Location` on these two lists) |
-| `Supplier Deliver To` | Where the supplier delivers the purchased goods (was `Deliver To` on these two lists) |
+| `Supplier Deliver To` | Where the PO told the supplier to deliver (was `Deliver To` on SO Batch, Manual Purchase and Receiving) |
+| `Goods received on` | Receiving register column (was detail-only): when the goods actually arrived, date and time; separate from `GRN Date` (record created) and `Supplier Delivery Date` (supplier's evidenced date) |
 | `Manual Purchase No.` | **Pending** — conflicts with the retired `MPR` number (Purchasing §6.1); not shown until the owner confirms |
 
 ### Receiving and supplier-exception words (locked 2026-07-27)
@@ -3508,8 +3513,8 @@ Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver 
 ### Date-first listing contract — APPROVED (Jess, 2026-09-17) · BUILT on Sales Orders, SO Batch, Manual Purchase and Purchase Orders 2026-09-17
 
 Exact leading columns: Sales Orders `SO Date · SO No`; SO Batch `Proceed Date · SO No`;
-Manual Purchase `Proceed Date · Items`; Purchase Orders `PO Date · PO No`;
-Receiving `GRN Date · GRN No`; Delivery Orders `DO Date · DO No`;
+Manual Purchase `Proceed Date · Items` (`Manual Purchase No.` pending, Purchasing §9.2); Purchase Orders `PO Date · PO No`;
+Receiving `GRN Date · GRN No`; Supplier Claims `Reported · Supplier Claim No.`; Delivery Orders `DO Date · DO No`;
 Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity alone below768px.
 Date-first adoption: Sales Orders small patch → Manual Purchase Round 2 → Purchase Orders.
 Personal saved layouts pilot on Purchase Orders only; rollout requires owner acceptance.
