@@ -197,11 +197,15 @@ No deposit · Online order
 
 **Date-first listing — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below 768px; neither can be hidden or moved (engine `leadingColumns`, layout key `…register.v5`). Personal account layouts remain PO-only until owner acceptance.
 
-The approved default columns:
+The approved default columns — **OWNER RULING (Jess, 2026-09-18): every listing uses the same order and
+words · NOT BUILT** (overwrites the 2026-09-17 order):
 
 ```
-SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
+SO Date | SO No | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | Showroom | PO No | DO No
 ```
+
+Same reading order and column words as SO Batch Purchase and Manual Purchase (date → number → customer
+facts → goods → linked documents). `Items` becomes a default column (`{first item} + {n} more`).
 
 **Widths re-measured for the date-first order (rendered shell fixture, 1440, Inter, 2026-09-17):**
 SO Date 118 (another year `Wed, 28 May 25` needs 117 — the 🟡 cross-year cut is closed) · SO No 80 ·
