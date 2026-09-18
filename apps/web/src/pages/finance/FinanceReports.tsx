@@ -102,7 +102,7 @@ export default function FinanceReports() {
   const { from, to } = readPeriod(params, today);
   const asOf = readDay(params.get("asOf")) ?? today;
 
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const pl = useProfitAndLoss(from, to, dept);
   const bs = useBalanceSheet(asOf, dept);
   const notStarted = notStartedError(pl.error) || notStartedError(bs.error);

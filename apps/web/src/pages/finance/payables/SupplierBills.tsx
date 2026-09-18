@@ -76,7 +76,7 @@ export default function SupplierBills() {
 
 function BillRegister() {
   const navigate = useNavigate();
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = useSupplierBills(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierBillRegisterRow>[]>(() => [

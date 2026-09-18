@@ -36,8 +36,9 @@ export function decodeDepartment(v: string | null | undefined): DepartmentChoice
   return { departmentType: t };
 }
 
-/** Query-string pairs for a list or report read. */
-export function departmentSearch(c: DepartmentChoice): Record<string, string> {
+/** Query-string pairs for a list or report read, from "TYPE" or "TYPE:id". */
+export function departmentSearch(dept: string | null | undefined): Record<string, string> {
+  const c = decodeDepartment(dept);
   const out: Record<string, string> = {};
   if (c.departmentType) out.departmentType = c.departmentType;
   if (c.departmentId) out.departmentId = c.departmentId;
@@ -45,15 +46,14 @@ export function departmentSearch(c: DepartmentChoice): Record<string, string> {
 }
 
 /** The page's filter, kept in `?dept=`. */
-export function useDepartmentParam(): [DepartmentChoice, (v: string) => void, string] {
+export function useDepartmentParam(): [string, (v: string) => void] {
   const [params, setParams] = useSearchParams();
-  const raw = params.get("dept") ?? "";
   const set = (v: string) => setParams((before) => {
     const next = new URLSearchParams(before);
     if (v) next.set("dept", v); else next.delete("dept");
     return next;
   });
-  return [decodeDepartment(raw), set, raw];
+  return [params.get("dept") ?? "", set];
 }
 
 
@@ -78,14 +78,14 @@ export function DepartmentFilter({ value, onChange }: { value: string; onChange:
 }
 
 /** Line picker: one instance. Income lines cannot pick Office. */
-export function DepartmentPicker({ type, id, onChange, income = false, label, className, disabled }: {
+export function DepartmentPicker({ type, id, onChange, income = false, label, className }: {
   type: string | null | undefined; id: string | null | undefined;
   onChange: (c: { departmentType: DepartmentType | null; departmentId: string | null }) => void;
-  income?: boolean; label: string; className?: string; disabled?: boolean;
+  income?: boolean; label: string; className?: string;
 }) {
   const { data = [] } = useDepartments();
   const rows = data.filter((d) => !(income && d.department_type === "OFFICE"));
-  return <select aria-label={label} className={className ?? fieldCls} disabled={disabled}
+  return <select aria-label={label} className={className ?? fieldCls}
     value={encodeDepartment(type, id)}
     onChange={(e) => {
       const c = decodeDepartment(e.target.value);
@@ -112,6 +112,6 @@ export function DepartmentName({ type, id }: { type?: string | null; id?: string
 
 /** A list's query key and URL with the filter on; unchanged without one. */
 export function withDepartment<K extends readonly unknown[]>(key: K, url: string, dept: string) {
-  const q = new URLSearchParams(departmentSearch(decodeDepartment(dept))).toString();
+  const q = new URLSearchParams(departmentSearch(dept)).toString();
   return q ? { queryKey: [...key, dept] as const, url: `${url}${url.includes("?") ? "&" : "?"}${q}` } : { queryKey: key, url };
 }

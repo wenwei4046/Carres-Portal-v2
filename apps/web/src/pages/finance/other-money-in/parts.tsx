@@ -65,7 +65,7 @@ export function readLines(lines: TypedLine[]): {
     else if (Number.isNaN(amount)) e.amount = "Type the amount in numbers, like 1500.00.";
     else if (amount <= 0) e.amount = "The amount must be more than RM 0.00.";
     else if (Math.abs(Math.round(amount * 100) - amount * 100) > 1e-6) e.amount = "An amount has at most two decimals.";
-    if (e.account || e.amount || !dept.departmentType) {
+    if (e.account || e.amount || e.department) {
       errors[l.key] = e;
       continue;
     }

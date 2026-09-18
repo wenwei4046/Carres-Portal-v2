@@ -128,7 +128,7 @@ export default function OtherReceiptsPage() {
 /* ── the Register ──────────────────────────────────────────────────────────── */
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
     () => [

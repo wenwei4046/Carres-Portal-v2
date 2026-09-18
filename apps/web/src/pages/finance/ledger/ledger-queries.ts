@@ -16,7 +16,7 @@ import type {
   TrialBalanceReport,
 } from "@carres/shared/finance-ledger";
 import { apiFetch } from "@/lib/api";
-import { decodeDepartment, departmentSearch } from "../department";
+import { departmentSearch } from "../department";
 
 /** What the Journal is narrowed to on the server. Everything else (source,
  *  date, search) narrows the rows already in hand. */
@@ -62,7 +62,7 @@ export async function readJournal(scope: JournalScope): Promise<JournalRead> {
     if (scope.account) q.set("account", scope.account);
     if (scope.from) q.set("from", scope.from);
     if (scope.to) q.set("to", scope.to);
-    for (const [k, v] of Object.entries(departmentSearch(decodeDepartment(scope.dept)))) q.set(k, v);
+    for (const [k, v] of Object.entries(departmentSearch(scope.dept))) q.set(k, v);
     const res = await apiFetch<LedgerEntriesPage>(`/api/finance/ledger/entries?${q.toString()}`);
     if (!Array.isArray(res.rows) || !Number.isInteger(res.total) || res.total < 0) throw new Error(JOURNAL_FAILED);
     if (total !== null && total !== res.total) throw new Error("The Journal changed while it loaded. Try again.");
@@ -106,7 +106,7 @@ export function useLedgerChart() {
 
 /** The Trial Balance read, as options — the page's hook and the Dashboard's month-end pack share it. */
 export function trialBalanceQuery(asOf: string, dept = "") {
-  const q = new URLSearchParams({ asOf, ...departmentSearch(decodeDepartment(dept)) });
+  const q = new URLSearchParams({ asOf, ...departmentSearch(dept) });
   return {
     queryKey: ledgerKeys.trialBalance(asOf, dept),
     queryFn: () => apiFetch<TrialBalanceReport>(`/api/finance/ledger/trial-balance?${q.toString()}`),

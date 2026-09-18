@@ -43,7 +43,7 @@ export function ageScopeWord(scope: AgeScope): string {
  * shows as a removable condition beside the column filters.
  */
 export default function FinanceAR() {
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = useInvoiceRegister(dept);
   const invoiceRows = query.data;
   const [params, setParams] = useSearchParams();

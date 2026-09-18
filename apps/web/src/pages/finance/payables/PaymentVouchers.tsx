@@ -77,7 +77,7 @@ export default function PaymentVouchers() {
 
 function VoucherRegister() {
   const navigate = useNavigate();
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [

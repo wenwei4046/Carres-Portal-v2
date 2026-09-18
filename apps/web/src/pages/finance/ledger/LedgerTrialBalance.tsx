@@ -41,7 +41,7 @@ export default function LedgerTrialBalance() {
     if (iso) next.set("asOf", iso); else next.delete("asOf");
     return next;
   });
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = useTrialBalance(asOf, dept);
   const report = query.data;
   const notStarted = (query.error as { status?: number } | null)?.status === 409;

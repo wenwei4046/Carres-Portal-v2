@@ -127,7 +127,7 @@ function Siblings({ current }: { current: "invoices" | "parties" }) {
 /* ── the invoice Register ──────────────────────────────────────────────────── */
 
 function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
-  const [, setDept, dept] = useDepartmentParam();
+  const [dept, setDept] = useDepartmentParam();
   const query = useOtherDebtorInvoices(dept);
   const columns = useMemo<DataGridColumn<OtherDebtorInvoiceRow>[]>(
     () => [

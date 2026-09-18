@@ -236,22 +236,13 @@ payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
   // 0540 (DEPT-6): each GRN line's default department, from its sales orders.
   const rows = (data ?? []) as Array<{ po_line_id?: string | null }>;
   const polIds = [...new Set(rows.map((r) => r.po_line_id).filter((x): x is string => !!x))];
-  const dept = new Map<string, { department_type: string; department_id: string | null }>();
+  const dept = new Map<string, Record<string, unknown>>();
   if (polIds.length) {
-    const d = await sb(c)
-      .from("fin_po_line_departments")
-      .select("po_line_id, department_type, department_id")
-      .in("po_line_id", polIds);
+    const d = await sb(c).from("fin_po_line_departments").select("po_line_id, department_type, department_id").in("po_line_id", polIds);
     if (d.error) return pgFail(c, d.error);
-    for (const r of (d.data ?? []) as Array<Record<string, unknown>>) {
-      dept.set(String(r.po_line_id), {
-        department_type: String(r.department_type),
-        department_id: (r.department_id as string | null) ?? null,
-      });
-    }
+    for (const r of d.data ?? []) dept.set(r.po_line_id, r);
   }
-  const none = { department_type: null, department_id: null };
-  return c.json({ rows: rows.map((r) => ({ ...r, ...(dept.get(r.po_line_id ?? "") ?? none) })) });
+  return c.json({ rows: rows.map((r) => ({ department_type: null, department_id: null, ...r, ...dept.get(r.po_line_id ?? "") })) });
 });
 
 payablesRouter.get("/bills/:id", requireFinance, async (c) => {

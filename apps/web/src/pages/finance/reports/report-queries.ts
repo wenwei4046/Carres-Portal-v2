@@ -13,7 +13,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import { decodeDepartment, departmentSearch } from "../department";
+import { departmentSearch } from "../department";
 
 export const PL_SECTIONS = ["INCOME", "EXPENSE"] as const;
 export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
@@ -300,7 +300,7 @@ function retryOnce(failures: number, error: unknown): boolean {
 
 /** The Profit and Loss read, as options — Reports and the Dashboard's month-end pack share it. */
 export function profitAndLossQuery(from: string, to: string, dept = "") {
-  const q = new URLSearchParams({ from, to, ...departmentSearch(decodeDepartment(dept)) });
+  const q = new URLSearchParams({ from, to, ...departmentSearch(dept) });
   return {
     queryKey: reportKeys.profitAndLoss(from, to, dept),
     queryFn: async () => parseProfitAndLoss(
@@ -314,7 +314,7 @@ export function profitAndLossQuery(from: string, to: string, dept = "") {
 
 /** The Balance Sheet read, as options — Reports and the Dashboard's month-end pack share it. */
 export function balanceSheetQuery(asOf: string, dept = "") {
-  const q = new URLSearchParams({ asOf, ...departmentSearch(decodeDepartment(dept)) });
+  const q = new URLSearchParams({ asOf, ...departmentSearch(dept) });
   return {
     queryKey: reportKeys.balanceSheet(asOf, dept),
     queryFn: async () => parseBalanceSheet(
