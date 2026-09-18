@@ -2207,12 +2207,31 @@ Warehouse submits count                (or Operation enters goods directly)
   result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
   `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
   filters, Columns and Export stay; a changed filter or search term returns to page 1.
-- **Register columns — APPROVED / NOT BUILT (Jess, 2026-09-17):** `GRN Date · GRN No ·
-  Supplier Delivery Date · PO/CO No · Supplier · Product · Deliver To · Goods arrived at ·
-  Received Qty`, followed by Supplier DO No. and damaged/wrong/extra quantities.
-  GRN Date is record creation, distinct from physical Goods received on, which stays in detail.
-  Supplier Delivery Date remains the evidenced linked-PO date; absent evidence reads Not confirmed. Product retains GRN paper line words. Pin date and GRN No at canvas ≥768px,
-  GRN No alone below 768px.
+- **Register columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
+
+  ```text
+  GRN Date · GRN No · SO No / Manual Purchase / CO No / RO No · PO No · Supplier ·
+  Supplier Deliver To · Goods arrived at · Supplier Delivery Date · Goods received on ·
+  Supplier DO No. · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+  ```
+
+  Overwrites the 2026-09-17 order (`GRN Date · GRN No · Supplier Delivery Date · PO/CO No ·
+  Supplier · Product · Deliver To · Goods arrived at · Received Qty`, then Supplier DO No. and the
+  damaged/wrong/extra quantities). The three dates stay separate facts and are never derived from
+  one another: `GRN Date` = when the receipt record was created; `Supplier Delivery Date` = the
+  supplier's evidenced delivery date (absent evidence reads `Not confirmed`); `Goods received on` =
+  when the goods actually arrived, date and time (now a register column, no longer detail-only).
+  `Goods arrived at` names any real location — warehouse, showroom or other site — never assumed to
+  be a warehouse. `Supplier Deliver To` = where the PO told the supplier to deliver (was `Deliver
+  To`). `Items` keeps the GRN paper line words (was `Product`).
+  The source column shows the receipt's actual linked source reference — the SO No, `Manual
+  Purchase`, the CO No or the RO No — one fact per row, blank when none; `PO No` stays its own
+  column (blank for a CO or RO receipt with no PO, never invented). Repair returns are in this
+  register: they come back through the one Receiving engine with a GRN (§9.5 matrix, §9.7, Stock
+  §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
+  checks it against COPY before it reaches the screen (Purchase Orders' `SO No` column already
+  shows `Manual Purchase` as a value). Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
+  below 768px; no column hidden by width.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods received on` = the physical arrival date and time, stored as a time point with time
