@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useManualMethods } from "@/lib/payment-methods";
+import { requiredPaymentReference } from "@carres/shared";
 import type { CustomerOwingRow } from "./money-owed";
 
 /** One receipt on the order, as the invoice register returns it. */
@@ -55,6 +56,7 @@ export default function ARDrawer({
   const { methods, label: methodLabel } = useManualMethods();
   const recMethod = methods.some((m) => m.value === chosenMethod)
     ? chosenMethod : methods[0]?.value ?? chosenMethod;
+  const refWord = requiredPaymentReference(recMethod); // §16 (0535)
   const soWord = balance.so !== null ? `SO-${balance.so}` : "SO not available";
 
   const recordReceipt = useRecordReceipt({
@@ -71,6 +73,10 @@ export default function ARDrawer({
     const amt = parseFloat(recAmt);
     if (!amt || amt <= 0) {
       toast.error("Amount must be positive");
+      return;
+    }
+    if (refWord && !recRef.trim()) {
+      toast.error(`Enter the ${refWord.toLowerCase()}`);
       return;
     }
     recordReceipt.mutate({
@@ -138,9 +144,9 @@ export default function ARDrawer({
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-label">Reference</span>
+                  <span className="text-label">{refWord ?? "Reference"}</span>
                   <input aria-label="Reference" value={recRef}
-                    placeholder="Bank ref / FPX ref (optional)"
+                    placeholder={refWord ?? "Bank ref / FPX ref (optional)"}
                     onChange={(e) => setRecRef(e.target.value)} className={fieldCls} />
                 </label>
                 <div className="flex gap-2">

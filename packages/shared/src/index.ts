@@ -1614,8 +1614,10 @@ export {
   type PaymentMoneyAccount,
   type PaymentMethodSaveInput,
   recordPaymentInputSchema,
+  requiredPaymentReference,
   collectStorageInput,
   summarizePayments,
+  receivedBeforeInvoice,
   // CARD 4 closing slice (0347) — the ONE "is this a valid payment?" predicate.
   // A voided row stays in the history and counts toward nothing.
   isLivePayment,

@@ -85,10 +85,9 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     sublabel: "Full payment",
     active: true,
     approvalCodeRequired: true,
-    // Bank ships OPTIONAL in the code default so an older POS client (or an
-    // in-flight order missing the answer) never 422s the moment the API
-    // deploys — the operator flips `required` in the SO Maintenance editor.
-    followUps: [{ key: "bank", label: "Bank", options: [...MY_BANKS], required: false }],
+    // KL Gateway 2026-09-18: a card sale names the bank that took it —
+    // required here and forced on in resolvePaymentMethods for any config.
+    followUps: [{ key: "bank", label: "Bank", options: [...MY_BANKS], required: true }],
   },
   {
     key: "installment",
@@ -134,7 +133,10 @@ export function resolvePaymentMethods(
 ): PaymentMethodConfig[] {
   const configured = cfg?.paymentMethods ?? [];
   const src = configured.length > 0 ? configured : DEFAULT_PAYMENT_METHODS;
-  return src.filter((m) => m.active);
+  // A card sale must name its bank, whatever the saved config says.
+  return src.filter((m) => m.active).map((m) => m.key !== "credit" ? m : {
+    ...m, followUps: m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),
+  });
 }
 
 // ---------------------------------------------------------------------------

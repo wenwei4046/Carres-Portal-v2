@@ -34,7 +34,9 @@ import {
   updateOrderInputSchema,
   type AutocountImportResult,
   type StaffTierDto,
+  receivedBeforeInvoice,
 } from "@carres/shared";
+import { invoicePayments } from "./finance/invoices";
 import { userClient, adminClient } from "../lib/supabase";
 import { getStaffContext, isStoreActivated } from "../lib/staff-token";
 import {
@@ -4434,6 +4436,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    received_before: receivedBeforeInvoice(await invoicePayments(sb, id), String(i.issued_at)),
   });
 });
 

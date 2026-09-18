@@ -14,6 +14,7 @@ import {
   type UpdateOpsOrderControlInput,
   type OpsOrderControl,
   type LineStockStatus,
+  requiredPaymentReference,
 } from "@carres/shared";
 import {
   useDeliveryPartners,
@@ -781,6 +782,8 @@ export function StorageCollectWaiver({
   const [chosenMethod, setMethod] = useState<string>("cash");
   const { methods } = useManualMethods();
   const method = methods.some((m) => m.value === chosenMethod) ? chosenMethod : methods[0].value;
+  const [reference, setReference] = useState("");
+  const refWord = requiredPaymentReference(method); // §16 (0535)
 
   // Already cleared → just confirm the gate is open.
   if (collectedAt) {
@@ -840,6 +843,16 @@ export function StorageCollectWaiver({
                 ))}
               </select>
             </div>
+            {refWord && (
+              <input
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder={refWord}
+                aria-label={refWord}
+                className={CELL}
+              />
+            )}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -850,8 +863,13 @@ export function StorageCollectWaiver({
                     toast.error("Enter the amount collected");
                     return;
                   }
+                  if (refWord && !reference.trim()) {
+                    toast.error(`Enter the ${refWord.toLowerCase()}`);
+                    return;
+                  }
                   collect.mutate(
-                    { amount: amt, paidOn: appTodayIso(), method },
+                    { amount: amt, paidOn: appTodayIso(), method,
+                      reference: refWord ? reference.trim() : null },
                     { onSuccess: () => setCollecting(false) },
                   );
                 }}

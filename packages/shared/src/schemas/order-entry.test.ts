@@ -16,8 +16,8 @@ describe("resolvePaymentMethods (0219)", () => {
       const credit = methods.find((m) => m.key === "credit")!;
       expect(credit.followUps[0]?.key).toBe("bank");
       expect(credit.followUps[0]?.options).toEqual([...MY_BANKS]);
-      // Deploy safety: the DEFAULT bank ships optional (older clients never 422).
-      expect(credit.followUps[0]?.required).toBe(false);
+      // KL Gateway 2026-09-18: a card sale names its bank.
+      expect(credit.followUps[0]?.required).toBe(true);
       expect(methods.find((m) => m.key === "cash")!.approvalCodeRequired).toBe(false);
     }
   });
@@ -29,6 +29,14 @@ describe("resolvePaymentMethods (0219)", () => {
     ];
     const methods = resolvePaymentMethods({ paymentMethods: configured });
     expect(methods.map((m) => m.key)).toEqual(["ewallet"]);
+  });
+
+  it("a saved config cannot make the card bank optional", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "credit", label: "Credit / Debit", sublabel: "", active: true, approvalCodeRequired: true,
+        followUps: [{ key: "bank", label: "Bank", options: ["Maybank"], required: false }] },
+    ] });
+    expect(methods[0].followUps[0].required).toBe(true);
   });
 });
 
