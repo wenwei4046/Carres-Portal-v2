@@ -130,8 +130,10 @@ a FAILED read says `Could not be loaded` rather than claiming counted stock. Ext
 their own rows and their own `Extra Qty`.
 
 **The field-width registry** is now real code —
-`apps/web/src/components/register/register-field-widths.ts` — holding UI MASTER §6.8's approved
-starting widths. Receiving's four gaps were measured and added THERE, not guessed on the page:
+`apps/web/src/components/register/register-field-widths.ts` — holding UI MASTER §6.8's parent-scope
+numbers, which that section made authoritative on 2026-09-18 while this card was open. The code
+carries §6.8's MEASURED values (Date 120, Supplier 140, PO Version 265, not the earlier prototype
+118/136/238), and Receiving's four gaps were added to §6.8's own table rather than kept beside it:
 
 | Field | Width | Why |
 |---|---|---|
@@ -154,6 +156,24 @@ starting widths. Receiving's four gaps were measured and added THERE, not guesse
   column words and the absence of every retired one, the arrow that opens a week without
   filtering, the toolbar's active-condition clearing, and the expansion's exact column order with
   no checkbox and no `Ready Stock`.
+
+## Merged with main mid-build
+
+`main` moved four commits while this card was open — the SO Batch build (#1459) and three docs
+rounds (#1461, #1465, #1466). The merge resolved to whoever OWNS each fact:
+
+- **`GoodsMiniTable`** — `soBatchGoodsLayout` and `receivingLayout` are two reading orders in ONE
+  registry, not two tables. This card's own `deliverToHeading` prop is DELETED: main introduced
+  `SUPPLIER_DELIVER_TO_LABEL`, so the word has one home rather than a spelling each page passes in.
+  The Receiving layout changes the destination column's WORD only — its width stays the goods
+  table's own 200, because §6.8's second scope holds a destination list there, not a single name.
+- **UI MASTER §6.8** — main's registry table is now the one truth, with MEASURED values that
+  supersede the prototype numbers this card started from. Receiving's four fields are added as rows
+  IN that table (marked `prototype`, with the rendered-portal measurement owed), and the code
+  registry was re-synced to §6.8's measured numbers.
+- **§6.9** — main's `BUILT 2026-09-18 for SO Batch` heading stands; this card added nothing there.
+- **Purchasing §9.4, COPY and this card** — #1461 merged the same text this branch carried forward,
+  so the resolution is that text plus this card's build record.
 
 ## Measured gaps and honest limits — NOT fixed here
 

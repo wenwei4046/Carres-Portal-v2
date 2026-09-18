@@ -1067,7 +1067,6 @@ export default function OperationReceiving() {
                       label={`Goods on ${receivingDisplayNo(r)}`}
                       lines={expansionLines(r)}
                       receivingLayout
-                      deliverToHeading="Supplier Deliver To"
                       itemHeading="Items"
                     />
                   </div>

@@ -11,7 +11,10 @@
  * once, rather than nudged on the page that noticed.
  *
  * ```
- * These are PROTOTYPE STARTING WIDTHS, not verified production maxima.
+ * The number is the WIDEST MEASURED requirement across the pages that show
+ * the field — a field that fits on one page and clips on another is not one
+ * field. Where UI MASTER §6.8 marks an entry `prototype` it has not been
+ * measured yet, and a prototype that clips a governed value is WRONG:
  * Required numbers never truncate; content may wrap; user resizing stays.
  * Validate actual fonts, longest values, 200% zoom and 1440/1180/820/390
  * before production, and fix the shared definition when one fails.
@@ -24,7 +27,7 @@ export const REGISTER_FIELD_WIDTH = {
   /** Checkbox / disclosure gutter, each. */
   control: 40,
   /** A short date — `Wed, 16 Sep`. */
-  date: 118,
+  date: 120,
   /** A formal document number: `PO-…`, `MPR-…`, `GRN-…`. */
   documentNo: 170,
   soNo: 90,
@@ -35,7 +38,7 @@ export const REGISTER_FIELD_WIDTH = {
   category: 112,
   qty: 64,
   items: 208,
-  supplier: 136,
+  supplier: 140,
   supplierDeliverTo: 150,
   customer: 150,
   customerDeliveryLocation: 176,
@@ -48,8 +51,11 @@ export const REGISTER_FIELD_WIDTH = {
   sourceAndUnitId: 230,
   unitId: 140,
   condition: 120,
-  purposeRequestedBy: 144,
-  poVersionWithSendEvidence: 238,
+  purpose: 150,
+  requestedBy: 144,
+  approvalStatus: 188,
+  orderBy: 112,
+  poVersionWithSendEvidence: 265,
 
   /* ── RECEIVING'S THREE ADDITIONS — measured 2026-09-18 against this page's
      approved columns (PURCHASING CARD 12). Each was a gap the registry could

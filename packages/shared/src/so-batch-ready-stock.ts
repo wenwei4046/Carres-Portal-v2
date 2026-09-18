@@ -60,8 +60,41 @@ export const readyStockUnitSchema = z.object({
   /** A counted row stands for several pieces; an exact Unit stands for one. */
   qty: z.number().int(),
   dateIn: z.string().nullable(),
+  /**
+   * ⭐ THE DOCUMENT THE GOODS CAME IN ON — owner ruling 2026-09-18.
+   *
+   * `stock_unit_register_v.po_no`, the provenance the warehouse recorded, and
+   * the first line of the picker's combined `PO No / Ref No` cell. Optional on
+   * the wire so a browser on this build against an older Worker says the
+   * reference is not recorded rather than inventing one. **A missing document
+   * is never a reason to invent a PO number.**
+   */
+  poNo: z.string().nullable().optional(),
   /** The order's item lines this Unit could answer, by the portal's one key. */
   matchingLineIds: z.array(z.string()),
+  /**
+   * ⭐ EVERY item line of this order whose GOODS these are, need or no need.
+   *
+   * `matchingLineIds` answers *which line may this Unit be committed to now*,
+   * so it empties the moment a line is covered. The per-item cell asks a
+   * different question — *what is on the shelf for this item line* — and a
+   * covered line whose shelf is full must not read as an empty shelf. Optional
+   * on the wire; a browser reading an older Worker falls back to the needing
+   * lines rather than inventing a match.
+   */
+  lineIds: z.array(z.string()).optional(),
+  /**
+   * ⭐ THE SAVED RESERVATION, CARRIED BY THE UNIT ITSELF — owner ruling
+   * 2026-09-18 ("saved reservations remain accessible even if available stock
+   * is zero").
+   *
+   * A Unit already committed to one of this order's item lines is NOT free, so
+   * the availability read cannot see it — and before this the picker simply
+   * lost it the moment it was saved. It is read back by `reserved_order_line_id`
+   * and rides here, so `Change selection` can show, and remove, exactly what
+   * was saved. `null` on every free Unit.
+   */
+  reservedForLineId: z.string().nullable().optional(),
   /** Why the Unit cannot be chosen, when it cannot. `null` = choosable. */
   blocked: z
     .enum(["counted_stock", "no_line_needs_it"])
@@ -117,6 +150,40 @@ export const readyStockReserveResultSchema = z.object({
 export type ReadyStockReserveResult = z.infer<typeof readyStockReserveResultSchema>;
 
 /**
+ * ── THE SAVE: ONE ITEM LINE'S WHOLE CHOSEN SET ────────────────────────────
+ *
+ * Owner ruling 2026-09-18. The operator edits a DRAFT freely and then commits
+ * the set — which may ADD Units, REMOVE Units, or remove all of them.
+ *
+ * ⭐ IT IS A REPLACEMENT, NOT A SEQUENCE OF LITTLE ACTS. The door works out the
+ * difference against what is saved RIGHT NOW and applies releases and draws
+ * inside ONE transaction: all or none. Sequential partial releases and
+ * reservations would leave a customer's line half-answered whenever the second
+ * half was refused, and every refusal in between is another race.
+ *
+ * `itemIds` is the COMPLETE intended set for this item line. An empty array is
+ * a real instruction — remove every saved choice — which is why it has no
+ * `.min(1)`.
+ */
+export const readyStockSaveInputSchema = z.object({
+  orderId: z.string().min(1),
+  orderLineId: z.string().uuid(),
+  itemIds: z.array(z.string().uuid()).max(50),
+});
+export type ReadyStockSaveInput = z.infer<typeof readyStockSaveInputSchema>;
+
+export const readyStockSaveResultSchema = z.object({
+  /** How many Units the line now stands at, after the replacement. */
+  reserved: z.number().int(),
+  /** How many the act added, and how many it gave back. Both are stated. */
+  added: z.number().int(),
+  released: z.number().int(),
+  reference: z.string(),
+  units: z.array(z.object({ itemId: z.string(), orderLineId: z.string() })),
+});
+export type ReadyStockSaveResult = z.infer<typeof readyStockSaveResultSchema>;
+
+/**
  * WHY A UNIT CANNOT BE CHOSEN, in the operator's words.
  *
  * Every string here is a FACT about the goods, never an instruction and never
@@ -155,6 +222,11 @@ export const READY_STOCK_REFUSAL_WORDS: Record<string, string> = {
      about a fact they share. */
   unit_no_longer_free: "Someone else took that Unit.",
   no_units_chosen: "Choose a Unit first.",
+  /* The release half of a replacement. A Unit that will not come back keeps
+     the whole act from happening, so nothing is half-applied. */
+  unit_not_reserved_here: "That Unit is no longer reserved to this item line.",
+  unit_cannot_be_released: "That Unit cannot be given back — it has already left the shelf.",
+  order_line_not_in_order: "That item line is no longer on this Sales Order.",
   too_many_units: "Choose at most 50 Units at a time.",
   no_reference: "This Sales Order has no number yet.",
 };
