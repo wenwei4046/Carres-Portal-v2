@@ -26,10 +26,8 @@ export default function FinanceSubscriptionMonth() {
     { key: "customer", label: "Customer", width: 200, accessor: (r) => r.customerName ?? "—",
       searchValue: (r) => `${r.customerName ?? ""} ${r.customerPhone ?? ""}` },
     { key: "phone", label: "Phone", width: 130, accessor: (r) => r.customerPhone ?? "—" },
-    { key: "so", label: "Sales Order", width: 120, accessor: (r) => (r.orderSo ? `SO-${r.orderSo}` : "—"),
-      searchValue: (r) => r.orderSo ?? "" },
-    { key: "agreement", label: "Agreement", width: 130, accessor: (r) => r.agreementNo,
-      searchValue: (r) => r.agreementNo },
+    { key: "so", label: "Sales Order", width: 120, accessor: (r) => (r.orderSo ? `SO-${r.orderSo}` : "—") },
+    { key: "agreement", label: "Agreement", width: 130, accessor: (r) => r.agreementNo },
     { key: "amount", label: "Amount", width: 120, align: "right", accessor: (r) => rm(r.amountDue),
       numberValue: (r) => r.amountDue, filterType: "number", exportValue: (r) => r.amountDue },
     { key: "due", label: "Due Date", width: 120, accessor: (r) => fmtDate(r.dueDate),
@@ -37,8 +35,7 @@ export default function FinanceSubscriptionMonth() {
     { key: "late", label: "Days Late", width: 100, align: "right",
       accessor: (r) => (r.daysLate > 0 ? String(r.daysLate) : "Not late"),
       numberValue: (r) => r.daysLate, filterType: "number" },
-    { key: "salesperson", label: "Salesperson", width: 160, accessor: (r) => r.salespersonName ?? "—",
-      filterValue: (r) => r.salespersonName ?? "—", filterType: "enum" },
+    { key: "salesperson", label: "Salesperson", width: 160, accessor: (r) => r.salespersonName ?? "—", filterType: "enum" },
   ], []);
 
   const figure = (n: number | undefined) => (q.isSuccess && n != null ? rm(n) : null);

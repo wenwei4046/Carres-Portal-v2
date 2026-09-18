@@ -259,7 +259,7 @@ export function rentalMonthView(rows: RentalMonthBilling[], today: string): Rent
   const live = rows.filter((r) => r.status !== "waived" && r.status !== "written_off");
   const paid = live.filter((r) => r.status === "paid");
   const unpaid = live.filter((r) => r.status !== "paid");
-  const sum = (xs: number[]) => round2(xs.reduce((a, x) => a + Number(x ?? 0), 0));
+  const sum = (xs: number[]) => round2(xs.reduce((a, x) => a + x, 0));
   const todayMs = Date.parse(`${today}T00:00:00Z`);
   return {
     due: sum(live.map((r) => r.amountDue)),
@@ -267,7 +267,7 @@ export function rentalMonthView(rows: RentalMonthBilling[], today: string): Rent
     outstanding: sum(unpaid.map((r) => r.amountDue)),
     unpaid: unpaid.map((r) => ({
       ...r,
-      daysLate: Math.max(0, Math.floor((todayMs - Date.parse(`${r.dueDate}T00:00:00Z`)) / 86_400_000)),
+      daysLate: Math.max(0, Math.floor((todayMs - Date.parse(`${r.dueDate}T00:00:00Z`)) / MS_PER_DAY)),
     })),
   };
 }
