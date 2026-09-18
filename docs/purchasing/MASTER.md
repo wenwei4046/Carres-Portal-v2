@@ -2158,9 +2158,8 @@ Warehouse submits count                (or Operation enters goods directly)
 - **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
   Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
   View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
-  proposal is superseded. The page is: left, the 240px rail with the full month Calendar FIXED
-  on top and the business filters scrolling independently beneath it; right, always the complete
-  GRN Register. The right side never becomes a weekly calendar and never shows work cards —
+  proposal is superseded. The page is: left, the 240px factual rail (GRN date and the business
+  filters, portal-wide rail style); right, always the complete GRN Register. The right side never becomes a weekly calendar and never shows work cards —
   daily Receiving actions stay in My Work / Team Work.
 - **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
   Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
@@ -2168,29 +2167,27 @@ Warehouse submits count                (or Operation enters goods directly)
   in Work and deep-links to its Receiving review; it becomes a Register row only when
   `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
   waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
-- **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
-  database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
-  name.
-- **THE RAIL MONTH CALENDAR (owner correction 2026-09-06, second ruling).** The full month
-  Calendar stays fixed at the top of the rail; the ‹ › arrows move exactly one month. Sunday
-  stays visible for understanding the month and wears the muted non-working state — Receiving
-  follows the Warehouse working calendar, Monday–Saturday. A date with expected supplier
-  arrivals prints a visible COUNT (colour is never the only signal, and the day's aria sentence
-  says it in words); expected dates come from the linked POs' governed `Supplier Delivery Date`
-  (`poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
-  marks a day, and a fully received or closed PO stops being expected). Selecting a date filters
-  the SAME right-hand GRN Register by that Supplier Delivery Date; selecting it again, or
-  `Clear filters`, restores the complete listing. The Calendar shows no work cards.
-- **The Filter Rail (owner correction §2)** holds, beneath the Calendar: `CATEGORY` ·
-  `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED AT` (the receiving
-  locations present in the records) · `Clear filters`. CATEGORY shows ONLY the governed rows
-  actually present in the Receiving result set, in the shared display order (`Mattress` ·
-  `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
-  protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
-  table's `GRN Date` column owns detailed creation-date filtering; physical `Goods received on` stays in detail. Re-clicking the active row
-  clears its section. Category comes from the governed catalog truth through the ONE shared
-  ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
-  never derives its own category from SKU text.
+- **Document status — APPROVED / NOT BUILT (Jess, 2026-09-17).** A normal GRN shows no status label.
+  A cancelled GRN shows `Cancelled` under its GRN No. `Valid` and the Status column are retired.
+  `Posted`/`Voided` remain internal database statuses and never reach a normal user's screen;
+  `Void Receiving` stays the act's name.
+- **THE RECEIVING RAIL — APPROVED / NOT BUILT (Jess, 2026-09-17).** The month calendar is removed;
+  the expected-arrival view lives in Warehouse Arrival Schedule. The rail uses the portal-wide rail
+  style (UI MASTER §6.7) and carries no explanatory sentences. Groups, in order:
+  - `GRN date` — the date each GRN was created: weeks (e.g. `14 – 20 Sep`), months and
+    `Choose dates…`. The arrow beside a week only expands it into its days and never filters;
+    pressing a week, month or day filters. Only days with GRNs are listed, Sunday included.
+  - `Received with` — `Damaged goods` · `Wrong items` · `Extra goods`. A record of what was found
+    at receiving, not a to-do list. Counted by GRN; one GRN may appear in more than one row.
+  - `Category` — only the governed categories present, in the shared display order (`Mattress` ·
+    `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`); counted by GRN, a GRN with several
+    categories counts in each. Category comes from the ONE shared ladder (`goodsCategoryWordOf`).
+  - `Goods arrived at` — the receiving locations present.
+  - `Supplier` — the suppliers present.
+  - last row `Cancelled GRNs`.
+  One choice per group; no `Any` or `All …` rows. Rail counts, table rows and the footer
+  (`Showing 1–{n} of {total}`) come from the same complete server-side filtered set, never the
+  loaded page. `Clear filters` restores the complete listing.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
@@ -2199,14 +2196,16 @@ Warehouse submits count                (or Operation enters goods directly)
   filters, Columns and Export stay; a changed filter or search term returns to page 1.
 - **Register columns — APPROVED / NOT BUILT (Jess, 2026-09-17):** `GRN Date · GRN No ·
   Supplier Delivery Date · PO/CO No · Supplier · Product · Deliver To · Goods arrived at ·
-  Received Qty · Status`, followed by Supplier DO No. and damaged/wrong/extra quantities.
+  Received Qty`, followed by Supplier DO No. and damaged/wrong/extra quantities.
   GRN Date is record creation, distinct from physical Goods received on, which stays in detail.
-  Supplier Delivery Date remains the evidenced linked-PO date used by the calendar; absent evidence
-  reads Not confirmed. Product retains GRN paper line words. Pin date and GRN No at canvas ≥768px,
-  GRN No alone below768. Other Receiving audit proposals are not approved by this date-first ruling.
+  Supplier Delivery Date remains the evidenced linked-PO date; absent evidence reads Not confirmed. Product retains GRN paper line words. Pin date and GRN No at canvas ≥768px,
+  GRN No alone below 768px.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
-  `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`
+  `Goods received on` = the physical arrival date and time, stored as a time point with time
+  zone and shown in `Asia/Kuala_Lumpur` on screen and PDF (APPROVED / NOT BUILT, 2026-09-17; the
+  column is date-only today). An older record keeps its date and shows `Time not recorded`; it is
+  never back-filled to midnight or to the save time. `Actual Site`, `Delivery Location`
   and `Goods Received At` are retired from every Receiving surface, filter, table, export, GRN
   and report; `Delivery Location` stays reserved for the customer's delivery address.
 - **The formal GRN document (owner correction §4).** Every GRN renders as a real official A4
@@ -2284,13 +2283,24 @@ Warehouse submits count                (or Operation enters goods directly)
   Inventory or the pending arithmetic.
 - Quantity words stay `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
   `Pending Delivery Qty`; damaged/wrong/extra never reduce Pending Delivery Qty and never create
-  available stock. `Goods received on` is the physical arrival date only.
-- **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) requires a reason,
-  records before/after in an append-only `amended` event, recalculates the PO counters and stock
-  safely, and refuses by name when goods moved on (`threads_block_amend` · `units_block_amend`).
-  Damaged/wrong corrections belong to their claims, not to Amend. `Void Receiving`
-  (`receiving_void`) is only for a GRN that should never have existed: full exact reversal when
-  safe, a named blocker otherwise (`claims_block_void` · `threads_block_void` ·
+  available stock. `Goods received on` is the physical arrival date and time (see above).
+- **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) corrects a recording
+  mistake only; damage or returns found later go to Supplier Claims / returns, never rewritten as
+  "not received". **APPROVED / NOT BUILT (Jess, 2026-09-17):**
+  - The person names each exact Unit in both directions (`Received` ↔ `Not received`); the system
+    never picks another Unit (today the function picks the newest free or oldest incoming Unit —
+    that behaviour is retired). Received Qty is counted from the named Unit outcomes. Quantity lines
+    keep quantity edits.
+  - Checks follow what changes. A change to a Unit outcome or to `Goods arrived at` is refused per
+    affected Unit that is reserved, on a DO, delivered or on a Supplier Claim (the Claim check is
+    added), naming the reason on that Unit. Corrections to Supplier DO No. and evidence are not
+    blocked by other locked Units, but still pass permission and audit.
+  - Concurrency: the first save wins; a later save based on an older version is refused as a whole
+    with `Someone changed this GRN. Check it again.` Nothing is partly saved.
+  - Every amendment keeps reason, before/after, actor and time in the append-only history and prints
+    on the GRN.
+  `Void Receiving` (`receiving_void`) is only for a GRN that should never have existed: full exact
+  reversal when safe, a named blocker otherwise (`claims_block_void` · `threads_block_void` ·
   `units_block_void`), the record and number preserved forever. Every physical arrival creates a
   NEW session and a NEW GRN — a later arrival is never edited into an earlier one.
 - **Work**: the `Goods to receive` queue projects into My Work / Team Work from two triggers only
