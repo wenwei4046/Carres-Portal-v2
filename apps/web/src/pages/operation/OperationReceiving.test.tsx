@@ -691,7 +691,8 @@ describe("OperationReceiving — the formal GRN Register", () => {
       "Goods arrived at",
       "Supplier Confirmed Delivery Date",
       "Goods Received Date",
-      "Supplier DO No.",
+      // `No` takes NO full stop (owner ruling 2026-09-18).
+      "Supplier DO No",
       "Items",
       "Received Qty",
       "Damaged Qty",

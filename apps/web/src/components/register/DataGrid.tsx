@@ -1453,6 +1453,43 @@ function DataGridInner<T>({
     return out;
   }, [sortedRows, layout.groupBy, columns, collapsedGroups, fixedGroups]);
 
+  /**
+   * ⭐ GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18. This supersedes the
+   * single global header above all groups.
+   *
+   * A governed grouped listing reads: `heading → column header → records`, per
+   * group. A collapsed group is its heading and its count and nothing else — a
+   * column header over no records names columns nobody is reading. The header
+   * belongs to the group it describes, so it stops at that group's boundary
+   * rather than sitting over the next group's rows.
+   *
+   * It is the ENGINE's behaviour, not a page's: every register that hands the
+   * grid governed `fixedGroups` gets it, and none of them gains or loses a
+   * group, a default expansion or a business rule by it. The embedded
+   * drill-down grid keeps its plain static header — it has no scroll container
+   * of its own for anything to stick to.
+   */
+  const groupLocalHeaders = fixedGroups != null && !embedded;
+
+  /** Every group table is exactly as wide as the columns, so the groups line
+   *  up with each other and with the horizontal scrollbar under them. */
+  const groupedTableWidth = useMemo(
+    () => visibleColumns.reduce((sum, col) => sum + Number(layout.widths[col.key] ?? col.width ?? 140), 0),
+    [visibleColumns, layout.widths],
+  );
+
+  /** One section per governed group: its heading, then the rows under it. */
+  const groupSections = useMemo(() => {
+    if (!groupLocalHeaders) return [];
+    type Section = { group: Extract<Render, { kind: "group" }>; rows: Render[]; index: number };
+    const out: Section[] = [];
+    renderList.forEach((item, index) => {
+      if (item.kind === "group") out.push({ group: item, rows: [], index });
+      else if (out.length > 0) out[out.length - 1]!.rows.push(item);
+    });
+    return out;
+  }, [groupLocalHeaders, renderList]);
+
   /* The no-match state carries its own complete `Clear filters`; the condition
      strip above it then keeps its removable chips but not a second, identical
      button (one act, one control on screen). */
@@ -1972,6 +2009,122 @@ function DataGridInner<T>({
   const padBottom = virtualItems.length
     ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
     : 0;
+
+  /**
+   * ⭐ ONE HEADER DEFINITION, DRAWN WHERE ITS RECORDS ARE (Jess, 2026-09-18).
+   *
+   * A grouped listing has no single header above every group. `inGroup` is the
+   * SAME cells, rendered inside a group's own `<tbody>` between that group's
+   * heading and its records, where they pin to the top of the viewport until
+   * the group ends. Nothing about a column changes with the flag: one
+   * `visibleColumns`, one `layout.widths`, one `layout.sort`, one resize
+   * handle — so every group is the same table, not four tables that agree.
+   */
+  const headerCells = (inGroup: boolean) =>
+      visibleColumns.map((col) => {
+        const w = layout.widths[col.key] ?? col.width ?? 140;
+        const style: CSSProperties = {
+          width: w,
+          minWidth: col.minWidth ?? 40,
+          ...pinStyle(col.key),
+        };
+        const isSorted = layout.sort?.key === col.key;
+        const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
+        if (col.key === "__select__" && selectable) {
+          /* Select-all means "every row that CAN be selected". A header
+             box that stays indeterminate forever because three rows can
+             never be ticked is a control that lies about its own state. */
+          const keys = sortedRows
+            .filter((r) => selectable.isSelectable?.(r as never) ?? true)
+            .map(rowKey);
+          const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
+          const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
+          return (
+            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={style}>
+              <span className={styles.thInner}>
+                <input
+                  type="checkbox"
+                  aria-label="Select all rows"
+                  checked={allSel}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSel;
+                  }}
+                  onChange={() => selectable.onToggleAll(keys, allSel)}
+                />
+              </span>
+            </th>
+          );
+        }
+        return (
+          <th
+            key={col.key}
+            scope="col"
+            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
+              dropTarget === col.key ? styles.thDragOver : ""
+            }${pinClass(col.key)}`}
+            style={style}
+            draggable={!leadingKeys.includes(col.key)}
+            onDragStart={(e) => onDragStartHeader(e, col.key)}
+            onDragOver={(e) => onDragOverHeader(e, col.key)}
+            onDragLeave={() => setDropTarget(null)}
+            onDrop={(e) => onDropHeader(e, col.key)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtx({ x: e.clientX, y: e.clientY, colKey: col.key });
+            }}
+            title={col.label}
+          >
+            <span className={styles.thInner}>
+              {col.sortable !== false ? (
+                <button
+                  type="button"
+                  className={styles.sortBtn}
+                  aria-label={col.headerLines ? col.label : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSort(col.key);
+                  }}
+                >
+                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
+                  {arrow && <span className={styles.sortArrow}>{arrow === "A" ? "^" : "v"}</span>}
+                </button>
+              ) : (
+                col.label
+              )}
+              {col.key !== "__expand__" && col.key !== "__select__" && col.filterable !== false && (
+                <button
+                  type="button"
+                  title="Filter this column"
+                  aria-label={`Filter ${col.label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: 0,
+                    padding: "0 2px",
+                    marginLeft: 2,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color:
+                      (filters[col.key]?.length ?? 0) > 0 ||
+                      dateFilters[col.key] ||
+                      numberFilters[col.key] ||
+                      dateRangeFilters[col.key]
+                        ? "var(--c-orange)"
+                        : "var(--fg-soft)",
+                  }}
+                >
+                  <Filter size={11} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </span>
+            <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
+          </th>
+        );
+      });
 
   /* One grid row (group banner OR data row + optional expansion). Extracted so
      the normal path and the virtualized window render through the same code. */
@@ -2910,117 +3063,64 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}>
-          <thead
-            className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
-            data-testid={isReference ? "grid-header" : undefined}
-          >
-            <tr>
-              {visibleColumns.map((col) => {
-                const w = layout.widths[col.key] ?? col.width ?? 140;
-                const style: CSSProperties = {
-                  width: w,
-                  minWidth: col.minWidth ?? 40,
-                  ...pinStyle(col.key),
-                };
-                const isSorted = layout.sort?.key === col.key;
-                const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
-                if (col.key === "__select__" && selectable) {
-                  /* Select-all means "every row that CAN be selected". A header
-                     box that stays indeterminate forever because three rows can
-                     never be ticked is a control that lies about its own state. */
-                  const keys = sortedRows
-                    .filter((r) => selectable.isSelectable?.(r as never) ?? true)
-                    .map(rowKey);
-                  const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
-                  const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
-                  return (
-                    <th key={col.key} className={`${styles.th}${pinClass(col.key)}`} style={style}>
-                      <span className={styles.thInner}>
-                        <input
-                          type="checkbox"
-                          aria-label="Select all rows"
-                          checked={allSel}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someSel;
-                          }}
-                          onChange={() => selectable.onToggleAll(keys, allSel)}
-                        />
-                      </span>
-                    </th>
-                  );
-                }
-                return (
-                  <th
-                    key={col.key}
-                    className={`${styles.th} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
-                      dropTarget === col.key ? styles.thDragOver : ""
-                    }${pinClass(col.key)}`}
-                    style={style}
-                    draggable={!leadingKeys.includes(col.key)}
-                    onDragStart={(e) => onDragStartHeader(e, col.key)}
-                    onDragOver={(e) => onDragOverHeader(e, col.key)}
-                    onDragLeave={() => setDropTarget(null)}
-                    onDrop={(e) => onDropHeader(e, col.key)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setCtx({ x: e.clientX, y: e.clientY, colKey: col.key });
-                    }}
-                    title={col.label}
-                  >
-                    <span className={styles.thInner}>
-                      {col.sortable !== false ? (
-                        <button
-                          type="button"
-                          className={styles.sortBtn}
-                          aria-label={col.headerLines ? col.label : undefined}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSort(col.key);
-                          }}
-                        >
-                          {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
-                          {arrow && <span className={styles.sortArrow}>{arrow === "A" ? "^" : "v"}</span>}
-                        </button>
-                      ) : (
-                        col.label
-                      )}
-                      {col.key !== "__expand__" && col.key !== "__select__" && col.filterable !== false && (
-                        <button
-                          type="button"
-                          title="Filter this column"
-                          aria-label={`Filter ${col.label}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterMenu({ colKey: col.key, x: e.clientX, y: e.clientY });
-                          }}
-                          style={{
-                            background: "transparent",
-                            border: 0,
-                            padding: "0 2px",
-                            marginLeft: 2,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            color:
-                              (filters[col.key]?.length ?? 0) > 0 ||
-                              dateFilters[col.key] ||
-                              numberFilters[col.key] ||
-                              dateRangeFilters[col.key]
-                                ? "var(--c-orange)"
-                                : "var(--fg-soft)",
-                          }}
-                        >
-                          <Filter size={11} strokeWidth={2} aria-hidden />
-                        </button>
-                      )}
-                    </span>
-                    <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+        {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
+            This SUPERSEDES the single global header.
+
+            A governed grouped listing is one table PER GROUP, in one scroll
+            container. That structure is not decoration: a sticky cell is held
+            by the table it is in, so each group's heading and column header
+            travel with the operator through that group's OWN records and stop
+            dead at its boundary, instead of standing over the next group's
+            rows. (A shared `<tbody>` per group does not do this — a table
+            cell's containing block is the table, and the header simply
+            escapes into the group below. Measured in Chromium, 2026-09-18.)
+
+            What the groups SHARE is the whole point, and it is shared by
+            construction rather than by agreement: one `visibleColumns`, one
+            `layout.widths` `<colgroup>`, one `layout.sort`, one resize handle,
+            `table-layout: fixed` so a long value in one group cannot widen a
+            column in that group alone. Four headers have nothing left to
+            disagree about. */}
+        {groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0
+          ? groupSections.map((section) => (
+              <table
+                key={`gs-${section.group.path}`}
+                className={`${styles.table} ${styles.tablePinnedBlock} ${styles.tableGrouped}`}
+                style={{ width: groupedTableWidth }}
+                data-testid={`grid-section-${section.group.path}`}
+              >
+                <colgroup>
+                  {visibleColumns.map((col) => (
+                    <col key={col.key} style={{ width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                  ))}
+                </colgroup>
+                <thead className={styles.thead}>
+                  {renderGridRow(section.group, section.index)}
+                  {/* A collapsed group is its heading and its count. A column
+                      header over no records names columns nobody is reading. */}
+                  {!section.group.collapsed && (
+                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
+                  )}
+                </thead>
+                <tbody className={styles.tbody}>
+                  {section.rows.map((item, i) => renderGridRow(item, section.index + 1 + i))}
+                </tbody>
+              </table>
+            ))
+          : null}
+        <table
+          className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
+          hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
+        >
+          {/* A flat register keeps the one sticky header it has always had. */}
+          {!groupLocalHeaders && (
+            <thead
+              className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
+              data-testid={isReference ? "grid-header" : undefined}
+            >
+              <tr>{headerCells(false)}</tr>
+            </thead>
+          )}
           <tbody className={styles.tbody}>
             {isLoading && <SkeletonRows cols={totalCols || 1} rows={12} />}
             {!isLoading && errorState != null && (
@@ -3038,7 +3138,11 @@ function DataGridInner<T>({
               </tr>
             )}
             {/* Small / grouped / expandable lists: render every row (unchanged). */}
-            {!isLoading && errorState == null && !canVirtualize && renderList.map((item, idx) => renderGridRow(item, idx))}
+            {!isLoading && errorState == null && !canVirtualize && !groupLocalHeaders &&
+              renderList.map((item, idx) => renderGridRow(item, idx))}
+            {/* A grouped listing with nothing to show still needs its loading,
+                failure and empty states, and they belong in one table across
+                the whole width — not repeated once per group. */}
             {/* Large flat lists: windowed — only the visible slice is in the DOM,
                with spacer rows reserving the scroll height above and below. */}
             {!isLoading && errorState == null && canVirtualize && (

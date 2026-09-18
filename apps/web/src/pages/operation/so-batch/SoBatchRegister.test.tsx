@@ -346,6 +346,13 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
  * are and rise above the customer's name. This is the owner's exact order; a
  * general ordering heuristic may not rearrange it.
  */
+/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
+   `<thead>` — every OPEN group draws the same header between its heading and
+   its records. One `<colgroup>` and one layout serve them all, so reading the
+   first group's header reads the layout. */
+const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
+  ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+];
 describe("the approved columns, in the approved reading order", () => {
   const APPROVED = [
     "Status",
@@ -364,7 +371,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("draws exactly the twelve business columns, in the owner's order", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll("thead th")]
+    const heads = groupHeaderCells(container)
       .map((el) => el.textContent ?? "")
       .filter((t) => t.trim() !== "");
     expect(heads).toHaveLength(APPROVED.length);
@@ -378,7 +385,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("says `Need PO` / `No PO needed`, and nothing about progress", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     expect(text).not.toContain("Partial");
     expect(text).not.toContain("Ordered");
     expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Need PO");
@@ -389,14 +396,14 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("retires `Order By` as a column and keeps it on the wire", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     expect(text).not.toContain("Order By");
     expect(LEAF_O1.orderBy ?? null).not.toBeUndefined();
   });
 
   it("the retired columns are gone from the Register", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     for (const gone of [
       "Source SO",
       "Required For",
@@ -434,7 +441,7 @@ describe("the approved columns, in the approved reading order", () => {
    */
   it("leads Status · Proceed Date · SO No, and pins only the pair (§6.7 rule 2)", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll<HTMLElement>("thead th")];
+    const heads = groupHeaderCells(container);
     const data = heads.filter((th) => th.title);
     expect(data.slice(0, 4).map((th) => th.title)).toEqual([
       "Status",
@@ -2320,8 +2327,11 @@ describe("search, clear and default buying order", () => {
 });
 
 describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
+  /* Group-local headers (Jess, 2026-09-18): each group is its own table, its
+     heading riding in that table's `<thead>` beside its column header. Reading
+     both sections keeps the document order this test is about. */
   const rowsIn = (container: HTMLElement) =>
-    [...container.querySelectorAll("tbody tr")].map((tr) =>
+    [...container.querySelectorAll("thead tr, tbody tr")].map((tr) =>
       tr.getAttribute("data-testid") ?? tr.textContent ?? "");
 
   it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {

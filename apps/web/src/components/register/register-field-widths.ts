@@ -97,9 +97,9 @@ export const REGISTER_FIELD_WIDTH = {
    */
   receiptQty: 112,
   /**
-   * `Supplier DO No.` — THEIRS, not ours, so it obeys no Carres format and
+   * `Supplier DO No` — THEIRS, not ours, so it obeys no Carres format and
    * has no upper bound the registry can prove. The two-line header
-   * (`Supplier` / `DO No.`) needs about 60px at 11px/600 plus the sort and
+   * (`Supplier` / `DO No`) needs about 60px at 11px/600 plus the sort and
    * filter affordances; the values seen in production are 8–14 characters at
    * 13px mono (≈110px) plus the shared 16px of padding. 150 holds every one
    * of them and matches the other identity-ish columns beside it; a longer

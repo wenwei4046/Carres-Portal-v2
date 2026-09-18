@@ -875,6 +875,21 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+### Repair Orders creation and locations — owner ruling 2026-09-18
+
+`Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom
+or Dealer locations; it is not permission for an unlinked free-text goods order. Supplier Claim
+is an optional source, not a mandatory prerequisite. Business authority: Purchasing MASTER §9.7.
+Exact words: `RO Doc Date` · `RO No` · `Supplier` · `Supplier Claim No` ·
+`Supplier Pickup Location` · `Supplier Return Location` · `Expected Return Date` ·
+`Repair Requirement` · `Repair Quotation` · `Cost Responsibility` · `Approval`.
+Supplier is the repair-order recipient, not necessarily the original PO supplier. Location words
+name intended pickup and return sites; neither asserts a physical movement or supplier transport.
+`Repair Location`, `Repair by`, and `Repairer` are not this register's headings. Use `Problem` and
+`Evidence` as separate columns. Rejected prototype rail copy is not admitted here; missing records
+must never be labelled as proof that sending or movement did not happen. Existing Issue recording
+and shared evidence-viewer words continue to apply. Scope is approved target, not a built feature.
+
 ### Purchase Returns register — owner-confirmed UI, 2026-09-18
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·
@@ -942,7 +957,9 @@ Preserve older version sending evidence without claiming the current version is 
 Never claim supplier receipt, reading or acceptance from a sent mark. Staff send externally
 before marking; the Portal cannot observe WhatsApp sending without an API.
 
-**PURCHASE ORDERS REGISTER — APPROVED / NOT BUILT (Jess, 2026-09-18).**
+**PURCHASE ORDERS REGISTER — APPROVED / LOCKED (Jess, 2026-09-18) · BUILT 2026-09-18 ·
+production walk OWED.** Approval is not production proof; Purchasing MASTER §9.3 carries the three
+statuses apart.
 
 Columns, exactly: `PO Date · PO No · SO No / MPR No · Supplier · Items ·
 Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version`.
@@ -953,30 +970,40 @@ Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery D
 | GRN creation date; physical arrival is separately Goods Received Date | `GRN Date` |
 | DO issue date | `DO Date` |
 | Separate delivery facts | `PO Default Delivery Date` · `Supplier Confirmed Delivery Date` · `Goods Received Date` |
-| Supplier reply missing / confirmed / changed | `Not confirmed by supplier` · `Confirmed by supplier` · `Supplier changed from {date}` |
+| `Supplier Confirmed Delivery Date` with no answer | `Not confirmed` (the dictionary's word for THIS column — its head already says whose date it is) |
+| The supplier moved the date, second line | `Supplier changed from {date}` |
+| `Not confirmed by supplier` · `Confirmed by supplier` | RETIRED on this listing with the merged `Expected Delivery Date` cell they explained |
+| A receipt record that carries no arrival clock | `Time not recorded`, under the date |
 | Unknown original date | `Not recorded` |
 | Current version | `PO V{n}` |
 | Current version sending evidence, supporting line | `PO sent to supplier · {channel} · {date}` / `Sending not confirmed` |
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
-| Manual source in SO No column | `Manual Purchase` |
+| Multiple physical receipts | `{n} receipt dates` |
+| Manual source in `SO No / MPR No` | the request's stored `MPR-YYYYMMDD-RRRR`; `Manual Purchase` ONLY where no number is stored (owner ruling 2026-09-18, overwriting the 2026-09-04 MPR retirement). Never a UUID, never a minted number |
+| Exact-unit PO line with no Unit IDs | `Unit IDs missing on this line — do not send this PO` |
+| Quantity-managed PO line's Unit ID cell | `—` |
+| The Unit ID read has not answered / failed | `Reading Unit IDs…` · `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
+| The list behind `{n} receipt dates` / `{n} GRNs` | title `Receipts on {PO No}`; columns `Goods Received Date` · `GRN No` · `Received Qty` |
 | Goods summary | one item name / `{first item} + {n} more` |
 | Shared send-area prompt after opening channel | `Send the PDF, then press PO sent to supplier.` |
 | Footer | `{n} purchase orders` · `{n} of {m} purchase orders` · `1 purchase order` |
 
 Groups: `Confirm PO sent to supplier` · `Waiting for goods from supplier` · `Completed` · `Cancelled`; membership and sorting are
 owned by Purchasing MASTER §9.3. No quantity totals in the PO listing footer.
-Expansion: `SKU · Item / configuration · Qty · Deliver To` (read-only).
+Expansion: `Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items` (read-only;
+approved 2026-09-18). Exact IDs exist from official PO issue; quantity goods display `—`.
 
 | Rail group | Visible rows |
 |---|---|
-| `Supplier reply` | `Date not confirmed` · `Date changed` · `Date passed` |
+| `Supplier reply` | `Supplier has not confirmed the PO date` · `Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed` |
 | `Receiving` | `Partly received` |
 | `Supplier` | Supplier facts |
-| `Deliver To` | Destination facts |
+| `Supplier Deliver To` | Destination facts |
 
-Inside the `Supplier reply` group the short rows are used. Outside that group context — including
-active-condition chips — use the complete labels `Supplier has not confirmed the PO date` ·
-`Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed`.
+**The complete label is written once and used everywhere** — rail row, active-condition chip and
+export (owner correction 2026-09-18). `Date not confirmed` · `Date changed` · `Date passed` are
+RETIRED: the page carries three different dates, and a row shortened to the only word that tells
+them apart leans on a group heading that scrolls away and does not exist on a chip at all.
 Supplier-reply conditions require the current version marked as sent and goods pending.
 Retire on this listing: `PO Issued`, separate `Sent to Supplier`, `Source`, combined `Expected Delivery Date`,
 `PDF not sent`, `All purchase orders`, `DOCUMENT` and `Send the new version to supplier` rail text.
@@ -1886,7 +1913,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Supplier Deliver To` | Destination instructed to the supplier; distinct from customer delivery address and actual arrival site. Replaces Deliver To for this fact on the four reviewed pages. |
 | `PO Default Delivery Date` | Original planned delivery date recorded on the PO using governed lead settings. A date, not a supplier's number of lead days. Preserved when the supplier replies or Settings later change. Replaces PO Delivery Date. |
 | `Supplier Confirmed Delivery Date` | Evidenced supplier-confirmed date. Missing confirmation reads `Not confirmed`; do not fill with the PO default. Replaces Supplier Delivery Date. |
-| `Goods Received Date` | Actual goods-arrival date AND time, displayed in Asia/Kuala_Lumpur; never GRN creation, expected arrival or save time. Replaces Goods received on. Old date-only records retain the date plus `Time not recorded`. |
+| `Goods Received Date` | Actual goods-arrival date AND time, displayed in Asia/Kuala_Lumpur; never GRN creation, expected arrival or save time. Replaces Goods received on. Date-only records retain the date plus `Time not recorded` — which is EVERY record today, because `warehouse_receipts.goods_received_at` is a date column (0314) and the database holds no arrival clock. Carrying the time is Receiving's fix, recorded as a gap in Purchasing §9.3; never guess it from a filing timestamp. |
 | `{n} receipt dates` | Multiple physical receipts on a PO; each GRN/date/time/quantity remains accessible. Never show one latest date as if all goods arrived then. |
 | `Goods arrived at` | Actual receiving location, including warehouse, showroom or other actual site. |
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
@@ -3673,8 +3700,9 @@ Canonical PO group labels: `Confirm PO sent to supplier` · `Waiting for goods f
 `Sending not confirmed` or `PO sent to supplier · {channel} · {date}`. Channel is recorded data,
 never hardcoded WhatsApp. Shared completion: `Current PO version marked as sent`.
 `Waiting for goods from supplier` is an exact approved exception, not permission for vague Waiting.
-Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`; outside that group
-use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
+Under `Supplier reply`, on chips and in exports, use the complete supplier-date labels defined in
+the PO Register dictionary — one label, written once (owner correction 2026-09-18). The wording
+never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
 

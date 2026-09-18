@@ -191,6 +191,21 @@ const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width
  */
 const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 
+/**
+ * ⭐ `PO No / Unit ID` — ONE CELL, TWO LINES (Purchasing §9.3, Jess
+ * 2026-09-18; the same shape UI MASTER §6.8 already approved for the SO Batch
+ * stock table's `PO No / Ref No` + Unit ID cell).
+ *
+ * The document is on the first line and the pieces it bought are underneath
+ * it, because on an ordered-goods table they are ONE identity read together:
+ * "these units, on this PO". Splitting them into two columns puts a document
+ * number in one place and the units it minted 200px away, and a reader
+ * comparing two expansions has to carry the number across the gap.
+ *
+ * 230px is the shared registry's width for this combined role.
+ */
+const PO_UNIT_COLUMN = { key: "poUnit", label: "PO No / Unit ID", width: 230 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 /**
  * ⭐ THE RECEIVING COMPOSITION — approved 2026-09-18 (Purchasing §9.4, CARD 12).
@@ -474,6 +489,7 @@ export default function GoodsMiniTable({
   showUnitId = true,
   showCategory = true,
   receivingLayout = false,
+  purchaseOrderLayout = false,
   itemHeading,
   onPoClick,
   onOpenPoDetails,
@@ -585,8 +601,28 @@ export default function GoodsMiniTable({
    * The saved GRN's own per-line truth, in the owner's order, with the source
    * number above its line-bound Unit IDs. It carries no checkbox, no
    * `Ready Stock` and no reservation control: nothing on a receipt is bought.
+   *
+   * Its source cell is `PO No / Ref No`, NOT Purchase Orders' `PO No / Unit ID`
+   * below: a receipt can arrive with no purchase order at all, and the two
+   * governed words are two facts, so they stay two columns in one registry.
    */
   receivingLayout?: boolean;
+  /**
+   * ⭐ THE ORDERED-GOODS READING ORDER — Purchase Orders (Purchasing §9.3,
+   * Jess 2026-09-18):
+   *
+   * ```
+   * Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+   * ```
+   *
+   * A third reading order, not a third table: the same registry, the same
+   * geometry, the same one flexible column last. It exists because this page
+   * reads a PO's goods from the DOCUMENT outwards — what kind of thing, who
+   * makes it, where they were told to send it, which units it bought — where
+   * the buying page reads from the goods outwards. Sales Orders, Delivery, SO
+   * Batch and Manual Purchase pass nothing and render byte-identically.
+   */
+  purchaseOrderLayout?: boolean;
   itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
@@ -615,6 +651,7 @@ export default function GoodsMiniTable({
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
     item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
+    poUnit: { ...PO_UNIT_COLUMN },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -666,16 +703,24 @@ export default function GoodsMiniTable({
   }
   /**
    * ⭐ THE RECEIVING GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.4.
-   * The destination takes the SAME one word SO Batch uses: the dictionary
-   * retired the bare `Deliver To` for this fact on these four pages, and the
-   * label has one home rather than a prop each page passes its own spelling
-   * to.
+   * The destination takes the SAME one word the sibling pages use: the
+   * dictionary retired the bare `Deliver To` for this fact on these four
+   * pages, and the label has one home rather than a prop each page passes its
+   * own spelling to.
    */
   if (receivingLayout) {
     /* Only the WORD changes. The widths stay the goods table's own — the
        registry's second scope (§6.8): `Deliver To` holds a destination list
        here, not the parent's single name, so the child's 200 stands. */
     REGISTRY.deliverTo = { ...CHILD_COLUMNS[2], label: SUPPLIER_DELIVER_TO_LABEL };
+  }
+  /* Purchase Orders reads a PO's goods from the DOCUMENT outwards and names
+     the destination with the SAME shared word SO Batch uses — one label, one
+     home (Purchasing §9.3, ui MASTER §6.8). Its `Supplier` takes the reviewed
+     136 the parent and SO Batch both carry. */
+  if (purchaseOrderLayout) {
+    REGISTRY.deliverTo = { ...REGISTRY.deliverTo!, label: SUPPLIER_DELIVER_TO_LABEL };
+    REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
   }
   const order = receivingLayout
     ? [
@@ -689,6 +734,8 @@ export default function GoodsMiniTable({
         "wrongItemQty",
         "extraQty",
       ]
+    : purchaseOrderLayout
+    ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
     : soBatchGoodsLayout
     ? ["status", "category", "qty", "item", "fromStock", "supplier", "deliverTo"]
     : salesOrderLayout
@@ -697,6 +744,7 @@ export default function GoodsMiniTable({
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
+    poUnit: purchaseOrderLayout,
     unit: showUnitId,
     category: showCategory,
     // The receipt columns exist only in the Receiving layout; the shared
@@ -948,6 +996,31 @@ export default function GoodsMiniTable({
                   ) : (
                     <Absence>{line.supplierAbsence ?? "—"}</Absence>
                   );
+                case "poUnit":
+                  /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
+                     box's 13px; the pieces it minted underneath at the
+                     governed 11px second-line treatment (ui MASTER §6.8).
+                     Whatever the owning page put in `unitNode` — a governed
+                     absence, an integrity refusal, a read failure — is printed
+                     as it stands: this box never decides what a missing Unit
+                     ID MEANS, because only the line's own identity mode and
+                     the state of the read can say. */
+                  return (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-mono">
+                        {line.poNos?.length
+                          ? line.poNos.map((po) => <span key={po} className="block">{poLink(po)}</span>)
+                          : <Absence>{line.poNoAbsence ?? "—"}</Absence>}
+                      </span>
+                      <span className="font-mono text-meta text-kit-slate-11">
+                        {line.unitNode != null ? line.unitNode : line.unitIds.length ? (
+                          line.unitIds.map((id) => <span key={id} className="block">{id}</span>)
+                        ) : (
+                          <Absence>{line.unitAbsence}</Absence>
+                        )}
+                      </span>
+                    </span>
+                  );
                 case "poNo":
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
@@ -1065,7 +1138,7 @@ export default function GoodsMiniTable({
                           `px-2 py-2 whitespace-normal break-words${
                             c.key === "qty" ? " align-middle text-center tabular-nums" : " align-top"
                           }`
-                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
+                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo" || c.key === "poUnit"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }

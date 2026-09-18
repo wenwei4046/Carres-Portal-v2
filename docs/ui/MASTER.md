@@ -1502,6 +1502,9 @@ facts, permissions, complete-record populations or task ownership.
    10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
    round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
    authenticated production walk of all four listings.
+   **Grouped listings: the header is group-local (§6.10, owner ruling 2026-09-18).** A Register
+   with governed groups draws no header above all groups; each open group carries its own between
+   its heading and its records, sticky inside that group only. The pinning rule above is unchanged.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
@@ -1529,7 +1532,8 @@ facts, permissions, complete-record populations or task ownership.
    with their selection actions; do not invent batch actions on read-only registers.
 6. **Presentation.** Reuse shared header, typography, palette, icons, row treatment and measured
    column-width rules. Content drives default width; full two-line headers plus controls set
-   minimum width. No separate page theme to imitate the shared component.
+   minimum width. No separate page theme to imitate the shared component. Where a governed grouped
+   listing is concerned, §6.10 owns where that header is drawn.
 7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
    goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
    Collapsed records remain in totals; missing/failed data must not imply zero or completion.
@@ -1995,7 +1999,7 @@ resizing remains available.
 | SO No / MPR No / CO No / RO No | 176 | prototype | Receiving, 2026-09-18. The FOUR-way header wraps inside the shared two-line header height, so the header does not set the width; the CONTENT does, and it is the same 17-character document number as the two-way entry above. Several references stack as lines in the cell and never widen it. **Owed:** the rendered-portal measurement |
 | Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
 | Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
-| Supplier DO No. | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
+| Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
 
 **THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
 different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
@@ -2024,7 +2028,7 @@ clicking a selected facet again clears that facet. Selects retain their All opti
 active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
 Purchasing §9.3; quantity-managed lines have none. Do not infer new selection capabilities.
 
-## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · APPROVED; IMPLEMENTATION ON UNMERGED PR #1462
+## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18 (#1462)
 
 **This ruling SUPERSEDES the earlier single global header above all groups.** A governed grouped
 listing reads, per group:

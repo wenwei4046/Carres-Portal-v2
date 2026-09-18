@@ -285,7 +285,7 @@ export default function OperationReceiving() {
    * ```
    * GRN Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
    * Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date ·
-   * Goods Received Date · Supplier DO No. · Items · Received Qty ·
+   * Goods Received Date · Supplier DO No · Items · Received Qty ·
    * Damaged Qty · Wrong Item Qty · Extra Qty
    * ```
    *
@@ -496,8 +496,10 @@ export default function OperationReceiving() {
       },
       {
         key: "doNo",
-        label: "Supplier DO No.",
-        headerLines: ["Supplier", "DO No."],
+        /* `No` takes NO full stop — owner ruling 2026-09-18. §9.4's column
+           list already carries the corrected word; this screen was the lag. */
+        label: "Supplier DO No",
+        headerLines: ["Supplier", "DO No"],
         width: REGISTER_FIELD_WIDTH.supplierDoNo,
         sortable: true,
         searchValue: (r) => r.do_number ?? "",

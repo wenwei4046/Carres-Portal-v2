@@ -172,6 +172,14 @@ rounds (#1461, #1465, #1466). The merge resolved to whoever OWNS each fact:
   IN that table (marked `prototype`, with the rendered-portal measurement owed), and the code
   registry was re-synced to §6.8's measured numbers.
 - **§6.9** — main's `BUILT 2026-09-18 for SO Batch` heading stands; this card added nothing there.
+
+A SECOND merge followed, bringing the Purchase Orders build (#1462), the repair-order blueprint
+(#1468) and the PO deploy record (#1469). `GoodsMiniTable` resolved as a union again:
+`receivingLayout` and `purchaseOrderLayout` are two more reading orders in the ONE registry.
+They keep separate source cells on purpose — Receiving's is `PO No / Ref No` because a receipt can
+arrive with no purchase order at all, and PO's is `PO No / Unit ID`; two governed words are two
+facts. #1462 also replaced the register header with the group-local engine (§6.10); Receiving is
+UNGROUPED, so it keeps its single sticky header and its tests pass unchanged against it.
 - **Purchasing §9.4, COPY and this card** — #1461 merged the same text this branch carried forward,
   so the resolution is that text plus this card's build record.
 
