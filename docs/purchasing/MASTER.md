@@ -2562,8 +2562,9 @@ must distinguish unknown from zero and provisional responsibility from an accept
 the reporter can produce. Damage needs overall item, fault and product/Unit label views; wrong
 item needs ordered specification and actual label/item comparison; missing parts needs the part
 list and present parts. Existing category/policy checklists govern specialised proof, including
-measurement video where needed. Late/short delivery needs the source, count and promise, not a
-photo of absent goods. Warehouse is never asked for a customer WhatsApp screenshot.
+measurement video where needed. Missing goods/parts need the source, count and promise, not a
+photo of absent goods. Routine pending delivery stays on the PO; an old late-only Claim retains
+its recorded evidence without permitting a new calendar-created Claim. Warehouse is never asked for a customer WhatsApp screenshot.
 
 Use video when movement, sound, intermittent failure or a governed measurement cannot be proved
 well in a photo. Do not require video for every claim. Each file retains uploader, observed/captured
