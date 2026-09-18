@@ -4,6 +4,8 @@ import {
   moneyAccountAddInput,
   paysOut,
   takesIn,
+  settlementBank,
+  type CardRouteRow,
   type MoneyAccountRow,
 } from "./money-accounts";
 
@@ -34,5 +36,23 @@ describe("the money-account rule (0512)", () => {
 
   it("says each kind in the standard's pay-method words, never the key", () => {
     expect(MONEY_ACCOUNT_KIND_WORD).toEqual({ CASH: "Cash", BANK: "Bank transfer", HOLDING: "Online payment" });
+  });
+});
+
+describe("settlementBank (0541)", () => {
+  const routes: CardRouteRow[] = [
+    { holding_code: "1131", channel: "dealer", bank_code: "1124" },
+    { holding_code: "1131", channel: "showroom", bank_code: "1123" },
+    { holding_code: "1134", channel: "showroom", bank_code: "1123" },
+  ];
+  it("follows the route for the place chosen", () => {
+    expect(settlementBank(routes, "1131", "dealer")).toBe("1124");
+    expect(settlementBank(routes, "1131", "showroom")).toBe("1123");
+  });
+  it("without a place, defaults only when every route agrees", () => {
+    expect(settlementBank(routes, "1131")).toBeUndefined();
+    expect(settlementBank(routes, "1134")).toBe("1123");
+    expect(settlementBank(routes, "1134", "dealer")).toBeUndefined();
+    expect(settlementBank(routes, undefined)).toBeUndefined();
   });
 });

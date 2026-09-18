@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
       if (net.failList) throw new Error("boom");
       return net.rows;
     }
+    if (key === "GET /card-routes") return [{ holding_code: "1131", channel: "dealer", bank_code: "1121" }];
     if (net.refuse) throw new Error(net.refuse);
     return { code: "1125" };
   }),
@@ -104,5 +105,18 @@ describe("Finance Settings — the money accounts", () => {
     net.failList = true;
     show();
     expect(await screen.findByText("The accounts could not be loaded. Try again.")).toBeInTheDocument();
+  });
+});
+
+describe("Finance Settings — card payout banks (0541)", () => {
+  it("shows each route and saves a new bank for it", async () => {
+    show();
+    const row = await screen.findByTestId("card-route-1131-dealer");
+    expect(row).toHaveTextContent("1131 · GHL · Dealer → 1121 · Public Bank");
+    fireEvent.click(row);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({ key: "POST /card-routes", body: { holding_code: "1131", channel: "dealer", bank_code: "1121" } });
   });
 });
