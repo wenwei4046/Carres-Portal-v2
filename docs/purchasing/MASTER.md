@@ -901,6 +901,13 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   unverified leaf is named before a covered one, because unknown must never read as covered. `To buy` reads selectable Order By ascending → `Not planned` →
   SO No descending; `No purchase needed` reads SO No descending. Header sorting orders rows inside
   each group, never across them. No client calendar arithmetic is admitted.
+  **Cell format — planner decision 2026-09-18 (presentation under the shared dictionary, not an
+  owner ruling; NOT BUILT):** the `PO Safety Days` cell prints the number alone — `12` · `0` ·
+  `-3` — right-aligned like every quantity; the heading already says the unit. A negative margin
+  is a customer promise at risk and takes the governed risk colour; `0` and positive stay plain.
+  Words appear only for the absences R2 names (`Not planned` · `Coverage not checked` ·
+  `Already on a PO`, the last with the covering PO number as its second line); the rail keeps its
+  full words. Falsifier: an operator walk where `-3` is misread as a date or a count of POs.
 - **R3 · Columns** — see the column paragraph below; the saved layout key is
   `carres.soBatchPurchase.register.v5`, and only this register's key moved.
 - **R4 · Search** follows UI MASTER §6.7 (the responsive Register Search rule), adopted here first.
@@ -1447,25 +1454,41 @@ is four, and the screen could not tell them apart. The two numbers come from dif
 | Allocation | none; it is a record | greedy, **earliest deadline first** — another order may drain the pool first |
 | What it IS | the **historical document quantity** | the **effective remaining demand** |
 
-**IS ANOTHER PURCHASE LEGITIMATELY ALLOWED? The guard is `isSelectableForOrder`, and it reads
-lineage, never the pool.** When this order's OWN `po_line_sources` covers `qty − stockTaken` on
-purchase orders whose CURRENT version has confirmed-sent evidence, the order is `ordered` and **the
-checkbox is not offered at all** — a fourteen-document row where any document is confirmed-sent
-cannot be bought again from this page. Otherwise the tick stands, and `validateIssuePlan`
-deliberately allows it (2026-09-03): the pool has no customer attribution, so the covering document
-routinely belongs to another customer and refusing would block a FIRST purchase for this one. Four
-representative fixtures pin all four outcomes — sent · unsent · delivered · pool-covered.
+**IS ANOTHER PURCHASE LEGITIMATELY ALLOWED? TWO GUARDS, ONE ANSWER EACH — measured 2026-09-18.**
+Two different facts refuse a buy. The Register never describes one with the other's words, and
+neither moves a row out of its group:
+
+| Fact | Read from | What refuses | Where the row lands |
+|---|---|---|---|
+| This order's OWN lineage — `po_line_sources` covers `qty − stockTaken` on POs whose CURRENT version is confirmed-sent | `soBatchOrderLineOutstandingQty` → order status `ordered` | the checkbox is not offered (`isSelectableForOrder`: `orderStatus !== "ordered"`) | `No purchase needed` — remaining demand is 0 |
+| The per-SKU open-PO POOL — the engine's `fullyOnPo` (`to-order.ts` T6, `coveredByOpenPo`), with NO customer attribution | the leaf's `fullyOnPo` | the checkbox is not offered (`isSelectableForOrder`: `fullyOnPo === false` required) AND `POST /issue-batch` refuses `already_on_po` (422, 0430) | `To buy` — remaining demand is still > 0 (R1: pool-covered demand is never assumed bought); the leaf prints `Already on a PO` and the covering document(s) from the server's `poNumbers` |
+
+**Corrected 2026-09-18.** This section said the guard "reads lineage, never the pool" and that
+`validateIssuePlan` "deliberately allows" a pool-covered buy. Measured: `isSelectableForOrder`
+(`packages/shared/src/so-batch-purchase.ts:908–926`) requires `row.fullyOnPo === false`, and
+`fullyOnPo` is the pool (`packages/shared/src/to-order.ts:1767`). The client `validateIssuePlan`
+stopped refusing the pool on 2026-09-03 (`to-order.ts:2115–2132`), but the server door still does
+(`apps/api/src/routes/operation/to-order.ts:406`, 0430, after six open POs were minted against one
+line of SO-1340). The page tick therefore agrees with the server; the client check is not the guard.
+What the operator sees today — `To buy · 3` with only one tick — is correct grouping (the goods are
+still needed and no document names this order) with an explanation that is one line short: the
+row must name the covering PO it is waiting on, so the buyer knows what to chase instead of what
+to buy. Moving such a row to `No purchase needed` is refused: nothing has been bought for this
+customer. Four representative fixtures pin all four outcomes — sent · unsent · delivered ·
+pool-covered.
 
 **⭐ `To buy` IS NOT ALWAYS A REMAINDER, AND THE ROW NOW SAYS SO.** On a build every unit of which
 was drawn from the open-PO pool (the engine's own `fullyOnPo`), the engine prints **what the
-covering document carries** under `To buy`, not `0` — the row stays buyable and a `0` would be an
-answer nobody asked for (T6). So one figure meant two opposite things: a genuine remainder, and a
-re-buy offer. It **cannot be told from the numbers** (`toBuy === onPo` is also true of a genuine
-remainder that happens to equal its coverage), so the engine's flag is carried onto the leaf and the
-cell prints **`Already on a PO`** under the figure, with the governed explanation
-`Demand is already covered by an open Purchase Order.` as its title. The figure itself is untouched:
-it is the number the tick allocates and the number `issue-batch` recomputes and refuses against, and
-a display that disagreed with its own control would be worse than the ambiguity it replaced.
+covering document carries** under `To buy`, not `0` — the row stays VISIBLE (not buyable: the tick
+is withheld and `issue-batch` refuses it, table above) and a `0` would be an answer nobody asked
+for (T6). So one figure meant two opposite things: a genuine remainder, and a covering quantity.
+It **cannot be told from the numbers** (`toBuy === onPo` is also true of a genuine remainder that
+happens to equal its coverage), so the engine's flag is carried onto the leaf and the cell prints
+**`Already on a PO`** under the figure, with the ONE governed title owned by
+[COPY-STANDARD's SO Batch goods table](../COPY-STANDARD.md) (`purchasingRefusal("already_on_po")`,
+the door's own sentence) — this MASTER no longer carries a second wording. The figure itself is
+untouched: it is the number `issue-batch` recomputes and refuses against, and a display that
+disagreed with its own control would be worse than the ambiguity it replaced.
 
 **⭐ WHAT ISSUING A COVERED SELECTION ACTUALLY DOES — TRACED THROUGH THE ONE DOOR, 2026-09-11.**
 
