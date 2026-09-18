@@ -3104,8 +3104,9 @@ never derived from another date.
 **Register — the SO Batch Purchase listing is the reference; only fields and rail differ:** grid in
 the white panel with the 8px canvas gap; checkbox (export only) and expand columns; `leadingColumns`
 {`Return Date`, `Return No.`} pinned at canvas ≥768px, `Return No.` alone below; no column hidden by
-width. Columns: Return Date · Return No. · Supplier · Supplier Claim No. · PO No · GRN No. · Items
-(`{first item} + {n} more`) · Qty · Collect From · Collection Date · Handover · Credit Consequence.
+width. Columns, in reading order (date → number → supplier → goods → quantity → collection facts →
+linked documents): Return Date · Return No. · Supplier · Items (`{first item} + {n} more`) · Qty ·
+Collect From · Collection Date · Handover · Supplier Claim No. · PO No · GRN No. · Credit Consequence.
 One fact per column; no Work column. One row is one return document.
 **Groups — every return in exactly one:** `Open` (any Unit not yet collected and not cancelled) ·
 `Closed` (every Unit Collected or cancelled with a reason, at least one Collected; starts collapsed)
