@@ -36,14 +36,6 @@ function lastMonths(): string[] {
   });
 }
 
-function useSave() {
-  const qc = useQueryClient();
-  return useMutation<unknown, Error, { path: string; method: "PUT" | "DELETE"; body?: unknown }>({
-    mutationFn: (v) => apiFetch(`${BASE}${v.path}`, { method: v.method, body: v.body === undefined ? undefined : JSON.stringify(v.body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "dealer-commission"] }),
-  });
-}
-
 export default function DealerCommission() {
   const months = useMemo(lastMonths, []);
   const [month, setMonth] = useState(months[0]);
@@ -104,7 +96,12 @@ export default function DealerCommission() {
 }
 
 function Rates({ src }: { src: DcSource }) {
-  const save = useSave();
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: (v: { path: string; method: "PUT" | "DELETE"; body?: unknown }) =>
+      apiFetch(`${BASE}${v.path}`, { method: v.method, body: v.body === undefined ? undefined : JSON.stringify(v.body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "dealer-commission"] }),
+  });
   const [rate, setRate] = useState(String(src.settings.defaultRate));
   const [product, setProduct] = useState<{ modelId: string; rate: string } | null>(null);
   const [quota, setQuota] = useState<{ dealerId: string; quota: string; rebateRate: string; startsOn: string } | null>(null);
