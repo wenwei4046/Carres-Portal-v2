@@ -1799,6 +1799,26 @@ releases or reservations. No second stock totals or duplicate writer. Persisted 
 drive counters, Status and buying quantities after refresh (`stock_reserved_qty` on the register
 read). Refusal preserves the unsaved choices with the governed explanation.
 
+**⛔ 0547 FIXES 0546's OWN DOOR: an empty set is a save, not a duplicate.** 0546's duplicate-Unit
+guard compared `array_length(v_want, 1)` — which is **NULL, not 0, on an empty array** — against a
+distinct count of 0, and `NULL is distinct from 0` is TRUE. So `Save changes` with nothing ticked
+refused itself as `duplicate_unit_chosen`, which is the one act the ruling names in as many words
+("removing every selected Unit") and is not even true of a set with nothing in it. 0547 replaces
+the body with the count coalesced to 0; a genuinely repeated Unit is still refused, and nothing
+else in the body moves. **A committed migration is never edited (red line 6), so it is a new file.**
+
+**HOW IT WAS FOUND, AND WHY THE SUITE EXISTS.** `apps/api/src/test/manual-purchase-stock-allocation.test.ts`
+runs the committed SQL in PGlite — the guards, the CHECK constraints, the lock order and the doors
+themselves — instead of mocking the database and asserting that the API passes a code through. The
+route tests could not have found this: they answer for the database rather than asking it. Verified
+on PostgreSQL 16.13 as well: `select array_length('{}'::uuid[], 1)` is NULL. The suite covers the
+exact-line binding, the refusal of a Unit asked to answer both a Sales Order line and an MPR line,
+the CHECK underneath that door, approval/refused/withdrawn/sent-back, additional replenishment, an
+unrecorded intent, a missing MPR No, a cancelled line, the approved-quantity ceiling, already-issued
+quantity, a non-matching SKU, add-and-remove in one save, release-everything, a duplicate, a Unit
+taken mid-act (all-or-none, and the refusal names it), the optimistic check in both directions, the
+role gate, and the event row.
+
 **THE RECORDED INTENT — `purchase_requests.fulfilment_intent` (0546).**
 `concrete_need` = existing Units may answer this request and a saved allocation reduces the
 remaining procurement quantity. `additional_stock` = buying EXTRA; existing stock is reference and
