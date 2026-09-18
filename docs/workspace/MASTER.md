@@ -1221,7 +1221,12 @@ honest Work for admitted modules.
   the shared owner login loses the PO/GRN doors while Jess keeps them (Purchasing MASTER §5.3). The API Manual Purchase ladder reads only the resolver — no
   `ops_manager` rung and no email list — and names the approver through `actor_display_names`.
   Real-PostgreSQL proof: `personal-approver-identity.integration.test.ts` 9/10 red on 0532, 10/10
-  green on 0533.
+  green on 0533. **SHIPPED AND DEPLOYED 2026-09-18:** 0533 applied before merge (tracker
+  `20260918020733`); PR #1433 merged `11dcade3`, every canonical surface reports it. Production
+  read: Jess principal · CR002 · person; `principal@carres.com` not a person, holds and covers
+  nothing; Jess holds `purchasing_approver` from 2026-09-18 with `assigned_by` NULL and the
+  bootstrap note, plus the two migration audit rows. **Owed:** Jess's signed-in walk of Staff &
+  Duties and a Manual Purchase approval (login-gated); she signs out and in once after the change.
 - Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
