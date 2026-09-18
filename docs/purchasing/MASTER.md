@@ -1573,15 +1573,15 @@ permanent history remains available in one table, with these mutually exclusive 
 | Group | Membership | Default display |
 |---|---|---|
 | `Need approval` | Waiting for approval, or sent back for changes | Expanded |
-| `To buy` | Approved with remaining quantity > 0, including `Not planned` | Expanded |
-| `No purchase needed` | Fully ordered, refused, withdrawn, or confirmed remaining = 0 after the preceding approval checks | Collapsed |
+| `Need PO` | Approved with remaining quantity > 0, including `Not planned` | Expanded |
+| `No PO needed` | Fully ordered, refused, withdrawn, or confirmed remaining = 0 after the preceding approval checks | Collapsed |
 
-Refused/withdrawn requests are terminal and remain in `No purchase needed`. Pending and
+Refused/withdrawn requests are terminal and remain in `No PO needed`. Pending and
 sent-back requests remain in `Need approval` even when remainder is unknown. Only an approved
-request with unknown/failed remainder stays visibly in `To buy`, with an explanatory fact and
+request with unknown/failed remainder stays visibly in `Need PO`, with an explanatory fact and
 Issue PO disabled until verified; unknown never means zero or complete.
 Pending and sent-back requests remain in `Need approval`; a stock-reference count of zero
-needed does not bypass approval. Partial purchasing stays in `To buy` while approved demand
+needed does not bypass approval. Partial purchasing stays in `Need PO` while approved demand
 remains. Search and filters cover all groups and expand a group containing a match. Footer
 shows one total, including collapsed rows: `{n} Manual Purchases`, `1 Manual Purchase`, or
 `{n} of {m} Manual Purchases` after filtering. Group counts use the same request population.
@@ -1592,7 +1592,7 @@ acts within groups. Search, column filters and export retain accurate source val
 **Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
 ```text
-Proceed Date · MPR No · Approval Status · Purpose · Requested By · PO Safety Days ·
+Status · Proceed Date · MPR No · Approval Status · Purpose · Requested By · PO Safety Days ·
 Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · Supplier ·
 Supplier Deliver To · PO No · PO Default Delivery Date
 ```
@@ -1610,7 +1610,7 @@ request. Customer and supplier facts use the shared dictionary. Existing groups 
 (`Ready Stock`, `Showroom Display`, `Service Case`, …); most have no customer. Those rows show the
 customer columns blank, never an invented customer; a customer appears only where the purpose's
 structured record names one.
-`Items` is the business identity and single-click entrance to the object. Use the same
+`MPR No` is the document identity and opens the object; Items is the product summary. Use the same
 responsive search, palette and measured column-width rules as SO Batch Purchase. Content
 sets default width; a complete two-line header and its controls set the minimum. Reuse the
 shared implementation; do not introduce a separate Manual Purchase palette or guessed widths.
@@ -1619,15 +1619,15 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   buying decision at row level; the exact quantities live in the goods table at the grain
   they were allocated, and the original ask keeps its authoritative home on the object.
 - `Purpose` prints the six governed purposes as an ordinary column. Historical purpose words
-  remain truthful. Structured `For` remains on the object and searchable; `Items` opens it.
+  remain truthful. Structured `For` remains on the object and searchable; `MPR No` opens it.
 - **`Approval Status` shows the approval FACT ONLY** — `Need approval` · `Approved` ·
   `Refused` · `Withdrawn` · `Sent back for changes`. No stacked approver name, no `Ordered.` second line
   and no Approve/Refuse button on the row: who decides is the object's `Approval` section
   and the Work row. The one other line that may appear is this row's own
   selectability explanation, computed from the same two facts the tick reads.
-- **Banned parent columns, never to return:** `Qty` · `For` · `Status` · `Partial` ·
+- **Banned parent columns, never to return:** `Qty` · `For` · `Partial` ·
   `PO Sent` · `PO Created` · `Purchase Purpose` (the heading is `Purpose`) · `Reason` ·
-  `MPR` or any request-number column · `Order late` · `Need price` · `Part received` ·
+  `Order late` · `Need price` · `Part received` ·
   `Received` · `Arrived` · `Work` · `Next action` · `Remark` · `Price` · a permanent PO
   Duty · row action buttons.
 
@@ -1641,9 +1641,8 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - `Order By` is derived for every line by walking Delivery Date backwards through supplier transit
   days on the Office calendar and Supplier × Category production days on that supplier's calendar.
   One request uses the earliest line result. It drives timing/work and the optional quiet
-  `Order by {date}` second line. It is NOT a parent column — the approved parent carries
-  `PO Safety Days` (the column list above); `Order By` stays an engine/detail date. It is not a stored date;
-  missing setup prints `Not planned` in the column.
+  `Order by {date}` second line but not a parent or goods `Order By` column. It is not a stored date;
+  missing setup prints the governed missing-planning fact.
 - Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
   Carres. Missing production/transit Settings produce no default or Order By.
 - `Approval Status` shows the approval badge (`Need approval`, `Approved`, `Refused`,
@@ -1653,10 +1652,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - Manual Purchase follows SO Batch's shared search, palette, column-width and responsive
   filter behavior. The toolbar retains Show filters when the rail is hidden. This approval
   does not change the Purchase Orders page's independent layout or business rules.
-- **The identity column is `MPR No`** (the ruling above, 2026-09-18). Card 08's
-  "no number column" is DELETED, not kept beside it: it was written while a Manual Purchase had
-  no number of its own. The row's deep-link still runs on the invisible request UUID, and legacy
-  `req_no` values stay searchable without becoming a second visible identity.
+- MPR No is the permanent request number; UUID remains an internal key, never the displayed identity.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
   `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
@@ -1684,121 +1680,63 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   (0422), never a hard-coded 14 days. `Edit and send again` opens the same form on the returned
   request, prefilled once, purpose locked, sending `Send again for approval`.
 
-**THE ROW EXPANSION IS THE SHARED GOODS TABLE — owner ruling 2026-09-11.** Manual
-Purchase and SO Batch Purchase draw ONE `GoodsMiniTable` and one Register engine, with the
-same toolbar, checkbox and expansion positions, the same active-filter treatment, the same
-horizontal scrolling, the same footer and the locked token values. Necessary business
-differences are preserved as CAPABILITIES a page asks for, never as a second table.
+**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / NOT BUILT.**
+The parent has checkbox and a separate goods-disclosure button before Status. Approval Status
+and Status are independent. For a known outstanding request, Status is `Need PO` even while
+Approval Status is `Need approval`; neither the PO tick nor stock Save is allowed before approval.
+`No PO needed` describes no further authorized purchase (fully covered, approved zero, or terminal
+refusal/withdrawal); Approval Status retains its actual decision. Unknown coverage is not zero:
+show the existing missing-coverage fact, not a guessed Need/No PO answer. Pending/sent-back rows
+stay in Need approval regardless of unknown remainder. Empty historical groups are hidden; nonempty
+No PO needed remains collapsed and counted. This changes Manual Purchase labels only, not SO Batch
+register groups.
 
-**ALIGNMENT PROPOSAL — NOT LAW (2026-09-18, awaiting owner approval).** The goods table reads in
-the approved SO Batch order for the facts both pages share, then the two document facts Manual
-Purchase alone answers:
+**Goods order:** `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date`.
+Use the SO Batch shared presentation: 8px horizontal padding, two-line headers, two-line item identity,
+blue selection, consistent field widths and the connected stock frame (UI MASTER §6.8–6.9).
+No SKU column; SKU remains searchable. Parent tick selects eligible remaining goods, not an
+independent duplicate purchase. Child ticks choose individual goods; parent/header show mixed state
+for a partial selection. Unapproved, already-covered, unknown or otherwise blocked lines cannot tick.
+Each tick submits the authoritative remaining amount for its exact MPR line/allocation. Retain existing
+PO lineage and split-destination/date quantities; never repeat the original ask for each linked PO.
+Qty and original/approved quantities keep their actual scopes; do not overwrite original requests.
+Unit IDs are not invented on unreceived purchase lines. Selection bar and issue review show actual
+selected remaining quantities and document partition; keep existing PO grouping and authority gates.
 
-```text
-Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date
-```
+**Ready Stock is retained for every purpose, not assumed to mean additional replenishment.**
+For an approved concrete need (e.g. internal use), exact available Units can fulfill that need;
+saved allocation reduces the remaining procurement quantity. Additional replenishment means buying
+EXTRA stock: existing stock is visible but not automatically deducted or allocatable against that ask.
+This distinction follows the recorded request intent; do not guess solely from SKU, stock count or
+an ambiguous Other Purchase purpose. If intent is absent, show stock read-only and explain the gap;
+no silent netting. This approval does not define a new replenishment forecast or history threshold.
 
-- **No goods-line checkbox.** Manual Purchase ticks the REQUEST on its parent row; SO Batch ticks
-  goods lines because a customer item line is the demand. This difference is business, not style.
-- **No generic `Status` column.** The parent carries `Approval Status`, the three groups carry the
-  buying state, and a goods row says which it is through `PO No` — `Not ordered yet` for the
-  remainder row, the actual number for an allocation row. A second status word here would repeat
-  the group heading.
-- **`SKU` leaves the table and stays searchable.** It prints as the 11px second line inside `Item`
-  beside the recorded configuration — the same two-line geometry the approved grammar uses for
-  `PO No / Ref No` + `Unit ID`. A column of codes was identifying two lines the configuration
-  already tells apart.
-- **The retired positional rule is DELETED, not kept beside this one.** The 2026-08-15 `Category`
-  first / `Supplier Deliver To` before `SKU` / `Item` always last ordering lived in the old
-  UI MASTER §6.8, which the 2026-09-18 approval rewrote. `Item` is no longer last; it sits where
-  SO Batch puts it, so two sibling expansions read as one listing.
-- Falsifier: an operator walk where a Manual Purchase goods line cannot be told from its sibling
-  without the SKU column, or where the missing tick is read as "this line cannot be bought".
+Stock picker: `☐ · Goods Received Date · Stock Location · Supplier · PO No / Ref No (Unit ID on line two) · Condition`.
+Physical receipt DATE only here; do not discard stored timestamps. Supplier, original PO/reference,
+current location, condition and ownership come from actual stock records. Missing facts stay missing.
+Count-managed goods remain identifiable as counted and not falsely offered as exact Units.
+Show available and this-MPR-line reserved counts on separate lines, with a separate cell disclosure.
+Saved choices remain reachable even at zero available. Unknown/error/loading never become zero.
+Stock selection is disabled for unapproved and additional-replenishment requests, with a reason.
 
-- **ONE ROW IS ONE ALLOCATION.** Each quantity is the quantity that document actually
-  carries, read from `purchase_order_lines.qty` / `.destination_id` for that demand
-  (`demand_id`, 0361), with the purchase order's own supplier and its ORIGINAL
-  `official_delivery_date` (0428/0430 — never `eta_date`). A line split across two POs
-  prints two rows of one each, never the whole request quantity twice. What is still to
-  buy is its own row (`Not ordered yet`), computed by the one governed remainder
-  arithmetic (`manualPurchaseLineRemainingOf`). A pre-0361 issue with no `demand_id` on
-  its PO line prints the document it can name with the demand's own `issued_qty`.
-- **`Still To Order` and `Covered by` are retired from this table.** `Still To Order` was a
-  second arithmetic beside a repeated quantity; the remainder is now a row. `Covered by`
-  answers *what covers this customer line*, which has no Manual Purchase meaning — a
-  replenishment is not covered by the shelf.
-- **`Unit ID` is deliberately absent**, and only because this page has no such fact: a
-  Manual Purchase line's goods become Units at Receiving through the PO line, and no door
-  maps a request line to them. Drawing the column would print `Not allocated` on every row
-  of every request forever. SO Batch, Sales Orders and Delivery keep it.
-- **The original ask and the approver's number keep their authoritative home** in the
-  object's `Items Requested` and `Approval` sections.
-- Read-only: no Approve/Refuse/Receive, no price editing, no PO creation, no PDF preview
-  and no goods-line checkbox — this Register buys from its PARENT row.
+**Stock selection:** tick/untick edits a draft; `Choose Ready Unit` saves the initial allocation;
+`Change selection` reopens it; `Save changes` commits additions/removals, including all removed;
+`Cancel` restores saved choices. No per-Unit Undo. Pending edits must be saved/cancelled before Issue PO.
+All-stock fulfillment must save without creating a PO. Bind allocation to the exact MPR item line,
+NEVER fabricate an SO binding or call an SO-only reservation endpoint with an MPR ID. The current
+MPR allocation backend is NOT claimed built. Extend the governed stock authority with provenance,
+permission/approval checks, atomic stock availability and release/downstream checks, version/concurrency
+validation and audit. Any invalid Unit refuses the entire save; no partial releases or reservations.
+No second stock totals or duplicate writer. Persisted server results drive counters, Status and buying
+quantities after refresh. Refusal preserves the unsaved choices with the governed explanation.
 
-**READY STOCK — ALIGNMENT PROPOSAL, NOT LAW (2026-09-18, awaiting owner approval; overwrites the
-2026-09-11 placement, which is DELETED rather than kept beside it).** `Ready Stock` is a CELL on the
-item row — `{n} available` with its own borderless disclosure arrow, opening the read-only Unit
-table directly beneath that item, exactly as the approved SO Batch composition does. The separate
-sibling section beneath the goods table is retired: the operator had to match a grouped table back
-to the lines it answered, and the two sibling pages drew one shelf two ways.
-
-- **Only `{n} available`. There is no `{n} reserved` line**, because nothing is ever reserved for a
-  Manual Purchase — see the business rule below. A successful empty read with no saved choice reads
-  `0` with no arrow. Loading, failed or unknown never renders as `0`.
-- **Every business rule below is unchanged by the move.** What changed is where the shelf is read,
-  not what the read means or what it may do.
-- **The grouped question survives as the object's answer.** `What We Already Have` on the object
-  page remains the per-SKU, `stockMatchKey`-grouped, authoritative reference; two request lines of
-  the same goods still get ONE grouped answer there. The cell answers the narrower question — what
-  is on the shelf for THIS line — and prints the same true count on both lines, because the count
-  is what exists, never what is allocated.
-- Falsifier: an operator reads two lines of one SKU as two separate shelves and buys twice, or the
-  object's grouped figure and the cell's figure are read as two arithmetics.
-
-The stock table shares the SO Batch implementation (`ReadyStockTable`), the disclosure frame and
-the one condition vocabulary; the differences below are business, not style.
-
-- **VIEWING INVENTORY IS NEITHER PURCHASING SELECTION NOR RESERVATION.** There is no
-  `Choose Ready Unit` here and nothing is tickable. The SO Batch sibling can commit a Unit
-  because a customer item line is OWED goods; an internal replenishment is owed by nobody
-  on the shelf, so there is no line to bind to and no act to press. The route has no
-  reservation twin.
-- **AN ADDITIONAL REPLENISHMENT QUANTITY IS NEVER AUTOMATICALLY REDUCED BY INVENTORY.**
-  The group states `Asked for {n} · {m} on the shelf` side by side and the ask stands. A
-  specific internal need may be reduced only after an authoritative allocation, transfer or
-  usage record covers it — none of which is this read.
-- **Grouped by matching product/configuration**, by `stockMatchKey` (the portal's one
-  configuration-aware rule, pinned to its SQL twin by a contract test over the live SKU
-  corpus) — never SKU text, so a King never answers a Super King's request. Two request
-  lines of the same goods are ONE shelf question.
-- **Heads — ALIGNMENT PROPOSAL, NOT LAW (2026-09-18).** The read-only table reads
-  `Goods Received Date · Stock Location · Supplier · PO No / Ref No (Unit ID on line two) ·
-  Condition · Owner` — the approved SO Batch stock-picker heads, minus its checkbox, plus `Owner`.
-  The retired `Unit ID · Condition · Qty · Where · Owner` heading set is DELETED, not kept beside
-  it. `Goods Received Date` is the physical receipt DATE only; a missing date reads `Not recorded`
-  and no time is invented. `Stock Location` is the Unit's actual current location.
-  **`Owner` (`Carres` · `Supplier`) is not optional here and it has no substitute:** `Supplier`
-  states PROVENANCE — who Carres bought from — while `Owner` states who owns the Unit today, and a
-  consignment Unit has a supplier owner with a Carres purchase behind it. 🔴 The approved SO Batch
-  picker (§9.1) requires that supplier-owned stock "remain distinguishable" but names no column
-  that carries it; this proposal is that both tables carry `Owner`.
-  A counted row (`identity_scope = 'quantity'`) prints its key with `Counted stock` on line two in
-  place of a Unit ID — it is never drawn as a choosable Unit.
-  No checkbox, no `Choose Ready Unit`, no `Save changes` and no `Cancel` appear on this table.
-  The facts are read from
-  `stock_unit_register_v` filtered on `availability = 'available'` (0371) through the ONE
-  `readFreeStock` reader — the same offer SO Batch shows. **Condition is a GRADE and is not
-  availability:** a `Display` unit is fully available. A counted row (`identity_scope =
-  'quantity'`, 0453) SHOWS with its key and no Unit ID pretence; hiding bulk would make a
-  full shelf read as an empty one. Consignment stock is labelled `Supplier`.
-- The read is LAZY — only an opened row asks — and it writes no row.
+The formal Issue PO workspace follows §8.2; the HTML quantity dialog is not its replacement.
+Replenishment advice based on history is deferred. No new automatic ordering or Finance scope.
 
 **Selection and PO Duty.** Selection replaces the top toolbar in place (UI MASTER §6.7),
 with Clear, the resolved PO Duty and Issue PO; no action bar below the table. An issue refusal
 uses the warning band between toolbar and table.
-Only APPROVED requests whose derived status is `Ready to order` with a CONFIRMED live remaining
-quantity take the tick; an approved request whose remainder could not be read stays in `To buy`
+Only APPROVED goods with a CONFIRMED live remaining quantity take the tick; an approved request whose remainder could not be read stays in `Need PO`
 beside `Remaining quantity not checked` and refuses it (Round 2). A tick dies the moment a refetch
 makes its row unbuyable. With no selection there is NO PO Duty block,
 initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
@@ -1810,7 +1748,7 @@ different dates therefore report and create different POs. The issued PO saves t
 Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
 stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
 
-**Object detail.** Clicking `Items` opens the full-width, one-scroll object on the shared
+**Object detail.** Clicking `MPR No` opens the full-width, one-scroll object on the shared
 Object Header + Summary + Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
@@ -1820,9 +1758,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   Register state the operator left (the grid stays mounted underneath — rail filters, search,
   column filters, sort, scroll and expansion survive); the business heading
   `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context
-  (Card 08 §3.3, corrected 2026-09-18: the heading now carries `MPR No` as the object's
-  identity — the "no MPR" clause is deleted, not kept beside it — still no UUID, and a browser
-  title of `Manual Purchase — Carres`);
+  (MPR No is visible; no UUID, and a browser title of `Manual Purchase — Carres`);
   one derived
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,

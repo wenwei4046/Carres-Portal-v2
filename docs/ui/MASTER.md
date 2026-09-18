@@ -1751,7 +1751,7 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 **Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
 approved reference for shared component work. Business columns remain owned by each module MASTER;
-this does not make other pages editable or give them SO Batch stock-reservation powers.
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain editing or reservation powers implicitly.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
@@ -1772,6 +1772,8 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+
+Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
 ## §6.9 · Connected expansion
 
