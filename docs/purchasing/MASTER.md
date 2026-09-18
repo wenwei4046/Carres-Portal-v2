@@ -2155,7 +2155,12 @@ Warehouse submits count                (or Operation enters goods directly)
   - last row `Cancelled GRNs`.
   One choice per group; no `Any` or `All …` rows. Rail counts, table rows and the footer
   (`Showing 1–{n} of {total}`) come from the same complete server-side filtered set, never the
-  loaded page. `Clear filters` restores the complete listing.
+  loaded page.
+  **⭐ NO DATE NEED BE CHOSEN TO SEE RECORDS (owner acceptance 2026-09-18).** Opening Receiving
+  shows every permitted GRN under server pagination; date filtering is OPTIONAL and nothing is
+  preselected. **Every rail count counts GRN RECORDS** — never units, never product quantities and
+  never outstanding work. A GRN carrying two exception types appears under both `Received with`
+  rows, so those counts OVERLAP and may never be added into a total.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
@@ -2181,9 +2186,13 @@ Warehouse submits count                (or Operation enters goods directly)
   §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
   checks it against COPY before it reaches the screen. No word stands in for a missing number. Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
   below 768px; no column hidden by width.
-- **🔴 FIVE RETIRED WORDS ARE LIVE ON THIS REGISTER TODAY — MEASURED 2026-09-18**
-  (`apps/web/src/pages/operation/OperationReceiving.tsx`). Each already has its governed
-  replacement written down; nothing new is being invented, and none of these is a redesign:
+- **🔴 FIVE RETIRED WORDS ARE IN THE REGISTER'S SOURCE — SOURCE READ 2026-09-18, PRODUCTION WALK
+  NOT DONE.** Evidence type matters and the two are not the same claim. What follows is a read of
+  `apps/web/src/pages/operation/OperationReceiving.tsx` on `origin/main`: it states what the
+  committed code renders, **not** that the deployed bundle was opened and seen.
+  A signed-in walk of the live page is OWED and is the only thing that turns this into a
+  production finding. Each word already has its governed replacement written down; nothing new is
+  invented and none of these is a redesign:
 
   | Line | On screen today | Governed word | Where it was retired |
   |---|---|---|---|
@@ -2212,31 +2221,45 @@ Warehouse submits count                (or Operation enters goods directly)
   **Fix:** add the three entries to the one registry rather than guessing them on this page. The
   registry's own law already says a field that fails validation is fixed in the shared definition.
 
-- **⛔ DOES THIS REGISTER GET A ROW EXPANSION? AN OWNER DECISION, NOT A PLANNER'S.** Measured: the
-  built page has no expansion, and §9.4 has never named one. The parent carries FOUR quantity
-  columns — `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` — and every one of them
-  is an AGGREGATE across the GRN's lines, while `Items` prints `{first item} + {n} more`. So on a
-  three-line GRN where one item arrived damaged, the row states `Damaged Qty 1` and **nothing on it
-  says which item**. Today that mapping exists only inside the GRN object.
+- **THE READ-ONLY GOODS EXPANSION — APPROVED (Jess, 2026-09-18).** The question this section
+  raised is settled: the Register gets one, and its column order is the owner's:
 
-  This is a real choice about how the operator works, and the planner may not settle it by drawing
-  a table:
+  ```text
+  Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID · Items ·
+  Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+  ```
 
-  | Option | What it costs |
-  |---|---|
-  | **Keep it as it is** | the per-line truth stays in the formal GRN object, one click away, and the Register stays a flat paged document list |
-  | **Add an expansion** | the damaged line is named without leaving the row; it adds a second place that states receipt facts, and the object remains the formal document |
+  - **The source number is the first line of its cell; the actual line-bound Unit IDs sit beneath
+    it** in the same cell. Configuration sits beneath the item name. Counted goods have no Unit ID
+    and keep the governed absence — a sample identity is never copied into real data.
+  - **No `Ready Stock`, no purchasing checkbox and no reservation control.** This is the read-only
+    expansion of a SAVED GRN, not a purchasing selector. Corrections go through `Amend Receiving`.
+  - **⭐ ONE ARITHMETIC, NOT TWO (Architecture Law D).** Every per-line quantity reads the SAME fact
+    source the formal GRN document prints. The expansion never re-derives a quantity, never nets
+    one against another and never introduces a second measure of the same fact; extra goods stay
+    separate from the ordered lines exactly as they are on the paper. If the expansion and the
+    document could ever disagree, the expansion is wrong by construction.
+  - Its columns are this section's own facts, never the SO Batch buying composition — that one
+    carries `Ready Stock` and a purchasing tick, which mean nothing on a receipt.
 
-  **If the owner chooses an expansion, its columns come from this section's own per-line facts** —
-  the governed category, the GRN paper's item words, the five quantity words and the exact-Unit
-  outcomes (`Received` · `Received with issue` · `Not received`) — never from the SO Batch buying
-  composition, which carries `Ready Stock` and a purchasing tick that have no meaning on a receipt.
+  **What this fixes:** the parent's four quantity columns are AGGREGATES across the GRN's lines
+  while `Items` prints `{first item} + {n} more`, so a row could read `Damaged Qty 1` without
+  naming which of four items it was. The mapping now sits on the row that states the total.
 
 - **🟢 THE GROUP-LOCAL HEADER RULING HAS NOTHING TO GROUP HERE, AND THAT IS CORRECT.** Receiving is
   a flat, SERVER-PAGED register: its filters live in the rail and its scope line is
   `Showing 1–{n} of {total}`. The shared grouped-header work must not introduce groups on this page
-  to make it match its siblings. Receiving also KEEPS its `Clear filters` control: the removal of
-  that button is a Purchase Orders correction and applies to that page only.
+  to make it match its siblings. **`Clear filters` — TWO PLACES, ONE KEPT AND ONE NOT (owner correction 2026-09-18).** The
+  distinction is not "Receiving keeps it" or "Receiving loses it", and this section may not be read
+  either way:
+
+  | Where | Ruling |
+  |---|---|
+  | A permanent button living in the rail | **Not added.** A selected facet clears by clicking it again, and a permanent control on an unfiltered rail is a dead control |
+  | The toolbar's active-condition clearing | **Kept.** While search, rail or header filters narrow the list, the active conditions show with their clearing, per the shared listing standard |
+
+  Clearing still restores the complete listing and still speaks for the complete server-filtered
+  set, never the loaded page.
 
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
