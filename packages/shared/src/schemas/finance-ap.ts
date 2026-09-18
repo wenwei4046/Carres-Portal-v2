@@ -24,6 +24,30 @@ const optText = (max: number) => z.string().max(max).nullable().optional();
 export const AP_FILE_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
 export const AP_FILE_MAX_BYTES = 20 * 1024 * 1024;
 
+// ── payment terms (0530) ────────────────────────────────────────────────────
+/** Days, or null to clear. Owner ruling 17 Sep 2026: set per supplier and per PO. */
+export const termsDays = z.number().int().min(0).max(365).nullable();
+export const setTermsDaysInput = z.object({ days: termsDays }).strict();
+export type SetTermsDaysInput = z.infer<typeof setTermsDaysInput>;
+
+/**
+ * The due date a new bill starts with: bill date + terms days. The PO's terms
+ * win when set, otherwise the supplier's. No terms, or no valid bill date,
+ * gives null (no due date) — nothing blocks.
+ */
+export function defaultBillDueDate(
+  billDate: string,
+  poTermsDays: number | null | undefined,
+  supplierTermsDays: number | null | undefined,
+): string | null {
+  const days = poTermsDays ?? supplierTermsDays;
+  if (days == null || !/^\d{4}-\d{2}-\d{2}$/.test(billDate)) return null;
+  const d = new Date(`${billDate}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // ── bills ────────────────────────────────────────────────────────────────────
 export const supplierBillLineInput = z
   .object({
@@ -268,6 +292,8 @@ export interface GrnCandidateRow {
   open_lines: number;
   open_qty: ApMoney;
   open_value_at_po_cost: ApMoney;
+  /** 0530 — the PO's own payment terms. Null = not set on the PO. */
+  po_terms_days: number | null;
 }
 
 export interface GrnLineRow {
@@ -302,6 +328,8 @@ export interface ApCreditor {
   id: string;
   name: string;
   kind: string;
+  /** 0530 — days after the bill date the supplier is paid. Null = not set. */
+  terms_days: number | null;
 }
 
 export interface ApOutstandingRow {

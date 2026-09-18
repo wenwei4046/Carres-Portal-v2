@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const navigate = vi.fn();
 const refetch = vi.fn();
 const reviseMutate = vi.fn();
+const termsMutate = vi.fn();
 const supplierDateMutate = vi.fn();
 let auditError = false;
 let connectionError = false;
@@ -229,6 +230,7 @@ vi.mock("@/lib/queries", () => ({
   useSetDefaultRegisterLayout: () => ({ mutateAsync: vi.fn() }),
   useRecordSupplierDate: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
+  useSetPoTermsDays: () => ({ mutate: termsMutate, isPending: false }),
 }));
 
 vi.mock("../components/PoIssueEvidence", () => ({
@@ -261,6 +263,7 @@ beforeEach(() => {
   connectionEmpty = false;
   receivingReturnReason = null;
   reviseMutate.mockReset();
+  termsMutate.mockReset();
   queryData.destinations.splice(
     0,
     queryData.destinations.length,
@@ -455,6 +458,18 @@ describe("Purchase Orders Register", () => {
     expect(work).toHaveTextContent("PO V2 has not been sent");
     expect(work).toHaveTextContent("Issue PO V2 to Hooka");
     expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
+  });
+
+  it("saves the PO's payment terms, and blank clears them (0530)", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const field = screen.getByLabelText("Terms (days)");
+    const save = screen.getByTestId("po-terms-save");
+    expect(save).toBeDisabled();
+    fireEvent.change(field, { target: { value: "-1" } });
+    expect(save).toBeDisabled();
+    fireEvent.change(field, { target: { value: "45" } });
+    fireEvent.click(save);
+    expect(termsMutate).toHaveBeenCalledWith(45, expect.anything());
   });
 
   it("opens an object from the live register without changing the page's Hook order", () => {

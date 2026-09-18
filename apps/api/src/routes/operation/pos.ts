@@ -28,6 +28,7 @@ import { requireOperation } from "../../lib/auth-guards";
 import { chunk } from "../../lib/purchase-demand-read";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { setTermsDaysInput } from "@carres/shared/schemas/finance-ap";
 import type { AppEnv } from "../../types";
 
 /**
@@ -149,7 +150,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at, terms_days",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -2282,6 +2283,21 @@ operationPosRouter.post("/:id/revise", requireOperation, async (c) => {
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
+});
+
+// ----- PUT /:id/terms-days -----
+// 0530 — the PO's own payment terms. They win over the supplier's when the
+// bill form fills in a due date. Null clears them.
+operationPosRouter.put("/:id/terms-days", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, setTermsDaysInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_po_terms_days", {
+    p_po_id: c.req.param("id"),
+    p_days: parsed.data.days,
+  });
+  if (error) return mapSupplierCallError(c, error);
+  return c.json({ ok: true });
 });
 
 // ----- PUT /message-template -----

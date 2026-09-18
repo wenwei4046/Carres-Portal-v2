@@ -3449,6 +3449,22 @@ the page to pass its own.
 
 ---
 
+### Payment terms in days (migration 0530) — PROPOSAL — PENDING APPROVAL
+
+Owner ruling (YH, 17 Sep 2026): terms are set per supplier and per PO; the PO's win. The words
+below are **PROPOSAL — PENDING APPROVAL**. Pages: Operation → Purchasing Settings, Purchase
+Order detail, Finance → Supplier bill form.
+
+| Where | Word | Meaning |
+|---|---|---|
+| Settings section | **`Payment terms`** | Heading for the per-supplier terms. |
+| | **`Days after the supplier's bill date that the bill is due. A PO's own terms come first.`** | What the number does. |
+| Supplier row · PO detail | **`Terms (days)`** | The number of days. Blank = not set. |
+| PO detail hint | **`Blank uses the supplier's terms`** | An empty PO field falls back. |
+| Both fields, refused | **`0 to 365`** | The allowed range. |
+| Bill form, under Due date | **`Bill date + {n} days, from the PO's terms`** · **`Bill date + {n} days, from the supplier's terms`** | Where the filled-in due date came from. Gone once the user types a date. |
+| PO detail, refused | **`The terms could not be saved`** | The save failed. |
+
 ## Header rules (see UI-KIT for the shell)
 
 Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:
