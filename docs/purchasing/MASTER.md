@@ -1751,19 +1751,22 @@ acts within groups. Search, column filters and export retain accurate source val
 **Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
 ```text
-Proceed Date · Manual Purchase No. · Approval Status · Purpose · Requested By · PO Safety Days ·
+Proceed Date · PO No · Approval Status · Purpose · Requested By · PO Safety Days ·
 Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · Supplier ·
-Supplier Deliver To · PO No · PO Default Delivery Date
+Supplier Deliver To · PO Default Delivery Date
 ```
 
-Customer and supplier facts use the shared dictionary below. Existing groups and sorting stay.
-
-**IDENTIFIER GAP — verify before building the approved second column.** The owner marked the second column
-"number and official name to be verified". §6.1 (Card 08, owner ruling 2026-09-04) retired `MPR`: a
-Manual Purchase is an internal record with no visible number, and PO No is the only purchasing
-document number; its stored `MPR-…`/`REQ-…` values are never displayed. Do not invent a public identifier or expose a UUID/retired MPR. The approved target reserves the
-second position for a verified identity; the current built identity stays
-`Proceed Date · Items` (pinned ≥768px; `Items` alone below).
+**Identity — confirmed by Jess, 2026-09-18.** Manual Purchase has no separate public number.
+`PO No` in the second position is the actual resulting PO reference, blank before any PO exists;
+it is not an earlier allocation of a PO number. Never introduce Manual Purchase No., MPR, a UUID
+or a placeholder document number. There is no duplicate PO No column later in the row. Multiple
+resulting POs retain their individual references and dates; never pick one arbitrary PO.
+One row remains one Manual Purchase request, not one row per PO. `Items` still opens that request;
+a PO reference opens its PO. The request retains its internal stable row identity even before PO.
+Pin Proceed Date and the PO No reference column on wide canvases, PO No alone below 768px; Items
+remains reachable when the PO cell is blank. This is an approved layout exception to the rule that
+an identity cell always opens the row's own object, not permission to create another document ID.
+Customer and supplier facts use the shared dictionary. Existing groups and sorting stay.
 
 **Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
 (`Ready Stock`, `Showroom Display`, `Service Case`, …); most have no customer. Those rows show the
