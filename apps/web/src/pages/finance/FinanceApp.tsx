@@ -13,6 +13,7 @@ import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
 import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
 import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
+import MoneyMovesPage from "./money-moves/MoneyMovesPage";
 // The read-only Finance Ledger — three destinations, three nav rows.
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
@@ -102,6 +103,8 @@ export default function FinanceApp() {
               other receipts. Finance only; customer money stays in Payments. */}
           <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />
           <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
+          {/* 0529 — bank transfers and card payouts between Finance's own accounts. */}
+          <Route path="money-moves" element={financeOnly(<MoneyMovesPage />)} />
           {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
           <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
           <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />

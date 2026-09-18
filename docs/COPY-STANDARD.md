@@ -3350,6 +3350,34 @@ with where it appears.
 | `Advance` (picker label) · `Bill` · `Date` · `Amount` · `Reference` | Field labels in the Apply advance and Record money back modals. |
 | `Bill No` · `Supplier invoice` · `Draft bill` · `Loading bills…` · `The bills could not be loaded. Try again.` · `This supplier has no confirmed bill left to pay.` · `Choose the bank or cash account` · `Bank reference or cheque No` | Reused from 0477 — the Apply advance and Record money back modals and the knock-off table. |
 
+### Money moves and the three-person voucher (migration 0529)
+
+**PROPOSAL — PENDING APPROVAL.** Every word below is new. Page: `Money moves` at
+`/finance/money-moves` (Finance sidebar, after `Other receipts`), and one new refusal on the
+payment voucher's Approve.
+
+| Word | Where · meaning |
+|---|---|
+| `Money moves` | Sidebar row, page header and export name: Finance moving its own money between its own accounts. |
+| `New money move` · `Prepare money move` | Toolbar button that opens the form; the form's press (prepares, posts nothing). |
+| `Bank transfer` · `Card payout` | The two kinds (`TRANSFER` · `CARD_PAYOUT`), and the Journal's Source for `MONEY_TRANSFER` / `CARD_PAYOUT` (with ` reversal`). `Bank transfer` is already a pay-method word. |
+| `Move No` · `MM-YYYYMMDD-NNNN` | The number column and the number (prefix MM = money move). |
+| `Kind` · `Date` · `Paid from` · `Paid into` · `Amount` · `Fee` · `Reference` · `Note` · `Status` | Register columns and form labels. `Paid into` is new; the rest are reused. |
+| `Amount (RM)` · `Paid into the bank (RM)` · `Card company fee (RM)` · `{RM} leaves {code}` | Form amount label for a transfer · for a card payout · the fee · the gross hint under the fee. |
+| `Prepared` · `Approved` · `Reversed` · `Cancelled` | Status (database `prepared` · `approved` · `reversed` · `cancelled`). |
+| `Approve` · `Cancel money move` · `Cancel this money move?` | Row actions and the cancel modal title. |
+| `Nothing was entered in the ledger yet.` · `The ledger entry is reversed on the money move date.` | Cancel modal description for a prepared · an approved move. |
+| `Nothing is entered in the ledger until another finance approver approves it.` | The form's description. |
+| `You prepared this. Another finance approver approves it.` | Expanded row of your own prepared move. |
+| `{RM gross} from {account} · {RM} into {account} · Fee {RM}` · `Prepared · {when} · {name}` · `Approved · {when} · {name}` | Expanded row facts and history. |
+| `No reference` · `No note` · `No reason on file` · `Name not available` | Empty values in the Reference column and the expanded row (reused from Other debtors). |
+| `{n} money moves · {n} to approve` · `Search money moves…` · `Inspect money move` | Register footer, search placeholder, expand control. |
+| `No money move yet. Press New money move to record a bank transfer or a card payout.` | Empty state. |
+| `Money move prepared. A finance approver approves it next.` · `{MM No} approved.` · `Money move cancelled.` | Toasts. |
+| `Choose where the money came from.` · `Choose where the money went.` · `The money must move between two different accounts.` · `A bank transfer has no fee.` · `Choose a bank transfer or a card payout.` · `The fee cannot be below RM 0.00.` · `Type the fee.` | Form refusals (shared schema). |
+| `Paid from must be a cash or bank account in use.` · `Paid into must be a cash or bank account in use.` · `A card payout comes from a card or online holding account in use.` · `A card payout goes into a bank account in use.` · `A bank transfer has no fee. Record a bank charge on a payment voucher.` · `The amount must be more than RM 0.00, in sen at most.` · `The fee must be RM 0.00 or more, in sen at most.` · `Choose the date the money moved.` · `Only Finance records a money move.` · `Approving a money move takes the finance approver.` · `You prepared money move {MM No}, so somebody else must approve it.` · `Money move {MM No} is {status}, so it cannot be approved.` · `Reversing a posted money move takes the finance approver.` · `Type why the money move is cancelled.` · `Money move {MM No} is already {status}.` · `Money moves are for Finance.` | Database refusals, shown as they come. |
+| `You checked payment voucher {PV No}, so somebody else must approve it. Three different people prepare, check and approve a payment.` | Payment voucher Approve refusal (`checker_cannot_approve`). |
+
 ### Finance Dashboard · AR · Receivables (build/finance-old-reads)
 
 **RULING — YH, 2026-09-14.** The Finance sidebar row that opens `/finance/ap-outstanding` is

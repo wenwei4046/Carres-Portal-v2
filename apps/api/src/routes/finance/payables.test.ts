@@ -307,6 +307,23 @@ describe("payment vouchers", () => {
     expect(await res.json()).toMatchObject({ code: "separation_of_duties" });
   });
 
+  it("approve by the checker: 403 checker_cannot_approve keeps the database's sentence (0529)", async () => {
+    mockRpc({
+      data: null,
+      error: {
+        code: "42501",
+        message: "You checked payment voucher PV-1, so somebody else must approve it. Three different people prepare, check and approve a payment.",
+        details: "checker_cannot_approve",
+      },
+    });
+    const res = await call(`/vouchers/${VOUCHER_ID}/approve`, { method: "POST" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "checker_cannot_approve",
+      message: expect.stringContaining("You checked payment voucher PV-1"),
+    });
+  });
+
   it("approve by someone without the approver duty: 403 keeps the reason code", async () => {
     mockRpc({
       data: null,

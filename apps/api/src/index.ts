@@ -93,6 +93,7 @@ import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 import financeLedgerRouter from "./routes/finance/ledger";
 // The manual journal door — the principal's one write to the ledger (0462).
 import financeManualJournalsRouter from "./routes/finance/manual-journals";
+import financeMoneyMovesRouter from "./routes/finance/money-moves";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
@@ -288,6 +289,8 @@ api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance/ledger", financeLedgerRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
+// Bank transfers and card payouts (0529). Before the catch-all as well.
+api.route("/finance/money-moves", financeMoneyMovesRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
