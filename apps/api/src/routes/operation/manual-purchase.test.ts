@@ -2323,6 +2323,97 @@ describe("GET /purchasing/requests/:id/stock-allocation", () => {
   });
 });
 
+/* ════════════════════════════════════════════════════════════════════════
+ * THE DEPLOY WINDOW — code on `main` before 0534 is applied
+ *
+ * ⭐ `main` deploys the code; the migration lands through its own governed
+ * path. Between them the allocation column does not exist, and the Register
+ * must keep working — but it must NOT start guessing.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("the Register before 0534 is applied", () => {
+  const LINES = [
+    {
+      id: "dddddddd-0000-0000-0000-0000000000a1",
+      request_id: REQUESTS[0]!.id,
+      sku: "5539-2NA",
+      supplier_id: SUP,
+      qty: 3,
+      approved_qty: null,
+      issued_qty: 0,
+      remaining_qty: 3,
+      required_by: null,
+      remark: null,
+      po_id: null,
+      cancelled_at: null,
+      cancel_reason: null,
+    },
+  ];
+
+  /** The whole register read, with the saved-stock read failing its own way. */
+  function registerSb(stockError: { code?: string; message: string }) {
+    const base = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(LINES, { filterInBy: "request_id" });
+          case "ops_stock_items":
+            /* `.select().in().in()` — the shape the saved-stock read uses. */
+            return {
+              select: () => ({
+                in: () => ({ in: () => Promise.resolve({ data: null, error: stockError }) }),
+              }),
+            };
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    };
+    return base as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(stockError: { code?: string; message: string }) {
+    vi.mocked(userClient).mockReturnValue(registerSb(stockError));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      linesUnavailable?: boolean;
+      lines: Array<{ stock_reserved_qty?: number }>;
+    };
+  }
+
+  it("⭐ a MISSING COLUMN is not unknown — nothing can be allocated where there is nowhere to store it", async () => {
+    const body = await register({
+      code: "42703",
+      message: "column ops_stock_items.reserved_purchase_demand_id does not exist",
+    });
+    /* Unknown here would be a portal-wide P1: every remainder unreadable, so
+       every Manual Purchase row would read `Remaining quantity not checked`
+       and NOTHING could be ticked until the migration landed. Zero is the TRUE
+       answer before the column exists, not a guess — which is the only reason
+       this one code is tolerated. */
+    expect(body.linesUnavailable).toBeFalsy();
+    expect(body.lines.length).toBeGreaterThan(0);
+    for (const l of body.lines) expect(l.stock_reserved_qty).toBe(0);
+  });
+
+  it("⛔ EVERY OTHER FAILURE STAYS UNKNOWN and still refuses the tick", async () => {
+    const body = await register({ code: "57014", message: "canceling statement due to timeout" });
+    expect(body.linesUnavailable).toBe(true);
+  });
+});
+
 describe("POST /purchasing/requests/:id/stock-allocation — the one save", () => {
   const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
   const OTHER_REQ = "aaaaaaaa-0000-0000-0000-0000000000bb";

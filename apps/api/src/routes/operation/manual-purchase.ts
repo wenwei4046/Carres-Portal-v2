@@ -561,7 +561,9 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
      * server has not confirmed.
      *
      * A failed read is UNKNOWN, not zero: it sets `linesUnavailable`, which
-     * keeps the row out of `No PO needed` and refuses its tick by name.
+     * keeps the row out of `No PO needed` and refuses its tick by name. The ONE
+     * exception is the deploy window before 0534 (`isMissingAllocationColumn`),
+     * where no allocation can exist because there is nowhere to store one.
      */
     const lineIds = lines.map((l) => l.id as string);
     if (lineIds.length > 0) {
@@ -570,12 +572,15 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
         .select("reserved_purchase_demand_id, qty")
         .in("reserved_purchase_demand_id", lineIds)
         .in("status", ["reserved", "sold"]);
-      if (held.error) {
+      if (held.error && !isMissingAllocationColumn(held.error)) {
         linesUnavailable = true;
         console.error(
           "manual purchase — saved stock unavailable",
           held.error.message,
         );
+      } else if (held.error) {
+        /* Pre-0534: the column is not there, so nothing is allocated. */
+        lines = lines.map((l) => ({ ...l, stock_reserved_qty: 0 }));
       } else {
         const byLine = new Map<string, number>();
         for (const u of (held.data ?? []) as Array<Record<string, unknown>>) {
@@ -1122,6 +1127,38 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     planUnavailable,
   });
 });
+
+/**
+ * ⭐ THE DEPLOY WINDOW — 0534 IS NOT APPLIED YET, AND THAT MUST NOT BREAK THE
+ * REGISTER.
+ *
+ * `main` deploys the code; the migration is applied through its own governed
+ * path, and the two do not land in the same second. Between them
+ * `ops_stock_items.reserved_purchase_demand_id` does not exist, and PostgREST
+ * answers the read below with `42703` / `PGRST204`.
+ *
+ * Treating THAT as unknown would have been a portal-wide P1: `linesUnavailable`
+ * makes every remainder unknown, so every Manual Purchase row would read
+ * `Remaining quantity not checked` and NOTHING could be ticked — Issue PO
+ * unusable for the whole module until the migration landed.
+ *
+ * ⛔ AND IT IS NOT "UNKNOWN IS ZERO" EITHER, which the ruling forbids. Before
+ * the column exists, NO allocation can exist: there is nowhere to store one and
+ * no door that writes one. Zero is the TRUE answer by construction, not a
+ * guess — which is exactly why this narrow code, and only this code, is
+ * tolerated. Every OTHER failure stays UNKNOWN and still refuses the tick.
+ *
+ * DELETE THIS the day 0534 is verified applied in production. It is a
+ * deploy-window tolerance, not a permanent rule (0471's delegator, same debt,
+ * paid the same day).
+ */
+function isMissingAllocationColumn(error: {
+  code?: string | null;
+  message?: string | null;
+}): boolean {
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return /reserved_purchase_demand_id/.test(error.message ?? "");
+}
 
 /**
  * THE STOCK PICKER'S SIX FACTS, read from ONE place.
@@ -2283,7 +2320,10 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       .select("reserved_purchase_demand_id, qty")
       .in("reserved_purchase_demand_id", liveLineIds)
       .in("status", ["reserved", "sold"]);
-    if (heldErr) return fail(c, heldErr);
+    /* Pre-0534 the column is not there and nothing is allocated, so there is
+       nothing to subtract; any OTHER failure still stops the issue, because
+       issuing against an unread allocation would buy goods twice. */
+    if (heldErr && !isMissingAllocationColumn(heldErr)) return fail(c, heldErr);
     for (const u of (heldUnits ?? []) as Array<Record<string, unknown>>) {
       const key = u.reserved_purchase_demand_id as string;
       heldByDemand.set(key, (heldByDemand.get(key) ?? 0) + Math.max(1, Number(u.qty ?? 1)));
