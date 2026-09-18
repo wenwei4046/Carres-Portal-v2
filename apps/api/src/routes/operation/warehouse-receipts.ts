@@ -11,8 +11,12 @@ import {
   receivingVoidInput,
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
+  warehouseReceiptTotals,
+  receivingExtraQty,
   warehouseReceiptReturnInput,
   type GrnRegisterFactRow,
+  type GrnReceivedWith,
+  type ReceivingExtraLine,
   type PoDatePromise,
   type WarehouseReceiptLine,
 } from "@carres/shared";
@@ -155,6 +159,21 @@ async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> 
   }
 }
 
+/**
+ * The business day an instant falls on, in `Asia/Kuala_Lumpur` — the ONE
+ * calendar the rail's `GRN date` ladder and the Warehouse working week share.
+ * A missing stamp stays missing: a GRN with no recorded creation instant is
+ * never given today's date so that it can appear under a heading.
+ */
+function businessDay(at: string | null | undefined): string | null {
+  if (!at) return null;
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+  }).format(d);
+}
+
 const GRN_PAGE_DEFAULT = 50;
 const GRN_PAGE_MAX = 200;
 /** The scan's own page size — a Worker-side read, never sent to the browser. */
@@ -176,11 +195,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       GRN_PAGE_MAX,
     );
     const offset = Math.max(0, Math.floor(Number(c.req.query("offset")) || 0));
+    /* The rail's six groups (§9.4, owner ruling 2026-09-17). `from`/`to` is
+       the ONE shape a day, a week, a month and `Choose dates…` all arrive in,
+       so the server never learns four date vocabularies. */
+    const receivedWithRaw = c.req.query("receivedWith") ?? null;
+    const receivedWith: GrnReceivedWith | null =
+      receivedWithRaw === "damaged" ||
+      receivedWithRaw === "wrong_item" ||
+      receivedWithRaw === "extra"
+        ? receivedWithRaw
+        : null;
+    const isoDay = (v: string | undefined) =>
+      v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
     const sel = {
       category: c.req.query("category") ?? null,
       supplier: c.req.query("supplier") ?? null,
       site: c.req.query("site") ?? null,
-      expected: c.req.query("expected") ?? null,
+      receivedWith,
+      from: isoDay(c.req.query("from")),
+      to: isoDay(c.req.query("to")),
+      cancelled: c.req.query("cancelled") === "1" ? true : null,
       q: c.req.query("q") ?? null,
     };
 
@@ -194,16 +228,21 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       actual_site_id: string | null;
       goods_received_at: string | null;
       submitted_at: string | null;
+      /* `GRN date` is the GRN's CREATION stamp — the posting — and is never
+         inferred from the physical arrival date (§9.4). */
+      posted_at: string | null;
+      status: string | null;
       grn_no: string | null;
       do_number: string | null;
       lines: WarehouseReceiptLine[] | null;
+      extra_lines: unknown;
     };
     const scan: ScanRow[] = [];
     for (let from = 0; ; from += GRN_SCAN_PAGE) {
       const { data, error } = await sb
         .from("warehouse_receipts")
         .select(
-          "id, po_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, grn_no, do_number, lines",
+          "id, po_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
         )
         .in("status", ["posted", "voided"])
         .order("goods_received_at", { ascending: false })
@@ -288,6 +327,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
     const factRows: GrnRegisterFactRow[] = scan.map((r) => {
       const supplierName = supplierByPo.get(r.po_id) ?? null;
+      const totals = warehouseReceiptTotals(r.lines ?? []);
       return {
         id: r.id,
         categories: receiptCategoryWords(r.lines, scanCatalog),
@@ -296,7 +336,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ??
           (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ??
           null,
-        supplierDeliveryDateIso: supplierDateByPo.get(r.po_id) ?? null,
+        grnDateIso: businessDay(r.posted_at),
+        // `Received with` reads the receipt's OWN stored quantities through the
+        // shared totals — the register never re-counts a jsonb line itself.
+        damaged: totals.damaged > 0,
+        wrongItem: totals.wrongItem > 0,
+        extra:
+          receivingExtraQty(
+            (Array.isArray(r.extra_lines)
+              ? r.extra_lines
+              : []) as ReceivingExtraLine[],
+          ) > 0,
+        cancelled: r.status === "voided",
         // The Search box's own promise: GRN, PO, supplier or DO number.
         searchText: [
           receivingDisplayNo({
@@ -361,11 +412,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     // else the SKU — resolved for the page only.
     const pageSkus = [
       ...new Set(
-        ordered.flatMap((r) =>
-          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+        ordered.flatMap((r) => [
+          ...((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
             (l) => l.sku,
           ),
-        ),
+          // Extra goods are their own rows in the expansion and need the same
+          // item word and category as an ordered line.
+          ...((Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
+            sku?: string;
+          }>)
+            .map((x) => x.sku)
+            .filter((v): v is string => typeof v === "string" && v.length > 0),
+        ]),
       ),
     ];
     const productWordBySku = new Map<string, string>();
@@ -376,6 +434,197 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         .in("sku", pageSkus);
       for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
         if (s.variant) productWordBySku.set(s.sku, s.variant);
+    }
+
+    /* ── THE PAGE'S OWN RECEIPT FACTS — the same ones the official GRN
+       object reads (§9.4), resolved for the fifty rows on screen and never
+       for the whole history. They answer two approved columns:
+
+         `SO No / MPR No / CO No / RO No`   the receipt's ACTUAL linked
+                                            documents, per line, blank when
+                                            there are none — never invented,
+                                            and never a PO standing in for a
+                                            CO or RO receipt
+         the read-only goods expansion      one row per received line, with
+                                            the source number above its own
+                                            line-bound Unit IDs
+       ──────────────────────────────────────────────────────────────────── */
+    const pageLineIds = [
+      ...new Set(
+        ordered.flatMap((r) =>
+          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.id,
+          ),
+        ),
+      ),
+    ].filter((id) => typeof id === "string" && id.length > 0);
+
+    /** `po_line_id` → the governed reference numbers of that line's sources. */
+    const refsByLine = new Map<string, string[]>();
+    if (pageLineIds.length > 0) {
+      const poLines = await readByIds<{
+        id: string;
+        demand_id: string | null;
+      }>(pageLineIds, (ids) =>
+        sb
+          .from("purchase_order_lines")
+          .select("id, demand_id")
+          .in("id", ids),
+      );
+      const sources = await readByIds<{ po_line_id: string; so: number | null }>(
+        pageLineIds,
+        (ids) =>
+          sb
+            .from("po_line_sources")
+            .select("po_line_id, so")
+            .in("po_line_id", ids),
+      );
+      for (const src of sources) {
+        if (src.so == null) continue;
+        const list = refsByLine.get(src.po_line_id) ?? [];
+        const reference = `SO-${Number(src.so)}`;
+        if (!list.includes(reference)) list.push(reference);
+        refsByLine.set(src.po_line_id, list);
+      }
+      // The Manual Purchase Request number (owner ruling 2026-09-18) — the
+      // request's own `MPR-YYYYMMDD-RRRR`, reached through the line's demand.
+      const demandIds = [
+        ...new Set(
+          poLines
+            .map((l) => l.demand_id)
+            .filter((v): v is string => typeof v === "string" && v.length > 0),
+        ),
+      ];
+      const requestByDemand = new Map<string, string>();
+      if (demandIds.length > 0) {
+        const demands = await readByIds<{ id: string; request_id: string | null }>(
+          demandIds,
+          (ids) =>
+            sb.from("purchase_demands").select("id, request_id").in("id", ids),
+        );
+        const requestIds = [
+          ...new Set(
+            demands
+              .map((d) => d.request_id)
+              .filter((v): v is string => typeof v === "string" && v.length > 0),
+          ),
+        ];
+        const reqNoById = new Map<string, string>();
+        if (requestIds.length > 0) {
+          const requests = await readByIds<{ id: string; req_no: string | null }>(
+            requestIds,
+            (ids) =>
+              sb.from("purchase_requests").select("id, req_no").in("id", ids),
+          );
+          for (const r of requests)
+            if (r.req_no) reqNoById.set(r.id, r.req_no);
+        }
+        for (const d of demands)
+          if (d.request_id && reqNoById.has(d.request_id))
+            requestByDemand.set(d.id, reqNoById.get(d.request_id)!);
+      }
+      for (const line of poLines) {
+        const mpr = line.demand_id ? requestByDemand.get(line.demand_id) : null;
+        if (!mpr) continue;
+        const list = refsByLine.get(line.id) ?? [];
+        if (!list.includes(mpr)) list.push(mpr);
+        refsByLine.set(line.id, list);
+      }
+    }
+
+    /* A receipt that came through an arrival source (0490) has NO purchase
+       order at all — the check constraint allows exactly one of the two — so
+       its own document number IS the reference: `RO-…` for a repair return,
+       the claim, case or delivery paper for the others. */
+    const arrivalIds = [
+      ...new Set(
+        ordered
+          .map((r) => r.arrival_source_id as string | null | undefined)
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const arrivalNoById = new Map<string, string>();
+    if (arrivalIds.length > 0) {
+      try {
+        const arrivals = await readByIds<{ id: string; source_no: string | null }>(
+          arrivalIds,
+          (ids) =>
+            sb.from("arrival_sources").select("id, source_no").in("id", ids),
+        );
+        for (const a of arrivals)
+          if (a.source_no) arrivalNoById.set(a.id, a.source_no);
+      } catch (e) {
+        // The arrival-source tables are still unnumbered in some deployments;
+        // a register that cannot read them prints no reference rather than
+        // refusing to open (the same discipline `readReceipts` already uses).
+        console.error("reading arrival sources failed (non-fatal):", e);
+      }
+    }
+
+    /** `receipt id` → `po_line_id` → the Unit IDs THIS receiving answered. */
+    const unitsByReceiptLine = new Map<string, Map<string, string[]>>();
+    if (view.pageIds.length > 0) {
+      try {
+        const results = await readByIds<{
+          receipt_id: string;
+          stock_item_id: string;
+          unit_code: string;
+        }>(view.pageIds, (ids) =>
+          sb
+            .from("receiving_unit_results")
+            .select("receipt_id, stock_item_id, unit_code")
+            .in("receipt_id", ids)
+            .order("unit_code"),
+        );
+        const itemIds = [...new Set(results.map((u) => u.stock_item_id))];
+        const lineByItem = new Map<string, string>();
+        if (itemIds.length > 0) {
+          const items = await readByIds<{
+            id: string;
+            po_line_id: string | null;
+            identity_scope: string | null;
+          }>(itemIds, (ids) =>
+            sb
+              .from("ops_stock_items")
+              .select("id, po_line_id, identity_scope")
+              .in("id", ids),
+          );
+          for (const item of items) {
+            // A quantity line's register row carries a TECHNICAL key and is
+            // never shown as a Unit ID (§9.4, 0453). Only exact-unit identity
+            // reaches the screen.
+            if (item.po_line_id && item.identity_scope !== "quantity")
+              lineByItem.set(item.id, item.po_line_id);
+          }
+        }
+        for (const u of results) {
+          const lineId = lineByItem.get(u.stock_item_id);
+          if (!lineId) continue;
+          const byLine =
+            unitsByReceiptLine.get(u.receipt_id) ?? new Map<string, string[]>();
+          const codes = byLine.get(lineId) ?? [];
+          if (!codes.includes(u.unit_code)) codes.push(u.unit_code);
+          byLine.set(lineId, codes);
+          unitsByReceiptLine.set(u.receipt_id, byLine);
+        }
+      } catch (e) {
+        console.error("reading receiving unit results failed (non-fatal):", e);
+      }
+    }
+
+    /* The expansion's `Category` and `Items` come from the SAME two reads the
+       official GRN object uses — the catalog ladder and the GRN paper's own
+       item word — so the register and the document can never disagree. */
+    const lineInfo: Record<string, { description: string | null; category: string }> =
+      {};
+    for (const sku of pageSkus) {
+      lineInfo[sku] = {
+        description: productWordBySku.get(sku) ?? null,
+        category: goodsCategoryWordOf({
+          sku,
+          category: scanCatalog.get(sku) ?? null,
+        }),
+      };
     }
 
     // Signed DOs — page rows only, best-effort exactly as the legacy list.
@@ -413,6 +662,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           product_labels: [
             ...new Set(lines.map((l) => productWordBySku.get(l.sku) ?? l.sku)),
           ],
+          /* `GRN Date` is CREATION; `Goods Received Date` is physical receipt.
+             Neither is ever inferred from the other (§9.4). */
+          grn_date: (r.posted_at as string | null) ?? null,
+          /* The receipt's ACTUAL linked documents. An arrival-source receipt
+             carries its own number and no purchase order; a PO receipt carries
+             its lines' SO and MPR numbers. Nothing stands in for a missing
+             one. */
+          source_refs: [
+            ...new Set([
+              ...(typeof r.arrival_source_id === "string"
+                ? [arrivalNoById.get(r.arrival_source_id)].filter(
+                    (v): v is string => typeof v === "string",
+                  )
+                : []),
+              ...lines.flatMap((l) => refsByLine.get(l.id) ?? []),
+            ]),
+          ],
+          unit_ids_by_line: Object.fromEntries(
+            unitsByReceiptLine.get(r.id as string) ?? new Map<string, string[]>(),
+          ),
           submitted_by_name: r.submitted_by
             ? (userNames.get(r.submitted_by as string) ?? null)
             : null,
@@ -443,6 +712,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       }),
       page: { offset, limit, total: view.total },
       facets: view.facets,
+      /* The expansion's item words and governed categories, resolved once for
+         the page — the same two facts the official GRN document prints. */
+      line_info: lineInfo,
       counts: { waiting: waiting ?? 0 },
     });
   }
