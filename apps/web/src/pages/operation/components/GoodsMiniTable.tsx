@@ -174,7 +174,21 @@ const CONNECTOR_BOTTOM = -(DETAIL_GAP + 1);
  * and Delivery pass neither and render byte-identically.
  */
 const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
-const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
+/**
+ * ⭐ `PO Default Delivery Date`, NOT `PO Delivery Date` — Purchasing UI
+ * dictionary, owner ruling 2026-09-18, which RETIRES the older label.
+ *
+ * It is the ORIGINAL planned date the purchase order was issued with, and it
+ * survives the supplier moving it; the supplier's own answer is a different
+ * column with a different name. One word for two facts is how a screen comes
+ * to show a promise nobody made. 176px holds the two-line heading and a
+ * cross-year date.
+ */
+const PO_DATE_COLUMN = {
+  key: "poDeliveryDate",
+  label: "PO Default Delivery Date",
+  width: 176,
+} as const;
 
 /**
  * ⭐ `PO No` — MANUAL PURCHASE'S OWN COLUMN (settled design, owner ruling
@@ -387,6 +401,7 @@ export default function GoodsMiniTable({
   lines,
   selection,
   soBatchGoodsLayout = false,
+  manualPurchaseGoodsLayout = false,
   showStatus = false,
   detailRow,
   showSku = true,
@@ -418,6 +433,19 @@ export default function GoodsMiniTable({
    * Purchase Orders pass nothing and render byte-identically.
    */
   soBatchGoodsLayout?: boolean;
+  /**
+   * ⭐ MANUAL PURCHASE'S APPROVED EXPANSION (Jess 2026-09-18, §9.2):
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To · PO No · PO Default Delivery Date`.
+   *
+   * It is the SO Batch order plus the two DOCUMENT columns, because a Manual
+   * Purchase row carries its own purchase orders where an SO Batch row does
+   * not. Everything else — the cells, the widths, the `Ready Stock` node, the
+   * detail row and its connector — is the sibling's, unchanged. A second
+   * near-identical layout constant is exactly the drift law ① exists to stop,
+   * so this adds two keys to one list rather than a second list.
+   */
+  manualPurchaseGoodsLayout?: boolean;
   /** `Need PO` / `No PO needed` — the need for a new document, not permission. */
   showStatus?: boolean;
   /**
@@ -543,6 +571,17 @@ export default function GoodsMiniTable({
    * computed offsets, which is how `Supplier` and `PO No` ended up depending
    * on whether `PO Delivery Date` happened to be asked for.
    */
+  /**
+   * ⭐ ONE PURCHASING GEOMETRY, TWO APPROVED ORDERS.
+   *
+   * SO Batch and Manual Purchase share every measured width, the blue context
+   * boundary, the 40px header, the content-width table and the connector; they
+   * differ only in that Manual Purchase carries two more DOCUMENT columns. So
+   * the geometry keys off this one flag and only the `order` list branches —
+   * two near-identical geometry branches is the drift law ① exists to stop.
+   */
+  const purchasingGoodsLayout = soBatchGoodsLayout || manualPurchaseGoodsLayout;
+
   type Column = { key: string; label: string; width: number | null };
   const REGISTRY: Record<string, Column> = {
     category: { ...CHILD_COLUMNS[0] },
@@ -581,7 +620,7 @@ export default function GoodsMiniTable({
    * `Ready Stock` widens because it stopped being a figure and became the door
    * to the stock picker; `Supplier` takes the reviewed 136 it has on the parent.
    */
-  if (soBatchGoodsLayout) {
+  if (purchasingGoodsLayout) {
     REGISTRY.fromStock = { key: "fromStock", label: "Ready Stock", width: 136 };
     REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
     REGISTRY.deliverTo = { key: "deliverTo", label: SUPPLIER_DELIVER_TO_LABEL, width: 200 };
@@ -606,6 +645,13 @@ export default function GoodsMiniTable({
   }
   const order = purchaseOrderLayout
     ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
+    /* ⭐ MANUAL PURCHASE IS SO BATCH'S ORDER PLUS THE TWO PO FACTS (Purchasing
+       §9.2). It is written as its own line rather than as a flag on SO Batch's,
+       because the two lists are owned by two rulings and a shared list would
+       make either round silently reorder the other's columns. The GEOMETRY
+       stays shared — see `purchasingGoodsLayout`. */
+    : manualPurchaseGoodsLayout
+    ? ["status", "category", "qty", "item", "fromStock", "supplier", "deliverTo", "poNo", "poDeliveryDate"]
     : soBatchGoodsLayout
     ? ["status", "category", "qty", "item", "fromStock", "supplier", "deliverTo"]
     : salesOrderLayout
@@ -652,8 +698,8 @@ export default function GoodsMiniTable({
     columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
   /* Content decides the width on the SO Batch layout; every other caller keeps
      `w-full` and its one flexible column. */
-  const tableStyle = soBatchGoodsLayout ? { width: minWidth } : { minWidth };
-  const tableClass = soBatchGoodsLayout
+  const tableStyle = purchasingGoodsLayout ? { width: minWidth } : { minWidth };
+  const tableClass = purchasingGoodsLayout
     ? "table-fixed text-left"
     : "w-full table-fixed text-left";
   return (
@@ -679,7 +725,7 @@ export default function GoodsMiniTable({
        * reserved` count and the Unit IDs in the picker — never a colour.
        */
       className={`overflow-x-auto rounded-control bg-white ${
-        soBatchGoodsLayout ? "border border-kit-blue-6" : "border border-base-200"
+        purchasingGoodsLayout ? "border border-kit-blue-6" : "border border-base-200"
       }`}
       data-testid="goods-mini-table"
     >
@@ -719,14 +765,14 @@ export default function GoodsMiniTable({
                    the match — and the weight is 600, because §2.2 deleted 700
                    into 600 and the CSS module's own 700 predates that ruling. */
                 className={`px-2 py-1.5 text-label font-semibold text-kit-slate-11${
-                  soBatchGoodsLayout ? " align-bottom" : ""
+                  purchasingGoodsLayout ? " align-bottom" : ""
                 }`}
                 /* ⭐ ONE HEADER HEIGHT FOR EVERY TABLE IN THE EXPANSION (§6.8).
                    `Supplier Deliver To` wraps to two lines and `Qty` does not;
                    without a reserved height the goods table and the stock
                    picker beneath it sat at two different header heights and
                    read as two near-miss listings. */
-                style={soBatchGoodsLayout ? { height: 40 } : undefined}
+                style={purchasingGoodsLayout ? { height: 40 } : undefined}
               >
                 {c.label}
               </th>
@@ -918,7 +964,7 @@ export default function GoodsMiniTable({
                      model name and above the configuration, so the control
                      looked like it belonged to the first line of the cell
                      rather than to the row. */
-                  <td className={salesOrderLayout ? "py-1 px-2 align-middle leading-tight text-center" : soBatchGoodsLayout ? "px-2 py-2 align-middle text-center" : "px-2 py-2 text-center"}>
+                  <td className={salesOrderLayout ? "py-1 px-2 align-middle leading-tight text-center" : purchasingGoodsLayout ? "px-2 py-2 align-middle text-center" : "px-2 py-2 text-center"}>
                     {line.selectable ? (
                       <input
                         type="checkbox"
@@ -949,7 +995,8 @@ export default function GoodsMiniTable({
                    * It exists only while that picker is open, so it can never
                    * run on into the next item.
                    */
-                  const connects = soBatchGoodsLayout && detail != null && c.key === "fromStock";
+                  const connects =
+                    purchasingGoodsLayout && detail != null && c.key === "fromStock";
                   return (
                   <td
                     key={c.key}
@@ -957,7 +1004,7 @@ export default function GoodsMiniTable({
                     className={
                       salesOrderLayout
                         ? `px-2 py-2 whitespace-normal break-words${c.key === "unit" || c.key === "qty" ? " tabular-nums" : ""}`
-                        : soBatchGoodsLayout
+                        : purchasingGoodsLayout
                         ? /* One row geometry for every line: the values sit at
                              the top of their cell so two-line items line up,
                              and `Qty` is centred with its tick because a lone

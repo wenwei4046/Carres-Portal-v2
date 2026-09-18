@@ -269,6 +269,10 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         supplier: u.supplier,
         qty: u.qty,
         dateIn: u.dateIn,
+        /* The Unit's OWN source document, for the approved picker's
+           `PO No / Ref No` column. Missing provenance stays missing — this
+           order's own number is not the goods' provenance. */
+        poNo: u.poNo,
         matchingLineIds: needing.map((l) => l.orderLineId),
         /* The goods match these lines whether or not they still need units. */
         lineIds: matched.map((l) => l.orderLineId),

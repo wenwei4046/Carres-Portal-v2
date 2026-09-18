@@ -756,18 +756,35 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
         chooserGroup: "Buying",
         accessor: (o) => {
           const cell = safetyDaysFacts.get(o.orderId)!;
+          /* ⚠️ MEASURED, 2026-09-18: at this column's width a Register cell
+             clips with an ellipsis at 119px, and three of the four governed
+             sentences are longer than that — `Already on a PO` 121px,
+             `Coverage not checked` 162px, `Not enough production days` 201px.
+             An ellipsis does not shorten a fact, it DESTROYS it, so the whole
+             sentence rides in `title` and stays recoverable at any width the
+             operator has dragged the column to. Whether the column itself
+             should be wider is this listing's own ruling to make; the fact
+             being unreadable is not something to leave until it does. */
+          const word =
+            cell.kind === "absent"
+              ? soBatchOrderByAbsenceWord(cell.absence)
+              : cell.kind === "days" && cell.days < 0
+                ? W.safetyDaysOverrun
+                : null;
           return (
-            <span className="tabular-nums" data-testid={`so-batch-safety-days-${o.orderId}`}>
+            <span
+              className="tabular-nums"
+              data-testid={`so-batch-safety-days-${o.orderId}`}
+              title={word ?? undefined}
+            >
               {/* NOTHING LEFT TO BUY PRINTS NOTHING — the cell is empty, not a
                   `0`, because there is no margin to state about a purchase
                   nobody has to make. */}
-              {cell.kind === "none" ? null : cell.kind === "absent" ? (
-                <Absent>{soBatchOrderByAbsenceWord(cell.absence)}</Absent>
-              ) : cell.days < 0 ? (
-                <Absent>{W.safetyDaysOverrun}</Absent>
-              ) : (
+              {word != null ? (
+                <Absent>{word}</Absent>
+              ) : cell.kind === "days" ? (
                 cell.days
-              )}
+              ) : null}
             </span>
           );
         },

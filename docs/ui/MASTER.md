@@ -1537,7 +1537,11 @@ facts, permissions, complete-record populations or task ownership.
 7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
    goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
    Collapsed records remain in totals; missing/failed data must not imply zero or completion.
-8. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
+8. **Group-local headers.** The ruling, the engine and the measurement that decides the structure
+   live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
+   writes no page-local version of it.
+
+9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
@@ -1889,7 +1893,7 @@ One implementation, reused by Supplier Claims, Receiving, Stock and Service Case
   record, which is itself **APPROVED TARGET / NOT BUILT** and must reuse the existing server door
   and the existing My Work deep link rather than grow a second editor (Purchasing §9.5).
 
-Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0546): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
 ## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
 
@@ -1910,6 +1914,21 @@ TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its desti
 the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
 no line into the next item or SO. The active goods context has a blue boundary; the stock detail
 has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
+
+**HOW IT IS DRAWN — BUILT 2026-09-18, after two measured failures.** The line is rendered INSIDE
+the `Ready Stock` cell, hanging below it (`left: 11px; top: 100%; height: 13px` in a relatively
+positioned cell), and the stock frame spans the FULL goods row so the line always lands on its top
+border. Two earlier shapes were measured in the rendered shell and rejected:
+
+- **Summing the declared column widths** was wrong by ~900px on a wide canvas. The goods box is
+  `w-full table-fixed` with a `minWidth`, so a canvas wider than that minimum STRETCHES the columns
+  and the sum stops describing where anything is.
+- **Anchoring the frame at the `Ready Stock` column** put it beyond the fold whenever the goods box
+  scrolled sideways: pressing the disclosure gave a 300px white hole with the Units off-screen.
+
+Verified at 1440/1180/820/390px: the line starts within the cell's own bounds and touches the
+frame's top border at every width. **A connector may never be positioned by arithmetic over
+declared widths** — the table that placed the cell is the only thing that knows where it is.
 Other modules keep their existing business sections; do not recreate the retired three-sibling-section
 SO Batch arrangement. Use one component implementation, not page-local connector drawings.
 

@@ -52,7 +52,7 @@ const REGISTER = {
   requests: [
     {
       id: REQ1,
-      req_no: "REQ-0001",
+      req_no: "MPR-20260819-0001",
       // A RETIRED purpose — pre-Card-03 history. It prints its own truthful
       // word (`Display`) and matches no approved rail row.
       purpose: "display",
@@ -76,7 +76,7 @@ const REGISTER = {
     },
     {
       id: REQ2,
-      req_no: "REQ-0002",
+      req_no: "MPR-20260819-0002",
       purpose: "ready_stock",
       destination_id: KLANG,
       required_by: null,
@@ -102,7 +102,7 @@ const REGISTER = {
       // Fully issued HISTORY — `Ordered`. The permanent Register keeps it;
       // `All not ordered` drops it (Card 03 §4).
       id: REQ3,
-      req_no: "REQ-0003",
+      req_no: "MPR-20260818-0003",
       purpose: "subsidiary_purchase",
       destination_id: KLANG,
       required_by: null,
@@ -421,16 +421,43 @@ function pickDeliveryDate(dayOfMonth = 15) {
 }
 
 describe("the register — one request per row (card §7)", () => {
-  it("lists requests with NO visible number — Card 08: business facts only", async () => {
+  it("⭐ `MPR No` is the identity again — and a retired REQ number still never prints", async () => {
     await loaded();
-    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
-    // The stored legacy identities exist in the payload and never render.
-    expect(document.body.textContent).not.toContain("REQ-0001");
-    expect(document.body.textContent).not.toContain("MPR");
+    /* Owner ruling 2026-09-18, which OVERWRITES Card 08's 2026-09-04
+       retirement: each request carries `MPR-YYYYMMDD-RRRR` and it opens the
+       document. */
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toHaveTextContent("MPR-20260819-0002");
+    /* The same ruling promises historical `REQ-####` values stay SEARCHABLE —
+       a weaker promise than the one it makes for MPR, and Card 08 retired the
+       series from every operator-facing surface. So it does not print, and the
+       row states the absence instead of borrowing a second document series. */
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toHaveTextContent("MPR-20260819-0001");
     expect(document.body.textContent).not.toContain("Manual Purchase No");
     // `PR-` is refused: 2990s prints it for a purchase return.
     expect(document.body.textContent).not.toMatch(/\bPR-\d/);
+  });
+
+  it("a retired REQ number and a request with none state the absence, and still open", async () => {
+    apiFetch.mockImplementation((url: string) => {
+      if (url.includes("/purchasing/requests/detail/")) return Promise.resolve(DETAIL);
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({
+          ...REGISTER,
+          requests: REGISTER.requests.map((r, i) =>
+            i === 0 ? { ...r, req_no: "REQ-0001" } : i === 1 ? { ...r, req_no: null } : r,
+          ),
+        });
+      }
+      return Promise.resolve({});
+    });
+    await loaded();
+    /* Neither prints a number under a heading that names ONE document series,
+       and neither invents one. The row still opens by double-click and from
+       the row menu, and the stored `REQ-0001` stays searchable. */
+    expect(document.body.textContent).not.toContain("REQ-0001");
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
+    expect(screen.getByTestId(`mp-row-${REQ1}`).textContent).toContain("Not recorded");
   });
 
   it("Approval Status is the approval FACT — R1: no request is exempt", async () => {
@@ -590,12 +617,41 @@ describe("Card 03 · the left filter rail", () => {
     expect(screen.queryByTestId("mp-setup-production_days_not_set")).toBeNull();
   });
 
-  it("R2 — three groups: waiting, to buy, and a collapsed history", async () => {
+  it("an EMPTY history group is hidden — a heading for a shelf nobody put anything on", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        String(url).includes("/purchasing/requests") &&
+        !String(url).includes("/detail/") &&
+        !String(url).includes("/plan") &&
+        !String(url).includes("/stock-allocation")
+      ) {
+        /* Only the two live requests: nothing is finished, refused or
+           withdrawn, so `No PO needed` has nothing to show. */
+        return Promise.resolve({
+          ...REGISTER,
+          requests: REGISTER.requests.filter((r) => r.id !== REQ3),
+          lines: REGISTER.lines.filter((l) => l.request_id !== REQ3),
+        });
+      }
+      return base(url, init);
+    });
     await loaded({ openHistory: false });
+    expect(screen.queryByTestId("grid-group-no-purchase-needed")).toBeNull();
+    /* `Need approval` keeps its heading at 0 and says so — a page whose
+       approval queue is empty is stating something useful. */
+    expect(screen.getByTestId("grid-group-need-approval")).toBeInTheDocument();
+  });
+
+  it("three groups: Need approval · Need PO · a collapsed No PO needed", async () => {
+    await loaded({ openHistory: false });
+    /* ⭐ THE HEADING SAYS WHAT THE ROW'S OWN `Status` CELL SAYS, in the same
+       two words (owner ruling 2026-09-18). `To buy` and `No purchase needed`
+       are retired on THIS page; SO Batch keeps its own group words. */
     expect(screen.getByTestId("grid-group-need-approval")).toHaveTextContent("Need approval1");
-    expect(screen.getByTestId("grid-group-to-buy")).toHaveTextContent("To buy1");
+    expect(screen.getByTestId("grid-group-to-buy")).toHaveTextContent("Need PO1");
     const history = screen.getByTestId("grid-group-toggle-no-purchase-needed");
-    expect(history).toHaveTextContent("No purchase needed1");
+    expect(history).toHaveTextContent("No PO needed1");
     expect(history).toHaveAttribute("aria-expanded", "false");
     // Collapsed rows stay in the total.
     expect(screen.getByTestId("mp-footer")).toHaveTextContent("3 Manual Purchases");
@@ -1698,40 +1754,45 @@ describe("Card 03 §3 · the approval owner's name", () => {
  * shared read-only goods table · selection admitting only Ready-to-order
  * remainder · PO Duty existing ONLY beside a selection.
  */
-/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
-   `<thead>` — every OPEN group draws the same header between its heading and
-   its records. One `<colgroup>` and one layout serve them all, so reading the
-   first group's header reads the layout. */
+/* Group-local headers (Jess, 2026-09-18, ui MASTER §6.10): a governed grouped
+   listing has no `<thead>` above the groups — every OPEN group draws the same
+   header between its heading and its records. One `<colgroup>` and one layout
+   serve them all, so reading the first group's header reads the layout. */
 const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
   ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
 ];
-describe("R2 · the ten columns, in the approved order", () => {
+describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)", () => {
+  const heads = (grid: HTMLElement) =>
+    groupHeaderCells(grid)
+      .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
+      .filter((t) => t !== "");
+
   it("renders the exact heads, in order — and none of the banned columns", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    const heads = groupHeaderCells(grid)
-      .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
-      .filter((t) => t !== "");
-    expect(heads).toEqual([
+    expect(heads(grid)).toEqual([
+      "Status",
       "Proceed Date",
-      "Items",
-      "Order By",
-      "Purpose",
-      "Supplier",
+      "MPR No",
       "Approval Status",
+      "Purpose",
       "Requested By",
-      "Delivery Date",
-      "Deliver To",
+      "PO Safety Days",
+      "Customer Requested Delivery Date",
+      "Customer Delivery Location",
+      "Customer",
+      "Items",
+      "Supplier",
+      "Supplier Deliver To",
       "PO No",
+      "PO Default Delivery Date",
     ]);
     for (const banned of [
       "Qty",
       "For",
-      "Status",
       "Partial",
       "PO Sent",
       "PO Created",
-      "MPR",
       "Need price",
       "Work",
       "Next action",
@@ -1739,21 +1800,42 @@ describe("R2 · the ten columns, in the approved order", () => {
       "Price",
       "Manual Purchase No",
       "Request No",
+      /* Retired by this ruling: the margin replaced the planning DATE, and the
+         request's internal required-arrival date may not stand in a customer
+         column. */
+      "Order By",
+      "Delivery Date",
+      "Deliver To",
+      "PO Delivery Date",
     ]) {
-      expect(heads, `banned column "${banned}"`).not.toContain(banned);
+      expect(heads(grid), `banned column "${banned}"`).not.toContain(banned);
     }
   });
 
-  it("Proceed Date · Items lead and BOTH pin on a wide canvas — the entrance lives on Items", async () => {
+
+  it("⭐ `Status` and `Approval Status` are INDEPENDENT — Need PO may stand beside Need approval", async () => {
+    await loaded();
+    /* REQ1 is waiting for a decision AND has quantity outstanding. The goods
+       are needed; the decision is a separate fact. Replacing one with the
+       other is exactly what this ruling forbids. */
+    const row = screen.getByTestId(`mp-row-${REQ1}`);
+    expect(within(row).getByText("Need PO")).toBeInTheDocument();
+    expect(within(row).getByTestId(`mp-approval-${REQ1}`)).toHaveTextContent("Need approval");
+  });
+
+  it("`MPR No` is the identity and the entrance; a request with no number states the absence", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
-    expect(entrance).toHaveTextContent("Ohana 2 Seater");
-    const itemsCell = entrance.closest("td")!;
-    expect(itemsCell.className).toMatch(/sticky|Sticky/);
-    const dateCell = itemsCell.previousElementSibling as HTMLElement;
+    expect(entrance).toHaveTextContent(/^MPR-/);
+    const mprCell = entrance.closest("td")!;
+    expect(mprCell.className).toMatch(/sticky|Sticky/);
+    /* Proceed Date pins beside it on a wide canvas; `Status` scrolls under the
+       block, because the approved order starts with it and a PIN may not
+       reorder the owner's own column list. */
+    const dateCell = mprCell.previousElementSibling as HTMLElement;
     expect(dateCell.className).toMatch(/sticky|Sticky/);
     expect(dateCell.style.left).not.toBe("");
-    expect((itemsCell.nextElementSibling as HTMLElement).style.left).toBe("");
+    expect((mprCell.nextElementSibling as HTMLElement).style.left).toBe("");
   });
 
   it("R2 default order: waiting · Order By · Not planned · history newest first", async () => {
@@ -1764,11 +1846,64 @@ describe("R2 · the ten columns, in the approved order", () => {
     expect(order).toEqual([`mp-open-${REQ1}`, `mp-open-${REQ2}`, `mp-open-${REQ3}`]);
   });
 
-  it("Order By prints the engine date, `Not planned` without setup, blank when nothing remains", async () => {
+  /**
+   * `PO Safety Days` is measured against TODAY, so a fixture date would flip
+   * from margin to overrun as the calendar moves. Both tests below state the
+   * case they mean as an offset from today instead.
+   */
+  function orderByInDays(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function withReq1OrderBy(iso: string) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const answer = respond(url, init);
+      if (answer !== REGISTER) return Promise.resolve(answer);
+      return Promise.resolve({
+        ...REGISTER,
+        lines: REGISTER.lines.map((l) =>
+          l.request_id === REQ1 ? { ...l, order_by: iso } : l,
+        ),
+      });
+    });
+  }
+
+  it("`PO Safety Days` is a MARGIN, and an unplannable line is never 0", async () => {
+    withReq1OrderBy(orderByInDays(30));
     await loaded();
-    expect(screen.getByTestId(`mp-order-by-${REQ1}`)).toHaveTextContent(fmtDate("2026-09-01"));
-    expect(screen.getByTestId(`mp-order-by-${REQ2}`)).toHaveTextContent("Not planned");
-    expect(screen.getByTestId(`mp-order-by-${REQ3}`).textContent).toBe("");
+    /* REQ1 has an engine Order By still ahead of us, so it has a real
+       working-day margin — a COUNT, never the date itself. */
+    expect(screen.getByTestId(`mp-safety-days-${REQ1}`).textContent).toMatch(/^\d+$/);
+    expect(screen.getByTestId(`mp-safety-days-${REQ1}`).textContent).not.toContain("Sep");
+    /* REQ2 cannot be planned (no Supplier × Category production days). UNKNOWN
+       says so; `0` would read as *order today or you are late*. */
+    expect(screen.queryByTestId(`mp-safety-days-${REQ2}`)).toBeNull();
+    /* REQ3 has nothing left to buy: no margin is owed, so the cell is blank
+       rather than alarming. */
+    expect(screen.queryByTestId(`mp-safety-days-${REQ3}`)).toBeNull();
+  });
+
+  it("⛔ A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER — past the date is a STATE", async () => {
+    /* SO Batch's shipped cell already refuses one ("never a negative number in
+       a days column") and the dictionary applies the shared margin display
+       here. `-18` is not a margin of minus eighteen days; it is the fact that
+       the day to order by is behind us, and a reader should not have to decode
+       a minus sign to learn it. The sort still reads the signed number, so the
+       worst row stays first. */
+    withReq1OrderBy(orderByInDays(-30));
+    await loaded();
+    const cell = screen.getByTestId(`mp-safety-days-${REQ1}`);
+    expect(cell.textContent).toBe("Order date passed");
+    expect(cell.textContent).not.toMatch(/-\d/);
+  });
+
+  it("the customer columns are BLANK where no customer is named — never invented", async () => {
+    await loaded();
+    /* A `Ready Stock` purchase serves no customer. The columns exist and say
+       nothing, which is the truthful answer; substituting the requester or the
+       request's own internal delivery date is what the dictionary bans. */
+    expect(screen.getByTestId(`mp-customer-${REQ1}`).textContent).toBe("");
   });
 
   it("PO No is real lineage — the actual number clickable, absence named", async () => {
@@ -1958,59 +2093,180 @@ describe("R2 · group membership", () => {
   });
 });
 
-describe("the row expansion is the SHARED goods table (settled design)", () => {
-  it("draws GoodsMiniTable's own box with Manual Purchase's columns, and offers no action", async () => {
+/**
+ * ⭐ THE ROW EXPANSION — the SHARED goods table in its Manual Purchase order,
+ * with each line's own Ready Stock frame beneath it
+ * (owner ruling 2026-09-18; MASTER §9.2; UI MASTER §6.8–6.9).
+ *
+ * Every test here FAILS on the settled 2026-09-11 page, and each failure is a
+ * sentence the owner overwrote: the goods could not be selected individually,
+ * the stock section was one read-only box at the bottom of the expansion, and
+ * nothing on it could be pressed.
+ */
+describe("the row expansion — goods, their Status, and their own Ready Stock", () => {
+  /** The allocation read, in the shape the new door answers. */
+  const STOCK = (over: Record<string, unknown> = {}) => ({
+    requestId: REQ2,
+    reference: "MPR-20260819-0002",
+    intent: "concrete_need",
+    approved: true,
+    lines: [
+      {
+        demandId: "l2",
+        sku: "MATTRESS-LOOK-9",
+        item: "Atlas K",
+        requestedQty: 3,
+        approvedQty: null,
+        issuedQty: 0,
+        availableQty: 1,
+        reservedQty: 0,
+        remainingQty: 3,
+        stockBlock: null,
+        units: [
+          {
+            itemId: "11111111-1111-1111-1111-111111111111",
+            unitCode: "U1-000-014",
+            identityScope: "unit",
+            sku: "MATTRESS-LOOK-9",
+            goodsReceivedDate: "2026-08-01",
+            stockLocation: "Carres Klang",
+            supplier: "Ohana",
+            sourceRef: "PO-20260801-1121",
+            condition: "exhibition",
+            ownership: "carres_owned",
+            qty: 1,
+            reservedForThisLine: false,
+            blocked: null,
+          },
+        ],
+      },
+    ],
+    ...over,
+  });
+
+  function withStock(payload: unknown) {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/stock-allocation")) return Promise.resolve(payload);
+      return base(url, init);
+    });
+  }
+
+  it("draws GoodsMiniTable's box with the APPROVED Manual Purchase columns", async () => {
+    withStock(STOCK());
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ3}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ3}`);
     /* THE SAME COMPONENT SO BATCH DRAWS — not a second table that starts
        identical and drifts. */
     expect(within(box).getByTestId("goods-mini-table")).toBeInTheDocument();
-    const expansionCell = box.closest("td")!;
-    expect(expansionCell).toHaveStyle({ padding: "0px" });
-    expect(expansionCell.parentElement!.children).toHaveLength(3);
-    expect(expansionCell.colSpan).toBe(
-      expansionCell.parentElement!.previousElementSibling!.children.length - 2,
-    );
-    const heads = [...box.querySelectorAll("th")].map((th) => th.textContent?.trim());
-    /* The owner's target — SKU · Qty · Supplier · Deliver To · PO No ·
-       PO Delivery Date · Item — reconciled with GoodsMiniTable's ruled
-       positions (Category first, Deliver To before SKU, Item always last).
-       `Covered by`, `Unit ID` and `Still To Order` are deliberately absent. */
+    /* The leading cell is the selection checkbox's — chrome, not a ruled
+       column (law ④: selection is a capability a page ASKS for). */
+    const heads = [...box.querySelectorAll("thead th")]
+      .map((th) => th.textContent?.trim())
+      .filter((t) => t !== "");
     expect(heads).toEqual([
+      "Status",
       "Category",
-      "Deliver To",
-      "SKU",
       "Qty",
-      "Supplier",
-      "PO No",
-      "PO Delivery Date",
       "Item",
+      "Ready Stock",
+      "Supplier",
+      "Supplier Deliver To",
+      "PO No",
+      "PO Default Delivery Date",
     ]);
-    for (const banned of ["Covered by", "Unit ID", "Still To Order", "Ordered Qty"]) {
+    /* SKU LEFT THE COLUMNS AND STAYED ON THE SCREEN — it prints under the
+       item, where a person reads a code, and the register still searches it. */
+    expect(heads).not.toContain("SKU");
+    expect(box.textContent).toContain("BED-K-01");
+    for (const banned of ["Covered by", "Unit ID", "Still To Order", "Ordered Qty", "To buy"]) {
       expect(heads, `banned goods column "${banned}"`).not.toContain(banned);
     }
-    const cells = [...box.querySelectorAll("td")].map((td) => td.textContent?.trim());
-    /* ONE ROW = ONE ALLOCATION. Both units went onto PO-9001, so the row
-       carries 2 — the document's own quantity — with that document's
-       supplier, destination and ORIGINAL delivery date. */
-    expect(cells).toEqual([
-      "Bedframe",
-      "HOUZS Balakong",
-      "BED-K-01",
-      "2",
-      "Hooka",
-      "PO-20260818-9001",
-      "Sun, 20 Sep",
-      "Atlas K",
-    ]);
-    /* Read-only goods: the only controls in the expansion are the PO door
-       and the Ready Stock handle — no Approve/Refuse/Receive, no price
-       editor, no PO creation, and no goods-line checkbox (this register
-       buys from its PARENT row). */
-    expect(box.querySelectorAll("input, textarea").length).toBe(0);
-    expect(box.querySelectorAll("select").length).toBe(0);
-    expect(box.textContent).not.toContain("Issue");
+  });
+
+  it("⭐ EACH GOODS LINE TAKES ITS OWN TICK, and the parent shows MIXED for a partial choice", async () => {
+    withStock(STOCK());
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    const ticks = [...box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")];
+    expect(ticks.length).toBeGreaterThan(0);
+    /* ⛔ THE GOODS DO NOT READ SELECTED WHILE THE REQUEST DOES NOT (found on
+       the rendered walk, 2026-09-18). A child tick NARROWS the parent's; it
+       cannot select anything on its own, and a row painting itself selected
+       while the act would do nothing is a promise the screen cannot keep. */
+    expect(ticks.every((t) => !t.checked)).toBe(true);
+    /* The parent tick means EVERY eligible line, so the children follow it. */
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    expect(
+      [...box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")].every((t) => t.checked),
+    ).toBe(true);
+    /* This request carries ONE eligible line, so unticking it is unticking the
+       request: a selection of no goods is not a selection. The narrowing case
+       — some lines kept, some dropped — is the test below. */
+    fireEvent.click(box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0]!);
+    expect(box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0]!.checked).toBe(false);
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("⭐ A PARTIAL CHOICE KEEPS THE REQUEST SELECTED and issues only the ticked lines", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    const posted: unknown[] = [];
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/stock-allocation")) return Promise.resolve(STOCK());
+      if (String(url).includes("/purchasing/requests/issue")) {
+        posted.push(JSON.parse(String(init?.body ?? "{}")));
+        return Promise.resolve({ poIds: [], documents: 1 });
+      }
+      if (
+        String(url).includes("/purchasing/requests") &&
+        !String(url).includes("/detail/") &&
+        !String(url).includes("/plan")
+      ) {
+        /* TWO eligible lines on one approved request. */
+        return Promise.resolve({
+          ...REGISTER,
+          lines: [
+            ...REGISTER.lines,
+            { ...REGISTER.lines.find((l) => l.request_id === REQ2)!, id: "l2b", sku: "BED-K-01" },
+          ],
+        });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    const ticks = () => [...box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")];
+    expect(ticks()).toHaveLength(2);
+    fireEvent.click(ticks()[0]!);
+    /* MIXED: one line dropped, the request still selected. */
+    expect(ticks().map((t) => t.checked)).toEqual([false, true]);
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    /* ⭐ THE ISSUE CARRIES THE CHOSEN LINES — the tick narrows what is bought
+       instead of buying the whole request. */
+    expect((posted[0] as { demandIds?: string[] }).demandIds).toEqual(["l2b"]);
+  });
+
+  it("ticking a goods line on an UNSELECTED request means *buy this one*", async () => {
+    withStock(STOCK());
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0]!);
+    /* The request joins the selection with exactly that line narrowed, rather
+       than the tick doing nothing visible. */
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(true);
+    expect(box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0]!.checked).toBe(true);
+    /* And unticking the LAST chosen line unticks the request: a selection of
+       no goods is not a selection. */
+    fireEvent.click(box.querySelectorAll<HTMLInputElement>("input[type='checkbox']")[0]!);
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(false);
   });
 
   it("a line split across two POs prints each document's OWN quantity", async () => {
@@ -2019,11 +2275,11 @@ describe("the row expansion is the SHARED goods table (settled design)", () => {
        left to right, that says BOTH documents ordered the full amount. */
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/stock-allocation")) return Promise.resolve(STOCK());
       if (
         String(url).includes("/purchasing/requests") &&
         !String(url).includes("/detail/") &&
-        !String(url).includes("/plan") &&
-        !String(url).includes("/ready-stock")
+        !String(url).includes("/plan")
       ) {
         return Promise.resolve({
           ...REGISTER,
@@ -2062,212 +2318,340 @@ describe("the row expansion is the SHARED goods table (settled design)", () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ3}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ3}`);
-    /* `box.querySelectorAll("tbody tr")` also matches MY thead's tr — the
-       whole expansion lives inside the parent grid's tbody, so the selector
-       lets the `tbody` part match that outer ancestor. Keep only real rows. */
-    const rows = [...box.querySelectorAll("tr")]
-      .map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent?.trim()))
-      .filter((cells) => cells.length > 0);
-    expect(rows).toEqual([
-      ["Bedframe", "HOUZS Balakong", "BED-K-01", "1", "Hooka", "PO-20260818-9001", "Sun, 20 Sep", "Atlas K"],
-      /* The SECOND document's own supplier and its own original date — the
-         parent row can only summarise, so this is where the exact mapping
-         lives. */
-      ["Bedframe", "HOUZS Balakong", "BED-K-01", "1", "Ohana", "PO-20260818-9002", "Sun, 27 Sep", "Atlas K"],
-    ]);
-    // 1 + 1, never 2 + 2.
-    expect(rows.reduce((n, r) => n + Number(r[3]), 0)).toBe(2);
+    const qtys = [...box.querySelectorAll('[data-row="demand"]')].map(
+      (tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent?.trim()),
+    );
+    /* Two documents, 1 + 1 — never 2 + 2 — each with its own supplier and its
+       own ORIGINAL delivery date. */
+    expect(qtys).toHaveLength(2);
+    expect(box.textContent).toContain("PO-20260818-9001");
+    expect(box.textContent).toContain("PO-20260818-9002");
+    expect(box.textContent).toContain("Sun, 20 Sep");
+    expect(box.textContent).toContain("Sun, 27 Sep");
   });
 
   it("what is still to buy is a ROW, not a `Still To Order` column", async () => {
+    withStock(STOCK());
     await loaded();
-    // REQ-0002: 3 asked, nothing issued — one `To purchase` row, no document.
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
-    const cells = [...box.querySelectorAll("tbody td")].map((td) => td.textContent?.trim());
-    expect(cells[3]).toBe("3");
     // The absence names itself; `—` would not say WHY the cell is empty.
     expect(box.textContent).toContain("Not ordered yet");
+    expect(box.textContent).toContain("Need PO");
   });
 
-  it("Ready Stock is a separately collapsible sibling that reads nothing until opened", async () => {
+  it("⭐ `Ready Stock` IS A CELL ON THE ITEM ROW — two counts and its own disclosure", async () => {
+    withStock(STOCK());
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
-    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
-    const handle = within(panel).getByRole("button", { name: /Ready Stock/ });
-    // CLOSED BY DEFAULT, and closed means NOT READ: opening a register row
-    // must not count the whole warehouse.
-    expect(handle).toHaveAttribute("aria-expanded", "false");
-    expect(
-      apiFetch.mock.calls.filter((call) => String(call[0]).includes("/ready-stock")).length,
-    ).toBe(0);
-    // It is BELOW the goods, not inside them — a sibling section, never a
-    // column and never a second goods table.
-    const goods = within(screen.getByTestId(`mp-expansion-${REQ2}`)).getByTestId(
-      "goods-mini-table",
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    /* It is not a sibling section at the bottom any more: a Unit answers a
+       LINE, so its counts and its door belong to that line. */
+    const cell = await within(box).findByText("1 available");
+    expect(cell).toBeInTheDocument();
+    const disclosure = within(box).getByTestId("mp-stock-disclosure-l2");
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    /* CLOSED MEANS CLOSED: the frame is not in the document until it is opened. */
+    expect(screen.queryByTestId("mp-stock-frame-l2")).toBeNull();
+  });
+
+  it("the stock frame opens under its OWN item, connected by the governed line", async () => {
+    withStock(STOCK());
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    const frame = await within(box).findByTestId("mp-stock-frame-l2");
+    /* UI MASTER §6.9 — the line leaves the cell it was opened from and
+       touches the TOP BORDER of the frame. It is drawn from the locked column
+       widths, so it does not move when the table finishes loading. */
+    const connector = within(box).getByTestId("goods-connector-l2");
+    expect(connector).toBeInTheDocument();
+    /* The frame rides in the goods table's own row, so it scrolls sideways
+       WITH the cell it belongs to. */
+    expect(within(box).getByTestId("goods-detail-l2").contains(frame)).toBe(true);
+  });
+
+  it("⭐ THE PICKER'S SIX APPROVED COLUMNS, and the date is a DATE", async () => {
+    withStock(STOCK());
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    const frame = await within(box).findByTestId("mp-stock-frame-l2");
+    const table = within(frame).getByRole("table");
+    /* The shared picker (`ReadyStockTable` `layout="picker"`) prints each
+       heading as one string, so the cell's own text IS the whole name. The
+       leading select cell is chrome and carries no heading. */
+    const heads = [...table.querySelectorAll<HTMLElement>("th")]
+      .map((th) => th.textContent ?? "")
+      .filter((t) => t !== "");
+    expect(heads).toEqual([
+      "Goods Received Date",
+      "Stock Location",
+      "Supplier",
+      "PO No / Ref No",
+      "Condition",
+    ]);
+    const row = within(box).getByTestId(
+      "ready-stock-unit-11111111-1111-1111-1111-111111111111",
     );
+    /* THE DATE IS A DATE. `2026-08-01` reaches the cell as a bare date (the
+       route slices the stored timestamp) and prints in the portal's ONE date
+       spelling — never a second, raw-ISO spelling of its own. What the ruling
+       forbids is the TIME, so that is what is asserted against. */
+    expect(row.textContent).toContain("Sat, 1 Aug");
+    expect(row.textContent).not.toMatch(/\d{2}:\d{2}/);
+    expect(row.textContent).toContain("Carres Klang");
+    expect(row.textContent).toContain("Ohana");
+    /* The Unit's OWN source document, with its Unit ID on line two. */
+    expect(row.textContent).toContain("PO-20260801-1121");
+    expect(row.textContent).toContain("U1-000-014");
+    /* CONDITION IS A GRADE — `Display` is fully available. */
+    expect(row.textContent).toContain("Display");
+  });
+
+  it("⭐ TICKING IS A DRAFT: it writes nothing, and `Choose Ready Unit` is the save", async () => {
+    withStock(STOCK());
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    await within(box).findByTestId("mp-stock-frame-l2");
+    const before = apiFetch.mock.calls.filter((c: unknown[]) =>
+      String(c[0]).includes("/stock-allocation") && (c[1] as RequestInit | undefined)?.method === "POST",
+    ).length;
+    fireEvent.click(
+      within(box).getByRole("checkbox", { name: "Choose U1-000-014" }),
+    );
+    /* VIEWING AND TICKING ARE NOT SAVING. */
     expect(
-      goods.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(goods.contains(panel)).toBe(false);
+      apiFetch.mock.calls.filter((c: unknown[]) =>
+        String(c[0]).includes("/stock-allocation") && (c[1] as RequestInit | undefined)?.method === "POST",
+      ).length,
+    ).toBe(before);
+    expect(within(box).getByTestId("mp-stock-count-l2")).toHaveTextContent("1 selected");
+    expect(box.textContent).toContain("Not saved");
+    fireEvent.click(within(box).getByTestId("mp-stock-save-l2"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.filter((c: unknown[]) =>
+          String(c[0]).includes("/stock-allocation") && (c[1] as RequestInit | undefined)?.method === "POST",
+        ).length,
+      ).toBe(before + 1),
+    );
+    const sent = JSON.parse(
+      String(
+        (apiFetch.mock.calls
+          .filter((c: unknown[]) => String(c[0]).includes("/stock-allocation") && (c[1] as RequestInit | undefined)?.method === "POST")
+          .at(-1)![1] as RequestInit).body,
+      ),
+    );
+    /* THE COMPLETE DESIRED SET, bound to the exact MPR LINE — never an SO. */
+    expect(sent).toEqual({
+      demandId: "l2",
+      itemIds: ["11111111-1111-1111-1111-111111111111"],
+      expectedItemIds: [],
+    });
   });
 
-  it("VIEWING IS NOT RESERVING — the section carries no act and nets nothing", async () => {
+  it("a SAVED choice reopens through `Change selection`, and `Cancel` restores it", async () => {
+    withStock(
+      STOCK({
+        lines: [
+          {
+            ...STOCK().lines[0],
+            reservedQty: 1,
+            remainingQty: 2,
+            units: [{ ...STOCK().lines[0].units[0], reservedForThisLine: true }],
+          },
+        ],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    /* The cell states BOTH counts, on their own lines. */
+    expect(await within(box).findByText("1 reserved")).toBeInTheDocument();
+    fireEvent.click(within(box).getByTestId("mp-stock-disclosure-l2"));
+    await within(box).findByTestId("mp-stock-frame-l2");
+    /* ⛔ NO PER-UNIT UNDO — one journey, four controls, and the first is
+       `Change selection`. */
+    expect(within(box).queryByText("Undo")).toBeNull();
+    fireEvent.click(within(box).getByTestId("mp-stock-change-l2"));
+    fireEvent.click(within(box).getByRole("checkbox", { name: "Choose U1-000-014" }));
+    expect(within(box).getByTestId("mp-stock-count-l2")).toHaveTextContent("0 selected");
+    /* `Save changes` would remove every Unit — including all of them. */
+    expect(within(box).getByTestId("mp-stock-save-l2")).toHaveTextContent("Save changes");
+    fireEvent.click(within(box).getByTestId("mp-stock-cancel-l2"));
+    expect(within(box).getByTestId("mp-stock-count-l2")).toHaveTextContent("1 selected");
+  });
+
+  it("⛔ ADDITIONAL REPLENISHMENT SHOWS THE SHELF AND CANNOT TAKE IT", async () => {
+    withStock(
+      STOCK({
+        intent: "additional_stock",
+        lines: [{ ...STOCK().lines[0], stockBlock: "additional_stock" }],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    const frame = await within(box).findByTestId("mp-stock-frame-l2");
+    expect(within(frame).getByTestId("mp-stock-block-l2")).toHaveTextContent(
+      "This purchase buys extra stock. What is on the shelf does not reduce it.",
+    );
+    /* The goods still SHOW — and nothing can be ticked, and the ask is not
+       netted down by what is standing there. */
+    expect(frame.textContent).toContain("U1-000-014");
+    expect(frame.querySelectorAll("input[type='checkbox']").length).toBe(0);
+    expect(frame.textContent).toContain("Requested 3");
+    expect(frame.textContent).toContain("3 to buy");
+  });
+
+  it("⛔ AN UNRECORDED INTENT IS ITS OWN STATE — never guessed into either answer", async () => {
+    withStock(
+      STOCK({
+        intent: null,
+        lines: [{ ...STOCK().lines[0], stockBlock: "intent_not_recorded" }],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
+      "This purchase did not record whether stock can answer it, so stock cannot be chosen.",
+    );
+  });
+
+  it("an UNAPPROVED request may not choose stock, and says why", async () => {
+    withStock(
+      STOCK({
+        approved: false,
+        lines: [{ ...STOCK().lines[0], stockBlock: "not_approved" }],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
+      "Stock can be chosen after this purchase is approved.",
+    );
+    expect(within(box).queryByTestId("mp-stock-save-l2")).toBeNull();
+  });
+
+  it("⭐ A REASON IS SOMETHING TO DISCLOSE — a blocked line with NO Units still opens", async () => {
+    /* The read-only reasons reached the operator only on lines that happened to
+       have stock to list. A line that cannot choose — not approved, additional
+       replenishment, no recorded intent — usually has no Units at all, so it
+       had no door and the cell read as a bare `0 available` with the one
+       sentence that explains it unreachable. A dead control is a control that
+       opens NOTHING; a control that opens the explanation is the opposite. */
+    withStock(
+      STOCK({
+        approved: false,
+        lines: [
+          {
+            ...STOCK().lines[0],
+            stockBlock: "not_approved",
+            availableQty: 0,
+            reservedQty: 0,
+            units: [],
+          },
+        ],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
+      "Stock can be chosen after this purchase is approved.",
+    );
+  });
+
+  it("⛔ AND A DOOR THAT WOULD OPEN NOTHING IS STILL NOT DRAWN", async () => {
+    /* No Units and no reason to give: there is nothing behind the caret, so
+       there is no caret. The count still prints, because `0 available` is the
+       one place `0` may appear. */
+    withStock(
+      STOCK({
+        lines: [
+          {
+            ...STOCK().lines[0],
+            stockBlock: null,
+            availableQty: 0,
+            reservedQty: 0,
+            units: [],
+          },
+        ],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    await within(box).findByTestId("goods-mini-table");
+    expect(within(box).queryByTestId("mp-stock-disclosure-l2")).toBeNull();
+    expect(box.textContent).toContain("0 available");
+  });
+
+  it("LOADING AND FAILURE NEVER PRINT `0`", async () => {
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (String(url).includes("/ready-stock")) {
-        return Promise.resolve({
-          requestId: REQ2,
-          groups: [
-            {
-              matchKey: "mattress-look-9",
-              item: "MATTRESS-LOOK-9",
-              skus: ["MATTRESS-LOOK-9"],
-              requestedQty: 3,
-              freeQty: 1,
-              units: [
-                {
-                  itemId: "11111111-1111-1111-1111-111111111111",
-                  unitCode: "U1-000-014",
-                  identityScope: "unit",
-                  sku: "MATTRESS-LOOK-9",
-                  condition: "exhibition",
-                  siteName: "Carres Klang",
-                  holderName: null,
-                  ownership: "carres_owned",
-                  supplier: null,
-                  qty: 1,
-                  dateIn: "2026-08-01",
-                },
-              ],
-            },
-          ],
-        });
-      }
+      if (String(url).includes("/stock-allocation")) return Promise.reject(new Error("down"));
       return base(url, init);
     });
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
-    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
-    fireEvent.click(within(panel).getByRole("button", { name: /Ready Stock/ }));
-    await within(panel).findByTestId("ready-stock-unit-11111111-1111-1111-1111-111111111111");
-    // The real Unit ID, its location, and CONDITION AS A GRADE — `Display`
-    // is a grade, not an availability: everything listed is already free.
-    expect(panel.textContent).toContain("U1-000-014");
-    expect(panel.textContent).toContain("Carres Klang");
-    expect(panel.textContent).toContain("Display");
-    // ⛔ NO RESERVATION ACT IS COPIED FROM SO BATCH, and nothing is tickable:
-    // viewing inventory is neither purchasing selection nor reservation.
-    expect(panel.querySelectorAll("input[type='checkbox']").length).toBe(0);
-    expect(panel.textContent).not.toContain("Choose Ready Unit");
-    // ⛔ AND THE ASK IS NOT NETTED DOWN BY THE SHELF: both numbers, side by
-    // side, and the requested 3 stays 3.
-    expect(panel.textContent).toContain("Asked for 3");
-    expect(panel.textContent).toContain("1 on the shelf");
-    expect(panel.textContent).not.toContain("Asked for 2");
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    await waitFor(() => expect(box.textContent).toContain("Could not be loaded"));
+    expect(box.textContent).not.toContain("0 available");
   });
 
-  it("two configurations of one model are told apart (walk, 2026-09-11)", async () => {
-    /* ⭐ Found on the production walk. A live request carries
-       `5539-1A(LHF)` and `5539-1A(RHF)` — the left- and right-hand halves of
-       one sofa. Grouping by configuration correctly makes them TWO groups,
-       and the Catalog model name for both is `Booqit`, so the screen showed
-       the identical heading twice on exactly the pair that must never be
-       confused. The SKU joins the heading only where the name fails. */
-    const unit = (itemId: string, sku: string) => ({
-      itemId,
-      unitCode: `U1-000-${itemId.slice(-3)}`,
-      identityScope: "unit" as const,
-      sku,
-      condition: "new",
-      siteName: "Carres Klang",
-      holderName: null,
-      ownership: "carres_owned" as const,
-      supplier: null,
-      qty: 1,
-      dateIn: "2026-08-01",
-    });
+  it("a refusal keeps the operator's choices on screen and says nothing was saved", async () => {
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (String(url).includes("/ready-stock")) {
-        return Promise.resolve({
-          requestId: REQ2,
-          groups: [
-            {
-              matchKey: "55391alhf",
-              item: "Booqit",
-              skus: ["5539-1A(LHF)"],
-              requestedQty: 1,
-              freeQty: 1,
-              units: [unit("11111111-1111-1111-1111-111111111101", "5539-1A(LHF)")],
-            },
-            {
-              matchKey: "55391arhf",
-              item: "Booqit",
-              skus: ["5539-1A(RHF)"],
-              requestedQty: 1,
-              freeQty: 1,
-              units: [unit("11111111-1111-1111-1111-111111111102", "5539-1A(RHF)")],
-            },
-          ],
-        });
+      if (String(url).includes("/stock-allocation") && init?.method === "POST") {
+        return Promise.reject(
+          Object.assign(new Error("conflict"), {
+            body: { code: "unit_no_longer_free", itemId: "11111111-1111-1111-1111-111111111111" },
+          }),
+        );
       }
+      if (String(url).includes("/stock-allocation")) return Promise.resolve(STOCK());
       return base(url, init);
     });
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
-    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
-    fireEvent.click(within(panel).getByRole("button", { name: /Ready Stock/ }));
-    const left = await within(panel).findByTestId("mp-ready-stock-group-55391alhf");
-    const right = within(panel).getByTestId("mp-ready-stock-group-55391arhf");
-    expect(left.textContent).toContain("5539-1A(LHF)");
-    expect(right.textContent).toContain("5539-1A(RHF)");
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    await within(box).findByTestId("mp-stock-frame-l2");
+    fireEvent.click(within(box).getByRole("checkbox", { name: "Choose U1-000-014" }));
+    fireEvent.click(within(box).getByTestId("mp-stock-save-l2"));
+    const refusal = await within(box).findByTestId("mp-stock-refusal-l2");
+    expect(refusal).toHaveTextContent("Someone else took that Unit.");
+    expect(refusal).toHaveTextContent("Nothing was saved.");
+    /* The tick survives the refusal — making them choose again to reach the
+       same answer is four more races. */
+    expect(within(box).getByTestId("mp-stock-count-l2")).toHaveTextContent("1 selected");
   });
 
-  it("the ordinary one-name case stays quiet — no SKU beside a heading that works", async () => {
-    const base = apiFetch.getMockImplementation()!;
-    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (String(url).includes("/ready-stock")) {
-        return Promise.resolve({
-          requestId: REQ2,
-          groups: [
-            {
-              matchKey: "only",
-              item: "Atlas K",
-              skus: ["BED-K-01"],
-              requestedQty: 2,
-              freeQty: 1,
-              units: [
-                {
-                  itemId: "11111111-1111-1111-1111-111111111103",
-                  unitCode: "U1-000-103",
-                  identityScope: "unit",
-                  sku: "BED-K-01",
-                  condition: "new",
-                  siteName: "Carres Klang",
-                  holderName: null,
-                  ownership: "carres_owned",
-                  supplier: null,
-                  qty: 1,
-                  dateIn: "2026-08-01",
-                },
-              ],
-            },
-          ],
-        });
-      }
-      return base(url, init);
-    });
+  it("⭐ AN UNSAVED DRAFT REFUSES `Issue PO` BY NAME", async () => {
+    withStock(STOCK());
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
-    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
-    fireEvent.click(within(panel).getByRole("button", { name: /Ready Stock/ }));
-    const group = await within(panel).findByTestId("mp-ready-stock-group-only");
-    /* The heading names the product and stops; the SKU still shows on the
-       Unit row below, where it belongs. */
-    const heading = group.firstElementChild!;
-    expect(heading.textContent).toContain("Atlas K");
-    expect(heading.textContent).not.toContain("BED-K-01");
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    await within(box).findByTestId("mp-stock-frame-l2");
+    fireEvent.click(within(box).getByRole("checkbox", { name: "Choose U1-000-014" }));
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    expect(await screen.findByTestId("mp-issue-selected-error")).toHaveTextContent(
+      "Save or cancel your stock selection before issuing a PO.",
+    );
   });
 });
 
@@ -2357,7 +2741,7 @@ describe("Card 04 · selection and PO Duty", () => {
     /* R2 — a CONFIRMED zero remainder needs no purchase: the group heading is
        the cause the greyed checkbox used to leave unsaid. */
     const toggle = screen.getByTestId("grid-group-toggle-no-purchase-needed");
-    expect(toggle).toHaveTextContent("No purchase needed1");
+    expect(toggle).toHaveTextContent("No PO needed1");
     fireEvent.click(toggle);
     expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
     const grid = screen.getByTestId("register-column");
@@ -2755,11 +3139,16 @@ describe("Card 05 · the object detail", () => {
  * Work hand-off (owner-corrected 2026-08-29).
  */
 describe("Card 06 · the Register's date facts and lens order", () => {
-  it("a historical null Delivery Date prints `Not recorded` — never a dash or a guess", async () => {
+  it("`Delivery Date` LEFT the Register — the request's internal date is not a customer promise", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    // REQ-0002 and REQ-0003 have no stored Delivery Date.
-    expect(within(grid).getAllByText("Not recorded").length).toBe(2);
+    /* Owner ruling 2026-09-18: the fifteen approved columns carry
+       `Customer Requested Delivery Date`, and the dictionary forbids
+       substituting Manual Purchase's own required-arrival date for it. The
+       internal date keeps its authoritative home on the object. */
+    const heads = [...grid.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title);
+    expect(heads).not.toContain("Delivery Date");
+    expect(heads).toContain("Customer Requested Delivery Date");
   });
 
   it("a timing filter keeps the R2 order and counts only what is still to buy", async () => {
