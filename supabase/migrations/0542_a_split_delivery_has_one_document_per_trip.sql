@@ -18,6 +18,8 @@
 -- after its gate — never a second gate. It reads the trip's scope, date, slot
 -- and partner from the booking itself, never from the caller, and mirrors the
 -- number onto orders.do_number for the legacy readers (0356's own rule).
+-- service_role is accepted because the finance exception door issues the
+-- document through the system client (exceptions.ts:126), the same as 0499/0504.
 
 set search_path = public;
 
@@ -46,7 +48,7 @@ declare
   v_trip int;
   v_row ops_delivery_orders;
 begin
-  if not (select public.is_operation()) then
+  if not (coalesce(auth.role() = 'service_role', false) or coalesce((select public.is_operation()), false)) then
     raise exception 'Only operation or principal may issue a Delivery Order' using errcode = '42501';
   end if;
   if nullif(btrim(coalesce(p_do_number, '')), '') is null then
@@ -94,4 +96,4 @@ begin
 end;
 $fn$;
 revoke all on function public.delivery_trip_document_mint(uuid, text) from public, anon;
-grant execute on function public.delivery_trip_document_mint(uuid, text) to authenticated;
+grant execute on function public.delivery_trip_document_mint(uuid, text) to authenticated, service_role;
