@@ -2181,6 +2181,63 @@ Warehouse submits count                (or Operation enters goods directly)
   §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
   checks it against COPY before it reaches the screen. No word stands in for a missing number. Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
   below 768px; no column hidden by width.
+- **🔴 FIVE RETIRED WORDS ARE LIVE ON THIS REGISTER TODAY — MEASURED 2026-09-18**
+  (`apps/web/src/pages/operation/OperationReceiving.tsx`). Each already has its governed
+  replacement written down; nothing new is being invented, and none of these is a redesign:
+
+  | Line | On screen today | Governed word | Where it was retired |
+  |---|---|---|---|
+  | 234 | `Supplier Delivery Date` | `Supplier Confirmed Delivery Date` | COPY's retired list for this exact fact |
+  | 263 | `Goods received on` | `Goods Received Date` | the same retired list |
+  | 335 | `Deliver To` | `Supplier Deliver To` | the dictionary replaces it on these four pages |
+  | 308 | `Product` | `Items` | owner ruling 2026-09-18 (`was Product`) |
+  | 386 | the `Status` column | no status label on a normal GRN; `Cancelled` under its `GRN No` | this section's own 2026-09-17 ruling retires `Valid` and the Status column |
+
+  **🟡 The date-first pair is not applied here.** The page passes `stickyIdentity` (line 683), not
+  `leadingColumns`, and carries no `GRN Date` column at all — so the approved `GRN Date · GRN No`
+  leading pair, which the shared listing contract pins at canvas ≥768px, has nothing to pin.
+  **🟡 `PO/CO No` is one merged column** (line 283) where the approved order carries the four-way
+  source reference and `PO No` as its own column.
+
+- **🟡 THREE GAPS IN THE SHARED FIELD-WIDTH REGISTRY — measured against this page's approved
+  columns.** The registry (UI MASTER §6.8) is the right mechanism and this page must use it; these
+  three fields have no entry it can answer with:
+
+  | Field | Why the registry cannot answer it yet |
+  |---|---|
+  | `SO No / MPR No / CO No / RO No` | the registry holds a two-way `SO No / MPR No mixed reference` at 176; this page's reference is FOUR-way and longer |
+  | `Goods arrived at` | a site name, with no entry of its own; it is not `Stock Location`, which names a stock position rather than a receiving site |
+  | `Wrong Item Qty` · `Damaged Qty` · `Extra Qty` | the `Qty` role is 64, but these carry two-line headers whose first line (`Wrong Item`) is wider than 64 at 11px — the registry's own rule is that a complete two-line header plus its controls sets the minimum |
+
+  **Fix:** add the three entries to the one registry rather than guessing them on this page. The
+  registry's own law already says a field that fails validation is fixed in the shared definition.
+
+- **⛔ DOES THIS REGISTER GET A ROW EXPANSION? AN OWNER DECISION, NOT A PLANNER'S.** Measured: the
+  built page has no expansion, and §9.4 has never named one. The parent carries FOUR quantity
+  columns — `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` — and every one of them
+  is an AGGREGATE across the GRN's lines, while `Items` prints `{first item} + {n} more`. So on a
+  three-line GRN where one item arrived damaged, the row states `Damaged Qty 1` and **nothing on it
+  says which item**. Today that mapping exists only inside the GRN object.
+
+  This is a real choice about how the operator works, and the planner may not settle it by drawing
+  a table:
+
+  | Option | What it costs |
+  |---|---|
+  | **Keep it as it is** | the per-line truth stays in the formal GRN object, one click away, and the Register stays a flat paged document list |
+  | **Add an expansion** | the damaged line is named without leaving the row; it adds a second place that states receipt facts, and the object remains the formal document |
+
+  **If the owner chooses an expansion, its columns come from this section's own per-line facts** —
+  the governed category, the GRN paper's item words, the five quantity words and the exact-Unit
+  outcomes (`Received` · `Received with issue` · `Not received`) — never from the SO Batch buying
+  composition, which carries `Ready Stock` and a purchasing tick that have no meaning on a receipt.
+
+- **🟢 THE GROUP-LOCAL HEADER RULING HAS NOTHING TO GROUP HERE, AND THAT IS CORRECT.** Receiving is
+  a flat, SERVER-PAGED register: its filters live in the rail and its scope line is
+  `Showing 1–{n} of {total}`. The shared grouped-header work must not introduce groups on this page
+  to make it match its siblings. Receiving also KEEPS its `Clear filters` control: the removal of
+  that button is a Purchase Orders correction and applies to that page only.
+
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods Received Date` = the physical arrival date and time, stored as a time point with time
