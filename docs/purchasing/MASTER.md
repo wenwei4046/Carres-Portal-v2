@@ -2971,17 +2971,56 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source Claim/PO/GRN, Units/Qty, Collect From, Collection Date,
-Handover, Credit Consequence, Work.
-**Journey:** system creates from outcome → check exact goods → send return PDF → record collection
-date → scan/count at handover → upload proof.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** supplier refuses collection, partial collection, wrong Unit collected, credit note
-missing/different.
-**Connections:** Purchasing stock claim, Stock custody, supplier, Finance credit read-only.
+**Owner-confirmed UI target — 2026-09-18. APPROVED TARGET / NOT BUILT.** Approval covers
+layout, labels and inspection interactions; sample parties, dates, quantities and document
+references are illustrative, not verified business data. This does not approve a new custody
+engine or claim production verification.
+
+**Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
+No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
+ownership chain (§7.4 and Stock MASTER §12.8). Issuing the document does not move stock.
+
+**Main columns, in order:** expand arrow → PR Doc Date → PR No → Supplier → Supplier Claim No
+→ Category → PO No / Unit ID → GRN No → Items → Qty → Pickup Location → Return To
+→ Confirmed Pickup Date → Collected By → Collected Qty → Actual Pickup Date
+→ Supplier Received Date. Category immediately precedes the combined PO No / Unit ID cell.
+Visible purchase-return references use `PR-`, not `PRTN-`; this is display vocabulary, not
+permission to migrate stored identifiers. PR Doc Date is the document date, not goods movement.
+
+**Identity / expansion:** PO No on line one, Unit ID on line two in the same cell. Multiple
+Units expose the count as the expansion entry. Items shows the model and its specification on
+line two. Expanded columns: Category → PO No / Unit ID → Items → Qty → Pickup Location
+→ Return To → Collected By → Actual Pickup Date → Supplier Received Date → Evidence.
+One tracked Unit per expanded row, Qty 1; never combine two physical Units into one evidence row.
+
+**Dates and places:** Pickup Location is where goods are collected; Return To is the recorded
+supplier-designated destination, not an assumed registered address. Collected By identifies the
+actual collector. Confirmed Pickup Date, Actual Pickup Date and Supplier Received Date are
+separate facts. Fully picked up does not mean received by the supplier. Unknown facts remain
+explicitly unrecorded; never fabricate dates, collectors or receipt evidence.
+
+**Left rail — owner-confirmed latest preview:** Supplier → Return document → Pickup → Evidence.
+Reuse Supplier Claims' rail composition, section icons, spacing, width and active state.
+Supplier is a visible list of supplier names with right-aligned matching PR counts, not a dropdown
+(e.g. illustrative `Hookka 2`, `Ohana 1`). Click to filter; click again to deselect. Supplier
+combines with the operational condition and search; counts respect the other active dimensions.
+Return document: `Return document not sent`. Pickup: `Pickup date not confirmed`, `Not picked up`,
+`Partly picked up`, `Fully picked up`. Evidence: `Pickup proof missing`.
+Counts count matching PR documents, not Units; conditions may overlap. These are factual filters,
+not new stored states. Date-range and Pickup Location rail sections discussed as possibilities
+were not in the confirmed preview; do not silently treat them as approved additions.
+
+**Evidence:** per-Unit inspection separates Problem evidence (linked claim), Pickup proof and
+Supplier receipt proof. Compact icon + text photo/video actions; no large pills or unnecessary
+row-height increase. Expand evidence on request. Use the shared read-only viewer target for
+photo zoom/pan/reset/navigation and video playback/fullscreen. Never label damage photos as
+pickup or receipt proof. Viewer and real evidence wiring require build verification.
+
+**Shared UI / scope:** flat register, sticky opaque column header; do not invent status groups.
+Use the shared field-width registry and kit geometry, not page-specific width standards.
+No Finance, Credit Consequence or Work column. Do not use Handover/Handover proof as this
+register's labels. The underlying custody rules remain governed by Stock. Full-width record
+view; 50/50 remains reserved for issuing/revising. No application build is claimed by this ruling.
 
 ### 9.7 Repair Orders
 

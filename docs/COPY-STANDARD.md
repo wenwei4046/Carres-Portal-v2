@@ -875,6 +875,20 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+### Purchase Returns register — owner-confirmed UI, 2026-09-18
+
+Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·
+`Qty` · `Pickup Location` · `Return To` · `Confirmed Pickup Date` · `Collected By` ·
+`Collected Qty` · `Actual Pickup Date` · `Supplier Received Date`.
+Visible purchase-return prefix: `PR-`, not `PRTN-`. PR Doc Date is the document date only.
+Rail headings: `Supplier` → `Return document` → `Pickup` → `Evidence`. Supplier rows show
+the supplier name and matching PR count, using the Supplier Claims list pattern, not a dropdown.
+Evidence labels: `Problem evidence` · `Pickup proof` · `Supplier receipt proof`; compact
+`Photos {n}` / `Video {n}` actions. Rail labels and exact column order are owned once by
+Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Doc Date` and
+`Return No` are superseded as labels on this register, not globally retired custody vocabulary.
+Finance is excluded from this UI. Display approval does not rename stored records or APIs.
+
 ### Purchasing navigation words — owner ruling 2026-08-22
 
 These are the exact visible words for the Purchasing sidebar tree. They name doors only; they
