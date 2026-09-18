@@ -1783,48 +1783,30 @@ A Claim's internal decision state uses the approved Purchasing wording `Carres d
 a mandatory customer Case owner. `Return` as a document-routing verb remains distinct from
 `Return to supplier` as a goods decision.
 
-**REAL GAP / CONTRADICTION — owner review required.** The `Carres Execution` words below are live
-(0409) and name customer-leg movements (`Collect Defective Item`, `Replace First`, `Collect First`,
-`Exchange on Collection`). The 2026-09-14 boundary places customer remedy in Service Case and does
-not say whether these movement words stay on the stock Claim or move to the customer Case. They are
-kept unchanged until that ruling; do not extend them.
+**Execution ownership — APPROVED / NOT BUILT, Jess 2026-09-18.** These existing words keep their
+meanings; their edit surface follows the customer/supplier boundary. No new synonym is introduced.
 
-**`Carres Execution` — the five, transcribed 2026-09-01 and built as layer ④ (migration 0409).**
-Loo ruled these on **2026-08-05**, the same day as the four resolutions above, and they sat in
-`packages/shared/src/supplier-claim.ts` as a prose comment and in no dictionary for four weeks —
-the same gap this section was written to close. **They are transcribed here, not invented.**
+| Existing option | Owning decision | Definition |
+|---|---|---|
+| `Return to Supplier` | Purchasing supplier-side execution | The item goes back to the supplier. Nothing goes to the customer. |
+| `Collect Defective Item` | Service Case customer arrangement | Carres collects the item from the customer. Nothing goes out. |
+| `Replace First` | Service Case customer arrangement | The new item goes out BEFORE the old one is collected. |
+| `Collect First` | Service Case customer arrangement | The old item comes back BEFORE the new one goes out. |
+| `Exchange on Collection` | Service Case customer arrangement | Both change hands in one visit. |
 
-Layer ③ says what the customer GETS. Layer ④ says how the goods GET there, and the test that
-keeps them apart is Loo's own: *can both be true at the same time?* Yes — `Replace` is a promise,
-and `Replace First` and `Collect First` are two ways of keeping it. They differ in nothing the
-customer sees and in something Carres cannot ignore: under `Replace First` two units are
-committed to one customer until the collection happens.
+`Carres Execution` on Supplier Claim is a read-only supplier execution summary with owning document
+links, not a customer movement picker or a default listing column. Historical values remain
+readable with their recorded provenance. Customer arrangement lives in the linked Case; no Case
+is fabricated merely to hold an old value. Stock/Delivery/Finance consequences follow Purchasing
+§9.5 and Service §1.1; choosing a word is not proof of physical movement, approval or payment.
+Supplier replacement and customer replacement are separate legs, not matched dropdown pairs.
 
-| Option | The line under it |
-|---|---|
-| `Return to Supplier` | `The item goes back to the supplier. Nothing goes to the customer.` |
-| `Collect Defective Item` | `Carres collects the item from the customer. Nothing goes out.` |
-| `Replace First` | `The new item goes out BEFORE the old one is collected.` |
-| `Collect First` | `The old item comes back BEFORE the new one goes out.` |
-| `Exchange on Collection` | `Both change hands in one visit.` |
-
-The line is a **DEFINITION, never a consequence** — the same law the resolution lines carry. It
-names which goods move and in what order, and stops before saying what that does to stock, to
-money or to the outstanding quantity. `BEFORE` is capitalised because the order IS the decision:
-`Replace First` and `Collect First` differ in nothing else, and an operator who misreads which is
-which sends a van to the wrong address.
-
-> **A THIRD sense of `Return to Supplier`, and all three stand.** It is a locked VERB (a record
-> goes back to its author), an **Item Outcome** (where the unit physically ended up) and now a
-> **Carres Execution** (there is no customer leg at all — which is what makes it the fifth option
-> rather than four). The same settlement as `Repair` on two lists: they are allowed to disagree.
-> A claim may execute `Collect First` and still end with the unit written off.
-
-> **NO CONSEQUENCE IS ON SCREEN YET, and that is still the ruling.** Both arguments of
-> `f(Resolution, Execution)` finally exist, so the consequence is computable for the first time.
-> **Which** stock, finance and demand moves each pair produces has never been ruled, and the
-> freeze was on the missing argument — lifting it does not license guessing the function. A line
-> naming one would be a guess wearing a screen's authority.
+Supplier Claims default heads: `Reported` · `Supplier Claim No.` · `Supplier` · `PO No` · `GRN No.` ·
+`Product` · `Variant` · `Qty` · `Problem` · `Supplier Response` · `Claim status`.
+`Reported` means stored report date/time, displayed in Malaysia time, not discovery/issue/closure.
+Rail heads: `Supplier` · `Problem` · `Claim status` · `Supplier Response`.
+`Late delivery` remains readable for historical records only; passing time never creates a new Claim.
+Missing source/evidence is retained in detail and Work, not presented as proof from a PO ID alone.
 
 ### Receiving and supplier-exception words (locked 2026-07-27)
 

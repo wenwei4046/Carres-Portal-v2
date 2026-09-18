@@ -2356,6 +2356,48 @@ The claim records a request for supplier remedy, not an automatic finding of sup
 Receiving rejection is a physical observation; supplier agreement and authorised outcome are
 separate decisions. This entry table governs business routing, not application delivery status.
 
+#### Customer arrangement and supplier execution boundary
+
+**APPROVED / NOT BUILT — Blueprint completion requested by Jess, 2026-09-18.**
+The four customer movement choices — `Collect Defective Item`, `Replace First`, `Collect First`,
+`Exchange on Collection` — belong to the related Service Case, under its existing decision and
+entitlement gates. Purchasing must not offer a second customer arrangement picker on the Claim.
+`Return to Supplier` remains supplier-side execution. Repair/replacement/return legs on a Claim
+name their supplier, exact goods, destination and owning execution document; a supplier replacement
+receipt is not a delivery to the customer.
+
+Delivery owns customer collection/replacement DOs, arrangement and actual visit results; Warehouse
+owns receipt, inspection, custody and availability. The Claim's `Carres Execution` summary is
+read-only supplier-side scope and links to PRTN/CRTN, Repair Order, replacement PO/CO and physical
+execution records. Any customer arrangement is read from its Service Case through a related link.
+Legacy customer-execution values remain historical evidence, never silently deleted, translated
+into supplier movements or copied into newly created Cases. A future change goes through its
+owning record and authority; missing related context is stated, not invented.
+
+Customer complaint → Service Case → customer investigation/remedy. If supplier recovery is needed,
+Purchasing verifies the affected Stock/PO/receipt source and opens or matches an independent Claim
+from that source. Where the current journey requires goods returned to Stock, keep that condition;
+a Case complaint alone never creates a Claim. Carry permitted existing evidence by reference and
+link the records for context; no forced one-to-one relationship, duplicate photo upload or Case
+parent. Customer help need not wait for supplier recovery. Case completion cannot close the Claim,
+and Claim completion cannot close the Case.
+
+#### No calendar-created product claims
+
+**Existing rule; implementation convergence REQUIRED, not yet built.** A passed ETA or routine
+partial delivery alone never opens a product Claim. Current source still calls
+`runSupplierClaimSweepCron` from `apps/api/src/index.ts`; its RPC
+`supplier_claim_sweep_overdue()` is defined in migration 0519. This is source evidence, not a live
+production scheduler or data-count verification.
+
+The build must retire this automatic creation path, inventory every caller and scheduled trigger,
+and remove or disable the obsolete RPC safely in a new migration after dependency review. Do not
+edit applied migrations or stop unrelated daily jobs. Preserve PO balance and date follow-up in
+Purchase Orders and shared My Work: `Date passed` uses the governed evidenced supplier date,
+never a calculated ETA described as a supplier promise. Missing confirmation remains its own fact.
+Historical `Late delivery` claims remain searchable and keep their history; no new selectable
+late-only product claim. Do not clear test or production records as part of this change.
+
 **CONFIGURABLE SUPPLIER REPLY TIMING — OWNER-APPROVED / LOCKED, 2026-09-06.** Central
 `Settings → Purchasing → Supplier Claims` holds `Reply waiting days` and
 `Extra days before escalation`. Both count Office working days. Authorised Purchasing Settings
@@ -2503,7 +2545,7 @@ retry the same record; never allocate another claim because a response was lost.
 | Supplier's claim/return reference, contact, stated answer date, reply channel/proof, quantity and promise | Purchasing records what the supplier actually said; no inferred acknowledgement |
 | Authorised stock-claim outcome, reason, decision scope/version | Authorised Purchasing decision; owning documents execute |
 | Customer remedy of a related customer complaint | Service Case; Claim shows a read-only link |
-| Carres Execution decision, exact old/new Units, required legs and prerequisites | Authorised Purchasing decision; owning documents execute |
+| Supplier execution scope, exact old/new Units, required legs and prerequisites | Authorised Purchasing decision; owning documents execute; customer arrangement is Service-owned |
 | Where, Who has it, condition, inspection and actual Item Outcome | Stock/Receiving/Outbound; read-only on Claim |
 | Requested/agreed commercial remedy | Purchasing decision evidence; it does not post money |
 | Credit accepted, cash received, invoice application, shortfall, amount waived, currency and references | Finance; Claim reads linked acceptance/results |
@@ -2552,8 +2594,8 @@ Delivery. Customer communication and policy promises stay with the Case owner/ac
 **RESOLVED:** preserve Stock / Receiving Problem → Supplier Response → Authorised Stock-Claim
 Decision → Execution as separate facts. Customer remedy (Replace / Repair / Accept As-Is /
 No Replacement Required) belongs to a related Service Case and is not a Claim picker.
-Execution retains Return to Supplier / Collect Defective Item / Replace First / Collect First /
-Exchange on Collection pending the owner review named in the Copy Standard. A supplier offer never
+Customer collection/replacement order is decided in Service Case; supplier return/repair/replacement
+execution follows the boundary above. A supplier offer never
 approves the customer remedy, and an item outcome never cancels a customer commitment.
 
 **APPROVED:** recording those facts remains flexible. Issuing a new instruction requires a
@@ -2562,7 +2604,7 @@ supplier agreement or authorised Carres-funded exception, movement order, party,
 required dates, cost authority and completion evidence. Incomplete or conflicting facts create
 a named decision action. They never silently create Stock, Finance or demand writes.
 
-A related customer remedy may coexist in its Case with any of the five execution answers. No matched-pair
+Customer and supplier decisions remain independent in their owning records. No matched-pair
 guard is reintroduced. The system instead checks each proposed future leg against its own approval
 and actual facts. A collection already performed must always be recordable, including an
 unauthorised one with an Issue. Recording it grants no permission for a future replacement.
@@ -2717,26 +2759,28 @@ parallel actions; required party/date/evidence is never hidden by truncation.
 #### Register, factual rail and full object
 
 **RESOLVED:** Purchasing → PROBLEMS → Supplier Claims, shared Shell + Register + Object Detail.
-No New Claim, module Work page, dashboard, second sidebar or duplicate editors. Use the current
-50px destination header, governed toolbar, 240px factual rail, 36/38/32 table grammar and tokens.
-These values reuse the shared authority; this Blueprint reuses existing kit components.
+No New Claim, module Work page, dashboard, second sidebar or duplicate editors. Use UI MASTER
+§6.7 shared listing style, toolbar, rail, responsive layout, typography and measured column-width
+contract; reuse existing kit components rather than freezing page-local dimensions.
 
-**APPROVED — register defaults (owner correction 2026-09-07):** Opening Supplier Claims
+**APPROVED — register defaults; date-first/boundary reconciliation 2026-09-18, NOT BUILT:** Opening Supplier Claims
 shows all permitted new and historical claims, including closed claims, newest report first.
 There is no View selector and no setup step before records appear. Search and factual filters
 are optional, start clear on normal entry, and clearing them restores the whole permitted set.
-The useful default columns are Supplier Claim No.,
-Reported, Supplier, PO No, GRN No., Product, Variant, Qty, Problem, Supplier Response and Claim
-status. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
+The useful default columns are **Reported · Supplier Claim No. · Supplier · PO No · GRN No. ·
+Product · Variant · Qty · Problem · Supplier Response · Claim status**. `Reported` uses the
+stored `reported_at` fact in Malaysia time, not discovery, issue or closure time; preserve those
+separate dates in detail. Unknown report dates stay unknown. The date and identity columns are
+pinned using the shared two-column contract, including an unissued record's permanent identity. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
 reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
 product name. SKU and Supplier DO each have their own optional column; when a record has no
 Catalog product name, SKU is visible by default so its recorded identity is not hidden behind
 Columns. A source SKU is never relabelled as a product name or used to invent a Catalog record. Preserve existing SC document numbers and explain
 them through the full Supplier Claim No. header; do not rename historical documents or invent
-another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
-identity column covering adjacent content. One row is one supplier claim, never one row
+another UI vocabulary. Horizontal scrolling uses the shared pinned offsets so the two fixed columns never cover
+adjacent content. One row is one supplier claim, never one row
 per photo or Work action. An unissued claim shows Not issued. Wider detail/reference fields
-remain optional Columns: Units, Requested Result, Authorised Outcome, Carres Execution,
+remain optional Columns: Units, Requested Result, Authorised Outcome,
 Item Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version
 and Sent to Supplier. Only relevant date facts appear; no generic workflow field. Unknown
 optional facts are not promoted to permanent empty columns; measure before final layout.
@@ -2744,7 +2788,7 @@ optional facts are not promoted to permanent empty columns; measure before final
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-SUPPLIER               Supplier Claim No. | Reported | Supplier | PO No | GRN No. | Product | Variant | Qty ...
+Supplier               Reported | Supplier Claim No. | Supplier | PO No | GRN No. | Product | Variant | Qty ...
   actual suppliers     one row per supplier claim; facts and evidence only
 PROBLEM
   observed types       footer: matching claims · affected Units/quantity with clear scope
@@ -2752,16 +2796,23 @@ CLAIM STATUS
   Open / Closed / Cancelled
 SUPPLIER RESPONSE
   Not recorded / actual recorded answer
-EVIDENCE
-  Source not linked / Reply evidence missing / Credit evidence missing
 Clear filters
 ```
+
+The four rail groups are Supplier, Problem, Claim status and Supplier Response; presentation follows
+UI MASTER §6.7, with no page-local typography or widths. Customer Resolution and Carres Execution
+are not listing columns. Historical problem types remain findable when present.
 
 Rail entries are factual predicates with truthful counts, not action queues. No empty invented
 supplier/category rows. Typed date filtering stays with the date column. Search covers claim,
 source PO/GRN, Unit, supplier, supplier reference and item; no privileged customer data leaks
 into supplier views. Clearing filters returns the full permitted set. Empty result, no access and
-load failure are different states. A failed source is never shown as zero claims.
+load failure are different states. A failed source is never shown as zero claims. Supplier presence or a PO ID alone does not prove
+valid PO-line/GRN-line/Unit scope. Remove the ordinary Evidence rail group; preserve required
+missing-source/reply/credit facts and source-search doors in detail and their owning Work. Legacy
+incomplete records remain visible. No formal issue passes without verified provenance. Facet
+counts cover the complete permitted searched/filtered set under shared facet semantics, not the
+loaded page; collapsed groups do not filter.
 
 Read-only row expansion is a short problem/evidence inspector: problem type and note, photo
 count, affected held Units and Open Claim. It does not repeat product, source or reply columns.
@@ -2780,7 +2831,7 @@ Problem         source · observed event · photos/video
 Supplier Response   asked / actual answer / exact scope / promises / contact proof
 Authorised Outcome  approved stock-claim decision · approver · reason
 Related customer    read-only link to a related Service Case, when one exists (no Claim picker)
-Carres Execution    approved scope and movement order + owning document doors
+Carres Execution    supplier-side scope + owning execution document doors (read-only)
 Item Outcome        read-only Where / Who has it / condition / inspection / remaining result
 Supplier money      requested/agreed remedy + Finance acceptance/result links
 Documents           version · recipient · actual send · required print/sign proof
@@ -2792,7 +2843,7 @@ Reference tabs: Document · Revisions · History · Order Route
 Main object is one full-width working scroll. Only claim-owned request/answer and supplier
 instruction controls edit here. A related customer remedy opens its Service Case; physical outcome
 opens Stock/Receiving/Outbound; Finance opens its own acceptance record. A shortcut never creates
-a second editor. Current action uses 13px fact / 11px instruction as governed; History uses its
+a second editor. Typography follows UI MASTER §6.7: main fact 13px, secondary table fact 11px, helper 12px; History uses its
 three-rank record grammar. Section actions live in their governed section header; rare
 Split/Cancel/Reopen are in More with reasons and exact consequence review.
 
@@ -2879,6 +2930,23 @@ These are dependency relationships, not build scopes or implementation sequencin
 | Supplier money completion | Finance-owned acceptance, external evidence and unique scoped allocation | RM80 agreed and RM50 received leaves RM30 open; credit is never displayed as received cash |
 | Dated Work | Shared Duty resolver, admitted source projection and approved date policy | Buddy cover sees the same obligation; the actual actor and normal owner remain separate in History |
 | Closure/correction | All required owner completion facts and append-only history | Customer served first; supplier collection still open keeps that work visible; reopen preserves the first close and original age |
+
+**Completion acceptance — documentation complete, implementation checks still OWED:**
+
+| Scenario | Required result |
+|---|---|
+| Receipt damage with no customer complaint | Exact source-linked Claim; no fabricated Case; retry reuses the occurrence |
+| Customer complaint followed by supplier recovery | Service owns customer arrangement; Purchasing verifies source and links an independent Claim; no Case-created Claim |
+| Customer replaced first while supplier repair/credit is outstanding | Customer and supplier outcomes progress independently; no duplicate delivery or premature Claim closure |
+| Old customer execution or Late delivery value | History stays readable; no new customer picker on Claim and no calendar-created Claim |
+| ETA passes, supplier-confirmed date passes, or supplier date is unknown | No automatic Claim in any case; governed PO/My Work follow-up still works with the correct date meaning |
+| PO exists but line/Unit provenance is missing or its read fails | Never count that as verified source; issue refuses appropriately; evidence and existing records remain accessible |
+| List, detail and document | Date/identity pinned, all historical states searchable, four factual rail groups; full-width detail; 50/50 only preparing/revising the external pack |
+| Partial goods/money outcome, concurrent edit or uncertain retry | Existing scoped closure, version, idempotency and owning-module evidence rules pass; no half-applied result |
+| Rendered acceptance | 1440/390, long names, keyboard, 200% zoom, contrast, empty/error/no-access and whole-set counts verified; screenshots attached outside repository |
+
+No application or database change is part of this documentation completion. A later build must
+prove the matrix and existing §9.5 lifecycle/permission/Finance gates before claiming delivery.
 
 A missing Finance continuation cannot be replaced with a Purchasing “paid” tick or sent to BUILD
 as an unresolved business choice. The acceptance contract may use an authorised Finance record
