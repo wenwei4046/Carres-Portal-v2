@@ -2219,7 +2219,7 @@ Warehouse submits count                (or Operation enters goods directly)
 - **Register columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
   ```text
-  GRN Date · GRN No · SO No / Manual Purchase / CO No / RO No · PO No · Supplier ·
+  GRN Date · GRN No · SO No / CO No / RO No · PO No · Supplier ·
   Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date · Goods Received Date ·
   Supplier DO No. · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
   ```
@@ -2228,13 +2228,13 @@ Warehouse submits count                (or Operation enters goods directly)
   `GRN Date` is creation; `Goods Received Date` is physical receipt date/time. They are never
   inferred from one another. `Goods arrived at` is the actual site; `Supplier Deliver To` is the
   instructed destination. `Items` keeps the GRN paper's own recorded item words.
-  The source column shows the receipt's actual linked source reference — the SO No, `Manual
-  Purchase`, the CO No or the RO No — preserve every actual linked reference, blank when none; `PO No` stays its own
-  column (blank for a CO or RO receipt with no PO, never invented). Repair returns are in this
+  The source column shows the receipt's actual linked document numbers — the SO No, the CO No or the
+  RO No — preserve every actual linked reference, blank when none (a Manual Purchase has no number of
+  its own; its receipt is identified by `PO No` alone). `PO No` stays its own column (blank for a CO
+  or RO receipt with no PO, never invented). Repair returns are in this
   register: they come back through the one Receiving engine with a GRN (§9.5 matrix, §9.7, Stock
   §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
-  checks it against COPY before it reaches the screen (Purchase Orders' `SO No` column already
-  shows `Manual Purchase` as a value). Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
+  checks it against COPY before it reaches the screen. No word stands in for a missing number. Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
   below 768px; no column hidden by width.
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·

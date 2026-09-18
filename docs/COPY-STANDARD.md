@@ -1732,7 +1732,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
 | `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
 | `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
-| `SO No / Manual Purchase / CO No / RO No` · `PO No` | GRN Register columns (owner ruling 2026-09-18; overwrites the single `PO/CO No` column) | The first shows the receipt's actual linked source — the SO No, `Manual Purchase`, the CO No or the RO No (repair returns come back through Receiving) — blank when none; `PO No` is its own column, blank for a CO or RO receipt with no PO. The one Receiving engine serves all of them. |
+| `SO No / CO No / RO No` · `PO No` | GRN Register columns (owner ruling 2026-09-18; overwrites the single `PO/CO No` column) | The first shows the receipt's actual linked document numbers — the SO No, the CO No or the RO No (repair returns come back through Receiving) — blank when none. A Manual Purchase has no number; its receipt is identified by `PO No`. `PO No` is its own column, blank for a CO or RO receipt with no PO. The one Receiving engine serves all of them. |
 | `Supplier Confirmed Delivery Date` | GRN Register column | The SAME governed word as the Purchase Orders register (the evidenced supplier answer — see the Purchasing date dictionary). `Not confirmed` while no evidenced reply exists. |
 | `Items` | GRN Register column (owner ruling 2026-09-18; was `Product`) | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
 | `Showing {from}–{to} of {total}` | GRN Register footer | Server-side pagination speaks for the WHOLE filtered result set (owner correction 2026-09-06, second ruling) — never `{n} loaded` over an unknown remainder. |
@@ -1847,7 +1847,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Goods arrived at` | Actual receiving location, including warehouse, showroom or other actual site. |
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
 | `SO No / Manual Purchase / CO No` | PO combined-reference header; actual linked references only, not invented mandatory relationships. |
-| `SO No / Manual Purchase / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
+| `SO No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
 | Manual Purchase document reference | `PO No` only: the actual resulting PO, blank before issue; multiple POs remain individually accessible. `Manual Purchase No.`, MPR and invented public request numbers are not used. Items opens the internal request. |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 
