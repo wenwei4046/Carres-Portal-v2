@@ -1749,8 +1749,18 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · Shared goods tables — approved SO Batch reference
 
-**Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
-approved reference for shared component work. Business columns remain owned by each module MASTER;
+**Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
+OWED.** SO Batch listing and stock-picker composition is the
+approved reference for shared component work.
+
+**Engine capabilities — BUILT 2026-09-18, all three opt-in, every other Register byte-identical:**
+`DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
+record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
+two); the pair still pins alone and the named column scrolls under the block like any other fact.
+`DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
+tables inside an expansion read as children — it is this reference's treatment and NOT a global
+blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector. Business columns remain owned by each module MASTER;
 this does not make other pages editable or give them SO Batch stock-reservation powers.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
@@ -1772,8 +1782,28 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+- **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
+  that `vite build` cannot emit): 1440 / 1180 / 820 and 200% zoom carry no page-level horizontal
+  scroll; both tables take their measured content width and neither stretches to fill the canvas;
+  the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the picker's
+  controls are the kit's own 32px Buttons. **🔴 At 390px the PAGE scrolls sideways by 30px — every
+  overflowing element is inside the shared `ModuleHeader` destination row (a 24px `shrink-0`
+  destination word beside a fixed global icon cluster), identical on all eight Purchasing pages
+  and predating this build. The Register's own grid scrolls inside its box. Reported, not taken:
+  the fix is a shell typography/IA decision, not a purchasing one.**
 
-## §6.9 · Connected expansion
+## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
+
+**The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column
+is.** `GoodsMiniTable` draws it inside that cell, in normal flow, as one unbroken 1px rule from
+beneath the disclosure caret to the TOP BORDER of the picker's frame — measured at 1440 in the
+rendered portal: centred on the caret to 0.2px, 1px below it, 0px from the frame's border, and
+unchanged after the goods box is scrolled horizontally. It exists only while that picker is open,
+so there is structurally no line that could run into the next item. The active goods context
+carries a blue boundary; the stock frame stays neutral white, and neither is evidence of a saved
+reservation — what a line holds is its `{n} reserved` count and the Unit IDs in the picker.
+Ready Stock is no longer a sibling SECTION of the expansion: the expansion is the goods table and
+`Purchase order details`, and the retired three-section arrangement does not return.
 
 Use the existing shared connector primitives. The SO row connects to its goods expansion.
 An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the

@@ -1827,7 +1827,7 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
 <a id="purchasing-ui-dictionary"></a>
-### Purchasing UI dictionary — APPROVED / NOT BUILT (Jess, 2026-09-18)
+### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
 This is the single naming reference for SO Batch Purchase, Manual Purchase, Purchase Orders and
 Receiving, including the same facts in details and exports. Every future task reads this section
@@ -1854,6 +1854,11 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
 | `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
+| `Need PO` · `No PO needed` | SO Batch Purchase's `Status`: whether the record still needs a NEW purchase order, read from the same remaining demand that decides its group. It renames no group and no rail row, and it is never permission to buy — unknown coverage and every other blocker still refuse the tick and state their own reason. Not a progress badge: `Partial` and `Ordered` stay retired. |
+| `{n} available` · `{n} reserved` | The Ready Stock cell on an item row: free exact Units for those goods, then Units saved against THIS item line. `0` prints only for a SUCCESSFUL read that found neither; a read that is loading, failed or unverified says so in its own words and NEVER as a zero. |
+| `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel` | The one stock-selection journey. Ticking is a draft and writes nothing; the first save is `Choose Ready Unit`; afterwards the saved set is reopened by `Change selection` and committed or abandoned by the other two. There is no per-Unit Undo or release: a removal is part of the replacement and is validated with it. |
+| `Stock Location` | Where a Unit actually stands today. Never the destination a purchase order instructs, and never the Sales Order's delivery address. |
+| `PO No / Ref No` | The stock picker's provenance cell: the document the goods came in on, with the `Unit ID` on its second line. Both print in full. Missing provenance reads `Not recorded`; it is never a reason to invent a PO. |
 
 Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date`, `Goods received on`.
 `Order By` remains an internal planning/detail fact, not the SO Batch/Manual Purchase parent column.

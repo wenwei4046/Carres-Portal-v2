@@ -5,7 +5,12 @@
 // windows-inside-windows AutoCount pattern the Constitution rejects (§2). Its
 // table follows GoodsMiniTable's grammar, its sibling.
 import type { ReactNode, Ref } from "react";
-import { READY_STOCK_CONDITION_ABSENT, readyStockConditionWord } from "@carres/shared";
+import {
+  READY_STOCK_CONDITION_ABSENT,
+  SO_BATCH_PURCHASE_WORDS as W,
+  readyStockConditionWord,
+} from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 
 /**
  * ⭐ READY STOCK — ONE TABLE, BOTH PURCHASING SURFACES (owner ruling
@@ -63,6 +68,14 @@ export interface ReadyStockTableRow {
   ownership: "carres_owned" | "supplier_consignment";
   supplier: string | null;
   qty: number;
+  /** The physical receipt DATE. The picker prints it; the inventory read does not. */
+  dateIn?: string | null;
+  /**
+   * The document the goods came in on, read from the register and never
+   * invented. `undefined` = the read did not carry it; `null` = it carries no
+   * document. Both print `Not recorded`, which is the truth in either case.
+   */
+  poNo?: string | null;
 }
 
 export interface ReadyStockTableSelection {
@@ -100,11 +113,46 @@ const RULED = [
 /** `Item` is the only flexible column and it is ALWAYS LAST (law ①). */
 const ITEM_FLOOR = 200;
 
+/**
+ * ⭐ THE SO BATCH STOCK PICKER — owner ruling 2026-09-18, Purchasing §9.1.
+ *
+ * `☐ · Goods Received Date · Stock Location · Supplier · PO No / Ref No ·
+ * Condition`, in that exact order, and it is a DIFFERENT QUESTION from the
+ * inventory read above — which is why it is a layout of this one box rather
+ * than a second box. The picker opens directly beneath ONE item line, so:
+ *
+ *   · `Item` and `Qty` are gone. Every row is the goods that line ordered, one
+ *     exact Unit at a time; a column that would print the same words on every
+ *     row in the width of a real answer is a column of noise.
+ *   · `Owner` is gone and `Supplier` takes its place — the operator needs the
+ *     PROVENANCE, and consignment goods still say so, beside the name.
+ *   · `PO No / Ref No` and `Unit ID` share ONE cell, the document on line one
+ *     and the Unit under it: they are the two identifiers a person copies, and
+ *     a reader who has to look across the table to pair them pairs them wrongly.
+ *   · The date is the physical RECEIPT date and carries no time on this
+ *     surface (§9.1). A stored timestamp is never rewritten to fit a column.
+ *
+ * Manual Purchase passes no layout at all and renders byte-identically.
+ *
+ * WIDTHS ARE CONTENT, and a field keeps ONE default across these tables: a
+ * cross-year date is the register's own 120, `PO-20260930-4827` its own 144,
+ * and `Supplier` the reviewed 136 — which is a SAMPLE measurement, not a clip:
+ * a longer real name takes an inline second line rather than an ellipsis.
+ */
+const PICKER = [
+  { key: "received", label: W.stockColReceived, width: 120 },
+  { key: "location", label: W.stockColLocation, width: 136 },
+  { key: "supplier", label: W.stockColSupplier, width: 136 },
+  { key: "reference", label: W.stockColReference, width: 144 },
+  { key: "condition", label: W.stockColCondition, width: 110 },
+] as const;
+
 export default function ReadyStockTable({
   label,
   rows,
   selection,
   extraColumn,
+  layout = "inventory",
 }: {
   /** The table's accessible name — `Ready Stock for SO-1303`. */
   label: string;
@@ -113,12 +161,146 @@ export default function ReadyStockTable({
   selection?: ReadyStockTableSelection;
   /** Present only on a page with a trailing fact of its own. */
   extraColumn?: ReadyStockTableExtraColumn;
+  /**
+   * `inventory` (the default) is the shipped shape Manual Purchase and the
+   * order-level section draw. `picker` is SO Batch's approved six columns under
+   * ONE item line (§9.1). Opt-in, so every existing caller is byte-identical.
+   */
+  layout?: "inventory" | "picker";
 }) {
+  const picker = layout === "picker";
+  const ruled = picker ? PICKER : RULED;
   const minWidth =
-    RULED.reduce((n, c) => n + c.width, 0) +
-    ITEM_FLOOR +
+    ruled.reduce((n, c) => n + c.width, 0) +
+    (picker ? 0 : ITEM_FLOOR) +
     (selection ? SELECT_WIDTH : 0) +
-    (extraColumn ? extraColumn.width : 0);
+    (extraColumn && !picker ? extraColumn.width : 0);
+  if (picker) {
+    return (
+      /* CONTENT DECIDES THE WIDTH (ui MASTER §6.8): the table takes exactly the
+         sum of its measured columns and the frame scrolls sideways if the
+         window is narrower. `w-full` would stretch six content columns across a
+         1440px canvas to fill it, which is the one thing the ruling names. */
+      <div className="overflow-x-auto">
+        <table
+          className="table-fixed text-left"
+          style={{ width: minWidth }}
+          aria-label={label}
+        >
+          <colgroup>
+            {selection ? <col style={{ width: SELECT_WIDTH }} /> : null}
+            {ruled.map((c) => (
+              <col key={c.key} style={{ width: c.width }} />
+            ))}
+          </colgroup>
+          {/* The child header treatment, exactly as the goods table above it:
+              slate-3 fill, slate-11 ink, 11px/600, NORMAL casing. A neutral
+              child header under the pale-blue main one (§6.8). */}
+          <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
+            <tr className="divide-x divide-base-200">
+              {selection ? <th className="px-2 py-1.5" aria-label="Choose Unit" /> : null}
+              {ruled.map((c) => (
+                <th
+                  key={c.key}
+                  scope="col"
+                  /* The same reserved two-line header height every table in
+                     this expansion carries, so three stacked boxes read as one
+                     listing rather than three near-misses. */
+                  className="px-2 py-1.5 align-bottom text-label font-semibold text-kit-slate-11"
+                  style={{ height: 40 }}
+                >
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-base-200 text-body">
+            {rows.map((u) => {
+              const blocked = selection?.blockedWord(u) ?? null;
+              const chosen = selection?.isChosen(u.itemId) ?? false;
+              const refused = selection?.isRefused?.(u.itemId) ?? false;
+              return (
+                <tr
+                  key={u.itemId}
+                  data-testid={`ready-stock-unit-${u.itemId}`}
+                  className={
+                    refused
+                      ? "divide-x divide-base-200 bg-kit-amber-3"
+                      : chosen
+                        ? "divide-x divide-base-200 bg-kit-blue-3"
+                        : "divide-x divide-base-200"
+                  }
+                >
+                  {selection ? (
+                    <td className="px-2 py-2 text-center align-middle">
+                      {blocked == null ? (
+                        <input
+                          type="checkbox"
+                          aria-label={`Choose ${u.unitCode ?? "Unit"}`}
+                          checked={chosen}
+                          onChange={() => selection.onToggle(u.itemId)}
+                        />
+                      ) : (
+                        <Absence>—</Absence>
+                      )}
+                    </td>
+                  ) : null}
+                  {/* GOODS RECEIVED DATE — the physical receipt, DATE only on
+                      this surface. A missing date says so; no time is invented
+                      and no stored timestamp is rewritten. */}
+                  <td className="px-2 py-2 align-top">
+                    {u.dateIn ? (
+                      fmtDate(u.dateIn)
+                    ) : (
+                      <Absence>{W.stockNotRecorded}</Absence>
+                    )}
+                  </td>
+                  {/* STOCK LOCATION — where the Unit actually stands today,
+                      never the destination a purchase order asks for. */}
+                  <td className="px-2 py-2 align-top">
+                    {u.siteName ?? <Absence>{W.stockNotRecorded}</Absence>}
+                  </td>
+                  {/* SUPPLIER — the recorded provenance. Consignment goods
+                      belong to their supplier and the operator must see it
+                      before committing them (§7.7). */}
+                  <td className="px-2 py-2 align-top">
+                    {u.supplier ?? <Absence>{W.stockNotRecorded}</Absence>}
+                    {u.ownership === "supplier_consignment" ? (
+                      <div className="text-meta text-kit-slate-11">Supplier owned</div>
+                    ) : null}
+                  </td>
+                  {/* ONE CELL, TWO LINES: the document, then the Unit under it.
+                      Both print in FULL and stay selectable — a shortened
+                      number names a document that does not exist. */}
+                  <td className="px-2 py-2 align-top">
+                    <div className="break-words">
+                      {u.poNo ?? <Absence>{W.stockNotRecorded}</Absence>}
+                    </div>
+                    <div className="mt-0.5 break-words text-meta text-kit-slate-11">
+                      {u.identityScope === "unit" && u.unitCode ? (
+                        u.unitCode
+                      ) : (
+                        /* 0453: a counted row's key is not a Unit ID and never
+                           prints as one. */
+                        <>{blocked ?? "—"}</>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    {u.condition ? (
+                      readyStockConditionWord(u.condition)
+                    ) : (
+                      <Absence>{READY_STOCK_CONDITION_ABSENT}</Absence>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   return (
     <div className="overflow-x-auto">
       <table

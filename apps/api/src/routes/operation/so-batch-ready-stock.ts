@@ -2,9 +2,11 @@ import { Hono } from "hono";
 import {
   READY_STOCK_DRAW_REASON,
   readyStockReserveInputSchema,
+  readyStockSaveInputSchema,
   stockMatchKey,
   type ReadyStockLine,
   type ReadyStockResponse,
+  type ReadyStockSaveResult,
   type ReadyStockUnit,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -163,6 +165,85 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
      at whatever site holds it. */
   const { freeUnitsByKey } = await readFreeStock(sb);
 
+  /**
+   * ⭐ THE PROVENANCE THE PICKER PRINTS (owner ruling 2026-09-18).
+   *
+   * `PO No / Ref No` is the document the goods came in on, and it is the
+   * warehouse's own recorded fact (`stock_unit_register_v.po_no`) — never the
+   * Sales Order's supplier, never an expected delivery site and never a number
+   * invented to fill the cell. `readFreeStock` does not carry it (nothing
+   * before this needed it), so it is read here for exactly the Units this
+   * response names.
+   *
+   * A read that fails leaves every reference ABSENT rather than blank-as-fact:
+   * the cell then says `Not recorded`, which is what it already says for a
+   * Unit whose document nobody recorded.
+   */
+  async function provenanceOf(ids: readonly string[]): Promise<Map<string, string | null>> {
+    const out = new Map<string, string | null>();
+    if (ids.length === 0) return out;
+    const { data, error } = await sb
+      .from("stock_unit_register_v")
+      .select("id, po_no")
+      .in("id", ids);
+    if (error) return out;
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      out.set(r.id as string, (r.po_no as string | null) ?? null);
+    }
+    return out;
+  }
+
+  /**
+   * ⭐ A SAVED CHOICE IS STILL PART OF THE PICKER — owner ruling 2026-09-18:
+   * *"saved reservations remain accessible even if available stock is zero"*.
+   *
+   * A committed Unit is no longer `available`, so the offer above cannot see
+   * it, and `Change selection` would have opened on an empty table with the
+   * saved set nowhere on screen. These rows are read back by the binding this
+   * order's own lines carry (`reserved_order_line_id`, 0471) and are marked
+   * with it, so the browser can show them ticked and let them be removed.
+   *
+   * They are NOT an offer: nothing here makes a bound Unit choosable for a
+   * different line, and `matchingLineIds` names only the line it already
+   * answers.
+   */
+  const reservedUnits: ReadyStockUnit[] = [];
+  if (lineIds.length > 0) {
+    const { data: boundRows, error: boundReadErr } = await sb
+      .from("stock_unit_register_v")
+      .select(
+        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, po_no, reserved_order_line_id",
+      )
+      .in("reserved_order_line_id", lineIds);
+    if (boundReadErr) return fail(c, boundReadErr);
+    for (const r of (boundRows ?? []) as Record<string, unknown>[]) {
+      const lineId = (r.reserved_order_line_id as string | null) ?? null;
+      if (!lineId) continue;
+      reservedUnits.push({
+        itemId: r.id as string,
+        unitCode: (r.unit_code as string | null) ?? null,
+        identityScope: (r.identity_scope as string | null) === "quantity" ? "quantity" : "unit",
+        sku: r.sku as string,
+        condition: (r.condition as string | null) ?? null,
+        siteName: (r.site_name as string | null) ?? null,
+        holderName: (r.holder_name as string | null) ?? null,
+        ownership:
+          (r.ownership as string | null) === "supplier_consignment"
+            ? "supplier_consignment"
+            : "carres_owned",
+        supplier: (r.supplier as string | null) ?? null,
+        qty: Math.max(1, Number(r.qty ?? 1)),
+        dateIn: (r.date_in as string | null) ?? null,
+        poNo: (r.po_no as string | null) ?? null,
+        matchingLineIds: [lineId],
+        lineIds: [lineId],
+        reservedForLineId: lineId,
+        blocked: null,
+      });
+    }
+  }
+  const reservedIds = new Set(reservedUnits.map((u) => u.itemId));
+
   const linesByKey = new Map<string, ReadyStockLine[]>();
   for (const l of outLines) {
     const key = stockMatchKey(l.sku);
@@ -172,6 +253,8 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
   const units: ReadyStockUnit[] = [];
   for (const [key, matched] of linesByKey) {
     for (const u of freeUnitsByKey.get(key) ?? []) {
+      /* A Unit this order already holds is named ONCE, by the saved set. */
+      if (reservedIds.has(u.id)) continue;
       const needing = matched.filter((l) => l.remainingQty > 0);
       units.push({
         itemId: u.id,
@@ -187,6 +270,9 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         qty: u.qty,
         dateIn: u.dateIn,
         matchingLineIds: needing.map((l) => l.orderLineId),
+        /* The goods match these lines whether or not they still need units. */
+        lineIds: matched.map((l) => l.orderLineId),
+        reservedForLineId: null,
         /* 0368: bulk is not bindable. The row still shows — hiding the 893
            counted pieces would make a full shelf read as an empty one. */
         blocked:
@@ -197,6 +283,11 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
               : null,
       });
     }
+  }
+  units.push(...reservedUnits);
+  const references = await provenanceOf(units.filter((u) => u.poNo === undefined).map((u) => u.itemId));
+  for (const u of units) {
+    if (u.poNo === undefined && references.has(u.itemId)) u.poNo = references.get(u.itemId) ?? null;
   }
   units.sort((a, b) => (a.unitCode ?? "").localeCompare(b.unitCode ?? ""));
 
@@ -289,6 +380,76 @@ soBatchReadyStockRouter.post("/ready-stock/reserve", requireOperation, async (c)
   }
 
   return c.json(data);
+});
+
+/**
+ * POST /api/operation/purchase/demands/ready-stock/save
+ *
+ * ⭐ ONE ITEM LINE'S WHOLE CHOSEN SET, AS A REPLACEMENT (owner ruling
+ * 2026-09-18). The browser sends what the line should stand at; the door works
+ * out what to give back and what to take, and applies both inside ONE
+ * transaction (0545). An empty `itemIds` is the governed instruction to remove
+ * every saved choice.
+ *
+ * ⛔ THE BROWSER'S DIFFERENCE IS NOT THE DOOR'S. Nothing here subtracts one set
+ * from another: a tab left open across someone else's release would otherwise
+ * release a Unit nobody chose to release. The SQL computes the difference from
+ * the locked rows it is about to change.
+ */
+soBatchReadyStockRouter.post("/ready-stock/save", requireOperation, async (c) => {
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json", code: "invalid_json" }, 400);
+  }
+  const parsed = readyStockSaveInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { orderId, orderLineId, itemIds } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: order, error: orderErr } = await sb
+    .from("orders")
+    .select("id, so")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (orderErr) return fail(c, orderErr);
+  if (!order) return c.json({ error: "order_not_found", code: "order_not_found" }, 404);
+
+  const reference = referenceOf(order as OrderRow);
+  if (!reference) {
+    /* The draw door refuses an empty reference by name. Refused here instead,
+       so the operator reads the reason rather than a 500. */
+    return c.json({ error: "no_reference", code: "no_reference" }, 422);
+  }
+
+  const { data, error } = await sb.rpc("so_batch_save_ready_units", {
+    p_ref: reference,
+    p_reason: READY_STOCK_DRAW_REASON,
+    p_note: `SO Batch Purchase · ${reference}`,
+    p_order_id: orderId,
+    p_line: orderLineId,
+    p_item_ids: itemIds,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    /* The detail carries the refusal's own code — the draw door's words for an
+       add, 0545's for a release. Passed through so the browser prints the
+       governed sentence for THAT refusal rather than a generic one. */
+    const code =
+      (error as { message?: string }).message?.match(
+        /(order_line_required|order_line_not_found|order_line_not_in_order|line_not_in_order|unit_not_found|unit_does_not_match_line|unit_not_available|quantity_row_not_bindable|line_already_covered|unit_no_longer_free|unit_not_reserved_here|unit_cannot_be_released|no_units_chosen|too_many_units|line_needs_sales_order_ref|line_needs_exact_unit)/,
+      )?.[1] ?? null;
+    const itemId = readyStockRefusedUnitId(error);
+    return c.json(
+      { ...(m.body as object), ...(code ? { code } : {}), ...(itemId ? { itemId } : {}) },
+      m.status,
+    );
+  }
+
+  return c.json(data as ReadyStockSaveResult);
 });
 
 export default soBatchReadyStockRouter;

@@ -1176,7 +1176,7 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
+**Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
 Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
@@ -1246,7 +1246,35 @@ widened with the optional mapping columns 2026-08-27, and with an optional `PO N
 `Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
 actually answer, and siblings that do not ask render byte-identically).
 
-**SO Batch approved listing and stock-selection UI — Jess, 2026-09-18 · APPROVED / NOT BUILT.**
+**SO Batch approved listing and stock-selection UI — Jess, 2026-09-18 · BUILT 2026-09-18 · authenticated production walk OWED.**
+
+**BUILD RECORD.** The approved composition below is implemented on the real
+Register, the shared `GoodsMiniTable` and the shared `ReadyStockTable`; no mock
+HTML or CSS was transplanted. The saved layout key moved to
+`carres.soBatchPurchase.register.v7` (the only key that moved). Migration
+`0545_a_ready_stock_choice_is_saved_whole_or_not_at_all` adds
+`so_batch_save_ready_units`, the replacement door `Save changes` presses: it
+gives back what the chosen set drops through `ops_stock_release`, then takes
+what it gains through the existing atomic `so_batch_reserve_ready_units`, inside
+ONE transaction. It decides nothing of its own (Architecture Law C), releases
+BEFORE it draws so a swap on a one-piece line is not refused as already covered,
+refuses to take back a `sold` Unit by name, and never rewinds the append-only
+pool ledger (0292). Proved as SQL against a real Postgres, plus the route,
+component and engine suites; the whole listing and picker were walked at
+1440 / 1180 / 820 / 390 and at 200% zoom on the real components. **OWED: the
+authenticated production walk, and the Worker/Pages SHA verification.**
+
+**MEASURED 🔴 FOUND ON THAT WALK, AND NOT THIS SLICE'S TO FIX.** At a 390px
+canvas the page scrolls sideways by 30px. The Register does not cause it — its
+grid scrolls inside its own box (client 374px, content 1709px) — and every
+overflowing element is inside the shared `ModuleHeader` destination row, where
+the 24px `SO Batch Purchase` word is `shrink-0` beside a fixed-width global icon
+cluster. It is identical on all eight Purchasing pages that draw that header and
+predates this change. The fix is a shell decision, not a purchasing one (let the
+destination word wrap to the 50px row, or drop the global cluster to a `…` below
+768px), so it is reported rather than taken: §6.7 rule 8's *no page scrolls
+sideways* is not met at 390px until the shell round takes it.
+
 
 The goods table is `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To`.
 No SKU, Ordered Qty, To buy, Order By or PO Safety Days column in this actionable expansion.
@@ -1383,9 +1411,19 @@ business. Selection is summarised once, in the toolbar, and never repeated at th
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
-**READY STOCK — reservation engine built; approved replacement UI above NOT BUILT.**
+**READY STOCK — reservation engine built; the approved replacement UI above BUILT 2026-09-18.**
 The item-cell disclosure and draft/edit/save journey above govern presentation. The following
-stock eligibility and transaction safeguards remain in force.
+stock eligibility and transaction safeguards remain in force, unchanged by it.
+
+- **THE READ CARRIES WHAT THE PICKER PRINTS.** `stock_unit_register_v.po_no` rides the wire as
+  the document reference, the receipt `date_in` as a DATE, and a Unit already committed to one of
+  this order's item lines rides back marked with the line it answers — so `Change selection` can
+  show and remove exactly what was saved even when free availability is zero. A Unit is named
+  once. `lineIds` answers *what is on the shelf for this item line* and `matchingLineIds` answers
+  *what may be committed now*: a covered line whose shelf is full must not read as an empty shelf.
+- **THE ITEM LINE IS STRUCTURAL, NOT TYPED.** The picker opens beneath ONE item row, so the
+  retired `For item line` dropdown is gone and the exact line id still reaches the door, which
+  still refuses to guess (0471).
 
 - **Reading it reserves nothing.** The read is lazy (opened rows only) and writes no row. Selecting
   a Unit still writes nothing. Only `Choose Ready Unit` writes, and its selection is entirely
