@@ -1960,22 +1960,6 @@ missing evidence does not prove no send — and it never claims anything about t
 have received, read or accepted nothing regardless of the mark. A sent mark is a person's statement
 of sending, never proof of receipt.
 
-**🟡 PRESENTATION PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** Three of the four
-group headings name what the document IS (`Waiting for goods from supplier` · `Completed` ·
-`Cancelled`); the fourth, `Confirm PO sent to supplier`, is an imperative. COPY's own law is
-**Action ≠ Status. They may never be mixed**, and the same file rules that no Register cell carries
-an action sentence — a group band is that same statement one level up. Read as an instruction, the
-band suggests the Register runs its own task queue beside Workspace, which it does not.
-**Recommendation:** the band reads the governed status word **`Sending not confirmed`**, which is
-already the cell word for exactly this state, so all four bands name a state and nothing is
-invented. The imperative `Confirm PO sent to supplier` stays alive where actions live — My Work,
-Team Work and the PO detail work card. The cell keeps its own line, because a collapsed group, a
-filtered view and an export must each stand alone. **Trade-off:** this changes an owner-approved
-2026-09-17 label, and the band then repeats the cell's words inside that one group.
-**Falsifier:** an operator walk where the status band leaves a person unsure that pressing
-`PO sent to supplier` is still the act, or where the repeated words read as two different facts.
-**Backend unchanged:** no send flow, evidence record, duty resolution or completion condition moves.
-
 **Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
 `Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
 (current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs once.
@@ -2019,27 +2003,43 @@ Use complete supplier-date labels outside the group context, including active-co
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion — ALIGNMENT PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** Read-only
-ordered goods, in the approved SO Batch / Manual Purchase grammar for the facts they share:
+**Expansion — the CONFIRMED shared goods composition, applied. Corrected 2026-09-18 after a
+planning round invented a third shape.** SO Batch (§9.1) and Manual Purchase (§9.2) draw ONE goods
+table:
 
 ```text
-Qty · Item · Supplier Deliver To
+☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To
 ```
 
-- **`SKU` leaves the table and stays searchable**, printing as the 11px second line inside `Item`
-  beside the recorded configuration — the same two-line identity the approved sibling pages use.
-- **No `Category` column, and the reason is measured.** `documentPartitionKey`
-  (`packages/shared/src/so-batch-purchase.ts:1088`) is
-  `supplier :: destination :: category :: (Source Order for one-PO-per-order categories)`, so every
-  line of one purchase order carries the SAME category. The column would print one repeated value
-  down the whole expansion.
-- **No `Status`, no checkbox, no `Ready Stock`.** A purchase order line has no independent buying
-  state — the document's state is its Register group and `PO Version`; a PO is never bought again,
-  so there is nothing to tick; and the shelf answers nothing about goods already ordered.
-- **No `Unit ID` here, although this page is where Unit IDs are born (§6.2, migration 0443).** One
-  row is one PO LINE, and a line of `Qty 3` carries three Units — printing them would return the
-  row-height defect §9.1 removed. The exact Units stay on the PO object's goods lines and on the
-  official PDF. Falsifier: an operator walk showing Unit IDs are needed before the PO is opened.
+Manual Purchase adds `PO No · PO Default Delivery Date` because one request can span several
+purchase orders. **Purchase Orders reuses that composition and changes only its business content.**
+A page does not get a new column order because a planner re-derived one; the owner set this shape
+across two pages and consistency is the point of it.
+
+**`Item` carries the SKU on its 11px second line beside the configuration, and SKU stays
+searchable** — that is the confirmed rule on both sibling pages, not a Purchase Orders idea.
+
+**No checkbox.** This is a genuine business difference, not a redesign: a purchase order is never
+bought again, the Register carries no batch action, and UI MASTER forbids inventing one on a
+read-only register.
+
+**⛔ THREE COLUMNS NEED AN OWNER DECISION BEFORE THIS PAGE IS BUILT — the planner may not settle
+them by deleting them.** On this page each would print the same value on every row of one document,
+because `documentPartitionKey` (`packages/shared/src/so-batch-purchase.ts:1088`) is
+`supplier :: destination :: category :: (Source Order for one-PO-per-order categories)`:
+
+| Column | What it would print here | The real choice |
+|---|---|---|
+| `Category` | one repeated value — the document's own category | keep it for one shared composition across the module, or drop it on this page only |
+| `Supplier` | one repeated value — the document's own supplier | same choice |
+| `Ready Stock` | the shelf, for goods that are already on order | keep, or drop on this page only — it answers a buying question and nothing here is bought |
+
+`Status` stays in the composition. Its per-line values must resolve to existing words in the build
+(`Completed` · `Waiting for goods from supplier` · `Sending not confirmed` for the document, and
+`Partly received` already exists on the rail); no new status word is admitted here.
+
+`PO No` and `PO Default Delivery Date` are NOT repeated per line on this page: they identify the
+document the operator already has open, unlike Manual Purchase where one request spans several.
 
 **⭐ THE PARENT DESTINATION MUST NOT PICK ONE OF SEVERAL — MEASURED DEFECT, 2026-09-18.**
 `purchase_order_lines.destination_id` is `Where THIS line goes` (migration `0311`; NULL means the
@@ -2062,10 +2062,11 @@ rail's destination facet matches a purchase order when ANY of its lines goes the
 production purchase order with two distinct line destinations whose parent already prints both
 truthfully today.
 
-**Footer:** `{n} Purchase Orders` / `{n} of {m} Purchase Orders` / `1 Purchase Order`; no quantity
-totals. **Corrected 2026-09-18:** the built footer prints lower-case `purchase orders` while its
-sibling listings print `27 Sales Orders` and `{n} Manual Purchases`. One listing family may not
-carry two casings for its own record noun.
+**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity
+totals — unchanged approved text. **🟡 OPEN QUESTION, not a correction (2026-09-18):** this footer
+is lower case while its sibling listings print `27 Sales Orders` and `{n} Manual Purchases`. A
+planning round changed it unilaterally and that change is withdrawn; whether the family uses one
+casing is the owner's to settle.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
