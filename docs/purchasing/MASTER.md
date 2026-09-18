@@ -1193,6 +1193,30 @@ pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
+**Goods expansion — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT (on the to-do list; no
+code yet).** One row per goods line, exactly in this order:
+
+```text
+☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To
+```
+
+- `To buy` and `Ordered Qty` leave the goods table, so it no longer shows three look-alike
+  quantities (`To buy` / `Ordered Qty` / PO qty). The quantity this purchase buys appears after
+  ticking — in the selection bar and the `Issue PO` preview — already net of the Ready Units chosen
+  and of quantities an existing PO covers, so nothing is bought twice. The duplicate-buy guard
+  (`isSelectableForOrder`) is unchanged.
+- `Ready Stock` cell: stock available → `▸ Ready Stock · {n}`; pressing it opens the choosable
+  Units directly under that goods line. No stock → `0`, no button. Reading or read failure → never
+  `0` (existing `Reading the stock register…` / `Ready Stock could not be read. Try again`).
+- In the opened list staff pick exact Units and confirm with the existing `Choose Ready Unit`; the
+  line then shows the chosen Unit IDs and the quantity used, for checking.
+- `Status` uses existing line words only (resolved against COPY in the build; no new status word).
+- Item: name, with its configuration as the 11px table second line; the tick sits vertically
+  centred with the quantity.
+- The shared goods-table look applies (§8.1): content width, same minimum row height, shared control
+  sizes (the `Split` control and the destination dropdown get the shared control size and touch
+  area), no box inside a box.
+
 - **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
   `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
   and in the expansion, and an operator could act on none of the three. **The derivation is
