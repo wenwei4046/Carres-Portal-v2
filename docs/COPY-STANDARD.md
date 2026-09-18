@@ -951,7 +951,7 @@ Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery D
 
 Groups: `Confirm PO sent to supplier` · `Waiting for goods from supplier` · `Completed` · `Cancelled`; membership and sorting are
 owned by Purchasing MASTER §9.3. No quantity totals in the PO listing footer.
-Expansion: `PO No / Unit ID · Qty · Item / configuration · Supplier Deliver To` (read-only; approved 2026-09-18). Exact IDs exist at official PO issue; quantity goods display `—`.
+Expansion: `Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items` (read-only; approved 2026-09-18). Exact IDs exist at official PO issue; quantity goods display `—`.
 
 | Rail group | Visible rows |
 |---|---|

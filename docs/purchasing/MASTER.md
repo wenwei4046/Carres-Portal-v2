@@ -1944,7 +1944,7 @@ No duplicate All purchase orders row, DOCUMENT group or action line. Preserve co
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
 **Expansion — APPROVED / NOT BUILT, owner confirmation 2026-09-18:** read-only ordered goods:
-`PO No / Unit ID · Qty · Item / configuration · Supplier Deliver To`. The first cell shows PO No on its first line and the associated Unit IDs beneath it. Exact-unit lines show actual
+`Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items`. The PO No / Unit ID cell shows PO No on its first line and the associated Unit IDs beneath it. Exact-unit lines show actual
 line-bound Unit IDs allocated at official PO issue (§6.2), one per line within the cell; counted
 lines show `—`. Missing required IDs is an integrity error, never invented or deferred to receipt.
 The parent remains one row per PO. Shared dimensions and sticky-header behaviour are owned by
