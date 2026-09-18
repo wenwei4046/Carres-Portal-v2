@@ -1925,8 +1925,56 @@ are implementation evidence, not dimensions for this expanded target; remeasure 
 - `Goods Received Date`: actual GRN receipt date/time. Multiple receipts show `{n} receipt dates`
   with access to each GRN, date/time and quantity; never pick a single date to represent all receipts.
 - `GRN No`: one link or `{n} GRNs`, preserving every receipt; blank when none.
+  **🟡 DRILL-DOWN PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** `{n} GRNs` is a
+  disclosure that opens the receipts directly beneath that purchase order's row — one row per
+  receipt, `Goods Received Date · GRN No · Received Qty` — using the same count-plus-disclosure
+  interaction the approved Ready Stock cell already uses. One purchase order therefore stays ONE
+  row, and no split receipt is hidden, summarised away or lost. The approved text above already
+  requires "access to each GRN, date/time and quantity"; this names the door. A single GRN keeps
+  its direct link into Receiving and opens nothing beneath.
+  **`Received Qty` here is the drill-down's fact, not a Register column** — the quantity words keep
+  their canonical home in PO detail and Receiving, and damaged, wrong or extra goods still never
+  reduce `Pending Delivery Qty`.
+  **ONE DOOR, NEVER TWO (Architecture Law C).** `{n} receipt dates` in the `Goods Received Date`
+  cell stays a plain FACT and does not become a second button onto the same list.
+  **Falsifier:** an operator walk where the receipts are wanted without leaving the row's own
+  context and the disclosure does not provide them.
 - `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` or `Sending not confirmed`
   for the current version. Earlier evidence stays in Revisions.
+
+**⭐ WHO OWNS THE SEND, AND WHAT `Sending not confirmed` MAY CLAIM — RESOLVED FROM AUTHORITY,
+re-confirmed 2026-09-18. No new mechanism, and none is wanted.** These words already exist in §5.6
+and COPY; this paragraph records the relationship the Register must not re-invent:
+
+```
+Workspace          assigns the person — PO Duty and its dated cover, through the shared resolver
+PoIssueEvidence    the ONE shared communication area: `PO sent to supplier` records which VERSION,
+                   the real actor, the recipient, the channel and the server time
+Purchase Orders    READS that same record. It writes no second confirmation and keeps no second
+                   owner list
+```
+
+**`Sending not confirmed` states one fact and no more: the system holds no send confirmation for
+THIS version.** It does not assert that the staff member did not send — §5.6 already rules that
+missing evidence does not prove no send — and it never claims anything about the supplier, who may
+have received, read or accepted nothing regardless of the mark. A sent mark is a person's statement
+of sending, never proof of receipt.
+
+**🟡 PRESENTATION PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** Three of the four
+group headings name what the document IS (`Waiting for goods from supplier` · `Completed` ·
+`Cancelled`); the fourth, `Confirm PO sent to supplier`, is an imperative. COPY's own law is
+**Action ≠ Status. They may never be mixed**, and the same file rules that no Register cell carries
+an action sentence — a group band is that same statement one level up. Read as an instruction, the
+band suggests the Register runs its own task queue beside Workspace, which it does not.
+**Recommendation:** the band reads the governed status word **`Sending not confirmed`**, which is
+already the cell word for exactly this state, so all four bands name a state and nothing is
+invented. The imperative `Confirm PO sent to supplier` stays alive where actions live — My Work,
+Team Work and the PO detail work card. The cell keeps its own line, because a collapsed group, a
+filtered view and an export must each stand alone. **Trade-off:** this changes an owner-approved
+2026-09-17 label, and the band then repeats the cell's words inside that one group.
+**Falsifier:** an operator walk where the status band leaves a person unsure that pressing
+`PO sent to supplier` is still the act, or where the repeated words read as two different facts.
+**Backend unchanged:** no send flow, evidence record, duty resolution or completion condition moves.
 
 **Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
 `Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
@@ -1935,6 +1983,34 @@ A failed/unknown quantity read is never zero or Completed; completed legacy POs 
 stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
 Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by confirmed supplier date, falling back to original PO date, ascending;
 Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
+
+**🔴 A RETIRED LABEL IS LIVE IN THE RAIL'S ACTIVE-CONDITION CHIP — MEASURED 2026-09-18.**
+`PurchaseOrdersPage.tsx:89` carries `chipLabel: "Supplier Delivery Date changed"`, and
+`Supplier Delivery Date` is named in COPY's own retired list for this exact fact; the governed word
+is `Supplier Confirmed Delivery Date`. **Fix:** the chip and the rail row both read
+`Supplier Confirmed Delivery Date changed`. This is a dictionary repair, not a new word.
+
+**🟡 RAIL WORDING PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** These rows are
+CONDITIONS THAT NARROW THE WHOLE REGISTER — they are not a column, not a display toggle and not a
+stock date. The short forms only read correctly under the `Supplier reply` heading, and a person
+arriving at a narrowed list sees the condition without its heading. **Recommendation:** the rail
+rows carry the complete dictionary names, which already exist in this file as the active-condition
+chip text:
+
+```text
+Supplier has not confirmed the PO date
+Supplier Confirmed Delivery Date changed
+Supplier delivery date passed
+```
+
+**These three conditions OVERLAP** — a date the supplier changed can also have passed — so their
+counts may exceed the group's purchase orders and **may never be added together or presented as a
+Register total**. The footer's single total remains the only count of purchase orders.
+**Trade-off, measured:** at the governed 240px rail each complete name wraps to two or three lines,
+so the section grows from three 36px rows to roughly three 48–66px rows. The rail law already
+requires a wrapped label to take its natural height and never be truncated or hidden behind a
+tooltip, so the cost is height, not legibility. **Falsifier:** an operator walk where the wrapped
+rail pushes `Receiving`, `Supplier` and `Supplier Deliver To` below the fold on a laptop.
 
 **Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
 `Date changed`, `Date passed`, using existing current-version sent/pending predicates.
