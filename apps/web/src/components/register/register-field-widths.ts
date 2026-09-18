@@ -14,7 +14,9 @@
  * The number is the WIDEST MEASURED requirement across the pages that show
  * the field — a field that fits on one page and clips on another is not one
  * field. Where UI MASTER §6.8 marks an entry `prototype` it has not been
- * measured yet, and a prototype that clips a governed value is WRONG:
+ * measured yet, and a prototype that clips a governed value is WRONG — fix
+ * the shared field definition, never squeeze the cell (Law 2: reality
+ * outranks the document).
  * Required numbers never truncate; content may wrap; user resizing stays.
  * Validate actual fonts, longest values, 200% zoom and 1440/1180/820/390
  * before production, and fix the shared definition when one fails.
@@ -22,6 +24,12 @@
  *
  * A page passes `REGISTER_FIELD_WIDTH.poNo`, never `168`. That is what makes
  * the next divergence a one-line change instead of an audit.
+ *
+ * THIS IS THE PARENT SCOPE ONLY. The goods table is the registry's SECOND
+ * scope, because the same fact carries different content there — a parent
+ * `Supplier Deliver To` cell holds one destination name, the child cell holds
+ * a destination list with counts. Those numbers live in `GoodsMiniTable`'s
+ * `CHILD_COLUMNS`, one implementation, and are not duplicated here.
  */
 export const REGISTER_FIELD_WIDTH = {
   /** Checkbox / disclosure gutter, each. */
