@@ -752,3 +752,43 @@ card silently re-cuts another's floor. **Closes when the six land in one owner-a
 
 **Falsifier:** a reading of `01-design-tokens.md` and UI MASTER §6.7–6.9 on a later `main` in which
 a listing build can answer all six from one file without choosing.
+
+## `evidence-has-an-uploader-and-no-reader` — ASK FOR A KIT COMPONENT, opened 2026-09-18
+
+**🔴 Carres uploads evidence through ONE shared component and reads it through none.** Measured on
+`origin/main` (source read; no production walk):
+
+| Half | State |
+|---|---|
+| **Upload** | 🟢 `apps/web/src/components/EvidenceUploadField.tsx` (263 lines) is the one field; `ArrivalEvidenceUploadField.tsx` (75) is a thin wrapper that imports it. It already renders each file's own preview and already tells a photo from a video — `<img>` for one, `<video>` for the other, with the file name as the accessible name |
+| **Reading saved evidence** | 🔴 **No component exists.** The governed viewer words are written and implemented NOWHERE: `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` · `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` return zero hits across `apps/web/src` and `packages/shared/src` |
+
+**The uploader's preview is not a reader.** Its `previewUrl` is `URL.createObjectURL(file)` — a
+local handle on a file being uploaded, alive only for that field's life. Nothing reads evidence
+back off a saved record through a shared surface.
+
+**At least six surfaces show saved evidence, each drawing its own:** Delivery proof (`delivery
+photo`, `Signed Delivery Order`, `Logistics confirmation`) · Receiving `Signed DO photo` ·
+Receiving `Arrival evidence` (photo AND video, APPEND-ONLY) · Supplier Claims problem photos ·
+Purchase Returns handover proof · Payment proof.
+
+**PROPOSAL / NOT LAW — one kit component, and this is the ask the Constitution requires.** A
+component that does not exist may not be drawn inline "just this once", so this is a request for
+`EvidenceStrip` (working name) to join the kit, not a page design. Its contract:
+
+| Rule | Why it is not optional |
+|---|---|
+| **Named by what it is a photo OF** | already the dictionary's rule (`Signed DO photo`). A flat pile of thumbnails loses which file answers which obligation, and Delivery's review depends on exactly that |
+| **A video is never drawn as a photo** | a still frame with no play affordance and no duration is a lie about what pressing it does. The uploader already splits them; the reader must too |
+| **Per-file failure, reported upward** | `Photo {n} of {total} could not be loaded`. Delivery's approved rule is that `Accept proof` is refused while ANY file in the latest package is unreadable, so the strip must report an unreadable file to its page rather than quietly showing one fewer |
+| **A missing file and an unread file are different** | the same law as every other absence on this portal: a failed read never renders as "no photo" |
+| **Keyboard is the governed path, not a nicety** | `← → change photo · Esc closes` is already approved copy |
+| **Read-only by default** | the uploader is a separate component and stays separate. A reader that grows a Remove button becomes a second writer (Architecture Law B) |
+| **Append-only where the record says so** | Receiving's arrival evidence is append-only; the component may never offer a control its record would refuse |
+
+**Trade-off:** one more kit component to own and test, and six surfaces to migrate — against six
+hand-rolled evidence displays that already disagree about failure, video and naming.
+**Falsifier:** a reading of `apps/web/src` that finds a shared saved-evidence reader already in
+use on two or more of those six surfaces — then this is a migration, not a new component.
+**Closes when** the owner accepts or refuses the component. If accepted, its contract moves into
+`docs/ui/MASTER.md` and this entry is deleted.
