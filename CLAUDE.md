@@ -77,6 +77,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
 | Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
+| Purchase Returns UI | `docs/purchasing/MASTER.md` §9.6 + `docs/COPY-STANDARD.md` | **APPROVED TARGET / NOT BUILT — 2026-09-18** | Read before editing: PR Doc Date / PR No; Category before PO No + Unit ID; Supplier Claims-style supplier rail; no Finance |
 | Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
 | Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
@@ -110,6 +111,13 @@ the evidence is strong enough AND its boundary is explicit: a Principle must be 
 Every Principle names the Findings it rests on; if one is overwritten it returns to review in
 the same change. **Principles guide research; they never replace research.** No Principle is
 permanent — it holds only until better evidence replaces it.
+
+**Owner confirmation handoff:** when the owner confirms a presented design, automatically
+synchronise the approved delta into the owning MASTER, applicable COPY/UI rules and authority
+index before reporting completion. Preserve unrelated edits. Distinguish UI approval from built
+or production-verified status, and report local vs committed/pushed/merged state accurately.
+A local edit does not notify other sessions; their shared authority is the synchronised repository.
+Do not require the owner to repeat “update the repo” after confirmation.
 
 ### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.

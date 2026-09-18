@@ -22,6 +22,12 @@
 
 # §1 · Overview
 
+**Purchase Returns rail — approved target, 2026-09-18:** reuse the Supplier Claims supplier-list
+pattern (heading icon, name + right-aligned document count, active state, click again to clear).
+Supplier filtering combines with operational conditions. Exact page fields and rail sections
+are governed by Purchasing MASTER §9.6; do not create a separate dropdown or page-specific
+geometry. This is UI approval, not a claim that production is built.
+
 ### MISSION
 Give every page ONE vocabulary, so an operator never re-learns a screen and a chat never invents
 a value.
