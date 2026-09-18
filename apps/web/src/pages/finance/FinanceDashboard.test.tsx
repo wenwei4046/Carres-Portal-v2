@@ -58,16 +58,16 @@ const GO_LIVE = "2026-09-10";
 
 function invoice(id: string, orderId: string, so: number, over: {
   kind?: InvoiceRegisterRow["kind"]; amount?: number; tax?: number; paid: number; lines: number; customer: string;
-  placedAt: string;
+  issuedAt: string;
 }): InvoiceRegisterRow {
   return {
     id, invoice_no: `INV-${id}`, status: "issued", kind: over.kind ?? "sales",
     amount: over.amount ?? over.lines, tax_amount: over.tax ?? 0,
-    issued_at: "2026-09-06", voided_at: null, void_reason: null, replaces_invoice_id: null,
+    issued_at: over.issuedAt, voided_at: null, void_reason: null, replaces_invoice_id: null,
     created_at: "2026-09-06T00:00:00Z", order_id: orderId,
     orders: {
       id: orderId, so, customer_name: over.customer, status: "proceed_order", paid: over.paid,
-      delivery_date: null, delivery_date_tbd: false, delivered_at: null, placed_at: over.placedAt,
+      delivery_date: null, delivery_date_tbd: false, delivered_at: null, placed_at: "2026-06-01T02:00:00Z",
       order_lines: [{ qty: 1, unit_price: over.lines }], order_addons: [],
       ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null, line_stock_status: null }],
       order_payments: [],
@@ -75,15 +75,16 @@ function invoice(id: string, orderId: string, so: number, over: {
   };
 }
 
-/* The aging edge, in Malaysia time: 16:00 UTC on 13 Sep is 00:00 on 14 Sep in Malaysia (30 days before
+/* Every order was placed on 1 Jun; the age counts from the invoice's issue day.
+   The aging edge, in Malaysia time: 16:00 UTC on 13 Sep is 00:00 on 14 Sep in Malaysia (30 days before
    today: 0-30), one second earlier is still 13 Sep (31 days: overdue). Read in UTC both would be 13 Sep. */
 const DAY_30 = "2026-09-13T16:00:00Z";
 const DAY_31 = "2026-09-13T15:59:59Z";
 const INVOICES: InvoiceRegisterRow[] = [
-  invoice("i1", "o1", 5101, { paid: 400, lines: 1000, customer: "Aria Tenggara", placedAt: DAY_31 }),
-  invoice("i1s", "o1", 5101, { kind: "storage", amount: 150, tax: 8, paid: 400, lines: 1000, customer: "Aria Tenggara", placedAt: DAY_31 }),
-  invoice("i2", "o2", 5102, { paid: 500, lines: 500, customer: "Bayu Kelana", placedAt: "2026-06-01T02:00:00Z" }),
-  invoice("i3", "o3", 5103, { paid: 0, lines: 2000, customer: "Cempaka Rahman", placedAt: DAY_30 }),
+  invoice("i1", "o1", 5101, { paid: 400, lines: 1000, customer: "Aria Tenggara", issuedAt: DAY_31 }),
+  invoice("i1s", "o1", 5101, { kind: "storage", amount: 150, tax: 8, paid: 400, lines: 1000, customer: "Aria Tenggara", issuedAt: DAY_31 }),
+  invoice("i2", "o2", 5102, { paid: 500, lines: 500, customer: "Bayu Kelana", issuedAt: "2026-06-01T02:00:00Z" }),
+  invoice("i3", "o3", 5103, { paid: 0, lines: 2000, customer: "Cempaka Rahman", issuedAt: DAY_30 }),
 ];
 
 function supplier(id: string, name: string, owing: string) {
@@ -338,8 +339,25 @@ describe("Finance Dashboard", () => {
     }
   });
 
-  it("an owing order with no placing date makes the aging unreadable, never 0-30", async () => {
-    api.routes[INV] = { rows: INVOICES.map((r) => ({ ...r, orders: { ...r.orders!, placed_at: null } })), total: INVOICES.length };
+  it("an owing order whose invoice is still a draft stays in Outstanding but has no age", async () => {
+    api.routes[INV] = {
+      rows: INVOICES.map((r) => (r.id === "i3"
+        ? { ...r, status: "draft" as const, invoice_no: null, issued_at: null } : r)),
+      total: INVOICES.length,
+    };
+    const dash = show(<FinanceDashboard />);
+    expect(await screen.findByTestId("dashboard-outstanding-amount")).toHaveTextContent("RM 2,758.00");
+    expect(screen.getByTestId("dashboard-overdue-amount")).toHaveTextContent("RM 758.00");
+    expect(screen.getByTestId("dashboard-aging-0-30-amount")).toHaveTextContent("RM 0.00 · 0 orders");
+    dash.unmount();
+
+    show(<FinanceAR />, "/finance/ar");
+    expect(await screen.findByTestId("ar-summary")).toHaveTextContent("2 orders · RM 2,758.00 outstanding");
+    expect(screen.getByText("Not issued yet")).toBeInTheDocument();
+  });
+
+  it("an issued invoice whose date cannot be read makes the aging unreadable, never 0-30", async () => {
+    api.routes[INV] = { rows: INVOICES.map((r) => ({ ...r, issued_at: "not a date" })), total: INVOICES.length };
     show(<FinanceDashboard />);
     expect(await screen.findByTestId("dashboard-outstanding-amount")).toHaveTextContent("RM 2,758.00");
     expect(within(screen.getByTestId("dashboard-overdue")).getByText("Could not load Invoices")).toBeInTheDocument();

@@ -100,12 +100,11 @@ describe("AR · Receivables", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-14T04:00:00Z")); // noon, 14 Oct, Malaysia
     try {
-      const placed = (row: InvoiceRegisterRow, at: string): InvoiceRegisterRow =>
-        ({ ...row, orders: { ...row.orders!, placed_at: at } });
+      const issued = (row: InvoiceRegisterRow, at: string): InvoiceRegisterRow => ({ ...row, issued_at: at });
       const rows = [
-        placed(invoice("a1", "a1", 6301, 0, 100, "Kenanga Ali"), "2026-08-30T04:00:00Z"), // 45 days
-        placed(invoice("a2", "a2", 6302, 0, 100, "Melur Hadi"), "2026-06-16T04:00:00Z"), // 120 days
-        placed(invoice("a3", "a3", 6303, 0, 100, "Nilam Omar"), "2026-10-05T04:00:00Z"), // 9 days
+        issued(invoice("a1", "a1", 6301, 0, 100, "Kenanga Ali"), "2026-08-30T04:00:00Z"), // 45 days
+        issued(invoice("a2", "a2", 6302, 0, 100, "Melur Hadi"), "2026-06-16T04:00:00Z"), // 120 days
+        issued(invoice("a3", "a3", 6303, 0, 100, "Nilam Omar"), "2026-10-05T04:00:00Z"), // 9 days
       ];
       api.routes[INV] = { rows, total: rows.length };
       show();
