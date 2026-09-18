@@ -2856,7 +2856,7 @@ Supplier               Reported | Supplier Claim No. | Supplier | Product | Vari
 PROBLEM                 one row per supplier claim; facts and evidence only
   observed types       footer: {N} Supplier Claims — no quantity total
 CLAIM STATUS
-  Open / Closed / Cancelled
+  In progress / Closed / Cancelled
 SUPPLIER RESPONSE
   Not recorded / actual recorded answer
 ```
@@ -2932,7 +2932,8 @@ Orders):*
 | Search and footer | Shared responsive search, condition bar and one `Clear filters` (grid `activeConditions`). Footer `{N} Supplier Claims` · `1 Supplier Claim` · filtered `{n} of {N} Supplier Claims`. No quantity total: `qty` is the reported quantity and held Units can be fewer or zero (`supplier-claims.ts` read), so it is not an independent Unit count |
 | Rail | `useFilterRailOpen` (starts hidden and overlays below 896px canvas); group state `carres.filterRail.<rail>.<group>`. Groups: Supplier · Problem · Claim status · Supplier Response |
 | States | Loading · `No Supplier Claims yet.` · `No Supplier Claims match these filters` · `Supplier Claims could not be loaded` + `Try again` inside the grid (toolbar stays) · no access · photo read failure `Photo {n} could not be loaded · Try again` — each distinct |
-| Row expansion | One job: short read-only problem/evidence inspector (problem and note, photo thumbnails, held Units, `Open Claim`). No editor. Selection is for export only |
+| Row expansion | **One job, PER UNIT (owner confirmation 2026-09-18).** The expansion lists the claim's held Units, one row each, with `PO No + Unit ID` in ONE cell — the document number on the first line, the Unit ID beneath it, the same identity pairing the sibling Purchasing pages use. Beside them sits the compact photo/video viewer. Read-only throughout: `Open Claim` is the one door out, there is no editor, and selection is for export only. The earlier per-claim "problem/evidence inspector" description is DELETED, not kept beside this one |
+| Evidence viewer | **Compact, in the expansion (owner confirmation 2026-09-18).** It states its count, tells a video from a photo, and names a file it could not read instead of showing one fewer. The governed words already exist and are not re-invented here: `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` · `Photo {n} of {total} could not be loaded` · `Try again`. It is read-only; uploading is a separate component and stays separate (Architecture Law B) |
 | Open and return | `Supplier Claim No.` opens the full-width object (`?claim=`, kept in the URL). The object has a visible back link to Supplier Claims and `‹ i of n ›`; the claim pack has a visible Close back to the object. Returning restores filters, scroll, row and focus on its Supplier Claim No. Esc is an extra shortcut, never the only way out. Object header follows Manual Purchase's pattern until the kit gains one shared object header |
 | Cross-links | PO No opens the Purchase Orders object (`?po=`); GRN No opens the Receiving record; Units open Stock |
 
