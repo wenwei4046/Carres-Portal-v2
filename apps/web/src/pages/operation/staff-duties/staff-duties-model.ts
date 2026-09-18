@@ -63,6 +63,11 @@ export function matchesDutySearch(duty: Duty, raw: string): boolean {
 /** The soonest cover starting after `today`, or null. Covers arrive newest
  *  first, so the soonest FUTURE one is the minimum, not the first row. */
 function nextScheduledCover(duty: Duty, today: string) {
+  /* When the API asked the resolver (S2-A), its answer is the only one: a
+     future cover it will not act through (a departed person's) is no news. */
+  if (duty.scheduled_cover_id !== undefined) {
+    return duty.covers.find((c) => c.id === duty.scheduled_cover_id) ?? null;
+  }
   return duty.covers
     .filter((c) => c.starts_on > today)
     .reduce<Duty["covers"][number] | null>(
@@ -74,7 +79,11 @@ function nextScheduledCover(duty: Duty, today: string) {
 /** The cover the resolver is ACTING through today — found only to print its
  *  end date. The resolver, not this row, decided that a cover is in force. */
 function coverInForce(duty: Duty, today: string) {
+  const byId = duty.resolution.cover_id
+    ? duty.covers.find((c) => c.id === duty.resolution.cover_id)
+    : undefined;
   return (
+    byId ??
     duty.covers.find(
       (c) =>
         c.acting_user_id === duty.resolution.acting_user_id &&
@@ -134,4 +143,58 @@ export function matchesDutyState(
 ): boolean {
   if (filter === "all") return true;
   return dutyDisplayState(duty, today).kind === filter;
+}
+
+/**
+ * The cover the selected detail describes (S2-A): the row the RESOLVER acts
+ * through today (`resolution.cover_id`), else the one it will act through when
+ * the next cover begins (`scheduled_cover_id`, asked of the resolver by the
+ * API). Never the first row whose dates happen to match.
+ */
+export function shownCoverOf(duty: Duty): Duty["covers"][number] | null {
+  const id = duty.resolution.cover_id ?? duty.scheduled_cover_id ?? null;
+  if (!id) return null;
+  return duty.covers.find((c) => c.id === id) ?? null;
+}
+
+/** The write-door refusal code the API returned (`body.code`), or `unknown`
+ *  for anything else — a network failure included. The error's own message
+ *  is never read: it may carry the database's English. */
+export function refusalCodeOf(error: unknown): string {
+  const body = (error as { body?: unknown } | null)?.body;
+  const code =
+    body && typeof body === "object" ? (body as { code?: unknown }).code : null;
+  return typeof code === "string" ? code : "unknown";
+}
+
+/**
+ * The governed §4.4.1 sentence for a refusal (workspace/MASTER.md). `name` is
+ * the person the manager chose in the open form. Every code the doors raise
+ * has a sentence; anything unrecognised is the unknown-failure sentence.
+ */
+export function dutyRefusalSentence(
+  act: "assign" | "cover",
+  error: unknown,
+  facts: { duty: string; name: string },
+): string {
+  const { duty, name } = facts;
+  switch (refusalCodeOf(error)) {
+    case "no_duty_holder":
+      return `${duty} has no normal holder for all these dates. Assign the holder first.`;
+    case "cover_overlap":
+      return `${duty} already has cover for these dates. Choose different dates.`;
+    case "cover_is_holder":
+      return `Choose another person to cover ${duty}.`;
+    case "invalid_cover":
+      return `${name} can no longer cover ${duty}. Choose another eligible staff member.`;
+    case "invalid_holder":
+    case "self_assignment_refused":
+      return `${name} cannot hold ${duty}. Choose an eligible active staff member.`;
+    case "invalid_dates":
+      return act === "assign" ? "Choose when this holder starts." : "Choose valid cover dates.";
+    case "not_duty_manager":
+      return "Duty assignments are set by the manager.";
+    default:
+      return `${duty} could not be updated. Try again.`;
+  }
 }

@@ -2,9 +2,10 @@ import { useState, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import AddCoverForm from "./AddCoverForm";
 import AssignHolderForm from "./AssignHolderForm";
-import { dutyDisplayState } from "./staff-duties-model";
+import { dutyDisplayState, shownCoverOf } from "./staff-duties-model";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+import { personInitials } from "@/lib/staff-avatar";
 import { qk, useOperationStaff } from "@/lib/queries";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 import type { OpsStaffListResponse } from "@carres/shared";
@@ -23,15 +24,6 @@ import type { OpsStaffListResponse } from "@carres/shared";
 
 type Duty = WorkspaceDutiesResponse["duties"][number];
 
-/** `Yu Jun` → `YJ`. One glyph pair, never a third letter. */
-export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  const first = words[0]![0] ?? "";
-  const last = words.length > 1 ? (words[words.length - 1]![0] ?? "") : "";
-  return `${first}${last}`.toLocaleUpperCase();
-}
-
 function Person({ name, testId }: { name: string; testId: string }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -41,7 +33,7 @@ function Person({ name, testId }: { name: string; testId: string }) {
         data-testid={testId}
         className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-kit-slate-3 text-label font-medium text-kit-slate-11"
       >
-        {initialsOf(name)}
+        {personInitials(name, "")}
       </span>
       <span className="text-body text-kit-slate-12">{name}</span>
     </span>
@@ -96,16 +88,9 @@ export default function DutyDetail({
   const staff = staffQ.data?.staff ?? [];
   const r = duty.resolution;
   const note = dutyDisplayState(duty, today);
-  /** The cover the detail describes: the one in force today, else the next
-   *  scheduled one. Both come from rows the server returned. */
-  const shownCover =
-    duty.covers.find(
-      (c) => c.starts_on <= today && c.ends_on >= today && r.is_cover,
-    ) ??
-    duty.covers
-      .filter((c) => c.starts_on > today)
-      .sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0] ??
-    null;
+  /** The cover the detail describes — the resolver's own row by id, today's
+   *  or the next scheduled one. Never the first row whose dates match. */
+  const shownCover = shownCoverOf(duty);
   /** The assignment that is in force — the newest one that has begun. */
   const activeAssignment =
     duty.assignments.find(
@@ -165,6 +150,9 @@ export default function DutyDetail({
             {shownCover ? (
               <>
                 <Fact label="Cover">
+                  <span className="block text-body text-kit-slate-12">
+                    {`${shownCover.acting_user_name ?? shownCover.acting_user_id} covering for ${shownCover.normal_user_name ?? shownCover.normal_user_id}`}
+                  </span>
                   <span className="text-body text-kit-slate-12">
                     {`${fmtDate(shownCover.starts_on)} – ${fmtDate(shownCover.ends_on)}`}
                   </span>

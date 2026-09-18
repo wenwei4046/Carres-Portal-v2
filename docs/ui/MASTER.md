@@ -550,11 +550,11 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 is the only way an operator can see what a supplier will read without printing it.
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
-               Purchase Return · Repair Order · Supplier Claim
-NEVER        Goods Receipt · Display Request · Manual Purchase
+               Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
+NEVER        Display Request · Manual Purchase
 ```
-Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
-half a screen on something no one outside will ever read.
+The GRN is an official A4 document the supplier and auditors read, so its object and Amend
+Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
 
 ### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
 Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
@@ -1477,10 +1477,26 @@ facts, permissions, complete-record populations or task ownership.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
    GRN Date is record creation; physical `Goods received on` remains in detail.
    DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
+   **Engine — BUILT 2026-09-17:** `DataGrid leadingColumns={{ date, identity }}` (opt-in) forces
+   the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
+   (disabled), the header `Hide column` / `Pin left` menu and drag, and pins both at a ≥768px
+   canvas, identity alone below it. It replaces `stickyIdentity` on the page that sets it.
+   **Adopted:** Sales Orders (layout key v5), SO Batch (v6), Manual Purchase (v6) — PR #1411,
+   merge `5b61f7fa`, live in production from `c6d8706e` (all five surfaces verified 2026-09-17
+   10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
+   round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
+   authenticated production walk of all four listings.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
-4. **Personal columns — APPROVED / NOT BUILT (Jess, 2026-09-17).** DataGrid provides an
+4. **Personal columns — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, PO pilot only.**
+   Engine: `DataGrid personalLayouts={{ layouts, limit, onSave, onSetDefault }}` (opt-in; the
+   page owns storage, the engine owns the shape `DataGridSavedLayout = order · hidden · widths ·
+   sort`). The seven actions sit above the column list in that order; `Save layout as…` asks for a
+   `Layout name`; the person's default applies once when their layouts arrive; `Reset columns`
+   also clears the header sort; `Best fit` sizes each visible column to its longest cell text and
+   its full header; `Collapse all` never closes an always-open group. Storage: migration 0528
+   (Purchasing MASTER §9.3). DataGrid provides an
    opt-in capability; only Purchase Orders enables the pilot, in its implementation round.
    Columns offers show/hide, `Save layout as…` (name), `Load layout`, `Set as my default`,
    `Reset columns`, `Best fit`, `Expand all` and `Collapse all`.
@@ -1505,23 +1521,68 @@ facts, permissions, complete-record populations or task ownership.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
+### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
+
+**Build record (SLICE 1, 2026-09-17).** Owner-approved Jess 2026-09-17. Shared `FilterRail` style C
+is the kit default (`workspace-rail.tsx`: required kit icon per group, collapse remembered per
+browser under `carres.filterRail.<rail>.<group>`, chosen value derived from the group's own rows
+or select, `resets` marks an `All …` row). `DataGrid` draws the slate listing surfaces on `.root`
+for every grid; `palette="slate"` now means only the ticked-row selection model. Body `--background`
+and `kit.canvas` are one token, #F7F8FA. `PurchasingRegister.module.css` (blue-grey theme) is
+deleted. Kit `FieldError` carries the 13px error voice with icon. Evidence: seeded before/after
+captures of 23 listings at 1440/390 with identical fixtures — page text changed only by approved
+words and heading casing; header 5.2:1, rail title 16.4:1, rail count 5.9:1; no page scroll at
+200% zoom; keyboard collapse/choose/clear verified. **SHIPPED:** PR #1426 → `8209ce8c`, deploy run
+35244605132 converged ERP/POS Pages + Worker on that SHA; the served bundle carries
+`--background: 220 23% 97.5%`, `carres.filterRail` and `Confirm PO sent to supplier`. Evidence branch
+`evidence/slice1-listing-readability`. **OWED:** signed-in production walk of the listings.
+Not changed (not listings, still carry blue-grey `#b9c9d8`): Sales Order detail palette trial
+(`sales-order-detail-theme.css`) and the Manual Purchase create header (`.mp-create-header`).
+
+This is the shared default for ALL Portal listings, not a PO visual pilot. It supersedes older
+listing typography, rail appearance and blue-grey surface prescriptions in this document.
+Personal saved layouts remain a separate PO-only capability; this ruling does not roll them out.
+
+- **Rail style C:** icon plus 13px/600 slate-12 normal-case text group titles, collapsible groups with remembered
+  expansion, 1px group dividers, selected value in blue at the right only when filtered; otherwise
+  leave that space empty. Icons supplement labels and come from the existing kit. Each group
+  remains single-choice; no new multi-select. Preserve each page's filter content and control type:
+  an existing dropdown remains a dropdown inside its group. Collapse does not clear a filter.
+- **Special rails:** Payment Monitor weekly plans and Warehouse schedule day lists use the same
+  heading, divider and text treatment; preserve their content, date meaning and behavior.
+  Sales Orders has no local filter rail; do not add one for visual consistency.
+- **Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11;
+  form/button helper 12px slate-11; input error/save failure 13px error color with text and icon;
+  cannot-act reason 13px dark grey or warning color according to meaning. Never use slate-9 for
+  meaningful text. No opacity reduction or italics for helper text. Critical states stay legible.
+- **Surfaces:** white toolbar, rail, table and footer; slate-3 header, slate-11 11px/600 normal
+  casing; 1px separators. One canvas token resolves to #F7F8FA. Retire blue-grey register themes
+  and #F3F4F6 body background; do not copy literal colors into page styles.
+- **Scope:** Sales Orders; SO Batch, Manual Purchase, Purchase Orders, Receiving, Supplier Claims;
+  Delivery Monitor and Delivery Orders; Warehouse Inbound, Inventory, Outbound; Payment Monitor,
+  Payment Records and every Finance listing. Other Portal listings follow this same contract.
+- **Verification:** inventory all listing routes and shared/legacy/custom rails. Capture each page
+  before and after at 1440/390; test long labels, keyboard expand/choose/clear, 200% zoom and actual
+  contrast. Active zero-count filters remain readable and removable; unknown is not zero.
+  Any unintended content/behavior change is a defect. This appearance rollout does not approve
+  Receiving's pending date-filter/workflow proposals or change business permissions and arithmetic.
+
 **Different jobs, shared interaction:** Sales Orders remains the complete customer-transaction
 register governed by Orders MASTER, not a purchasing work queue. SO Batch uses `To buy` /
 `No purchase needed`. Manual Purchase uses `Need approval` / `To buy` / `No purchase needed`.
-Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Not marked as sent`,
-`Issued`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
+Purchase Orders uses the approved groups in Purchasing MASTER §9.3: `Confirm PO sent to supplier`,
+`Waiting for goods from supplier`, `Completed`, `Cancelled`, classified cancelled → completed → marked with pending goods
 → unmarked. Receiving remains a formal GRN register, not a work queue.
 
-**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `Mark as sent`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
+**Pre-WhatsApp-API evidence:** an operator sends the PDF externally, then uses `PO sent to supplier`. Recorded sending is not proof of supplier receipt/read/acceptance. Absent confirmation is
 not proof that no external send happened. Completed legacy documents must not become resend work
 solely because a send record is absent. Purchasing MASTER owns the full send/version contract.
 
-**Adoption order — Jess, 2026-09-17:** merge this documentation PR → Sales Orders small patch
-(search totals, long-list keyboard navigation, two pinned columns and SO Date first) → Manual
-Purchase Round 2 (Proceed Date first) → Purchase Orders (nine columns, groups, sending marks and
-personal saved-layout pilot). Coordinate shared engine ownership. Account layouts roll out to
-other listings only after owner acceptance of the PO pilot. These rulings are APPROVED / NOT BUILT;
-record implementation, merge, deployment and rendered verification separately.
+**Adoption order — Jess, 2026-09-17:** merge the documentation update, then wait for PR #1419
+to merge, then open a fresh Claude task with the updated Slice 1 handoff. Slice 1 covers PO copy
+and Portal-wide readability, not a visual pilot. An open PR editing FilterRail, DataGrid or
+register CSS is a build stop: report the overlap before implementation. Personal saved-layout
+rollout remains subject to separate owner acceptance. Approval is not build/deployment evidence.
 
 
 **This section overwrites every conflicting composition rule in §6.4–§6.6.** Those sections remain
@@ -1781,4 +1842,4 @@ gone. `components/ConnectedSections` composes it into a stack of sections.
 | **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
 | **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
 | **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
-| **Layout memory** | Refused as a kit-wide default. Sales Orders preserves its existing role-scoped browser layout key by owner ruling; no other page inherits that exception. |
+| **Layout memory** | Refused as a kit-wide default. Browser layout keys stay per page. Server-side personal saved layouts exist only on Purchase Orders (§6.7 rule 4, BUILT 2026-09-17); rollout to other listings waits for owner acceptance of that pilot. |

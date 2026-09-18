@@ -266,7 +266,7 @@ function Absence({ children }: { children: ReactNode }) {
      in the `Unit ID` column's mono face reads like a unit somebody registered
      under that name. The column keeps mono for the codes it actually holds. */
   return (
-    <span className="font-sans text-kit-slate-9" data-absence="true">
+    <span className="font-sans text-kit-slate-11" data-absence="true">
       {children}
     </span>
   );
@@ -340,6 +340,8 @@ export default function GoodsMiniTable({
   showPoDeliveryDate = false,
   showPoNo = false,
   showUnitId = true,
+  showCategory = true,
+  itemHeading,
   onPoClick,
   onOpenPoDetails,
 }: {
@@ -414,6 +416,13 @@ export default function GoodsMiniTable({
    * MASTER rather than fake a read.
    */
   showUnitId?: boolean;
+  /**
+   * Purchase Orders (MASTER §9.3, Jess 2026-09-17) reads the ordered goods as
+   * exactly `SKU · Item / configuration · Qty · Deliver To`: it omits Category
+   * and names the item column for what it shows. Every other caller keeps both.
+   */
+  showCategory?: boolean;
+  itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
@@ -440,7 +449,7 @@ export default function GoodsMiniTable({
     deliverTo: { ...CHILD_COLUMNS[2] },
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
-    item: { ...CHILD_COLUMNS[5] },
+    item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -456,6 +465,7 @@ export default function GoodsMiniTable({
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     unit: showUnitId,
+    category: showCategory,
     supplier: showSupplier,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
@@ -726,7 +736,7 @@ export default function GoodsMiniTable({
 
 export function UnitEvidence({ ids, unverified, mismatch, singleLineCodes = false }: { ids: string[]; unverified: string[]; mismatch: boolean; singleLineCodes?: boolean }) {
   if (ids.length === 0 && unverified.length === 0 && mismatch) return <p className="text-meta text-kit-amber-11">Unit ID count exceeds order quantity</p>;
-  if (ids.length === 0 && unverified.length === 0) return <span data-absence="true" className="text-kit-slate-9">Not allocated</span>;
+  if (ids.length === 0 && unverified.length === 0) return <span data-absence="true" className="text-kit-slate-11">Not allocated</span>;
   if (ids.length === 1 && unverified.length === 0 && !mismatch) return <span className={singleLineCodes ? "block max-w-full overflow-x-auto whitespace-nowrap" : undefined} tabIndex={singleLineCodes ? 0 : undefined} title={singleLineCodes ? ids[0] : undefined}>{ids[0]}</span>;
   return <div>
     <Popover label="Unit ID" trigger={<Button size="sm" variant="ghost">Unit ID ({ids.length + unverified.length})</Button>}>

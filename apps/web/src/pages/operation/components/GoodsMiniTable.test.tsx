@@ -311,3 +311,31 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     expect(screen.queryByText("never printed")).not.toBeInTheDocument();
   });
 });
+
+/* Purchasing MASTER §9.3 (Jess, 2026-09-17): the Purchase Orders expansion is
+   exactly `SKU · Item / configuration · Qty · Deliver To`, read-only. */
+describe("the Purchase Orders reading", () => {
+  it("omits Category and Unit ID, names the item column, and offers no control", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on PO-20260901-1001"
+        lines={[goodsLine({ selectable: false, itemDetail: "Sand · CG-012" })]}
+        identityFirst
+        showUnitId={false}
+        showCategory={false}
+        itemHeading="Item / configuration"
+      />,
+    );
+    const table = screen.getByRole("table", { name: "Goods on PO-20260901-1001" });
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "SKU", "Item / configuration", "Qty", "Deliver To",
+    ]);
+    expect(within(table).queryAllByRole("checkbox")).toHaveLength(0);
+    expect(table).toHaveTextContent("Sand · CG-012");
+  });
+
+  it("every other caller keeps Category", () => {
+    render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
+    expect(within(screen.getByRole("table", { name: "Goods on SO-1303" })).getAllByRole("columnheader").map((h) => h.textContent)).toContain("Category");
+  });
+});

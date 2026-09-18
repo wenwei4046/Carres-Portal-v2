@@ -1175,10 +1175,10 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   });
 
   it("the group headings are the owner's words", () => {
-    expect(MONITOR_COPY.railWork).toBe("WORK TO DO");
-    expect(MONITOR_COPY.railState).toBe("STATE");
-    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS");
-    expect(MONITOR_COPY.railStatus).toBe("DELIVERY STATUS");
+    expect(MONITOR_COPY.railWork).toBe("Work to do");
+    expect(MONITOR_COPY.railState).toBe("State");
+    expect(MONITOR_COPY.railLogistics).toBe("Logistics");
+    expect(MONITOR_COPY.railStatus).toBe("Delivery status");
   });
 });
 

@@ -22,6 +22,7 @@ import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
 import { ExtensionAgreementTemplate } from "./extension-agreement-template";
 import { LoanNoteTemplate } from "./loan-note-template";
+import { OtherDebtorInvoiceTemplate } from "./other-debtor-invoice-template";
 import { RegisterListTemplate, type RegisterListTemplateData } from "./register-list-template";
 import { registerNotoSansSC } from "./fonts/noto";
 import type {
@@ -30,6 +31,7 @@ import type {
   GrnTemplateData,
   InvoiceTemplateData,
   LoanNoteTemplateData,
+  OtherDebtorInvoiceTemplateData,
   PoTemplateData,
   ReceiptTemplateData,
   SalesOrderTemplateData,
@@ -71,6 +73,11 @@ export function renderCombinedSalesOrderPdf(list: SalesOrderTemplateData[]): Pro
 
 export function renderInvoicePdf(data: InvoiceTemplateData): Promise<Blob> {
   return toBlob(InvoiceTemplate(data));
+}
+
+/** Other debtor invoice (ARI, 0478) — rendered on demand from the detail read. */
+export function renderOtherDebtorInvoicePdf(data: OtherDebtorInvoiceTemplateData): Promise<Blob> {
+  return toBlob(OtherDebtorInvoiceTemplate(data));
 }
 
 /** Balance job (0184) — payment receipt, one per ledger entry. Rendered

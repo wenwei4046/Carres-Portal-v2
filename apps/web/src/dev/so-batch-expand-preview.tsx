@@ -132,7 +132,7 @@ const PO_ROWS: PoDetailRow[] = [
   {
     key: "buy-1::PO-20260820-4827::U1-000-078",
     poNo: "PO-20260820-4827",
-    poStatus: "Issued",
+    poStatus: "Waiting for goods from supplier",
     unitId: "U1-000-078",
     unitAbsence: "Not allocated",
     association: "exact" as const,
@@ -166,7 +166,7 @@ const PO_ROWS: PoDetailRow[] = [
   ...FOURTEEN.map((poNo) => ({
     key: `buy-2::${poNo}::rest`,
     poNo,
-    poStatus: "Not sent to supplier",
+    poStatus: "Sending not confirmed",
     unitId: null,
     unitAbsence: "Not allocated",
     association: "exact" as const,

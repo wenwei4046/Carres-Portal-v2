@@ -106,7 +106,7 @@ const sel = (r: PurchaseDemandRow, allocations: DestinationAllocation[]): SoBatc
 });
 
 describe("the rail — latest Owner ruling 2026-08-30", () => {
-  it("puts REGION after SUPPLIER in the purchasing fact rail", () => {
+  it("puts Region after Supplier in the purchasing fact rail", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
@@ -123,7 +123,7 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
        and the section may not come back as a key. */
     expect(SO_BATCH_RAIL).not.toHaveProperty("toOrder");
     expect(JSON.stringify(SO_BATCH_RAIL)).not.toMatch(/not ordered/i);
-    expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
+    expect(SO_BATCH_RAIL.timing.heading).toBe("Order timing");
     expect(SO_BATCH_RAIL.timing.states).toEqual([
       "can_order_early",
       "safety_days_full",
@@ -131,7 +131,7 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "safety_days_none",
       "not_enough_production_time",
     ]);
-    expect(SO_BATCH_RAIL.product.heading).toBe("PRODUCT");
+    expect(SO_BATCH_RAIL.product.heading).toBe("Product");
     expect(SO_BATCH_RAIL.product.all).toBe("All products");
     /* The approved product filters, in the approved order — the CATALOG's
        categories, never SKU-text inference. */
@@ -140,11 +140,11 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       { category: "bedframe", word: "Bedframe" },
       { category: "sofa", word: "Sofa" },
     ]);
-    expect(SO_BATCH_RAIL.supplier.heading).toBe("SUPPLIER");
+    expect(SO_BATCH_RAIL.supplier.heading).toBe("Supplier");
     expect(SO_BATCH_RAIL.supplier.all).toBe("All suppliers");
-    expect(SO_BATCH_RAIL.region.heading).toBe("REGION");
+    expect(SO_BATCH_RAIL.region.heading).toBe("Region");
     expect(SO_BATCH_RAIL.region.all).toBe("All regions");
-    expect(SO_BATCH_RAIL.setup.heading).toBe("SETUP TO FIX");
+    expect(SO_BATCH_RAIL.setup.heading).toBe("Setup to fix");
     expect(SO_BATCH_RAIL.setup.states).toEqual(["no_production_days"]);
   });
 
@@ -423,7 +423,7 @@ describe("the rail model — unique-SO counts that cross-update between sections
    * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY.
    *
    * It is what makes the two scopes legible on screen: fourteen `Completed`
-   * documents and fourteen `Not sent to supplier` ones are opposite
+   * documents and fourteen `Sending not confirmed` ones are opposite
    * situations wearing the same `On PO 14`.
    */
   /**
@@ -494,9 +494,9 @@ describe("the rail model — unique-SO counts that cross-update between sections
       expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: false }))
         .toBe("Completed");
       expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: true }))
-        .toBe("Issued");
+        .toBe("Waiting for goods from supplier");
       expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: false }))
-        .toBe("Not sent to supplier");
+        .toBe("Sending not confirmed");
     });
 
     it("⛔ never says the raw word — COPY-STANDARD bans the bare word as a PO status", () => {

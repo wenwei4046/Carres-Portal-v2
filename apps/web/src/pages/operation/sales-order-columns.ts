@@ -13,7 +13,7 @@
  * through.
  *
  * THE DEFAULT ROW — re-ruled to EIGHT by the owner, 2026-08-15:
- *   ☐ ▸ SO No · Ordered · Requested Delivery Date · Customer · Delivery Location ·
+ *   ☐ ▸ SO Date · SO No · Requested Delivery Date · Customer · Delivery Location ·
  *   Showroom · PO No · DO No
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
@@ -243,14 +243,17 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
 
 /**
  * DEFAULT WIDTHS — Listing Standard 2026-09-16, measured on the rendered page:
- * each fixed fact column is its widest governed value + 16px padding (SO Date
- * `Wed, 00 May` 81.3px text in production Inter → 100; 96 cut `Wed, 19 A…`,
- * measured signed-in 2026-09-17 · Showroom `Sungai Buloh` 96 · PO No `2 Purchase Orders`
- * 149 · DO No `No delivery order yet` 143), and the header's sort + filter
- * controls are the floor. Customer and Delivery Location are the flexible text
- * columns: a cut value opens whole (engine `overflowText`). The eight defaults
- * plus the gutter render 1135px (each cell adds its 1px rule), inside the 1140px grid at a 1440 window, so
- * DO No is fully visible.
+ * each fixed fact column is its widest governed value + 16px padding, and the
+ * header's sort + filter controls are the floor. Re-measured 2026-09-17 for the
+ * date-first order, in the rendered portal shell at 1440 (Inter): SO Date
+ * `Wed, 28 May 25` (another year) 100.2px → 118; Requested Delivery Date's
+ * amber `No delivery date` 103px → 120; Showroom `Kota Damansara` (longest live
+ * outlet) 100.7px → 118; PO No `2 Purchase Orders` 149 → 152; DO No
+ * `No delivery order yet` 129.2px → 144. Customer (170) and Delivery Location
+ * (160, holds `Sungai Buloh, Selangor`) are the flexible text columns: a cut
+ * value opens whole (engine `overflowText`). The eight defaults plus the gutter
+ * render 1125px — the grid's client width at 1440 once a long list draws its
+ * vertical scrollbar — so DO No is fully visible and nothing scrolls sideways.
  *
  * THE CATALOG — the eight owner-ruled defaults in their order, everything else
  * hidden. Hidden columns are sized to their own longest live value plus the
@@ -258,24 +261,25 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
  * widen the sheet an operator did not ask to widen.
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
-  /* The eight owner-ruled defaults, in their governed order. */
-  { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
-    text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "SO Date", width: "100px", group: "Dates", on: true,
+  /* The eight owner-ruled defaults, in their governed order — date first, then
+     identity (ui MASTER §6.7 rule 2, Jess 2026-09-17). */
+  { key: "ordered", label: "SO Date", width: "118px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "customer_delivery", label: "Requested Delivery Date", width: "128px", group: "Dates", on: true,
+  { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
+    text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
+  { key: "customer_delivery", label: "Requested Delivery Date", width: "120px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "188px", group: "Customer", on: true,
+  { key: "customer", label: "Customer", width: "170px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "delivery_location", label: "Delivery Location", width: "172px", group: "Customer", on: true,
+  { key: "delivery_location", label: "Delivery Location", width: "160px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
   /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
      Sales-ownership fact the order already carries (`outlets.name`) — it is
      the same declaration that has always been in this catalog, promoted to a
      default. No new writer, no new query, no new fact. */
-  { key: "showroom", label: "Showroom", width: "100px", group: "Sales ownership", on: true,
+  { key: "showroom", label: "Showroom", width: "118px", group: "Sales ownership", on: true,
     text: (r) => showroomShort(r.o.outlets?.name) || NOT_RECORDED },
   { key: "po_number", label: "PO No", width: "152px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },

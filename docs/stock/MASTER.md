@@ -1,5 +1,11 @@
 # STOCK / WAREHOUSE — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, re-closed 2026-09-04.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.

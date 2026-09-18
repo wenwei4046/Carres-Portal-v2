@@ -33,7 +33,6 @@ import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
-import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import {
   filterWork,
@@ -190,9 +189,8 @@ export default function OperationWork() {
     };
   }, []);
 
-  const authEmail = useAuth((s) => s.user?.email ?? null);
-
-  const { items: allItems, generatedOn, unhealthySources, staff, staffById, loading, error, retry } = useOpenWorkSet();
+  // One identity, shared with the Right Rail (HF-3): the signed-in account id.
+  const { items: allItems, generatedOn, myUserId, unhealthySources, staffById, loading, error, retry } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -219,12 +217,6 @@ export default function OperationWork() {
     else next.set(key, value);
     return next;
   }, { replace: true });
-
-  const myUserId = useMemo(() => {
-    if (!authEmail) return null;
-    const me = staff.find((s) => s.email.toLowerCase() === authEmail.toLowerCase());
-    return me?.user_id ?? null;
-  }, [staff, authEmail]);
 
   /** My Work — only the signed-in person's actions. */
   const mineAll = useMemo(

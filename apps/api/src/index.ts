@@ -19,6 +19,7 @@ import operationStockRouter from "./routes/operation/stock";
 import operationOrdersFeedRouter from "./routes/operation/orders-feed";
 import operationSuppliersOverviewRouter from "./routes/operation/suppliers-overview";
 import operationBadgesRouter from "./routes/operation/badges";
+import registerLayoutsRouter from "./routes/operation/register-layouts";
 import operationDashboardRouter from "./routes/operation/dashboard";
 // `Jump to…` — the document half of the ONE global navigate-only command
 // surface (ui/MASTER, APPROVED / LOCKED 2026-08-11). Read-only, no create.
@@ -79,7 +80,6 @@ import partnerPickupsBatchRouter from "./routes/partner/pickups-batch";
 import partnerPodRouter from "./routes/partner/pod";
 import pickupEventsRouter from "./routes/pickup-events/print";
 import financePaymentsRouter from "./routes/finance/payments";
-import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
 import collectionOwnerRouter from "./routes/finance/collection-owner";
@@ -200,6 +200,8 @@ api.route("/account", accountRouter);
 // Guarantee packages (0261-0263) — terms config + the claim/track-back desk.
 api.route("/guarantees", guaranteesRouter);
 api.route("/operation/badges", operationBadgesRouter);
+// 0528 — personal saved column layouts (Purchase Orders pilot), own rows only.
+api.route("/operation/register-layouts", registerLayoutsRouter);
 api.route("/operation/dashboard", operationDashboardRouter);
 api.route("/operation/jump", jumpRouter);
 api.route("/operation/movements", operationMovementsRouter);
@@ -269,7 +271,6 @@ api.route("/partner/pickups", partnerPickupsBatchRouter);
 api.route("/partner/pod", partnerPodRouter);
 api.route("/pickup-events", pickupEventsRouter);
 api.route("/finance/payments", financePaymentsRouter);
-api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
 // 0489 — one Sales Order keeps one collection owner (owner ruling 2026-09-13).

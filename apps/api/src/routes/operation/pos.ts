@@ -208,7 +208,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   // presents them as line attribution. Manual Purchase lineage follows the
   // line's `demand_id` to its request header.
   const poSourcesByLine = new Map<string, Record<string, unknown>[]>();
-  const salesSourcesByPo = new Map<string, Array<{ kind: "sales_order"; reference: string }>>();
+  const salesSourcesByPo = new Map<string, Array<{ kind: "sales_order"; reference: string; order_id: string | null }>>();
   if (poIds.length > 0) {
     const sourceResult = await readEveryChunked<Record<string, unknown>, string>(
       poIds,
@@ -232,7 +232,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         const reference = `SO-${Number(source.so)}`;
         const current = salesSourcesByPo.get(poId) ?? [];
         if (!current.some((item) => item.reference === reference)) {
-          current.push({ kind: "sales_order", reference });
+          /* The order id makes one SO number a door to its Sales Order. */
+          current.push({ kind: "sales_order", reference, order_id: (source.order_id as string | null) ?? null });
           salesSourcesByPo.set(poId, current);
         }
       }
@@ -656,6 +657,33 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  /* GRN No (Purchasing MASTER §9.3, Jess 2026-09-17): the posted receipts of
+     each PO. A draft has no number and is not a GRN, so only numbered receipts
+     ride the list. Receiving owns them; the register only links. */
+  const grnsByPo = new Map<string, Array<{ id: string; grn_no: string }>>();
+  if (poIds.length > 0) {
+    const grnResult = await readEveryChunked<Record<string, unknown>, string>(
+      poIds,
+      (ids) => sb
+        .from("warehouse_receipts")
+        .select("id, po_id, grn_no, created_at")
+        .in("po_id", ids)
+        .not("grn_no", "is", null)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
+    );
+    if (grnResult.error) {
+      const m = mapPgError(grnResult.error);
+      return c.json(m.body, m.status);
+    }
+    for (const receipt of grnResult.data) {
+      const poId = receipt.po_id as string;
+      const current = grnsByPo.get(poId) ?? [];
+      current.push({ id: receipt.id as string, grn_no: receipt.grn_no as string });
+      grnsByPo.set(poId, current);
+    }
+  }
+
   const { data: tmplRow, error: tmplError } = await sb
     .from("purchasing_settings")
     .select("supplier_message_template")
@@ -707,6 +735,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       eta_revised: (arrivalDatesByPo.get(row.id as string)?.size ?? 0) > 1,
       promises: promisesByPo.get(row.id as string) ?? [],
       sends: sendsByPo.get(row.id as string) ?? [],
+      grns: grnsByPo.get(row.id as string) ?? [],
       purchase_order_lines: lines.map((l) => {
         const salesLineSources = poSourcesByLine.get(l.id as string) ?? [];
         const salesAllocated = salesLineSources.reduce(

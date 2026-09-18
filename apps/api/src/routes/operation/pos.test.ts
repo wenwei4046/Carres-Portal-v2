@@ -113,6 +113,7 @@ describe("GET /api/operation/pos", () => {
       demands?: Record<string, unknown>[];
       requests?: Record<string, unknown>[];
       sends?: Record<string, unknown>[];
+      grns?: Record<string, unknown>[];
       referencedDestinations?: Record<string, unknown>[];
       onPoLineRange?: (phase: "start" | "end") => void;
     } = {},
@@ -134,6 +135,7 @@ describe("GET /api/operation/pos", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const builder: any = {};
       builder.order = vi.fn(() => builder);
+      builder.not = vi.fn(() => builder);
       builder.range = vi.fn(async (from: number, to: number) => {
         onRange?.("start");
         if (onRange) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -188,6 +190,9 @@ describe("GET /api/operation/pos", () => {
     const demandIn = vi.fn(() => paged(lineage.demands ?? []));
     const demandSelect = vi.fn(() => ({ in: demandIn }));
     const requestIn = vi.fn(() => paged(lineage.requests ?? []));
+    const grnPaged = paged(lineage.grns ?? []);
+    const grnIn = vi.fn(() => grnPaged);
+    const grnSelect = vi.fn(() => ({ in: grnIn }));
     const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
@@ -202,13 +207,39 @@ describe("GET /api/operation/pos", () => {
         if (table === "purchase_requests") return { select: requestSelect };
         if (table === "purchasing_destinations") return { select: destSelect };
         if (table === "po_sends") return { select: sendsSelect };
+        if (table === "warehouse_receipts") return { select: grnSelect };
         if (table === "purchasing_settings") return { select: tmplSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range };
+    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range, grnSelect, grnNot: grnPaged.not };
   }
+
+  it("carries each PO's numbered GRNs and each SO source's order id (§9.3 GRN No · SO No)", async () => {
+    const { grnSelect, grnNot } = mockPosList([PO_ROW], [], [], [], {
+      poLineSources: [{ id: "s1", po_id: "PO-2030", po_line_id: "line-a", order_id: "order-4001", order_line_id: "ol-1", so: 4001, qty: 2 }],
+      grns: [
+        { id: "receipt-1", po_id: "PO-2030", grn_no: "GRN-20260910-1001", created_at: "2026-09-10T02:00:00Z" },
+        { id: "receipt-2", po_id: "PO-2030", grn_no: "GRN-20260912-1002", created_at: "2026-09-12T02:00:00Z" },
+      ],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ grns: unknown; sources: unknown }> };
+    expect(body.pos[0]?.grns).toEqual([
+      { id: "receipt-1", grn_no: "GRN-20260910-1001" },
+      { id: "receipt-2", grn_no: "GRN-20260912-1002" },
+    ]);
+    expect(body.pos[0]?.sources).toEqual([{ kind: "sales_order", reference: "SO-4001", order_id: "order-4001" }]);
+    expect(grnSelect).toHaveBeenCalledWith("id, po_id, grn_no, created_at");
+    // A draft receipt has no number and is not a GRN.
+    expect(grnNot).toHaveBeenCalledWith("grn_no", "is", null);
+  });
 
   it("returns POs for operation with default 'all' status", async () => {
     const { order, range } = mockPosList([PO_ROW]);
@@ -348,7 +379,7 @@ describe("GET /api/operation/pos", () => {
     /* Card 08 §3.5 — the visible reference is the LABEL; identity is the
        request UUID plus the business facts, never a request number. */
     expect(body.pos[0]?.sources).toEqual([
-      { kind: "sales_order", reference: "SO-4001" },
+      { kind: "sales_order", reference: "SO-4001", order_id: "order-1" },
       {
         kind: "manual_purchase",
         reference: "Manual Purchase",

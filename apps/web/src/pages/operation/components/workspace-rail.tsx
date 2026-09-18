@@ -10,8 +10,19 @@
  * navigation rail is a WORKSPACE shape rather than a general one. When the kit
  * grows one, this file is what it replaces.
  */
-import { useCallback, useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
-import Icon from "@/components/kit/Icon";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import Icon, { type IconName } from "@/components/kit/Icon";
 
 export function RailGroup({
   title,
@@ -23,7 +34,7 @@ export function RailGroup({
   return (
     <div>
       <div className="flex items-center px-1.5">
-        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">
           {title}
         </span>
       </div>
@@ -84,29 +95,60 @@ export function RailItem({
         {label}
       </span>
       {count != null && (
-        <span className="tabular-nums text-label text-kit-slate-9">{count}</span>
+        <span className="tabular-nums text-label text-kit-slate-11">{count}</span>
       )}
     </button>
   );
 }
 
 /**
- * ── THE READABLE FILTER RAIL — Card 02-C, owner ruling 2026-08-27 ────────────
- * (`docs/ui/MASTER.md` — LOCAL FILTER RAIL / READABLE SHELL).
+ * ── THE READABLE FILTER RAIL — style C, the Portal default ──────────────────
+ * (`docs/ui/MASTER.md` §6.7 Portal-wide listing readability, Jess 2026-09-17;
+ * geometry from Card 02-C, owner ruling 2026-08-27).
  *
- * The successor grammar to the 200px pair above: 240px wide · 12px outer
- * padding · 8px heading → first row · 20px between groups · 36px minimum row —
- * and a governed label is NEVER truncated: it wraps onto a second line in the
- * same body font at its natural height, count still visible and right-aligned.
- * The rail is navigation, not batch selection — no row here ever grows a
- * checkbox.
+ * 240px wide · 12px outer padding · a 1px divider between groups · 36px
+ * minimum row — and a governed label is NEVER truncated: it wraps onto a
+ * second line in the same body font at its natural height, count still
+ * visible and right-aligned. The rail is navigation, not batch selection — no
+ * row here ever grows a checkbox, and each group stays single-choice.
  *
- * SO Batch Purchase drew it first; Manual Purchase imports the same shell
- * since Card 03 (2026-08-28). Pages still on `RailGroup`/`RailItem` migrate
- * in their own cards, not as a side effect of this one — which is why the
- * legacy pair survives above instead of being reshaped underneath its other
- * governed pages.
+ * Every group heading is a button: kit icon + 13px/600 slate-12 normal-case
+ * title, the group's chosen value in blue at the right ONLY while that group
+ * is filtered (empty otherwise), and a chevron. Collapsing hides the group's
+ * controls but keeps them mounted, so a collapsed group never loses or clears
+ * its filter. The open/closed state is remembered per browser, per rail, per
+ * group.
  */
+type RailContextValue = { railKey: string | null };
+const RailContext = createContext<RailContextValue>({ railKey: null });
+
+type GroupContextValue = { report: (id: string, label: string | null) => void };
+const GroupContext = createContext<GroupContextValue | null>(null);
+
+function railStorageKey(railKey: string | null, groupKey: string): string | null {
+  return railKey ? `carres.filterRail.${railKey}.${groupKey}` : null;
+}
+
+function readGroupOpen(key: string | null): boolean {
+  if (!key) return true;
+  try {
+    return localStorage.getItem(key) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/** Reports a control's chosen label to its group heading while it is chosen. */
+function useReportChosen(label: string | null) {
+  const group = useContext(GroupContext);
+  const id = useId();
+  useEffect(() => {
+    if (!group) return;
+    group.report(id, label);
+    return () => group.report(id, null);
+  }, [group, id, label]);
+}
+
 export function FilterRail({
   children,
   testId,
@@ -116,6 +158,7 @@ export function FilterRail({
   ariaLabel,
 }: {
   children: ReactNode;
+  /** Also names the rail for remembered group open/closed state. */
   testId?: string;
   className?: string;
   ariaLabel?: string;
@@ -125,88 +168,145 @@ export function FilterRail({
    * corrections landed the same day and share this one slot): a FIXED region
    * above the scrolling filter groups — the rail's month calendar lives
    * here. It never scrolls away; the groups below scroll independently.
-   * Absent = the rail renders byte-identically to before (one scroll area,
-   * nothing added). The two regions carry `{testId}-fixed` / `{testId}-scroll`
-   * so a page can assert the independence.
+   * The two regions carry `{testId}-fixed` / `{testId}-scroll` so a page can
+   * assert the independence.
    */
   header?: ReactNode;
 }) {
+  const ctx = useMemo(() => ({ railKey: testId ?? null }), [testId]);
+  const hide = onHide && (
+    <button
+      type="button"
+      onClick={onHide}
+      aria-label="Hide filters"
+      title="Hide filters"
+      className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+    >
+      <Icon name="panelToggle" panelOpen />
+    </button>
+  );
   if (header) {
     return (
-      <aside
-        data-testid={testId}
-        aria-label={ariaLabel}
-        className={`relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white ${className ?? ""}`}
-      >
-        {onHide && (
-          <button
-            type="button"
-            onClick={onHide}
-            aria-label="Hide filters"
-            title="Hide filters"
-            className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      <RailContext.Provider value={ctx}>
+        <aside
+          data-testid={testId}
+          aria-label={ariaLabel}
+          className={`relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white ${className ?? ""}`}
+        >
+          {hide}
+          <div
+            className="shrink-0 border-b border-kit-slate-5 p-3"
+            data-testid={testId ? `${testId}-fixed` : undefined}
           >
-            <Icon name="panelToggle" panelOpen />
-          </button>
-        )}
-        <div
-          className="shrink-0 border-b border-kit-slate-5 p-3"
-          data-testid={testId ? `${testId}-fixed` : undefined}
-        >
-          {header}
-        </div>
-        <div
-          className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
-          data-testid={testId ? `${testId}-scroll` : undefined}
-        >
-          {children}
-        </div>
-      </aside>
+            {header}
+          </div>
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3"
+            data-testid={testId ? `${testId}-scroll` : undefined}
+          >
+            {children}
+          </div>
+        </aside>
+      </RailContext.Provider>
     );
   }
   return (
-    <aside
-      data-testid={testId}
-      aria-label={ariaLabel}
-      /* The collapse toggle sits `top-2`, absolutely positioned over the
-         first heading — unaffected by padding, so it stays put while a
-         touch more top padding gives the first group's own row room to
-         clear it (Jess, 2026-09-09: "terlalu rapat" between the two). Only
-         when the toggle exists; without it there is nothing to clear. */
-      className={`relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white ${onHide ? "px-3 pb-3 pt-4" : "p-3"} ${className ?? ""}`}
-    >
-      {onHide && (
-        <button
-          type="button"
-          onClick={onHide}
-          aria-label="Hide filters"
-          title="Hide filters"
-          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-        >
-          <Icon name="panelToggle" panelOpen />
-        </button>
-      )}
-      {children}
-    </aside>
+    <RailContext.Provider value={ctx}>
+      <aside
+        data-testid={testId}
+        aria-label={ariaLabel}
+        /* The collapse toggle sits `top-2`, absolutely positioned beside the
+           first heading; the first heading leaves it room on the right. */
+        className={`relative flex w-[240px] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-kit-slate-5 bg-white px-3 pb-3 ${onHide ? "pt-1 [&>div:first-of-type>button]:pr-9" : ""} ${className ?? ""}`}
+      >
+        {hide}
+        {children}
+      </aside>
+    </RailContext.Provider>
   );
 }
 
+/**
+ * One collapsible rail group. `icon` is required: the icon supplements the
+ * title, it never replaces it. `chosen` is normally derived from the
+ * group's own rows/select; pass it only for a page-local control that is not
+ * a `FilterRailRow`/`FilterRailSelect` (`null` = not filtered).
+ */
 export function FilterRailGroup({
   title,
+  icon,
   children,
+  chosen,
+  groupKey,
 }: {
   title: string;
+  icon: IconName;
   children: ReactNode;
+  chosen?: string | null;
+  /** Stable storage name when the title is not (defaults to the title). */
+  groupKey?: string;
 }) {
+  const { railKey } = useContext(RailContext);
+  const storageKey = railStorageKey(railKey, groupKey ?? title);
+  const [open, setOpenState] = useState(() => readGroupOpen(storageKey));
+  const [reported, setReported] = useState<ReadonlyArray<readonly [string, string]>>([]);
+  const report = useCallback((id: string, label: string | null) => {
+    setReported((prev) => {
+      const rest = prev.filter(([k]) => k !== id);
+      if (label == null) return rest.length === prev.length ? prev : rest;
+      const same = prev.find(([k, v]) => k === id && v === label);
+      return same ? prev : [...rest, [id, label] as const];
+    });
+  }, []);
+  const groupCtx = useMemo(() => ({ report }), [report]);
+  const shown = chosen !== undefined ? chosen : (reported[0]?.[1] ?? null);
+  const bodyId = useId();
+  const toggle = () => {
+    const next = !open;
+    setOpenState(next);
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, next ? "1" : "0");
+    } catch {
+      // Storage may be unavailable in a locked-down browser.
+    }
+  };
   return (
-    <div>
-      <div className="flex items-center px-1.5">
-        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+    <div
+      className="border-t border-kit-slate-5 py-2 first-of-type:border-t-0"
+      data-rail-group={groupKey ?? title}
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        className="flex min-h-[36px] w-full items-center gap-2 rounded-control px-1.5 text-left hover:bg-kit-slate-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9"
+      >
+        <span className="shrink-0 text-kit-slate-11">
+          <Icon name={icon} />
+        </span>
+        <span className="min-w-0 flex-1 break-words text-body font-semibold text-kit-slate-12">
           {title}
         </span>
-      </div>
-      {/* 8px heading → first row (Card 02-C §9). */}
-      <div className="mt-2 flex flex-col gap-0.5">{children}</div>
+        {shown != null && (
+          <span
+            className="min-w-0 max-w-[45%] truncate text-body font-semibold text-kit-blue-11"
+            title={shown}
+            data-testid="rail-group-chosen"
+          >
+            {shown}
+          </span>
+        )}
+        <span className="shrink-0 text-kit-slate-11">
+          <Icon name={open ? "collapse" : "expand"} />
+        </span>
+      </button>
+      <GroupContext.Provider value={groupCtx}>
+        <div id={bodyId} hidden={!open} className="mt-1 flex flex-col gap-0.5">
+          {children}
+        </div>
+      </GroupContext.Provider>
     </div>
   );
 }
@@ -219,17 +319,22 @@ export function FilterRailRow({
   onClick,
   title,
   testId,
+  resets = false,
 }: {
   label: string;
   supportingText?: string;
-  /** Omitted renders no number (the section's `All …` rows). A live count is
-   *  passed as-is — the fixed rows print zero rather than hiding it. */
+  /** Omitted renders no number. A live count is passed as-is — the fixed rows
+   *  print zero rather than hiding it. */
   count?: number;
   active: boolean;
   onClick: () => void;
   title?: string;
   testId: string;
+  /** The group's `All …` row: choosing it means the group is NOT filtered, so
+   *  the heading shows no chosen value. */
+  resets?: boolean;
 }) {
+  useReportChosen(active && !resets ? label : null);
   return (
     <button
       type="button"
@@ -241,10 +346,8 @@ export function FilterRailRow({
         /* 36px minimum: 18px text-body line + 9px above and below. A wrapped
            label simply adds its second 18px line — natural height, same font,
            never a tooltip. `items-start` keeps the count on the first line. */
-        "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
-        active
-          ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-          : "text-kit-slate-11 hover:bg-kit-slate-3",
+        "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
+        active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3",
       ].join(" ")}
     >
       {active && (
@@ -256,11 +359,11 @@ export function FilterRailRow({
       <span className="min-w-0 flex-1 break-words">
         {label}
         {supportingText && (
-          <span className="block text-label font-normal leading-4 text-kit-slate-9">{supportingText}</span>
+          <span className="block text-meta font-normal text-kit-slate-11">{supportingText}</span>
         )}
       </span>
       {count != null && (
-        <span className="shrink-0 tabular-nums text-label leading-[18px] text-kit-slate-9">
+        <span className="shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11">
           {count}
         </span>
       )}
@@ -315,6 +418,7 @@ export function FilterRailSelect({
   allLabel: string;
 }) {
   const active = value != null;
+  useReportChosen(active ? (options.find((o) => o.value === value)?.label ?? null) : null);
   return (
     <div className="relative">
       {active && (
@@ -335,7 +439,7 @@ export function FilterRailSelect({
           "min-h-[36px] w-full rounded-control border px-2 py-[9px] text-body",
           active
             ? "border-kit-blue-9 bg-kit-blue-3 font-semibold text-kit-slate-12"
-            : "border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3",
+            : "border-kit-slate-6 bg-white text-kit-slate-12 hover:bg-kit-slate-3",
         ].join(" ")}
       >
         <option value="">{allLabel}</option>

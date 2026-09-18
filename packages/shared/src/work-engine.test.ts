@@ -110,7 +110,7 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
     expect(item.dueIso).toBe("2026-08-18"); // the delivery day itself
   });
 
-  it("the Delivery Duty holder from Workspace owns the loan collection — cover and all", () => {
+  it("an order with no responsible person falls to the Delivery Duty holder — cover and all (owner ruling 2026-09-17)", () => {
     const items = workItemsForOrder(
       [],
       {
@@ -134,7 +134,7 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
       HOLS,
     );
     const item = items.find((i) => i.ruleKey === "collect_loan_item")!;
-    expect(item.ownerRule).toBe("delivery_duty");
+    expect(item.ownerRule).toBe("responsible_operation");
     expect(item.normalOwner?.name).toBe("Li Ching");
     expect(item.ownerName).toBe("Yu Jun");
     expect(item.ownerUserId).toBe("u-cover");
@@ -150,7 +150,7 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
       HOLS,
     );
     const review = items.find((item) => item.ruleKey === "check_delivery_proof");
-    expect(review).toMatchObject({ module: "delivery", ownerRule: "delivery_duty", ownerDuty: "Delivery Duty" });
+    expect(review).toMatchObject({ module: "delivery", ownerRule: "responsible_operation", ownerDuty: "Delivery Duty" });
     expect(review?.dueIso).toBe("2026-08-21");
     expect(review?.action).toBe("Check delivery proof");
     expect(
@@ -214,12 +214,13 @@ describe("WORK_RULES — five parts, or no entry", () => {
     expect(byKey.get("ask_delivery_date")!.ownerRule).toBe("salesperson");
     expect(byKey.get("collect")!.ownerRule).toBe("collection_owner");
     expect(byKey.get("issue_delivery_order")!.ownerRule).toBe("system");
-    expect(byKey.get("collect_loan_item")!.ownerRule).toBe("delivery_duty");
+    expect(byKey.get("collect_loan_item")!.ownerRule).toBe("responsible_operation");
     expect(byKey.get("resolve_payment_exception")!.ownerRule).toBe("finance_duty");
-    // Delivery MASTER §13.1 (2026-09-13): every routine Delivery action is
-    // Delivery Duty's — the PIC no longer proxies the arrangement.
-    for (const key of ["assign_logistics", "confirm_delivery_date", "deliver_today", "upload_delivery_photo"]) {
-      expect(byKey.get(key)!.ownerRule).toBe("delivery_duty");
+    // Owner ruling 2026-09-17 (overriding 2026-09-13): every routine Delivery
+    // action is the order's responsible Operation person's; Delivery Duty is
+    // only the no-PIC fallback.
+    for (const key of ["assign_logistics", "confirm_delivery_date", "deliver_today", "upload_delivery_photo", "check_delivery_proof"]) {
+      expect(byKey.get(key)!.ownerRule).toBe("responsible_operation");
     }
   });
 

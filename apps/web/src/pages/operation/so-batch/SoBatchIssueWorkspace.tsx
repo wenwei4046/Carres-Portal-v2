@@ -44,7 +44,7 @@ import PoIssueEvidence, {
  * ── LEAVING IS SAFE, AND DELIBERATELY SO ────────────────────────────────────
  *
  * A numbered purchase order is never deleted by walking away. It waits in
- * Purchase Orders as `Not sent to supplier`, and SO Batch does not offer the
+ * Purchase Orders under `Confirm PO sent to supplier`, and SO Batch does not offer the
  * same remainder again because the open PO now covers it (§5.2).
  */
 export interface SoBatchIssueWorkspaceProps {

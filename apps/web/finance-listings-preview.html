@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>Finance listings preview — DEV ONLY</title>
+  </head>
+  <body>
+    <!-- DEV ONLY. `vite build` emits index.html's graph only, so this entry cannot
+         reach production. It mounts the REAL FinanceApp shell on the listing
+         named by ?page= with a seeded payload. -->
+    <div id="root"></div>
+    <script type="module" src="/src/dev/finance-listings-preview.tsx"></script>
+  </body>
+</html>

@@ -103,7 +103,8 @@ import GoodsMiniTable, {
    one. The key is the only thing that retires a saved layout. */
 /* v5 — owner ruling R3 2026-09-16 moved Supplier beside Customer. Only THIS
    register's saved layout is retired; no other page's key moves. */
-const STORAGE_KEY = "carres.soBatchPurchase.register.v5";
+/* v6 — date-first ruling (Jess 2026-09-17): Proceed Date · SO No lead and pin. */
+const STORAGE_KEY = "carres.soBatchPurchase.register.v6";
 /* R7 widths, MEASURED 2026-09-16 in the rendered portal (Inter, real header
    chrome): a column's default width is its content (cell padding 16 + rule 1 +
    the longest governed value — a cross-year date is 99px, `No delivery date
@@ -595,7 +596,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(
     () => [
       {
-        /* THE IDENTITY — explicitly sticky, so horizontal scrolling never
+        /* THE RECORD DATE leads (ui MASTER §6.7 rule 2, Jess 2026-09-17): the
+           actual hand-off to Operations, `orders.proceeded_at`. */
+        key: "proceededAt",
+        label: W.colProceedDate,
+        width: 120, minWidth: 118,
+        sortable: true,
+        chooserGroup: "Order",
+        accessor: (o) => (
+          <span data-testid={`so-batch-proceed-${o.orderId}`}>
+            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
+          </span>
+        ),
+        dateValue: (o) => o.proceededAt,
+        filterType: "date",
+        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
+        exportValue: (o) => o.proceededAt ?? "",
+      },
+      {
+        /* THE IDENTITY — pinned with the date, so horizontal scrolling never
            loses WHICH record a row is (Card §9). */
         key: "soNo",
         label: W.colSoNo,
@@ -689,22 +708,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName ?? "")].join(" "),
         filterValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
         exportValue: (o) => summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`) ?? "",
-      },
-      {
-        key: "proceededAt",
-        label: W.colProceedDate,
-        width: 120, minWidth: 118,
-        sortable: true,
-        chooserGroup: "Order",
-        accessor: (o) => (
-          <span data-testid={`so-batch-proceed-${o.orderId}`}>
-            {o.proceededAt ? fmtDate(o.proceededAt) : <Absent>Not recorded</Absent>}
-          </span>
-        ),
-        dateValue: (o) => o.proceededAt,
-        filterType: "date",
-        sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
-        exportValue: (o) => o.proceededAt ?? "",
       },
       {
         key: "requestedDelivery",
@@ -933,7 +936,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               `ORDER TIMING`, the section that answers what to buy today. The
               outstanding arithmetic behind it is untouched and still governs
               the tick and the Ready Stock door. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.timing.heading} icon="date">
             {SO_BATCH_RAIL.timing.states.map((s) => (
               <FilterRailRow
                 key={s}
@@ -955,7 +958,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               rows wrote, so `All …` still clears only its own section and
               sections still combine with AND. The counts ride in the option
               text; `TO ORDER` and `ORDER TIMING` keep their visible rows. */}
-          <FilterRailGroup title={SO_BATCH_RAIL.product.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.product.heading} icon="goods">
             {/* The CATALOG's categories, never SKU-text inference. `All
                 products` is the section's clear — and where the uncommon
                 categories live. */}
@@ -977,7 +980,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading} icon="supplier">
             {/* Actual names from the Register's own supplier projection —
                 dynamic, alphabetical, never hardcoded. A name with no match
                 under the other filters drops off; the SELECTED name stays,
@@ -995,7 +998,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               onChange={(supplier) => setFilter((prev) => ({ ...prev, supplier }))}
             />
           </FilterRailGroup>
-          <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
+          <FilterRailGroup title={SO_BATCH_RAIL.region.heading} icon="delivery">
             {/* ⭐ REGION JOINS PRODUCT AND SUPPLIER (owner correction
                 2026-09-11). It is the third FACT list on this rail and it grows
                 with the business — every outstation state Carres delivers to
@@ -1020,7 +1023,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
           {/* The one Purchasing-owned setup exception, and only while it
               exists — an empty exception section is noise wearing a heading. */}
           {rail.setupExists && (
-            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading}>
+            <FilterRailGroup title={SO_BATCH_RAIL.setup.heading} icon="settings">
               {SO_BATCH_RAIL.setup.states.map((s) => (
                 <FilterRailRow
                   key={s}
@@ -1126,7 +1129,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
                 groupOf: (o) => orderByFacts.get(o.orderId)!.group,
                 revealMatches: Object.values(filter).some((value) => value != null && value !== false),
               }}
-              stickyIdentity={{ columnKey: "soNo" }}
+              leadingColumns={{ date: "proceededAt", identity: "soNo" }}
               chooserGroupOrder={["Order", "Documents", "Buying"]}
               onRowDoubleClick={openOrder}
               contextMenu={rowMenu}

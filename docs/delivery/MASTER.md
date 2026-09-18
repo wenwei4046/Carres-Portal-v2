@@ -1,8 +1,14 @@
 # DELIVERY — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > **The only Delivery authority.** Overwrite it when re-ruled; Git is the archive.
-> **Owner-approved complete Blueprint, 2026-09-13**, closing the 2026-09-12 to 09-13 owner
-> corrections on the 2026-08-14 Blueprint. Sections 1 to 15 are the one current operating model.
+> **Owner-approved complete Blueprint, updated 2026-09-17**, including the ruling that routine
+> Delivery work follows the Sales Order PIC. Sections 1 to 15 are the one current operating model.
 > Section 16 is the production closure record of what has shipped; where an entry there quotes a
 > word this MASTER has since retired, the entry is historical evidence of that day's build, never a
 > second truth. Current implementation may lag this target; existing code, old Cards or legacy write
@@ -1424,20 +1430,20 @@ appears in any line. The row's status word carries the fact.
 
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|
-| no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | `delivery_duty` | partner recorded |
-| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Confirm the delivery date` | `delivery_duty` | day and window recorded |
-| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Confirm the delivery date` | `delivery_duty` | day and window recorded |
-| day agreed, no window | `Call NETS` | `Confirm the delivery time` | `delivery_duty` | window recorded |
-| new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | `delivery_duty` | contact record with proof |
-| collected, no ETA | `Ask NETS` | `Record the delivery ETA` | `delivery_duty` | ETA recorded |
-| confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | `delivery_duty` | attempt recorded |
-| confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | `delivery_duty` | attempt recorded |
-| delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | `delivery_duty` | photo on the ledger |
-| delivered, signed DO missing | `Upload the signed Delivery Order` | `Attach the paper the customer signed` | `delivery_duty` | signed file on record |
-| delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | `delivery_duty` | review recorded |
-| Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | `delivery_duty` | the named next fact |
-| Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | `delivery_duty` | arrangement event recorded |
-| loan out, delivery day | `Collect the loan item` | `Bring back U1-000-045 on the delivery day` | `delivery_duty` | loan row reads returned |
+| no partner on the scope | `Assign logistics` | `Choose the company that carries this delivery` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | partner recorded |
+| partner set, no day agreed, partner contacts the customer | `Call NETS` | `Confirm the delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
+| partner set, no day agreed, Carres contacts the customer | `Call the customer` | `Confirm the delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | day and window recorded |
+| day agreed, no window | `Call NETS` | `Confirm the delivery time` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | window recorded |
+| new date later than the requested date, no reply proof | `Call the customer` | `Record the reply and upload the WhatsApp proof` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | contact record with proof |
+| collected, no ETA | `Ask NETS` | `Record the delivery ETA` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | ETA recorded |
+| confirmed day is today, no result | `Deliver on Thu, 22 Oct` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
+| confirmed day passed, no result | `Ask NETS` | `Record the delivery result` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | attempt recorded |
+| delivered, photo missing | `Upload the delivery photo` | `Attach the photo from NETS` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | photo on the ledger |
+| delivered, signed DO missing | `Upload the signed Delivery Order` | `Attach the paper the customer signed` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | signed file on record |
+| delivered, proof not reviewed | `Check the delivery proof` | `Accept it, ask for more, or reject it` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | review recorded |
+| Failed Delivery recorded | the §7 next action, for example `Call the customer` | `Confirm a new delivery date` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | the named next fact |
+| Cannot Deliver reported by the partner | `Decide the next step for this delivery` | `Keep NETS with a new date, correct the details, or change logistics` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | arrangement event recorded |
+| loan out, delivery day | `Collect the loan item` | `Bring back U1-000-045 on the delivery day` | Sales Order PIC; Buddy cover acts; Delivery Duty fallback only when no PIC | loan row reads returned |
 | handover counts disagree | `Check the handover` | `Find the Unit the driver did not confirm` | `grn_duty` | mismatch resolved |
 
 The partner name always comes from the data. Delivery stores an action's owner rule, never a
@@ -1447,7 +1453,8 @@ calculate a duty holder.
 
 - **My Work Quick Rail** previews the person's owned Delivery actions and deep-links to the row or
   the DO; it is not another work store.
-- **Team Quick Rail** shows the resolved Delivery Duty holder and today's cover.
+- **Team Quick Rail** groups Delivery actions by the Sales Order's normal PIC and shows today's
+  Buddy cover only when that person differs. Orders without a PIC remain under `Delivery Duty`.
 - **Calendar Quick Rail** shows confirmed deliveries, contact deadlines, handover deadlines,
   Failed Delivery follow-up and return due dates on actual dates.
 - **Activity Quick Rail** shows append-only assignment, arrangement, contact, handover, result,
@@ -1484,8 +1491,9 @@ numbers are entered by a manager in this surface, never typed into code.
 
 Per-DO dates, partner, ETA, single-event handling, personal Columns and personal Saved Views are
 not Settings. Historical objects retain the rule and version in force when their event occurred.
-Delivery Settings stores only the duty keys its actions require, `delivery_duty` and
-`delivery_charge_approver`; the people resolve from `Workspace → Staff & Duties`.
+Delivery Settings stores only the `delivery_charge_approver` Duty key used by its approval action.
+Routine Delivery ownership reads the Sales Order PIC; `delivery_duty` is retained only as the
+explicit no-PIC fallback through `Workspace → Staff & Duties`.
 
 ## 12 · Reports
 
@@ -1518,59 +1526,36 @@ customer-leg results only and say so in their coverage sentence (Card 20, 2026-0
 
 ### 13.1 · The owner rule
 
-Every routine Delivery action resolves through the existing `delivery_duty` owner rule and the
-Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1). The rule already exists in the Work
-Engine; the approved architecture correction is only that it gains its assignment key
-`delivery_duty` (`Delivery Duty`) in the shared Workspace catalogue. The Primary holder and Buddy
-cover are configured only in `Workspace → Staff & Duties`. This is not a Delivery-local duty
-system.
+**OWNER-APPROVED / LOCKED 2026-09-17.** Every routine Delivery action belongs to the Sales
+Order's PIC: the individual Operation person recorded in `ops_order_control.assigned_staff` when
+the order enters Operations. That person owns the order's work from arrival through logistics
+assignment, customer/partner booking, delivery result, proof, Failed Delivery recovery, loan
+collection and ordinary money follow-up. Delivery owns and writes the Delivery facts; the PIC owns
+the human action. There is no second Delivery-local assignment or owner list.
 
-**The Responsible Delivery Operation owns the customer's money follow-up, and it is the person
-the Sales Order was DEALT to (owner ruling 2026-09-13; Payment MASTER §10, Orders MASTER
-§"How the PIC is decided", migrations 0489 · 0504).** A Sales Order is dealt to one individual
-Operation person when it enters Operations (`ops_order_control.assigned_staff`, 0232/0235). That
-person continues the customer follow-up — the delivery contact, the ordinary balance and the
-storage collection. Delivery and Payment read ONE authority,
-`delivery_responsible_operation(order, day)` (0504): the order's responsibility ledger row
-(an establishment or a formal handover) · else the individual the order was dealt to · else
-nobody. Today's acting person is that person's governed buddy cover, else — when they are away
-today and no cover was named — the least-loaded individual who is in, else the person.
+Absence is Buddy cover, not reassignment. Today's governed cover acts in My Work while the Sales
+Order PIC remains the normal owner in Team Work and history. A shared or manager account may record
+authorised evidence but never becomes the order owner; managers are never dealt orders. A formal
+handover changes the Sales Order PIC and its append-only responsibility evidence together.
 
-**Contact history and the Delivery Duty holder are NOT owner sources.** 0495/0498 inferred the
-owner from the earliest customer contact and 0489/0499 from the Delivery Duty holder; the owner
-rejected both, and 0504 removed them. Delivery Duty keeps its own work and remains the key the
-buddy-cover law is written against; it no longer decides who chases a customer's money. **Nobody
-needs to be asked for an initial Delivery Duty holder** — that request was the workaround the
-owner refused, and automatic ownership no longer waits on it.
+Delivery Duty is no longer the routine owner. It is used only when the Sales Order has no PIC so
+the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
+Delivery Duty.` with `Set the holder in Workspace → Staff & Duties`. Once a PIC exists, every open
+and future routine Delivery action resolves to that PIC and cover. Governed delivery-charge
+exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
+exceptional proof and refusal closure without an approved action definition enter no engine and
+remain named in §15.1.
 
-The contact writer still fills the record's four identities from that read (§5.1); the
-recorder — including the shared `Operations` login — is evidence, never responsibility, and an
-account with no `staff_code` may record but never own. The owner stays until the balance is
-RM 0; a later contact by someone else, a duty rotation, a changed date, a filter or a reload
-never moves it. Only two things change who acts: buddy cover (today only) and a formal handover,
-which moves the assignment and appends the ledger row together. Delivery configures nothing extra
-for this.
-
-When the resolver returns nobody, the action stays visible in Team Work under its duty word and
-the surface prints the governed configuration failure with its door: `Nobody holds Delivery Duty.`
-and `Set the holder in Workspace → Staff & Duties`. 🔴 **Those words are now WRONG and wait on the
-owner** — after 0504 an unresolved owner means no individual is in the Operation assignment pool,
-and Staff & Duties cannot fix it. Approved copy is the owner's to change; the recommended
-replacement is `Nobody is assigned to this order.` with the door
-`Assign it in Sales Orders → Team`. The state is unreachable while the pool holds an individual,
-which is why this is recorded rather than shipped. The protected
-act refuses with the same sentence. No action is routed to an Operations Superuser by default and
-no fallback identity is invented; an authorised superuser who does act is recorded as the actual
-actor with the normal owner and cover kept separate. Governed delivery-charge exceptions route to
-the resolved `delivery_charge_approver`. Corrections of saved facts, exceptional proof and refusal
-closure have no approved action definition yet; they enter no engine and are named in §15.1.
+This replaces the 2026-09-13 routine Delivery Duty ruling. The PIC sweep shares orders between
+Shasha and Yu Jun at roughly 50/50; the former single-Duty rule left 101 routine Delivery actions
+unowned in production.
 
 ### 13.2 · Permissions
 
 Permissions separate view, record, record-on-behalf, review, correct, approve, configure and
 export.
 
-- The Delivery Duty holder or cover may arrange, proxy-record, upload replies, assign after
+- The Sales Order PIC or today's Buddy cover may arrange, proxy-record, upload replies, assign after
   `Cannot Deliver`, record results and proof on behalf of a partner, review proof and manage
   problems. Nobody issues the DO by hand and nobody may impersonate Warehouse or rewrite results.
 - Warehouse roles see and record only preparation, handover and returns for their Warehouse.

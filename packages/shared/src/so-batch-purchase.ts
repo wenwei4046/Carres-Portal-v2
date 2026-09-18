@@ -236,9 +236,9 @@ export const SO_BATCH_PURCHASE_WORDS = {
  * (`soBatchOrderLineOutstandingQty`); what goes is the row.
  */
 export const SO_BATCH_RAIL = {
-  timing: { heading: "ORDER TIMING", states: PURCHASE_DEMAND_TIMING_STATES },
+  timing: { heading: "Order timing", states: PURCHASE_DEMAND_TIMING_STATES },
   product: {
-    heading: "PRODUCT",
+    heading: "Product",
     all: "All products",
     /** The approved filters, in the approved order — Catalog categories. */
     categories: [
@@ -247,10 +247,10 @@ export const SO_BATCH_RAIL = {
       { category: "sofa", word: "Sofa" },
     ],
   },
-  supplier: { heading: "SUPPLIER", all: "All suppliers" },
-  region: { heading: "REGION", all: "All regions" },
+  supplier: { heading: "Supplier", all: "All suppliers" },
+  region: { heading: "Region", all: "All regions" },
   setup: {
-    heading: "SETUP TO FIX",
+    heading: "Setup to fix",
     states: ["no_production_days"] as readonly PurchaseDemandState[],
   },
 } as const;
@@ -553,8 +553,8 @@ export function soBatchOrderStatusOf(f: {
  * in the same precedence, so one document can never be described two ways.
  *
  * It is a NARROWED view, not a second implementation:
- * `purchaseOrderRegisterFacts` decides between `Issued`, `In Production` and
- * `Receiving` from lines, sends and supplier dates this read does not carry,
+ * `purchaseOrderRegisterFacts` decides the operation status (`Issued`,
+ * `In Production`, `Receiving`) from lines, sends and supplier dates this read does not carry,
  * and this register does not claim any of those three — it answers only the
  * question its own screen asks: *has this document been sent, and are its
  * goods already in?* A cancelled purchase order never reaches this register at
@@ -572,7 +572,7 @@ export function soBatchPoDocumentState(
   po: Pick<SoBatchOrderPoFact, "status" | "sentCurrentVersion">,
 ): PurchaseOrderRegisterFacts["documentState"] {
   if (po.status === "received") return "Completed";
-  return po.sentCurrentVersion ? "Issued" : "Not sent to supplier";
+  return po.sentCurrentVersion ? "Waiting for goods from supplier" : "Sending not confirmed";
 }
 
 /** One linked purchase order, through `po_line_sources` lineage ONLY. */

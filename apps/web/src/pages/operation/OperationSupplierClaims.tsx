@@ -13,6 +13,7 @@ import { useOperationSupplierClaims, type SupplierClaimListRow } from "@/lib/que
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
+import type { IconName } from "@/components/kit/Icon";
 import StatusPill from "@/components/kit/StatusPill";
 import { fmtDate } from "@/lib/fmt-date";
 import PurchasingTabs from "./PurchasingTabs";
@@ -24,6 +25,7 @@ const absent = "Not recorded";
 const statusLabel = (row: SupplierClaimListRow) => ({ open: "Open", closed: "Closed", cancelled: "Cancelled" })[row.status] ?? absent;
 type Facet = "supplier" | "problem" | "status" | "response" | "evidence";
 const titles: Record<Facet, string> = { supplier: "Supplier", problem: "Problem", status: "Claim status", response: "Supplier Response", evidence: "Evidence" };
+const facetIcons: Record<Facet, IconName> = { supplier: "supplier", problem: "late", status: "flag", response: "message", evidence: "attach" };
 /** Rail predicates are FACTS about the row (§9.5: factual predicates with
  *  truthful counts). `null` means the predicate does not apply to this row,
  *  so it is never counted — an absent source is a fact; a linked one is not
@@ -109,14 +111,14 @@ export default function OperationSupplierClaims() {
       {query.isError ? <div role="alert"><EmptyState title={errorTitle} detail={query.error?.message} action={<Button variant="neutral" onClick={() => void query.refetch()}>Try again</Button>} /></div>
         : <div className="flex min-h-0 flex-1 overflow-hidden">
           {railOpen && <FilterRail testId="supplier-claims-rail" onHide={() => setRailVisible(false)}>
-            {po && <FilterRailGroup title="Source">
+            {po && <FilterRailGroup title="Source" icon="order">
               <FilterRailRow label={`PO: ${po}`} active onClick={clearSource} title="Clear the purchase order filter" testId="claims-rail-source" />
             </FilterRailGroup>}
             {(Object.keys(titles) as Facet[]).map((facet) => {
               const counts = new Map<string, number>();
               inSource.filter((row) => matches(row, facet)).forEach((row) => { const value = valueOf(row, facet); if (value != null) counts.set(value, (counts.get(value) ?? 0) + 1); });
               if (counts.size === 0) return null;
-              return <FilterRailGroup key={facet} title={titles[facet]}>
+              return <FilterRailGroup key={facet} title={titles[facet]} icon={facetIcons[facet]}>
                 {[...counts].sort(([a], [b]) => a.localeCompare(b)).map(([value, count]) => <FilterRailRow key={value} label={value} count={count} active={picks[facet] === value} testId={`claims-rail-${facet}-${value}`}
                   onClick={() => setPicks((previous) => { const next = { ...previous }; if (next[facet] === value) delete next[facet]; else next[facet] = value; return next; })} />)}
               </FilterRailGroup>;

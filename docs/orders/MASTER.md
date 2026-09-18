@@ -1,5 +1,11 @@
 # ORDERS — MASTER
 
+**All listing appearance — APPROVED / NOT BUILT (Jess, 2026-09-17):** follow
+[UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
+This is the shared default, not a PO visual pilot. Preserve this module's filter content,
+control types, special schedules and business behavior; no page-local appearance specification.
+
+
 > ## ORDERS V1 — historical implementation evidence
 >
 > **Orders V1 is historical implementation evidence. It is not the architectural template.**
@@ -189,13 +195,22 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**Date-first listing — APPROVED / NOT BUILT (Jess, 2026-09-17).** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below768px. Build sequence follows UI MASTER §6.7. Personal account layouts remain PO-only until owner acceptance.
+**Date-first listing — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below 768px; neither can be hidden or moved (engine `leadingColumns`, layout key `…register.v5`). Personal account layouts remain PO-only until owner acceptance.
 
-The approved default columns remain:
+The approved default columns:
 
 ```
 SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
+
+**Widths re-measured for the date-first order (rendered shell fixture, 1440, Inter, 2026-09-17):**
+SO Date 118 (another year `Wed, 28 May 25` needs 117 — the 🟡 cross-year cut is closed) · SO No 80 ·
+Requested Delivery Date 120 (amber `No delivery date` needs 119) · Customer 170 · Delivery Location 160
+(`Sungai Buloh, Selangor`; the longest live `Port Dickson, Negeri Sembilan` opens whole) · Showroom 118
+(longest live outlet `Kota Damansara` needs 117; 100 cut it) · PO No 152 · DO No 144. Total with the
+gutter 1125px = the grid's client width at 1440 when the vertical scrollbar is drawn; every default is
+fully visible and nothing scrolls sideways. 1180: both pinned, the rest scrolls under. 820 / 720 (200% of
+1440) / 390: SO No pins alone at 72px, SO Date scrolls under it, no page sideways scroll.
 
 **Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
 Order was created (`orders.placed_at`). It is one read-only fact and uses that exact label in the
@@ -217,7 +232,7 @@ FILTERS    active search + header filters shown as conditions · one `Clear filt
            footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = the server's count
            (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
            unknown total → `{n} sales orders`, never a guessed `of`
-IDENTITY   SO No pinned and a door to the order
+IDENTITY   SO Date · SO No lead and pin (SO No alone below 768px); SO No is a door to the order
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
@@ -231,23 +246,18 @@ NARROW     toolbar wraps and stays usable · grid scrolls itself · no page side
 
 **Status — BUILT, [PR #1396](https://github.com/wenwei4046/Carres-Portal-v2/pull/1396) (on the
 shared register of PR #1395).** The page runs `palette="slate"` and the responsive search; the
-page-local hex theme is deleted. Default widths are content-measured (SO No 80 · SO Date 100 ·
-Requested Delivery Date 128 · Customer 188 · Delivery Location 172 · Showroom 100 · PO No 152 ·
-DO No 144); Customer and Delivery Location open a cut value whole (engine `overflowText`). The
-error state is the kit error inside the work surface, so the toolbar and `New Sales Order` stay.
-Measured on the rendered fixture page 2026-09-17: 1440 grid 1140/1140, DO No fully visible;
-1180/820/390 grid scrolls itself, no page sideways scroll, toolbar ends where the header begins;
-200% zoom same; keyboard Tab → row, ↓, Shift+F10 menu, Escape back, Enter opens the order;
+page-local hex theme is deleted. Default widths are content-measured (current values in the
+date-first block above); Customer and Delivery Location open a cut value whole (engine
+`overflowText`). The error state is the kit error inside the work surface, so the toolbar and
+`New Sales Order` stay. Keyboard: one Tab stop, ↓/End, Shift+F10 menu, Escape back, Enter opens the order;
 search `kimmy` reads `Showing only: Search: kimmy` and `3 of 24 sales orders`, and `Clear filters`
 returns `24 sales orders`. **Total follow-up (2026-09-17):** `{m}` is no longer the loaded rows or a
 remembered number — `GET /api/operation/orders` returns `salesOrderTotal`, one head-only exact count
 under the caller's RLS (same stage/channel, `source_system` null or not `rental`, search not
 applied), re-read with every list refresh (create/cancel invalidate the list). Rendered: fixture
 total 612 → `24 of 612` and, searching, `3 of 612`; total unknown → `24 sales orders` / `3 sales
-orders`. SO Date widened 96 → 100 after the signed-in production walk showed `Wed, 19 A…` (widest
-current-year date 81.3px). 🟡 A date from another year (`Wed, 28 May 2025`, 116px) needs 132px in
-both date columns and is still cut; resolving it without losing DO No at 1440 is owed. The production SHA is recorded on the PR. **Owed:** the authenticated
-owner walk in production (fixture evidence is not production evidence).
+orders`. The production SHA is recorded on the PR. **Owed:** the authenticated owner walk in
+production of the date-first order (fixture evidence is not production evidence).
 
 ### The two-line cell law
 
@@ -685,9 +695,9 @@ missing customer promise                 → responsible salesperson
 available goods to check/pack/handover   → governed Warehouse duty
 missing goods / issue PO                 → current PO Duty
 supplier date too late                   → current PO Duty contacts supplier
-Delivery Journey / partner arrangement   → governed Delivery ownership
-customer date/time confirmation          → assigned Partner or governed proxy owner
-collect customer money                   → Payment ownership rule
+Delivery Journey / partner arrangement   → Sales Order PIC, with Buddy cover
+customer date/time confirmation          → Sales Order PIC, with Buddy cover
+collect customer money                   → Sales Order PIC, with Buddy cover
 create Delivery Order                    → System
 ```
 
@@ -3238,16 +3248,17 @@ Owner** = the person or duty responsible for one current action, resolved automa
 action's Owner Rule and current roster/cover facts. **Case Owner** = the stable owner of a linked
 Service Case. These identities may coincide, but the system never treats them as one field.
 
-The Sales Order therefore does not have one universal action owner. Missing customer commitment
-work resolves to the responsible salesperson; Purchasing, Receiving, Payment and Delivery work
-resolves through those modules' governed duty/ownership rules. Owner identity is displayed
+The Sales Order does not turn its PIC into the owner of every cross-module act: Purchasing,
+Receiving and approval work retain their governed Duty rules. The PIC does own this order's
+Operation journey from the moment it arrives through delay decisions, logistics, delivery contact,
+delivery result/proof, loan return and ordinary collection. Missing customer commitment on an
+admitted legacy row remains with the responsible salesperson. Owner identity is displayed
 structurally and is not repeated inside every action sentence.
 
-**BUILT 2026-08-27 — the Action Owner Engine resolution.** The Card 9 registry
-(`packages/shared/src/work-engine.ts`) now carries a **structured `ownerRule` beside the prose**
-(`po_duty · salesperson · order_pic · payment_duty · delivery_duty · finance_duty · system`, plus
-the cross-module rules' own precise keys `grn_duty · claim_month_po_duty` recorded for the later
-feed wiring), and `workItemsForOrder` resolves the person per RULE instead of borrowing the PIC:
+The Action Owner Engine registry carries a structured `ownerRule` beside the prose. The approved
+target uses `order_pic` for the order's Operation, Delivery and ordinary collection work;
+`delivery_duty` remains only the no-PIC fallback. Purchasing, Receiving, approval and system rules
+keep their own precise keys, and `workItemsForOrder` resolves the person per rule:
 
 - **Purchasing's order-track work (`Issue PO` · `Confirm ready date`) lands on the month's
   PO-duty holder** (`ops_po_duty`, the one rostered duty that exists) — in the holder's My Work,
@@ -3259,23 +3270,22 @@ feed wiring), and `workItemsForOrder` resolves the person per RULE instead of bo
   falls back. Composed only for the rows nobody asked (`delivery_date` null AND
   `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
   order. The ladder never raises it, so no register cell or drawer headline changed.
-- **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
-  choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
-  is ours, and a partner has no login), today's run and its photo.
-- **`collect` records `collection_owner` as its rule** (payment/MASTER §10, owner ruling
-  2026-09-13): the Sales Order's ONE stable collection owner, the Responsible Delivery Operation,
-  established from the Delivery Duty holder when collection first became actionable (0489). It
-  never borrows the PIC; with nothing established the Delivery Duty word stands.
+- **The PIC owns the order's Operation journey from beginning to end** — delay decision, logistics
+  choice and calls, delivery date/time, today's result, proof, Failed Delivery next step, loan
+  return and ordinary collection. Delivery, Payment and Warehouse still own their business facts;
+  action ownership does not transfer those write boundaries.
+- **`collect` resolves to the same PIC** as the Sales Order's stable collection owner. A formal
+  handover changes the order responsibility and its append-only evidence together. Delivery Duty
+  appears only when the order has no PIC; it never replaces a valid PIC.
 - Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
   (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
   filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
   word.
 
-**Measured boundaries, reported not hidden:** no delivery-staff, finance or payment-duty roster
-fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
-the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
-unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
-what the shared Workspace Duty resolver already applies is not re-derived here.
+**Measured boundaries, reported not hidden:** a partner company without a personal login cannot
+own or close portal Work. The Sales Order PIC remains the normal owner; the PIC's Buddy cover is
+today's actor during absence and never rewrites history. An order with no PIC falls back to the
+Delivery Duty word until that exceptional owner is resolved.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -4815,8 +4825,9 @@ Exception plus a Reason, never a family of failure words.**
 
 **`Collect the loan item`** over **`Bring back {Unit ID} on the delivery day`** — blueprint card §7
 (owner-approved 2026-08-16; two-line grammar 2026-09-13) · trigger: a loan item is still out
-(`ops_sofa_loans`) and the delivery day has arrived · owner: the `delivery_duty` rule through the
-Shared Duty Resolver · due: the delivery day itself · completion: the loan row reads returned.
+(`ops_sofa_loans`) and the delivery day has arrived · owner: the Sales Order PIC, with Buddy cover
+when absent and Delivery Duty only when no PIC exists · due: the delivery day itself · completion:
+the loan row reads returned.
 Composed by the Work engine from the loan fact; it never blocks a delivery (Card 6's law is
 untouched). **THE LOAN OFFER IS A RECORD OF THIS MODULE (Delivery Blueprint, owner ruling
 2026-09-13):** Carres Operation offers the loan and records the customer's answer on the Sales

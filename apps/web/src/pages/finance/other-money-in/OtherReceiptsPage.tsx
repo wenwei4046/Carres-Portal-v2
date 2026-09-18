@@ -40,6 +40,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
+import { otherReceiptDoc } from "@/lib/pdf/other-money-in-docs";
 import {
   useCancelReceipt,
   useMoneyInAccounts,
@@ -64,6 +65,7 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_PARTY = "none";
@@ -519,17 +521,17 @@ function ReceiptForm({
         </Facts>
 
         {fieldErrors.empty && (
-          <p role="alert" className="text-body text-kit-red-11">
+          <FieldError>
             {fieldErrors.empty}
-          </p>
+          </FieldError>
         )}
         <p className="text-strong" data-testid="receipt-total">
           Total received {money(total)}
         </p>
         {refusal && (
-          <p role="alert" className="text-body text-kit-red-11" data-testid="receipt-refusal">
+          <FieldError testId="receipt-refusal">
             {refusal}
-          </p>
+          </FieldError>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
@@ -587,6 +589,18 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
   const [refusal, setRefusal] = useState<string | null>(null);
   const r = detail.receipt;
   const mayCancel = me.data?.mayCancel === true && r.status === "posted";
+  const [printing, setPrinting] = useState(false);
+  const downloadPdf = async () => {
+    setPrinting(true);
+    try {
+      const { renderReceiptPdf } = await import("@/lib/pdf/render");
+      window.open(URL.createObjectURL(await renderReceiptPdf(otherReceiptDoc(detail))), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The receipt could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-auto p-4" data-testid="other-receipt-object">
@@ -598,6 +612,9 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
           <span className="text-strong">{r.receipt_no}</span>
           <StatusPill tone={r.status === "posted" ? "success" : "neutral"}>{otherReceiptStatusWord(r.status)}</StatusPill>
           <span className="flex-1" />
+          <Button variant="neutral" loading={printing} onClick={downloadPdf}>
+            Download PDF
+          </Button>
           {mayCancel && (
             <Button
               variant="neutral"

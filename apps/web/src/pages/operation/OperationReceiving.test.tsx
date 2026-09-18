@@ -556,7 +556,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
       ).not.toBeInTheDocument();
       expect(inRail.queryByText(banned)).not.toBeInTheDocument();
     }
-    expect(inRail.getByText("GOODS ARRIVED AT")).toBeInTheDocument();
+    expect(inRail.getByText("Goods arrived at")).toBeInTheDocument();
     expect(inRail.getByTestId("rail-clear-filters")).toHaveTextContent(
       "Clear filters",
     );
@@ -598,7 +598,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
   it("speaks the corrected location/date words in the table", () => {
     renderPage();
     expect(screen.getByText("Goods received on")).toBeInTheDocument();
-    expect(screen.getByText("Goods arrived at")).toBeInTheDocument();
+    expect(within(screen.getByTestId("grid-header")).getByText("Goods arrived at")).toBeInTheDocument();
     expect(screen.getByText("Deliver To")).toBeInTheDocument();
     expect(screen.queryByText("Actual Site")).not.toBeInTheDocument();
     expect(screen.queryByText("Goods Received At")).not.toBeInTheDocument();

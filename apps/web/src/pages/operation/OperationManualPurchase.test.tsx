@@ -502,11 +502,11 @@ describe("Card 03 · the left filter rail", () => {
     const rail = screen.getByTestId("manual-purchase-rail");
     const text = rail.textContent ?? "";
     const expected = [
-      "ORDER TIMING",
+      "Order timing",
       "Can order early",
       "Order date reached",
       "Order date passed",
-      "PURPOSE",
+      "Purpose",
       "All purposes",
       "Ready Stock",
       "Showroom Display",
@@ -514,18 +514,18 @@ describe("Card 03 · the left filter rail", () => {
       "Internal Staff Purchase",
       "Subsidiary Purchase",
       "Other Purchase",
-      "PRODUCT",
+      "Product",
       "All products",
       "Mattress",
       "Bedframe",
       "Sofa",
-      "SUPPLIER",
+      "Supplier",
       "All suppliers",
       "Hooka",
       "Office Co",
       "Ohana",
       // Only the setup row with an affected request (REQ-0002's transit gap).
-      "SETUP TO FIX",
+      "Setup to fix",
       "Transit days not set",
     ];
     let cursor = -1;
@@ -536,7 +536,7 @@ describe("Card 03 · the left filter rail", () => {
     }
     // R2 — retired from this page.
     for (const retired of ["WORK TO DO", "TO ORDER", "All not ordered", "Approve purchase", "Production days not set"]) {
-      expect(text, retired).not.toContain(retired);
+      expect(text.toLowerCase(), retired).not.toContain(retired.toLowerCase());
     }
   });
 
@@ -1706,13 +1706,13 @@ describe("R2 · the ten columns, in the approved order", () => {
       .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
       .filter((t) => t !== "");
     expect(heads).toEqual([
+      "Proceed Date",
       "Items",
       "Order By",
       "Purpose",
       "Supplier",
       "Approval Status",
       "Requested By",
-      "Proceed Date",
       "Delivery Date",
       "Deliver To",
       "PO No",
@@ -1737,11 +1737,16 @@ describe("R2 · the ten columns, in the approved order", () => {
     }
   });
 
-  it("the sticky identity is `Items` — the column the entrance lives on", async () => {
+  it("Proceed Date · Items lead and BOTH pin on a wide canvas — the entrance lives on Items", async () => {
     await loaded();
     const entrance = screen.getByTestId(`mp-open-${REQ1}`);
     expect(entrance).toHaveTextContent("Ohana 2 Seater");
-    expect(entrance.closest("td")?.className ?? "").toMatch(/sticky|Sticky/);
+    const itemsCell = entrance.closest("td")!;
+    expect(itemsCell.className).toMatch(/sticky|Sticky/);
+    const dateCell = itemsCell.previousElementSibling as HTMLElement;
+    expect(dateCell.className).toMatch(/sticky|Sticky/);
+    expect(dateCell.style.left).not.toBe("");
+    expect((itemsCell.nextElementSibling as HTMLElement).style.left).toBe("");
   });
 
   it("R2 default order: waiting · Order By · Not planned · history newest first", async () => {
@@ -3086,7 +3091,7 @@ describe("Round 2 · the object's rounds", () => {
       fmtDate("2026-09-02T03:00:00Z", { time: true }),
     );
     expect(screen.getByTestId("mp-object-po-issued-0")).not.toHaveTextContent(fmtDate("2026-09-01"));
-    expect(screen.getByTestId("mp-object-po-issued-1")).toHaveTextContent("Not marked as sent");
+    expect(screen.getByTestId("mp-object-po-issued-1")).toHaveTextContent("Sending not confirmed");
   });
 });
 

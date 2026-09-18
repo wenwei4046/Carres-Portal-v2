@@ -329,12 +329,13 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
  * where the goods land, and finally the documents.
  */
 describe("the approved columns, in the approved reading order", () => {
+  /* Date first, then identity (purchasing MASTER §9.1, Jess 2026-09-17). */
   const APPROVED = [
+    "Proceed Date",
     "SO No",
     "Order By",
     "Customer",
     "Supplier",
-    "Proceed Date",
     "Requested Delivery Date",
     "Delivery Location",
     "Deliver To",
@@ -342,7 +343,7 @@ describe("the approved columns, in the approved reading order", () => {
     "PO Delivery Date",
   ];
 
-  it("draws exactly the nine business columns, identity first and documents last", () => {
+  it("draws exactly the ten business columns, date then identity first and documents last", () => {
     const { container } = renderRegister();
     const heads = [...container.querySelectorAll("thead th")]
       .map((el) => el.textContent ?? "")
@@ -389,12 +390,18 @@ describe("the approved columns, in the approved reading order", () => {
   });
 
   it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v5"');
-    expect(source()).not.toContain("register.v1");
+    expect(source()).toContain('"carres.soBatchPurchase.register.v6"');
+    expect(source()).not.toContain('"carres.soBatchPurchase.register.v5"');
   });
 
-  it("`SO No` is the explicit sticky identity", () => {
-    expect(source()).toContain('stickyIdentity={{ columnKey: "soNo" }}');
+  it("reads Proceed Date · SO No first, both pinned on a wide canvas (§6.7 rule 2)", () => {
+    const { container } = renderRegister();
+    const heads = [...container.querySelectorAll<HTMLElement>("thead th")];
+    const data = heads.filter((th) => th.title);
+    expect(data.slice(0, 3).map((th) => th.title)).toEqual(["Proceed Date", "SO No", "Order By"]);
+    expect(data[0]!.style.left).not.toBe("");
+    expect(data[1]!.style.left).not.toBe("");
+    expect(data[2]!.style.left).toBe("");
   });
 });
 
@@ -901,10 +908,10 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     expect(rail().parentElement?.className).toContain("relative");
   });
 
-  it("renders REGION immediately after SUPPLIER", () => {
+  it("renders Region immediately after Supplier", () => {
     renderRegister();
     const text = rail().textContent ?? "";
-    const order = ["ORDER TIMING", "PRODUCT", "SUPPLIER", "REGION", "SETUP TO FIX"];
+    const order = ["Order timing", "Product", "Supplier", "Region", "Setup to fix"];
     const positions = order.map((h) => text.indexOf(h));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -927,7 +934,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     ]) {
       expect(text, word).toContain(word);
     }
-    expect(text).not.toContain("WORK TO DO");
+    expect(text.toLowerCase()).not.toContain("work to do");
     expect(text).not.toContain("Ask customer for a delivery date");
     /* The retired wording never returns. */
     expect(text).not.toContain("Not enough production time");
@@ -1182,7 +1189,7 @@ describe("the expansion — the ONE shared child table", () => {
     const second = rowFor("PO-20260821-2222");
     expect(second).toHaveTextContent("Ohana");
     expect(second).toHaveTextContent("AL Sungai Buloh");
-    expect(second).toHaveTextContent("Issued");
+    expect(second).toHaveTextContent("Waiting for goods from supplier");
     /* ⛔ A RECORD CARRIES NO CONTROL. Not a tick, not a destination editor. */
     expect(within(details).queryByRole("checkbox")).toBeNull();
     expect(within(details).queryByRole("combobox")).toBeNull();
@@ -1710,15 +1717,15 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     expect(within(within(box).getByTestId("goods-mini-table")).queryByRole("checkbox")).toBeNull();
-    /* And the record says WHY: fourteen documents, every one of them Issued. */
+    /* And the record says WHY: fourteen documents, every one of them Waiting for goods from supplier. */
     const details = within(box).getByTestId("po-details-table");
-    expect(within(details).getAllByText("Issued")).toHaveLength(14);
+    expect(within(details).getAllByText("Waiting for goods from supplier")).toHaveLength(14);
   });
 
   /**
    * FIXTURE B — the documents are NUMBERED and none has been sent. Nothing has
    * reached a supplier, so status stays `blank` and buying is legitimate. The
-   * record says so: fourteen rows, every one `Not sent to supplier`.
+   * record says so: fourteen rows, every one `Sending not confirmed`.
    */
   it("allows the purchase when not one of the fourteen has been sent", async () => {
     renderRegister({
@@ -1729,7 +1736,7 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const details = within(box).getByTestId("po-details-table");
-    expect(within(details).getAllByText("Not sent to supplier")).toHaveLength(14);
+    expect(within(details).getAllByText("Sending not confirmed")).toHaveLength(14);
     /* Fourteen document rows, one unit each — the whole evidence, not a sample. */
     expect(within(details).getAllByRole("row").filter((r) => r.dataset.row === "record"))
       .toHaveLength(14);

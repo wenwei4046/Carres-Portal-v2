@@ -17,7 +17,7 @@ import {
   type CaseSlaEvent,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 /**
  * S4 — the deadline. **No case silently passes day 14.**
@@ -51,7 +51,7 @@ export default function CaseDeadline({
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
 
   const clock = caseSlaClock(
-    { openedAt, todayIso: todayLocal(), events, closed, customerName },
+    { openedAt, todayIso: appTodayIso(), events, closed, customerName },
     holidayOpts,
   );
   const action = caseSlaAction(clock, customerName);
@@ -202,7 +202,7 @@ function RecordDeadlineForm({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [on, setOn] = useState(todayLocal());
+  const [on, setOn] = useState(appTodayIso());
   const [reason, setReason] = useState<CaseDelayReason | "">("");
   const [note, setNote] = useState("");
   const [until, setUntil] = useState("");
@@ -317,10 +317,4 @@ function RecordDeadlineForm({
       )}
     </div>
   );
-}
-
-/** Today in the operator's own timezone. `toISOString()` is UTC, which is
- *  yesterday in Malaysia until 8 AM — the wrong day to count a deadline from. */
-function todayLocal(): string {
-  return new Date().toLocaleDateString("en-CA");
 }

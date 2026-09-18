@@ -30,16 +30,8 @@ import { toast } from "sonner";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Textarea from "@/components/kit/Textarea";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useSubmitSalesOrderAmendment, type SalesOrderAmendment } from "@/lib/queries";
-
-/** Today as `YYYY-MM-DD`, read in LOCAL time so the day never shifts. */
-function todayIso(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${mm}-${dd}`;
-}
 
 export default function SalesOrderAmendDeliveryDate({
   orderId,
@@ -131,7 +123,7 @@ export default function SalesOrderAmendDeliveryDate({
               reason: reason.trim(),
               /* A day nobody typed is not "today" — it is unknown, and the
                  door refuses a future one outright. */
-              customerAskedOn: askedOn && askedOn <= todayIso() ? askedOn : null,
+              customerAskedOn: askedOn && askedOn <= appTodayIso() ? askedOn : null,
             })
           }
         >

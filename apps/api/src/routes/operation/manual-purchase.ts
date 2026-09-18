@@ -907,7 +907,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     id: string;
     po_no: string;
     placed_at: string | null;
-    /** D5 — the CURRENT version's marked-sent time; null = `Not marked as sent`. */
+    /** D5 — the CURRENT version's marked-sent time; null = `Sending not confirmed`. */
     marked_sent_at: string | null;
     po_delivery_date: string | null;
     supplier_delivery_date: string | null;

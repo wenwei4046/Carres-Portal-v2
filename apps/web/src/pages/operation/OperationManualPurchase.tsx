@@ -705,6 +705,24 @@ export default function OperationManualPurchase() {
   const columns = useMemo<DataGridColumn<RequestRegisterRow>[]>(
     () => [
       {
+        /* The record date leads (ui MASTER §6.7 rule 2, Jess 2026-09-17). */
+        key: "proceed_date",
+        label: MW.colProceedDate,
+        headerLines: ["Proceed", "Date"],
+        width: 112,
+        minWidth: 94,
+        sortable: true,
+        chooserGroup: "Request",
+        filterType: "date",
+        dateValue: (r) => r.proceedDate,
+        accessor: (r) => (
+          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
+        ),
+        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
+        exportValue: (r) => r.proceedDate.slice(0, 10),
+        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
+      },
+      {
         key: "items",
         label: MW.colItems,
         wrap: true,
@@ -847,23 +865,6 @@ export default function OperationManualPurchase() {
         searchValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
         filterValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
         exportValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
-      },
-      {
-        key: "proceed_date",
-        label: MW.colProceedDate,
-        headerLines: ["Proceed", "Date"],
-        width: 112,
-        minWidth: 94,
-        sortable: true,
-        chooserGroup: "Request",
-        filterType: "date",
-        dateValue: (r) => r.proceedDate,
-        accessor: (r) => (
-          <span className="tabular-nums">{fmtDate(r.proceedDate.slice(0, 10))}</span>
-        ),
-        searchValue: (r) => fmtDate(r.proceedDate.slice(0, 10)),
-        exportValue: (r) => r.proceedDate.slice(0, 10),
-        sortFn: (a, b) => a.proceedDate.localeCompare(b.proceedDate),
       },
       {
         key: "delivery_date",
@@ -1036,7 +1037,7 @@ export default function OperationManualPurchase() {
           onHide={() => setFilterRailVisible(false)}
           className={registerStyles.rail}
         >
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.timing.heading} icon="date">
             {/* Counts only requests with quantity still to buy — a filter and
                 a fact, never an issue permission gate. */}
             {MANUAL_PURCHASE_RAIL.timing.rows.map((row) => (
@@ -1055,7 +1056,7 @@ export default function OperationManualPurchase() {
               />
             ))}
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.purpose.heading} icon="order">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.purpose.heading}
               allLabel={MANUAL_PURCHASE_RAIL.purpose.all}
@@ -1074,7 +1075,7 @@ export default function OperationManualPurchase() {
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.product.heading} icon="goods">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.product.heading}
               allLabel={MANUAL_PURCHASE_RAIL.product.all}
@@ -1093,7 +1094,7 @@ export default function OperationManualPurchase() {
               }
             />
           </FilterRailGroup>
-          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading}>
+          <FilterRailGroup title={MANUAL_PURCHASE_RAIL.supplier.heading} icon="supplier">
             <FilterRailSelect
               label={MANUAL_PURCHASE_RAIL.supplier.heading}
               allLabel={MANUAL_PURCHASE_RAIL.supplier.all}
@@ -1110,7 +1111,7 @@ export default function OperationManualPurchase() {
           {/* Only while an affected request exists, and only the rows that
               have one: fixing the setup stays in Catalog / Settings. */}
           {rail.setupExists && (
-            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading}>
+            <FilterRailGroup title={MANUAL_PURCHASE_RAIL.setup.heading} icon="settings">
               {MANUAL_PURCHASE_RAIL.setup.rows
                 .filter((row) => rail.setupRows.includes(row.key))
                 .map((row) => (
@@ -1174,8 +1175,9 @@ export default function OperationManualPurchase() {
             columns={columns}
             onFilteredRowsChange={setGridRows}
             /* v5 — round 2 changed the column set and order, so a saved v4
-               layout must not replay the old nine columns over the new ten. */
-            storageKey="carres.manualPurchase.register.v5"
+               layout must not replay the old nine columns over the new ten.
+               v6 — Proceed Date · Items lead and pin (Jess 2026-09-17). */
+            storageKey="carres.manualPurchase.register.v6"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
             exportName="Manual Purchase"
@@ -1216,7 +1218,7 @@ export default function OperationManualPurchase() {
               groupOf: (r) => r.group,
               revealMatches: activeConditions.length > 0,
             }}
-            stickyIdentity={{ columnKey: "items" }}
+            leadingColumns={{ date: "proceed_date", identity: "items" }}
             chooserGroupOrder={["Request", "Buying", "Documents"]}
             onRowDoubleClick={openRequest}
             contextMenu={rowMenu}
@@ -3290,14 +3292,14 @@ function ManualPurchaseObject({
               {lines.map((l, i) => (
                 <tr
                   key={l.id}
-                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-base-400" : ""}`}
+                  className={`divide-x divide-base-200 align-top${l.cancelled_at ? " text-kit-slate-11" : ""}`}
                   data-testid={`mp-object-item-${i}`}
                 >
                   <td className="px-2 py-2 font-mono">{l.sku}</td>
                   <td className="px-2 py-2">
                     {l.item_label ?? l.sku}
                     {l.cancelled_at ? (
-                      <span className="block text-label text-base-400">
+                      <span className="block text-label text-kit-slate-11">
                         {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
                         {l.cancel_reason ? ` — ${l.cancel_reason}` : ""}
                       </span>

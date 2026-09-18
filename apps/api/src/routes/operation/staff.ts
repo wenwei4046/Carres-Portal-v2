@@ -53,7 +53,8 @@ staffRouter.get("/", async (c) => {
   requireOperationOrPrincipal(auth.role);
   const sb = userClient(c.env, auth.jwt);
 
-  const roles = workspaceDutyRolesOf(c.req.query("duty") ?? "");
+  const dutyKey = c.req.query("duty") ?? "";
+  const roles = workspaceDutyRolesOf(dutyKey);
   if (roles.join() !== "operation") {
     const { data, error } = await sb.rpc("workspace_duty_staff", {
       p_roles: roles,
@@ -77,7 +78,7 @@ staffRouter.get("/", async (c) => {
   const [users, settings] = await Promise.all([
     sb
       .from("app_users")
-      .select("id, email, name, status, last_seen_at")
+      .select("id, email, name, status, staff_code, last_seen_at")
       .eq("role", "operation")
       .order("email"),
     sb.from("ops_staff_settings").select("user_id, available, note"),
@@ -97,6 +98,10 @@ staffRouter.get("/", async (c) => {
   const staff: OpsStaffMember[] = (users.data ?? [])
     // Disabled accounts drop out of the pool automatically (resign = disable).
     .filter((u) => (u.status ?? "active") === "active")
+    // A duty picker (S2-A) offers individuals only: a People record with a
+    // staff_code, as 0504 requires of anyone who carries responsibility. A
+    // shared login or a test robot records evidence and never holds a duty.
+    .filter((u) => !dutyKey || u.staff_code != null)
     .map((u) => {
       const s = byId.get(u.id as string);
       return {

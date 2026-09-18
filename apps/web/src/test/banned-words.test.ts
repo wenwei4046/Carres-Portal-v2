@@ -85,7 +85,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
     );
     itSaysNoBannedWord(
       join(PAGES, "operation", "components", "PoIssueEvidence.tsx"),
-      { minStrings: 20, expectString: "Record the PDF sent" },
+      { minStrings: 20, expectString: "PO sent to supplier" },
     );
   });
 
@@ -162,7 +162,7 @@ describe("the scanner reads what a human reads", () => {
   });
 
   it("carries the whole banned list, so a rule cannot be quietly dropped", () => {
-    expect(BANNED.length).toBe(12);
+    expect(BANNED.length).toBe(14);
     expect(BANNED.map(([re]) => re.source)).toContain("\\bchase[ds]?\\b");
   });
 });

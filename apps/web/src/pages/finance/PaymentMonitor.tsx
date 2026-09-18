@@ -547,11 +547,11 @@ export default function PaymentMonitor() {
               <ChevronRight size={15} aria-hidden />
             </button>
           </div>
-          {!onPlanWeek && <button type="button" className="text-label text-kit-slate-11 underline underline-offset-2"
+          {!onPlanWeek && <button type="button" className="text-meta text-kit-slate-11 underline underline-offset-2"
             data-testid="payment-monitor-this-week" onClick={() => pickDay(planDay)}>This week</button>}
         </div>
         : <p className="pr-8 text-body text-kit-slate-11">The follow-up plan is Operation's.</p>}>
-      {canReadWork && <div className="flex flex-col gap-1" data-testid="payment-monitor-days">
+      {canReadWork && <div className="flex flex-col gap-1 py-3" data-testid="payment-monitor-days">
         {planFailed
           ? <div role="alert" className="px-1.5 text-body">
             <p>The follow-up plan could not be loaded.</p>
@@ -560,9 +560,9 @@ export default function PaymentMonitor() {
           : plan.days.map((d) => <DayCard key={d.iso} day={d} active={picked === d.iso}
               words={planLoaded ? dayWords(d) : null} onPick={() => pickDay(d.iso)} />)}
       </div>}
-      <div className={canReadWork ? "border-t border-kit-slate-5 pt-3" : ""}>
+      <div className={canReadWork ? "border-t border-kit-slate-5 py-2" : "py-2"}>
         <FilterRailRow label="All unpaid orders" count={loaded ? scopedRows.length : undefined}
-          active={picked === ALL_UNPAID} testId="payment-monitor-all-unpaid"
+          active={picked === ALL_UNPAID} resets testId="payment-monitor-all-unpaid"
           onClick={() => { if (canReadWork) pickDay(ALL_UNPAID); }} />
       </div>
     </FilterRail>
@@ -686,7 +686,7 @@ function DayCard({ day, active, words, onPick }: {
     data-testid={`payment-monitor-day-${day.iso}`} data-today={day.isToday ? "yes" : undefined}
     className={[
       "relative flex w-full flex-col items-stretch gap-0.5 rounded-control px-2 py-2 text-left text-body",
-      active ? "bg-kit-blue-3 text-kit-slate-12" : "text-kit-slate-11 hover:bg-kit-slate-3",
+      active ? "bg-kit-blue-3 text-kit-slate-12" : "text-kit-slate-12 hover:bg-kit-slate-3",
       day.isToday ? "ring-1 ring-inset ring-kit-blue-9" : "",
     ].join(" ")}>
     {active && <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" />}
@@ -695,11 +695,11 @@ function DayCard({ day, active, words, onPick }: {
       {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11"
         data-testid="payment-monitor-today">Today</span>}
     </span>
-    {day.holiday !== null && <span className="break-words text-label text-kit-slate-11">
+    {day.holiday !== null && <span className="break-words text-meta text-kit-slate-11">
       {day.holiday ? `Public holiday · ${day.holiday}` : "Public holiday"}</span>}
     {words === null
-      ? <span className="text-label text-kit-slate-9">Reading the collection desk…</span>
-      : words.map((w) => <span key={w} className={`break-words ${late(w) ? "text-label text-kit-red-11" : w === "No follow-up planned" || w.includes(" not done · ") ? "text-label text-kit-slate-9" : "text-body text-kit-slate-12"}`}>{w}</span>)}
+      ? <span className="text-meta text-kit-slate-11">Reading the collection desk…</span>
+      : words.map((w) => <span key={w} className={`break-words ${late(w) ? "text-meta text-kit-red-11" : w === "No follow-up planned" || w.includes(" not done · ") ? "text-meta text-kit-slate-11" : "text-body text-kit-slate-12"}`}>{w}</span>)}
   </button>;
 }
 

@@ -371,7 +371,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
  * OBSERVE — a date exists, a relationship exists, a document reached a
  * supplier. None of them is a person saying they are done.
  */
-const BUY_COMPLETION_FACT = "Current PO version reached supplier with evidence";
+const BUY_COMPLETION_FACT = "Current PO version marked as sent";
 const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   can_order_early: BUY_COMPLETION_FACT,
   safety_days_full: BUY_COMPLETION_FACT,

@@ -60,9 +60,17 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *   payment_approver  the effective Payment Approver resolution from Workspace
  *                  — §12 gives void, reallocation and overpayment review to
  *                  this duty and to nobody else; unresolved fails closed
- *   delivery_duty  the effective Delivery Duty resolution from Workspace
- *                  (Delivery MASTER §13.1, 2026-09-13); unresolved fails
- *                  closed — the duty word stands, never the PIC
+ *   responsible_operation  routine Delivery work (owner ruling 2026-09-17,
+ *                  overriding the 2026-09-13 Delivery Duty routing): the
+ *                  Sales Order's responsible Operation person — the individual
+ *                  it was dealt to, read through 0504's
+ *                  `delivery_responsible_operation` with governed buddy cover
+ *                  (supplied per order as `dutyResolutions.responsible_operation`).
+ *                  Only when the order has NO such person does the effective
+ *                  Delivery Duty resolution act; nobody holding that either
+ *                  fails closed under the Delivery Duty word. The raw
+ *                  `picName`/`picUserId` are never read for it — a shared
+ *                  login can sit on the assignment and owns nothing
  *   warehouse_duty §6 gives the storage check to Warehouse and names no duty;
  *                  no warehouse roster fact exists, so the word stands — the
  *                  same measured-boundary rule finance_duty follows
@@ -75,7 +83,8 @@ export type WorkOwnerRule =
   | "order_pic"
   | "collection_owner"
   | "payment_approver_duty"
-  | "delivery_duty"
+  | "responsible_operation"
+  | "delivery_duty" // the Delivery Duty resolution — responsible_operation's no-PIC fallback
   | "warehouse_duty"
   | "finance_duty"
   | "system"
@@ -161,8 +170,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
     owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1); choosing the company is Delivery's arrangement act",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person — the individual it was dealt to, with buddy cover (owner ruling 2026-09-17); Delivery Duty only when the order has no such person. Choosing the company is Delivery's arrangement act",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("assign_logistics"),
     dueRule: "3 working days before the promised date, delivery week + MY holidays",
     completionFact: "a company recorded (orders.delivery_partners / ops_assigned_logistic)",
@@ -172,8 +181,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
     owner:
-      "Delivery Duty — the holder calls the partner or the customer (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line names the partner)",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person calls the partner or the customer, with buddy cover (owner ruling 2026-09-17); Delivery Duty only when the order has no such person (§0.1: the partner has no login, so the closable action is ours; the action line names the partner)",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("confirm_delivery_date"),
     dueRule:
       "logistics_call_working_days (3 — Card 3's ruling) before the promised date, delivery week + MY holidays",
@@ -204,8 +213,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
     owner:
-      "Delivery Duty — the holder watches today's run reach its result (Delivery MASTER §13.1)",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person watches today's run reach its result, with buddy cover (owner ruling 2026-09-17); Delivery Duty only when the order has no such person",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("deliver_today"),
     dueRule: "the confirmed date itself",
     completionFact:
@@ -216,8 +225,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger: "delivered with no photo on file",
     owner:
-      "Delivery Duty — the proof arrives on the order's WhatsApp thread; filing it is the arrangement owner's act (Delivery MASTER §6)",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person — the proof arrives on the order's WhatsApp thread (Delivery MASTER §6); buddy cover acts when they are away, Delivery Duty only when the order has no such person (owner ruling 2026-09-17)",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("upload_delivery_photo"),
     dueRule: "1 working day after the delivery, delivery week + MY holidays",
     completionFact: "a photo in the ledger (ops_order_control.delivery_photos, 0280)",
@@ -243,8 +252,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     trigger:
       "a delivered or partially delivered result with a file on record that no review has judged yet (a newer upload reopens the question)",
     owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1)",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person, with buddy cover (owner ruling 2026-09-17); Delivery Duty only when the order has no such person",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("check_delivery_proof"),
     dueRule: "1 working day after the delivery, delivery week + MY holidays — the same clock as the upload it judges",
     completionFact:
@@ -255,8 +264,8 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
     owner:
-      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1, §14.2)",
-    ownerRule: "delivery_duty",
+      "the Sales Order's responsible Operation person, with buddy cover (owner ruling 2026-09-17, Delivery MASTER §14.2); Delivery Duty only when the order has no such person",
+    ownerRule: "responsible_operation",
     action: orderActionQueue("collect_loan_item"),
     dueRule: "the delivery day itself (confirmed date, else the recorded delivery)",
     completionFact: "the loan row reads returned (ops_sofa_loans.status, 0209/0217)",
@@ -308,12 +317,12 @@ export const MODULE_WORK_RULES: readonly WorkRuleDefinition[] = [
   {
     key: "manual_purchase.issue_po",
     module: "purchasing",
-    trigger: "approved Manual Purchase demand remains uncovered or its current PO version has not reached the supplier",
+    trigger: "approved Manual Purchase demand remains uncovered or its current PO version is not marked as sent",
     owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "po_duty",
     action: "Issue PO",
     dueRule: "no later than the request's Order By date on the OFFICE calendar",
-    completionFact: "confirmed-sent evidence for every linked current PO version (po_sends)",
+    completionFact: "a sent mark for every linked current PO version (po_sends)",
   },
   {
     key: "purchasing.confirm_ready_date",
@@ -477,7 +486,7 @@ const WORK_COMPLETION_STATEMENTS: Readonly<Record<string, string>> = {
   resolve_payment_exception: "The payment exception is cleared with evidence",
   ask_delivery_date: "The requested delivery date or governed no-date answer is recorded",
   "manual_purchase.approve": "The approval or refusal decision is recorded",
-  "manual_purchase.issue_po": "Every linked current PO version has confirmed-send evidence",
+  "manual_purchase.issue_po": "Every linked current PO version marked as sent",
   "purchasing.confirm_ready_date": "A standing supplier promise is recorded",
   "payment.collect_customer_balance": "The outstanding balance is RM 0",
   "payment.review_overpayment": "The overpaid amount is RM 0 or an approved refund covers it",
@@ -832,25 +841,28 @@ export function workItemsForOrder(
     ownerUserId: person?.userId ?? null,
     ...(ownerDuty ? { ownerDuty } : {}),
   });
+  const dutyOwnerFrom = (
+    ownerRule: WorkOwnerRule,
+    resolution: WorkspaceDutyResolution,
+    unresolvedWord: string,
+  ): ResolvedOwner => ({
+    ownerRule,
+    ownerDutyKey: resolution.dutyKey,
+    normalOwner: resolution.normalOwner,
+    activeCover: resolution.activeCover,
+    actingPerson: resolution.actingPerson,
+    ownerState: resolution.state,
+    ownerName: resolution.actingPerson?.name ?? null,
+    ownerUserId: resolution.actingPerson?.userId ?? null,
+    ...(resolution.state === "not_assigned" ? { ownerDuty: unresolvedWord } : {}),
+  });
   const dutyOwner = (
     ownerRule: WorkOwnerRule,
     dutyKey: string,
     unresolvedWord: string,
   ): ResolvedOwner => {
     const resolution = ctx.dutyResolutions?.[ownerRule];
-    if (resolution) {
-      return {
-        ownerRule,
-        ownerDutyKey: resolution.dutyKey,
-        normalOwner: resolution.normalOwner,
-        activeCover: resolution.activeCover,
-        actingPerson: resolution.actingPerson,
-        ownerState: resolution.state,
-        ownerName: resolution.actingPerson?.name ?? null,
-        ownerUserId: resolution.actingPerson?.userId ?? null,
-        ...(resolution.state === "not_assigned" ? { ownerDuty: unresolvedWord } : {}),
-      };
-    }
+    if (resolution) return dutyOwnerFrom(ownerRule, resolution, unresolvedWord);
     // One-release compatibility for callers not yet supplying the shared
     // resolution. It never applies to another Duty and never falls back to PIC.
     if (ownerRule === "po_duty" && ctx.poDuty) {
@@ -883,17 +895,30 @@ export function workItemsForOrder(
           name ? undefined : "Sales",
         );
       }
-      case "delivery_duty":
-        // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): resolved by the
-        // Shared Duty Resolver like PO Duty; no holder → the duty
-        // word stands, never the PIC and never a superuser fallback.
-        return dutyOwner("delivery_duty", "delivery_duty", "Delivery Duty");
+      case "responsible_operation": {
+        // Owner ruling 2026-09-17: routine Delivery work is the Sales Order's
+        // responsible Operation person — 0504's one read, cover and all.
+        // Only an order with NO such person falls to Delivery Duty; nobody
+        // holding that either → the duty word stands. The raw PIC name is
+        // never consulted: the read already refused non-individuals.
+        const responsible = ctx.dutyResolutions?.responsible_operation;
+        if (responsible?.actingPerson && responsible.state !== "not_assigned") {
+          return dutyOwner("responsible_operation", "delivery_duty", "Delivery Duty");
+        }
+        const duty = ctx.dutyResolutions?.delivery_duty;
+        return {
+          ...(duty
+            ? dutyOwnerFrom("responsible_operation", duty, "Delivery Duty")
+            : directOwner("responsible_operation", null, "Delivery Duty")),
+          ownerDutyKey: "delivery_duty",
+        };
+      }
       case "finance_duty":
         return directOwner("finance_duty", null, "Finance");
       case "collection_owner":
-        // The order's stable collection owner (0489) rides in per order; no
-        // owner yet (no Delivery Duty holder on the first actionable day) →
-        // the Delivery Duty word stands, never the PIC.
+        // The order's stable collection owner (0489/0504 — the person the
+        // order was dealt to) rides in per order; no owner → the Delivery Duty
+        // word stands (Payment MASTER §10: collection never borrows a holder).
         return dutyOwner("collection_owner", "delivery_duty", "Delivery Duty");
       case "system":
         return directOwner("system", null, "System");

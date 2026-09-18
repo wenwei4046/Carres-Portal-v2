@@ -96,7 +96,7 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
           A Storage Invoice correction is in progress — the replacement is a draft and asks
           for nothing until it is issued. Issue it so the money is asked again.</p>}
         {cases.length === 0 && !casesQ.isLoading &&
-          <p className="text-label font-normal text-base-400">
+          <p className="text-label font-normal text-kit-slate-11">
             No storage case. Storage begins only when the goods are ready AND the customer
             delays the delivery.</p>}
         {requests.length > 0 && <div data-testid="later-delivery-requests">

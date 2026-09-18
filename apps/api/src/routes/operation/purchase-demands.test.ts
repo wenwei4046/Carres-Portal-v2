@@ -874,7 +874,7 @@ describe("the buying facts SO Batch Purchase needs", () => {
     expect(ready.action).toMatchObject({
       trigger: "can_order_early",
       ownerRule: "Current PO Duty",
-      completionFact: "Current PO version reached supplier with evidence",
+      completionFact: "Current PO version marked as sent",
       sourceObject: { type: "sales_order", id: "o1", number: "SO-1207" },
     });
     expect(ready.action!.action).toBe("Issue PO to Nice Future");

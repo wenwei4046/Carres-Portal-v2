@@ -261,6 +261,29 @@ describe("HrApp", () => {
     ).toHaveTextContent(/^Commission$/);
   });
 
+  it("defaults to the Malaysian month, not the runner's, in the small hours", async () => {
+    // 16:30 UTC on 31 Aug is already 00:30 on 1 Sep in Kuala Lumpur. The
+    // runner is pinned to UTC so the case is the same on a KL laptop and CI.
+    const savedTz = process.env.TZ;
+    process.env.TZ = "UTC";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-31T16:30:00Z"));
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.startsWith("/api/hr/report")) return REPORT;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    try {
+      render(wrap(<HrApp />, "/hr?tab=performance"));
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "Performance · September 2026",
+      );
+    } finally {
+      vi.useRealTimers();
+      if (savedTz === undefined) delete process.env.TZ;
+      else process.env.TZ = savedTz;
+    }
+  });
+
   it("lands on the Overview digest when no tab is given", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.startsWith("/api/hr/report")) return REPORT;

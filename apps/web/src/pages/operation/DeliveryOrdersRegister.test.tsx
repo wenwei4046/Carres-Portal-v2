@@ -281,8 +281,8 @@ describe("DeliveryOrdersRegister", () => {
       }),
     ]);
     const rail = screen.getByTestId("delivery-orders-rail");
-    expect(within(rail).getByText("WORK TO DO")).toBeTruthy();
-    expect(within(rail).getByText("DOCUMENT STATUS")).toBeTruthy();
+    expect(within(rail).getByText("Work to do")).toBeTruthy();
+    expect(within(rail).getByText("Document status")).toBeTruthy();
     for (const queue of [
       "Record delivery result",
       "Upload delivery photo",
