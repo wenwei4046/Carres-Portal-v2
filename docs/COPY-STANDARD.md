@@ -1808,14 +1808,17 @@ Rail heads: `Supplier` · `Problem` · `Claim status` · `Supplier Response`.
 `Late delivery` remains readable for historical records only; passing time never creates a new Claim.
 Missing source/evidence is retained in detail and Work, not presented as proof from a PO ID alone.
 
-**Supplier Claims words — APPROVED (Jess, 2026-09-18) · NOT BUILT.** Words only; the Supplier
-Claims page proposal that uses them is still under owner review and is not approved by this entry.
+**Supplier Claims words — APPROVED (Jess, 2026-09-18) · NOT BUILT.** The page that uses them is
+APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 
 | Where | Exact wording | Meaning |
 |---|---|---|
 | Claim object, action that opens the 50/50 pack | `Prepare supplier claim` | Prepare the claim content and its document. Preparing, copying or opening WhatsApp is not sending |
 | Claim pack, confirmation after staff actually sent it | `Claim sent to supplier` | Staff confirm a real send. It records the pack version, channel, recipient, actor and time. It never claims the supplier received, read or accepted it |
 | Supplier Claims register, read failure (the grid keeps its toolbar) | `Supplier Claims could not be loaded` + `Try again` | The read failed; never shown as zero claims |
+| Supplier Claims register, nothing recorded yet | `No Supplier Claims yet.` | True empty; never shown for a read failure |
+| Supplier Claims register, filters leave no rows | `No Supplier Claims match these filters` | Filtered empty; `Clear filters` restores the set |
+| Supplier Claims footer | `{N} Supplier Claims` · `1 Supplier Claim` · `{n} of {N} Supplier Claims` | Claim count only; no quantity total |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
 ### Receiving and supplier-exception words (locked 2026-07-27)

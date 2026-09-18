@@ -2806,41 +2806,71 @@ incomplete records remain visible. No formal issue passes without verified prove
 counts cover the complete permitted searched/filtered set under shared facet semantics, not the
 loaded page; collapsed groups do not filter.
 
-Read-only row expansion is a short problem/evidence inspector: problem type and note, photo
-count, affected held Units and Open Claim. It does not repeat product, source or reply columns.
-Selection remains useful for exporting the selected records; it introduces no batch mutation.
-The inspector has no decision or Stock form. Opening the object preserves register
-filters, scroll and record position. Keyboard access, visible labels and narrow-screen wrapping
-reuse the kit; no meaning depends on hover alone.
+**SUPPLIER CLAIMS PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18).** The owner
+approved the complete page after two correction rounds. The Blueprint is closed; implementation
+and the signed-in walk at 1440/1180/820/390 are still owed. Widths below are candidates until
+measured in the real DOM.
+
+*Shared listing alignment (UI MASTER §6.7; same grammar as SO Batch, Manual Purchase, Purchase
+Orders):*
+
+| Region | Approved rule |
+|---|---|
+| Pinned columns | `leadingColumns` {date: `Reported`, identity: `Supplier Claim No.`}. Canvas ≥768px: both pinned. Below 768px: only `Supplier Claim No.` pinned; `Reported` stays and scrolls. No column is hidden by width. The approved default columns or the user's saved layout always show; overflow scrolls inside the grid |
+| Widths | Content-measured `width` + `minWidth` like SO Batch/Manual Purchase. Candidates from production Inter 13px text: widest date `Wed, 08 May` 81.1px text (column ≈97px); `SC-20260916-0007` 122.8px text (column ≈147px). Final values come from the build's DOM measurement |
+| Type and colour | Main text 13px · table second line 11px · form/button helper 12px · error 13px with icon. Shared slate palette (`palette="slate"`); no Claim-specific styles |
+| Buttons | Kit Button, `md` = 32px. Touch targets expand only by the shared rule; no page-level 40px buttons |
+| Search and footer | Shared responsive search, condition bar and one `Clear filters` (grid `activeConditions`). Footer `{N} Supplier Claims` · `1 Supplier Claim` · filtered `{n} of {N} Supplier Claims`. No quantity total: `qty` is the reported quantity and held Units can be fewer or zero (`supplier-claims.ts` read), so it is not an independent Unit count |
+| Rail | `useFilterRailOpen` (starts hidden and overlays below 896px canvas); group state `carres.filterRail.<rail>.<group>`. Groups: Supplier · Problem · Claim status · Supplier Response |
+| States | Loading · `No Supplier Claims yet.` · `No Supplier Claims match these filters` · `Supplier Claims could not be loaded` + `Try again` inside the grid (toolbar stays) · no access · photo read failure `Photo {n} could not be loaded · Try again` — each distinct |
+| Row expansion | One job: short read-only problem/evidence inspector (problem and note, photo thumbnails, held Units, `Open Claim`). No editor. Selection is for export only |
+| Open and return | `Supplier Claim No.` opens the full-width object (`?claim=`, kept in the URL). The object has a visible back link to Supplier Claims and `‹ i of n ›`; the claim pack has a visible Close back to the object. Returning restores filters, scroll, row and focus on its Supplier Claim No. Esc is an extra shortcut, never the only way out. Object header follows Manual Purchase's pattern until the kit gains one shared object header |
+| Cross-links | PO No opens the Purchase Orders object (`?po=`); GRN No opens the Receiving record; Units open Stock |
+
+*Full object — one full-width working scroll, in this order:*
 
 ```text
-SC number / source problem                Supplier · Open                 previous / next · close
-Problem fact
-[owner avatar] one smaller specific action                        actual working date · action
-
-The Item        original PO/CO · GRN · Supplier DO · SKU · affected Units/quantity
-Problem         source · observed event · photos/video
-Supplier Response   asked / actual answer / exact scope / promises / contact proof
-Authorised Outcome  approved stock-claim decision · approver · reason
-Related customer    read-only link to a related Service Case, when one exists (no Claim picker)
-Carres Execution    supplier-side scope + owning execution document doors (read-only)
-Item Outcome        read-only Where / Who has it / condition / inspection / remaining result
-Supplier money      requested/agreed remedy + Finance acceptance/result links
-Documents           version · recipient · actual send · required print/sign proof
-History             observed/recorded dates · actor/duty/cover · decision/revision/results
-
-Reference tabs: Document · Revisions · History · Order Route
+← Supplier Claims   SC-… · Hooka · Open                                   ‹ 3 of 12 ›
+[Current action] owner avatar · fact line · instruction line · working date · ONE primary button
+The Item      product · variant · SKU · reported Qty · held Units (own count, separate)
+Problem       type · note · photo thumbnails · reported date and reporter
+Supplier      what we asked · sending evidence · supplier reply · Reply expected
+Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PRTN / replacement
+              doors · supplier money (Finance, read-only)
+Related       Service Case, read-only (hidden only when there is no linked Case)
+Documents     pack versions · Claim sent to supplier · channel · recipient · actor · time
+History       three-rank records
 ```
 
-Main object is one full-width working scroll. Only claim-owned request/answer and supplier
-instruction controls edit here. A related customer remedy opens its Service Case; physical outcome
-opens Stock/Receiving/Outbound; Finance opens its own acceptance record. A shortcut never creates
-a second editor. Typography follows UI MASTER §6.7: main fact 13px, secondary table fact 11px, helper 12px; History uses its
-three-rank record grammar. Section actions live in their governed section header; rare
-Split/Cancel/Reopen are in More with reasons and exact consequence review.
+*Business protections carried into the page (owner rulings 2026-09-18):*
 
-External claim pack uses 50/50 only while preparing/revising: facts/checks left, exact PDF right,
-stacked below the governed width. Includes SC/version, supplier, source PO/GRN/Supplier DO,
+- **What was asked and whether it was sent are separate facts.** The request content lives in
+  Supplier; the send is proved only by `Claim sent to supplier` with pack version, channel,
+  recipient, actor and time. `Prepare supplier claim`, copying or opening WhatsApp is history,
+  never sending.
+- **Result does not depend on a reply.** The Result section shows whenever any authorised outcome,
+  receipt/inspection, RO/PRTN/replacement or Finance record exists, with or without a supplier
+  reply.
+- **Repair execution is server-checked.** A supplier's `Repair` answer is an offer. `Plan Repair`
+  is offered only when the server confirms Authorised Outcome = Repair, the exact Units, and the
+  actor's permission (current PO Duty, its dated cover, or Operations Superuser); otherwise the
+  missing fact and its owning door show. The server refuses the act on the same checks.
+- **Missing facts are never silently hidden.** Not applicable → hidden. Required but missing →
+  `Not recorded` or the specific missing fact. Read failure → `{X} could not be loaded` +
+  `Try again`. Capability not yet connected → one short line saying so.
+- **System-written facts never read as staff acts.** A `requested_at` written by the retired
+  late-delivery sweep (no requester, no send evidence) shows `What we asked: Not recorded`; its
+  History line uses `Recorded automatically` only when confirmed system-written. An unknown
+  individual stays `Staff identity not recorded`. Retiring the cron does not rewrite old rows.
+
+Section actions live in their governed section header; rare Split/Cancel/Reopen are in More with
+reasons and exact consequence review. A related customer remedy opens its Service Case; physical
+outcome opens Stock/Receiving/Outbound; Finance opens its own acceptance record. A shortcut never
+creates a second editor.
+
+External claim pack (`Prepare supplier claim`) uses 50/50 only while preparing/revising, like PO:
+facts/checks left, exact PDF right, stacking below 1130px (§8.2). Normal claim detail is full
+width; Receiving's 50/50 GRN detail is an approved exception and is not copied here. Includes SC/version, supplier, source PO/GRN/Supplier DO,
 supplier reference, item/Units, problem, approved request, relevant evidence and required reply.
 Exclude internal fault review, margin, selling price and unrelated customer information. A
 supplier home visit releases only the authorised visit/contact details through the related Case's governed
