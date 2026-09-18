@@ -29,12 +29,6 @@ export const MONEY_MOVE_KIND_WORD: Record<MoneyMoveKind, string> = {
   BANK_CREDIT: "Bank credit",
 };
 
-/** The side a kind fixes to one ledger account (0537); the other side is a bank. */
-export const MONEY_MOVE_FIXED: Partial<Record<MoneyMoveKind, { side: "from" | "to"; code: string }>> = {
-  BANK_CHARGE: { side: "to", code: "6500" },
-  BANK_CREDIT: { side: "from", code: "4900" },
-};
-
 const accountCode = (msg: string) => z.string().regex(/^\d{4}$/, msg);
 
 export const moneyMoveInput = z

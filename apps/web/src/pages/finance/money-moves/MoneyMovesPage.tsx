@@ -13,7 +13,6 @@
  */
 import { useMemo, useState } from "react";
 import {
-  MONEY_MOVE_FIXED,
   MONEY_MOVE_KIND_WORD,
   MONEY_MOVE_KINDS,
   MONEY_MOVE_STATUS_WORD,
@@ -249,7 +248,9 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
   const options = (side: "from" | "to") =>
     moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
   const amountN = parseTypedAmount(amount);
-  const fixed = MONEY_MOVE_FIXED[kind];
+  // 0537: a bank credit always comes from 4900, a bank charge always goes to 6500.
+  const fixedFrom = kind === "BANK_CREDIT" ? "4900" : undefined;
+  const fixedTo = kind === "BANK_CHARGE" ? "6500" : undefined;
   const feeN = kind !== "CARD_PAYOUT" ? 0 : parseTypedAmount(fee) ?? 0;
   const gross = amountN && !Number.isNaN(amountN) && !Number.isNaN(feeN) ? moneyMoveGross(amountN, feeN) : null;
 
@@ -258,8 +259,8 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
     const parsed = moneyMoveInput.safeParse({
       kind,
       move_date: date ?? "",
-      from_account_code: (fixed?.side === "from" ? fixed.code : fromCode) ?? "",
-      to_account_code: (fixed?.side === "to" ? fixed.code : toCode) ?? "",
+      from_account_code: fixedFrom ?? fromCode ?? "",
+      to_account_code: fixedTo ?? toCode ?? "",
       amount: amountN === null || Number.isNaN(amountN) ? undefined : amountN,
       fee: Number.isNaN(feeN) ? undefined : feeN,
       reference: reference.trim() || null,
@@ -310,7 +311,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           options={MONEY_MOVE_KINDS.map((k) => ({ value: k, label: MONEY_MOVE_KIND_WORD[k] }))}
         />
         <DatePicker id="move-date" label="Date" required value={date} onChange={setDate} />
-        {fixed?.side !== "from" && (
+        {!fixedFrom && (
           <Select
             id="move-from"
             label="Paid from"
@@ -321,7 +322,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}
-        {fixed?.side !== "to" && (
+        {!fixedTo && (
           <Select
             id="move-to"
             label="Paid into"
