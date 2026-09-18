@@ -1470,8 +1470,7 @@ facts, permissions, complete-record populations or task ownership.
    with its own record date, then its document number/business identity. Canvas ≥768px pins
    both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
    layout changes. Identity opens the object. Mappings: Sales Orders `SO Date · SO No`;
-   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · Items` (`Manual Purchase No.`
-   pending, Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
+   SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
    Supplier Claims `Reported · Supplier Claim No.`;
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
    Other listings use their governed record date and identity, without inventing date facts.

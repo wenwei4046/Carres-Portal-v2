@@ -257,20 +257,15 @@ purchase links the actual Case, an `Internal Staff Purchase` names the real staf
 emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. **A Manual Purchase has NO visible document number — owner correction
-2026-09-04 (Card 08); PRODUCTION-VERIFIED on `bc96a1e3`/`23ab3121` 2026-09-04** (0424
-applied through the governed path after the compatible app deployed; walked
-authenticated as `operation@`: a new Manual Purchase was created with `req_no NULL`,
-no number shown or announced anywhere, `—` in its PO No cell, business-fact object
-heading, and the two historical rows keeping their stored `MPR-…` values untouched).
-It is an internal way to prepare and approve a purchase, not a
-second supplier document: before `Issue PO` nothing shows, and after it the only visible
-purchasing document identity is the actual `PO No` (`PO-YYYYMMDD-RRRR`, the same formal
-document both buying doors produce). The canonical invisible identity is
-`purchase_requests.id`; migration 0424 retires the MPR allocator default and lets new
-rows carry a null `req_no`. Historical `REQ-####` / `MPR-YYYYMMDD-RRRR` values stay
-stored unchanged as legacy compatibility data — never displayed, never renumbered, and
-no operator-facing surface may consume them.
+vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (Jess, 2026-09-18);
+overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
+(`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
+reused. It names the request, not a supplier document: the supplier still receives only the PO
+(`PO-YYYYMMDD-RRRR`), and one request may become several POs. Consignment Orders, Repair Orders and
+other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
+`MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
+the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
+used — it is the Mattress Protector SKU code.
 **Approval — APPROVED / LOCKED (Jess, 2026-09-16); BUILT in Manual Purchase Round 2, migration
 0522.** Every Manual Purchase requires approval, whatever its purpose or amount; no purpose or
 amount bypass exists. `purchasing_create_request` always stores `approval_required = true` and no
@@ -550,6 +545,7 @@ permanent and are NOT renumbered.**
 | Prefix | Document |
 |---|---|
 | `PO` | Purchase Order |
+| `MPR` | Manual Purchase Request |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
 | `PRTN` | Purchase Return |
@@ -559,9 +555,9 @@ permanent and are NOT renumbered.**
 | `CRTN` | Consignment Return |
 | `CSN` | Consignment Sale Notice |
 
-Internal records still use invisible permanent technical IDs. `MPR` is retired (Card 08,
-2026-09-04): a Manual Purchase is an internal preparation record with no visible number;
-its stored historical `MPR-…`/`REQ-…` values are permanent legacy data, never displayed.
+Internal records still use invisible permanent technical IDs. `MPR` is the Manual Purchase Request
+number (owner ruling 2026-09-18, reinstated after the 2026-09-04 retirement): each Manual Purchase
+request has one; CO, RO and other documents keep their own numbers. Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable.
 
 ### 6.2 Unit ID
 
@@ -1768,19 +1764,19 @@ acts within groups. Search, column filters and export retain accurate source val
 **Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
 ```text
-Proceed Date · Manual Purchase No. · Approval Status · Purpose · Requested By · PO Safety Days ·
+Proceed Date · MPR No · Approval Status · Purpose · Requested By · PO Safety Days ·
 Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · Supplier ·
 Supplier Deliver To · PO No · PO Default Delivery Date
 ```
 
-Customer and supplier facts use the shared dictionary below. Existing groups and sorting stay.
-
-**IDENTIFIER GAP — verify before building the approved second column.** The owner marked the second column
-"number and official name to be verified". §6.1 (Card 08, owner ruling 2026-09-04) retired `MPR`: a
-Manual Purchase is an internal record with no visible number, and PO No is the only purchasing
-document number; its stored `MPR-…`/`REQ-…` values are never displayed. Do not invent a public identifier or expose a UUID/retired MPR. The approved target reserves the
-second position for a verified identity; the current built identity stays
-`Proceed Date · Items` (pinned ≥768px; `Items` alone below).
+**Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
+the 2026-09-04 MPR retirement.** Each Manual Purchase request has its own number `MPR-YYYYMMDD-RRRR`
+(§6.1), allocated when the request is created, permanent and never reused. `MPR` = Manual Purchase Request: it is requested and
+approved before it becomes one or more POs. `MP` is not used — it is already the Mattress Protector
+SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` values stay searchable.
+`MPR No` and `Proceed Date` pin at canvas ≥768px, `MPR No` alone below; `MPR No` opens the request.
+`PO No` lists every resulting PO (blank before any PO), each opening its own PO; one row remains one
+request. Customer and supplier facts use the shared dictionary. Existing groups and sorting stay.
 
 **Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
 (`Ready Stock`, `Showroom Display`, `Service Case`, …); most have no customer. Those rows show the
@@ -2100,14 +2096,14 @@ now also shows actual Goods Received Date linked to each GRN; this does not add 
 **Columns — APPROVED / NOT BUILT (Jess, 2026-09-18), exactly in order:**
 
 ```text
-PO Date · PO No · SO No / Manual Purchase / CO No · Supplier · Items · Supplier Deliver To ·
+PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
 PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
 ```
 
 Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The prior width measurements
 are implementation evidence, not dimensions for this expanded target; remeasure before build.
 - `PO Date`: authoritative PO document date, never sending confirmation time.
-- `SO No / Manual Purchase / CO No`: actual structured linked references, individually reachable.
+- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint update, never an automatic one.
   Never invent a CO or Manual Purchase number. A multi-source PO preserves all line allocations.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
 - The three delivery-date columns use the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
@@ -2235,7 +2231,7 @@ Warehouse submits count                (or Operation enters goods directly)
 - **Register columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
   ```text
-  GRN Date · GRN No · SO No / Manual Purchase / CO No / RO No · PO No · Supplier ·
+  GRN Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
   Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date · Goods Received Date ·
   Supplier DO No. · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
   ```
@@ -2244,13 +2240,12 @@ Warehouse submits count                (or Operation enters goods directly)
   `GRN Date` is creation; `Goods Received Date` is physical receipt date/time. They are never
   inferred from one another. `Goods arrived at` is the actual site; `Supplier Deliver To` is the
   instructed destination. `Items` keeps the GRN paper's own recorded item words.
-  The source column shows the receipt's actual linked source reference — the SO No, `Manual
-  Purchase`, the CO No or the RO No — preserve every actual linked reference, blank when none; `PO No` stays its own
-  column (blank for a CO or RO receipt with no PO, never invented). Repair returns are in this
+  The source column shows the receipt's actual linked document numbers — the SO No, the MPR No, the
+  CO No or the RO No — preserve every actual linked reference, blank when none. `PO No` stays its own column (blank for a CO
+  or RO receipt with no PO, never invented). Repair returns are in this
   register: they come back through the one Receiving engine with a GRN (§9.5 matrix, §9.7, Stock
   §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
-  checks it against COPY before it reaches the screen (Purchase Orders' `SO No` column already
-  shows `Manual Purchase` as a value). Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
+  checks it against COPY before it reaches the screen. No word stands in for a missing number. Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
   below 768px; no column hidden by width.
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
