@@ -24,8 +24,9 @@ number, the party and the date already worked out, and one obvious button.
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 §6.7–6.9, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
-Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase
-(Jess 2026-09-18, NOT BUILT); preserve their distinct approval and allocation rules.
+Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch (Jess 2026-09-18, BUILT 2026-09-18 —
+the authenticated production walk is still owed) and §9.2 Manual Purchase (Jess 2026-09-18, NOT
+BUILT); preserve their distinct approval and allocation rules.
 Use the current main versions; open PRs and mockups are not a second authority. Resolve older PR
 text against these rules before merging. Never ask Jess to repeat already recorded UI decisions.
 

@@ -226,7 +226,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
      * may sit inside the nameplate. */
     expect(word.querySelector("svg")).toBeNull();
     expect(word).toHaveClass("text-page");
-    expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("h-[50px]");
+    /* ⭐ 50px IS A FLOOR, NOT A CEILING (2026-09-18). It is exact at every
+       width where the identity fits on one line — which is every desktop
+       canvas — and it grows only when a phone forces the governed 24px word to
+       wrap, because the alternative measured on 390px was the whole page
+       scrolling sideways, which §6.7 rule 8 forbids. */
+    expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("min-h-[50px]");
   });
 
   it("Showroom drops the house name — every showroom is ours (§6.7)", () => {

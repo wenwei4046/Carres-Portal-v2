@@ -1084,6 +1084,26 @@ div:first-child > .columnsMenuGroup {
   outline: 2px solid theme("colors.kit.blue.9");
   outline-offset: 1px;
 }
+/* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN — owner ruling 2026-09-18, UI §6.8.
+   "Headers reserve a common two-line height, 11px/600, normal casing; main
+   header pale blue in this SO Batch reference, child headers neutral slate.
+   This is not a new global blue-header ruling."
+
+   So the PARENT listing's header band takes blue-2 — the palest step the kit
+   has — and every child table inside an expansion keeps slate-3. Two stacked
+   headers eight pixels apart otherwise read as one table that lost its place.
+   Only `headerTone="paleBlue"` draws it; every other Register is untouched,
+   and no page may copy this rule into its own stylesheet.
+
+   THE INK DOES NOT MOVE: slate-11 on blue-2 is the same 11px/600 normal-cased
+   label, and the separator stays the slate rule — this changes a FILL, not a
+   type or contrast decision. */
+.rootHeaderPaleBlue .thead,
+.rootHeaderPaleBlue .th,
+.rootHeaderPaleBlue .thead .stickyCell {
+  background: theme("colors.kit.blue.2");
+}
+
 /* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
    row is in the batch — blue-3 across the WHOLE row, pinned cells included,
    and it outranks hover. An expanded row that is not ticked stays white. */

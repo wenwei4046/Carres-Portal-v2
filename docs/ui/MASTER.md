@@ -1615,7 +1615,27 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+**⭐ ROW 1's 50px IS A FLOOR, NOT A CEILING — BUILT 2026-09-18, a measured defect.**
+At a 390px canvas EVERY destination page scrolled sideways by 30px, which rule 8
+above forbids by name. The cause was one missing rule in `ModuleHeader`: the identity span was
+`shrink-0` at the governed 24px, so `SO Batch Purchase` demanded 260px beside the 144px utility
+cluster inside 366px of usable width. `Jump to…` had collapsed its label under `sm` since it
+shipped; the WORD had no narrow-canvas rule at all.
+
+The word may now WRAP (`min-w-0 break-words`) and the row's 50px became `min-h-[50px]`. **Nothing
+was truncated, nothing was hidden and no phone type step was invented** — a governed label is
+never cut and never sits behind a tooltip, and all four global utilities stay on the row. 50px
+stays EXACT at every width where the identity fits one line. Measured on all 29 real destination
+words: at 1440 every one is a single line in a 51px row (50 + the rule), unchanged; at 390, 11 of
+them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
+component, so all 28 destination pages carry it.
+
+🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
+— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
+takes four lines and a 137px row. It is correct and readable now where it used to blow the page
+open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+
+**ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
 which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
 word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
@@ -1749,9 +1769,23 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · Shared goods tables — approved SO Batch reference
 
-**Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
+**Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
+OWED.** SO Batch listing and stock-picker composition is the
 approved reference for shared component work. Business columns remain owned by each module MASTER;
-Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain editing or reservation powers implicitly.
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain
+editing or reservation powers implicitly, and this build gave none of them any.
+
+**Engine capabilities — BUILT 2026-09-18, all four opt-in, every other Register byte-identical:**
+`DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
+record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
+two); the pair still pins alone and the named column scrolls under the block like any other fact.
+`DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
+tables inside an expansion read as children — it is this reference's treatment and NOT a global
+blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
+`ReadyStockTable layout="picker"` draws the approved six picker columns. **Manual Purchase's own
+§9.2 build inherits these four rather than growing a second set** — the geometry and the
+edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
@@ -1772,10 +1806,27 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+- **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
+  that `vite build` cannot emit): 1440 / 1180 / 820 / 390 and 200% zoom carry no page-level
+  horizontal scroll; both tables take their measured content width and neither stretches to fill
+  the canvas; the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the
+  picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
+  was in the shared destination header and is fixed there — see §6.7 below.
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
-## §6.9 · Connected expansion
+## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
+
+**The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column
+is.** `GoodsMiniTable` draws it inside that cell, in normal flow, as one unbroken 1px rule from
+beneath the disclosure caret to the TOP BORDER of the picker's frame — measured at 1440 in the
+rendered portal: centred on the caret to 0.2px, 1px below it, 0px from the frame's border, and
+unchanged after the goods box is scrolled horizontally. It exists only while that picker is open,
+so there is structurally no line that could run into the next item. The active goods context
+carries a blue boundary; the stock frame stays neutral white, and neither is evidence of a saved
+reservation — what a line holds is its `{n} reserved` count and the Unit IDs in the picker.
+Ready Stock is no longer a sibling SECTION of the expansion: the expansion is the goods table and
+`Purchase order details`, and the retired three-section arrangement does not return.
 
 Use the existing shared connector primitives. The SO row connects to its goods expansion.
 An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the
