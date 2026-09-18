@@ -1393,6 +1393,17 @@ Finance consumes physical movement without maintaining freight allocation in Tra
 
 ### 12.8 Customer Return, Supplier Return and Repair
 
+**Direct inventory repair source — owner-approved target, 2026-09-18; NOT BUILT.**
+Purchasing MASTER §9.7 admits an authorised RO from existing Warehouse, Showroom or Dealer Units,
+including Display, without a Supplier Claim. Location does not establish ownership: supplier-owned
+consignment/display requires owner authority and agreed cost responsibility. Preserve existing
+holds, reservations, custody, eligibility and duplicate-repair guards. Planned pickup defaults from
+actual Stock Location; editing it does not move stock. Outbound proves dispatch; Receiving accepts
+the original Unit against the authorised RO and requires inspection before availability. The 0490
+Claim/Case source restriction needs a scoped extension, not a fabricated Claim or a bypass. §9.7
+owns commercial approval; this section owns physical truth for both direct and Claim-origin repairs.
+
+
 **CURRENT CARRES →** a failed Delivery or return can leave the Unit falsely with Delivery; returned
 goods may become Ready Stock without inspection; Service Case/Supplier Claim closure can be
 mistaken for physical completion; Warehouse may duplicate the owning Return document; repair out

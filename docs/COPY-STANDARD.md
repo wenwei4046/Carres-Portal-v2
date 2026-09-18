@@ -875,6 +875,21 @@ stay on record.` — a discrepancy keeps both facts and overwrites neither.
 
 **PURCHASING** (docs/purchasing/MASTER.md):
 
+### Repair Orders creation and locations — owner ruling 2026-09-18
+
+`Create Repair Order` selects existing inventory Units, including Display at Warehouse, Showroom
+or Dealer locations; it is not permission for an unlinked free-text goods order. Supplier Claim
+is an optional source, not a mandatory prerequisite. Business authority: Purchasing MASTER §9.7.
+Exact words: `RO Doc Date` · `RO No` · `Supplier` · `Supplier Claim No` ·
+`Supplier Pickup Location` · `Supplier Return Location` · `Expected Return Date` ·
+`Repair Requirement` · `Repair Quotation` · `Cost Responsibility` · `Approval`.
+Supplier is the repair-order recipient, not necessarily the original PO supplier. Location words
+name intended pickup and return sites; neither asserts a physical movement or supplier transport.
+`Repair Location`, `Repair by`, and `Repairer` are not this register's headings. Use `Problem` and
+`Evidence` as separate columns. Rejected prototype rail copy is not admitted here; missing records
+must never be labelled as proof that sending or movement did not happen. Existing Issue recording
+and shared evidence-viewer words continue to apply. Scope is approved target, not a built feature.
+
 ### Purchase Returns register — owner-confirmed UI, 2026-09-18
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·

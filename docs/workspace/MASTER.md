@@ -782,6 +782,16 @@ Work is ready for owner acceptance only when all are demonstrable:
 
 ## 6 · Module admission gate
 
+**Repair Orders integration — owner-approved target, 2026-09-18; NOT BUILT.** Purchasing MASTER
+§9.7 admits direct inventory repairs as well as Claim-linked repairs, including Warehouse,
+Showroom and Dealer Display Units. RO quote/approval/Issue/follow-up obligations and the existing
+Outbound/Receiving inspection obligations share this Work engine. No separate repair task list,
+status writer or custody ledger. Every new projection must pass the admission contract below;
+reuse existing physical-work occurrences to avoid duplicate tasks. Duties, cover, permissions,
+source actions and actual completion facts stay with their existing owners. The RO business
+blueprint does not itself admit a production Work rule or define new financial approval limits.
+
+
 A page displaying an action sentence is not enough. A module joins Work only with:
 
 1. authoritative trigger and completion fact;
