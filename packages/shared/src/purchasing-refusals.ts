@@ -94,10 +94,18 @@ export function purchasingRefusal(
       };
 
     // ── THE DECISION (0360 · Card 05) — the Manual Purchase approval door ─
+    /* Owner ruling 2026-09-18 (0533): unheld is its own governed answer —
+       never a fallback to the operations manager or an email list. */
     case "no_purchase_approver":
       return {
-        wrong: "No purchase approver is set.",
-        todo: "Ask management to set the purchase approver.",
+        wrong: "Nobody holds Purchasing Approver.",
+        todo: "Set the holder in Workspace → Staff & Duties.",
+      };
+    /* Owner ruling 2026-09-18 (0533): nobody approves a purchase they raised. */
+    case "own_request":
+      return {
+        wrong: "You cannot decide a purchase you raised.",
+        todo: "Withdraw it if the goods are no longer needed.",
       };
     case "already_decided":
       return {
@@ -474,6 +482,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "no_po_duty_holder",
   "not_purchase_approver",
   "no_purchase_approver",
+  "own_request",
   "already_decided",
   "reason_required",
   "invalid_cut_qty",

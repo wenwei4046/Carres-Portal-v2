@@ -117,8 +117,9 @@ describe.skipIf(!URL)("the order's assigned person → collection owner → cove
     for (const [id, name, role, code, superuser, email] of people) {
       await q("insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing", [id, email]);
       await q(
-        "insert into app_users (id, email, name, role, status, staff_code, operations_superuser) values ($1, $2, $3, $4, 'active', $5, $6) on conflict (id) do nothing",
-        [id, email, name, role, code, superuser],
+        // 0533: the shared login is not a person; every named individual is.
+        "insert into app_users (id, email, name, role, status, staff_code, operations_superuser, is_person) values ($1, $2, $3, $4, 'active', $5, $6, $7) on conflict (id) do nothing",
+        [id, email, name, role, code, superuser, !superuser],
       );
     }
     // Both individuals are in the assignment pool and have opened the portal

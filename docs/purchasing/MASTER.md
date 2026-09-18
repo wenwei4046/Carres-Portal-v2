@@ -289,8 +289,9 @@ retype it.
 Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
 accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
 action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
-Superuser through Principal authority; `operation@carres.com` is the explicitly governed shared
-Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
+Superuser through Principal authority as a principal **person** (`is_operations_superuser`, 0533);
+`operation@carres.com` is the explicitly governed shared Operations Superuser (its flag). The shared
+owner login `principal@carres.com` is not a person and executes no duty (owner ruling 2026-09-18). An ordinary Operations login that is neither duty, cover nor superuser is
 refused. Commercial approval remains separate and never follows from issue authority.
 
 **HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
@@ -1688,41 +1689,31 @@ Banned rail rows remain `Supplier not selected`, `No supplier`, `Not in catalog`
 `Need correction`, `Queues` and safety-days rows. `Supplier not set` is the governed setup
 exception, not a substitute supplier option.
 
-The object's Approval section names the resolved Purchasing Approver through `{name} approves`.
+The object's Approval section names the resolved Purchasing Approver through `{name} approves`,
+or `Nobody holds Purchasing Approver.` when the Duty is unheld.
 Purchasing Settings stores the required Duty key; Staff & Duties resolves the person.
-Operation prepares and submits without price control. Approved requests continue through
-normal PO Duty; approval authority does not grant configuration or issuance authority.
-The existing self-approval and shared Duty resolution rules remain unchanged.
+Operation prepares and submits without price control; the principal role does not raise a Manual
+Purchase. Approved requests continue through normal PO Duty; approval authority does not grant
+configuration or issuance authority. **Nobody decides a Manual Purchase they raised** (owner ruling
+2026-09-18, `own_request`); the requester withdraws instead.
 
-- **THE PURCHASING APPROVER DUTY NOW RESOLVES TO THE DOOR — 0474, verified 2026-09-11.**
-  The approved target was the resolved `Purchasing Approver` Duty, and the route never
-  reached the decision. Staff & Duties has OFFERED the key all along
-  (`workspace-duties.ts`) and writes every assignment to `workspace_duty_assignments`,
-  read by `workspace_resolve_duty` — the Shared Duty Resolver the Constitution's GLOBAL
-  DUTY LAW names — and the Work Engine already carried it as
-  `manual_purchase.approve`'s `ownerDutyKey`. **The door asked a different system
-  entirely:** `purchasing_decide_request` gated on `purchasing_settings_gate`, which reads
-  the HR POSITION table `org_position_duties` for `ops_manager`. Measured on production
-  2026-09-11: `workspace_duty_assignments` holds 13 `po_duty` and 13 `grn_duty` rows and
-  zero `purchasing_approver`, so `Approve purchase` was an ownerless Work row while the
-  Register printed an approver from `ops_manager`, and an assignment made on the Staff &
-  Duties screen could never have reached the decision. **0474 moves the decide door onto
-  its own `purchasing_approver_gate`:** `principal`, or whoever
-  `workspace_resolve_duty('purchasing_approver')` names as today's actor (the assignment,
-  or today's cover), or the `ops_manager` position holder **while that duty resolves to
-  nobody** — a fallback that retires itself the moment the duty is assigned, with no
-  further migration. The gate is deliberately NOT `purchasing_settings_gate`: ten Settings
-  doors call that one, and approving a purchase must not grant the production days, transit
-  days and Deliver To numbers. `canApprove` (the Approve/Refuse controls AND the
-  approver-only money) and the Register's approver name walk the identical three rungs in
-  the identical order, so the name the screen prints and the person the SQL door admits
-  cannot disagree; neither honours the legacy email list, and an unreachable resolver fails
-  soft onto the same `ops_manager` rung rather than a wider gate. **OWNER ACTION OWED:**
-  nobody holds `purchasing_approver` yet — assign it in `Workspace → Staff & Duties`;
-  until then the behaviour is exactly what it was. Card 04's production walk measured the older disagreement
-  (`MPR-20260829-2779`: controls offered, door refused with the raw word `forbidden`); the
-  door's 42501 leaves as the governed two lines (`not_purchase_approver`), naming the
-  resolved approver.
+- **THE PURCHASING APPROVER IS ONE PERSON, RESOLVED — owner rulings (Jess) 2026-09-18, 0533.**
+  `purchasing_decide_request` gates on `purchasing_approver_gate`, which admits exactly one
+  caller: whoever `workspace_resolve_duty('purchasing_approver')` names as today's actor (the
+  holder, or their dated cover), and only while that actor is an active principal **person**.
+  There is no principal-role rung (the shared owner login executes no duty), no `ops_manager`
+  position rung and no email list. The holder and cover must be active Principal people —
+  Operation accounts, Shasha and Yu Jun included, are refused (`invalid_holder` /
+  `invalid_cover`). Unheld refuses `no_purchase_approver` → `Nobody holds Purchasing Approver.` ·
+  `Set the holder in Workspace → Staff & Duties.` The holder away with no eligible cover means
+  the approval **waits**; it is never downgraded to Operation. The requester is refused
+  (`own_request`). `canApprove` (the Approve/Refuse controls and the approver-only money) asks the
+  same resolver and is false on the caller's own request; the approver name is read through
+  `actor_display_names`, because `app_users` row security hides Principal rows from Operation
+  readers. **Bootstrap:** 0533 assigned Jess once from 2026-09-18 (`assigned_by` NULL, note
+  `Bootstrap — owner ruling 2026-09-18 (no second Principal person)`, audit row naming the
+  migration), because no door could name the first holder. The deliberate separation from
+  `purchasing_settings_gate` stands: approving a purchase grants no Settings numbers.
 **Permanent Register.** One request per parent row on the shared DataGrid. The complete
 permanent history remains available in one table, with these mutually exclusive groups:
 
@@ -2003,7 +1994,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   shared Receiving engine. There is no Manual Purchase receipt lane.
 - **One decision refusal dictionary** (Card 05; shared `purchasingRefusal`): the 0360 door's
   refusals leave as the governed two lines — `not_purchase_approver` (naming the resolved
-  approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
+  approver) · `no_purchase_approver` · `own_request` · `already_decided` · `reason_required` ·
   `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
   role or an email.
 - **Work Engine boundary — owner-corrected by Card 06, Duty ruling 2026-09-03 and Card 08
@@ -3237,9 +3228,9 @@ are snapshots, not editable truth or a second settlement ledger.
 |---|---|---|
 | Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
-| Purchasing Approver | approve/reject governed internal buy and commercial exceptions; the resolved holder may approve their own request where the rule permits | replace receiving/PO evidence |
+| Purchasing Approver (an active Principal person; today Jess) | approve/reject governed internal buy and commercial exceptions | decide a Manual Purchase they raised; replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
-| Operations Superuser (`operation@carres.com`, Jess) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
+| Operations Superuser (`operation@carres.com` by its flag; Jess as a principal person — never the shared `principal@` login) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
 | Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
 | Service | intake customer complaints and govern customer remedy; read related stock-claim progress | originate or govern Purchasing stock claims |

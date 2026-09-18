@@ -15,7 +15,9 @@ export const WORKSPACE_DUTIES = [
   // Operation, established from Delivery Duty. No caller remains, so the
   // catalogue no longer offers the assignment.
   { key: "storage_waiver_approver", label: "Storage Waiver Approver" },
-  { key: "purchasing_approver", label: "Purchasing Approver" },
+  // 0533 (owner ruling 2026-09-18): held and covered by an active Principal
+  // PERSON only — Operation staff can never hold or cover it.
+  { key: "purchasing_approver", label: "Purchasing Approver", roles: ["principal"] },
   { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
   { key: "payment_approver", label: "Payment Approver" },
   // 0508: releases money on the Finance side (payment vouchers, cancelling a

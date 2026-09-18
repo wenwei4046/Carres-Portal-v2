@@ -40,28 +40,22 @@ export type DutyHolderMap = Readonly<Record<string, readonly string[]>>;
 // TRANSITION FALLBACK — delete this block one release after 0260 ships
 // ---------------------------------------------------------------------------
 /**
- * The pre-0260 email hardcodes, kept live for ONE release so nobody loses
- * power on switch day. `checkDuty` reports `via: "legacy_email"` whenever the
- * legacy list was the ONLY thing that let someone through — the API logs those
- * hits, and once a clean week passes with zero of them, this block and every
- * reference to it come out.
+ * The pre-0260 email hardcodes, kept for ONE daily-surface reason only.
+ * `checkDuty` reports `via: "legacy_email"` whenever the legacy list was the
+ * ONLY thing that let someone through.
  *
- * Seeding note (why the fallback is not merely belt-and-braces): Jess holds the
- * **COO** seat, and the "Operation Manager" seat is empty. 0260 grants COO the
- * duties so she is covered by the new path from minute one — but the fallback
- * is what makes that verifiable rather than hoped-for.
+ * ⭐ NO APPROVAL READS THIS (owner ruling 2026-09-18, 0533). Deciding a Manual
+ * Purchase is the resolved Purchasing Approver and nobody else; an email list
+ * never names an approver. `jess@carres.com` left both lists the same day:
+ * she is a `principal` person now and passes every gate below by role, so an
+ * email entry for her would only be a second, silent answer to who she is.
+ * What remains is the shared `operation@` login's PIC-manager fallback on the
+ * Sales Orders Team surface (not an approval) — a named carry-forward.
  */
-export const LEGACY_OPS_MANAGER_EMAILS = [
-  "operation@carres.com",
-  "jess@carres.com",
-] as const;
-
-/** STRICTER than manager (Jess 2026-07-19: "can edit roster only me"). */
-export const LEGACY_PO_DUTY_EDITOR_EMAILS = ["jess@carres.com"] as const;
+export const LEGACY_OPS_MANAGER_EMAILS = ["operation@carres.com"] as const;
 
 const LEGACY_EMAILS_BY_DUTY: Partial<Record<DutyKey, readonly string[]>> = {
   ops_manager: LEGACY_OPS_MANAGER_EMAILS,
-  po_duty_editor: LEGACY_PO_DUTY_EDITOR_EMAILS,
   // account_creator / finance_approver / roster_editor are NEW in 0260 —
   // nobody held them via email, so they have no fallback to grant.
 };

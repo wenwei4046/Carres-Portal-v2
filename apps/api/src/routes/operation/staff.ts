@@ -78,7 +78,7 @@ staffRouter.get("/", async (c) => {
   const [users, settings] = await Promise.all([
     sb
       .from("app_users")
-      .select("id, email, name, status, staff_code, last_seen_at")
+      .select("id, email, name, status, staff_code, is_person, last_seen_at")
       .eq("role", "operation")
       .order("email"),
     sb.from("ops_staff_settings").select("user_id, available, note"),
@@ -98,10 +98,11 @@ staffRouter.get("/", async (c) => {
   const staff: OpsStaffMember[] = (users.data ?? [])
     // Disabled accounts drop out of the pool automatically (resign = disable).
     .filter((u) => (u.status ?? "active") === "active")
-    // A duty picker (S2-A) offers individuals only: a People record with a
-    // staff_code, as 0504 requires of anyone who carries responsibility. A
-    // shared login or a test robot records evidence and never holds a duty.
-    .filter((u) => !dutyKey || u.staff_code != null)
+    // A duty picker offers PEOPLE only — the governed `is_person` marker
+    // (0533, owner ruling 2026-09-18), never `staff_code`: the shared owner
+    // login carries CR001. A shared login or a test robot records evidence
+    // and never holds a duty; the SQL doors refuse it either way.
+    .filter((u) => !dutyKey || (u as { is_person?: boolean }).is_person === true)
     .map((u) => {
       const s = byId.get(u.id as string);
       return {

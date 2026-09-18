@@ -942,6 +942,10 @@ export function manualPurchaseRailModel(
 export function manualPurchaseApproverLine(
   names: ReadonlyArray<string | null | undefined>,
 ): string | null {
+  /* 0533 (owner ruling 2026-09-18): unheld is said, never hidden — and never
+     filled from the operations manager or an email list. A resolved approver
+     whose name could not be read prints nothing rather than a false "nobody". */
+  if (names.length === 0) return "Nobody holds Purchasing Approver.";
   const real = names.filter((n): n is string => n != null && n.trim() !== "");
   if (real.length === 0) return null;
   return `${real.join(" or ")} approves`;

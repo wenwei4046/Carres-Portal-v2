@@ -2,7 +2,6 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   DEMAND_PURPOSE_VALUES,
-  LEGACY_OPS_MANAGER_EMAILS,
   expectedArrivalOf,
   isOpsGenericAccount,
   isOtherCreditor,
@@ -22,7 +21,6 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { resolveActorNames } from "../../lib/actor-names";
-import { dutyHolders, myDuties } from "../../lib/duties";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 import {
@@ -157,30 +155,15 @@ function withDatePlan(
  *  `purchasing_decide_request` re-gates in SQL, which is the actual
  *  protection.
  *
- *  ⭐ THE RENDER GATE ASKS EXACTLY WHAT THE DOOR ASKS. That is the whole
- *  point of this function, and it is why it changes whenever the door does.
- *  The old `isOpsManager` check admitted the shared `operation@` login, which
- *  is a manager for other daily surfaces — so the shared login was OFFERED
- *  Approve/Refuse and the door then refused it (measured on production,
- *  MPR-20260829-2779, 2026-08-29).
- *
- *  0474 moved the door onto its own gate — `purchasing_approver_gate`:
- *  `principal`, or an active position holding `purchasing_approver`, or the
- *  `ops_manager` holder while that duty has NO active holder. Deciding a
- *  purchase is no longer the same permission as writing Purchasing Settings,
- *  because `purchasing_settings_gate` still guards those ten Settings doors
- *  and nobody should gain them by being allowed to approve a purchase.
- *  This function walks the identical three rungs, in the identical order,
- *  and — like the door — honours no email list. */
+ *  ⭐ THE RENDER GATE ASKS EXACTLY WHAT THE DOOR ASKS. 0533 (owner rulings
+ *  2026-09-18) left `purchasing_approver_gate` ONE rung: today's resolved
+ *  `purchasing_approver` actor — the holder, or their dated Principal cover.
+ *  No role rung (the shared owner login executes no duty), no `ops_manager`
+ *  rung, no email list. When the holder is away with no cover the approval
+ *  waits for them; it is never handed to Operation. */
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
-  if (c.var.auth.role === "principal") return true;
   const actor = await purchasingApproverActor(c);
-  if (actor.userId != null) return actor.userId === c.var.auth.id;
-  /* The self-retiring rung: the operations manager keeps deciding only while
-     the Purchasing Approver duty has no holder. The moment somebody is
-     assigned, this returns false here and the SQL door refuses there —
-     together, because both read the same resolver in the same order. */
-  return (await myDuties(c)).includes("ops_manager");
+  return actor.userId != null && actor.userId === c.var.auth.id;
 }
 
 /**
@@ -188,94 +171,57 @@ async function canApprove(c: Context<AppEnv>): Promise<boolean> {
  *
  * ⭐ THE SCREEN AND THE DOOR MUST ASK THE SAME SYSTEM. Staff & Duties writes
  * `workspace_duty_assignments` and `workspace_resolve_duty` reads it — that
- * is the Constitution's GLOBAL DUTY LAW and it is what
- * `workspace-duties.ts` has offered `Purchasing Approver` into all along.
- * `org_position_duties` is a DIFFERENT system (the HR position duties:
- * `ops_manager`, `stock_planner`), and reading it here is what made an
- * assignment made on the Staff & Duties screen invisible to this module.
+ * is the Constitution's GLOBAL DUTY LAW. `actor_user_id` is already
+ * `coalesce(today's cover, the assignment)`, so a cover decides while they
+ * cover and not after.
  *
- * `actor_user_id` is already `coalesce(today's cover, the assignment)`, so a
- * buddy covering the approver decides while they cover and not after.
- *
- * FAILS SOFT: an unreachable resolver answers "nobody holds it", which lands
- * on the same `ops_manager` rung the module used before 0474 — never on a
- * wider gate, and never on a 500.
+ * FAILS SOFT to "nobody": an unreachable resolver renders no Approve row and
+ * the SQL door still decides — never a wider gate, never a 500.
  */
 async function purchasingApproverActor(
   c: Context<AppEnv>,
-): Promise<{ userId: string | null; name: string | null }> {
+): Promise<{ userId: string | null }> {
   try {
     const sb = userClient(c.env, c.var.auth.jwt);
     const { data, error } = await sb.rpc("workspace_resolve_duty", {
       p_duty_key: "purchasing_approver",
     });
     if (error || data == null || typeof data !== "object") {
-      return { userId: null, name: null };
+      return { userId: null };
     }
     const raw = data as Record<string, unknown>;
     const userId = typeof raw.actor_user_id === "string" ? raw.actor_user_id : null;
-    return { userId, name: null };
+    return { userId };
   } catch {
-    return { userId: null, name: null };
+    return { userId: null };
   }
 }
 
 /**
- * Card 03 §3 — THE REAL ACTION OWNER'S NAME. The rail says `Need approval`;
- * the Register and object print who actually decides: the resolved
- * `ops_manager` duty holder(s) (Purchasing Settings' own gate — Jess today,
- * changeable in HR without redesigning the rail), falling back to the governed
- * legacy list while the duty seat is empty. A robot or shared-password account
- * is a PERMISSION, not a person (org-duties' own words: "the shared
- * operation@ login is a manager for daily surfaces") — it never prints as the
- * owner while a named person also holds the gate.
+ * THE REAL ACTION OWNER'S NAME — the ONE resolved Purchasing Approver
+ * (holder or today's cover), named through the governed actor-name read
+ * (`actor_display_names`), so an Operation reader sees the Principal's name
+ * even though `app_users` row security hides Principal rows from them.
+ *
+ * Nobody resolved → `[]`, which the screens print as
+ * `Nobody holds Purchasing Approver.` — never the operations manager and
+ * never an email list (owner ruling 2026-09-18: the email fallback is gone).
  */
 async function resolveApprovers(
   c: Context<AppEnv>,
-  users: Array<{ id: string; name: string | null; email: string | null }>,
 ): Promise<Array<{ id: string; name: string | null }>> {
-  /**
-   * ⭐ THE PURCHASING APPROVER IS ASKED FOR FIRST, THROUGH THE SHARED
-   * RESOLVER (0474; owner instruction 2026-09-11, "verify Jess's Purchasing
-   * Approver route through the shared duty authority").
-   *
-   * The Work Engine has named `purchasing_approver` as the owner of
-   * `manual_purchase.approve` since it was written, and Staff & Duties offers
-   * it — but Staff & Duties writes `workspace_duty_assignments`, and this
-   * reader asked `org_position_duties`, which is the HR POSITION duty table
-   * and a different system. Measured on production 2026-09-11: 13 `po_duty`
-   * and 13 `grn_duty` assignments exist there and zero `purchasing_approver`,
-   * so `Approve purchase` had no owner in Work while the Register printed one
-   * from `ops_manager`. Two answers to "who approves this", from two systems.
-   *
-   * The ladder is the SQL gate's own, in the same order, so the name the
-   * screen prints and the person the door admits cannot disagree:
-   *   1. today's resolved `purchasing_approver` — the approved target.
-   *   2. `ops_manager` — ONLY while nobody holds the duty above. It retires
-   *      itself the moment the duty is assigned, in the gate and here.
-   *   3. the legacy email list — last, and only if neither resolves at all,
-   *      so a duty read that fails soft still names somebody.
-   */
   const actor = await purchasingApproverActor(c);
-  let approvers = actor.userId
-    ? users.filter((u) => u.id === actor.userId)
-    : [];
-  if (approvers.length === 0 && actor.userId == null) {
-    const holders = await dutyHolders(c);
-    approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
-    if (approvers.length === 0) {
-      approvers = users.filter((u) =>
-        (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
-      );
-    }
+  if (actor.userId == null) return [];
+  /* The name is a label, never the gate: an unreadable name keeps the
+     approver and prints no name rather than failing the Register. */
+  let name: string | null = null;
+  try {
+    const names = await resolveActorNames(userClient(c.env, c.var.auth.jwt), [actor.userId]);
+    name = names.get(actor.userId) ?? null;
+  } catch {
+    name = null;
   }
-  const isSharedLogin = (email: string | null) =>
-    (email ?? "").toLowerCase() === "operation@carres.com";
-  const named = approvers.filter(
-    (u) => !isOpsGenericAccount(u.email) && !isSharedLogin(u.email),
-  );
-  if (named.length > 0) approvers = named;
-  return approvers.map((u) => ({ id: u.id, name: u.name }));
+  return [{ id: actor.userId, name }];
 }
 
 /**
@@ -658,10 +604,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
   for (const r of [dests, sups, users, cases]) {
     if (r.error) return fail(c, r.error);
   }
-  const approvers = await resolveApprovers(
-    c,
-    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
-  );
+  const approvers = await resolveApprovers(c);
   /* D2 — the ONE requester identity (see `identityResolver`). */
   const requesterOf = identityResolver(
     (users.data ?? []) as Array<{ id: string; email: string | null }>,
@@ -843,10 +786,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email, role"),
   ]);
-  const approvers = await resolveApprovers(
-    c,
-    (users.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
-  );
+  const approvers = await resolveApprovers(c);
 
   /* The request's round history (0522) — every send back, every send again
      and a withdrawal, append-only. An older database without the table
@@ -1073,7 +1013,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     suppliers: purchasingSuppliersOnly(sups.data ?? []),
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
-    canApprove: approver,
+    /* Owner ruling 2026-09-18: nobody decides a purchase they raised. */
+    canApprove: approver && request.created_by !== c.var.auth.id,
     todayIso: todayIsoMYT(),
     planUnavailable,
   });
@@ -1256,11 +1197,9 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
        two lines and names who can actually decide — and when nobody at all
        holds the gate, it says THAT (Card 05 §5). */
     if ((error as { code?: string }).code === "42501") {
-      const { data: users } = await sb.from("app_users").select("id, name, email");
-      const approvers = await resolveApprovers(
-        c,
-        (users ?? []) as Array<{ id: string; name: string | null; email: string | null }>,
-      );
+      const detail42501 = String((error as { details?: string }).details ?? "").trim();
+      if (detail42501 === "own_request") return refuse(c, 403, "own_request");
+      const approvers = await resolveApprovers(c);
       const names = approvers
         .map((a) => (a.name ?? "").trim())
         .filter((n) => n !== "");

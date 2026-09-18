@@ -88,7 +88,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
     for (const [id, role, position, status] of people) {
       const email = `it-fa-${role}-${id.slice(-4)}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
-      await q("insert into app_users (id, email, name, role, status, position_id) values ($1, $2, $3, $4, $5, $6)", [
+      await q("insert into app_users (id, email, name, role, status, position_id, is_person) values ($1, $2, $3, $4, $5, $6, true)", [
         id, email, `IT ${role} ${id.slice(-4)}`, role, status, position,
       ]);
     }
