@@ -804,6 +804,22 @@ correction preserves lineage.
 The local rail helps find records and work; it does not become a second Work Engine or show PIC
 summary. Action ownership uses structured avatar metadata.
 
+**SHARED PURCHASING GOODS-TABLE APPEARANCE — APPROVED / NOT BUILT (owner review 2026-09-18).** The
+Purchase Orders expansion is the accepted sample; SO Batch Purchase, Manual Purchase and Purchase
+Returns reuse the appearance and keep their own fields (SO Batch/Manual Purchase keep Ready Stock,
+Ordered Qty, To buy and the other buying facts; Purchase Returns keeps Unit ID, Who has it and
+Handover). Sales Orders and Delivery Orders are unchanged this round: the look is opt-in per page,
+never a changed `GoodsMiniTable` default.
+- Item comes first where the page shows it; the table is content-width and starts under the
+  parent's first data column, never stretched across the whole row.
+- One set of column widths per page, so expansions opened together line up.
+- Item column capped (candidate 336px = 320 text + 16 padding; longest sample name ~285px at 13px
+  Inter); longer names wrap in full — never cut.
+- Minimum row height of two lines (item 13/18 + variant 12/16 + 8px padding ≈ 50px); rows grow for
+  wrapped names or larger text, never fixed-height truncation.
+- Kit look: white, 6px radius, light border, slate-3 header with 11/600 slate-11 normal-case labels,
+  8px cells, column dividers.
+
 ### 8.2 Object Detail
 
 - View is full width and usually one scroll: WORK, authoritative facts, lines/Units, source,
@@ -2088,7 +2104,9 @@ Use complete supplier-date labels outside the group context, including active-co
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Deliver To`.
+**Expansion — APPROVED / NOT BUILT (owner review 2026-09-18):** read-only ordered goods `Item · Qty ·
+Deliver To` (SKU stays in the PO object's Goods lines), drawn with the shared Purchasing goods-table
+appearance (§8.1). Sample: https://claude.ai/artifact/V1J8orWZAoyzjRTV3kws8k.
 **Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
@@ -3066,17 +3084,57 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source Claim/PO/GRN, Units/Qty, Collect From, Collection Date,
-Handover, Credit Consequence, Work.
-**Journey:** system creates from outcome → check exact goods → send return PDF → record collection
-date → scan/count at handover → upload proof.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** supplier refuses collection, partial collection, wrong Unit collected, credit note
-missing/different.
-**Connections:** Purchasing stock claim, Stock custody, supplier, Finance credit read-only.
+**PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18).** Mockup:
+https://claude.ai/artifact/RFt7X6cz9gKaVvH1brzxFV (sample data). Widths are candidates until the
+build measures them in the real DOM; the signed-in 1440/1180/820/390 walk is owed.
+
+**Purpose / source:** return Carres-owned purchased goods to the supplier. A return is born only
+from an approved Supplier Claim outcome `Return` on goods Carres received against a PO line (a GRN
+proves ownership). No blank `+ New`. Goods rejected at arrival never became Carres stock — no
+Purchase Return. Unordered extra goods with no PO line are the supplier's property — no Purchase
+Return; they go back through Receiving's extra-goods record. Consignment goods use Consignment
+Returns. Never invent a purchase source or stock.
+
+**Identity and dates:** the Return No. and `Return Date` are born together when the approved outcome
+creates the return. `Return Date` is that creation date — never a collection or handover date and
+never derived from another date.
+
+**Register (same frame as SO Batch Purchase):** grid in the white panel with the 8px canvas gap;
+checkbox (export only) and expand columns; `leadingColumns` {`Return Date`, `Return No.`} pinned at
+canvas ≥768px, `Return No.` alone below; no column hidden by width. Columns: Return Date · Return No.
+· Supplier · Supplier Claim No. · PO No · GRN No. · Items (`{first item} + {n} more`, like Purchase
+Orders) · Qty · Collect From · Collection Date · Handover · Credit Consequence. One fact per column;
+no Work column. One row is one return document. Groups: `Open`, then `Collected` (starts collapsed).
+Footer `{N} Purchase Returns` / `1 Purchase Return` / `{n} of {N} Purchase Returns`; no quantity total.
+**Left rail:** Return — `PDF not sent` · `Collection date missing` · `Handover proof missing` ·
+`Part collected` · `Collected` (missing facts are facts); Supplier; Collect From.
+
+**Handover:** `Not collected` · `Part collected` with `{n} of {N}` · `Collected`. Collected means the
+supplier has the goods. Goods handed to NETS Logistics show `Who has it: NETS Logistics` and are not
+yet Collected; supplier receipt evidence is required. Warehouse Outbound scans and records every
+handover; issuing the document never moves goods.
+
+**Row expansion (one job):** the goods — Item (name, variant on the second line) · Qty · Unit ID ·
+Who has it · Handover, per Unit, using the shared Purchasing goods-table appearance (§8.1).
+
+**Object (one scroll, full width, no tabs):** Purchase Orders-style header — back, `Return No. ·
+Supplier`, meta line `V{n} · PDF not sent/sent · Handover`, ‹ n of N ›, neutral Revise / Download
+PDF. Amber work card with the one blue action. Sections as kit `Panel`: Return (supplier, Return
+Date, source Claim + Authorised Outcome, Credit Consequence) · Goods (per Unit) · Collection (Collect
+From, Collection Date with the supplier's agreement evidence or `Not recorded`, Handover, proof,
+door to Outbound) · History.
+
+**Issue / revise:** 50/50 only while issuing or revising (stacks below 1130px, §8.2). Confirm with
+`PDF sent` after staff really sent it (records version, channel, recipient, actor, time). A new
+version changes only goods not yet collected; collected facts never change.
+
+**Cancel / revise after partial handover:** only the Units not yet collected; collected facts stay.
+The return closes when every Unit is Collected or cancelled with a reason.
+
+**Exceptions:** supplier refuses collection → back to the Supplier Claim decision; wrong Unit
+collected → Outbound exception + Stock; credit note missing/different → Supplier Claim + Finance.
+**Connections:** Supplier Claim (source and credit), Stock/Outbound custody, supplier, Finance credit
+read-only.
 
 ### 9.7 Repair Orders
 

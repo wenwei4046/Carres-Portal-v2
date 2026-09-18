@@ -1821,6 +1821,23 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | Supplier Claims footer | `{N} Supplier Claims` · `1 Supplier Claim` · `{n} of {N} Supplier Claims` | Claim count only; no quantity total |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
+### Purchase Returns words — APPROVED (Jess, 2026-09-18) · NOT BUILT
+
+Purchasing MASTER §9.6 words are reused as written (`Return No.` · `Collect From` · `Collection Date`
+· `Handover` · `Credit Consequence` · `PDF not sent` · `Collection date missing` · `Handover proof
+missing` · `Part collected` · `Collected`). Added:
+
+| Word | Meaning |
+|---|---|
+| `Return Date` | The date the approved outcome created the return (its leading register date). Never a collection or handover date |
+| `Not collected` | No Unit of the return has been collected yet |
+| `PDF sent` | Staff confirm they really sent the return PDF; records version, channel, recipient, actor and time. Never claims supplier receipt |
+| `Who has it` | The current holder of a Unit, read from Stock (e.g. `NETS Warehouse`, `NETS Logistics`, the supplier) |
+| `No Purchase Returns yet.` · `No Purchase Returns match these filters` · `Purchase Returns could not be loaded` | Register empty / filtered-empty / read-failure states |
+| `{N} Purchase Returns` · `1 Purchase Return` · `{n} of {N} Purchase Returns` | Footer; returns only, no quantity total |
+
+A transport company is `Logistics` (e.g. `NETS Logistics`), never `Carrier`.
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.
