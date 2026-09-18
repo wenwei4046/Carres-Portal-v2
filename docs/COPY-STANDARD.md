@@ -3605,3 +3605,10 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+### Receiving approved goods expansion — 2026-09-18
+
+`Category · Supplier · Supplier Deliver To · PO No / Ref No` (Unit ID beneath) `· Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty`.
+This is the read-only expansion of a saved GRN, not a purchasing selector. Normal GRNs have no
+Status column; cancelled ones show `Cancelled` beneath GRN No. Rail date and exception counts
+are counts of GRN records, never uncompleted tasks or product quantities.
