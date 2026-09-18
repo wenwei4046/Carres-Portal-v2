@@ -11,6 +11,7 @@ import {
 import {
   PO_SAFETY_DAYS_NONE,
   poSafetyDaysOf,
+  poSafetyDaysWord,
   tightestPoSafetyDays,
 } from "./purchasing-safety-days";
 
@@ -217,5 +218,39 @@ describe("PO Safety Days", () => {
   it("nothing outstanding is BLANK — a finished request is not late and not early", () => {
     expect(tightestPoSafetyDays("2026-09-18", [])).toEqual(PO_SAFETY_DAYS_NONE);
     expect(tightestPoSafetyDays("2026-09-18", [null, null]).days).toBeNull();
+  });
+
+  /**
+   * ⛔ THE SIGNED NUMBER IS FOR THE SORT, NOT FOR THE CELL. SO Batch's shipped
+   * cell already refuses a negative in a days column; the dictionary applies
+   * the shared margin display to Manual Purchase, so the refusal is the
+   * formatter's, not one page's private habit.
+   */
+  it("⛔ A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER — a passed date is WORDS", () => {
+    const passed = poSafetyDaysOf("2026-09-18", "2026-09-15");
+    expect(poSafetyDaysWord(passed, "Order date passed")).toBe("Order date passed");
+    expect(poSafetyDaysWord(passed, "Order date passed")).not.toMatch(/-\d/);
+  });
+
+  it("a real margin is its own number, and the lane's word is not used", () => {
+    const live = poSafetyDaysOf("2026-09-18", "2026-09-25");
+    expect(poSafetyDaysWord(live, "Order date passed")).toBe("5");
+  });
+
+  it("nothing to state is null — the formatter never invents an absence word", () => {
+    expect(poSafetyDaysWord(PO_SAFETY_DAYS_NONE, "Order date passed")).toBeNull();
+  });
+
+  /**
+   * THE SENTENCE IS THE LANE'S, because the FACT is the lane's: SO Batch's
+   * negative means supplier production cannot make the customer's date; Manual
+   * Purchase's means the day to order by has gone. A caller that passes no word
+   * gets null rather than the other lane's claim.
+   */
+  it("a caller that names no word gets null, never another lane's sentence", () => {
+    expect(poSafetyDaysWord(poSafetyDaysOf("2026-09-18", "2026-09-15"))).toBeNull();
+    expect(
+      poSafetyDaysWord(poSafetyDaysOf("2026-09-18", "2026-09-15"), "Not enough production days"),
+    ).toBe("Not enough production days");
   });
 });

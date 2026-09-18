@@ -2324,13 +2324,13 @@ describe("GET /purchasing/requests/:id/stock-allocation", () => {
 });
 
 /* ════════════════════════════════════════════════════════════════════════
- * THE DEPLOY WINDOW — code on `main` before 0534 is applied
+ * THE DEPLOY WINDOW — code on `main` before 0546 is applied
  *
  * ⭐ `main` deploys the code; the migration lands through its own governed
  * path. Between them the allocation column does not exist, and the Register
  * must keep working — but it must NOT start guessing.
  * ════════════════════════════════════════════════════════════════════════ */
-describe("the Register before 0534 is applied", () => {
+describe("the Register before 0546 is applied", () => {
   const LINES = [
     {
       id: "dddddddd-0000-0000-0000-0000000000a1",

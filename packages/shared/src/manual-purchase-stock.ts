@@ -28,7 +28,7 @@ import { readyStockIdentityScopeSchema, readyStockOwnershipSchema } from "./so-b
  *                        owner forbade.
  * ```
  *
- * The intent is a STORED fact (`purchase_requests.fulfilment_intent`, 0534).
+ * The intent is a STORED fact (`purchase_requests.fulfilment_intent`, 0546).
  * It is never inferred from the SKU, from the shelf count, or from the
  * purpose — `Other Purchase` in particular answers nothing at all.
  *
@@ -69,7 +69,7 @@ export const manualPurchaseStockBlockSchema = z.enum([
   "nothing_left_to_buy",
   /** The line is marked not going ahead. */
   "line_not_going_ahead",
-  /** A request minted before 0534 has no MPR No to commit a Unit to. */
+  /** A request minted before 0546 has no MPR No to commit a Unit to. */
   "request_has_no_number",
 ]);
 export type ManualPurchaseStockBlock = z.infer<typeof manualPurchaseStockBlockSchema>;
@@ -177,7 +177,7 @@ export type ManualPurchaseStockLine = z.infer<typeof manualPurchaseStockLineSche
 
 export const manualPurchaseStockResponseSchema = z.object({
   requestId: z.string(),
-  /** The MPR No a saved Unit is committed to; `null` on a pre-0534 request. */
+  /** The MPR No a saved Unit is committed to; `null` on a pre-0546 request. */
   reference: z.string().nullable(),
   /** The STORED answer, or `null` when the request never recorded one. */
   intent: manualPurchaseIntentSchema.nullable(),
@@ -289,7 +289,7 @@ export function manualPurchaseStockRefusal(code: string | null | undefined): {
 /**
  * ⭐ WHAT A MANUAL PURCHASE LINE STILL HAS TO BUY — ONE ARITHMETIC (Law D).
  *
- * The SQL twin is `purchasing_mpr_line_remaining_requirement` (0534) and the
+ * The SQL twin is `purchasing_mpr_line_remaining_requirement` (0546) and the
  * two are the same expression written twice on purpose: the browser needs it
  * to draw a number before the round trip, the door needs it on the locked row
  * so a tab left open cannot over-commit. A contract test pins them together.

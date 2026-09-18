@@ -166,7 +166,7 @@ export const MANUAL_PURCHASE_WORDS = {
    */
   colStatus: "Status",
   colMprNo: "MPR No",
-  /** A request minted between 0424 and 0534 stored no number. The absence is
+  /** A request minted between 0424 and 0546 stored no number. The absence is
    *  a FACT and is never an invented `MPR-…`; the row still opens. */
   mprNotRecorded: "Not recorded",
   colPoSafetyDays: "PO Safety Days",

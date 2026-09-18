@@ -16,7 +16,9 @@ import {
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import { apiFetch } from "@/lib/api";
-import StockPickerTable, { type StockPickerRow } from "./components/StockPickerTable";
+import ReadyStockTable, {
+  type ReadyStockTableRow,
+} from "./components/ReadyStockTable";
 
 /**
  * ⭐ MANUAL PURCHASE · READY STOCK — the ALLOCATION section
@@ -129,10 +131,17 @@ export function ReadyStockCell({
         ) : null}
       </span>
       {/* A DISCLOSURE ONLY WHERE THERE IS SOMETHING TO DISCLOSE — zero
-          available with nothing saved has no table to open, and a control that
+          available with nothing to say has no table to open, and a control that
           opens nothing is a dead control (`03-page-patterns.md:149`). A SAVED
-          choice keeps its door open at zero availability, always. */}
-      {line.units.length > 0 ? (
+          choice keeps its door open at zero availability, always.
+
+          ⭐ AND A REASON IS SOMETHING TO DISCLOSE. A line that cannot choose
+          stock — not approved yet, additional replenishment, no recorded intent
+          — has no Units and therefore had no door, so the one sentence that
+          says WHY never reached the operator and the cell read as a bare
+          `0 available`. The ruling asks for the explanation, so the door opens
+          wherever there is either stock to show or a reason to give. */}
+      {line.units.length > 0 || line.stockBlock != null ? (
         <button
           type="button"
           aria-expanded={open}
@@ -240,20 +249,29 @@ export function ManualPurchaseStockFrame({
     [onDraft, qc, requestId, save],
   );
 
-  const rows: StockPickerRow[] = line.units.map((u) => ({
+  /**
+   * ⭐ THE SHARED PICKER, NOT A SECOND ONE (UI MASTER §6.8).
+   *
+   * SO Batch built `ReadyStockTable layout="picker"` for the same six approved
+   * columns; Manual Purchase INHERITS it rather than growing a twin. The shape
+   * is mapped here because the WIRE shape is this lane's and the TABLE's shape
+   * is the shared component's — one changing must not silently change the
+   * other.
+   */
+  const rows: ReadyStockTableRow[] = line.units.map((u) => ({
     itemId: u.itemId,
     unitCode: u.unitCode,
     identityScope: u.identityScope,
     sku: u.sku,
-    goodsReceivedDate: u.goodsReceivedDate,
-    stockLocation: u.stockLocation,
-    supplier: u.supplier,
-    sourceRef: u.sourceRef,
     condition: u.condition,
+    siteName: u.stockLocation,
     ownership: u.ownership,
+    supplier: u.supplier,
     qty: u.qty,
-    reservedForThisLine: u.reservedForThisLine,
+    dateIn: u.goodsReceivedDate,
+    poNo: u.sourceRef,
   }));
+  const reservedById = new Map(line.units.map((u) => [u.itemId, u.reservedForThisLine]));
   const blockedById = new Map(line.units.map((u) => [u.itemId, u.blocked]));
 
   const canChoose = block == null;
@@ -302,28 +320,28 @@ export function ManualPurchaseStockFrame({
       {rows.length === 0 ? (
         <p className="px-2 py-2 text-label text-kit-slate-11">{MW.stockNoneMatches}</p>
       ) : (
-        <StockPickerTable
+        <ReadyStockTable
+          layout="picker"
           label={`${MW.colReadyStock} for ${reference ?? MW.page} · ${line.item}`}
           rows={rows}
           selection={
             canChoose
               ? {
-                  isChosen: (itemId) => chosen.has(itemId),
-                  onToggle: (itemId) => {
+                  isChosen: (itemId: string) => chosen.has(itemId),
+                  onToggle: (itemId: string) => {
                     const next = new Set(draft ?? saved);
                     if (next.has(itemId)) next.delete(itemId);
                     else next.add(itemId);
                     setSaved0k(false);
                     onDraft(next);
                   },
-                  isRefused: (itemId) => refusedUnit === itemId,
-                  frozen: save.isPending,
-                  blockedWord: (row) => {
+                  isRefused: (itemId: string) => refusedUnit === itemId,
+                  blockedWord: (row: ReadyStockTableRow) => {
                     const b = blockedById.get(row.itemId) ?? null;
                     /* A Unit this line ALREADY HOLDS is never blocked by the
                        remainder its own allocation created — unticking it is
                        the only way back. */
-                    if (row.reservedForThisLine) return null;
+                    if (reservedById.get(row.itemId)) return null;
                     return b ? MANUAL_PURCHASE_STOCK_UNIT_BLOCKED_WORDS[b] : null;
                   },
                 }

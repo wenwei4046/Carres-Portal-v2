@@ -288,7 +288,7 @@ export type FreeStockUnit = {
   supplier: string | null;
   identityScope: string;
   dateIn: string | null;
-  /** 0534 — the Unit's OWN source document, for the approved stock picker's
+  /** 0546 — the Unit's OWN source document, for the approved stock picker's
    *  `PO No / Ref No` column. It is the goods' provenance, never the purchase
    *  that happens to be looking at them. */
   poNo: string | null;

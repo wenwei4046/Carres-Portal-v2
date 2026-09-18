@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 0534 · A MANUAL PURCHASE HAS A NUMBER AGAIN, AND ITS LINE CAN HOLD READY
+-- 0546 · A MANUAL PURCHASE HAS A NUMBER AGAIN, AND ITS LINE CAN HOLD READY
 --        STOCK
 --
 -- Owner rulings 2026-09-18 (docs/purchasing/MASTER.md §9.2; docs/ui/MASTER.md
@@ -63,7 +63,7 @@ alter table public.purchase_requests
   alter column req_no set default public.allocate_formal_document_code('MPR');
 
 comment on column public.purchase_requests.req_no is
-  'The Manual Purchase Request identity — `MPR-YYYYMMDD-RRRR` from allocate_formal_document_code (0381), allocated at creation, permanent and never reused (owner ruling 2026-09-18, which OVERWRITES Card 08''s 2026-09-04 retirement in 0424). MPR = Manual Purchase Request; `MP` is never used, it is already the Mattress Protector SKU code. Rows raised between 0424 and 0534 store NULL and are NOT backfilled (CLAUDE.md §6): they print the governed absence and open through the row, never an invented number. Pre-0401 `REQ-####` identities print exactly as stored and stay searchable.';
+  'The Manual Purchase Request identity — `MPR-YYYYMMDD-RRRR` from allocate_formal_document_code (0381), allocated at creation, permanent and never reused (owner ruling 2026-09-18, which OVERWRITES Card 08''s 2026-09-04 retirement in 0424). MPR = Manual Purchase Request; `MP` is never used, it is already the Mattress Protector SKU code. Rows raised between 0424 and 0546 store NULL and are NOT backfilled (CLAUDE.md §6): they print the governed absence and open through the row, never an invented number. Pre-0401 `REQ-####` identities print exactly as stored and stay searchable.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 2 · I2 · The recorded intent — the ONE fact that decides whether existing
@@ -111,7 +111,7 @@ alter table public.ops_stock_items
   );
 
 comment on column public.ops_stock_items.reserved_purchase_demand_id is
-  '0534 — the Manual Purchase LINE (purchase_demands.id) this Unit answers. Written ONLY by ops_stock_pool_draw through purchasing_allocate_ready_units, cleared by ops_stock_release. It is the MPR twin of reserved_order_line_id and the two are mutually exclusive by constraint: a Unit answers one line, never both. A request has several lines, so reserved_ref (the MPR No) can never say which one — that is why this column exists.';
+  '0546 — the Manual Purchase LINE (purchase_demands.id) this Unit answers. Written ONLY by ops_stock_pool_draw through purchasing_allocate_ready_units, cleared by ops_stock_release. It is the MPR twin of reserved_order_line_id and the two are mutually exclusive by constraint: a Unit answers one line, never both. A request has several lines, so reserved_ref (the MPR No) can never say which one — that is why this column exists.';
 
 -- ⚠️ BOTH VIEWS, IN THIS ORDER. `stock_unit_register_v` reads
 -- `stock_unit_availability_v`, which selects an EXPLICIT column list from
@@ -221,7 +221,7 @@ as $function$
 $function$;
 
 comment on function public.purchasing_mpr_line_remaining_requirement(uuid, uuid) is
-  '0534 — what a Manual Purchase line still has to BUY: its approved quantity (coalesce(approved_qty, qty); a cancelled line is 0) less what purchase orders already took (issued_qty) less the Ready Stock Units bound to this exact line. One arithmetic for the allocation door, the Issue PO gate and the Register (Law D).';
+  '0546 — what a Manual Purchase line still has to BUY: its approved quantity (coalesce(approved_qty, qty); a cancelled line is 0) less what purchase orders already took (issued_qty) less the Ready Stock Units bound to this exact line. One arithmetic for the allocation door, the Issue PO gate and the Register (Law D).';
 
 grant execute on function public.purchasing_mpr_line_remaining_requirement(uuid, uuid)
   to authenticated;
@@ -288,7 +288,7 @@ begin
     raise exception 'item_or_sku_required' using errcode = '22023';
   end if;
 
-  -- ── 0534 · A UNIT ANSWERS ONE LINE, AND TWO KINDS OF LINE EXIST ──────────
+  -- ── 0546 · A UNIT ANSWERS ONE LINE, AND TWO KINDS OF LINE EXIST ──────────
   if p_order_line_id is not null and p_purchase_demand_id is not null then
     raise exception 'one_binding_only' using errcode = '22023',
       detail = 'a Unit answers a Sales Order line or a Manual Purchase line, never both';
@@ -381,7 +381,7 @@ begin
     end if;
   end if;
 
-  -- ── 0534 · THE MANUAL PURCHASE BRANCH ───────────────────────────────────
+  -- ── 0546 · THE MANUAL PURCHASE BRANCH ───────────────────────────────────
   --
   -- Every guard the SO branch has, asked of the facts a Manual Purchase line
   -- actually carries, plus the two this lane owns: the request must be
@@ -546,7 +546,7 @@ grant execute on function public.ops_stock_pool_draw(text, text, text, uuid, tex
   to authenticated;
 
 comment on function public.ops_stock_pool_draw(text, text, text, uuid, text, text, uuid, uuid, uuid) is
-  '0534 — 0471/0473''s pool draw plus the MANUAL PURCHASE LINE a Unit may answer. The Sales Order branch is unchanged. The Manual Purchase branch asks the same questions of the facts an MPR line carries (exact Unit, not counted stock, goods match by stock_match_key, available by the one availability arithmetic, remaining requirement above zero) and two of its own: the request is APPROVED, and it recorded a CONCRETE NEED — additional replenishment is never netted against the shelf. The two bindings are mutually exclusive, in this door and by table constraint.';
+  '0546 — 0471/0473''s pool draw plus the MANUAL PURCHASE LINE a Unit may answer. The Sales Order branch is unchanged. The Manual Purchase branch asks the same questions of the facts an MPR line carries (exact Unit, not counted stock, goods match by stock_match_key, available by the one availability arithmetic, remaining requirement above zero) and two of its own: the request is APPROVED, and it recorded a CONCRETE NEED — additional replenishment is never netted against the shelf. The two bindings are mutually exclusive, in this door and by table constraint.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 6 · RELEASE GIVES BACK BOTH BINDINGS
@@ -573,7 +573,7 @@ BEGIN
          -- 0471: the line goes with the reference. The customer still owes the
          -- goods, so the requirement must return to SO Batch Purchase.
          reserved_order_line_id = NULL,
-         -- 0534: and the Manual Purchase line goes with it for the same
+         -- 0546: and the Manual Purchase line goes with it for the same
          -- reason — a released Unit must stop answering a purchase line, or
          -- that line reads as covered by goods it no longer holds.
          reserved_purchase_demand_id = NULL,
@@ -607,7 +607,7 @@ revoke all on function public.ops_stock_release(uuid) from public, anon;
 grant execute on function public.ops_stock_release(uuid) to authenticated;
 
 comment on function public.ops_stock_release(uuid) is
-  '0534 — the release door, unchanged except that it now clears reserved_purchase_demand_id beside reserved_order_line_id. A released Unit answers nothing: both requirements return to their own buying surface.';
+  '0546 — the release door, unchanged except that it now clears reserved_purchase_demand_id beside reserved_order_line_id. A released Unit answers nothing: both requirements return to their own buying surface.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 7 · I4 · ONE SAVE — additions and removals together, all or none
@@ -689,7 +689,7 @@ begin
   end if;
   if v_req.req_no is null then
     -- Every Unit taken from the pool is committed to a named reference
-    -- (`ref_required`). A request minted before 0534 has no number, so it has
+    -- (`ref_required`). A request minted before 0546 has no number, so it has
     -- nothing honest to commit to — and inventing one here would put a
     -- fabricated document number in the stock ledger for ever.
     raise exception 'request_has_no_number' using errcode = '22023';
@@ -797,7 +797,7 @@ grant execute on function public.purchasing_allocate_ready_units(uuid, uuid[], u
   to authenticated;
 
 comment on function public.purchasing_allocate_ready_units(uuid, uuid[], uuid[]) is
-  '0534 — the ONE Manual Purchase stock save (owner ruling 2026-09-18). It receives the COMPLETE desired set for one MPR line and reconciles: releases every Unit that left it, draws every Unit that joined it, in one transaction, all or none — including an empty set, which releases everything. It adds no stock rule of its own: every guard, ledger row and audit row is ops_stock_pool_draw''s and ops_stock_release''s. p_expected_item_ids is the optimistic check — the saved set the browser was editing; a different current set refuses the whole save with stock_selection_changed so nobody overwrites somebody else''s allocation.';
+  '0546 — the ONE Manual Purchase stock save (owner ruling 2026-09-18). It receives the COMPLETE desired set for one MPR line and reconciles: releases every Unit that left it, draws every Unit that joined it, in one transaction, all or none — including an empty set, which releases everything. It adds no stock rule of its own: every guard, ledger row and audit row is ops_stock_pool_draw''s and ops_stock_release''s. p_expected_item_ids is the optimistic check — the saved set the browser was editing; a different current set refuses the whole save with stock_selection_changed so nobody overwrites somebody else''s allocation.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 7b · A UNIT SAVED OFF THE SHELF IS NOT BOUGHT AGAIN
@@ -859,7 +859,7 @@ begin
     raise exception 'demand is cancelled' using errcode = 'P0001', detail = 'already_cancelled';
   end if;
 
-  -- 0534 · what Ready Stock already answers for this exact line.
+  -- 0546 · what Ready Stock already answers for this exact line.
   select coalesce(sum(coalesce(i.qty, 1)), 0) into v_held
     from ops_stock_items i
    where i.reserved_purchase_demand_id = p_id
@@ -892,7 +892,7 @@ end;
 $function$;
 
 comment on function public.purchasing_demand_record_issue(uuid, integer, text) is
-  '0534 — 0522''s issue recorder, with the ceiling reduced by the Ready Stock Units saved against this exact Manual Purchase line. A Unit taken off the shelf for a line is not bought again; the original ask (`qty`) is untouched, as is the approver''s cut.';
+  '0546 — 0522''s issue recorder, with the ceiling reduced by the Ready Stock Units saved against this exact Manual Purchase line. A Unit taken off the shelf for a line is not bought again; the original ask (`qty`) is untouched, as is the approver''s cut.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 8 · The create door records the intent
@@ -969,7 +969,7 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'ops_stock_pool_draw';
   if v_n <> 1 then
-    raise exception '0534 sanity: the draw door must stay ONE door, found %', v_n;
+    raise exception '0546 sanity: the draw door must stay ONE door, found %', v_n;
   end if;
 
   select count(*) into v_n
@@ -977,7 +977,7 @@ begin
    where table_schema = 'public' and table_name = 'ops_stock_items'
      and column_name = 'reserved_purchase_demand_id';
   if v_n <> 1 then
-    raise exception '0534 sanity: the Manual Purchase binding column is missing';
+    raise exception '0546 sanity: the Manual Purchase binding column is missing';
   end if;
 
   select count(*) into v_n
@@ -985,7 +985,7 @@ begin
    where table_schema = 'public' and table_name = 'purchase_requests'
      and column_name = 'fulfilment_intent';
   if v_n <> 1 then
-    raise exception '0534 sanity: the recorded intent column is missing';
+    raise exception '0546 sanity: the recorded intent column is missing';
   end if;
 
   select count(*) into v_n
@@ -993,7 +993,7 @@ begin
    where table_schema = 'public' and table_name = 'stock_unit_register_v'
      and column_name = 'reserved_purchase_demand_id';
   if v_n <> 1 then
-    raise exception '0534 sanity: the register view does not carry the binding';
+    raise exception '0546 sanity: the register view does not carry the binding';
   end if;
 
   if (select pg_get_expr(adbin, adrelid)
@@ -1001,7 +1001,7 @@ begin
         join pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
        where d.adrelid = 'public.purchase_requests'::regclass
          and a.attname = 'req_no') is null then
-    raise exception '0534 sanity: MPR No has no allocator again';
+    raise exception '0546 sanity: MPR No has no allocator again';
   end if;
 end;
 $sanity$;

@@ -562,7 +562,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
      *
      * A failed read is UNKNOWN, not zero: it sets `linesUnavailable`, which
      * keeps the row out of `No PO needed` and refuses its tick by name. The ONE
-     * exception is the deploy window before 0534 (`isMissingAllocationColumn`),
+     * exception is the deploy window before 0546 (`isMissingAllocationColumn`),
      * where no allocation can exist because there is nowhere to store one.
      */
     const lineIds = lines.map((l) => l.id as string);
@@ -579,7 +579,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
           held.error.message,
         );
       } else if (held.error) {
-        /* Pre-0534: the column is not there, so nothing is allocated. */
+        /* Pre-0546: the column is not there, so nothing is allocated. */
         lines = lines.map((l) => ({ ...l, stock_reserved_qty: 0 }));
       } else {
         const byLine = new Map<string, number>();
@@ -1129,7 +1129,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
 });
 
 /**
- * ⭐ THE DEPLOY WINDOW — 0534 IS NOT APPLIED YET, AND THAT MUST NOT BREAK THE
+ * ⭐ THE DEPLOY WINDOW — 0546 IS NOT APPLIED YET, AND THAT MUST NOT BREAK THE
  * REGISTER.
  *
  * `main` deploys the code; the migration is applied through its own governed
@@ -1148,7 +1148,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
  * guess — which is exactly why this narrow code, and only this code, is
  * tolerated. Every OTHER failure stays UNKNOWN and still refuses the tick.
  *
- * DELETE THIS the day 0534 is verified applied in production. It is a
+ * DELETE THIS the day 0546 is verified applied in production. It is a
  * deploy-window tolerance, not a permanent rule (0471's delegator, same debt,
  * paid the same day).
  */
@@ -1264,7 +1264,7 @@ function stockUnitOf(
  * there.
  *
  * WHICH OF THE TWO A REQUEST IS, IS READ, NEVER GUESSED
- * (`purchase_requests.fulfilment_intent`, 0534). Not from the SKU, not from
+ * (`purchase_requests.fulfilment_intent`, 0546). Not from the SKU, not from
  * the shelf count, and not from the purpose — `Other Purchase` answers
  * nothing. A request that recorded neither gets the goods READ-ONLY and a
  * sentence saying so.
@@ -2308,7 +2308,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   // the same function).
   /* ⭐ WHAT READY STOCK ALREADY ANSWERS — subtracted here so the PREVIEW and
      the document agree with the door. `purchasing_demand_record_issue` applies
-     the same reduction on the locked row (0534), so a stale tab is refused
+     the same reduction on the locked row (0546), so a stale tab is refused
      rather than allowed to buy a sofa that is already standing in Klang. */
   const heldByDemand = new Map<string, number>();
   const liveLineIds = (allLines ?? [])
@@ -2320,7 +2320,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       .select("reserved_purchase_demand_id, qty")
       .in("reserved_purchase_demand_id", liveLineIds)
       .in("status", ["reserved", "sold"]);
-    /* Pre-0534 the column is not there and nothing is allocated, so there is
+    /* Pre-0546 the column is not there and nothing is allocated, so there is
        nothing to subtract; any OTHER failure still stops the issue, because
        issuing against an unread allocation would buy goods twice. */
     if (heldErr && !isMissingAllocationColumn(heldErr)) return fail(c, heldErr);

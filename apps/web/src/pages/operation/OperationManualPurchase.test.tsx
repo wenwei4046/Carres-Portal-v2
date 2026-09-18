@@ -1755,15 +1755,8 @@ describe("Card 03 §3 · the approval owner's name", () => {
  * remainder · PO Duty existing ONLY beside a selection.
  */
 describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)", () => {
-  /**
-   * ⭐ A GROUPED REGISTER STATES ITS COLUMNS INSIDE EACH EXPANDED GROUP
-   * (owner ruling 2026-09-18). It is still ONE header — one definition, one
-   * set of widths, one sort — drawn where it is read.
-   */
-  const headerRows = (grid: HTMLElement) =>
-    [...grid.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"]')];
   const heads = (grid: HTMLElement) =>
-    [...(headerRows(grid)[0]?.querySelectorAll("th") ?? [])]
+    [...grid.querySelectorAll("thead th")]
       .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
       .filter((t) => t !== "");
 
@@ -1812,17 +1805,6 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     }
   });
 
-  it("EVERY expanded group draws the SAME header, and the header above the groups is gone", async () => {
-    await loaded();
-    const grid = screen.getByTestId("register-column");
-    const rows = headerRows(grid);
-    expect(rows.length).toBeGreaterThan(1);
-    const shape = rows.map((r) =>
-      [...r.querySelectorAll<HTMLElement>("th")].map((th) => `${th.title}:${th.style.width}`),
-    );
-    for (const s of shape.slice(1)) expect(s).toEqual(shape[0]);
-    expect(grid.querySelectorAll("thead th")).toHaveLength(0);
-  });
 
   it("⭐ `Status` and `Approval Status` are INDEPENDENT — Need PO may stand beside Need approval", async () => {
     await loaded();
@@ -1857,11 +1839,35 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(order).toEqual([`mp-open-${REQ1}`, `mp-open-${REQ2}`, `mp-open-${REQ3}`]);
   });
 
+  /**
+   * `PO Safety Days` is measured against TODAY, so a fixture date would flip
+   * from margin to overrun as the calendar moves. Both tests below state the
+   * case they mean as an offset from today instead.
+   */
+  function orderByInDays(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function withReq1OrderBy(iso: string) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const answer = respond(url, init);
+      if (answer !== REGISTER) return Promise.resolve(answer);
+      return Promise.resolve({
+        ...REGISTER,
+        lines: REGISTER.lines.map((l) =>
+          l.request_id === REQ1 ? { ...l, order_by: iso } : l,
+        ),
+      });
+    });
+  }
+
   it("`PO Safety Days` is a MARGIN, and an unplannable line is never 0", async () => {
+    withReq1OrderBy(orderByInDays(30));
     await loaded();
-    /* REQ1 has an engine Order By, so it has a real working-day margin — a
-       COUNT, never the date itself. */
-    expect(screen.getByTestId(`mp-safety-days-${REQ1}`).textContent).toMatch(/^-?\d+$/);
+    /* REQ1 has an engine Order By still ahead of us, so it has a real
+       working-day margin — a COUNT, never the date itself. */
+    expect(screen.getByTestId(`mp-safety-days-${REQ1}`).textContent).toMatch(/^\d+$/);
     expect(screen.getByTestId(`mp-safety-days-${REQ1}`).textContent).not.toContain("Sep");
     /* REQ2 cannot be planned (no Supplier × Category production days). UNKNOWN
        says so; `0` would read as *order today or you are late*. */
@@ -1869,6 +1875,20 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     /* REQ3 has nothing left to buy: no margin is owed, so the cell is blank
        rather than alarming. */
     expect(screen.queryByTestId(`mp-safety-days-${REQ3}`)).toBeNull();
+  });
+
+  it("⛔ A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER — past the date is a STATE", async () => {
+    /* SO Batch's shipped cell already refuses one ("never a negative number in
+       a days column") and the dictionary applies the shared margin display
+       here. `-18` is not a margin of minus eighteen days; it is the fact that
+       the day to order by is behind us, and a reader should not have to decode
+       a minus sign to learn it. The sort still reads the signed number, so the
+       worst row stays first. */
+    withReq1OrderBy(orderByInDays(-30));
+    await loaded();
+    const cell = screen.getByTestId(`mp-safety-days-${REQ1}`);
+    expect(cell.textContent).toBe("Order date passed");
+    expect(cell.textContent).not.toMatch(/-\d/);
   });
 
   it("the customer columns are BLANK where no customer is named — never invented", async () => {
@@ -1995,17 +2015,13 @@ describe("R2 · group membership", () => {
       return base(url, init);
     });
   }
-  /**
-   * ⭐ A GROUP IS ITS OWN `<tbody>` (owner ruling 2026-09-18) — which is what
-   * bounds its sticky header at the group boundary. So a row's group is simply
-   * the body it is in, rather than a walk back up the siblings.
-   */
-  const groupOfRow = (id: string) =>
-    screen
-      .getByTestId(`mp-row-${id}`)
-      .closest("tbody")
-      ?.getAttribute("data-testid")
-      ?.replace("grid-group-body-", "grid-group-");
+  const groupOfRow = (id: string) => {
+    let el = screen.getByTestId(`mp-row-${id}`).previousElementSibling;
+    while (el && !(el.getAttribute("data-testid") ?? "").startsWith("grid-group-")) {
+      el = el.previousElementSibling;
+    }
+    return el?.getAttribute("data-testid");
+  };
 
   it("⭐ an approved request whose lines could not be read stays in To buy, says so, and refuses the tick", async () => {
     withRegister({ ...REGISTER, lines: [], linesUnavailable: true });
@@ -2139,7 +2155,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     expect(within(box).getByTestId("goods-mini-table")).toBeInTheDocument();
     /* The leading cell is the selection checkbox's — chrome, not a ruled
        column (law ④: selection is a capability a page ASKS for). */
-    const heads = [...box.querySelectorAll("th")]
+    const heads = [...box.querySelectorAll("thead th")]
       .map((th) => th.textContent?.trim())
       .filter((t) => t !== "");
     expect(heads).toEqual([
@@ -2342,7 +2358,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     /* UI MASTER §6.9 — the line leaves the cell it was opened from and
        touches the TOP BORDER of the frame. It is drawn from the locked column
        widths, so it does not move when the table finishes loading. */
-    const connector = within(box).getByTestId("goods-detail-connector-l2");
+    const connector = within(box).getByTestId("goods-connector-l2");
     expect(connector).toBeInTheDocument();
     /* The frame rides in the goods table's own row, so it scrolls sideways
        WITH the cell it belongs to. */
@@ -2355,11 +2371,13 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
-    const table = await within(box).findByTestId("stock-picker-table");
-    /* A two-line heading is ONE name; the `title` carries it whole, because
-       two block spans concatenate in the DOM with no space between them. */
+    const frame = await within(box).findByTestId("mp-stock-frame-l2");
+    const table = within(frame).getByRole("table");
+    /* The shared picker (`ReadyStockTable` `layout="picker"`) prints each
+       heading as one string, so the cell's own text IS the whole name. The
+       leading select cell is chrome and carries no heading. */
     const heads = [...table.querySelectorAll<HTMLElement>("th")]
-      .map((th) => th.title)
+      .map((th) => th.textContent ?? "")
       .filter((t) => t !== "");
     expect(heads).toEqual([
       "Goods Received Date",
@@ -2369,9 +2387,14 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
       "Condition",
     ]);
     const row = within(box).getByTestId(
-      "stock-picker-unit-11111111-1111-1111-1111-111111111111",
+      "ready-stock-unit-11111111-1111-1111-1111-111111111111",
     );
-    expect(row.textContent).toContain("2026-08-01");
+    /* THE DATE IS A DATE. `2026-08-01` reaches the cell as a bare date (the
+       route slices the stored timestamp) and prints in the portal's ONE date
+       spelling — never a second, raw-ISO spelling of its own. What the ruling
+       forbids is the TIME, so that is what is asserted against. */
+    expect(row.textContent).toContain("Sat, 1 Aug");
+    expect(row.textContent).not.toMatch(/\d{2}:\d{2}/);
     expect(row.textContent).toContain("Carres Klang");
     expect(row.textContent).toContain("Ohana");
     /* The Unit's OWN source document, with its Unit ID on line two. */
@@ -2387,7 +2410,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
-    await within(box).findByTestId("stock-picker-table");
+    await within(box).findByTestId("mp-stock-frame-l2");
     const before = apiFetch.mock.calls.filter((c: unknown[]) =>
       String(c[0]).includes("/stock-allocation") && (c[1] as RequestInit | undefined)?.method === "POST",
     ).length;
@@ -2444,7 +2467,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     /* The cell states BOTH counts, on their own lines. */
     expect(await within(box).findByText("1 reserved")).toBeInTheDocument();
     fireEvent.click(within(box).getByTestId("mp-stock-disclosure-l2"));
-    await within(box).findByTestId("stock-picker-table");
+    await within(box).findByTestId("mp-stock-frame-l2");
     /* ⛔ NO PER-UNIT UNDO — one journey, four controls, and the first is
        `Change selection`. */
     expect(within(box).queryByText("Undo")).toBeNull();
@@ -2513,6 +2536,61 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     expect(within(box).queryByTestId("mp-stock-save-l2")).toBeNull();
   });
 
+  it("⭐ A REASON IS SOMETHING TO DISCLOSE — a blocked line with NO Units still opens", async () => {
+    /* The read-only reasons reached the operator only on lines that happened to
+       have stock to list. A line that cannot choose — not approved, additional
+       replenishment, no recorded intent — usually has no Units at all, so it
+       had no door and the cell read as a bare `0 available` with the one
+       sentence that explains it unreachable. A dead control is a control that
+       opens NOTHING; a control that opens the explanation is the opposite. */
+    withStock(
+      STOCK({
+        approved: false,
+        lines: [
+          {
+            ...STOCK().lines[0],
+            stockBlock: "not_approved",
+            availableQty: 0,
+            reservedQty: 0,
+            units: [],
+          },
+        ],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
+    expect(await within(box).findByTestId("mp-stock-block-l2")).toHaveTextContent(
+      "Stock can be chosen after this purchase is approved.",
+    );
+  });
+
+  it("⛔ AND A DOOR THAT WOULD OPEN NOTHING IS STILL NOT DRAWN", async () => {
+    /* No Units and no reason to give: there is nothing behind the caret, so
+       there is no caret. The count still prints, because `0 available` is the
+       one place `0` may appear. */
+    withStock(
+      STOCK({
+        lines: [
+          {
+            ...STOCK().lines[0],
+            stockBlock: null,
+            availableQty: 0,
+            reservedQty: 0,
+            units: [],
+          },
+        ],
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
+    await within(box).findByTestId("goods-mini-table");
+    expect(within(box).queryByTestId("mp-stock-disclosure-l2")).toBeNull();
+    expect(box.textContent).toContain("0 available");
+  });
+
   it("LOADING AND FAILURE NEVER PRINT `0`", async () => {
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
@@ -2543,7 +2621,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
-    await within(box).findByTestId("stock-picker-table");
+    await within(box).findByTestId("mp-stock-frame-l2");
     fireEvent.click(within(box).getByRole("checkbox", { name: "Choose U1-000-014" }));
     fireEvent.click(within(box).getByTestId("mp-stock-save-l2"));
     const refusal = await within(box).findByTestId("mp-stock-refusal-l2");
@@ -2560,7 +2638,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ2}`);
     fireEvent.click(await within(box).findByTestId("mp-stock-disclosure-l2"));
-    await within(box).findByTestId("stock-picker-table");
+    await within(box).findByTestId("mp-stock-frame-l2");
     fireEvent.click(within(box).getByRole("checkbox", { name: "Choose U1-000-014" }));
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     fireEvent.click(screen.getByTestId("mp-issue-selected"));
@@ -3061,8 +3139,7 @@ describe("Card 06 · the Register's date facts and lens order", () => {
        `Customer Requested Delivery Date`, and the dictionary forbids
        substituting Manual Purchase's own required-arrival date for it. The
        internal date keeps its authoritative home on the object. */
-    const heads = [...grid.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"] th')]
-      .map((th) => th.title);
+    const heads = [...grid.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title);
     expect(heads).not.toContain("Delivery Date");
     expect(heads).toContain("Customer Requested Delivery Date");
   });

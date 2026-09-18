@@ -53,6 +53,12 @@ function req(over: Record<string, unknown>): Record<string, unknown> {
     for_staff_user_id: null,
     for_subsidiary_name: null,
     created_by: U_SITI,
+    /* THE SERVER'S ONE IDENTITY, exactly as the register read carries it
+       (`requested_by_name` / `requested_by_user_id`) — the page never looks a
+       requester up a second time, so a fixture that seeds only `created_by`
+       would make a working column read `Staff identity not recorded`. */
+    requested_by_name: "Siti",
+    requested_by_user_id: U_SITI,
     destination_id: KLANG,
     ...over,
   };
@@ -166,7 +172,20 @@ const REGISTER = {
     { id: PO_C, po_no: "PO-20260827-9012", official_delivery_date: "2026-09-30",
       supplier_id: S_OHANA },
   ],
-  serviceCases: [{ id: SC_1, case_no: "SC-20260815-3311" }],
+  /* A linked Service Case carries the CUSTOMER facts the four customer columns
+     print — the case's customer, and the linked order's requested delivery date
+     and delivery locality. All four are `null` on a case with no order, which is
+     what the unlinked requests above walk. */
+  serviceCases: [
+    {
+      id: SC_1,
+      case_no: "SC-20260815-3311",
+      customer_name: "Tan Mei Ling",
+      requested_delivery_date: "2026-09-12",
+      delivery_city: "Klang",
+      delivery_state: "Selangor",
+    },
+  ],
   destinations: [
     { id: KLANG, name: "Carres Klang" },
     { id: BULOH, name: "AL Sungai Buloh" },
@@ -392,7 +411,12 @@ function stockAnswer(requestId: string) {
       ],
     };
   }
-  /* ① Other Purchase — approved nothing yet, and it recorded NO intent. */
+  /* ① Other Purchase — approved nothing yet, and it recorded NO intent.
+     THE `demandId` IS THE REGISTER'S OWN LINE ID. The goods row, the cell, the
+     frame and the connector share one identity, so a fixture that invented a
+     second id would make every cell read `Not checked` — the truthful answer to
+     a read that carried no entry for the line, and exactly the wrong state to
+     walk the read-only reasons on. */
   return {
     requestId,
     reference: null,
@@ -400,7 +424,9 @@ function stockAnswer(requestId: string) {
     approved: requestId !== R1,
     lines: [
       {
-        demandId: `l-${requestId}-a`,
+        demandId:
+          (REGISTER.lines.find((l) => l.request_id === requestId)?.id as string) ??
+          `l-${requestId}-a`,
         sku: "CASTOR-75",
         item: "Castor 75mm",
         requestedQty: 8,

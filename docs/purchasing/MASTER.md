@@ -1176,7 +1176,7 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / BUILT, exactly in this order:**
+**Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
 Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
@@ -1246,7 +1246,33 @@ widened with the optional mapping columns 2026-08-27, and with an optional `PO N
 `Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
 actually answer, and siblings that do not ask render byte-identically).
 
-**SO Batch approved listing and stock-selection UI — Jess, 2026-09-18 · APPROVED / NOT BUILT.**
+**SO Batch approved listing and stock-selection UI — Jess, 2026-09-18 · BUILT 2026-09-18 · authenticated production walk OWED.**
+
+**BUILD RECORD.** The approved composition below is implemented on the real
+Register, the shared `GoodsMiniTable` and the shared `ReadyStockTable`; no mock
+HTML or CSS was transplanted. The saved layout key moved to
+`carres.soBatchPurchase.register.v7` (the only key that moved). Migration
+`0545_a_ready_stock_choice_is_saved_whole_or_not_at_all` adds
+`so_batch_save_ready_units`, the replacement door `Save changes` presses: it
+gives back what the chosen set drops through `ops_stock_release`, then takes
+what it gains through the existing atomic `so_batch_reserve_ready_units`, inside
+ONE transaction. It decides nothing of its own (Architecture Law C), releases
+BEFORE it draws so a swap on a one-piece line is not refused as already covered,
+refuses to take back a `sold` Unit by name, and never rewinds the append-only
+pool ledger (0292). Proved as SQL against a real Postgres, plus the route,
+component and engine suites; the whole listing and picker were walked at
+1440 / 1180 / 820 / 390 and at 200% zoom on the real components. **OWED: the
+authenticated production walk, and the Worker/Pages SHA verification.**
+
+**THE 390px 🔴 FOUND ON THAT WALK IS FIXED, IN THE SHARED HEADER — 2026-09-18.**
+At a 390px canvas every destination page scrolled sideways by 30px. The Register
+never caused it — its grid scrolls inside its own box (client 374px, content
+1709px) — and every overflowing element sat in the shared `ModuleHeader`
+destination row. The fix is there, not here, and not behind a purchasing flag:
+UI MASTER §6.7 carries it. Re-measured on all 29 real destination words at 1440
+and 390: 0px page overflow, nothing clipped, the governed 24px kept, and 1440
+unchanged at exactly 51px.
+
 
 The goods table is `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To`.
 No SKU, Ordered Qty, To buy, Order By or PO Safety Days column in this actionable expansion.
@@ -1383,9 +1409,19 @@ business. Selection is summarised once, in the toolbar, and never repeated at th
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
-**READY STOCK — reservation engine built; approved replacement UI above NOT BUILT.**
+**READY STOCK — reservation engine built; the approved replacement UI above BUILT 2026-09-18.**
 The item-cell disclosure and draft/edit/save journey above govern presentation. The following
-stock eligibility and transaction safeguards remain in force.
+stock eligibility and transaction safeguards remain in force, unchanged by it.
+
+- **THE READ CARRIES WHAT THE PICKER PRINTS.** `stock_unit_register_v.po_no` rides the wire as
+  the document reference, the receipt `date_in` as a DATE, and a Unit already committed to one of
+  this order's item lines rides back marked with the line it answers — so `Change selection` can
+  show and remove exactly what was saved even when free availability is zero. A Unit is named
+  once. `lineIds` answers *what is on the shelf for this item line* and `matchingLineIds` answers
+  *what may be committed now*: a covered line whose shelf is full must not read as an empty shelf.
+- **THE ITEM LINE IS STRUCTURAL, NOT TYPED.** The picker opens beneath ONE item row, so the
+  retired `For item line` dropdown is gone and the exact line id still reaches the door, which
+  still refuses to guess (0471).
 
 - **Reading it reserves nothing.** The read is lazy (opened rows only) and writes no row. Selecting
   a Unit still writes nothing. Only `Choose Ready Unit` writes, and its selection is entirely
@@ -1598,10 +1634,10 @@ Supplier Deliver To · PO No · PO Default Delivery Date
 ```
 
 **Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
-the 2026-09-04 MPR retirement. BUILT in 0534.** Each Manual Purchase request has its own number
+the 2026-09-04 MPR retirement. BUILT in 0546.** Each Manual Purchase request has its own number
 `MPR-YYYYMMDD-RRRR` (§6.1), allocated when the request is created, permanent and never reused.
-0534 restores the `allocate_formal_document_code('MPR')` default that 0424 dropped. **Rows raised
-between 0424 and 0534 stored NULL and are NOT backfilled** (CLAUDE.md §6): they print the governed
+0546 restores the `allocate_formal_document_code('MPR')` default that 0424 dropped. **Rows raised
+between 0424 and 0546 stored NULL and are NOT backfilled** (CLAUDE.md §6): they print the governed
 absence `Not recorded`, open from the row and its menu, and no number is invented to fill a column.
 A stored `REQ-####` does not print under `MPR No` either — the ruling promises those "stay
 searchable", a weaker promise than the one it makes for MPR, and Card 08 retired the series from
@@ -1686,7 +1722,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   (0422), never a hard-coded 14 days. `Edit and send again` opens the same form on the returned
   request, prefilled once, purpose locked, sending `Send again for approval`.
 
-**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / BUILT (migration 0534).**
+**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / BUILT (migration 0546).**
 The parent has checkbox and a separate goods-disclosure button before Status. Approval Status
 and Status are independent. For a known outstanding request, Status is `Need PO` even while
 Approval Status is `Need approval`; neither the PO tick nor stock Save is allowed before approval.
@@ -1734,7 +1770,7 @@ failed) · `Not checked` (the read answered for the request and carried no entry
 All-stock fulfillment must save without creating a PO. Bind allocation to the exact MPR item line,
 NEVER fabricate an SO binding or call an SO-only reservation endpoint with an MPR ID.
 
-**BUILT — migration 0534, the allocation backend the approval called for.**
+**BUILT — migration 0546, the allocation backend the approval called for.**
 `ops_stock_items.reserved_purchase_demand_id` names the exact `purchase_demands` line a Unit
 answers; it is mutually exclusive with `reserved_order_line_id` by table CHECK, so one Unit can
 never answer a customer line and an internal purchase line at once. The ONE writer is still
@@ -1754,14 +1790,14 @@ releases or reservations. No second stock totals or duplicate writer. Persisted 
 drive counters, Status and buying quantities after refresh (`stock_reserved_qty` on the register
 read). Refusal preserves the unsaved choices with the governed explanation.
 
-**THE RECORDED INTENT — `purchase_requests.fulfilment_intent` (0534).**
+**THE RECORDED INTENT — `purchase_requests.fulfilment_intent` (0546).**
 `concrete_need` = existing Units may answer this request and a saved allocation reduces the
 remaining procurement quantity. `additional_stock` = buying EXTRA; existing stock is reference and
 is never netted. **NULL = not recorded**, which is its own state: the stock section shows read-only
 and says so. It is never inferred from the SKU, the shelf count or the purpose.
 **PROPOSAL / NOT LAW — the create form asks the question.** The ruling requires a RECORDED intent
 but does not say where it is recorded; `purchasing_create_request` therefore takes an optional
-`p_fulfilment_intent`, and every request raised before 0534 keeps NULL and states the gap.
+`p_fulfilment_intent`, and every request raised before 0546 keeps NULL and states the gap.
 Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
 column is dropped and the derivation replaces it.
 

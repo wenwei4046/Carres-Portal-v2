@@ -1,8 +1,18 @@
 /**
+ * ⛔ THE THREE-SECTION SO BATCH ARRANGEMENT IS RETIRED — owner ruling
+ * 2026-09-18 (UI §6.9: *"do not recreate the retired three-sibling-section SO
+ * Batch arrangement"*). `Ready Stock` is a CELL on the item row now, and its
+ * Units open directly beneath that row.
+ *
+ * This page is kept as the reference for what did NOT change — the
+ * `ConnectedSections` grammar and `PoDetailsTable`, which other modules still
+ * draw — and it must not be read as SO Batch's expansion. That is
+ * `so-batch-listing-preview.html`, which renders the real Register.
+ *
  * SO BATCH EXPAND · THE THREE CONNECTED SECTIONS — DEV ONLY.
  *
  * The REAL components — `ConnectedSections`, `GoodsMiniTable`,
- * `StockDisclosure` + `StockPickerTable`, `PoDetailsTable` — drawn the way
+ * `ReadyStockDisclosure` + `ReadyStockTable`, `PoDetailsTable` — drawn the way
  * an expanded Sales Order row draws them, with a stand-in parent row above and
  * a second Sales Order below it, so the two things the drawing has to prove can
  * actually be LOOKED AT:
@@ -27,10 +37,10 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import GoodsMiniTable, { type GoodsMiniLine } from "@/pages/operation/components/GoodsMiniTable";
-import StockPickerTable, {
-  StockDisclosure,
-  type StockPickerRow,
-} from "@/pages/operation/components/StockPickerTable";
+import ReadyStockTable, {
+  ReadyStockDisclosure,
+  type ReadyStockTableRow,
+} from "@/pages/operation/components/ReadyStockTable";
 import ConnectedSections, {
   CONNECT_AT_DISCLOSURE,
   CONNECT_AT_TABLE_HEADER,
@@ -180,18 +190,16 @@ const PO_ROWS: PoDetailRow[] = [
   })),
 ];
 
-const STOCK_ROWS: StockPickerRow[] = [
+const STOCK_ROWS: ReadyStockTableRow[] = [
   {
     itemId: "1",
     unitCode: "id-vyf051985",
     identityScope: "unit",
     sku: "JAGER-SS",
     condition: "new",
-    goodsReceivedDate: "2026-08-14",
-    stockLocation: "Carres Klang",
-    sourceRef: "PO-20260801-1121",
+    siteName: "Carres Klang",
     ownership: "carres_owned",
-    supplier: "Ohana",
+    supplier: null,
     qty: 1,
   },
   {
@@ -200,9 +208,7 @@ const STOCK_ROWS: StockPickerRow[] = [
     identityScope: "quantity",
     sku: "MP-K",
     condition: null,
-    goodsReceivedDate: null,
-    stockLocation: "Carres Klang",
-    sourceRef: null,
+    siteName: "Carres Klang",
     ownership: "carres_owned",
     supplier: null,
     qty: 893,
@@ -259,21 +265,21 @@ function Expansion() {
       key: "ready-stock",
       connectAt: CONNECT_AT_DISCLOSURE,
       node: (
-        <StockDisclosure
+        <ReadyStockDisclosure
           testId="preview-ready-stock"
           open={stockOpen}
           onToggle={() => setStockOpen((v) => !v)}
           className=""
         >
-          <StockPickerTable label="Ready Stock for SO-1203" rows={STOCK_ROWS} />
-        </StockDisclosure>
+          <ReadyStockTable label="Ready Stock for SO-1203" rows={STOCK_ROWS} />
+        </ReadyStockDisclosure>
       ),
     },
     {
       key: "po-details",
       connectAt: CONNECT_AT_DISCLOSURE,
       node: (
-        <StockDisclosure
+        <ReadyStockDisclosure
           testId="preview-po-details"
           open={poOpen}
           onToggle={() => setPoOpen((v) => !v)}
@@ -281,7 +287,7 @@ function Expansion() {
           className=""
         >
           <PoDetailsTable label="Purchase order details for SO-1203" rows={PO_ROWS} />
-        </StockDisclosure>
+        </ReadyStockDisclosure>
       ),
     },
   ];

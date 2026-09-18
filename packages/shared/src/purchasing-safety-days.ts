@@ -98,9 +98,31 @@ export function tightestPoSafetyDays(
 }
 
 /**
- * THE CELL'S WORDS. A number is a number; an unknown margin says so, in the
- * governed absence the rest of the portal uses for a fact nobody recorded.
+ * ⛔ THE CELL'S WORDS — AND A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER.
+ *
+ * SO Batch's shipped cell already refuses one ("production that overruns the
+ * customer's date prints the sentence that says so, never a negative number in
+ * a days column"), and the dictionary says the shared margin display applies to
+ * Manual Purchase too. `-18` under a heading called `PO Safety Days` is not a
+ * margin of minus eighteen days; it is a state — the date to order by is behind
+ * us — and a reader has to decode a minus sign to learn it. Low English and low
+ * computer literacy is the design target; a sentence costs nothing here.
+ *
+ * ⚠️ THE SENTENCE IS THE LANE'S, BECAUSE THE FACT IS THE LANE'S. SO Batch's
+ * negative says SUPPLIER PRODUCTION CANNOT MAKE THE CUSTOMER'S DATE
+ * (`Not enough production days`). Manual Purchase's says THE DAY TO ORDER HAS
+ * PASSED (`Order date passed`). Printing either lane's sentence on the other
+ * would state a fact nobody measured, so the caller passes its own governed
+ * word and this function decides nothing but WHEN it is used.
+ *
+ * `null` = nothing to state: no margin is owed (nothing left to buy) or none
+ * could be computed. The cell prints its own absence; this never invents one.
  */
-export function poSafetyDaysWord(m: PoSafetyDays): string | null {
-  return m.days == null ? null : String(m.days);
+export function poSafetyDaysWord(
+  m: PoSafetyDays,
+  passedWord?: string,
+): string | null {
+  if (m.days == null) return null;
+  if (m.passed) return passedWord ?? null;
+  return String(m.days);
 }

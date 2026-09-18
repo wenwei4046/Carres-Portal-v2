@@ -1520,40 +1520,21 @@ facts, permissions, complete-record populations or task ownership.
 7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
    goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
    Collapsed records remain in totals; missing/failed data must not imply zero or completion.
-8. **GROUP-LOCAL HEADERS — OWNER RULING (Jess, 2026-09-18) · BUILT.** ⛔ **This REPLACES the
-   one-header-above-the-groups rule for every GROUPED Register**, which is superseded and is not
-   an alternative: a grouped listing no longer draws a header above its groups at all.
+8. **GROUP-LOCAL HEADERS — OWNER RULING (Jess, 2026-09-18).** A grouped Register draws its
+   column header inside each EXPANDED group, below that group's heading; a COLLAPSED group shows
+   its heading and its count only; the single header above the groups is superseded. All groups
+   share one column definition, widths, visibility, sorting and resizing state, the current
+   group's header stays sticky within that group and stops at its boundary, pinned date/identity
+   behaviour is preserved, and an ungrouped Register keeps one sticky header.
 
-   ```text
-   Need approval  3
-     Status │ Proceed Date │ MPR No │ …     ← its own header, sticky within THIS group
-     …records…
-   Need PO  2
-     Status │ Proceed Date │ MPR No │ …     ← the SAME header, drawn where it is read
-     …records…
-   No PO needed  8                          ← collapsed: heading and count only
-   ```
+   ⚠️ **MEASURED, AND IT DECIDES THE STRUCTURE: one `<tbody>` per group does NOT hold its sticky
+   header.** A table cell's containing block is the TABLE, not the `<tbody>`, so the first group's
+   header escapes and sits over the next group's rows. Measured in Chromium 2026-09-18: with group
+   one scrolled entirely away (its bottom at −7px) its header was still pinned at 9px, over group
+   two. **One table per group, sharing one `<colgroup>` and one layout,** is what makes the shared
+   widths true by construction and the boundary real. The engine implementation and the full
+   ruling live in §6.10, owned by the Purchase Orders round; no page writes a local copy.
 
-   A **collapsed** group shows its heading and its count and nothing else — a header naming
-   columns for records nobody can see is a header for an empty screen. An **expanded** group states
-   its columns immediately below its own heading, then its records. **All groups share ONE column
-   definition, widths, visibility, sorting and resizing state**; they each show the one header, they
-   do not each own one. The current group's header stays sticky while the operator scrolls within
-   that group and **stops at the group boundary**. Pinned date/identity behaviour is unchanged
-   inside it. An **UNGROUPED Register keeps its single sticky header** and is byte-identical.
-
-   **Engine — BUILT 2026-09-18, once, in `DataGrid`.** The header cells are extracted to one
-   `headerCells()` and drawn either in the table's `<thead>` (ungrouped) or inside each expanded
-   group. Each group renders as **its own `<tbody>`**, and that is what makes the boundary real
-   rather than approximate: a `position: sticky` row is held by its scrolling ancestor AND by its
-   containing block, so inside one `<tbody>` every group's header would stick at the same offset
-   and stack on the last one. With a `<tbody>` per group the GROUP is the containing block, its
-   heading and header ride down with it and slide away at its last row, and there is structurally
-   nothing for them to run on into. Group headings sit at `top: 0`, the column header at the
-   heading's own 38px. **Adopted automatically by every grouped Register** — SO Batch Purchase,
-   Manual Purchase and Purchase Orders — because it is engine behaviour, not a page option; no
-   page-local copy exists and none may be written. Each page keeps its own business rules, default
-   group expansion and selection behaviour unchanged. **Owed:** the authenticated production walk.
 9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
@@ -1649,7 +1630,27 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+**⭐ ROW 1's 50px IS A FLOOR, NOT A CEILING — BUILT 2026-09-18, a measured defect.**
+At a 390px canvas EVERY destination page scrolled sideways by 30px, which rule 8
+above forbids by name. The cause was one missing rule in `ModuleHeader`: the identity span was
+`shrink-0` at the governed 24px, so `SO Batch Purchase` demanded 260px beside the 144px utility
+cluster inside 366px of usable width. `Jump to…` had collapsed its label under `sm` since it
+shipped; the WORD had no narrow-canvas rule at all.
+
+The word may now WRAP (`min-w-0 break-words`) and the row's 50px became `min-h-[50px]`. **Nothing
+was truncated, nothing was hidden and no phone type step was invented** — a governed label is
+never cut and never sits behind a tooltip, and all four global utilities stay on the row. 50px
+stays EXACT at every width where the identity fits one line. Measured on all 29 real destination
+words: at 1440 every one is a single line in a 51px row (50 + the rule), unchanged; at 390, 11 of
+them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
+component, so all 28 destination pages carry it.
+
+🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
+— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
+takes four lines and a 137px row. It is correct and readable now where it used to blow the page
+open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+
+**ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
 which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
 word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
@@ -1783,15 +1784,23 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · Shared goods tables — approved SO Batch reference
 
-**Jess, 2026-09-18 · APPROVED; the shared stock picker is BUILT.** SO Batch listing and
-stock-picker composition is the approved reference for shared component work.
-`components/StockPickerTable.tsx` is that ONE implementation — the six approved columns, the common
-two-line header height, 8px cell padding, 1px dividers, 13px/11px type, one row height and the blue
-selected row — and BOTH purchasing surfaces draw it. The retired `ReadyStockTable` (its
-`Unit ID · Condition · Qty · Where · Owner` order) is deleted, not deprecated.
-`Condition` is the flexible last column, which is the fix for the reviewed defect: as a fixed
-110px track at the end of a scrolling table a two-word grade was squeezed onto three lines. Business columns remain owned by each module MASTER;
-Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain editing or reservation powers implicitly.
+**Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
+OWED.** SO Batch listing and stock-picker composition is the
+approved reference for shared component work. Business columns remain owned by each module MASTER;
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain
+editing or reservation powers implicitly, and this build gave none of them any.
+
+**Engine capabilities — BUILT 2026-09-18, all four opt-in, every other Register byte-identical:**
+`DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
+record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
+two); the pair still pins alone and the named column scrolls under the block like any other fact.
+`DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
+tables inside an expansion read as children — it is this reference's treatment and NOT a global
+blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
+`ReadyStockTable layout="picker"` draws the approved six picker columns. **Manual Purchase's own
+§9.2 build inherits these four rather than growing a second set** — the geometry and the
+edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
@@ -1812,10 +1821,27 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+- **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
+  that `vite build` cannot emit): 1440 / 1180 / 820 / 390 and 200% zoom carry no page-level
+  horizontal scroll; both tables take their measured content width and neither stretches to fill
+  the canvas; the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the
+  picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
+  was in the shared destination header and is fixed there — see §6.7 below.
 
-Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0534): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0546): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
-## §6.9 · Connected expansion
+## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
+
+**The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column
+is.** `GoodsMiniTable` draws it inside that cell, in normal flow, as one unbroken 1px rule from
+beneath the disclosure caret to the TOP BORDER of the picker's frame — measured at 1440 in the
+rendered portal: centred on the caret to 0.2px, 1px below it, 0px from the frame's border, and
+unchanged after the goods box is scrolled horizontally. It exists only while that picker is open,
+so there is structurally no line that could run into the next item. The active goods context
+carries a blue boundary; the stock frame stays neutral white, and neither is evidence of a saved
+reservation — what a line holds is its `{n} reserved` count and the Unit IDs in the picker.
+Ready Stock is no longer a sibling SECTION of the expansion: the expansion is the goods table and
+`Purchase order details`, and the retired three-section arrangement does not return.
 
 Use the existing shared connector primitives. The SO row connects to its goods expansion.
 An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the

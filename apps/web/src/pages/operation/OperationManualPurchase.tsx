@@ -6,7 +6,7 @@
 // module (docs/ui/MASTER.md; docs/purchasing/MASTER.md §8.1), and it is the
 // shape its sibling SO Batch Purchase already carries; wrapping it in a
 // second `ListPageShell` would draw a page header inside a page header.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState , type ReactNode } from "react";
 import "./manual-purchase-create.css";
 import registerStyles from "./ManualPurchaseRegister.module.css";
 import {
@@ -330,7 +330,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
      * ⭐ WHAT IS STILL TO BUY — the approved quantity, less what purchase
      * orders took, LESS the Ready Stock Units saved against this exact line
      * (owner ruling 2026-09-18). The same three terms the SQL door applies on
-     * the locked row (`purchasing_mpr_line_remaining_requirement`, 0534), so
+     * the locked row (`purchasing_mpr_line_remaining_requirement`, 0546), so
      * the screen and the door cannot disagree about what a tick would buy.
      *
      * `qty` and `approved_qty` are untouched: the original ask and the
@@ -376,7 +376,7 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
        * (owner ruling 2026-09-18, in its own two sentences).
        *
        *   `MPR-…`   prints exactly as stored — "historical MPR values stay as
-       *             they are", and every request minted from 0534 onward is
+       *             they are", and every request minted from 0546 onward is
        *             one of these.
        *   `REQ-…`   does NOT print. The ruling says these "stay searchable",
        *             which is a weaker promise than the one it makes for MPR,
@@ -518,7 +518,11 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
                 {
                   ...base,
                   demandId: l.id,
-                  key: `${l.id}::open`,
+                  /* The LIVE line is keyed by its demand id, so the row, its
+                     stock frame and its connector all carry one identity. The
+                     allocation rows above it are keyed `${l.id}::po::…`, so
+                     nothing collides. */
+                  key: l.id,
                   qty: cancelled ? l.qty : remaining,
                   supplier: catalogSupplier,
                   deliverTo: lineDestination,
@@ -1132,8 +1136,11 @@ export default function OperationManualPurchase() {
         key: "po_safety_days",
         label: MW.colPoSafetyDays,
         headerLines: ["PO Safety", "Days"],
-        width: 112,
-        minWidth: 96,
+        /* CONTENT DECIDES THE WIDTH (§2). The widest thing this cell prints is
+           `Order date passed`, measured at 137px in Chromium; 112 truncated it
+           to `Order date ...`, which says less than the number it replaced. */
+        width: 144,
+        minWidth: 120,
         sortable: true,
         chooserGroup: "Buying",
         accessor: (r) => {
@@ -1145,20 +1152,33 @@ export default function OperationManualPurchase() {
               <span />
             );
           }
+          /* ⛔ A DAYS COLUMN NEVER PRINTS A NEGATIVE NUMBER — the same refusal
+             SO Batch's cell already carries. Past the date is a STATE, not a
+             margin of minus eighteen days, and it says so in the request's own
+             governed words. The sort still reads the signed number below, so
+             the worst row stays first without the reader decoding a minus. */
           return (
             <span
-              className={`tabular-nums${margin.passed ? " text-kit-amber-11" : ""}`}
+              className="tabular-nums"
               data-testid={`mp-safety-days-${r.id}`}
-              title={margin.passed ? MW.orderDatePassed : undefined}
             >
-              {margin.days}
+              {margin.passed ? (
+                <Absent>{MW.orderDatePassed}</Absent>
+              ) : (
+                margin.days
+              )}
             </span>
           );
         },
         sortFn: (a, b) =>
           (safetyDaysOf(a).days ?? Number.POSITIVE_INFINITY) -
           (safetyDaysOf(b).days ?? Number.POSITIVE_INFINITY),
-        exportValue: (r) => poSafetyDaysWord(safetyDaysOf(r)) ?? "",
+        /* Search, filter and export read the SAME word the cell prints; a
+           listing whose export says `-18` where the screen says
+           `Order date passed` is two answers to one question. */
+        searchValue: (r) => poSafetyDaysWord(safetyDaysOf(r), MW.orderDatePassed) ?? "",
+        filterValue: (r) => poSafetyDaysWord(safetyDaysOf(r), MW.orderDatePassed) ?? "",
+        exportValue: (r) => poSafetyDaysWord(safetyDaysOf(r), MW.orderDatePassed) ?? "",
       },
       {
         key: "customer_requested_delivery_date",
@@ -1640,11 +1660,15 @@ export default function OperationManualPurchase() {
               groupOf: (r) => r.group,
               revealMatches: activeConditions.length > 0,
             }}
-            /* The approved order leads with `Status`, so the identity block is
-               NAMED rather than taken from the first data column: `Proceed
-               Date` and `MPR No` pin, `Status` scrolls under them, and below
-               768px `MPR No` pins alone (ui MASTER §6.7). */
-            leadingColumns={{ date: "proceed_date", identity: "mpr_no", reorder: false }}
+            /* The approved order leads with `Status`, so it is NAMED as a
+               column ahead of the pair (§6.7 rule 2, `before`): `Proceed Date`
+               and `MPR No` still pin — and below 768px `MPR No` pins alone —
+               while `Status` scrolls under the block like any other fact. */
+            leadingColumns={{
+              date: "proceed_date",
+              identity: "mpr_no",
+              before: ["status"],
+            }}
             chooserGroupOrder={["Request", "Buying", "Customer", "Documents"]}
             onRowDoubleClick={openRequest}
             contextMenu={rowMenu}
@@ -1959,8 +1983,11 @@ function RequestExpansion({
       ]
         .filter(Boolean)
         .join(" · "),
-      statusNode: <GoodsStatusCell goods={g} row={row} />,
-      readyStockNode:
+      /* `status` is a STRING on the shared box (SO Batch's own API); the
+         row's separate refusal sentence rides under the item, because the
+         status column states the purchase NEED and nothing else. */
+      status: goodsStatusWord(g, row),
+      fromStockNode:
         g.demandId == null ? (
           /* A row that is a PO ALLOCATION, not a live line: the goods were
              bought, so there is no shelf question to ask about it. */
@@ -1980,22 +2007,34 @@ function RequestExpansion({
             }
           />
         ),
-      detailKey: g.demandId ?? g.key,
-      detailNode:
-        open && stockLine ? (
-          <ManualPurchaseStockFrame
-            requestId={row.id}
-            line={stockLine}
-            reference={stock.data?.reference ?? row.mprNo}
-            draft={drafts.get(stockLine.demandId) ?? null}
-            onDraft={(next) => onDraft(stockLine.demandId, next)}
-          />
-        ) : undefined,
       /* Only a LIVE line with something left to buy can be ticked. A row that
          records a purchase order already made is evidence, not a decision. */
       selectable: g.demandId != null && !g.cancelled && g.poNos.length === 0,
     };
   });
+
+  /**
+   * THE OPEN STOCK FRAMES, by the row key the shared box names them after.
+   * `detailRow` is the sibling's API: the box asks the page what is open under
+   * a line, and renders it in one full-width row with the §6.9 connector drawn
+   * from the `Ready Stock` cell above it.
+   */
+  const detailByKey = new Map<string, ReactNode>();
+  for (const g of row.goods) {
+    if (g.demandId == null || !openCells.has(g.demandId)) continue;
+    const stockLine = stockByDemand.get(g.demandId);
+    if (!stockLine) continue;
+    detailByKey.set(
+      g.key,
+      <ManualPurchaseStockFrame
+        requestId={row.id}
+        line={stockLine}
+        reference={stock.data?.reference ?? row.mprNo}
+        draft={drafts.get(stockLine.demandId) ?? null}
+        onDraft={(next) => onDraft(stockLine.demandId, next)}
+      />,
+    );
+  }
 
   /* THE PARENT'S TICK IS THIS REQUEST'S; the children narrow it. A line is
      chosen when the request is selected AND it is either in the narrowed set
@@ -2017,7 +2056,11 @@ function RequestExpansion({
       <GoodsMiniTable
         label={`Goods on this ${MW.page}`}
         lines={lines}
-        manualPurchaseLayout
+        manualPurchaseGoodsLayout
+        showStatus
+        showSku={false}
+        showFromStock
+        detailRow={(l) => detailByKey.get(l.key) ?? null}
         selection={{
           selectedKeys,
           onToggle: (key) => {
@@ -2032,7 +2075,6 @@ function RequestExpansion({
         showSupplier
         showPoNo
         showPoDeliveryDate
-        deliverToHeading={MW.colSupplierDeliverTo}
         /* The number is a door here, exactly as it is on the sibling: the
            parent cell links only when there is ONE purchase order, and with
            several it points the reader at this table. */
@@ -2053,38 +2095,18 @@ function RequestExpansion({
  * reads `Need approval` is correct and is exactly what the ruling asks for —
  * so the refusal sentence sits BELOW the pill rather than replacing it.
  */
-function GoodsStatusCell({
-  goods,
-  row,
-}: {
-  goods: GoodsRow;
-  row: RequestRegisterRow;
-}) {
+function goodsStatusWord(goods: GoodsRow, row: RequestRegisterRow): string {
   if (goods.demandId == null) {
     /* A purchase-order allocation: this quantity stopped being something to
        buy the day the document was issued. */
-    return (
-      <StatusPill tone="neutral">
-        {MANUAL_PURCHASE_NEED_STATUS_WORDS.no_po_needed}
-      </StatusPill>
-    );
+    return MANUAL_PURCHASE_NEED_STATUS_WORDS.no_po_needed;
   }
-  if (!row.remainderKnown) {
-    /* UNKNOWN IS NEITHER ANSWER. */
-    return <Absent title={MW.remainderNotCheckedWhy}>{MW.remainderNotChecked}</Absent>;
-  }
-  const need: ManualPurchaseNeedStatus =
-    goods.cancelled || goods.qty <= 0 ? "no_po_needed" : "need_po";
-  return (
-    <span className="flex flex-col gap-0.5">
-      <StatusPill tone={need === "need_po" ? "info" : "neutral"}>
-        {MANUAL_PURCHASE_NEED_STATUS_WORDS[need]}
-      </StatusPill>
-      {need === "need_po" && row.approval.kind !== "approved" ? (
-        <span className="text-label text-kit-amber-11">{MW.groupNeedApproval}</span>
-      ) : null}
-    </span>
-  );
+  /* ⛔ UNKNOWN IS NEITHER ANSWER — the row states the missing-coverage fact
+     instead of guessing an operator into or out of a purchase. */
+  if (!row.remainderKnown) return MW.remainderNotChecked;
+  return goods.cancelled || goods.qty <= 0
+    ? MANUAL_PURCHASE_NEED_STATUS_WORDS.no_po_needed
+    : MANUAL_PURCHASE_NEED_STATUS_WORDS.need_po;
 }
 
 /* ── The create workspace — full page, never a dialog (card §3) ───────────── */
