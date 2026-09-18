@@ -1264,16 +1264,14 @@ component and engine suites; the whole listing and picker were walked at
 1440 / 1180 / 820 / 390 and at 200% zoom on the real components. **OWED: the
 authenticated production walk, and the Worker/Pages SHA verification.**
 
-**MEASURED 🔴 FOUND ON THAT WALK, AND NOT THIS SLICE'S TO FIX.** At a 390px
-canvas the page scrolls sideways by 30px. The Register does not cause it — its
-grid scrolls inside its own box (client 374px, content 1709px) — and every
-overflowing element is inside the shared `ModuleHeader` destination row, where
-the 24px `SO Batch Purchase` word is `shrink-0` beside a fixed-width global icon
-cluster. It is identical on all eight Purchasing pages that draw that header and
-predates this change. The fix is a shell decision, not a purchasing one (let the
-destination word wrap to the 50px row, or drop the global cluster to a `…` below
-768px), so it is reported rather than taken: §6.7 rule 8's *no page scrolls
-sideways* is not met at 390px until the shell round takes it.
+**THE 390px 🔴 FOUND ON THAT WALK IS FIXED, IN THE SHARED HEADER — 2026-09-18.**
+At a 390px canvas every destination page scrolled sideways by 30px. The Register
+never caused it — its grid scrolls inside its own box (client 374px, content
+1709px) — and every overflowing element sat in the shared `ModuleHeader`
+destination row. The fix is there, not here, and not behind a purchasing flag:
+UI MASTER §6.7 carries it. Re-measured on all 29 real destination words at 1440
+and 390: 0px page overflow, nothing clipped, the governed 24px kept, and 1440
+unchanged at exactly 51px.
 
 
 The goods table is `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To`.

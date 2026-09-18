@@ -1615,7 +1615,27 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+**⭐ ROW 1's 50px IS A FLOOR, NOT A CEILING — BUILT 2026-09-18, a measured defect.**
+At a 390px canvas EVERY destination page scrolled sideways by 30px, which rule 8
+above forbids by name. The cause was one missing rule in `ModuleHeader`: the identity span was
+`shrink-0` at the governed 24px, so `SO Batch Purchase` demanded 260px beside the 144px utility
+cluster inside 366px of usable width. `Jump to…` had collapsed its label under `sm` since it
+shipped; the WORD had no narrow-canvas rule at all.
+
+The word may now WRAP (`min-w-0 break-words`) and the row's 50px became `min-h-[50px]`. **Nothing
+was truncated, nothing was hidden and no phone type step was invented** — a governed label is
+never cut and never sits behind a tooltip, and all four global utilities stay on the row. 50px
+stays EXACT at every width where the identity fits one line. Measured on all 29 real destination
+words: at 1440 every one is a single line in a 51px row (50 + the rule), unchanged; at 390, 11 of
+them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
+component, so all 28 destination pages carry it.
+
+🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
+— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
+takes four lines and a 137px row. It is correct and readable now where it used to blow the page
+open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+
+**ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
 which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
 word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
@@ -1787,14 +1807,11 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
 - **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
-  that `vite build` cannot emit): 1440 / 1180 / 820 and 200% zoom carry no page-level horizontal
-  scroll; both tables take their measured content width and neither stretches to fill the canvas;
-  the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the picker's
-  controls are the kit's own 32px Buttons. **🔴 At 390px the PAGE scrolls sideways by 30px — every
-  overflowing element is inside the shared `ModuleHeader` destination row (a 24px `shrink-0`
-  destination word beside a fixed global icon cluster), identical on all eight Purchasing pages
-  and predating this build. The Register's own grid scrolls inside its box. Reported, not taken:
-  the fix is a shell typography/IA decision, not a purchasing one.**
+  that `vite build` cannot emit): 1440 / 1180 / 820 / 390 and 200% zoom carry no page-level
+  horizontal scroll; both tables take their measured content width and neither stretches to fill
+  the canvas; the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the
+  picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
+  was in the shared destination header and is fixed there — see §6.7 below.
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
