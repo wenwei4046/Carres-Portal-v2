@@ -155,7 +155,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
 | Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available and reports a source-linked Purchasing claim; later discovery on a Stock Unit/receipt opens a Purchasing stock claim directly | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Purchasing claim authority; GRN/Unit evidence; related customer Service Case read-only; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
-| Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Approved repair outcome creates RO; same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Approved stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
+| Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Authorised inventory repair or Claim outcome creates RO (§9.7); same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Authorised inventory repair or stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
 | Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
@@ -915,13 +915,17 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   a ticked row a link takes slate-12 ink with its underline, because blue-11 on blue-3 measured
   4.25:1.
 - **R6 · Footer** — one total: `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order`.
-- **R7 · Widths.** A column's default width is its content; its minimum is the complete two-line
-  header plus its controls. Measured in the rendered portal (Inter): header chrome is 46px beyond the
-  header text; a cross-year date is 99px, so date columns are 120; `No delivery date yet` is 124px,
-  so Requested Delivery Date is 144; `PO-20260930-4827` is 127px, so PO No is 144. No quantity column
-  exists on this parent table, so no 88px value was adopted. Customer, Supplier, Delivery Location
-  and Deliver To never ellipsise: a long value takes an inline second line, so the full value is
-  readable by keyboard and touch with no hover title.
+- **R7 · Widths — the number lives in ONE registry (owner instruction 2026-09-18).** A column's
+  default width is its content; its minimum is the complete two-line header plus its controls. **The
+  width itself is [UI MASTER §6.8's shared field registry](../ui/MASTER.md), not this section's:**
+  a page MASTER that carries its own number for a registry field becomes a second authority, and
+  one fact then has four widths. This page's measurements are EVIDENCE the registry reads — measured
+  in the rendered portal (Inter): header chrome is 46px beyond the header text; a cross-year date is
+  99px; `No delivery date yet` is 124px; `PO-20260930-4827` is 127px. No quantity column exists on
+  this parent table, so no 88px value was adopted. Where this page's built width is narrower than the
+  registry, the registry names the convergence it owes; closing it is this page's own round.
+  Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
+  second line, so the full value is readable by keyboard and touch with no hover title.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
   and the list is re-read so a line bought meanwhile drops its tick. `Esc` closes only transient
@@ -1709,11 +1713,16 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   name is ONE server-resolved identity (`identityResolver` over the shared actor door, 0390) that
   the Register, the object, search and export all read; a shared or robot login and an unnamed
   account resolve to `Staff identity not recorded` on every surface.
-- **Built widths (measured 2026-09-17, rendered shell, Inter):** `Items` 180 (the longest live
+- **Built widths — evidence for the ONE registry, not a second one (owner instruction 2026-09-18).**
+  [UI MASTER §6.8](../ui/MASTER.md) holds the width; these are what this page MEASURED
+  (2026-09-17, rendered shell, Inter) and what the registry reads: `Items` 180 (the longest live
   model name is 18 characters; the sticky identity also fits beside the gutters at 390px) ·
   `Order By` 112 · `Purpose` 150 · `Supplier` 140 (longest live supplier 17 characters) ·
   `Approval Status` 188 (`Sent back for changes` pill 134px + requester avatar) · `Requested By`
-  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. Saved layout key
+  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. `Purpose` 150, `Approval Status` 188
+  and `Supplier` 140 were the WIDEST measurement of their field and are now the registry's number;
+  `Items`, `Supplier Deliver To`, `Requested By`, dates and `PO No` are narrower than the registry
+  and the convergence is named there, to be closed in this page's own round. Saved layout key
   `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
 - **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
   `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
@@ -1952,101 +1961,213 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
-**APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots personal saved
-layouts; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
+**STATUS — three different things, never one word (2026-09-18).**
+
+| | What it covers |
+|---|---|
+| **APPROVED / LOCKED** | The listing, its eleven columns, its four groups, the group-local header, the ordered-goods expansion, the rail and the sending-evidence reading below. Owner rulings 2026-09-17 and 2026-09-18. |
+| **BUILT 2026-09-18** | All of the above is implemented and covered by tests, and measured on the rendered register at 1440 / 1180 / 820 / 390. Personal saved layouts (2026-09-17) and the Slice 1 readability pass remain built as recorded. |
+| **PRODUCTION-VERIFIED** | **NOT YET.** No authenticated production walk of this build exists. The 2026-09-17 walk was of the previous nine-column register and does not carry forward. Until that walk is done, no line here may be quoted as production truth. |
+
+**Owner acceptance — 2026-09-18.** Jess confirmed the reviewed PO Register and goods expansion.
+Acceptance covers this listing composition, the full supplier-date facet labels, removal of the
+rail Clear filters control, the group-local header and the shared UI MASTER geometry. It does not
+approve a new PO detail/issue workflow, and it is not production implementation evidence.
+
+**Personal saved layouts — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots
+them; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
 owner-private, per-account, up to 10 layouts per listing, saving order/widths/visibility/sort but
 not search/filters/group state. Other pages retain current layout persistence until owner
-acceptance and rollout approval.
-
-**Build record (2026-09-17).** Layout key `carres.purchaseOrders.register.v2`; `leadingColumns`
-pins `PO Date · PO No` (PO No alone below 768px). `GET /api/operation/pos` now carries each PO's
-numbered GRNs (`warehouse_receipts.grn_no`, drafts excluded) and each SO source's `order_id`.
-Personal layouts: migration `0528` table `register_personal_layouts` — RLS SELECT own rows only
-(`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from `authenticated`, writes only through
-`register_layout_save` / `register_layout_set_default` acting on `auth.uid()`; a shape check
-refuses any key but order/hidden/widths/sort; 10 per person per listing; one default. Routes
-`/api/operation/register-layouts` run as the caller. Measured at 1440 with the rail open (885px
-grid), re-measured SIGNED-IN on production 2026-09-17 on `1c278f8c`: PO Date 118 · PO No 142
-(production's JetBrains Mono renders `PO-20260903-4316` at 125px; the fixture font measured 114
-and 132 cut 34 live rows) · Supplier 128 · SO No 123 · Items 135 · Expected Delivery Date 207
-exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 150 (`GRN-20260904-0210` renders 133px) ·
-PO Version 265 scroll (widened from 236 for `PO sent to supplier · {channel} · {date}`, SLICE 1 — scaled, re-measure signed in). Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
-footer `62 purchase orders`, layouts read 200, unauthenticated 401. The rail uses the shared
-`useFilterRailOpen` (hidden by default below 896px). **Owed:** saving a layout and pressing
-`PO sent to supplier` on production (the walk was read-only by instruction).
+acceptance and rollout approval. Storage: migration `0528`, table `register_personal_layouts` —
+RLS SELECT own rows only (`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from
+`authenticated`, writes only through `register_layout_save` / `register_layout_set_default` acting
+on `auth.uid()`; a shape check refuses any key but order/hidden/widths/sort; 10 per person per
+listing; one default. Routes `/api/operation/register-layouts` run as the caller. **Owed:** saving
+a layout and pressing `PO sent to supplier` on production.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
-Quantity progress belongs to Warehouse Inbound / Receiving and PO detail. The approved listing
-now also shows actual Goods Received Date linked to each GRN; this does not add quantity-progress columns.
+Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
-**Columns — APPROVED / NOT BUILT (Jess, 2026-09-18), exactly in order:**
+**Columns — APPROVED / LOCKED (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in order:**
 
 ```text
 PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
 PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
 ```
 
-Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The prior width measurements
-are implementation evidence, not dimensions for this expanded target; remeasure before build.
+Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The goods expansion arrow
+stays the grid's own control in the gutter, separate from the number: **the number opens the actual
+PO**, and a decorative arrow concatenated into a document number makes one target out of two acts.
+
 - `PO Date`: authoritative PO document date, never sending confirmation time.
-- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint update, never an automatic one.
-  Never invent a CO or Manual Purchase number. A multi-source PO preserves all line allocations.
+- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. One
+  reference is its own door; several print the approved count and open the PO's **Order Route**,
+  where each reference is its own row and its own link. The listing never picks one source to stand
+  for the rest. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner
+  ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint
+  update, never an automatic one. A multi-source PO preserves all line allocations.
+  **MPR is the Manual Purchase's visible identity again (owner ruling 2026-09-18, which overwrites
+  Card 08 §3.5's 2026-09-04 retirement):** the request's own stored `purchase_requests.req_no`
+  (`MPR-YYYYMMDD-RRRR`, §6.1 / migration 0359) is READ and printed. A request with no stored number
+  keeps the governed label `Manual Purchase` and opens nothing — never a UUID, never a minted
+  number. Manual sources still dedupe by request identity, never by label.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
-- The three delivery-date columns use the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
-  Do not combine original and confirmed dates into an Expected Delivery Date cell.
-- `Goods Received Date`: actual GRN receipt date/time. Multiple receipts show `{n} receipt dates`
-  with access to each GRN, date/time and quantity; never pick a single date to represent all receipts.
+- **The three delivery-date columns are three columns, and one is NEVER filled in from another**
+  ([shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary)). `PO Default Delivery Date`
+  is what Carres planned, preserved when the supplier replies and when Settings later change (0428).
+  `Supplier Confirmed Delivery Date` is the supplier's evidenced answer for the current version;
+  with no answer it reads `Not confirmed`, and a supplier who moved the date carries
+  `Supplier changed from {date}` on its second line. The retired combined `Expected Delivery Date`
+  printed whichever of the two it had with a sentence underneath saying which — so the two could
+  never be compared, sorted or filtered against each other. It does not return.
+- `Goods Received Date`: the actual physical arrival (`warehouse_receipts.goods_received_at`, 0314),
+  never the day the GRN record was filed. Multiple receipts show `{n} receipt dates`; never pick a
+  single date to represent all receipts.
 - `GRN No`: one link or `{n} GRNs`, preserving every receipt; blank when none.
-- `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` or `Sending not confirmed`
-  for the current version. Earlier evidence stays in Revisions.
+  **Both count links open the same list**, because they are two facts about one set of receipts:
+  every `Goods Received Date`, `GRN No` and `Received Qty` on its own row, each with the door to the
+  actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
+  count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
+  wrong-item units are not received, which is that same arithmetic, not a second one.
+- `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` for the current version,
+  or `Sending not confirmed` when the CURRENT version's confirmation is missing. Earlier evidence
+  stays in Revisions. Missing evidence never proves the PO was never sent.
 
-**Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
-`Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
-(current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs once.
-A failed/unknown quantity read is never zero or Completed; completed legacy POs without a mark
-stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
-Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by confirmed supplier date, falling back to original PO date, ascending;
-Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
+🔴 **GOODS RECEIVED DATE HAS NO TIME, AND THE SCREEN SAYS SO.** The dictionary asks for the arrival
+date AND time; `warehouse_receipts.goods_received_at` is a `date` column (0314) and the database
+holds no arrival clock anywhere. Every row therefore prints the date plus the dictionary's own
+words for a date-only record, `Time not recorded` — a guess from `submitted_at` would be the time
+somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receiving's:** carry the
+arrival time on the receipt (a new column and the Receiving form field that fills it), then this
+column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
-**Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
-`Date changed`, `Date passed`, using existing current-version sent/pending predicates.
-`Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
-Use complete supplier-date labels outside the group context, including active-condition chips.
-No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
+**Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
+and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
+buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
+(current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs
+once. A failed/unknown quantity read is never zero or Completed; completed legacy POs without a
+mark stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
+Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by
+confirmed supplier date, falling back to original PO date, ascending; Completed/Cancelled newest
+first. Unknown dates remain explicit, not invented.
+
+**Group-local header — owner ruling 2026-09-18, BUILT 2026-09-18.** A collapsed group is its
+heading and its count; an open group reads heading → column header → records. There is no header
+above all groups. Every group shares one width, visibility, sorting and resizing set, and the
+current group's header is sticky inside its own group and stops at its boundary. Pinned date +
+number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
+grouped listing page; this section neither restates its mechanics nor varies them.
+
+**Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18.** `Supplier reply` contains
+`Supplier has not confirmed the PO date`, `Supplier Confirmed Delivery Date changed` and
+`Supplier delivery date passed`, using the existing current-version sent/pending predicates.
+`Receiving` contains `Partly received`. `Supplier` and `Supplier Deliver To` keep their facts and
+selection rules. **The complete label is used everywhere — row, active-condition chip and export —
+and is written once.** `Date changed` named none of the page's three dates, and the group heading
+meant to qualify it scrolls away and does not exist on a chip at all. Icons come from the shared
+kit at its own 16px / stroke 2 / neutral ink with an 8px gap: Supplier reply → message · Receiving
+→ goods · Supplier → supplier · Supplier Deliver To → warehouse. A selected facet clears by being
+clicked again; selects keep their `All …` option. **There is no Clear filters control in the rail**
+(verified: the shared `FilterRail` has never had one). The toolbar's active-condition strip and its
+own `Clear filters` are the shared listing standard's and are unchanged. No duplicate
+`All purchase orders` row, DOCUMENT group or action line. Counts and predicates are preserved:
+a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
-**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
+ordered goods, exactly in order:
+
+```text
+Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+```
+
+`PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
+cell; item configuration sits beneath the item name. **The parent remains one row per PO** — a
+line's Units never multiply the record they belong to. **It is a truth table: no purchasing
+checkbox, no Ready Stock allocation control**, nothing that can commit a unit — buying happens on
+SO Batch Purchase and Manual Purchase, which own those acts and their guards. Shared dimensions
+are UI MASTER §6.8's; the connected expansion is §6.9's.
+
+**Unit IDs in the expansion are the real ones**, read from the PO's own units — one permanent
+`U1-000-001` per ordered piece, bound to the line at official PO issue (§6.2, migrations
+0442/0443/0444). Three states, three different sentences, because they are three different facts:
+
+| State | What the cell says |
+|---|---|
+| Quantity-managed line | `—` — it has none by law |
+| Exact-unit line, units read, none found | `Unit IDs missing on this line — do not send this PO` — an integrity failure, never an ordinary empty state, and **never deferred to receipt**: the Units are born at PO issue, not when the goods land |
+| The units read has not answered, or failed | `Reading Unit IDs…` / `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
+
+**Never generate presentation-only IDs and never copy a sample ID into production.** A Unit ID is
+written on a package in a factory; an invented one sends somebody to look for furniture that does
+not exist.
+
+**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity
+totals, and no page title repeated inside the toolbar.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
 
-**Sending, all shared surfaces:** `PO sent to supplier` records current version, channel, recipient, actor
-and time. After Open WhatsApp / Open email show `Send the PDF, then press PO sent to supplier.` in the
-same communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent,
-the person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
-automatically marks sending. Never claim supplier receipt, reading or acceptance.
+**Sending, all shared surfaces:** `PO sent to supplier` records current version, channel, recipient,
+actor and time through the ONE existing shared sending authority — **no second task store and no
+second confirmation store is introduced, here or anywhere.** Workspace controls duty routing.
+After Open WhatsApp / Open email show `Send the PDF, then press PO sent to supplier.` in the same
+communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent, the
+person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
+automatically marks sending. Never claim supplier receipt, reading or acceptance, and **missing
+evidence does not prove the PO was never sent** — a completed legacy document must not become
+resend work solely because a send record is absent.
 
-**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** migration `0428`
-preserves an immutable original PO date and requires an append-only current-version reply with
-channel/evidence/reporter/recorder/time and shared duty/cover. Production rollback verification
-proved atomic supplier setup, role/send/version/evidence guards, preserved known and unknown
-original dates, exact persisted source planning without changing an unrelated order, and a
-negative control that fails when the send guard is removed. All six committed function bodies
-were reconciled before and after apply; tracker version `20260906073520` stores the exact approved
-SQL SHA-256 `c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`.
-Earlier records receive no invented dates or reply evidence. PR #1105 carries the Register,
-reply form and shared Work projection; application deployment proof remains pending.
+**BUILD 2026-09-06 / DATABASE APPLIED:** migration `0428` preserves an immutable original PO date
+and requires an append-only current-version reply with channel/evidence/reporter/recorder/time and
+shared duty/cover. Production rollback verification proved atomic supplier setup, role/send/version/
+evidence guards, preserved known and unknown original dates, exact persisted source planning without
+changing an unrelated order, and a negative control that fails when the send guard is removed. All
+six committed function bodies were reconciled before and after apply; tracker version
+`20260906073520` stores the exact approved SQL SHA-256
+`c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`. Earlier records receive no
+invented dates or reply evidence.
+
+**API — BUILT 2026-09-18.** `GET /api/operation/pos` carries each PO's numbered GRNs with
+`goods_received_at` and the shared `received_qty`, each SO source's `order_id`, and each Manual
+Purchase source's stored `req_no`. Drafts are excluded: a receipt with no number is not a GRN.
+
+**Measured on the rendered register, 2026-09-18 (fixture shell, Inter).** Every width comes from
+the shared field registry in UI MASTER §6.8, never from a per-page guess — including `PO Date` 120
+and `Supplier` 140, which are SO Batch's and Manual Purchase's wider measurements of those same
+fields rather than this page's own. This page contributed three corrections back to the registry:
+`PO Version` **265** rather than the prototype 238 (the longest evidence line needs 247px of
+content), and the measured `SO No / MPR No` 176 · `Supplier Confirmed Delivery Date` 180 ·
+`Goods Received Date` 140 for the three columns it introduced. Nothing truncates at 1440: no cell,
+no two-line header, no document number. The eleven columns total 1869px (1901 with the goods-disclosure gutter, measured), so the sheet scrolls
+sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather than squeezing any
+column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
+document numbers wider than the fixture font.
+
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
-History, Order Route.
+History, Order Route. The formal PO detail, issue, revision and PDF workflows are unchanged by the
+2026-09-18 listing work, and no Finance functionality was added.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
+
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
+
+**Listing UI acceptance — Jess, 2026-09-18 · APPROVED / NOT BUILT.** The Receiving Register
+proposal is accepted for implementation in [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
+This approval concerns the Register and its read-only goods expansion, not replacement of the
+formal GRN object/receiving engine. Default entry shows all permitted GRNs with server pagination;
+date filtering is optional. Date and exception counts count GRNs, not units or unfinished work.
+No normal Status column is added; PO Partial/Completed progress is not a GRN document state.
+The approved goods expansion is `Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty`.
+Use actual line-linked identity with source number above Unit IDs; preserve quantity-managed and
+extra-goods distinctions. Receiving remains ungrouped with a sticky header. Use shared heading
+icons and dimensions; no permanent bottom-rail Clear filters control. Full date and pagination
+behaviour below remains authoritative; abbreviated sample data is not a new rule.
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
@@ -2087,7 +2208,7 @@ Warehouse submits count                (or Operation enters goods directly)
   `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
   waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
 - **Document status — APPROVED / NOT BUILT (Jess, 2026-09-17).** A normal GRN shows no status label.
-  A cancelled GRN shows `Cancelled` under its GRN No. `Valid` and the Status column are retired.
+  A cancelled GRN shows `Cancelled` beneath its GRN No — `Valid` and the Status column are retired.
   `Posted`/`Voided` remain internal database statuses and never reach a normal user's screen;
   `Void Receiving` stays the act's name.
 - **THE RECEIVING RAIL — APPROVED / NOT BUILT (Jess, 2026-09-17).** The month calendar is removed;
@@ -2118,7 +2239,7 @@ Warehouse submits count                (or Operation enters goods directly)
   ```text
   GRN Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
   Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date · Goods Received Date ·
-  Supplier DO No. · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+  Supplier DO No · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
   ```
 
   Date meanings and location labels follow the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
@@ -2225,7 +2346,7 @@ Warehouse submits count                (or Operation enters goods directly)
     keep quantity edits.
   - Checks follow what changes. A change to a Unit outcome or to `Goods arrived at` is refused per
     affected Unit that is reserved, on a DO, delivered or on a Supplier Claim (the Claim check is
-    added), naming the reason on that Unit. Corrections to Supplier DO No. and evidence are not
+    added), naming the reason on that Unit. Corrections to Supplier DO No and evidence are not
     blocked by other locked Units, but still pass permission and audit.
   - Concurrency: the first save wins; a later save based on an older version is refused as a whole
     with `Someone changed this GRN. Check it again.` Nothing is partly saved.
@@ -2256,10 +2377,11 @@ Warehouse submits count                (or Operation enters goods directly)
 
 ### 9.5 Supplier Claims — approved complete Blueprint
 
-**Release scope — 2026-09-07:** the current delivery is the governed factual Register,
-full-width read-only SC object and paginated source/catalog/Unit reads. Stock-claim intake from a
-Stock Unit and the claim write controls below are **APPROVED / NOT BUILT**. Local implementation
-evidence below is not production proof.
+**Release scope — 2026-09-07, restated 2026-09-18:** the current delivery is the governed factual
+Register, full-width read-only SC object and paginated source/catalog/Unit reads. Stock-claim
+intake from a Stock Unit, the claim write controls below, **the shared saved-evidence viewer** and
+**the Supplier Response recording surface** are all **APPROVED TARGET / NOT BUILT**. Local
+implementation evidence below is not production proof.
 
 **OWNER-APPROVED / LOCKED — 2026-09-06; claim boundary owner-approved 2026-09-14.** This is the
 single complete Supplier Claims operating model. Existing built facts and unbuilt target rules are
@@ -2608,7 +2730,9 @@ Carres-funded early replacement is a separate approved cost, not assumed supplie
 | Supplier recovery stopped | Required approval, reason, contact/refusal evidence and Finance-recognised unrecovered amount; required physical/customer actions still have owners |
 | No supplier responsibility | Authorised finding closes that supplier scope; any related Case/Issue continues with its own owner; no false supplier reply or “recovered” amount |
 
-The approved lifecycle is **Open · Closed · Cancelled**. Missing reply, late collection,
+The approved lifecycle has three states, stored as `open · closed · cancelled` and DISPLAYED as
+**`In progress` · `Closed` · `Cancelled`** (owner ruling 2026-09-18 — a display-label change only;
+`In progress` means not yet closed and never that the supplier has started). Missing reply, late collection,
 repair not returned and credit evidence missing are derived facts, not new editable statuses.
 Closed requires source/scope, request/contact evidence, actual reply or approved no-response
 decision, required outcome evidence and no unresolved supplier obligation. No generic Done or
@@ -2696,38 +2820,114 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 §6.7 shared listing style, toolbar, rail, responsive layout, typography and measured column-width
 contract; reuse existing kit components rather than freezing page-local dimensions.
 
-**APPROVED — register defaults; date-first/boundary reconciliation 2026-09-18, NOT BUILT:** Opening Supplier Claims
-shows all permitted new and historical claims, including closed claims, newest report first.
-There is no View selector and no setup step before records appear. Search and factual filters
-are optional, start clear on normal entry, and clearing them restores the whole permitted set.
-The useful default columns — owner ruling 2026-09-18 (every listing the same reading order) — are
-**Reported · Supplier Claim No. · Supplier · Product · Variant · Qty · Problem · Supplier Response ·
-Claim status · PO No · GRN No.** (linked documents last). `Reported` uses the
-stored `reported_at` fact in Malaysia time, not discovery, issue or closure time; preserve those
-separate dates in detail. Unknown report dates stay unknown. The date and identity columns are
-pinned using the shared two-column contract, including an unissued record's permanent identity. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
-reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
-product name. SKU and Supplier DO each have their own optional column; when a record has no
-Catalog product name, SKU is visible by default so its recorded identity is not hidden behind
-Columns. A source SKU is never relabelled as a product name or used to invent a Catalog record. Preserve existing SC document numbers and explain
-them through the full Supplier Claim No. header; do not rename historical documents or invent
-another UI vocabulary. Horizontal scrolling uses the shared pinned offsets so the two fixed columns never cover
-adjacent content. One row is one supplier claim, never one row
-per photo or Work action. An unissued claim shows Not issued. Wider detail/reference fields
-remain optional Columns: Units, Requested Result, Authorised Outcome,
-Item Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version
-and Sent to Supplier. Only relevant date facts appear; no generic workflow field. Unknown
-optional facts are not promoted to permanent empty columns; measure before final layout.
+**APPROVED — register defaults; owner-confirmed column order, two-line identity and status words,
+2026-09-18, NOT BUILT.** Opening Supplier Claims shows every permitted claim — new, historical,
+closed and cancelled — newest report first, in ONE ungrouped list. There are no group bands, no
+View selector and no setup step before records appear. Purchase Orders' four groups are that
+page's ruling and are not copied here. Search and factual filters are optional, start clear on
+normal entry, and clearing them restores the whole permitted set.
+
+**THE CONFIRMED COLUMN ORDER (Jess, 2026-09-18).** This exact sequence. It replaces the earlier
+`Reported · Supplier Claim No · Supplier · Product · Variant · Qty · Problem · Supplier Response ·
+Claim status · PO No · GRN No` order completely; that order is deleted, not kept beside this one.
+Never rearrange it with a general date-first or linked-documents-last heuristic.
+
+```text
+☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · Supplier ·
+PO No (Unit ID on line two) · GRN No · Items · Qty · Problem · Supplier Response
+```
+
+- **`☐` and `▸` are two separate leading controls**, exactly as SO Batch (§9.1): a selection
+  checkbox and a goods/evidence disclosure. Never concatenate a decorative arrow into the claim
+  number. Selection is for Export only — this register has no batch write action.
+- **`Claim status`** reads **`In progress` · `Closed` · `Cancelled`** (owner ruling 2026-09-18,
+  replacing `Open`, which staff found confusing). **`In progress` means NOT YET CLOSED** — awaiting
+  a Carres action or awaiting the supplier's reply are both inside it. **It never asserts that the
+  supplier has started work.** This is a DISPLAY LABEL change only: the stored values remain
+  `open · closed · cancelled` (`0288_supplier_claims.sql:70`, `0291_supplier_claim_lifecycle.sql`),
+  no lifecycle state is added, and no migration is authorised by this ruling. Its governed tooltip
+  is `Not closed yet. It does not mean the supplier has started.`
+- **`Supplier Claim No`** is the identity and the only door into the object. An unissued claim
+  keeps its place and reads `Not issued`; its permanent internal identity still opens the record.
+  Preserve existing SC document numbers; never rename a historical document.
+- **`Claim Reported`** (renamed from `Reported`, owner ruling 2026-09-18) is the stored
+  `reported_at` fact in Malaysia time — never discovery, issue, send or closure time. Those dates
+  keep their own fields in detail. An unknown report date stays unknown.
+- **`PO No` carries the Unit ID on line two, in one cell.** Line one is the PO number in full
+  (`PO-20260904-4665`, never shortened). Line two is the exact goods identity that PO names:
+  one recorded Unit ID · `{n} Units` when the claim covers more than one individually tracked Unit ·
+  `Counted stock` for quantity-managed goods that have no Unit ID and never will (§9.1's word) ·
+  `Unit not recorded` when nothing is stored · `Units could not be loaded` when the read failed.
+  **Never fabricate a Unit ID, and never let `{n} Units` read as one.**
+- **`{n} Units` is a disclosure link into THIS ROW's expansion, not a second panel.** One expanded
+  state per row: the leading `▸` and the `{n} Units` link open and close the same thing, and the
+  link moves focus to the Unit rows. This is §9.1's Ready Stock precedent (a borderless in-cell
+  disclosure beside the row-leading one), not a new control type.
+- **`GRN No` stays its own column.** **One cell may carry a document number and the exact goods
+  identity that document names, on two lines. It may NEVER carry two different documents.** This
+  replaces the older blanket sentence "PO and GRN never share a Source cell" while keeping the
+  protection it existed for: a reader must never have to guess which document a number belongs to.
+- **`Items` replaces the separate `Product` and `Variant` columns** (owner ruling 2026-09-18, and
+  the same word as §9.2–§9.4). Line one is the model in Catalog's own words; line two is the
+  configuration/specification, 11px slate-11. A claim covering more than one model reads
+  `{first item} + {n} more` on line one, with every item in the expansion. When Catalog cannot name
+  the goods, line one prints the RECORDED SKU and says so — a source SKU is never relabelled as a
+  product name and never used to invent a Catalog record. `SKU` and `Supplier DO` remain their own
+  optional columns; `SKU` shows by default while any loaded record has no Catalog product name.
+- **`Qty` is the reported claim quantity**, not a Unit count: held Units can be fewer or zero. No
+  quantity total in the footer.
+- **`Problem`** is the recorded problem type. `Late delivery` stays readable on historical records
+  only; passing time never creates a new claim.
+- **`Supplier Response`** is what the supplier actually answered, from its own closed list
+  (`Replacement · Deliver remaining · Repair · Return & replace · Reject · Other agreement`);
+  absent reads `Not recorded`. It is never Carres's ask and never a completion.
+
+**ONE PARENT ROW IS ONE SUPPLIER CLAIM WORKSTREAM.** `Qty 2` does not create two Claims or two
+Cases, and never one row per Unit, per photo or per Work action. The existing supplier/source-line
+and incident boundaries are unchanged by this presentation: a claim still starts from one verified
+Stock/PO-line/receipt source, and a related customer complaint is still its own linked Case.
+
+**PINNING — owner-ordered exception to the shared date-first pair, recorded so no later chat
+"corrects" it back.** UI MASTER §6.7 rule 2 pins `date · identity`; this page's owner-approved
+order puts `Claim status` first and the date third, and §6.7 already rules that exact
+owner-approved page orders outrank the general heuristic. Therefore: **canvas ≥768px pins the two
+leading controls plus `Claim status` and `Supplier Claim No`; below 768px only `Supplier Claim
+No.` pins**, and `Claim status` scrolls with the rest. `Claim Reported` is never pinned here.
+Consequence for build: the shipped `DataGrid leadingColumns` capability forces `date · identity`
+to lead and cannot express this order — Supplier Claims must NOT adopt it as built; the engine
+needs a pinned-prefix that takes the page's own leading columns. No column is hidden by width; the
+approved defaults or the person's saved layout always show and overflow scrolls inside the grid.
+Horizontal scrolling uses the shared pinned offsets, so a pinned cell never covers adjacent
+content.
+
+**HEADER GEOMETRY — fix the overlap and the blank blocks with the SHARED contract, never a
+page-local one.** Every header cell — including the two leading control cells — is part of the one
+slate-3 header band, painted opaque, and reserves the shared two-line header height (§6.8) so a
+one-word header centres instead of leaving a blank block above it. A sticky header paints above
+body cells; a pinned cell paints above unpinned ones; a pinned header cell paints above both. No
+transparent sticky cell, no page-specific z-index ladder, no page-specific row or header height.
+
+**ROW HEIGHT.** This register carries two-line identity (`PO No` + Unit ID) and two-line goods
+(`Items`), so every row uses the **shared 54px two-line listing row** with vertically centred
+checkbox, disclosure and quantity (§6.8). The engine's 38px single-line default stays correct for
+single-line registers; 54px is the goods-row geometry, not a portal-wide replacement. Short
+content fits inside 54px; long content and accessibility needs may grow the row — a required
+party, number, document or date is never ellipsised to protect the height.
+
+Wider detail/reference fields remain optional Columns: Requested Result, Authorised Outcome, Item
+Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version and Sent to
+Supplier. Only relevant date facts appear; no generic workflow field. Unknown optional facts are
+not promoted to permanent empty columns; measure before final layout.
 
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-Supplier               Reported | Supplier Claim No. | Supplier | PO No | GRN No. | Product | Variant | Qty ...
-  actual suppliers     one row per supplier claim; facts and evidence only
-PROBLEM
-  observed types       footer: matching claims · affected Units/quantity with clear scope
-CLAIM STATUS
-  Open / Closed / Cancelled
+SUPPLIER               ☐ ▸ Claim status | Supplier Claim No | Claim Reported | Supplier |
+  actual suppliers         PO No (Unit ID line two) | GRN No | Items | Qty | Problem |
+PROBLEM                    Supplier Response
+  observed types       one ungrouped list, newest report first; facts and evidence only
+CLAIM STATUS           footer: matching claims, claim count only
+  In progress / Closed / Cancelled
 SUPPLIER RESPONSE
   Not recorded / actual recorded answer
 Clear filters
@@ -2748,35 +2948,148 @@ incomplete records remain visible. No formal issue passes without verified prove
 counts cover the complete permitted searched/filtered set under shared facet semantics, not the
 loaded page; collapsed groups do not filter.
 
-**SUPPLIER CLAIMS PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18).** The owner
-approved the complete page after two correction rounds. The Blueprint is closed; implementation
-and the signed-in walk at 1440/1180/820/390 are still owed. Widths below are candidates until
-measured in the real DOM.
+#### Row expansion — the per-Unit evidence inspector
 
-*Shared listing alignment (UI MASTER §6.7; same grammar as SO Batch, Manual Purchase, Purchase
+**OWNER-CONFIRMED 2026-09-18 · APPROVED / NOT BUILT.** The expansion has exactly one job: read the
+problem and its evidence for each affected Unit. **It is read-only. It contains no editor, no
+uploader, no delete control and no status change.** It replaces the earlier "photo thumbnails"
+inspector completely.
+
+**Expansion columns, in this order:**
+
+```text
+PO No (Unit ID on line two) · Items · Qty · Problem & Evidence · Supplier Response
+```
+
+- **For individually tracked goods, each Unit gets its own row, `Qty 1`**, carrying that Unit's
+  own recorded problem, its own linked evidence and the supplier response that actually applies to
+  it. A reply recorded against the whole claim shows on each Unit as the claim-level answer it is;
+  **an aggregate reply is never distributed across Units as if each had been answered separately**,
+  and a Unit with no applicable answer reads `Not recorded`.
+- **Quantity-managed goods keep their genuine quantity on one row.** No Unit ID is invented, no
+  row is split to manufacture a per-Unit appearance. Line two reads `Counted stock`.
+- The parent row's facts are not repeated as a summary row inside its own expansion.
+
+**Evidence controls — compact, inside the row, never a button bar.** Beneath the problem
+description sit small icon + text controls reading exactly **`Photos {n}`** and **`Video {n}`**
+(singular `Photo 1` · `Video 1`). Icon plus text only: **no large buttons, no pills, no borders,
+no permanent filled background.** They take the shared control ink and the 12px helper size, show
+a hover/focus tint only while hovered or focused, and carry a visible focus ring. Short content
+fits the shared 54px row; long problem text and accessibility needs may grow it.
+
+- **Clicking expands that Unit's evidence directly beneath that Unit. Clicking again collapses
+  it.** `aria-expanded` states it. Each Unit owns its own evidence disclosure; opening one never
+  closes another and never moves the rows above it.
+- A count is never printed when it is unknown: an unread evidence list reads
+  `Evidence could not be loaded` + `Try again`, never `Photos 0`. `Photos 0` means the record
+  genuinely has none — and a kind with zero files prints no control at all rather than a dead one.
+
+**The saved-evidence viewer — ONE shared component, and it does not exist yet.**
+
+| Check | Measured answer |
+|---|---|
+| Does a shared saved-evidence viewer exist? | **No.** `apps/web/src/pages/operation/components/CaseEvidenceGallery.tsx` is a Service-Case list with an UPLOADER (append-only, no delete) and no zoom, drag, Previous/Next or overlay. `ClaimPhotoUploadField.tsx` is an upload field. `SupplierClaimPanel.tsx:35` prints `Evidence: {n} photos` as text. Source read on this branch, 2026-09-18 |
+| Consequence | **🟡 KIT COMPONENT REQUEST — the component must join the kit before this page is built** (Constitution §2: never draw one inline "just this once"). Its contract is below. It is `APPROVED TARGET / NOT BUILT` |
+
+The one shared viewer, reused by Supplier Claims, Receiving, Stock and Service Case alike:
+
+- **Photos:** zoom in · zoom out · drag to pan while enlarged · `Reset` · `Previous` · `Next` ·
+  `Close` · `Esc`. Closing returns focus to the control that opened it and restores the register's
+  scroll position and the open expansion — the operator never loses their place.
+- **Video:** play/pause, seek and fullscreen. **Local video zoom is outside this approval** and is
+  not built silently.
+- **It is a READ-ONLY viewer.** No uploader, no delete, no re-order, no rotate-and-save. Adding
+  evidence stays with its owning record and its own permission.
+- **File-to-Unit and file-to-event relationships are preserved and visible** — a photo opened from
+  a Unit says which Unit and which recorded event it belongs to. Permissions are enforced per file
+  on the server; the viewer never widens them.
+- **Loading, failure and retry are distinct, and MISSING is not UNREADABLE.** A file the record
+  never had reads as absent; a file that exists but could not be read reads
+  `Photo {n} could not be loaded` + `Try again`. The two never render alike, because one means
+  nobody uploaded it and the other means the operator is being shown less than the record holds.
+
+**SUPPLIER CLAIMS PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18, column order and
+evidence design confirmed 2026-09-18).** The Blueprint is closed; implementation and the signed-in
+walk at 1440/1180/820/390 are still owed. Widths below are candidates until measured in the real
+DOM.
+
+*Shared listing alignment (UI MASTER §6.7–6.9; same grammar as SO Batch, Manual Purchase, Purchase
 Orders):*
 
 | Region | Approved rule |
 |---|---|
-| Pinned columns | `leadingColumns` {date: `Reported`, identity: `Supplier Claim No.`}. Canvas ≥768px: both pinned. Below 768px: only `Supplier Claim No.` pinned; `Reported` stays and scrolls. No column is hidden by width. The approved default columns or the user's saved layout always show; overflow scrolls inside the grid |
-| Widths | Content-measured `width` + `minWidth` like SO Batch/Manual Purchase. Candidates from production Inter 13px text: widest date `Wed, 08 May` 81.1px text (column ≈97px); `SC-20260916-0007` 122.8px text (column ≈147px). Final values come from the build's DOM measurement |
-| Type and colour | Main text 13px · table second line 11px · form/button helper 12px · error 13px with icon. Shared slate palette (`palette="slate"`); no Claim-specific styles |
-| Buttons | Kit Button, `md` = 32px. Touch targets expand only by the shared rule; no page-level 40px buttons |
+| Pinned columns | The two leading controls plus `Claim status` and `Supplier Claim No` pin at canvas ≥768px; below 768px only `Supplier Claim No` pins. `Claim Reported` is never pinned. The shipped `leadingColumns` capability cannot express this order and is not adopted here. No column is hidden by width; the approved defaults or the person's saved layout always show, and overflow scrolls inside the grid |
+| Widths | Content-measured `width` + `minWidth` like SO Batch/Manual Purchase, with the minimum set by the complete two-line header plus its controls. Candidates from production Inter 13px text: `SC-20260916-0007` 122.8px text (column ≈147px); widest date `Wed, 08 May` 81.1px text (column ≈97px); `In progress` needs ≈96px; `PO-20260904-4665` and `U1-000-075` share one cell, so its width is the wider of the two lines. Final values come from the build's DOM measurement |
+| Row height | Shared 54px two-line listing row (§6.8), vertically centred controls. Growth for long content and accessibility is allowed; ellipsising a required fact to protect 54px is not |
+| Type and colour | Main text 13px · second line 11px slate-11 · form/button helper 12px · error 13px with icon. Shared slate palette (`palette="slate"`); no Claim-specific styles |
+| Buttons | Kit Button, `md` = 32px. Evidence controls are NOT Buttons — icon + text only. Touch targets expand only by the shared rule; no page-level 40px buttons |
 | Search and footer | Shared responsive search, condition bar and one `Clear filters` (grid `activeConditions`). Footer `{N} Supplier Claims` · `1 Supplier Claim` · filtered `{n} of {N} Supplier Claims`. No quantity total: `qty` is the reported quantity and held Units can be fewer or zero (`supplier-claims.ts` read), so it is not an independent Unit count |
-| Rail | `useFilterRailOpen` (starts hidden and overlays below 896px canvas); group state `carres.filterRail.<rail>.<group>`. Groups: Supplier · Problem · Claim status · Supplier Response |
-| States | Loading · `No Supplier Claims yet.` · `No Supplier Claims match these filters` · `Supplier Claims could not be loaded` + `Try again` inside the grid (toolbar stays) · no access · photo read failure `Photo {n} could not be loaded · Try again` — each distinct |
-| Row expansion | One job: short read-only problem/evidence inspector (problem and note, photo thumbnails, held Units, `Open Claim`). No editor. Selection is for export only |
-| Open and return | `Supplier Claim No.` opens the full-width object (`?claim=`, kept in the URL). The object has a visible back link to Supplier Claims and `‹ i of n ›`; the claim pack has a visible Close back to the object. Returning restores filters, scroll, row and focus on its Supplier Claim No. Esc is an extra shortcut, never the only way out. Object header follows Manual Purchase's pattern until the kit gains one shared object header |
-| Cross-links | PO No opens the Purchase Orders object (`?po=`); GRN No opens the Receiving record; Units open Stock |
+| Rail | `useFilterRailOpen` (starts hidden and overlays below 896px canvas); group state `carres.filterRail.<rail>.<group>`. Groups: Supplier · Problem · Claim status (`In progress` · `Closed` · `Cancelled`) · Supplier Response |
+| States | Loading · `No Supplier Claims yet.` · `No Supplier Claims match these filters` · `Supplier Claims could not be loaded` + `Try again` inside the grid (toolbar stays) · no access · evidence read failure `Evidence could not be loaded` / `Photo {n} could not be loaded` + `Try again` — each distinct |
+| Row expansion | One job: the read-only per-Unit problem/evidence inspector above. No editor, no uploader, no delete. Selection is for Export only |
+| Open and return | `Supplier Claim No` opens the full-width object (`?claim=`, kept in the URL) — never a summary popup, which is rejected. The object has a visible back link to Supplier Claims and `‹ i of n ›`; the claim pack has a visible Close back to the object. Returning restores filters, scroll, row, open expansion and focus on its Supplier Claim No Esc is an extra shortcut, never the only way out. Object header follows Manual Purchase's pattern until the kit gains one shared object header |
+| Cross-links | PO No opens the Purchase Orders object (`?po=`); GRN No opens the Receiving record; a Unit ID opens Stock |
+
+**THE RECORD IS WHERE WORK HAPPENS — owner-confirmed 2026-09-18.** The listing and the Unit
+expansion are read-only. `Open Claim` and the claim number both lead to the ONE governed full-width
+working record. **My Work links to that same record** (`/operation?tab=claims&claim=…`, built by
+`packages/shared/src/sales-order-route.ts:402`). Authorised staff record the supplier's actual
+reply THERE — the answer, the affected scope, the date and its evidence. **No separate Workspace
+editor, no second reply form, no inline reply in the register.** Case, Stock, Receiving and Finance
+ownership boundaries are unchanged: the record reads their facts and links to them, and never
+writes them.
+
+**Implementation state of reply recording — measured on this branch, 2026-09-18, source evidence
+only (no production walk):**
+
+| Layer | Measured | Classification |
+|---|---|---|
+| Server door | `apps/api/src/routes/operation/supplier-claims.ts:413` defines `POST /:id/response` | **BUILT — source measured** |
+| Web caller | **None.** No call to that route exists anywhere in `apps/web/src` | **NOT BUILT** |
+| Record surface | `SupplierClaimPanel.tsx:83` prints `Supplier Response` read-only; its own header comment states the old inline mutations cannot stand in for the approved doors | **Read-only today** |
+| Governed reply recording as designed above (answer + affected scope + date + evidence, under the approved permission gate) | Not present | **APPROVED TARGET / NOT BUILT** |
+
+Do not describe reply recording as available. A committed route is not a delivered capability, and
+neither is an approved design.
+
+**TWO APPROVED TARGETS, BOTH NOT BUILT, AND NEITHER MAY BE DELIVERED HALF-WAY.**
+
+| Target | State | The build's obligation |
+|---|---|---|
+| The ONE shared read-only saved-evidence viewer (UI MASTER §6.8) | **APPROVED TARGET / NOT BUILT** | It joins the kit before this page uses it. One implementation for Supplier Claims, Receiving, Stock and Service Case — never a page-local copy |
+| The Supplier Response recording surface on the full-width claim record | **APPROVED TARGET / NOT BUILT** | The build **must** ship a working reply-recording journey, not a read-only page plus a promise |
+
+**The reply-recording build reuses what exists; it does not grow a second system.**
+
+- **Reuse the existing server door.** `POST /api/ops/operation/supplier-claims/:id/response`
+  (`apps/api/src/routes/operation/supplier-claims.ts:413`) is the write path. Extend it where the
+  approved facts need it — affected scope, date, evidence, the permission gate — rather than minting
+  a parallel endpoint beside it.
+- **Reuse the existing work entry.** My Work links to the claim record through the built deep link
+  `/operation?tab=claims&claim=…` (`packages/shared/src/sales-order-route.ts:402`). The reply is
+  recorded there. **No separate Workspace editor, no second reply form, no inline reply in the
+  register, and no new claim-only work page.**
+- **One writer per fact.** The reply records what the supplier actually answered, its affected
+  scope, its date and its evidence — and nothing else. Authorised Outcome, Item Outcome, Stock,
+  Receiving, Case and Finance keep their own writers; the record reads and links to them.
+- **Scope honesty travels with the answer.** A reply recorded for the whole claim is stored and
+  shown as a claim-level answer; recording it never distributes it across Units as if each had been
+  answered separately, and a Unit with no applicable answer stays `Not recorded`.
+- **A page that can show a reply but not record one is not this scope delivered.** Closing this
+  scope requires the recorded reply to appear on the record, in History with its actor and time,
+  and in the register's `Supplier Response` column — proved on production, not in a fixture.
 
 *Full object — one full-width working scroll, in this order:*
 
 ```text
-← Supplier Claims   SC-… · Hooka · Open                                   ‹ 3 of 12 ›
+← Supplier Claims   SC-… · Hooka · In progress                            ‹ 3 of 12 ›
 [Current action] owner avatar · fact line · instruction line · working date · ONE primary button
-The Item      product · variant · SKU · reported Qty · held Units (own count, separate)
-Problem       type · note · photo thumbnails · reported date and reporter
-Supplier      what we asked · sending evidence · supplier reply · Reply expected
+The Item      Items (model · configuration) · SKU · reported Qty · affected Units (own
+              count, separate) · PO No / Unit ID · GRN No
+Problem       type · note · per-Unit evidence through the ONE shared saved-evidence viewer ·
+              reported date and reporter
+Supplier      what we asked · sending evidence · the supplier's recorded reply, its affected
+              scope, its date and its evidence · Reply expected
 Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PRTN / replacement
               doors · supplier money (Finance, read-only)
 Related       Service Case, read-only (hidden only when there is no linked Case)
@@ -3008,39 +3321,204 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source Claim/PO/GRN, Units/Qty, Collect From, Collection Date,
-Handover, Credit Consequence, Work.
-**Journey:** system creates from outcome → check exact goods → send return PDF → record collection
-date → scan/count at handover → upload proof.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** supplier refuses collection, partial collection, wrong Unit collected, credit note
-missing/different.
-**Connections:** Purchasing stock claim, Stock custody, supplier, Finance credit read-only.
+**Owner-confirmed UI target — 2026-09-18. APPROVED TARGET / NOT BUILT.** Approval covers
+layout, labels and inspection interactions; sample parties, dates, quantities and document
+references are illustrative, not verified business data. This does not approve a new custody
+engine or claim production verification.
+
+**Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
+No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
+ownership chain (§7.4 and Stock MASTER §12.8). Issuing the document does not move stock.
+
+**Main columns, in order:** expand arrow → PR Doc Date → PR No → Supplier → Supplier Claim No
+→ Category → PO No / Unit ID → GRN No → Items → Qty → Pickup Location → Return To
+→ Confirmed Pickup Date → Collected By → Collected Qty → Actual Pickup Date
+→ Supplier Received Date. Category immediately precedes the combined PO No / Unit ID cell.
+Visible purchase-return references use `PR-`, not `PRTN-`; this is display vocabulary, not
+permission to migrate stored identifiers. PR Doc Date is the document date, not goods movement.
+
+**Identity / expansion:** PO No on line one, Unit ID on line two in the same cell. Multiple
+Units expose the count as the expansion entry. Items shows the model and its specification on
+line two. Expanded columns: Category → PO No / Unit ID → Items → Qty → Pickup Location
+→ Return To → Collected By → Actual Pickup Date → Supplier Received Date → Evidence.
+One tracked Unit per expanded row, Qty 1; never combine two physical Units into one evidence row.
+
+**Dates and places:** Pickup Location is where goods are collected; Return To is the recorded
+supplier-designated destination, not an assumed registered address. Collected By identifies the
+actual collector. Confirmed Pickup Date, Actual Pickup Date and Supplier Received Date are
+separate facts. Fully picked up does not mean received by the supplier. Unknown facts remain
+explicitly unrecorded; never fabricate dates, collectors or receipt evidence.
+
+**Left rail — owner-confirmed latest preview:** Supplier → Return document → Pickup → Evidence.
+Reuse Supplier Claims' rail composition, section icons, spacing, width and active state.
+Supplier is a visible list of supplier names with right-aligned matching PR counts, not a dropdown
+(e.g. illustrative `Hookka 2`, `Ohana 1`). Click to filter; click again to deselect. Supplier
+combines with the operational condition and search; counts respect the other active dimensions.
+Return document: `Return document not sent`. Pickup: `Pickup date not confirmed`, `Not picked up`,
+`Partly picked up`, `Fully picked up`. Evidence: `Pickup proof missing`.
+Counts count matching PR documents, not Units; conditions may overlap. These are factual filters,
+not new stored states. Date-range and Pickup Location rail sections discussed as possibilities
+were not in the confirmed preview; do not silently treat them as approved additions.
+
+**Evidence:** per-Unit inspection separates Problem evidence (linked claim), Pickup proof and
+Supplier receipt proof. Compact icon + text photo/video actions; no large pills or unnecessary
+row-height increase. Expand evidence on request. Use the shared read-only viewer target for
+photo zoom/pan/reset/navigation and video playback/fullscreen. Never label damage photos as
+pickup or receipt proof. Viewer and real evidence wiring require build verification.
+
+**Shared UI / scope:** flat register, sticky opaque column header; do not invent status groups.
+Use the shared field-width registry and kit geometry, not page-specific width standards.
+No Finance, Credit Consequence or Work column. Do not use Handover/Handover proof as this
+register's labels. The underlying custody rules remain governed by Stock. Full-width record
+view; 50/50 remains reserved for issuing/revising. No application build is claimed by this ruling.
 
 ### 9.7 Repair Orders
 
-**Local physical-chain implementation — 2026-09-07, not deployed:** an authorised Claim repair or
-replacement outcome can now open exact-Unit arrival source work, with recorded handover and return
-Receiving through the existing GRN/result ledger and GRN Duty. Repair preserves identity;
-replacement allocates a new Unit linked to the original. This does not complete the formal Repair
-Order/Purchase Return document target below. Database draft readiness and local evidence are
-recorded once in `docs/stock/MASTER.md` under Inbound local implementation.
+**Owner-confirmed business blueprint — 2026-09-18. APPROVED TARGET / NOT BUILT.**
+This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
+ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
+The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
+merely because they appeared there. No application implementation or deployment is claimed.
 
+**Purpose:** commission a selected Supplier to repair identified existing goods, record the agreed
+scope and cost responsibility, and follow the same Units out, back and through inspection.
+Supplier Claim addresses alleged supplier responsibility and its agreed outcome; RO executes a
+repair commission. A Claim does not prove fault has been admitted. An RO does not imply either
+free warranty service or a charge to Carres. Supplier may differ from the original PO supplier.
 
-**Purpose / source:** send a specific Carres-owned Unit for approved supplier/repairer work; no blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Handover out missing`, `Expected back date missing`, `Expected back date passed`, `Return inspection missing`, `Closed`.
-**Columns:** RO No., Repairer, Source Stock Claim, Unit, Problem, Sent Out, Expected Back, Returned,
-Inspection, Work.
-**Journey:** create from approved repair outcome → issue → prove same Unit handed out → chase actual
-date → receive/inspect same Unit → close or route failed repair.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** cannot repair, repairer returns a different physical Unit, date changed, damage added,
-replacement offered.
-**Connections:** Purchasing stock claim, Stock custody/history, Goods Receipt/inspection.
+#### Creation sources and eligible goods
+
+1. **Direct inventory repair:** `Create Repair Order` on this register, or the linked action on an
+   inventory Unit, opens selection of existing Units. Supplier Claim is not required.
+2. **Claim-linked repair:** an authorised repair decision opens the same RO flow with the Claim,
+   exact Units, requirements and evidence prefilled. Retain the source links; do not ask staff to
+   report the same problem again. Creating or issuing RO does not itself close the Claim.
+
+Eligible selection locations include **Warehouse, Showroom and Dealer**, including **Display**
+goods. Display is a use of the goods, not a separate ownership class. Showroom/Dealer are actual
+recorded locations, not proof of ownership. This is not permission to commission repair for any
+untracked product owned by a dealer or customer.
+
+Select existing, accessible Unit records; do not type a product into an RO and thereby invent
+stock. Bring in Category, Items/configuration, original PO/source, Unit ID and current recorded
+Stock Location. If an original PO is absent, retain the genuine source and missing-reference fact;
+never fabricate a PO. The selected repair Supplier does not rewrite the original purchase source.
+
+Carres-owned stock follows the normal authority and cost-approval rules. Consignment or other
+non-Carres-owned goods require the owner's authority and explicit cost responsibility before
+commitment. Do not silently treat supplier-owned Display goods as Carres assets. Sold/reserved,
+held, already-out, or already-in-repair Units require the owning workflow's eligibility checks;
+selection must not bypass commitments, controls, permissions or create duplicate active repair.
+A photo or free-text item is not a substitute for a real Unit. Untracked/count-managed repair is
+not admitted by this exact-Unit blueprint; resolve identity in the owning inventory process.
+
+#### Required record and location meanings
+
+| Field / fact | Meaning and source |
+|---|---|
+| RO Doc Date / RO No | Repair document date and governed RO identity; not the pickup date. Follow the existing number-allocation policy; do not invent a sequence in the UI |
+| Supplier | Supplier accepting this repair commission; selected independently of the original seller |
+| Supplier Claim No | Optional related Claim; prefilled for Claim-origin repairs, empty for direct inventory repairs |
+| Category / PO No + Unit ID / Items / Qty | Existing goods facts; PO on line one and Unit ID beneath in one cell; model then configuration; one tracked Unit per detail row, Qty 1 |
+| Repair Requirement / Problem | Observed fault, required repair and expected result, attributable to each Unit |
+| Evidence | Per-Unit photos/videos with their source and purpose; retain existing Claim evidence links |
+| Supplier Pickup Location | Recorded place from which these goods are to be collected for repair; default from the Unit's actual Stock Location |
+| Supplier Return Location | Intended place to receive the goods after repair; can differ from pickup location; not evidence of receipt |
+| Expected Return Date | Recorded expected return with its provider/evidence; do not imply supplier confirmation where none exists |
+| Repair Quotation / Cost Responsibility | Supplier's quoted scope and charges, and who will bear them; an unknown cost is not zero |
+| Approval | Actual authorised actor, time and scope, according to existing approval policy |
+
+Supplier Pickup Location and Supplier Return Location apply equally to Warehouse, Showroom and
+Dealer sites. Record actual collector/carrier separately; these labels do not require the supplier
+to transport personally. Changing a planned location never moves a Unit or overwrites Stock's
+current-location fact. A pickup-location mismatch must be resolved against actual custody.
+Do not add `Repair Location`: this register does not track where the supplier performs the repair.
+
+#### Quotation, approval and issue
+
+Save an incomplete quotation as a draft. If Carres pays, obtain the supplier quotation and the
+required approval before committing or issuing the order. If Supplier pays, retain its evidenced
+agreement; never infer free repair from a Claim link. Use existing approval roles/limits, not a new
+threshold invented by this page. Missing applicable authority prevents commitment and explains
+what is needed. Any charge or repair-scope increase needs the applicable approval; keep the old
+quote, new proposal and decision rather than overwriting them.
+
+If a supplier rejects warranty liability and proposes paid repair, keep its reply and the original
+Claim history. Carres must expressly approve the paid commission; do not auto-convert the Claim
+or accept the quotation. Decide outstanding Claim matters under §9.5 independently.
+
+Issue uses the shared formal-document flow: staff actually send the approved document and record
+version, recipient, channel, actor and time. Generating/downloading PDF proves neither sending
+nor supplier acceptance. Preserve sent revisions and corrections. Quote/approval is a purchasing
+commitment fact; payment, balance and credit processing remain in Finance, outside the register.
+
+#### Physical execution and completion
+
+Outbound records exact Units actually handed out, actual recipient/collector, time and evidence.
+Document issue never moves inventory. Track the expected return and evidenced changes. Receiving
+records actual returned Units, receipt date, receiving location and evidence through the one receipt
+engine; the expected destination is not substituted for the actual one. Inspect the returned goods,
+record actual inspector, date, result and supporting media before restoring availability.
+
+Repair retains the original Unit ID. A different replacement is a linked replacement with a new
+identity, not a repaired original. Partial return/inspection completes only the actual Units; keep
+remaining quantities and dates visible. Failed repair, new damage, refusal, cancellation or inability
+to repair needs its owning authorised outcome. Closure does not erase stock obligations or restore
+availability. A supplier saying the work is finished is not receipt or inspection evidence.
+
+#### Register, detail and shared UI
+
+Keep Repair Orders as a separate register for both creation sources. Supplier Claim opens its
+related RO directly. Register expansion is read-only per-Unit inspection; RO No opens the one formal
+record. Ordinary detail is full-width; only document issue/revision uses governed 50/50 preview.
+Use shared grid/rail geometry and width registry, Supplier-name/count filters, Category immediately
+before PO No / Unit ID, Items/configuration and Qty. Counts distinguish RO documents from Units.
+Problem and Evidence are separate columns. Evidence actions are compact icon/text controls;
+expand by Unit and distinguish original fault, dispatch and receipt/inspection evidence. Use the
+shared viewer contract for photo zoom/pan/reset/navigation and video playback/fullscreen.
+No Work, Finance, Credit or Payment column. No invented editable lifecycle, supplier progress or
+ambiguous dash-joined status. The old §9.7 field/rail list is superseded; remaining exact filter copy
+and layout require a fresh preview against this business scope, not reuse of the rejected HTML.
+
+#### Whole-Portal ownership and Workspace integration
+
+This is one connected workflow, not a standalone repair tracker. Workspace My Work / Team Work
+coordinates admitted obligations from the owning records; it does not keep a second RO, quote,
+status or stock ledger. Each work occurrence must satisfy Workspace MASTER §6 before build admission:
+stable source/rule/occurrence, authoritative trigger/completion, resolved Duty/person and cover,
+governed date/calendar, permission, actual-actor history and a direct link to the owning action.
+Do not invent a new approval holder or deadline; unresolved ownership remains explicit.
+
+| Portal owner | Repair connection |
+|---|---|
+| Purchasing / RO | Requirements, chosen Supplier, quote/cost responsibility, authorised scope, Issue and supplier follow-up |
+| Workspace / Staff & Duties | Resolve who must approve, issue or follow up; My Work/Team Work shows the same source-owned outstanding act and removes it only after proved completion |
+| Inventory / Stock | Select existing Units and actual locations, verify ownership/holds/reservations, retain identity and custody history |
+| Outbound / transport | Actual Unit dispatch, collector/recipient and proof; existing delivery/transport records when applicable, no second logistics engine |
+| Receiving / inspection | Authorised RO-linked receipt, original identity, partial quantities, actual receiving site and inspection result |
+| Supplier Claim | Optional source and supplier-responsibility follow-through; no fabricated Claim for direct inventory repair |
+| Finance | Consume authorised cost/source facts for its existing payable/payment process; RO never posts payment or duplicates approval/financial ledgers |
+| Linked customer order / Service Case | Preserve any actual reservation/customer relationship and outstanding service obligations; RO completion cannot silently complete a different record |
+| Portal history / documents | Trace source, Unit, quote, approval, sent revision, physical movements and actual actors across the linked records |
+
+Potential Work obligations include completing a required quote/approval, issuing the approved RO,
+following up a recorded return date, and completing receiving/inspection in the owning module.
+A register filter is not itself a Work obligation. Reuse existing stock/receiving tasks rather than
+create duplicate RO tasks for the same physical act. Tests must prove permission/cover behaviour,
+partial completion, stale-state handling and disappearance of exactly the completed occurrence.
+These integrations are approved targets, not claims that Work projections are already admitted.
+
+#### Build implications and validation boundary
+
+Existing migration 0490 repair-return sources require a Claim or Case and are not proof of a formal
+RO implementation. Stock/Receiving must accept an authorised direct-stock RO as a governed source
+without fake Claims/Cases, while preserving permissions, ownership, exact-Unit identity and receipt
+checks. Do not weaken constraints globally or implement independent custody writers.
+
+Build must verify both sources, warehouse/showroom/dealer Display selection, owner authority for
+consignment, Supplier different from original PO supplier, missing quote, denied approval, duplicate
+active repair, partial return, failed inspection, replacement identity and receipt-source compatibility.
+This document authorises the target, not a migration, build-card creation or production rollout.
 
 ### 9.8 Display Requests
 
@@ -3061,7 +3539,7 @@ duplicate request.
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.
 **Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
-**Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
+**Columns:** CO No, Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
 Date, Received, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
 send one PDF → record promise → receive through Receiving → prove outgoing handover.
@@ -3075,7 +3553,7 @@ swap, supplier changes model/date.
 **Purpose / source:** return an unsold supplier-owned Unit after approved removal, paired swap,
 supplier collection, overdelivery or claim outcome; no blank `+ New`.
 **Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
+**Columns:** Return No, Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
 Paired CO, Work.
 **Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
 combined CO PDF → scan exact Unit and prove collection.

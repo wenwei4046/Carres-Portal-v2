@@ -19,9 +19,11 @@ import {
   setLineDestinationInput,
   setLineOpsRemarkInput,
   splitLineDestinationInput,
+  warehouseReceiptTotals,
   type AwaitingStockShortageResponse,
   type PoReportLine,
   type PoReportResponse,
+  type WarehouseReceiptLine,
 } from "@carres/shared";
 // renderPoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import { requireOperation } from "../../lib/auth-guards";
@@ -277,18 +279,23 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         .filter((id): id is string => !!id),
     ),
   ];
-  /* Card 08 §3.5 — a Manual Purchase source has no visible number. The
-     visible reference is the label `Manual Purchase`; identity stays the
-     request UUID, and the business facts (Proceed Date, purpose) travel so
-     detailed source lines can tell two purchases apart. `req_no` is legacy
-     compatibility data and is not read. */
-  const requestFactsById = new Map<string, { proceedDate: string | null }>();
+  /* ⭐ MPR IS THE MANUAL PURCHASE'S VISIBLE IDENTITY AGAIN — owner ruling
+     2026-09-18, which overwrites Card 08 §3.5's 2026-09-04 retirement. The
+     request's own permanent number (`purchase_requests.req_no`,
+     `MPR-YYYYMMDD-RRRR`, 0359) is what the PO listing's `SO No / MPR No`
+     column prints and what opens the request. It is READ, never minted here: a
+     request with no stored number keeps the governed label `Manual Purchase`,
+     because a number nobody allocated is a number nobody can look up.
+     Identity stays the request UUID and the business facts (Proceed Date,
+     purpose) still travel, so detailed source lines can tell two purchases
+     apart. */
+  const requestFactsById = new Map<string, { proceedDate: string | null; reqNo: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, created_at")
+        .select("id, created_at, req_no")
         .in("id", ids)
         .order("id"),
     );
@@ -301,6 +308,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         proceedDate:
           typeof request.created_at === "string"
             ? request.created_at.slice(0, 10)
+            : null,
+        reqNo:
+          typeof request.req_no === "string" && request.req_no.trim() !== ""
+            ? request.req_no.trim()
             : null,
       });
     }
@@ -657,18 +668,34 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     }
   }
 
-  /* GRN No (Purchasing MASTER §9.3, Jess 2026-09-17): the posted receipts of
-     each PO. A draft has no number and is not a GRN, so only numbered receipts
-     ride the list. Receiving owns them; the register only links. */
-  const grnsByPo = new Map<string, Array<{ id: string; grn_no: string }>>();
+  /* GRN No · Goods Received Date · Received Qty (Purchasing MASTER §9.3, Jess
+     2026-09-17, extended by the owner ruling 2026-09-18): the posted receipts
+     of each PO. A draft has no number and is not a GRN, so only numbered
+     receipts ride the list. Receiving owns them; the register only links.
+
+     ⭐ THE PHYSICAL DATE IS ITS OWN FACT. `goods_received_at` is the day the
+     goods actually arrived (0314); `created_at` is when the record was filed.
+     They are routinely different days and the register may never substitute
+     one for the other — a PO Default Delivery Date, a Supplier Confirmed
+     Delivery Date and a Goods Received Date are three separate columns.
+
+     ⭐ AND THE QUANTITY HAS ONE ARITHMETIC (Law D). `warehouseReceiptTotals`
+     is the shared reader Receiving already uses, so the count beside a GRN
+     here and the count on the GRN itself cannot drift. Damaged and wrong-item
+     units are NOT received — that is the same arithmetic, not a second one. */
+  const grnsByPo = new Map<
+    string,
+    Array<{ id: string; grn_no: string; goods_received_at: string | null; received_qty: number }>
+  >();
   if (poIds.length > 0) {
     const grnResult = await readEveryChunked<Record<string, unknown>, string>(
       poIds,
       (ids) => sb
         .from("warehouse_receipts")
-        .select("id, po_id, grn_no, created_at")
+        .select("id, po_id, grn_no, goods_received_at, lines, created_at")
         .in("po_id", ids)
         .not("grn_no", "is", null)
+        .order("goods_received_at", { ascending: true })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true }),
     );
@@ -679,7 +706,18 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     for (const receipt of grnResult.data) {
       const poId = receipt.po_id as string;
       const current = grnsByPo.get(poId) ?? [];
-      current.push({ id: receipt.id as string, grn_no: receipt.grn_no as string });
+      const lines = Array.isArray(receipt.lines)
+        ? (receipt.lines as WarehouseReceiptLine[])
+        : [];
+      current.push({
+        id: receipt.id as string,
+        grn_no: receipt.grn_no as string,
+        goods_received_at:
+          typeof receipt.goods_received_at === "string"
+            ? receipt.goods_received_at.slice(0, 10)
+            : null,
+        received_qty: warehouseReceiptTotals(lines).received,
+      });
       grnsByPo.set(poId, current);
     }
   }
@@ -708,7 +746,10 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
       return [{
         kind: "manual_purchase" as const,
-        reference: "Manual Purchase",
+        /* The stored MPR number where the request has one; the governed label
+           where it has none. Never a UUID, never an invented number. */
+        reference: facts?.reqNo ?? "Manual Purchase",
+        req_no: facts?.reqNo ?? null,
         request_id: demand.requestId,
         purpose: demand.purpose,
         proceed_date: facts?.proceedDate ?? null,
@@ -756,7 +797,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             }]),
             ...(demand ? [{
               kind: "manual_purchase" as const,
-              reference: "Manual Purchase",
+              reference: manualFacts?.reqNo ?? "Manual Purchase",
+              req_no: manualFacts?.reqNo ?? null,
               // A mixed legacy row can carry both ledgers. Preserve its Manual
               // Purchase reference without claiming the full line twice.
               qty: Math.max(0, Number(l.qty ?? 0) - salesAllocated) || null,
