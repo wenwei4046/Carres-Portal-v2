@@ -1866,6 +1866,7 @@ confirmed`. Groups reuse `Open` · `Closed` · `Cancelled`. Added:
 
 | Word | Meaning |
 |---|---|
+| `Return No.` | The Purchase Return number `PR-YYYYMMDD-RRRR` (owner ruling 2026-09-18; `PR` as in AutoCount and 2990, replaces `PRTN`). Manual Purchase requests use `MPR`, so the two never mix |
 | `Return Date` | The date the approved outcome created the return (its leading register date). Never a collection or handover date |
 | `Goods Collect From` | Where the goods are picked up (the Carres site holding them) |
 | `Goods Collection Date` | The agreed pickup date, with the supplier's agreement evidence; otherwise `Not recorded` |

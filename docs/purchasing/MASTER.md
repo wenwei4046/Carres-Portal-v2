@@ -548,7 +548,7 @@ permanent and are NOT renumbered.**
 | `MPR` | Manual Purchase Request |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
-| `PRTN` | Purchase Return |
+| `PR` | Purchase Return (owner ruling 2026-09-18: `PR` as in AutoCount and 2990; replaces `PR`) |
 | `RO` | Repair Order |
 | `DR` | Display Request |
 | `CO` | Consignment Order |
@@ -2415,7 +2415,7 @@ receipt is not a delivery to the customer.
 
 Delivery owns customer collection/replacement DOs, arrangement and actual visit results; Warehouse
 owns receipt, inspection, custody and availability. The Claim's `Carres Execution` summary is
-read-only supplier-side scope and links to PRTN/CRTN, Repair Order, replacement PO/CO and physical
+read-only supplier-side scope and links to PR/CRTN, Repair Order, replacement PO/CO and physical
 execution records. Any customer arrangement is read from its Service Case through a related link.
 Legacy customer-execution values remain historical evidence, never silently deleted, translated
 into supplier movements or copied into newly created Cases. A future change goes through its
@@ -2493,7 +2493,7 @@ validation remain measurement gates, not invented percentages based on two test 
 | BUILT — source measured | `0288_supplier_claims.sql:70` has required PO, nullable PO line, supplier/SKU snapshot, quantity, photo array and open/closed status; `0302_warehouse_files_its_own_receiving.sql:228` adds receipt link | Source integrity and exact affected-Unit scope need convergence |
 | BUILT — source measured | `apps/api/src/routes/operation/supplier-claims.ts:133,411,431,451,485,532,576` exposes list/photos, request, response, close, stock outcome, customer resolution and execution | No Stock-Unit intake, split, reopen, formal claim-version/send or Finance completion door was found in this router |
 | APPROVED TARGET / NOT BUILT | Claim intake from a Stock Unit found after acceptance; read-only related-Case link. `supplier_claim_close` in `0291_supplier_claim_lifecycle.sql:389` checks ask + answer, not completion of promised goods/money | Add the Stock-source door; strengthen closure to the approved full outcome boundary |
-| APPROVED TARGET / NOT BUILT | Source-linked PRTN/RO and shared Claim Work projection: §9.6–9.7 and Workspace §6, §10 | Reuse owning documents and shared Work contract |
+| APPROVED TARGET / NOT BUILT | Source-linked PR/RO and shared Claim Work projection: §9.6–9.7 and Workspace §6, §10 | Reuse owning documents and shared Work contract |
 | RESOLVED — owner approved 2026-09-06 | The former consequence gap is settled by the scoped outcome contract below | Preserve independent facts; only approved future legs create owning-module work |
 | RESOLVED — owner approved 2026-09-06 | Formal Claim requires verified purchase provenance | Keep the problem/evidence and Purchasing source-search work; do not fabricate a PO or formal supplier claim |
 | RESOLVED — owner approved 2026-09-06 | Claim commercial remedy and Finance acceptance are separate authorities | Claim owns requested/agreed remedy; Finance owns accepted amounts, credit, cash, application and ledger evidence under the closure contract below |
@@ -2516,7 +2516,7 @@ Primary references checked on 2026-09-06:
 
 | Capability / lesson | Current Carres and owner | Disposition and why | Approved journey / placement / connection |
 |---|---|---|---|
-| Source-based return and original cost (M1/M3) | Claim has PO/line; Receiving has GRN; Finance owns value | KEEP source; IMPROVE exact scope | Open source evidence on Claim; derived PRTN retains Units and Finance source links |
+| Source-based return and original cost (M1/M3) | Claim has PO/line; Receiving has GRN; Finance owns value | KEEP source; IMPROVE exact scope | Open source evidence on Claim; derived PR retains Units and Finance source links |
 | Source problem with execution documents (M2) | Claim writer starts from PO/receipt; no Stock-Unit door yet | KEEP source; BUILD Stock-Unit door | Report at Stock/PO/receipt → source-linked Claim → execution documents; one evidence set; related customer Case links read-only |
 | Partial replacement/return (M1/M3) | Current Claim has one quantity/answer | ADAPT line/Unit allocations | Supplier may agree different results for different Units; details show each remainder |
 | Replacement before/after collection (M2) | Four-layer model is built | KEEP independence; IMPROVE executable scope | Stock claim authorises the supplier leg; a related customer Case owns the customer remedy; separate old/new Unit legs in Delivery/Stock |
@@ -2670,7 +2670,7 @@ An obsolete instruction is explicitly cancelled/replaced with its consequence re
 | Exchange on collection | One arranged visit carries separate incoming/outgoing Units and separate results | Delivery may report a partial result; failed old-item collection cannot be concealed by successful replacement |
 | Accept As-Is | Customer acceptance in a related Service Case, plus authorised conditions; Stock separately confirms suitability for any retained stock | Case records customer result; Finance records any agreed allowance. No stock release from a Claim picker |
 | No Replacement Required | Preserve explicit customer decision; review any outstanding goods or money commitment through its owner | Sales/Case may cancel the remaining obligation through its governed path; never delete PO demand, refund or loan debt by selecting this value |
-| Return purchased goods | Approved PRTN → actual collector/date/Unit handover → supplier-return result | Purchasing document, Warehouse physical proof, Finance credit/cash evidence separate |
+| Return purchased goods | Approved PR → actual collector/date/Unit handover → supplier-return result | Purchasing document, Warehouse physical proof, Finance credit/cash evidence separate |
 | Return unsold consignment | CRTN, or combined CO swap with linked outgoing return | Supplier ownership preserved; no purchase refund/credit/payable is created |
 | Put back in stock / refurbish | Goods are present, repaired/checked, complete and eligible; reservation and ownership checked | Stock inspection/eligibility authority; refurbish retains Unit identity and repair history, never a new “good” Unit to erase the fault |
 | Write-off / disposal | Stock Adjustment Approver decision and Finance value consequence; separate disposal authorisation/proof | Stock owns outcome; disposal remains open if required. Claim cannot erase the item or write off value |
@@ -2891,7 +2891,7 @@ Orders):*
 The Item      product · variant · SKU · reported Qty · held Units (own count, separate)
 Problem       type · note · photo thumbnails · reported date and reporter
 Supplier      what we asked · sending evidence · supplier reply · Reply expected
-Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PRTN / replacement
+Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PR / replacement
               doors · supplier money (Finance, read-only)
 Related       Service Case, read-only (hidden only when there is no linked Case)
 Documents     pack versions · Claim sent to supplier · channel · recipient · actor · time
@@ -2905,7 +2905,7 @@ History       three-rank records
   recipient, actor and time. `Prepare supplier claim`, copying or opening WhatsApp is history,
   never sending.
 - **Result does not depend on a reply.** The Result section shows whenever any authorised outcome,
-  receipt/inspection, RO/PRTN/replacement or Finance record exists, with or without a supplier
+  receipt/inspection, RO/PR/replacement or Finance record exists, with or without a supplier
   reply.
 - **Repair execution is server-checked.** A supplier's `Repair` answer is an offer. `Plan Repair`
   is offered only when the server confirms Authorised Outcome = Repair, the exact Units, and the
@@ -2943,7 +2943,7 @@ Order Route is a graph of real linked records, not an invented single sequence:
 
 ```text
 PO / CO → Receiving / GRN → original Unit → Supplier Claim
-                                            ├→ PRTN / CRTN → actual handover
+                                            ├→ PR / CRTN → actual handover
                                             ├→ RO → same Unit out / back / check
                                             ├→ replacement instruction / PO → new Unit / GRN
                                             │                                  → replacement DO / proof
@@ -3004,7 +3004,7 @@ These are dependency relationships, not build scopes or implementation sequencin
 | Claim identity and communication | Shared number/version authority, Supplier Master contact, exact sent evidence | Retrying an uncertain send keeps the same claim/version; opening WhatsApp alone completes nothing |
 | Scoped outcomes | Purchasing stock-claim approval, original source coverage and exact Unit identity | Three damaged Units: two repaired, one replaced; every Unit and remainder stays visible without a second buy |
 | Replacement fulfilment | Authorised instruction, one purchase-demand coverage, Receiving and Stock | New physical replacement gets a new Unit and new receipt; the original damaged Unit remains traceable |
-| Repair/return | Owning RO/PRTN/CRTN plus physical Outbound/Inbound evidence | One of two Units collected leaves the other open; a repaired Unit is not usable until inspection passes |
+| Repair/return | Owning RO/PR/CRTN plus physical Outbound/Inbound evidence | One of two Units collected leaves the other open; a repaired Unit is not usable until inspection passes |
 | Supplier money completion | Finance-owned acceptance, external evidence and unique scoped allocation | RM80 agreed and RM50 received leaves RM30 open; credit is never displayed as received cash |
 | Dated Work | Shared Duty resolver, admitted source projection and approved date policy | Buddy cover sees the same obligation; the actual actor and normal owner remain separate in History |
 | Closure/correction | All required owner completion facts and append-only history | Customer served first; supplier collection still open keeps that work visible; reopen preserves the first close and original age |
