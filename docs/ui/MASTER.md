@@ -1489,6 +1489,9 @@ facts, permissions, complete-record populations or task ownership.
    10:13 UTC; the ERP bundle carries the three layout keys). Purchase Orders adopts it in the PO
    round (`PO Date · PO No`). Every other Register is unchanged until its own round. **Owed:** the
    authenticated production walk of all four listings.
+   **Grouped listings: the header is group-local (§6.10, owner ruling 2026-09-18).** A Register
+   with governed groups draws no header above all groups; each open group carries its own between
+   its heading and its records, sticky inside that group only. The pinning rule above is unchanged.
 3. **Useful default view.** At 1440px with filters open, identity and facts needed for the main
    judgement must be fully visible. Measure in the actual portal shell/font. Other columns may
    scroll or be offered in Columns; do not squeeze dates/names or silently hide approved facts.
@@ -1516,7 +1519,8 @@ facts, permissions, complete-record populations or task ownership.
    with their selection actions; do not invent batch actions on read-only registers.
 6. **Presentation.** Reuse shared header, typography, palette, icons, row treatment and measured
    column-width rules. Content drives default width; full two-line headers plus controls set
-   minimum width. No separate page theme to imitate the shared component.
+   minimum width. No separate page theme to imitate the shared component. Where a governed grouped
+   listing is concerned, §6.10 owns where that header is drawn.
 7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
    goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
    Collapsed records remain in totals; missing/failed data must not imply zero or completion.
@@ -1774,6 +1778,129 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+
+### Shared Purchasing geometry — owner-approved consolidation, 2026-09-18
+
+One registry governs SO Batch, Manual Purchase and Purchase Orders. Existing page-local widths
+must converge; approval of this contract does not claim the three pages are already built or
+production-verified. Other Registers inherit the shared padding, typography and sticky-header
+behaviour, not Purchasing business fields or page-specific colours.
+
+| Geometry | Shared value / behaviour |
+|---|---|
+| Cell horizontal padding | 8px per side; adjacent content separated by 16px plus divider |
+| Dividers / connector | 1px |
+| Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
+| Single-line parent row | 38px minimum, existing density law |
+| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
+| Standard control | 32px minimum; checkbox 16px, vertically centred |
+| Toolbar / footer | 45px / 32px minimum |
+| Expansion | 12px above, 16px below; begins after the parent's control gutter |
+| Sticky header | Group-local, per the ruling below; groups share one width/visibility/sort/resize set |
+| Pinned identity | Date + number at canvas >=768px; number only below; headers and cells scroll together |
+
+The following are the common **prototype starting widths**, not verified production maxima.
+Use one field-width registry, never a fresh per-page guess. Validate actual fonts, longest values,
+200% zoom and 1440/1180/820/390 before production; fix the shared field definition when it fails.
+Required numbers never truncate; content may wrap, and user resizing remains available.
+
+| Field / role | Starting width (px) |
+|---|---:|
+| Checkbox / disclosure (each) | 40 |
+| Date (short date) | 118 |
+| PO No / MPR No / GRN No | 170 |
+| SO No | 90 |
+| SO No / MPR No mixed reference | 176 |
+| Status / Approval Status | 144 |
+| PO Safety Days | 110 |
+| Category | 112 |
+| Qty | 64 |
+| Item / Items | 208 |
+| Supplier / Ready Stock | 136 |
+| Supplier Deliver To | 150 |
+| Customer | 150 |
+| Customer Delivery Location | 176 |
+| Customer Requested Delivery Date | 180 |
+| PO Default Delivery Date | 150 |
+| Supplier Confirmed Delivery Date | 180 |
+| Goods Received Date | 140 |
+| Stock Location | 160 |
+| PO No / Ref No + Unit ID | 230 |
+| Unit ID standalone | 140 |
+| Condition | 120 |
+| Purpose / Requested By | 144 |
+| PO Version with send evidence | **265 — MEASURED 2026-09-18, correcting the prototype 238** |
+
+**MEASUREMENT OUTRANKS THE PROTOTYPE NUMBER (Law 2).** A starting width that clips a governed
+value is wrong, and the registry entry is corrected rather than the cell squeezed into it. Two
+corrections are recorded so far, both measured on the rendered Purchase Orders register at 1440:
+
+- `PO Version with send evidence` **265**, not 238. `PO sent to supplier · WhatsApp · Wed, 28 Sep`
+  needs 247px of content at the 11px second line; 238 clipped it.
+- The **parent row and the goods table are two scopes of the same registry**, because the same fact
+  carries different content in each: a parent `Supplier Deliver To` cell holds one destination name
+  (150), while the child cell holds a destination list with counts (`AL Sungai Buloh ×10`, measured
+  200). The child registry lives in `GoodsMiniTable`'s `CHILD_COLUMNS` and measures Category 132 ·
+  Unit ID 140 · Deliver To 200 · SKU 152 · Qty 64 · Supplier 140 · `PO No / Unit ID` 230 · Item
+  flexible, floor 220. Exactly one column in a goods table is flexible and it is always last.
+  **Owed:** SO Batch and Manual Purchase have not been re-measured against the parent registry in
+  their own rounds; where their page-local widths differ, that convergence is theirs, not a
+  licence to change them from another page's card.
+
+PO rail section titles use the shared 16px Icon, Lucide stroke 2, inherited neutral colour and an 8px text gap: Supplier reply → message; Receiving → goods; Supplier → supplier; Supplier Deliver To → warehouse (the current Site destination filter). Keep the full visible label; icons are supplementary and aria-hidden when text already names the section. Do not add decorative icons to every filter row.
+
+Repeat no page title inside the toolbar. PO's rail has no Clear filters button (owner correction);
+clicking a selected facet again clears that facet. Selects retain their All option. The shared
+active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
+Purchasing §9.3; quantity-managed lines have none. Do not infer new selection capabilities.
+
+## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18
+
+**This ruling SUPERSEDES the earlier single global header above all groups.** A governed grouped
+listing reads, per group:
+
+```
+collapsed   heading + count
+expanded    heading  →  column header  →  records
+```
+
+There is no header above all groups. A collapsed group is its heading and its count and nothing
+else — a column header over no records names columns nobody is reading. The current group's header
+stays sticky within its own group and **stops at that group's boundary**; it never stands over the
+next group's rows. Pinned identity is preserved: date + number at a canvas ≥768px, number only
+below it.
+
+**Every group shares one setting, not four copies of it:** the same column widths, the same
+visibility, the same sorting and the same resizing. Sorting from any group's header sorts the whole
+register once.
+
+**It is the ENGINE's behaviour, implemented once** (`components/register/DataGrid`), for every
+Register that hands the grid governed `fixedGroups` — today SO Batch Purchase, Manual Purchase and
+Purchase Orders. **No page gains or loses a group, a default expansion, a collapse default or a
+business rule by it.** A flat register keeps the one sticky header it has always had. The embedded
+drill-down grid keeps its plain static header: it has no scroll container of its own for anything
+to stick to.
+
+**HOW, AND WHY IT IS STRUCTURAL — measured 2026-09-18.** Each group is its own `<table>` inside the
+one scroll container, its heading and its column header riding together in that table's `<thead>`.
+A sticky cell is constrained by the table it is in, so the header is pushed out with its own group
+at the boundary and the next group's takes the top. **One `<tbody>` per group does not work and was
+measured failing:** a table cell's containing block is the TABLE, so the first group's header
+escaped its section and came to rest on top of the second group's own header, both drawn at once
+6px apart (Chromium). The tables share one `<colgroup>` built from one `layout.widths` and use
+`table-layout: fixed`, so a long value in one group cannot widen a column in that group alone —
+which is what makes "every group shares the same widths" true by construction rather than by
+agreement.
+
+**Measured on the rendered Purchase Orders register, 2026-09-18:** the first group's header pinned
+at 40px while its rows scrolled 573px beneath it, then was pushed to −32px as its table bottom
+passed 4px, with the second group's header taking the top at 40px. No `<thead>` above all groups at
+1440 / 1180 / 820 / 390.
+
+**Falsifier:** a browser in which a sticky `<thead>` is not constrained by its own table, or a
+grouped listing whose groups drift out of column alignment, overturns the structure — not the
+ruling, which is about what the operator reads.
 
 ## §6.9 · Connected expansion
 

@@ -1879,99 +1879,194 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
-**APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots personal saved
-layouts; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
+**STATUS — three different things, never one word (2026-09-18).**
+
+| | What it covers |
+|---|---|
+| **APPROVED / LOCKED** | The listing, its eleven columns, its four groups, the group-local header, the ordered-goods expansion, the rail and the sending-evidence reading below. Owner rulings 2026-09-17 and 2026-09-18. |
+| **BUILT 2026-09-18** | All of the above is implemented and covered by tests, and measured on the rendered register at 1440 / 1180 / 820 / 390. Personal saved layouts (2026-09-17) and the Slice 1 readability pass remain built as recorded. |
+| **PRODUCTION-VERIFIED** | **NOT YET.** No authenticated production walk of this build exists. The 2026-09-17 walk was of the previous nine-column register and does not carry forward. Until that walk is done, no line here may be quoted as production truth. |
+
+**Owner acceptance — 2026-09-18.** Jess confirmed the reviewed PO Register and goods expansion.
+Acceptance covers this listing composition, the full supplier-date facet labels, removal of the
+rail Clear filters control, the group-local header and the shared UI MASTER geometry. It does not
+approve a new PO detail/issue workflow, and it is not production implementation evidence.
+
+**Personal saved layouts — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots
+them; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
 owner-private, per-account, up to 10 layouts per listing, saving order/widths/visibility/sort but
 not search/filters/group state. Other pages retain current layout persistence until owner
-acceptance and rollout approval.
-
-**Build record (2026-09-17).** Layout key `carres.purchaseOrders.register.v2`; `leadingColumns`
-pins `PO Date · PO No` (PO No alone below 768px). `GET /api/operation/pos` now carries each PO's
-numbered GRNs (`warehouse_receipts.grn_no`, drafts excluded) and each SO source's `order_id`.
-Personal layouts: migration `0528` table `register_personal_layouts` — RLS SELECT own rows only
-(`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from `authenticated`, writes only through
-`register_layout_save` / `register_layout_set_default` acting on `auth.uid()`; a shape check
-refuses any key but order/hidden/widths/sort; 10 per person per listing; one default. Routes
-`/api/operation/register-layouts` run as the caller. Measured at 1440 with the rail open (885px
-grid), re-measured SIGNED-IN on production 2026-09-17 on `1c278f8c`: PO Date 118 · PO No 142
-(production's JetBrains Mono renders `PO-20260903-4316` at 125px; the fixture font measured 114
-and 132 cut 34 live rows) · Supplier 128 · SO No 123 · Items 135 · Expected Delivery Date 207
-exactly fill the grid; Supplier and Items open whole when cut; Deliver To 118 · GRN No 150 (`GRN-20260904-0210` renders 133px) ·
-PO Version 265 scroll (widened from 236 for `PO sent to supplier · {channel} · {date}`, SLICE 1 — scaled, re-measure signed in). Production read-only walk: nine columns in order, groups 55 + 3 + 4 =
-footer `62 purchase orders`, layouts read 200, unauthenticated 401. The rail uses the shared
-`useFilterRailOpen` (hidden by default below 896px). **Owed:** saving a layout and pressing
-`PO sent to supplier` on production (the walk was read-only by instruction).
+acceptance and rollout approval. Storage: migration `0528`, table `register_personal_layouts` —
+RLS SELECT own rows only (`user_id = auth.uid()`), INSERT/UPDATE/DELETE revoked from
+`authenticated`, writes only through `register_layout_save` / `register_layout_set_default` acting
+on `auth.uid()`; a shape check refuses any key but order/hidden/widths/sort; 10 per person per
+listing; one default. Routes `/api/operation/register-layouts` run as the caller. **Owed:** saving
+a layout and pressing `PO sent to supplier` on production.
 
 **Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
-Quantity progress belongs to Warehouse Inbound / Receiving and PO detail. The approved listing
-now also shows actual Goods Received Date linked to each GRN; this does not add quantity-progress columns.
+Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
-**Columns — APPROVED / NOT BUILT (Jess, 2026-09-18), exactly in order:**
+**Columns — APPROVED / LOCKED (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in order:**
 
 ```text
 PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
 PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
 ```
 
-Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The prior width measurements
-are implementation evidence, not dimensions for this expanded target; remeasure before build.
+Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The goods expansion arrow
+stays the grid's own control in the gutter, separate from the number: **the number opens the actual
+PO**, and a decorative arrow concatenated into a document number makes one target out of two acts.
+
 - `PO Date`: authoritative PO document date, never sending confirmation time.
-- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint update, never an automatic one.
-  Never invent a CO or Manual Purchase number. A multi-source PO preserves all line allocations.
+- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. One
+  reference is its own door; several print the approved count and open the PO's **Order Route**,
+  where each reference is its own row and its own link. The listing never picks one source to stand
+  for the rest. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner
+  ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint
+  update, never an automatic one. A multi-source PO preserves all line allocations.
+  **MPR is the Manual Purchase's visible identity again (owner ruling 2026-09-18, which overwrites
+  Card 08 §3.5's 2026-09-04 retirement):** the request's own stored `purchase_requests.req_no`
+  (`MPR-YYYYMMDD-RRRR`, §6.1 / migration 0359) is READ and printed. A request with no stored number
+  keeps the governed label `Manual Purchase` and opens nothing — never a UUID, never a minted
+  number. Manual sources still dedupe by request identity, never by label.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
-- The three delivery-date columns use the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
-  Do not combine original and confirmed dates into an Expected Delivery Date cell.
-- `Goods Received Date`: actual GRN receipt date/time. Multiple receipts show `{n} receipt dates`
-  with access to each GRN, date/time and quantity; never pick a single date to represent all receipts.
+- **The three delivery-date columns are three columns, and one is NEVER filled in from another**
+  ([shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary)). `PO Default Delivery Date`
+  is what Carres planned, preserved when the supplier replies and when Settings later change (0428).
+  `Supplier Confirmed Delivery Date` is the supplier's evidenced answer for the current version;
+  with no answer it reads `Not confirmed`, and a supplier who moved the date carries
+  `Supplier changed from {date}` on its second line. The retired combined `Expected Delivery Date`
+  printed whichever of the two it had with a sentence underneath saying which — so the two could
+  never be compared, sorted or filtered against each other. It does not return.
+- `Goods Received Date`: the actual physical arrival (`warehouse_receipts.goods_received_at`, 0314),
+  never the day the GRN record was filed. Multiple receipts show `{n} receipt dates`; never pick a
+  single date to represent all receipts.
 - `GRN No`: one link or `{n} GRNs`, preserving every receipt; blank when none.
-- `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` or `Sending not confirmed`
-  for the current version. Earlier evidence stays in Revisions.
+  **Both count links open the same list**, because they are two facts about one set of receipts:
+  every `Goods Received Date`, `GRN No` and `Received Qty` on its own row, each with the door to the
+  actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
+  count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
+  wrong-item units are not received, which is that same arithmetic, not a second one.
+- `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` for the current version,
+  or `Sending not confirmed` when the CURRENT version's confirmation is missing. Earlier evidence
+  stays in Revisions. Missing evidence never proves the PO was never sent.
 
-**Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
-`Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
-(current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs once.
-A failed/unknown quantity read is never zero or Completed; completed legacy POs without a mark
-stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
-Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by confirmed supplier date, falling back to original PO date, ascending;
-Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
+🔴 **GOODS RECEIVED DATE HAS NO TIME, AND THE SCREEN SAYS SO.** The dictionary asks for the arrival
+date AND time; `warehouse_receipts.goods_received_at` is a `date` column (0314) and the database
+holds no arrival clock anywhere. Every row therefore prints the date plus the dictionary's own
+words for a date-only record, `Time not recorded` — a guess from `submitted_at` would be the time
+somebody filed paperwork, not the time a lorry arrived. **Fix, and it is Receiving's:** carry the
+arrival time on the receipt (a new column and the Receiving form field that fills it), then this
+column prints it with no change here. Until then the gap is stated on screen, not hidden.
 
-**Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
-`Date changed`, `Date passed`, using existing current-version sent/pending predicates.
-`Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
-Use complete supplier-date labels outside the group context, including active-condition chips.
-No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
+**Groups — APPROVED / LOCKED, wording correction Jess 2026-09-17:** `Confirm PO sent to supplier`
+and `Waiting for goods from supplier` are open headings; `Completed` and `Cancelled` are collapsed
+buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
+(current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs
+once. A failed/unknown quantity read is never zero or Completed; completed legacy POs without a
+mark stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
+Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by
+confirmed supplier date, falling back to original PO date, ascending; Completed/Cancelled newest
+first. Unknown dates remain explicit, not invented.
+
+**Group-local header — owner ruling 2026-09-18, BUILT 2026-09-18.** A collapsed group is its
+heading and its count; an open group reads heading → column header → records. There is no header
+above all groups. Every group shares one width, visibility, sorting and resizing set, and the
+current group's header is sticky inside its own group and stops at its boundary. Pinned date +
+number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
+grouped listing page; this section neither restates its mechanics nor varies them.
+
+**Rail — owner correction Jess 2026-09-18, BUILT 2026-09-18.** `Supplier reply` contains
+`Supplier has not confirmed the PO date`, `Supplier Confirmed Delivery Date changed` and
+`Supplier delivery date passed`, using the existing current-version sent/pending predicates.
+`Receiving` contains `Partly received`. `Supplier` and `Supplier Deliver To` keep their facts and
+selection rules. **The complete label is used everywhere — row, active-condition chip and export —
+and is written once.** `Date changed` named none of the page's three dates, and the group heading
+meant to qualify it scrolls away and does not exist on a chip at all. Icons come from the shared
+kit at its own 16px / stroke 2 / neutral ink with an 8px gap: Supplier reply → message · Receiving
+→ goods · Supplier → supplier · Supplier Deliver To → warehouse. A selected facet clears by being
+clicked again; selects keep their `All …` option. **There is no Clear filters control in the rail**
+(verified: the shared `FilterRail` has never had one). The toolbar's active-condition strip and its
+own `Clear filters` are the shared listing standard's and are unchanged. No duplicate
+`All purchase orders` row, DOCUMENT group or action line. Counts and predicates are preserved:
+a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
-**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
+ordered goods, exactly in order:
+
+```text
+Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+```
+
+`PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
+cell; item configuration sits beneath the item name. **It is a truth table: no purchasing
+checkbox, no Ready Stock allocation control**, nothing that can commit a unit — buying happens on
+SO Batch Purchase and Manual Purchase, which own those acts and their guards. Shared dimensions
+are UI MASTER §6.8's; the connected expansion is §6.9's.
+
+**Unit IDs in the expansion are the real ones**, read from the PO's own units — one permanent
+`U1-000-001` per ordered piece, bound to the line at official PO issue (§6.2, migrations
+0442/0443/0444). Three states, three different sentences, because they are three different facts:
+
+| State | What the cell says |
+|---|---|
+| Quantity-managed line | `—` — it has none by law |
+| Exact-unit line, units read, none found | `Unit IDs missing on this line — do not send this PO` — an integrity failure, never an ordinary empty state |
+| The units read has not answered, or failed | `Reading Unit IDs…` / `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
+
+**Never generate presentation-only IDs and never copy a sample ID into production.** A Unit ID is
+written on a package in a factory; an invented one sends somebody to look for furniture that does
+not exist.
+
+**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity
+totals, and no page title repeated inside the toolbar.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
 
-**Sending, all shared surfaces:** `PO sent to supplier` records current version, channel, recipient, actor
-and time. After Open WhatsApp / Open email show `Send the PDF, then press PO sent to supplier.` in the
-same communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent,
-the person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
-automatically marks sending. Never claim supplier receipt, reading or acceptance.
+**Sending, all shared surfaces:** `PO sent to supplier` records current version, channel, recipient,
+actor and time through the ONE existing shared sending authority — **no second task store and no
+second confirmation store is introduced, here or anywhere.** Workspace controls duty routing.
+After Open WhatsApp / Open email show `Send the PDF, then press PO sent to supplier.` in the same
+communication area. Recipient prefills the supplier's recorded WhatsApp group/email; if absent, the
+person supplies it. Never substitute supplier name for a group. Opening a channel or PDF never
+automatically marks sending. Never claim supplier receipt, reading or acceptance, and **missing
+evidence does not prove the PO was never sent** — a completed legacy document must not become
+resend work solely because a send record is absent.
 
-**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** migration `0428`
-preserves an immutable original PO date and requires an append-only current-version reply with
-channel/evidence/reporter/recorder/time and shared duty/cover. Production rollback verification
-proved atomic supplier setup, role/send/version/evidence guards, preserved known and unknown
-original dates, exact persisted source planning without changing an unrelated order, and a
-negative control that fails when the send guard is removed. All six committed function bodies
-were reconciled before and after apply; tracker version `20260906073520` stores the exact approved
-SQL SHA-256 `c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`.
-Earlier records receive no invented dates or reply evidence. PR #1105 carries the Register,
-reply form and shared Work projection; application deployment proof remains pending.
+**BUILD 2026-09-06 / DATABASE APPLIED:** migration `0428` preserves an immutable original PO date
+and requires an append-only current-version reply with channel/evidence/reporter/recorder/time and
+shared duty/cover. Production rollback verification proved atomic supplier setup, role/send/version/
+evidence guards, preserved known and unknown original dates, exact persisted source planning without
+changing an unrelated order, and a negative control that fails when the send guard is removed. All
+six committed function bodies were reconciled before and after apply; tracker version
+`20260906073520` stores the exact approved SQL SHA-256
+`c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`. Earlier records receive no
+invented dates or reply evidence.
+
+**API — BUILT 2026-09-18.** `GET /api/operation/pos` carries each PO's numbered GRNs with
+`goods_received_at` and the shared `received_qty`, each SO source's `order_id`, and each Manual
+Purchase source's stored `req_no`. Drafts are excluded: a receipt with no number is not a GRN.
+
+**Measured on the rendered register, 2026-09-18 (fixture shell, Inter).** Widths come from the
+shared field registry in UI MASTER §6.8, not from a per-page guess — with one measured correction,
+`PO Version` 265 rather than the registry's prototype 238, because the longest evidence line needs
+247px of content. Nothing truncates at 1440: no cell, no two-line header, no document number. The
+eleven columns total 1868px, so the sheet scrolls sideways under the pinned `PO Date · PO No`
+(`PO No` alone below 768px) rather than squeezing any column. **Owed:** the same measurement signed
+in on production, where JetBrains Mono renders document numbers wider than the fixture font.
+
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
-History, Order Route.
+History, Order Route. The formal PO detail, issue, revision and PDF workflows are unchanged by the
+2026-09-18 listing work, and no Finance functionality was added.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
+
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
