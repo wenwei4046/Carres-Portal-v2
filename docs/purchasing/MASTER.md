@@ -1975,6 +1975,18 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
+**Listing UI acceptance — Jess, 2026-09-18 · APPROVED / NOT BUILT.** The Receiving Register
+proposal is accepted for implementation in [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
+This approval concerns the Register and its read-only goods expansion, not replacement of the
+formal GRN object/receiving engine. Default entry shows all permitted GRNs with server pagination;
+date filtering is optional. Date and exception counts count GRNs, not units or unfinished work.
+No normal Status column is added; PO Partial/Completed progress is not a GRN document state.
+The approved goods expansion is `Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty`.
+Use actual line-linked identity with source number above Unit IDs; preserve quantity-managed and
+extra-goods distinctions. Receiving remains ungrouped with a sticky header. Use shared heading
+icons and dimensions; no permanent bottom-rail Clear filters control. Full date and pagination
+behaviour below remains authoritative; abbreviated sample data is not a new rule.
+
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
 **State: PRODUCTION-VERIFIED 2026-09-06 — migrations 0425/0426/0427 APPLIED (tracker
