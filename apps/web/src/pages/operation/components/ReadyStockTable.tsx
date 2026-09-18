@@ -277,14 +277,21 @@ export default function ReadyStockTable({
                       {u.poNo ?? <Absence>{W.stockNotRecorded}</Absence>}
                     </div>
                     <div className="mt-0.5 break-words text-meta text-kit-slate-11">
-                      {u.identityScope === "unit" && u.unitCode ? (
-                        u.unitCode
-                      ) : (
-                        /* 0453: a counted row's key is not a Unit ID and never
-                           prints as one. */
-                        <>{blocked ?? "—"}</>
-                      )}
+                      {/* 0453: a counted row's key is not a Unit ID and never
+                          prints as one — what the goods ARE takes its place. */}
+                      {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? "—")}
                     </div>
+                    {/* ⭐ AND A ROW THAT LOST ITS CHECKBOX SAYS WHY. The approved
+                        six columns hold no `why` column, and a Unit that cannot
+                        be chosen with nothing beside it reads as a broken
+                        control rather than as a fact about the goods. The
+                        reason goes UNDER the Unit ID, in the quiet voice — the
+                        identity is still the fact a person copies. */}
+                    {blocked && u.identityScope === "unit" && u.unitCode ? (
+                      <div className="mt-0.5 break-words text-meta">
+                        <Absence>{blocked}</Absence>
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-2 py-2 align-top">
                     {u.condition ? (

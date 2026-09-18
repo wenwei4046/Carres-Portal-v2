@@ -423,9 +423,35 @@ export function useSoBatchReadyStock({
         chosen={draft.chosen}
         blockedWord={(row) => {
           const unit = rows.find((u) => u.itemId === row.itemId);
+          /* A Unit this line already holds is always untickable-again — that
+             is how it is REMOVED. */
           if (unit?.reservedForLineId === orderLineId) return null;
-          if (unit?.blocked) return READY_STOCK_BLOCKED_WORDS[unit.blocked];
-          return unit && unit.matchingLineIds.length > 0 ? null : "—";
+          /* 0368 and the covered-line facts are the server's, and permanent
+             for this read: counted stock is never bindable. */
+          if (unit?.blocked === "counted_stock") {
+            return READY_STOCK_BLOCKED_WORDS.counted_stock;
+          }
+          if (!unit) return "—";
+          /**
+           * ⭐ A REPLACEMENT NEEDS ROOM THE DRAFT HAS ALREADY MADE.
+           *
+           * `matchingLineIds` is the server's answer about the CURRENT saved
+           * state, so on a one-piece line that already holds a Unit every free
+           * Unit reads `No item line needs it` — and the swap the owner's
+           * journey names (`Change selection` → remove one → choose another)
+           * could not be made at all. It is the same trap in reverse: the
+           * screen refusing an act the door would accept.
+           *
+           * So a free Unit is choosable when the SERVER says the line still
+           * needs one, OR when the draft is giving back at least one Unit it
+           * holds — which is exactly the room a replacement takes. The draft can
+           * therefore never exceed what was saved plus what the server said was
+           * needed, and the door still recomputes the line's requirement on the
+           * locked row and refuses by name whatever the browser believes.
+           */
+          if (unit.matchingLineIds.includes(orderLineId)) return null;
+          if (draft.chosen.size < saved.length) return null;
+          return READY_STOCK_BLOCKED_WORDS[unit.blocked ?? "no_line_needs_it"];
         }}
         refusedId={act?.kind === "refused" ? act.unitId : null}
         onToggle={(itemId) => toggleUnit(orderLineId, itemId)}

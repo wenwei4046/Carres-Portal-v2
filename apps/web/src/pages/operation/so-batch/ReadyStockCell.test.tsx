@@ -453,6 +453,80 @@ describe("the selection journey", () => {
     expect(JSON.parse(String((post![1] as RequestInit).body)).itemIds).toEqual([UNIT_CONSIGNED]);
   });
 
+  /**
+   * ⭐ THE SWAP THE OWNER'S JOURNEY NAMES. `matchingLineIds` is the server's
+   * answer about the CURRENT saved state, so on a one-piece line that already
+   * holds a Unit every free Unit reads `No item line needs it`. Giving one back
+   * in the draft is what makes room for its replacement — and the door still
+   * recomputes the line's requirement on the locked row.
+   */
+  it("frees a replacement once the draft gives a saved Unit back", async () => {
+    draw(
+      response({
+        units: [
+          unit({ itemId: UNIT_A, reservedForLineId: LINE_A, matchingLineIds: [] }),
+          /* The line needs nothing more while A is saved, so the server offers
+             this one against no line at all. */
+          unit({
+            itemId: UNIT_CONSIGNED, unitCode: "U1-000-065",
+            matchingLineIds: [], blocked: "no_line_needs_it",
+          }),
+        ],
+      }),
+      {},
+      { reserved: 1, added: 1, released: 1, reference: "SO-1251", units: [] },
+    );
+    await openPicker();
+    fireEvent.click(screen.getByTestId(`ready-stock-change-${LINE_A}`));
+    /* Before anything is given back there is no room, and the row says so. */
+    expect(
+      within(screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`)).queryByRole("checkbox"),
+    ).toBeNull();
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`)).toHaveTextContent(
+      "No item line needs it",
+    );
+    /* Give A back — and the replacement becomes choosable. */
+    fireEvent.click(
+      within(screen.getByTestId(`ready-stock-unit-${UNIT_A}`)).getByRole("checkbox"),
+    );
+    const replacement = within(
+      screen.getByTestId(`ready-stock-unit-${UNIT_CONSIGNED}`),
+    ).getByRole("checkbox");
+    fireEvent.click(replacement);
+    /* And there is room for exactly ONE — the draft can never exceed what was
+       saved plus what the server said was needed. */
+    expect(screen.getByTestId(`ready-stock-count-${LINE_A}`)).toHaveTextContent("1 chosen");
+    fireEvent.click(screen.getByTestId(`ready-stock-save-${LINE_A}`));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    const post = apiFetch.mock.calls.find(([p]) => String(p).endsWith("/ready-stock/save"));
+    expect(JSON.parse(String((post![1] as RequestInit).body)).itemIds).toEqual([UNIT_CONSIGNED]);
+  });
+
+  it("still refuses counted stock, whatever the draft gave back", async () => {
+    draw(
+      response({
+        units: [
+          unit({ itemId: UNIT_A, reservedForLineId: LINE_A, matchingLineIds: [] }),
+          unit({
+            itemId: UNIT_COUNTED, unitCode: "QTY-000000001", identityScope: "quantity",
+            qty: 893, matchingLineIds: [], blocked: "counted_stock",
+          }),
+        ],
+      }),
+    );
+    await openPicker();
+    fireEvent.click(screen.getByTestId(`ready-stock-change-${LINE_A}`));
+    fireEvent.click(
+      within(screen.getByTestId(`ready-stock-unit-${UNIT_A}`)).getByRole("checkbox"),
+    );
+    expect(
+      within(screen.getByTestId(`ready-stock-unit-${UNIT_COUNTED}`)).queryByRole("checkbox"),
+    ).toBeNull();
+    expect(screen.getByTestId(`ready-stock-unit-${UNIT_COUNTED}`)).toHaveTextContent(
+      "Counted stock",
+    );
+  });
+
   it("removes every choice — an empty set is a real instruction", async () => {
     draw(
       response({ units: [unit({ itemId: UNIT_A, reservedForLineId: LINE_A })] }),
