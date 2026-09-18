@@ -915,13 +915,17 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   a ticked row a link takes slate-12 ink with its underline, because blue-11 on blue-3 measured
   4.25:1.
 - **R6 · Footer** — one total: `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order`.
-- **R7 · Widths.** A column's default width is its content; its minimum is the complete two-line
-  header plus its controls. Measured in the rendered portal (Inter): header chrome is 46px beyond the
-  header text; a cross-year date is 99px, so date columns are 120; `No delivery date yet` is 124px,
-  so Requested Delivery Date is 144; `PO-20260930-4827` is 127px, so PO No is 144. No quantity column
-  exists on this parent table, so no 88px value was adopted. Customer, Supplier, Delivery Location
-  and Deliver To never ellipsise: a long value takes an inline second line, so the full value is
-  readable by keyboard and touch with no hover title.
+- **R7 · Widths — the number lives in ONE registry (owner instruction 2026-09-18).** A column's
+  default width is its content; its minimum is the complete two-line header plus its controls. **The
+  width itself is [UI MASTER §6.8's shared field registry](../ui/MASTER.md), not this section's:**
+  a page MASTER that carries its own number for a registry field becomes a second authority, and
+  one fact then has four widths. This page's measurements are EVIDENCE the registry reads — measured
+  in the rendered portal (Inter): header chrome is 46px beyond the header text; a cross-year date is
+  99px; `No delivery date yet` is 124px; `PO-20260930-4827` is 127px. No quantity column exists on
+  this parent table, so no 88px value was adopted. Where this page's built width is narrower than the
+  registry, the registry names the convergence it owes; closing it is this page's own round.
+  Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
+  second line, so the full value is readable by keyboard and touch with no hover title.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
   and the list is re-read so a line bought meanwhile drops its tick. `Esc` closes only transient
@@ -1667,11 +1671,16 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   name is ONE server-resolved identity (`identityResolver` over the shared actor door, 0390) that
   the Register, the object, search and export all read; a shared or robot login and an unnamed
   account resolve to `Staff identity not recorded` on every surface.
-- **Built widths (measured 2026-09-17, rendered shell, Inter):** `Items` 180 (the longest live
+- **Built widths — evidence for the ONE registry, not a second one (owner instruction 2026-09-18).**
+  [UI MASTER §6.8](../ui/MASTER.md) holds the width; these are what this page MEASURED
+  (2026-09-17, rendered shell, Inter) and what the registry reads: `Items` 180 (the longest live
   model name is 18 characters; the sticky identity also fits beside the gutters at 390px) ·
   `Order By` 112 · `Purpose` 150 · `Supplier` 140 (longest live supplier 17 characters) ·
   `Approval Status` 188 (`Sent back for changes` pill 134px + requester avatar) · `Requested By`
-  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. Saved layout key
+  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. `Purpose` 150, `Approval Status` 188
+  and `Supplier` 140 were the WIDEST measurement of their field and are now the registry's number;
+  `Items`, `Supplier Deliver To`, `Requested By`, dates and `PO No` are narrower than the registry
+  and the convergence is named there, to be closed in this page's own round. Saved layout key
   `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
 - **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
   `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
@@ -2001,7 +2010,8 @@ Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
 ```
 
 `PO No` is the first line of its cell and the associated Unit IDs sit underneath it in the same
-cell; item configuration sits beneath the item name. **It is a truth table: no purchasing
+cell; item configuration sits beneath the item name. **The parent remains one row per PO** — a
+line's Units never multiply the record they belong to. **It is a truth table: no purchasing
 checkbox, no Ready Stock allocation control**, nothing that can commit a unit — buying happens on
 SO Batch Purchase and Manual Purchase, which own those acts and their guards. Shared dimensions
 are UI MASTER §6.8's; the connected expansion is §6.9's.
@@ -2013,7 +2023,7 @@ are UI MASTER §6.8's; the connected expansion is §6.9's.
 | State | What the cell says |
 |---|---|
 | Quantity-managed line | `—` — it has none by law |
-| Exact-unit line, units read, none found | `Unit IDs missing on this line — do not send this PO` — an integrity failure, never an ordinary empty state |
+| Exact-unit line, units read, none found | `Unit IDs missing on this line — do not send this PO` — an integrity failure, never an ordinary empty state, and **never deferred to receipt**: the Units are born at PO issue, not when the goods land |
 | The units read has not answered, or failed | `Reading Unit IDs…` / `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
 
 **Never generate presentation-only IDs and never copy a sample ID into production.** A Unit ID is
@@ -2050,13 +2060,17 @@ invented dates or reply evidence.
 `goods_received_at` and the shared `received_qty`, each SO source's `order_id`, and each Manual
 Purchase source's stored `req_no`. Drafts are excluded: a receipt with no number is not a GRN.
 
-**Measured on the rendered register, 2026-09-18 (fixture shell, Inter).** Widths come from the
-shared field registry in UI MASTER §6.8, not from a per-page guess — with one measured correction,
-`PO Version` 265 rather than the registry's prototype 238, because the longest evidence line needs
-247px of content. Nothing truncates at 1440: no cell, no two-line header, no document number. The
-eleven columns total 1868px, so the sheet scrolls sideways under the pinned `PO Date · PO No`
-(`PO No` alone below 768px) rather than squeezing any column. **Owed:** the same measurement signed
-in on production, where JetBrains Mono renders document numbers wider than the fixture font.
+**Measured on the rendered register, 2026-09-18 (fixture shell, Inter).** Every width comes from
+the shared field registry in UI MASTER §6.8, never from a per-page guess — including `PO Date` 120
+and `Supplier` 140, which are SO Batch's and Manual Purchase's wider measurements of those same
+fields rather than this page's own. This page contributed three corrections back to the registry:
+`PO Version` **265** rather than the prototype 238 (the longest evidence line needs 247px of
+content), and the measured `SO No / MPR No` 176 · `Supplier Confirmed Delivery Date` 180 ·
+`Goods Received Date` 140 for the three columns it introduced. Nothing truncates at 1440: no cell,
+no two-line header, no document number. The eleven columns total 1869px (1901 with the goods-disclosure gutter, measured), so the sheet scrolls
+sideways under the pinned `PO Date · PO No` (`PO No` alone below 768px) rather than squeezing any
+column. **Owed:** the same measurement signed in on production, where JetBrains Mono renders
+document numbers wider than the fixture font.
 
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.

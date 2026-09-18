@@ -594,7 +594,10 @@ export default function PurchaseOrdersPage() {
       key: "po_date",
       chooserGroup: "Document",
       label: "PO Date",
-      width: 118,
+      /* The registry's number, not this page's: SO Batch measured a cross-year
+         date at 99px and landed on 120, which is the widest measurement of the
+         field, so the field is 120 here too (ui MASTER §6.8). */
+      width: 120,
       sortable: true,
       accessor: (row) => (row.poDate ? <span className="tabular-nums">{fmtDate(row.poDate)}</span> : <Absence />),
       searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
@@ -675,7 +678,10 @@ export default function PurchaseOrdersPage() {
       key: "supplier",
       chooserGroup: "Supplier",
       label: "Supplier",
-      width: 136,
+      /* 140, the registry's number: Manual Purchase measured a 17-character
+         live supplier name, which is wider than anything this page's fixtures
+         carry. One field, one width (ui MASTER §6.8). */
+      width: 140,
       sortable: true,
       overflowText: (row) => row.supplierName,
       accessor: (row) => row.supplierName,

@@ -1797,56 +1797,64 @@ behaviour, not Purchasing business fields or page-specific colours.
 | Standard control | 32px minimum; checkbox 16px, vertically centred |
 | Toolbar / footer | 45px / 32px minimum |
 | Expansion | 12px above, 16px below; begins after the parent's control gutter |
-| Sticky header | Group-local, per the ruling below; groups share one width/visibility/sort/resize set |
+| Sticky header | Each Register keeps its header inside its own scrolling viewport; on a grouped listing it is group-local per §6.10, and the groups share one width/visibility/sort/resize set |
 | Pinned identity | Date + number at canvas >=768px; number only below; headers and cells scroll together |
 
-The following are the common **prototype starting widths**, not verified production maxima.
-Use one field-width registry, never a fresh per-page guess. Validate actual fonts, longest values,
-200% zoom and 1440/1180/820/390 before production; fix the shared field definition when it fails.
-Required numbers never truncate; content may wrap, and user resizing remains available.
+**THE FIELD-WIDTH REGISTRY — ONE NUMBER PER FIELD (owner instruction 2026-09-18).**
 
-| Field / role | Starting width (px) |
-|---|---:|
-| Checkbox / disclosure (each) | 40 |
-| Date (short date) | 118 |
-| PO No / MPR No / GRN No | 170 |
-| SO No | 90 |
-| SO No / MPR No mixed reference | 176 |
-| Status / Approval Status | 144 |
-| PO Safety Days | 110 |
-| Category | 112 |
-| Qty | 64 |
-| Item / Items | 208 |
-| Supplier / Ready Stock | 136 |
-| Supplier Deliver To | 150 |
-| Customer | 150 |
-| Customer Delivery Location | 176 |
-| Customer Requested Delivery Date | 180 |
-| PO Default Delivery Date | 150 |
-| Supplier Confirmed Delivery Date | 180 |
-| Goods Received Date | 140 |
-| Stock Location | 160 |
-| PO No / Ref No + Unit ID | 230 |
-| Unit ID standalone | 140 |
-| Condition | 120 |
-| Purpose / Requested By | 144 |
-| PO Version with send evidence | **265 — MEASURED 2026-09-18, correcting the prototype 238** |
+A page MASTER may not carry its own width for a registry field. When it does, one fact ends up
+with four widths — measured, this is exactly what had happened: `PO No` was 144 on SO Batch, 144 on
+Manual Purchase and 170 here, and a date was 120 / 112 / 118. So the number lives here, once, and a
+page MASTER records its MEASUREMENT as evidence the registry reads (Purchasing §9.1 R7, §9.2, §9.3).
 
-**MEASUREMENT OUTRANKS THE PROTOTYPE NUMBER (Law 2).** A starting width that clips a governed
-value is wrong, and the registry entry is corrected rather than the cell squeezed into it. Two
-corrections are recorded so far, both measured on the rendered Purchase Orders register at 1440:
+**The registry number is the WIDEST measured requirement across the pages that show the field**,
+because a field that fits on one page and clips on another is not one field. `MEASURED` means the
+rendered portal in the real font; `prototype` means not yet measured, and a prototype that clips a
+governed value is wrong — **fix the shared field definition, never squeeze the cell** (Law 2:
+reality outranks the document). Validate actual fonts, longest values, 200% zoom and
+1440/1180/820/390 before production. Required numbers never truncate; content may wrap, and user
+resizing remains available.
 
-- `PO Version with send evidence` **265**, not 238. `PO sent to supplier · WhatsApp · Wed, 28 Sep`
-  needs 247px of content at the 11px second line; 238 clipped it.
-- The **parent row and the goods table are two scopes of the same registry**, because the same fact
-  carries different content in each: a parent `Supplier Deliver To` cell holds one destination name
-  (150), while the child cell holds a destination list with counts (`AL Sungai Buloh ×10`, measured
-  200). The child registry lives in `GoodsMiniTable`'s `CHILD_COLUMNS` and measures Category 132 ·
-  Unit ID 140 · Deliver To 200 · SKU 152 · Qty 64 · Supplier 140 · `PO No / Unit ID` 230 · Item
-  flexible, floor 220. Exactly one column in a goods table is flexible and it is always last.
-  **Owed:** SO Batch and Manual Purchase have not been re-measured against the parent registry in
-  their own rounds; where their page-local widths differ, that convergence is theirs, not a
-  licence to change them from another page's card.
+| Field / role | Width | Status | Evidence, and the convergence owed |
+|---|---:|---|---|
+| Checkbox / disclosure (each) | 40 | prototype | |
+| Date (short date) | 120 | **MEASURED** | SO Batch: cross-year date 99px → 120. PO built 118 → widened to 120 (2026-09-18). **Owed:** Manual Purchase built 112 |
+| PO No / MPR No / GRN No | 170 | **MEASURED** | PO: `PO-20260903-4316` renders 125px in production's JetBrains Mono, and 142 cut 34 live rows. **Owed:** SO Batch and Manual Purchase built 144 off a 127px Inter measurement — the mono face is the wider one |
+| SO No | 90 | prototype | |
+| SO No / MPR No mixed reference | 176 | **MEASURED** | PO, built 2026-09-18 |
+| Status | 144 | prototype | |
+| Approval Status | 188 | **MEASURED** | Manual Purchase: `Sent back for changes` pill 134px + requester avatar |
+| PO Safety Days | 110 | prototype | |
+| Order By | 112 | **MEASURED** | Manual Purchase |
+| Category (parent) | 112 | prototype | |
+| Qty | 64 | **MEASURED** | header floor 24px + 16 |
+| Item / Items | 208 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 180 |
+| Supplier / Ready Stock | 140 | **MEASURED** | Manual Purchase: longest live supplier 17 characters. PO built 136 → widened to 140 (2026-09-18) |
+| Supplier Deliver To | 150 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 132 |
+| Customer | 150 | prototype | |
+| Customer Delivery Location | 176 | prototype | |
+| Customer Requested Delivery Date | 180 | prototype | **Owed:** SO Batch built 144 off `No delivery date yet` 124px; re-measure against the longest governed absence |
+| PO Default Delivery Date | 150 | **MEASURED** | PO, built 2026-09-18 |
+| Supplier Confirmed Delivery Date | 180 | **MEASURED** | PO, built 2026-09-18, holding `Not confirmed` and the `Supplier changed from {date}` second line |
+| Goods Received Date | 140 | **MEASURED** | PO, built 2026-09-18, holding `{n} receipt dates` and the `Time not recorded` second line |
+| Purpose | 150 | **MEASURED** | Manual Purchase |
+| Requested By | 144 | prototype | **Owed:** Manual Purchase built 124 |
+| Stock Location | 160 | prototype | |
+| Unit ID standalone | 140 | prototype | |
+| Condition | 120 | prototype | |
+| PO Version with send evidence | 265 | **MEASURED** | PO, 2026-09-18, correcting the prototype 238: `PO sent to supplier · WhatsApp · Wed, 28 Sep` needs 247px of content at the 11px second line and 238 clipped it |
+
+**THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
+different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
+child cell holds a destination list with counts (`AL Sungai Buloh ×10`, measured 200). The child
+numbers live in `GoodsMiniTable`'s `CHILD_COLUMNS` — ONE implementation, so the three pages cannot
+drift — and measure Category 132 · Unit ID 140 · Deliver To 200 · SKU 152 · Qty 64 · Supplier 140 ·
+`PO No / Unit ID` 230 · Item flexible, floor 220. Exactly one column in a goods table is flexible
+and it is always last.
+
+**Owed convergence is a page's own round, not another page's card.** A card that is building one
+page corrects the registry with what it measured and names the divergence here; it does not reach
+into a page it was not asked to build.
 
 PO rail section titles use the shared 16px Icon, Lucide stroke 2, inherited neutral colour and an 8px text gap: Supplier reply → message; Receiving → goods; Supplier → supplier; Supplier Deliver To → warehouse (the current Site destination filter). Keep the full visible label; icons are supplementary and aria-hidden when text already names the section. Do not add decorative icons to every filter row.
 
