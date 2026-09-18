@@ -749,10 +749,12 @@ event that found the problem · the customer order waiting on the goods, when ap
 
 **LINKS TO** — Service Case · Receiving · Purchasing · Stock · the customer order.
 
-> **A claim has no independent create button.** Staff report the problem where they discover it;
-> stock/supplier problems open a source-linked Purchasing Claim directly. Service Case handles
-> customer complaints separately and is not a Claim creation or approval route. `Supplier Claims`
-> is the stock-claim Register; related customer context is a read-only link.
+> **A claim has no independent create button — two doors, one flow (owner ruling 2026-09-18).**
+> Staff report the problem where they discover it: stock/receiving problems open a source-linked
+> Purchasing Claim directly; a customer complaint stays in its Service Case, which opens one linked
+> Claim only when the supplier must answer. The Case never approves or closes the Claim.
+> Supplier late delivery is PO follow-up and never a Claim. `Supplier Claims` is the stock-claim
+> Register for both doors; the related Case is a read-only link.
 
 ---
 
@@ -782,7 +784,8 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 > require a Service Case, an Operational Issue, an owning-module exception, or linked records;
 > staff do not choose a module or document type first. A stock/receiving supplier-goods problem
 > is reported from its Stock Unit, PO line or Goods Receipt as a source-linked Purchasing Supplier
-> Claim; it never needs a Service Case.
+> Claim; it never needs a Service Case. A customer complaint whose supplier must answer opens a
+> linked Supplier Claim from its Case (2026-09-18).
 >
 > **A customer-facing case is finished when the CUSTOMER is, and all required internal or
 > external outcomes are complete** — never merely when a dropdown changes.

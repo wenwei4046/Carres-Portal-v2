@@ -1740,9 +1740,10 @@ dictionary with the approved Receiving build; each is registered here so no chat
 
 ### Supplier Claim decision words — owner boundary confirmed 2026-09-14
 
-`docs/purchasing/MASTER.md` §7.3 and §9.5 own the stock-claim flow. A Supplier Claim starts
-from Stock/PO/receiving evidence, not a customer complaint or Service Case. The official
-Purchasing destination remains `Supplier Claims`; this boundary does not rename it.
+`docs/purchasing/MASTER.md` §7.3 and §9.5 own the stock-claim flow. A Supplier Claim has two
+doors and one flow (2026-09-18): directly from Stock/PO/receiving evidence, or linked from a
+Service Case only when the supplier must answer. The official Purchasing destination remains
+`Supplier Claims`; this boundary does not rename it.
 
 Keep these facts separate:
 
@@ -1783,11 +1784,14 @@ A Claim's internal decision state uses the approved Purchasing wording `Carres d
 a mandatory customer Case owner. `Return` as a document-routing verb remains distinct from
 `Return to supplier` as a goods decision.
 
-**REAL GAP / CONTRADICTION — owner review required.** The `Carres Execution` words below are live
-(0409) and name customer-leg movements (`Collect Defective Item`, `Replace First`, `Collect First`,
-`Exchange on Collection`). The 2026-09-14 boundary places customer remedy in Service Case and does
-not say whether these movement words stay on the stock Claim or move to the customer Case. They are
-kept unchanged until that ruling; do not extend them.
+**RULED 2026-09-18 — the four customer-leg words move to the Service Case.** `Collect Defective
+Item`, `Replace First`, `Collect First` and `Exchange on Collection` order Carres' movements with
+the customer, so they are Service Case customer-execution words. The Supplier Claim keeps only
+supplier-side results — `Repair` · `Replacement` · `Return` · `Refund` (supplier money, accepted by
+Finance) — and shows the related Case link. `Return to Supplier` stays a Supplier Claim goods
+decision. No Supplier Claim screen may show the four customer-leg words as a picker or column.
+The definitions below stay valid; only their owner changed (built today as Claim layer ④, 0409 —
+APPROVED TARGET / NOT BUILT on the Case).
 
 **`Carres Execution` — the five, transcribed 2026-09-01 and built as layer ④ (migration 0409).**
 Loo ruled these on **2026-08-05**, the same day as the four resolutions above, and they sat in
