@@ -1731,7 +1731,16 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   (0422), never a hard-coded 14 days. `Edit and send again` opens the same form on the returned
   request, prefilled once, purpose locked, sending `Send again for approval`.
 
-**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / BUILT (migration 0546).**
+**Manual Purchase aligned UI — Jess, 2026-09-18.** State, in the three parts §9.3 keeps them in,
+because each proves something different and only the last one is production truth:
+
+| | |
+|---|---|
+| **APPROVED / LOCKED** | The listing, its fifteen columns, its three groups, the goods expansion, the Ready Stock cell and picker, the draft/save/cancel selection flow and the allocation rules below. Owner ruling 2026-09-18. |
+| **BUILT 2026-09-18** | All of the above is implemented and covered by tests — including a PGlite suite that runs migrations 0546/0547's committed SQL rather than a mock of it — and measured in Chromium at 1440 and 1024 on the rendered register. |
+| **DEPLOYED** | **NOT YET.** Migrations **0546 + 0547 are not applied**, and 0547 must never be applied without 0546. The code is deploy-order tolerant (a missing allocation column reads as zero held stock and leaves the Register usable), but until both are applied the allocation door does not exist in production. |
+| **PRODUCTION-VERIFIED** | **NOT YET**, and a converged SHA would not be it: that proves the bundle shipped, not what the register draws. **The walk owes, specifically:** the fifteen columns in order against real rows · `Status` standing beside an independent `Approval Status` · a real concrete-need request choosing, changing and releasing real Units, with the counters and the remaining quantity coming back from the server · an additional-replenishment request showing the shelf and taking none of it · the `Issue PO` draft gate · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. |
+
 The parent has checkbox and a separate goods-disclosure button before Status. Approval Status
 and Status are independent. For a known outstanding request, Status is `Need PO` even while
 Approval Status is `Need approval`; neither the PO tick nor stock Save is allowed before approval.
