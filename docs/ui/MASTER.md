@@ -550,11 +550,11 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 is the only way an operator can see what a supplier will read without printing it.
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
-               Purchase Return · Repair Order · Supplier Claim
-NEVER        Goods Receipt · Display Request · Manual Purchase
+               Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
+NEVER        Display Request · Manual Purchase
 ```
-Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
-half a screen on something no one outside will ever read.
+The GRN is an official A4 document the supplier and auditors read, so its object and Amend
+Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
 
 ### A PANEL'S ACTIONS LIVE IN ITS OWN HEADER ⋮
 Already ruled (Jess, 2026-07-11) and it corrected nine surfaces at once —
