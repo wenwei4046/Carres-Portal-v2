@@ -1855,6 +1855,13 @@ Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date
 `Order By` remains an internal planning/detail fact, not the SO Batch/Manual Purchase parent column.
 `Expected Delivery Date` no longer merges default and confirmed dates in the PO register.
 
+### Every listing, same order and words — OWNER RULING (Jess, 2026-09-18)
+
+All listings read date → number → customer or supplier → goods → quantity → other facts → linked
+documents, with the same column words: Sales Orders now uses `Customer Requested Delivery Date` and
+`Customer Delivery Location` like SO Batch Purchase and Manual Purchase (orders MASTER); Supplier
+Claims puts `PO No` · `GRN No.` last (Purchasing §9.5).
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

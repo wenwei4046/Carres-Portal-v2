@@ -2796,8 +2796,9 @@ contract; reuse existing kit components rather than freezing page-local dimensio
 shows all permitted new and historical claims, including closed claims, newest report first.
 There is no View selector and no setup step before records appear. Search and factual filters
 are optional, start clear on normal entry, and clearing them restores the whole permitted set.
-The useful default columns are **Reported · Supplier Claim No. · Supplier · PO No · GRN No. ·
-Product · Variant · Qty · Problem · Supplier Response · Claim status**. `Reported` uses the
+The useful default columns — owner ruling 2026-09-18 (every listing the same reading order) — are
+**Reported · Supplier Claim No. · Supplier · Product · Variant · Qty · Problem · Supplier Response ·
+Claim status · PO No · GRN No.** (linked documents last). `Reported` uses the
 stored `reported_at` fact in Malaysia time, not discovery, issue or closure time; preserve those
 separate dates in detail. Unknown report dates stay unknown. The date and identity columns are
 pinned using the shared two-column contract, including an unissued record's permanent identity. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
