@@ -256,6 +256,16 @@ export type DataGridProps<T> = {
       single clicked-row highlight. The slate surfaces it first carried are
       every grid's default since UI MASTER §6.7 (Jess 2026-09-17). */
   palette?: "slate";
+  /**
+   * ⭐ THE MAIN HEADER'S FILL — owner ruling 2026-09-18, UI §6.8. OPT-IN.
+   *
+   * `paleBlue` gives the PARENT listing's header band blue-2, so the child
+   * tables inside an expansion — which keep neutral slate — read as children
+   * rather than as a second listing. It is the SO Batch reference's own
+   * treatment and explicitly not a new global blue-header ruling: omitted,
+   * every Register draws the slate-3 band it draws today.
+   */
+  headerTone?: "paleBlue";
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,
       and an active query plus its clear control always visible. */
@@ -345,8 +355,20 @@ export type DataGridProps<T> = {
    *   · a canvas ≥768px pins both; a narrower canvas pins the identity alone,
    *     so a phone keeps WHICH record without spending half its width on dates.
    * When set it replaces `stickyIdentity`. Omitted = every register unchanged.
+   *
+   * ⭐ `before` — A COLUMN THE OWNER PUT AHEAD OF THE PAIR (Jess 2026-09-18).
+   * OPTIONAL, default empty.
+   *
+   * §6.7 rule 2 fixes the ORDER of the date and the identity; it does not make
+   * them the first two columns of every page. SO Batch Purchase's approved
+   * order opens with `Status`, and a general ordering heuristic may not
+   * rearrange an exact owner-approved page order (§6.7 rule 2 · Purchasing
+   * §9.1). So a page may name columns that LEAD the pair. They are protected
+   * exactly as the pair is — never hidden, never dragged away — and the PINNING
+   * rule is untouched: only the date and the identity pin, and a leading column
+   * scrolls under the pinned block like any other fact.
    */
-  leadingColumns?: { date: string; identity: string };
+  leadingColumns?: { date: string; identity: string; before?: readonly string[] };
   /**
    * ⭐ PERSONAL SAVED LAYOUTS — ui MASTER §6.7 rule 4 (Jess 2026-09-17).
    * OPTIONAL, default OFF; Purchase Orders is the only pilot.
@@ -618,6 +640,7 @@ function DataGridInner<T>({
   initialSearch = "",
   appearance = "default",
   palette,
+  headerTone,
   searchPresentation = "icon",
   labelledToolbar = false,
   wrapToolbar = false,
@@ -962,8 +985,21 @@ function DataGridInner<T>({
     setLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, ...(personalLayouts ? { sort: null } : {}) }));
     setColumnsMenuOpen(false);
   }, [setLayout, personalLayouts]);
-  /** The date and identity a `leadingColumns` listing may never lose. */
+  /**
+   * The columns a `leadingColumns` listing may never lose or reorder: the
+   * owner's own leading columns, then the record date, then the identity. A key
+   * named twice is kept once, in this order.
+   */
+  const leadingBefore = leadingColumns?.before;
   const leadingKeys = useMemo(
+    () =>
+      leadingColumns
+        ? [...new Set([...(leadingBefore ?? []), leadingColumns.date, leadingColumns.identity])]
+        : [],
+    [leadingBefore, leadingColumns?.date, leadingColumns?.identity],
+  );
+  /** Of those, only the date and identity PIN — §6.7 rule 2 is about the pair. */
+  const pinnedLeadingKeys = useMemo(
     () => (leadingColumns ? [leadingColumns.date, leadingColumns.identity] : []),
     [leadingColumns?.date, leadingColumns?.identity],
   );
@@ -1076,7 +1112,7 @@ function DataGridInner<T>({
     /* Date-first listings: both lead and pin on a canvas ≥768px; below it the
        identity pins alone and the date scrolls under it like any other fact. */
     const pinRule: DataGridProps<T>["stickyIdentity"] = leadingColumns
-      ? { columnKey: narrowCanvas ? [leadingColumns.identity] : [leadingColumns.date, leadingColumns.identity] }
+      ? { columnKey: narrowCanvas ? [leadingColumns.identity] : pinnedLeadingKeys }
       : stickyIdentity;
     if (!pinRule) return m;
     /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
@@ -1123,7 +1159,7 @@ function DataGridInner<T>({
       if (pinned > 0) break;
     }
     return m;
-  }, [stickyIdentity, leadingColumns, narrowCanvas, visibleColumns, layout.widths]);
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, narrowCanvas, visibleColumns, layout.widths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -2449,6 +2485,7 @@ function DataGridInner<T>({
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
         palette === "slate" ? styles.rootPaletteSlate : null,
+        headerTone === "paleBlue" ? styles.rootHeaderPaleBlue : null,
         searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
         labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]

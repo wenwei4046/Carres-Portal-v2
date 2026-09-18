@@ -1,4 +1,14 @@
 /**
+ * ⛔ THE THREE-SECTION SO BATCH ARRANGEMENT IS RETIRED — owner ruling
+ * 2026-09-18 (UI §6.9: *"do not recreate the retired three-sibling-section SO
+ * Batch arrangement"*). `Ready Stock` is a CELL on the item row now, and its
+ * Units open directly beneath that row.
+ *
+ * This page is kept as the reference for what did NOT change — the
+ * `ConnectedSections` grammar and `PoDetailsTable`, which other modules still
+ * draw — and it must not be read as SO Batch's expansion. That is
+ * `so-batch-listing-preview.html`, which renders the real Register.
+ *
  * SO BATCH EXPAND · THE THREE CONNECTED SECTIONS — DEV ONLY.
  *
  * The REAL components — `ConnectedSections`, `GoodsMiniTable`,

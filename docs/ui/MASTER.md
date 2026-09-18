@@ -22,6 +22,12 @@
 
 # §1 · Overview
 
+**Purchase Returns rail — approved target, 2026-09-18:** reuse the Supplier Claims supplier-list
+pattern (heading icon, name + right-aligned document count, active state, click again to clear).
+Supplier filtering combines with operational conditions. Exact page fields and rail sections
+are governed by Purchasing MASTER §9.6; do not create a separate dropdown or page-specific
+geometry. This is UI approval, not a claim that production is built.
+
 ### MISSION
 Give every page ONE vocabulary, so an operator never re-learns a screen and a chat never invents
 a value.
@@ -1471,8 +1477,15 @@ facts, permissions, complete-record populations or task ownership.
    both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
    layout changes. Identity opens the object. Mappings: Sales Orders `SO Date · SO No`;
    SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
-   Supplier Claims `Reported · Supplier Claim No.`;
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
+   **Supplier Claims is the one owner-approved exception (Jess, 2026-09-18):** its confirmed order
+   is `☐ · ▸ · Claim status · Supplier Claim No · Claim Reported · …`, so status leads, identity is
+   second and the date is third. It pins the two leading controls plus `Claim status` and
+   `Supplier Claim No` at a ≥768px canvas, and `Supplier Claim No` alone below it; its date is
+   never pinned. The shipped `leadingColumns` capability forces `date · identity` to lead and
+   therefore cannot express this page — Supplier Claims does not adopt it as built, and the engine
+   needs a pinned-prefix that takes a page's own leading columns (Purchasing §9.5). Do not
+   "restore" the date-first pair there.
    Other listings use their governed record date and identity, without inventing date facts.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
    GRN Date is record creation; physical `Goods Received Date` is its own Receiving column (owner
@@ -1619,7 +1632,27 @@ its own tools, and nothing that is not needed is on screen.*
    ── 8px ──
 ```
 
-**ROW 1 · DESTINATION HEADER, 50px.** Left = one short identity, **the word alone** — owner ruling
+**⭐ ROW 1's 50px IS A FLOOR, NOT A CEILING — BUILT 2026-09-18, a measured defect.**
+At a 390px canvas EVERY destination page scrolled sideways by 30px, which rule 8
+above forbids by name. The cause was one missing rule in `ModuleHeader`: the identity span was
+`shrink-0` at the governed 24px, so `SO Batch Purchase` demanded 260px beside the 144px utility
+cluster inside 366px of usable width. `Jump to…` had collapsed its label under `sm` since it
+shipped; the WORD had no narrow-canvas rule at all.
+
+The word may now WRAP (`min-w-0 break-words`) and the row's 50px became `min-h-[50px]`. **Nothing
+was truncated, nothing was hidden and no phone type step was invented** — a governed label is
+never cut and never sits behind a tooltip, and all four global utilities stay on the row. 50px
+stays EXACT at every width where the identity fits one line. Measured on all 29 real destination
+words: at 1440 every one is a single line in a 51px row (50 + the rule), unchanged; at 390, 11 of
+them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
+component, so all 28 destination pages carry it.
+
+🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
+— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
+takes four lines and a 137px row. It is correct and readable now where it used to blow the page
+open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+
+**ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
 which is why the row grew from 44px to 50px. 24px inside 44px leaves 5.5px above and below and the
 word reads as if it is touching the rule; 50px leaves 8.5px. The module's icon still identifies it
@@ -1753,9 +1786,23 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · Shared goods tables — approved SO Batch reference
 
-**Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
+**Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
+OWED.** SO Batch listing and stock-picker composition is the
 approved reference for shared component work. Business columns remain owned by each module MASTER;
-Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain editing or reservation powers implicitly.
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain
+editing or reservation powers implicitly, and this build gave none of them any.
+
+**Engine capabilities — BUILT 2026-09-18, all four opt-in, every other Register byte-identical:**
+`DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
+record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
+two); the pair still pins alone and the named column scrolls under the block like any other fact.
+`DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
+tables inside an expansion read as children — it is this reference's treatment and NOT a global
+blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
+`ReadyStockTable layout="picker"` draws the approved six picker columns. **Manual Purchase's own
+§9.2 build inherits these four rather than growing a second set** — the geometry and the
+edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
@@ -1776,8 +1823,114 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
+- **Walked 2026-09-18 on the real components** (`so-batch-listing-preview`, a dev-only vite entry
+  that `vite build` cannot emit): 1440 / 1180 / 820 / 390 and 200% zoom carry no page-level
+  horizontal scroll; both tables take their measured content width and neither stretches to fill
+  the canvas; the pinned pair is `Proceed Date · SO No` at ≥768px and `SO No` alone at 390px; the
+  picker's controls are the kit's own 32px Buttons. The 390px page-level overflow this walk found
+  was in the shared destination header and is fixed there — see §6.7 below.
+
+**THE SHARED TWO-LINE LISTING ROW IS 54px — owner ruling 2026-09-18, APPROVED / NOT BUILT.** A
+listing whose cells carry two-line identity or two-line goods uses one shared 54px row with
+vertically centred checkbox, disclosure and quantity. It is the goods-row geometry, NOT a
+portal-wide replacement: the engine's 38px single-line row (`--grid-row-h`) stays correct for
+single-line registers, and existing per-page exceptions keep their own approved heights
+(SO Batch 40px, Payment Monitor 72px). Short content fits 54px; long content and accessibility
+needs may grow the row — **a required party, number, document or date is never ellipsised to
+protect the height.** No page-local row or header height. *Falsifier: the DOM measurement owed at
+build. 54px is the owner's reviewed number from the 2026-09-18 mockups; no shipped surface states
+it yet, so the build measures it in the rendered shell at 1440/1180/820/390 and reports back
+rather than hard-coding a number nobody checked.*
+
+**ONE CELL MAY CARRY A DOCUMENT AND THE EXACT GOODS IT NAMES — NEVER TWO DOCUMENTS.** The stock
+picker's `PO No / Ref No` with the Unit ID on line two (§9.1) is the approved shape, and Supplier
+Claims reuses it exactly (`PO No` line one, Unit ID line two — Purchasing §9.5). Line one is the
+document number in full and never shortened. Line two is the goods identity that document names:
+one Unit ID, `{n} Units` as a disclosure link into that row's own expansion, `Counted stock` where
+there is no Unit ID and never will be, or the honest absence/failure word. **Never fabricate a
+Unit ID, and never put a second document's number in that cell** — a reader must never have to
+guess which document a number belongs to.
+
+**HEADER BANDS DO NOT OVERLAP AND DO NOT LEAVE BLANK BLOCKS.** Every header cell — the leading
+control cells included — belongs to the one opaque header band and reserves the shared two-line
+header height, so a one-word header centres instead of leaving a blank block above it. Paint order
+is fixed and shared: sticky header above body cells, pinned cells above unpinned ones, pinned
+header cells above both. A transparent sticky cell, a page-local z-index ladder and a page-local
+header height are all defects, not page style.
+
+**EVIDENCE CONTROLS INSIDE A ROW ARE ICON + TEXT, NEVER BUTTONS.** Beneath a row's problem text,
+saved evidence is offered as compact `Photos {n}` / `Video {n}` controls: icon plus text, shared
+control ink, 12px helper size, hover/focus tint only while hovered or focused, a visible focus
+ring, and `aria-expanded`. No large button, no pill, no border, no permanent filled background.
+Clicking expands that row's evidence directly beneath it; clicking again collapses it. Opening one
+never closes another and never moves the rows above it. A count is never printed when it is
+unknown.
+
+**KIT COMPONENT REQUEST — ONE SHARED SAVED-EVIDENCE VIEWER (does not exist; APPROVED TARGET /
+NOT BUILT).** Verified on 2026-09-18: `CaseEvidenceGallery.tsx` is a Service-Case list with an
+append-only uploader and no zoom, drag, Previous/Next or overlay; `ClaimPhotoUploadField.tsx` is an
+upload field; `SupplierClaimPanel.tsx:35` prints `Evidence: {n} photos` as text. **No viewer
+exists, so one joins the kit rather than being drawn inline on Supplier Claims** (Constitution §2).
+One implementation, reused by Supplier Claims, Receiving, Stock and Service Case:
+
+- **Photos:** zoom in · zoom out · drag to pan while enlarged · `Reset` · `Previous` · `Next` ·
+  `Close` · `Esc`. Closing restores focus to the control that opened it and the caller's scroll
+  position and open expansion.
+- **Video:** play/pause, seek, fullscreen. **Local video zoom is outside this approval.**
+- **Read-only.** No uploader, no delete, no rotate-and-save. Adding evidence stays with the owning
+  record and its own permission; the viewer never widens a permission.
+- **File-to-Unit and file-to-event relationships stay visible**, and per-file permission is
+  enforced on the server.
+- **Loading, failure and retry are distinct, and MISSING is not UNREADABLE.** A file the record
+  never had is absent; a file that exists but could not be read says
+  `Photo {n} could not be loaded` + `Try again`. The two never render alike.
+- **It is a viewer, and only a viewer.** Recording or attaching evidence stays with the owning
+  record's own governed write surface. On Supplier Claims that surface is the full-width claim
+  record, which is itself **APPROVED TARGET / NOT BUILT** and must reuse the existing server door
+  and the existing My Work deep link rather than grow a second editor (Purchasing §9.5).
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+
+## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
+
+**The connector belongs to the TABLE, because only the table knows where the `Ready Stock` column
+is.** `GoodsMiniTable` draws it inside that cell, in normal flow, as one unbroken 1px rule from
+beneath the disclosure caret to the TOP BORDER of the picker's frame — measured at 1440 in the
+rendered portal: centred on the caret to 0.2px, 1px below it, 0px from the frame's border, and
+unchanged after the goods box is scrolled horizontally. It exists only while that picker is open,
+so there is structurally no line that could run into the next item. The active goods context
+carries a blue boundary; the stock frame stays neutral white, and neither is evidence of a saved
+reservation — what a line holds is its `{n} reserved` count and the Unit IDs in the picker.
+Ready Stock is no longer a sibling SECTION of the expansion: the expansion is the goods table and
+`Purchase order details`, and the retired three-section arrangement does not return.
+
+Use the existing shared connector primitives. The SO row connects to its goods expansion.
+An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the
+TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its destination, moves with
+the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
+no line into the next item or SO. The active goods context has a blue boundary; the stock detail
+has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
+Other modules keep their existing business sections; do not recreate the retired three-sibling-section
+SO Batch arrangement. Use one component implementation, not page-local connector drawings.
+
+**ONE EXPANDED STATE PER ROW, AND A SECOND DOOR IS NOT A SECOND PANEL.** A row-leading disclosure
+and an in-cell disclosure (SO Batch's Ready Stock count, Supplier Claims' `{n} Units` link) may
+both exist; they open and close the SAME expansion, and the in-cell one additionally moves focus to
+the part it names. Inside an expansion, a per-item evidence disclosure is its own independent
+open/closed state beneath that item — it never collapses a sibling and never reflows the rows
+above it.
+
+# §7 · Approved Evolution
+
+| What | Why it is not built |
+|---|---|
+| **The flame repoint — `--primary` to blue, 594 sites** | Approved. **It cannot be proved by checksum**, so it needs its own card AND a visual approval. |
+| **`base-*` → the kit palette, 4,661 sites** | Approved. Ten steps into six, so it rolls out **page by page with the page migrations, never globally.** |
+| **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
+| **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
+| **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
+| **Layout memory** | Refused as a kit-wide default. Browser layout keys stay per page. Server-side personal saved layouts exist only on Purchase Orders (§6.7 rule 4, BUILT 2026-09-17); rollout to other listings waits for owner acceptance of that pilot. |
+
 
 ### Shared Purchasing geometry — owner-approved consolidation, 2026-09-18
 
@@ -1863,7 +2016,7 @@ clicking a selected facet again clears that facet. Selects retain their All opti
 active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
 Purchasing §9.3; quantity-managed lines have none. Do not infer new selection capabilities.
 
-## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18
+## §6.10 · GROUP-LOCAL HEADERS — OWNER RULING, Jess 2026-09-18 · BUILT 2026-09-18 (#1462)
 
 **This ruling SUPERSEDES the earlier single global header above all groups.** A governed grouped
 listing reads, per group:
@@ -1909,25 +2062,3 @@ passed 4px, with the second group's header taking the top at 40px. No `<thead>` 
 **Falsifier:** a browser in which a sticky `<thead>` is not constrained by its own table, or a
 grouped listing whose groups drift out of column alignment, overturns the structure — not the
 ruling, which is about what the operator reads.
-
-## §6.9 · Connected expansion
-
-Use the existing shared connector primitives. The SO row connects to its goods expansion.
-An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the
-TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its destination, moves with
-the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
-no line into the next item or SO. The active goods context has a blue boundary; the stock detail
-has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
-Other modules keep their existing business sections; do not recreate the retired three-sibling-section
-SO Batch arrangement. Use one component implementation, not page-local connector drawings.
-
-# §7 · Approved Evolution
-
-| What | Why it is not built |
-|---|---|
-| **The flame repoint — `--primary` to blue, 594 sites** | Approved. **It cannot be proved by checksum**, so it needs its own card AND a visual approval. |
-| **`base-*` → the kit palette, 4,661 sites** | Approved. Ten steps into six, so it rolls out **page by page with the page migrations, never globally.** |
-| **Real pages rendering through `PageShell` / `DataTable` / `DetailShell`** | Approved. Components-only was the ruling, not a shortfall. The order drawer specifically is BLOCKED: L4 needs a persistent-facts 4-tuple that does not exist on it, and creating one reverses a frozen ruling. |
-| **A picker inside a dialog renders UNDER it** | A real P1 defect, scoped and approved, not yet built. |
-| **Splitting the grid's `layout` prop** | `resize` and `reorder` arrive through ONE prop, so **no page can justify one power without the other.** The day a page wants one and not the other, this is the kit's card. |
-| **Layout memory** | Refused as a kit-wide default. Browser layout keys stay per page. Server-side personal saved layouts exist only on Purchase Orders (§6.7 rule 4, BUILT 2026-09-17); rollout to other listings waits for owner acceptance of that pilot. |

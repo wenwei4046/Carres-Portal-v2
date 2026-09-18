@@ -1180,7 +1180,6 @@ function OrderedGoods({ row, destinations }: { row: RegisterRow; destinations: A
         lines={lines}
         purchaseOrderLayout
         showSupplier
-        deliverToHeading="Supplier Deliver To"
         itemHeading="Items"
       />
     </div>

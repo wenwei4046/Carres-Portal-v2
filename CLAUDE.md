@@ -24,8 +24,9 @@ number, the party and the date already worked out, and one obvious button.
 
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 §6.7–6.10, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
-Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase
-(Jess 2026-09-18, NOT BUILT); preserve their distinct approval and allocation rules.
+Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch (Jess 2026-09-18, BUILT 2026-09-18 —
+the authenticated production walk is still owed) and §9.2 Manual Purchase (Jess 2026-09-18, NOT
+BUILT); preserve their distinct approval and allocation rules.
 Use the current main versions; open PRs and mockups are not a second authority. Resolve older PR
 text against these rules before merging. Never ask Jess to repeat already recorded UI decisions.
 
@@ -76,6 +77,8 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
 | Sales Orders / Customer Order | `docs/orders/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Approved-target gaps explicitly named in that MASTER; preserve verified register/object truth |
 | Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
+| Purchase Returns UI | `docs/purchasing/MASTER.md` §9.6 + `docs/COPY-STANDARD.md` | **APPROVED TARGET / NOT BUILT — 2026-09-18** | Read before editing: PR Doc Date / PR No; Category before PO No + Unit ID; Supplier Claims-style supplier rail; no Finance |
+| Purchasing confirmed UI handoff — all six reviewed pages | `docs/purchasing/MASTER.md` §9.1–9.6; COPY and UI MASTER | **Confirmed decisions recorded on main; build status remains per page** | SO Batch #1459 merged; Manual design #1457 merged/build #1464 pending; PO specification synced from #1462, app pending; Receiving #1461 merged; Supplier Claims specification synced from #1463; Returns #1465 merged. Read current sections; do not restart design or revive older PR text. |
 | Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
 | Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
@@ -109,6 +112,13 @@ the evidence is strong enough AND its boundary is explicit: a Principle must be 
 Every Principle names the Findings it rests on; if one is overwritten it returns to review in
 the same change. **Principles guide research; they never replace research.** No Principle is
 permanent — it holds only until better evidence replaces it.
+
+**Owner confirmation handoff:** when the owner confirms a presented design, automatically
+synchronise the approved delta into the owning MASTER, applicable COPY/UI rules and authority
+index before reporting completion. Preserve unrelated edits. Distinguish UI approval from built
+or production-verified status, and report local vs committed/pushed/merged state accurately.
+A local edit does not notify other sessions; their shared authority is the synchronised repository.
+Do not require the owner to repeat “update the repo” after confirmation.
 
 ### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.

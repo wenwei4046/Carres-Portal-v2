@@ -39,6 +39,8 @@ function statement(rawSql: string, start: string, end: string) {
 export const RESERVATION_MIGRATION = "0471_a_reserved_unit_names_the_sales_order_line";
 /** 0473 redefines the batch door so a refusal names the Unit it is about. */
 export const REFUSAL_NAMING_MIGRATION = "0473_the_refusal_names_the_unit_that_stopped_it";
+/** 0545 adds the replacement door `Save changes` presses (owner 2026-09-18). */
+export const SAVE_DOOR_MIGRATION = "0545_a_ready_stock_choice_is_saved_whole_or_not_at_all";
 
 export async function readyStockDatabase() {
   const db = new PGlite();
@@ -139,6 +141,21 @@ export async function readyStockDatabase() {
     statement(
       migration(REFUSAL_NAMING_MIGRATION),
       "create or replace function public.so_batch_reserve_ready_units",
+      "$function$;",
+    ),
+  );
+
+  /* ── and the replacement door, 0545 ─────────────────────────────────────
+   *
+   * `Save changes` is one act: it gives back what the chosen set drops and
+   * takes what it gains, inside ONE transaction. Whether that actually holds —
+   * that a refused release leaves nothing released, that a swap on a one-piece
+   * line is not refused as already covered — is a database behaviour, so the
+   * committed function body is executed here rather than restated. */
+  await db.exec(
+    statement(
+      migration(SAVE_DOOR_MIGRATION),
+      "create or replace function public.so_batch_save_ready_units",
       "$function$;",
     ),
   );

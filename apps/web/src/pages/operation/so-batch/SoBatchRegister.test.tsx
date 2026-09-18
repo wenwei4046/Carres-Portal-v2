@@ -22,11 +22,29 @@ vi.mock("../components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 /* The expansion's Unit IDs come through the Sales Order expansion endpoint —
    the same door the Sales Orders register asks. The suite answers it empty
    unless a test overrides. */
-const apiFetch = vi.fn(async (..._a: unknown[]) => ({
-  defaultDeliverTo: null,
-  place: [],
-  lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: Array<{ name: string; qty: number }> }[],
-} as SalesOrderExpansionResponse));
+/* ⭐ AND THE READY STOCK READ IS ANSWERED TOO (owner ruling 2026-09-18). The
+   `Ready Stock` cell is on the item row now, so every expanded row asks this
+   door; an unanswered read leaves every cell reading `Loading…` for ever,
+   which is correct behaviour and useless as a fixture. The suite answers an
+   EMPTY shelf unless a test overrides — the honest default for an order
+   nothing is reserved against. */
+const EMPTY_READY_STOCK = {
+  orderId: "o1",
+  so: null,
+  reference: null,
+  lines: [],
+  units: [],
+};
+const apiFetch = vi.fn(async (path?: unknown, ..._a: unknown[]) => {
+  if (typeof path === "string" && path.endsWith("/ready-stock")) {
+    return EMPTY_READY_STOCK as unknown as SalesOrderExpansionResponse;
+  }
+  return {
+    defaultDeliverTo: null,
+    place: [],
+    lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: Array<{ name: string; qty: number }> }[],
+  } as SalesOrderExpansionResponse;
+});
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
@@ -316,17 +334,17 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
 
 /**
- * ⭐ THE READING ORDER — owner correction 2026-09-11.
+ * ⭐ THE APPROVED READING ORDER — owner ruling 2026-09-18, Purchasing §9.1.
  *
- * `Status` is retired as a presentation: blank · `Partial` · `Ordered` was a
- * generic word for an arithmetic the row already showed in `PO No` and the
- * expansion, and an operator could not act on any of the three. The
- * ELIGIBILITY it was derived from is untouched — it still decides which rows
- * can be ticked — it simply stopped being a column.
+ * `Status` returns, and it is a DIFFERENT column: `Need PO` / `No PO needed`,
+ * the one question a buying page exists for, read from the same remaining
+ * demand that puts the row under its group. What stays retired is blank ·
+ * `Partial` · `Ordered` — a generic progress word nobody could act on.
  *
- * What remains is ordered the way the work is read: which order, whose, when
- * it arrived, when the customer wants it, where it goes, who supplies it,
- * where the goods land, and finally the documents.
+ * `PO Safety Days` replaces `Order By` (the date becomes an engine/detail fact
+ * again), `Items` joins, and the customer's date and location say WHOSE they
+ * are and rise above the customer's name. This is the owner's exact order; a
+ * general ordering heuristic may not rearrange it.
  */
 /* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
    `<thead>` — every OPEN group draws the same header between its heading and
@@ -336,36 +354,51 @@ const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
   ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
 ];
 describe("the approved columns, in the approved reading order", () => {
-  /* Date first, then identity (purchasing MASTER §9.1, Jess 2026-09-17). */
   const APPROVED = [
+    "Status",
     "Proceed Date",
     "SO No",
-    "Order By",
+    "PO Safety Days",
+    "Customer Requested Delivery Date",
+    "Customer Delivery Location",
     "Customer",
+    "Items",
     "Supplier",
-    "Requested Delivery Date",
-    "Delivery Location",
-    "Deliver To",
+    "Supplier Deliver To",
     "PO No",
-    "PO Delivery Date",
+    "PO Default Delivery Date",
   ];
 
-  it("draws exactly the ten business columns, date then identity first and documents last", () => {
+  it("draws exactly the twelve business columns, in the owner's order", () => {
     const { container } = renderRegister();
     const heads = groupHeaderCells(container)
       .map((el) => el.textContent ?? "")
       .filter((t) => t.trim() !== "");
     expect(heads).toHaveLength(APPROVED.length);
-    APPROVED.forEach((label, i) => expect(heads[i], label).toContain(label));
+    /* A two-line head carries no space between its lines in `textContent`, so
+       the comparison is made on the letters, not on the line break. */
+    const flat = (t: string) => t.replace(/\s+/g, "");
+    APPROVED.forEach((label, i) =>
+      expect(flat(heads[i]!), label).toContain(flat(label)),
+    );
   });
 
-  it("has no Status column, and no Status cell on any row", () => {
+  it("says `Need PO` / `No PO needed`, and nothing about progress", () => {
     const { container } = renderRegister();
     const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
-    expect(text).not.toContain("Status");
-    expect(screen.queryByTestId("so-batch-status-o1")).toBeNull();
-    /* The FACT survives: eligibility still refuses the tick on an Ordered row. */
+    expect(text).not.toContain("Partial");
+    expect(text).not.toContain("Ordered");
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Need PO");
+    /* A word is not a permission: eligibility still refuses the tick. */
     expect(screen.getByTestId("so-batch-select-o5")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-status-o5")).toHaveTextContent("No PO needed");
+  });
+
+  it("retires `Order By` as a column and keeps it on the wire", () => {
+    const { container } = renderRegister();
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
+    expect(text).not.toContain("Order By");
+    expect(LEAF_O1.orderBy ?? null).not.toBeUndefined();
   });
 
   it("the retired columns are gone from the Register", () => {
@@ -396,19 +429,30 @@ describe("the approved columns, in the approved reading order", () => {
     expect(container.textContent).not.toContain("Goods Must Arrive");
   });
 
-  it("the saved layout key is BUMPED so a stale leaf-grain layout cannot override the order", () => {
-    expect(source()).toContain('"carres.soBatchPurchase.register.v6"');
-    expect(source()).not.toContain('"carres.soBatchPurchase.register.v5"');
+  it("the saved layout key is BUMPED so a stale arrangement cannot override the order", () => {
+    expect(source()).toContain('"carres.soBatchPurchase.register.v7"');
+    expect(source()).not.toContain('"carres.soBatchPurchase.register.v6"');
   });
 
-  it("reads Proceed Date · SO No first, both pinned on a wide canvas (§6.7 rule 2)", () => {
+  /**
+   * §6.7 rule 2 fixes the ORDER of the record date and the identity; the
+   * owner's page order puts `Status` ahead of them. All three lead; only the
+   * PAIR pins, and `Status` scrolls under the pinned block like any other fact.
+   */
+  it("leads Status · Proceed Date · SO No, and pins only the pair (§6.7 rule 2)", () => {
     const { container } = renderRegister();
     const heads = groupHeaderCells(container);
     const data = heads.filter((th) => th.title);
-    expect(data.slice(0, 3).map((th) => th.title)).toEqual(["Proceed Date", "SO No", "Order By"]);
-    expect(data[0]!.style.left).not.toBe("");
+    expect(data.slice(0, 4).map((th) => th.title)).toEqual([
+      "Status",
+      "Proceed Date",
+      "SO No",
+      "PO Safety Days",
+    ]);
+    expect(data[0]!.style.left).toBe("");
     expect(data[1]!.style.left).not.toBe("");
-    expect(data[2]!.style.left).toBe("");
+    expect(data[2]!.style.left).not.toBe("");
+    expect(data[3]!.style.left).toBe("");
   });
 });
 
@@ -1136,7 +1180,7 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
 });
 
 describe("the expansion — the ONE shared child table", () => {
-  it("draws THREE connected sections, and the line ends in a curve at the last", async () => {
+  it("draws TWO connected sections, and the line ends in a curve at the last", async () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
@@ -1148,25 +1192,25 @@ describe("the expansion — the ONE shared child table", () => {
     expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__expand__");
     expect(expansionCell).toHaveStyle({ padding: "0px" });
 
-    /* Demand · shelf · record, in that order — Ready Stock sits between the
-       compact demand it can answer and the record, which grows without limit. */
+    /* ⭐ READY STOCK IS NOT A SECTION ANY MORE (owner ruling 2026-09-18). The
+       question is per ITEM LINE, so it is answered on the item line. What is
+       left is the pair that answers two different questions about the whole
+       order: what can still be bought, and what has already been bought. */
     const sections = within(box)
       .getAllByTestId(/^connected-section-/)
       .map((s) => s.getAttribute("data-testid"));
     expect(sections).toEqual([
       "connected-section-goods",
-      "connected-section-ready-stock",
       "connected-section-po-details",
     ]);
 
     /* ⭐ EVERY SECTION TAKES THE LINE IN ON ITS OWN ELBOW, and the LAST one
        draws no trunk — so there is structurally nothing that could run on into
        the next Sales Order. */
-    for (const key of ["goods", "ready-stock", "po-details"]) {
+    for (const key of ["goods", "po-details"]) {
       expect(within(box).getByTestId(`section-elbow-${key}`)).toBeInTheDocument();
     }
     expect(within(box).getByTestId("section-trunk-goods")).toBeInTheDocument();
-    expect(within(box).getByTestId("section-trunk-ready-stock")).toBeInTheDocument();
     expect(within(box).queryByTestId("section-trunk-po-details")).toBeNull();
   });
 
@@ -1175,12 +1219,14 @@ describe("the expansion — the ONE shared child table", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
 
-    /* ⛔ THE ITEM ROW CARRIES NO PO REFERENCE AT ALL. It states HOW MANY units
-       documents carry; a collection of them never decides its height. */
+    /* ⛔ THE ITEM ROW CARRIES NO PO REFERENCE AND NO DOCUMENT QUANTITY AT ALL
+       (owner ruling 2026-09-18). `Ordered Qty` left the actionable table with
+       `SKU`, `To buy` and `Order By`; every one of those facts is still on the
+       page, in the section that is ABOUT documents. */
     const goods = within(box).getByTestId("goods-mini-table");
     expect(goods).not.toHaveTextContent("PO-20260820-1111");
     expect(goods).not.toHaveTextContent("PO-20260821-2222");
-    expect(within(goods).getByTestId("goods-ordered-qty-l51")).toHaveTextContent("1");
+    expect(within(goods).queryByTestId("goods-ordered-qty-l51")).toBeNull();
 
     /* And the record says everything, once, under its own heading. */
     const details = within(box).getByTestId("po-details-table");
@@ -1222,31 +1268,47 @@ describe("the expansion — the ONE shared child table", () => {
     const box = await screen.findByTestId("so-batch-inspector-o1");
     expect(within(box).queryByTestId("po-details-table")).toBeNull();
     expect(within(box).queryByTestId("connected-section-po-details")).toBeNull();
-    /* Two sections, so the LINE still ends in a curve at Ready Stock. */
-    expect(within(box).queryByTestId("section-trunk-ready-stock")).toBeNull();
-    expect(within(box).getByTestId("goods-mini-table")).toHaveTextContent("Not ordered yet");
+    /* ONE section, so the LINE still ends in a curve at the goods table. */
+    expect(within(box).queryByTestId("section-trunk-goods")).toBeNull();
+    expect(within(box).getByTestId("section-elbow-goods")).toBeInTheDocument();
   });
 
-  it("Ready Stock coverage is explained in the expansion, never as a parent Status", async () => {
+  /**
+   * ⭐ THE APPROVED GOODS TABLE — owner ruling 2026-09-18:
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To`, and nothing else.
+   *
+   * This line is fully answered off the shelf: the customer ordered 2, Ready
+   * Stock answered 2, no document carries any of it and nothing is left to buy
+   * — so it cannot be ticked, and it says `No PO needed` rather than a generic
+   * progress word.
+   */
+  it("draws the approved goods columns, and the removed ones are gone", async () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
     const box = await screen.findByTestId("so-batch-inspector-o6");
-    /* ⭐ THE ARITHMETIC IS EXPLICIT — `Covered by` folded three answers into
-       one word. This line is fully answered off the shelf: the customer
-       ordered 2, Ready Stock answered 2, no document carries any of it and
-       nothing is left to buy — so the row cannot be ticked, and it says why
-       without a generic Status word anywhere on the page.
-
-       ⛔ AND THERE IS NO `Unit ID` COLUMN ON THE ACTIONABLE TABLE. It described
-       a document's goods, so on every unbought line it printed an absence in
-       the width of a real answer. */
-    const line = within(box).getByTestId("so-batch-part-B1201S-Q");
-    const cells = [...line.querySelectorAll("td")].map((c) => c.textContent);
-    expect(cells).toEqual([
-      "—", "B1201S-Q", "BooqitQueen", "2", "2", "—", "—", "—", "—", "—", "Mattress",
+    const goods = within(box).getByTestId("goods-mini-table");
+    const heads = [...goods.querySelectorAll("thead th")]
+      .map((el) => (el.textContent ?? "").trim())
+      .filter(Boolean);
+    expect(heads).toEqual([
+      "Status",
+      "Category",
+      "Qty",
+      "Item",
+      "Ready Stock",
+      "Supplier",
+      "Supplier Deliver To",
     ]);
+    for (const gone of ["SKU", "Ordered Qty", "To buy", "Order By", "Unit ID", "PO Safety Days"]) {
+      expect(heads, gone).not.toContain(gone);
+    }
+    const line = within(box).getByTestId("so-batch-part-B1201S-Q");
+    expect(within(line).getByTestId("goods-status-l61")).toHaveTextContent("No PO needed");
     expect(within(line).queryByRole("checkbox")).toBeNull();
-    expect(screen.queryByTestId("so-batch-status-o6")).toBeNull();
+    /* The customer's ORIGINAL quantity, never quietly rewritten. */
+    expect(line).toHaveTextContent("2");
+    expect(screen.getByTestId("so-batch-status-o6")).toHaveTextContent("No PO needed");
   });
 
   it("an eligible line carries the existing destination editor — Split included", async () => {
@@ -1325,18 +1387,18 @@ describe("the expansion — the ONE shared child table", () => {
     const five = await screen.findByTestId("so-batch-inspector-o5");
     const one = await screen.findByTestId("so-batch-inspector-o1");
 
-    /* o5 has documents, so it holds three sections and its line ends at the
-       record; o1 has none, so it holds two and its line ends at Ready Stock. */
-    expect(within(five).getAllByTestId(/^connected-section-/)).toHaveLength(3);
-    expect(within(one).getAllByTestId(/^connected-section-/)).toHaveLength(2);
+    /* o5 has documents, so it holds two sections and its line ends at the
+       record; o1 has none, so it holds one and its line ends at the goods. */
+    expect(within(five).getAllByTestId(/^connected-section-/)).toHaveLength(2);
+    expect(within(one).getAllByTestId(/^connected-section-/)).toHaveLength(1);
 
     /* THE LAST SECTION OF EACH DRAWS NO TRUNK. There is no line to leak. */
     expect(within(five).queryByTestId("section-trunk-po-details")).toBeNull();
-    expect(within(one).queryByTestId("section-trunk-ready-stock")).toBeNull();
+    expect(within(one).queryByTestId("section-trunk-goods")).toBeNull();
 
     /* And each row's elbows belong to that row, not to the register. */
-    expect(within(five).getAllByTestId(/^section-elbow-/)).toHaveLength(3);
-    expect(within(one).getAllByTestId(/^section-elbow-/)).toHaveLength(2);
+    expect(within(five).getAllByTestId(/^section-elbow-/)).toHaveLength(2);
+    expect(within(one).getAllByTestId(/^section-elbow-/)).toHaveLength(1);
   });
 
   it("no second hand-drawn mini-table — the box is the shared component", () => {
@@ -1346,14 +1408,20 @@ describe("the expansion — the ONE shared child table", () => {
   });
 
   it("does not call pending Unit IDs unallocated", async () => {
-    apiFetch.mockImplementationOnce(() => new Promise(() => {}));
+    /* The Sales Order expansion read is the one left hanging; the Ready Stock
+       read still answers, so the only `Loading…` on screen is the Unit's. */
+    apiFetch.mockImplementationOnce((path?: unknown) =>
+      typeof path === "string" && path.endsWith("/ready-stock")
+        ? (Promise.resolve(EMPTY_READY_STOCK) as unknown as Promise<SalesOrderExpansionResponse>)
+        : (new Promise(() => {}) as Promise<SalesOrderExpansionResponse>),
+    );
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o7"));
     const box = await screen.findByTestId("so-batch-inspector-o7");
     /* UNKNOWN is not `None`: the document carries a unit, and whether a Unit
        answers it has not been ANSWERED yet. Saying `Not allocated` here is how
        a reader concludes goods do not exist because a request was slow. */
-    expect(within(box).getByText("Loading…")).toBeInTheDocument();
+    expect(within(box).getAllByText("Loading…").length).toBeGreaterThan(0);
     expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
   });
 
@@ -1762,8 +1830,11 @@ describe("fourteen documents on a one-unit line", () => {
     });
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
-    /* The HISTORICAL quantity, undiminished. */
-    expect(within(box).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
+    /* ⭐ THE HISTORICAL QUANTITY LEFT THE ITEM ROW AND NOT THE PAGE (owner
+       ruling 2026-09-18). `Ordered Qty` is no longer a goods column; the
+       fourteen documents are named one per row in the section that is ABOUT
+       documents, which is where the quantity was always evidenced. */
+    expect(within(box).queryByTestId("goods-ordered-qty-l14")).toBeNull();
     const details = within(box).getByTestId("po-details-table");
     expect(within(details).getAllByText("Completed")).toHaveLength(14);
     /* ⛔ And the raw database word never reaches the screen. */
@@ -1798,22 +1869,20 @@ describe("fourteen documents on a one-unit line", () => {
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const demand = within(box).getByTestId("so-batch-part-B1201S-K");
     expect(within(demand).queryByRole("checkbox")).toBeNull();
-    /* And the row SAYS why, in the refusal's own words. */
-    expect(demand).toHaveTextContent("Already on a PO");
-    expect(demand).toHaveTextContent("Nothing to buy here");
-    /* ⛔ AND `To buy` STATES NO PURCHASING QUANTITY. The engine's figure here
-       is the COVERING document's quantity (T6), and printing it under a head
-       that means *what is left to buy*, on a row nobody may tick, presented a
-       covering quantity as a purchasing one. The customer's `Qty 1` and the
-       historical `Ordered Qty 14` are untouched two columns away. */
+    /* ⭐ REMOVING THE COLUMNS REMOVED NO SAFEGUARD (owner ruling 2026-09-18).
+       `To buy` is gone from this table and the page still refuses the act the
+       door would refuse: no tick on the demand, no tick on the parent, and the
+       parent's `PO Safety Days` naming the covering document in the page's own
+       governed word rather than printing a margin it cannot state. The
+       customer's ORIGINAL `Qty 1` is untouched. */
     const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
     expect(cells).toContain("1");
-    expect(within(demand).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
     expect(demand.textContent).not.toMatch(/To buy/);
-    const toBuyCell = [...demand.querySelectorAll("td")].find((c) =>
-      /Already on a PO/.test(c.textContent ?? ""),
-    )!;
-    expect(toBuyCell.textContent).toBe("—Already on a PONothing to buy here");
+    /* This order's own lineage already carries every unit it required, so the
+       row needs no NEW document and has no margin to state — the cell is
+       BLANK, which is its own meaning and is never a `0`. */
+    expect(screen.getByTestId("so-batch-status-o14")).toHaveTextContent("No PO needed");
+    expect(screen.getByTestId("so-batch-safety-days-o14")).toHaveTextContent("");
   });
 
   /**
@@ -1836,13 +1905,15 @@ describe("fourteen documents on a one-unit line", () => {
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const demand = within(box).getByTestId("so-batch-part-B1201S-K");
     expect(within(demand).queryByRole("checkbox")).toBeNull();
-    expect(demand).toHaveTextContent("Coverage not checked");
-    /* ⛔ AND NO PURCHASING FIGURE. The demand is still fully visible — `Qty 1`
-       and `Ordered Qty 14` are two columns away — but `To buy` states nothing
-       it cannot stand behind. */
+    /* UNKNOWN is stated, and it is stated as the MARGIN nobody could measure —
+       never as a `0` and never as permission. The demand stays fully visible:
+       the customer's original `Qty 1` is on its row. */
     const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
     expect(cells).toContain("1");
-    expect(within(demand).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
+    expect(screen.getByTestId("so-batch-safety-days-o14")).toHaveTextContent(
+      "Coverage not checked",
+    );
+    expect(screen.getByTestId("so-batch-safety-days-o14")).not.toHaveTextContent("0");
   });
 
   it("says nothing of the kind when the remainder is genuine", async () => {
@@ -1853,6 +1924,8 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     expect(within(box).getByTestId("so-batch-part-B1201S-K"))
+      .not.toHaveTextContent("Already on a PO");
+    expect(screen.getByTestId("so-batch-safety-days-o14"))
       .not.toHaveTextContent("Already on a PO");
   });
 
@@ -1912,9 +1985,13 @@ describe("a demand that covers several item lines", () => {
     expect(within(table).getAllByRole("checkbox")).toHaveLength(1);
     expect(within(table).getAllByTestId(/^so-batch-deliver-to-select-/)).toHaveLength(1);
     expect(table).toHaveTextContent("With 1 more lines in this set");
-    /* Both of the customer's lines are still listed with their own goods. */
-    expect(within(table).getByText("S9-2A")).toBeInTheDocument();
-    expect(within(table).getByText("S9-1A")).toBeInTheDocument();
+    /* Both of the customer's lines are still listed with their own goods. The
+       SKU column is gone (owner ruling 2026-09-18), so what tells the two
+       module lines apart is the configuration under the item — which is what
+       identified them to an operator in the first place. */
+    expect(table).toHaveTextContent("2 seater");
+    expect(table).toHaveTextContent("1 seater");
+    expect(table).not.toHaveTextContent("S9-2A");
   });
 
   it("ticks the whole set once — the leaf contract is unchanged", async () => {
@@ -2069,7 +2146,10 @@ describe("choosing a Ready Unit", () => {
         supplier: null,
         qty: 1,
         dateIn: "2026-08-01",
+        poNo: "PO-20260820-4827",
         matchingLineIds: ["l1"],
+        lineIds: ["l1"],
+        reservedForLineId: null,
         blocked: null,
       },
     ],
@@ -2085,9 +2165,11 @@ describe("choosing a Ready Unit", () => {
     apiFetch.mockImplementation(async (path: unknown) => {
       const p = String(path);
       if (p.endsWith("/ready-stock")) return READY as unknown as SalesOrderExpansionResponse;
-      if (p.includes("ready-stock/reserve")) {
+      if (p.includes("ready-stock/save")) {
         return {
           reserved: 1,
+          added: 1,
+          released: 0,
           reference: "SO-1318",
           units: [{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: "l1" }],
         } as unknown as SalesOrderExpansionResponse;
@@ -2109,28 +2191,24 @@ describe("choosing a Ready Unit", () => {
     expect(screen.getByTestId("so-batch-issue")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    /* ⭐ THE SAFEGUARD SURVIVED THE SECTION STACK (2026-09-11). Ready Stock is
-       now a CONNECTED SECTION rather than a box appended to the expansion, so
-       the path its act travels back to the Register is worth pinning: the
-       panel sits inside its own section, and pressing its button still reaches
-       `onReserved` and still drops the tick BEFORE the recomputed numbers
+    /* ⭐ THE SAFEGUARD SURVIVED THE MOVE TO THE ITEM ROW (2026-09-18). Ready
+       Stock is a CELL now, and the path its act travels back to the Register is
+       worth pinning: the picker opens under its own item, and saving still
+       reaches `onSaved` and still drops the tick BEFORE the recomputed numbers
        arrive. Nothing about the reservation door itself changed. */
-    const shelf = within(await screen.findByTestId("so-batch-inspector-o1"))
-      .getByTestId("connected-section-ready-stock");
-    expect(within(shelf).getByRole("button", { name: /Ready Stock/ })).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    fireEvent.click(await screen.findByTestId("ready-stock-toggle-l1"));
     const row = await screen.findByTestId(
       "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    fireEvent.click(screen.getByTestId("ready-stock-save-l1"));
 
     await waitFor(() =>
       expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument(),
     );
     /* And the act says what it did, in Units. */
-    expect(screen.getByTestId("ready-stock-act-o1")).toHaveTextContent(
-      "Unit ID · U1-000-001",
+    expect(screen.getByTestId("ready-stock-act-l1")).toHaveTextContent(
+      "1 Unit on this item line",
     );
   });
 
@@ -2139,13 +2217,13 @@ describe("choosing a Ready Unit", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
-    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    fireEvent.click(await screen.findByTestId("ready-stock-toggle-l1"));
     const row = await screen.findByTestId(
       "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
-    await screen.findByTestId("ready-stock-act-o1");
+    fireEvent.click(screen.getByTestId("ready-stock-save-l1"));
+    await screen.findByTestId("ready-stock-act-l1");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o3::b3", allocations: [{ destinationId: KLANG, qty: 1 }] },
@@ -2154,19 +2232,53 @@ describe("choosing a Ready Unit", () => {
 });
 
 
-describe("approved Order By correction", () => {
-  it("shows the earliest selectable engine date and ignores covered leaves", () => {
+describe("approved PO Safety Days column", () => {
+  /**
+   * ⭐ THE MARGIN, NOT THE DATE — owner ruling 2026-09-18.
+   *
+   * The parent states the TIGHTEST margin over exactly the leaves the parent
+   * checkbox would tick, and the number is the SERVER's. Nothing to buy prints
+   * nothing; a margin nobody could measure prints the governed absence word,
+   * never a `0`.
+   */
+  it("shows the tightest measured margin and ignores covered leaves", () => {
     const original = data();
-    const rows: PurchaseDemandRow[] = original.rows.map((r) => ({ ...r, orderBy: "2026-09-25" }));
-    rows.push(leaf({ id: "covered", orderBy: "2026-01-01", fullyOnPo: true }));
+    const rows: PurchaseDemandRow[] = original.rows.map((r) => ({
+      ...r,
+      orderBy: "2026-09-25",
+      safetyDaysLeft: 9,
+    }));
+    rows.push(leaf({ id: "covered", orderBy: "2026-01-01", safetyDaysLeft: 1, fullyOnPo: true }));
     renderRegister({ rows });
-    expect(screen.getByTestId("so-batch-order-by-o1")).toHaveTextContent("25 Sep");
-    expect(screen.getByTestId("so-batch-order-by-o5")).toBeEmptyDOMElement();
+    expect(screen.getByTestId("so-batch-safety-days-o1")).toHaveTextContent("9");
+    expect(screen.getByTestId("so-batch-safety-days-o5")).toBeEmptyDOMElement();
+  });
+
+  it("never prints a `0` for a margin the engine did not measure", () => {
+    const rows: PurchaseDemandRow[] = data().rows.map((r) => ({
+      ...r,
+      safetyDaysLeft: null,
+    }));
+    renderRegister({ rows });
+    const cell = screen.getByTestId("so-batch-safety-days-o1");
+    expect(cell).not.toHaveTextContent("0");
+    expect(cell).toHaveTextContent("Not planned");
+  });
+
+  it("names a production overrun rather than a negative number", () => {
+    const rows: PurchaseDemandRow[] = data().rows.map((r) => ({
+      ...r,
+      safetyDaysLeft: -2,
+    }));
+    renderRegister({ rows });
+    const cell = screen.getByTestId("so-batch-safety-days-o1");
+    expect(cell).toHaveTextContent("Not enough production days");
+    expect(cell).not.toHaveTextContent("-2");
   });
 
   it("names blocked planning and leaves the no-PO destination blank", () => {
     renderRegister();
-    expect(screen.getByTestId("so-batch-order-by-o4")).toHaveTextContent("Not planned");
+    expect(screen.getByTestId("so-batch-safety-days-o4")).toHaveTextContent("Not planned");
     expect(screen.getByTestId("so-batch-deliver-to-o4")).toBeEmptyDOMElement();
   });
 
@@ -2262,7 +2374,10 @@ describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
     }, false);
     const rows = rowsIn(container).filter((t) => t.startsWith("so-batch-row-"));
     expect(rows).toEqual(["so-batch-row-o3", "so-batch-row-o8", "so-batch-row-o1", "so-batch-row-o4"]);
-    expect(screen.getByTestId("so-batch-order-by-o4").textContent).toBe("Not planned");
+    /* The DEFAULT READING ORDER is still the engine's Order By, even though
+       the column that prints is the margin: the sort is planning truth, not a
+       column's text (owner ruling R2, unchanged 2026-09-18). */
+    expect(screen.getByTestId("so-batch-safety-days-o4").textContent).toBe("Not planned");
   });
 
   it("R6 — the footer carries one total, singular for one order", () => {
