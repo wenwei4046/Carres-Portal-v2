@@ -133,9 +133,12 @@ export function resolvePaymentMethods(
 ): PaymentMethodConfig[] {
   const configured = cfg?.paymentMethods ?? [];
   const src = configured.length > 0 ? configured : DEFAULT_PAYMENT_METHODS;
-  // A card sale must name its bank, whatever the saved config says.
-  return src.filter((m) => m.active).map((m) => m.key !== "credit" ? m : {
-    ...m, followUps: m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),
+  // Whatever the saved config says: a card sale names its bank, and credit /
+  // installment (card, to _customer_payment_post 0535) carry an approval code.
+  return src.filter((m) => m.active).map((m) => m.key !== "credit" && m.key !== "installment" ? m : {
+    ...m, approvalCodeRequired: true,
+    followUps: m.key !== "credit" ? m.followUps
+      : m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),
   });
 }
 

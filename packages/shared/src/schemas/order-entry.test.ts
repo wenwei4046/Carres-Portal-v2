@@ -38,6 +38,14 @@ describe("resolvePaymentMethods (0219)", () => {
     ] });
     expect(methods[0].followUps[0].required).toBe(true);
   });
+
+  it("a saved config cannot drop the approval code on credit or installment", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "installment", label: "Installment", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([true, false]);
+  });
 });
 
 describe("resolveFormTab (0219)", () => {
