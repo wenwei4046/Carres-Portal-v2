@@ -1747,94 +1747,42 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
   confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
   than filled with an `Add stock` control the Unit authority removed.
 
-## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
+## §6.8 · Shared goods tables — approved SO Batch reference
 
-**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY** for the reading order and record rows
-below. **S5 (owner follow-up 2026-09-16, BUILT 2026-09-17) changes the HEADER for every caller:**
-the child header follows DataGrid's `palette="slate"` header — slate-3 fill, slate-5 rule,
-slate-11 ink, 11px/600, NORMAL casing — so an expansion no longer shouts in uppercase grey under a
-slate parent. Sales Orders, SO Batch, Manual Purchase and Delivery expansions were re-rendered and
-their suites re-run after the change.
+**Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
+approved reference for shared component work. Business columns remain owned by each module MASTER;
+this does not make other pages editable or give them SO Batch stock-reservation powers.
+Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
-The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
-That law holds. What changed is that the buying page may now ask for a second READING ORDER and for
-READ-ONLY record rows, and every sibling that does not ask gets the ruled layout unchanged.
+- Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
+  not equal widths or stretching to fill a canvas. Same field/role shares its default width.
+  Personal resizing remains supported. No global 144/160/192px type-width proposal was approved.
+- Headers reserve a common two-line height, 11px/600, normal casing; main header pale blue in
+  this SO Batch reference, child headers neutral slate. This is not a new global blue-header ruling.
+- Main/item text 13px; configuration and Unit ID on line two 11px/slate-11. All rows in a given
+  goods table use consistent two-line geometry, vertically centered checkbox and quantity.
+- SO Batch has separate leading checkbox and goods disclosure controls. SO No opens the object;
+  never concatenate a decorative arrow into the number. Keyboard disclosure exposes expanded state.
+- Ready Stock shows available count then reserved count, with a separate borderless disclosure
+  button in that cell. Saved selections have a single Change selection journey, not per-row Undo.
+- The stock table combines actual PO No / Ref No and Unit ID in one cell, identity on two lines.
+  It shows date only. Its six-column order and business safeguards live in Purchasing §9.1.
+- The reviewed local sample uses Supplier 136px consistently and Ready Stock 136px with two-line
+  counts. These are reference sample measurements, not hard-coded production limits: validate long
+  names, large counts, zoom and actual fonts. Do not hide required columns at narrow widths.
+- Approval covers this composition and interaction, not production readiness or a 10/10 score.
+  Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
 
-- **`identityFirst`** puts `SKU` and the item's configuration ahead of `Category` and `Unit ID`. The
-  ruled order opened with the two least identifying facts, so a buying page read `Mattress` ·
-  `Not allocated` before it read what the goods were. Law ① is kept: exactly ONE column is flexible
-  and every other width is fixed, so two expansions opened together still line up column for
-  column. What moved is WHICH column is flexible and where it sits, not how many.
-- **⭐ ONE ROW PER DEMAND, AND THE RECORD IS A DIFFERENT TABLE — owner correction 2026-09-11
-  (second pass).** The component drew a line's Unit records as extra rows beneath it. The first
-  correction stopped them inheriting the line's key, tick and destination editor; this one removes
-  them from the component altogether, because a record of what was bought is not a quieter kind of
-  demand. The page composes its own read-only table (SO Batch's `PoDetailsTable`) and this box holds
-  ACTIONABLE rows only: one row per item line, at the height of its own item description.
-- **⭐ `Ordered Qty` IS A QUANTITY AND A DOOR, NEVER A LIST.** It printed every covering purchase
-  order stacked inside one cell, so a line fourteen documents touch drew a fourteen-line-tall item
-  row and filled the screen with one item. **A collection must never decide how tall an item row
-  is.** The cell states the units documents have ordered and `onOpenPoDetails` makes it open the
-  read-only details where each document is its own row. Nothing is truncated; the evidence moves to
-  the table that is about documents. The head is `Ordered Qty` and not `On PO` because the figure is
-  lineage HISTORY, delivered documents included — `On PO` is the dictionary's head for open-PO
-  coverage, a different number (`COPY-STANDARD.md`).
-- **`Covered by` is retired from the component.** It answered three questions in one heading. The
-  page now asks for `Ready Stock`, `On PO` and `To buy`, so the arithmetic adds up on screen
-  instead of hiding inside one word.
-- **`toBuyNote` / `toBuyNoteWhy` — a cell may say why it is stating no number.** SO Batch withholds
-  the figure on every row it does not offer for buying (the engine's covering quantity is not a
-  purchasing quantity), so the absence needs a reason beside it. The page supplies the words as an
-  ARRAY OF LINES, written at the width they are read at; **the box prints them in BOTH branches** —
-  beside the figure and beside the `—` — and carries the long governed explanation as the cell's
-  title. The absence branch used to return early, so a deliberately withheld figure printed a bare
-  dash with nothing saying why, which is the silence the whole card exists to remove. **A sentence
-  left to wrap under a one-digit number is the same row-height defect as a stack of documents,
-  spelt out in words** — measured at 91px on the rendered preview before the written lines replaced
-  it. Siblings pass neither and render byte-identically.
-- **A page may omit a column it cannot answer.** `showUnitId={false}` is how Manual Purchase and now
-  SO Batch's ACTIONABLE table decline a column that would print an absence on every row forever — an
-  absence in the width of a real answer states nothing.
-- **A number is a door only where the page can open one.** `onPoClick` makes every PO number
-  navigable; a truth register that passes nothing keeps the printed text.
+## §6.9 · Connected expansion
 
-## §6.9 · The Carres connector — ONE drawing, and the sections of an expanded row
-
-**OWNER CORRECTION 2026-09-11.** The portal's left navigation has drawn a parent→child relationship
-since 2026-08-19: a trunk drops from the parent, and each child takes it in on a small curved elbow.
-The owner asked for **that** line — the same subtle curve, not a new one — between the sections
-inside an expanded SO Batch Purchase row. The drawing therefore moved into
-`components/tree-connector` and **both surfaces call it**; the sidebar's two hand-rolled copies are
-gone. `components/ConnectedSections` composes it into a stack of sections.
-
-```text
-▼ SO-1303
-  │
-  ├─ Goods on SO-1303            the ACTIONABLE demand
-  │
-  ├─ ▸ Ready Stock               what is on the shelf for it
-  │
-  ╰─ ▾ Purchase order details    the READ-ONLY record
-▸ SO-1302                        the line NEVER reaches this row
-```
-
-- **The line starts under the parent.** The first elbow reaches UP through the gap above the first
-  section, so it visibly comes from the row that was opened rather than beginning in mid-air.
-- **It ends in a curve at the last section.** Every section draws its own elbow, and its own trunk to
-  the NEXT one; the last section draws no trunk, so there is structurally nothing that could run on
-  into the next record. It cannot leak — there is no line there to leak.
-- **It lands on each section's HEADING**, not on the middle of a table whose height depends on how
-  much was bought. A section states its own `connectAt`: 13px for a ruled column header, 18px for
-  the 36px disclosure handle. Both are STATED, never measured at runtime — a line that re-measures
-  is a line that moves when a table loads.
-- **It is not a nested card.** The sections keep their own ordinary table borders and frames. The
-  hierarchy is a 1px `kit-slate-6` line and an indent, which is what a tree is. Nothing wraps the
-  sections in a second large box, and no section is tinted to look disabled.
-- **Geometry, stated once:** trunk at 10px inside the expansion cell · sections indented to
-  `10 + 11 + 4 = 25px` · 10px of air between sections · 8px above the first · 12px after the last.
-- **Available to every register that grows a second section.** Manual Purchase and Purchase Orders
-  may adopt the same stack without inheriting any SO-specific column: `ConnectedSections` takes
-  `{ key, connectAt, node }` and knows nothing about purchasing.
+Use the existing shared connector primitives. The SO row connects to its goods expansion.
+An item's Ready Stock disclosure connects vertically from beneath its own arrow/cell to the
+TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its destination, moves with
+the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
+no line into the next item or SO. The active goods context has a blue boundary; the stock detail
+has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
+Other modules keep their existing business sections; do not recreate the retired three-sibling-section
+SO Batch arrangement. Use one component implementation, not page-local connector drawings.
 
 # §7 · Approved Evolution
 

@@ -1179,32 +1179,22 @@ only rows satisfying both, never a widening OR.
 **Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
 ```text
-Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
 PO Default Delivery Date
 ```
 
 `Items` shows `{first item} + {n} more`, with all items available in expansion.
 The default sort is unchanged — groups, then the Order By urgency, then SO No — and the `To buy` /
-`No purchase needed` groups stay. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date stays available in the goods
-expansion and detail. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
+`No purchase needed` groups stay. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
 pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 `orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-- **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
-  `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
-  and in the expansion, and an operator could act on none of the three. **The derivation is
-  untouched and still governs the tick:** from the quantity that genuinely requires purchasing
-  (demanded minus Ready-Stock coverage) against the quantity covered by a NON-CANCELLED purchase
-  order whose CURRENT PDF version has confirmed-sent evidence
-  (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`). `external_open`
-  never counts; supplier silence changes nothing; a numbered but unsent PO shows under `PO No`; a
-  new unsent revision invalidates older-version completeness; received lineage with valid evidence
-  refuses the tick; a fully Ready-Stock-covered order stays visible and unselectable. What the
-  word used to say, the row now says with facts: the document under `PO No`, and a checkbox that
-  is simply not offered.
+- **Status is the new-PO need, not a generic Partial/Ordered progress badge.** Use `Need PO` /
+  `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
+  nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Default Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
@@ -1256,96 +1246,39 @@ widened with the optional mapping columns 2026-08-27, and with an optional `PO N
 `Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
 actually answer, and siblings that do not ask render byte-identically).
 
-**⭐ ONE EXPANDED ROW, THREE CONNECTED SECTIONS — owner correction 2026-09-11.**
+**SO Batch approved listing and stock-selection UI — Jess, 2026-09-18 · APPROVED / NOT BUILT.**
 
-An expanded Sales Order holds exactly three sections, in this order, joined to their parent by the
-portal navigation's own connector (`docs/ui/MASTER.md` §6.9 — the same subtle curve, one drawing,
-called by both surfaces):
+The goods table is `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To`.
+No SKU, Ordered Qty, To buy, Order By or PO Safety Days column in this actionable expansion.
+Qty remains the original SO quantity. Remaining purchasing quantity is shown in the selection
+bar and the issue review, using authoritative coverage; removing columns removes no duplicate-order
+protection. A matched set remains one purchasing demand, not one tick per physical display row.
+Status uses `Need PO` / `No PO needed` for the need for a new PO, not permission to buy:
+unknown coverage and other blockers still prevent selection and state their actual reason.
 
-```text
-▼ SO-1303
-  │
-  ├─ Goods on SO-1303            ACTIONABLE demand — one tick, one destination editor per demand
-  │
-  ├─ ▸ Ready Stock               what is on the shelf for it
-  │
-  ╰─ ▾ Purchase order details    the READ-ONLY record — PO No · Unit ID · no control at all
-▸ SO-1302                        the line NEVER reaches the next Sales Order
-```
+The row-leading disclosure expands goods; it is separate from the SO No detail link.
+Ready Stock is a cell on the item row: available count on line one, reserved-for-this-line count
+on line two, and a separate disclosure button. Zero available with no saved reservation shows `0`
+and no disclosure; saved reservations remain accessible even when free availability is zero.
+Loading/failed/unknown stock never renders as zero. Its Unit table opens directly beneath this item:
+`☐ · Goods Received Date · Stock Location · Supplier · PO No / Ref No (Unit ID on line two) · Condition`.
+Use actual provenance and actual current location, not the SO supplier or expected delivery site.
+Receipt date is the physical receipt DATE only on this stock picker. Missing dates are `Not recorded`;
+do not invent time or change stored timestamps. Missing PO provenance is not a reason to invent a PO.
+Supplier-owned stock must remain distinguishable; this presentation grants no new eligibility.
 
-The connector starts beneath the parent, lands on each section's own heading, and **ends in a curve
-at the last section** — every section draws its own elbow and its own trunk to the NEXT one, and the
-last draws no trunk, so nothing can run on into the following record. The sections keep their own
-ordinary table borders; **they are not wrapped in a large nested card**, and no section is tinted to
-look disabled. Ready Stock sits BETWEEN the two tables: after the compact demand it can answer, and
-before the record, which is the section that grows without limit.
+Checkboxes edit a draft freely. `Choose Ready Unit` saves the first reservation independently of
+Issue PO. After saving, `Change selection` reopens the saved set; `Save changes` saves the replacement
+set, including removing all choices; `Cancel` restores the saved set. Pending edits cannot silently
+change procurement quantities: save or cancel before Issue PO. No per-Unit Undo/release buttons.
+Saving must atomically validate additions AND releases against current stock/line state and downstream
+locks; all or none, no second stock writer. A failure retains the draft and explains the refusal.
+These editing controls are approved targets, not a claim that current production supports replacement.
+An all-stock SO must be savable without creating a PO. Read-only Purchase order details remain separate.
 
-**THE ACTIONABLE TABLE (`GoodsMiniTable`), and why it is compact.**
-
-```text
-☑  SKU   Item / configuration   Qty  Ready Stock  Ordered Qty  To buy               Deliver To   Supplier  Category
-☑  L12…  Laveo · King · Fab 3    4        1            2         1                 ▾ + Split    Nice F…   Mattress
-☐  JAG…  Jager · SS · Fab 1      1        —           14         1                 ▾ + Split    Ohana     Bedframe
-                                                                 Already on a PO
-                                                                 Issue PO buys again
-```
-
-- **⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY — owner correction
-  2026-09-11.** The engine prints the COVERING document's quantity under `To buy` when the open-PO
-  pool covers every unit of a build (T6 — a receipt states what it bought, and `0` would answer a
-  question nobody asked). Drawing that figure on a row nobody may tick presented **a covering
-  quantity as a purchasing quantity**, under a heading that means *what is left to buy*. So the cell
-  prints its existing governed absence in every non-actionable state and the row says which state it
-  is in — `soBatchToBuyState` gives the four, and a figure appears on exactly the rows
-  `isSelectableForOrder` offers:
-  | State | `To buy` | Tick |
-  |---|---|---|
-  | verified uncovered (`fullyOnPo === false`) | the remainder | offered |
-  | covered (`fullyOnPo === true`) | `—` · `Already on a PO` · `Nothing to buy here` | none |
-  | not checked (no flag in the payload) | `—` · `Coverage not checked` | none |
-  | nothing to buy / order finished | `—` | none |
-  **No arithmetic is invented and no server number is changed.** The customer's original `Qty` and
-  the historical `Ordered Qty` are two columns away and untouched, and the documents themselves are
-  one section below — nothing is hidden, only nothing is claimed.
-- **⭐ THE COLUMN IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.** `On PO` is the
-  dictionary's head for *how many of this item an **open** purchase order already covers* — the
-  engine's pooled, netted, still-outstanding coverage. The figure this cell prints is a different
-  number: the exact `po_line_sources` lineage for the item line, which counts every **non-cancelled**
-  document, `Completed` ones included, and is never netted by what has already arrived. Printing it
-  under `On PO` said *still on order* about goods that may be in the warehouse. **`Ordered Qty` is
-  the approved word for exactly that**, already in the dictionary and already used by Manual
-  Purchase's own purchase-order lineage table for the same relationship — beside `Already On PO`,
-  the head for the effective coverage it deliberately is not. One figure, one head, the same door;
-  no second number was added to explain the first.
-- **⭐ IT IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
-  purchase order inside the cell, so a line fourteen documents touch drew a fourteen-line-tall item
-  row that filled the screen — and the same fourteen numbers were repeated underneath it. **A
-  collection of documents may never decide how tall an item row is.** The cell states the units
-  documents have ordered, and pressing it opens the details below. **Nothing is truncated to tidy
-  the screen**: every reference is still on the page, in the section that is about references. An
-  item description may wrap; a PO collection may not.
-- **Exactly one checkbox and one arrangement editor per real purchasing demand**, on the item table
-  and nowhere else. A ticked demand row carries the register's own selected fill — the selected
-  styling belongs to the compact row, never to a block that also holds history.
-- **A matched set is ONE demand across several of the customer's item lines.** It is ticked once
-  and arranged once, on the first of its lines, which names what the tick covers
-  (`With {n} more lines in this set`); its other lines are listed with their own goods and print
-  the absence in the tick column. The issue contract is unchanged — the leaf `SoBatchSelection[]`.
-- **⭐ `Covered by` IS RETIRED.** One heading answered three different questions — units drawn from
-  the shelf, documents already carrying quantity, and `Not ordered yet` — so a half-bought line
-  read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
-  front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
-  already answered · **`Ordered Qty`** how many units documents have ordered for this line ·
-  **`To buy`** the remainder this page may still act on.
-- **Identity leads.** `SKU` then the item and its recorded configuration come first, so two lines of
-  one model are told apart by the goods rather than by position. The configuration is the line's own
-  recorded variant, never re-derived from the SKU text. Exactly one column is flexible, so two
-  expansions opened together still line up column for column.
-- **No `Unit ID` column and no `PO Default Delivery Date` column here.** Both describe a DOCUMENT's goods,
-  so on the actionable table they printed an absence on every row of every unbought order — a column
-  of dashes in the width of a real answer. Both belong to the record below, where the Unit sits
-  beside the purchase order it came in on.
-- Batch Purchase owns no duplicate demand editor and no second mini-table.
+Shared appearance and connector geometry are governed only by UI MASTER §6.8–6.9; words by COPY.
+The HTML quantity dialog is NOT approved as the Issue PO workspace. §8.2 still governs formal draft
+review (50/50 from 1130px, stacked below); that preview remains unfinished in this design review.
 
 **THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
 
@@ -1432,100 +1365,14 @@ when the goods are counted rather than individually tracked · and `Not allocate
 answered for this line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
 concludes goods do not exist because a request was slow.
 
-**⭐ THE TWO QUANTITIES, TRACED — APPROVED / LOCKED, owner correction 2026-09-11.**
-
-`Qty 1 · On PO 14 · To buy 1` was reported as possible duplicate buying. It is not one situation; it
-is four, and the screen could not tell them apart. The two numbers come from different reads with
-**different scopes**, and both are correct:
-
-| | `On PO` — the goods table | `To buy` — the tick's quantity |
-|---|---|---|
-| Source | `po_line_sources` rows whose `order_line_id` is THIS item line | `computeNetRequirements` (`net-requirements.ts`) |
-| Customer attribution | **exact** — the document names this order line | **none** — a per-SKU pool |
-| Documents counted | every **non-cancelled** one, `Completed` included | only `purchase_orders.status = 'open'` lines |
-| Delivered goods | **not netted** — the quantity as recorded | **netted** — `qty − received_qty` |
-| Allocation | none; it is a record | greedy, **earliest deadline first** — another order may drain the pool first |
-| What it IS | the **historical document quantity** | the **effective remaining demand** |
-
-**IS ANOTHER PURCHASE LEGITIMATELY ALLOWED? The guard is `isSelectableForOrder`, and it reads
-lineage, never the pool.** When this order's OWN `po_line_sources` covers `qty − stockTaken` on
-purchase orders whose CURRENT version has confirmed-sent evidence, the order is `ordered` and **the
-checkbox is not offered at all** — a fourteen-document row where any document is confirmed-sent
-cannot be bought again from this page. Otherwise the tick stands, and `validateIssuePlan`
-deliberately allows it (2026-09-03): the pool has no customer attribution, so the covering document
-routinely belongs to another customer and refusing would block a FIRST purchase for this one. Four
-representative fixtures pin all four outcomes — sent · unsent · delivered · pool-covered.
-
-**⭐ `To buy` IS NOT ALWAYS A REMAINDER, AND THE ROW NOW SAYS SO.** On a build every unit of which
-was drawn from the open-PO pool (the engine's own `fullyOnPo`), the engine prints **what the
-covering document carries** under `To buy`, not `0` — the row stays buyable and a `0` would be an
-answer nobody asked for (T6). So one figure meant two opposite things: a genuine remainder, and a
-re-buy offer. It **cannot be told from the numbers** (`toBuy === onPo` is also true of a genuine
-remainder that happens to equal its coverage), so the engine's flag is carried onto the leaf and the
-cell prints **`Already on a PO`** under the figure, with the governed explanation
-`Demand is already covered by an open Purchase Order.` as its title. The figure itself is untouched:
-it is the number the tick allocates and the number `issue-batch` recomputes and refuses against, and
-a display that disagreed with its own control would be worse than the ambiguity it replaced.
-
-**⭐ WHAT ISSUING A COVERED SELECTION ACTUALLY DOES — TRACED THROUGH THE ONE DOOR, 2026-09-11.**
-
-It is **REFUSED**, and nothing is created. `POST /issue-batch` checks every selection against the
-engine's own recomputation before a single document is composed, and answers **`already_on_po`
-(422)** — naming the covering purchase order — for any build the open-PO pool fully covers (0430).
-That guard exists because production had already minted **six open purchase orders against one
-1-unit order line of SO-1340** (2026-09-04/05) when nothing downstream of the receipt refused it.
-
-Had it not refused, the act would have ADDED SUPPLY rather than changed anything: the creation path
-`purchasing_issue_pos_batch` → `purchasing_mint_po` is INSERT-only — `purchase_orders`, its
-`purchase_order_lines`, its `po_line_sources` lineage, its `ops_stock_items` Unit IDs, `po_history`,
-`audit_log` — and its only UPDATEs touch the row just minted, the `po_cost_approvals` row consumed
-and the new PO's own incoming Units. **No existing purchase order is ever amended, replaced,
-reassigned or cancelled by this door, and no existing lineage row is touched.**
-
-**THE PRODUCTION WALK THAT FOUND IT — recorded from PR #1233 (merge `9ed63009`), not re-measured
-here.** That lane walked the real page AUTHENTICATED on `fc9034c7` and reported: one demand row with
-fourteen read-only Unit records, ONE checkbox, ONE `Supplier Deliver To` editor, ONE `Split`; the parent
-holding no control; `PO No` reading `14 POs` and `PO-20260907-1874`; the footer `26 Sales Orders`;
-and `REGION` as the third compact dropdown (Klang Valley · 12, Johor · 1, Kedah · 2). **It also found
-what no fixture had: one LIVE item line carries fourteen purchase orders** — the historical
-duplicate-PO shape `already_on_po` now refuses — **and that is the shape in the owner's screenshot.**
-This MASTER records it as that walk's measurement. The layout work below was verified against
-fixtures and the rendered components, not against live rows.
-
-**THE SCREEN NOW AGREES WITH THE DOOR.** `isSelectableForBuying` states this register's contract —
-*a row that cannot become a purchase order is not offered a tick-box, because the Register refuses
-it here and the API refuses it again* — and the covered shape was the one case where the page
-offered an act the door then refused. The engine's own `fullyOnPo` rides the wire, so
-`isSelectableForOrder` closes the same gate, and the row states the refusal's own words in place of
-the figure: `To buy —` · `Already on a PO` · `Nothing to buy here`, titled with
-`purchasingRefusal("already_on_po")`. **This is not a new buying rule and it disables no workflow** —
-the workflow was already dead at the door; the operator now learns it before arranging a destination
-instead of after pressing a button.
-
-**⭐ AND UNKNOWN IS NOT YES.** `isSelectableForOrder` requires `fullyOnPo === false` — verified
-uncovered — not merely "not known to be covered". A payload without the flag cannot distinguish an
-uncovered line from one nobody checked, and reading that gap as permission is what put the tick on a
-covered row in the first place. **The carried build path always sends the boolean**
-(`purchase-demands.ts`), and a refused line carries no `toBuy`/`issueRef` and fails
-`isSelectableForBuying` anyway — so the only payload that reaches this gate without it is an older
-Worker's, during a deploy in which the Pages bundle leads the Worker. There the row states
-`Coverage not checked`, offers no tick and prints no purchasing quantity, and **the issue door's own
-refusal is untouched underneath**. The demand itself is never hidden: `Qty`, `Ready Stock` and
-`Ordered Qty` all still print.
-
-The other duplication — an order whose own lineage already covers what it required — is refused by
-the `ordered` half of `isSelectableForOrder`, and that is untouched.
-
-**`PO Status` is the column that reconciles the two scopes** — `Completed` · `Waiting for goods from supplier` ·
-`Sending not confirmed`, the same `documentState` vocabulary the Purchase Orders register prints
-(`soBatchPoDocumentState`, narrowed to the two facts this register carries). Fourteen `Completed`
-documents beside `To buy 1` and fourteen `Sending not confirmed` ones beside the same figure are
-opposite situations, and before this column a reader could not see which they were looking at.
-**`Open` is never a Purchase Order status** and the raw database value never reaches the screen.
-
-**Neither number is re-derived to make the other agree, no third arithmetic is invented, the
-customer's ordered `Qty` is never rewritten, and nothing on this page cancels or edits an existing
-purchase order.**
+**Coverage safeguards remain independent of the new display.** Exact `po_line_sources` records
+are historical lineage; the open-PO pool is effective remaining supply. Do not equate them, count
+received quantities twice, invent a third arithmetic, or change grouping/coverage allocation in this
+UI change. `fullyOnPo` must explicitly be false to authorize the pool gate; true or unknown is not
+buyable. The issue API independently recomputes and rejects already-covered quantities before any
+PO is created. Preserve existing lineage guards as well. Read-only PO details retain document
+states (`Completed`, `Waiting for goods from supplier`, `Sending not confirmed`); raw `Open` is not
+operator copy. Remaining purchasing quantities belong in selection/review, not removed goods columns.
 
 **Footer — owner correction 2026-09-11, ruling R6 2026-09-16.** The footer answers SCOPE with ONE
 total: `{n} of {total} Sales Orders`, the bare total when nothing is filtered, and `1 Sales Order`
@@ -1536,11 +1383,9 @@ business. Selection is summarised once, in the toolbar, and never repeated at th
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
-**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10/11 (migrations 0471 · 0472 · 0473).** Directly beneath
-`GoodsMiniTable`, and INDEPENDENTLY collapsible, sits `Ready Stock`: the free stock that could
-answer this Sales Order's item lines. It is a sibling SECTION, never a column and never a second
-mini-table — the goods table answers *what was ordered and what covers it*, this one answers *what
-is on the shelf for it*.
+**READY STOCK — reservation engine built; approved replacement UI above NOT BUILT.**
+The item-cell disclosure and draft/edit/save journey above govern presentation. The following
+stock eligibility and transaction safeguards remain in force.
 
 - **Reading it reserves nothing.** The read is lazy (opened rows only) and writes no row. Selecting
   a Unit still writes nothing. Only `Choose Ready Unit` writes, and its selection is entirely
@@ -1575,7 +1420,7 @@ is on the shelf for it*.
   for every new reservation and the historical ledger only for units that carry none, and the two
   sets are disjoint by Unit so nothing is counted twice.
 - **The original demand survives.** After reserving, the section states
-  `Requested N = Ready Stock n + On PO n + To purchase n` with the exact Unit IDs. The ordered
+  the original Qty, saved stock quantity and remaining purchasing quantity; the exact saved Unit IDs stay visible in the picker. The ordered
   quantity is never quietly rewritten, and choosing stock never cancels, replaces or edits an
   existing purchase order.
 - **Consignment stock is choosable and is labelled.** §7.7 already rules that reservation creates no
