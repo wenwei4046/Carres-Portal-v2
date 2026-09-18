@@ -1751,17 +1751,21 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 **Jess, 2026-09-18 · BUILT 2026-09-18 (SO Batch Purchase only) · authenticated production walk
 OWED.** SO Batch listing and stock-picker composition is the
-approved reference for shared component work.
+approved reference for shared component work. Business columns remain owned by each module MASTER;
+Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain
+editing or reservation powers implicitly, and this build gave none of them any.
 
-**Engine capabilities — BUILT 2026-09-18, all three opt-in, every other Register byte-identical:**
+**Engine capabilities — BUILT 2026-09-18, all four opt-in, every other Register byte-identical:**
 `DataGrid leadingColumns.before` lets an owner-approved page order put a column AHEAD of the
 record date and identity (§6.7 rule 2 fixes the pair's ORDER, not that they are columns one and
 two); the pair still pins alone and the named column scrolls under the block like any other fact.
 `DataGrid headerTone="paleBlue"` draws the MAIN header band in blue-2, so the neutral slate child
 tables inside an expansion read as children — it is this reference's treatment and NOT a global
 blue-header ruling. `GoodsMiniTable soBatchGoodsLayout` draws the approved seven columns, a
-page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector. Business columns remain owned by each module MASTER;
-this does not make other pages editable or give them SO Batch stock-reservation powers.
+page-drawn `Ready Stock` cell, a per-item `detailRow`, and the §6.9 connector.
+`ReadyStockTable layout="picker"` draws the approved six picker columns. **Manual Purchase's own
+§9.2 build inherits these four rather than growing a second set** — the geometry and the
+edit/save/cancel controls are the same; its business guards stay in Purchasing.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
 - Every cell has 8px left/right padding and 1px dividers. Columns use measured content widths,
@@ -1791,6 +1795,8 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
   destination word beside a fixed global icon cluster), identical on all eight Purchasing pages
   and predating this build. The Register's own grid scrolls inside its box. Reported, not taken:
   the fix is a shell typography/IA decision, not a purchasing one.**
+
+Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
 ## §6.9 · Connected expansion — BUILT 2026-09-18 for SO Batch
 
