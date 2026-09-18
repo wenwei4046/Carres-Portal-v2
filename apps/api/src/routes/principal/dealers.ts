@@ -65,12 +65,7 @@ principalDealersRouter.get("/", async (c) => {
   if (joinErr) return fail(c, joinErr);
   const chanRows = chanRes.data;
   const outletRows = outletRes.data;
-  const channelById = new Map<string, string>(
-    (chanRows ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
-  );
-  const codeById = new Map<string, string | null>(
-    (chanRows ?? []).map((r) => [r.id as string, (r.code as string | null) ?? null]),
-  );
+  const rowById = new Map((chanRows ?? []).map((r) => [r.id as string, r]));
   const outletCountById = new Map<string, number>();
   for (const o of outletRows ?? []) {
     const k = o.dealer_id as string;
@@ -92,9 +87,9 @@ principalDealersRouter.get("/", async (c) => {
     gmv: Number(d.gmv ?? 0),
     outstanding: Number(d.outstanding ?? 0),
     // Unknown id → 'dealer', matching the column's own DB default.
-    channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
+    channel: rowById.get(d.id)?.channel === "showroom" ? "showroom" : "dealer",
     outletCount: outletCountById.get(d.id) ?? 0,
-    code: codeById.get(d.id) ?? null,
+    code: (rowById.get(d.id)?.code as string | null) ?? null,
   }));
   return c.json({ dealers });
 });
