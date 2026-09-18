@@ -14,7 +14,10 @@ import DropdownMenu from "@/components/kit/DropdownMenu";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
   qk,
+  useClearFinanceException,
+  useFinanceExceptions,
   useInvoiceRegister,
+  useOpenFinanceException,
   usePaymentRegister,
   usePaymentSettings,
   useVoidPayment,
@@ -269,6 +272,17 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
   const [correcting, setCorrecting] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [sending, setSending] = useState(false);
+  // BR-7 — Finance holds the delivery when collected money cannot be found.
+  const mayHold = myRole === "finance" || myRole === "principal";
+  const [holding, setHolding] = useState<"open" | "clear" | null>(null);
+  const holdsQ = useFinanceExceptions(payment.order_id, mayHold);
+  const openHold = (holdsQ.data ?? []).find((h) => h.status === "open") ?? null;
+  const holdDone = (done: string, failed: string) => ({
+    onSuccess: () => { toast.success(done); setHolding(null); },
+    onError: (e: Error) => toast.error(`${failed} — ${e.message}`),
+  });
+  const openHoldM = useOpenFinanceException(payment.order_id, holdDone("Delivery held", "The delivery was not held"));
+  const clearHoldM = useClearFinanceException(payment.order_id, holdDone("Hold cleared", "The hold was not cleared"));
   const live = isLivePayment(payment);
   const invoiceRows = invoicesQ.data ?? [];
   const allocatedInvoiceId = (payment.payment_allocations ?? []).find((a) => a.voided_at == null && a.invoice_id)?.invoice_id
@@ -306,12 +320,16 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
       ? [{ key: "correct", label: "Correct allocation", onSelect: () => setCorrecting(true) }] : []),
     ...(mayCorrect && live
       ? [{ key: "void", label: "Void payment", onSelect: () => setVoiding(true) }] : []),
+    ...(mayHold && holdsQ.isSuccess
+      ? [{ key: "hold", label: "Hold delivery", onSelect: () => setHolding("open") }] : []),
+    ...(mayHold && openHold
+      ? [{ key: "clear-hold", label: "Clear hold", onSelect: () => setHolding("clear") }] : []),
   ];
-  const composing = correcting || voiding || sending;
+  const composing = correcting || voiding || sending || holding != null;
   return <>
     <SalesOrderTabs identity={payment.receipt_no ?? "Payment"}
       customer={payment.orders?.customer_name} backLabel="Payment Records" backTo="?"
-      onBack={(event) => { event.preventDefault(); setCorrecting(false); setVoiding(false); setSending(false); onClose(); }}
+      onBack={(event) => { event.preventDefault(); setCorrecting(false); setVoiding(false); setSending(false); setHolding(null); onClose(); }}
       status={<span data-testid="payment-record-state">{live ? "Payment recorded" : "VOIDED"}</span>}
       navigation={<span className="text-body">{payment.orders ? `SO-${payment.orders.so}` : "SO not available"}</span>}
       right={!composing ? <span className="flex items-center gap-2">
@@ -324,9 +342,23 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
     {correcting
       ? <PaymentCorrectAllocation payment={payment} onClose={() => setCorrecting(false)} />
       : voiding
-      ? <VoidPaymentForm payment={payment} pending={voidPayment.isPending}
+      ? <ReasonForm testId="payment-void-form" title="Void payment" action="Void payment"
+          sentence={`${payment.receipt_no ?? "This payment"} · ${rm(payment.amount)} will stop counting as money. The Receipt stays and is marked VOIDED.`}
+          label="Why is this payment being voided" pending={voidPayment.isPending}
           onCancel={() => setVoiding(false)}
           onConfirm={(reason) => voidPayment.mutate({ paymentId: payment.id, reason })} />
+      : holding === "open"
+      ? <ReasonForm testId="finance-hold-form" title="Hold delivery" action="Hold delivery"
+          sentence="The Delivery Order is not issued while Finance holds this delivery."
+          label="Why is Finance holding this delivery" pending={openHoldM.isPending}
+          onCancel={() => setHolding(null)}
+          onConfirm={(reason) => openHoldM.mutate({ reason })} />
+      : holding === "clear" && openHold
+      ? <ReasonForm testId="finance-clear-form" title="Clear hold" action="Clear hold"
+          sentence={`Finance is holding this delivery: ${openHold.reason}`}
+          label="What shows the money is found" pending={clearHoldM.isPending}
+          onCancel={() => setHolding(null)}
+          onConfirm={(evidence) => clearHoldM.mutate({ id: openHold.id, evidence })} />
       : sending && invoice && canSendReceipt
       ? <InvoiceSendReceipt invoice={invoice} templates={receiptTemplates}
           receiptNo={payment.receipt_no} amount={payment.amount} stillNeeded={stillNeeded ?? 0}
@@ -387,27 +419,27 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
   </>;
 }
 
-/** `Void payment` — a wrong or duplicate Payment. There is no delete and no
- *  silent amount edit: the row stays, stops being money, keeps its Receipt
- *  marked VOIDED, and carries the reason, actor and time. */
-function VoidPaymentForm({ payment, pending, onCancel, onConfirm }: {
-  payment: PaymentRegisterRow;
+/** One act that needs a written reason: `Void payment` (no delete, no silent
+ *  amount edit — the row stays, stops being money, keeps its Receipt marked
+ *  VOIDED), and Finance's `Hold delivery` / `Clear hold` (BR-7). */
+function ReasonForm({ testId, title, sentence, label, action, pending, onCancel, onConfirm }: {
+  testId: string; title: string; sentence: string; label: string; action: string;
   pending: boolean;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
 }) {
   const [reason, setReason] = useState("");
-  return <div className="flex-1 overflow-auto p-4" data-testid="payment-void-form">
-    <Facts title="Void payment">
-      <p>{payment.receipt_no ?? "This payment"} · {rm(payment.amount)} will stop counting as money. The Receipt stays and is marked VOIDED.</p>
+  return <div className="flex-1 overflow-auto p-4" data-testid={testId}>
+    <Facts title={title}>
+      <p>{sentence}</p>
       <label className="mt-2 block">
-        <span className="text-label">Why is this payment being voided</span>
+        <span className="text-label">{label}</span>
         <textarea className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body"
           rows={3} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)}
-          aria-label="Why is this payment being voided" />
+          aria-label={label} />
       </label>
       <span className="mt-3 flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>Void payment</button>
+        <button className="btn-primary" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>{action}</button>
         <button className="btn-secondary" onClick={onCancel}>Cancel</button>
       </span>
     </Facts>

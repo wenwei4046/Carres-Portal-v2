@@ -11489,3 +11489,56 @@ export function useAddCommissionAdjustment() {
     onSuccess: invalidate,
   });
 }
+
+/* ─── BR-7 — Finance holds a delivery from the Payment Record ────────────────
+ * The two doors of `/api/finance/exceptions` (0355). The server gates both to
+ * Finance and principal; clearing may issue the Delivery Order, so both
+ * refresh the whole order family.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** Every Finance exception on one order, newest first. */
+export function useFinanceExceptions(orderId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId, "finance-exceptions"] as const,
+    queryFn: () => apiFetch<SalesOrderRouteFinanceException[]>(
+      `/api/finance/exceptions/${encodeURIComponent(orderId)}`),
+    enabled,
+  });
+}
+
+/** Finance opens a hold. `reason` is required by the schema, RPC and table. */
+export function useOpenFinanceException(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { reason: string }>({
+    mutationFn: ({ reason }) => apiFetch("/api/finance/exceptions/open", {
+      method: "POST", body: JSON.stringify({ orderId, reason }),
+    }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Finance lifts one hold, with the evidence that closed it. */
+export function useClearFinanceException(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { id: string; evidence: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { id: string; evidence: string }>({
+    mutationFn: ({ id, evidence }) => apiFetch(
+      `/api/finance/exceptions/${encodeURIComponent(id)}/clear`,
+      { method: "POST", body: JSON.stringify({ evidence }) },
+    ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
