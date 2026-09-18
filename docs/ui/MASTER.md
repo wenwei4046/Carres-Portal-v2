@@ -1524,6 +1524,54 @@ facts, permissions, complete-record populations or task ownership.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
+### Standard Listing Template = SO Batch Purchase — PROPOSAL / NOT LAW (owner direction 2026-09-18)
+
+**Why the pages drifted (measured on origin/main, 2026-09-18):** the kit has the parts — `DataGrid`,
+`FilterRail`, `GoodsMiniTable`, `ConnectedSections`, `Panel` — but no listing *template*. Every page
+assembles the parts itself and adds its own CSS, so each page ends up slightly different. SO Batch
+Purchase is the best-assembled page and becomes the one template; other pages stop assembling and
+only pass their business content.
+
+**What the template fixes for every listing (taken from SO Batch Purchase):**
+
+| Part | Template rule |
+|---|---|
+| Frame | Grid in a white panel with the 8px canvas gap; header 50px; toolbar 45px; footer 32px |
+| Grid | `DataGrid` `appearance="reference"` · `palette="slate"` · `searchPresentation="responsive"` |
+| Leading columns | `leadingColumns` date + identity; both pinned ≥768px canvas, identity alone below |
+| Columns | measured `width` + `minWidth`; two-line headers via `headerLines`; nothing hidden by width |
+| Rail | `FilterRail` + `useFilterRailOpen`; overlay below 896px canvas; group state remembered |
+| Narrow canvas | overlay rail <896px, 40px rows <768px, compact selection bar <640px — moved from SO Batch's page CSS into the template |
+| Expansion | `ConnectedSections` + `GoodsMiniTable` in the shared Purchasing goods look (Purchasing §8.1) |
+| States | loading spinner in the grid; `errorState` keeps the toolbar; empty / filtered-empty sentences per COPY |
+| Footer | `{N} <Title Case plural>` · `{n} of {N} <Title Case plural>`; no quantity total |
+| Clear filters | one control via the grid's active conditions |
+
+**What each page passes (its own business content only):** columns (from its module MASTER),
+rail groups, fixed groups, sort, expansion content, footer noun, empty sentences.
+
+**Per-page changes to reach the template:**
+
+| Page | Change |
+|---|---|
+| SO Batch Purchase | Becomes the template; its page CSS moves into the kit |
+| Manual Purchase | Drop the old `PurchasingRegister.module.css` palette and its copied narrow-canvas CSS |
+| Purchase Orders | Old palette out; rail overlay by canvas (not viewport `max-md`); add `minWidth`; footer Title Case; loading and read failure inside the grid instead of replacing the page |
+| Receiving | `leadingColumns` (GRN Date · GRN No) instead of `stickyIdentity`; slate palette and responsive search; hideable rail; shared Clear filters; keep server paging |
+| Supplier Claims | `leadingColumns`; `useFilterRailOpen` instead of its own storage; slate palette; approved §9.5 columns and footer |
+| Sales Orders | Already uses the grid settings; apply the 2026-09-18 column order |
+| Purchase Returns · Repair Orders | Built on the template from the start |
+
+**Kit fixes that come with it:** `Clear filters` and sort arrows leave the retired flame colour for
+blue-11; `GoodsMiniTable` content-width, capped Item column, two-line minimum row height, 11px
+second line; the PO detail page's local blue-grey stylesheet is retired (detail pages use `Panel`).
+
+**Detail pages are a separate template:** identity header → current action → facts and goods in
+`Panel`s → History. The SO Batch listing does not decide detail pages.
+
+**Acceptance:** SO Batch Purchase and each converted page compared side by side at the same canvas
+widths; the same function must look and behave the same.
+
 ### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
 
 **Build record (SLICE 1, 2026-09-17).** Owner-approved Jess 2026-09-17. Shared `FilterRail` style C
