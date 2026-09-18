@@ -376,18 +376,16 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
               </View>
               {/* Deposit then final invoice (KL Gateway 2026-09-18): the full
                   total, the money received before this invoice, what is left. */}
-              {received_before ? (
+              {received_before ? (<>
                 <View style={styles.totalsRow}>
                   <Text style={styles.totalsLabel}>Received before this invoice</Text>
                   <Text style={styles.totalsValue}>{money(received_before)}</Text>
                 </View>
-              ) : null}
-              {received_before ? (
                 <View style={styles.grandBox}>
                   <Text style={styles.grandLabel}>BALANCE DUE</Text>
                   <Text style={styles.grandValue}>{money(Math.max(0, total - received_before))}</Text>
                 </View>
-              ) : null}
+              </>) : null}
             </View>
           </View>
 
