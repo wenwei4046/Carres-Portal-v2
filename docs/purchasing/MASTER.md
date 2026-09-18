@@ -1925,8 +1925,40 @@ are implementation evidence, not dimensions for this expanded target; remeasure 
 - `Goods Received Date`: actual GRN receipt date/time. Multiple receipts show `{n} receipt dates`
   with access to each GRN, date/time and quantity; never pick a single date to represent all receipts.
 - `GRN No`: one link or `{n} GRNs`, preserving every receipt; blank when none.
+  **🟡 DRILL-DOWN PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** `{n} GRNs` is a
+  disclosure that opens the receipts directly beneath that purchase order's row — one row per
+  receipt, `Goods Received Date · GRN No · Received Qty` — using the same count-plus-disclosure
+  interaction the approved Ready Stock cell already uses. One purchase order therefore stays ONE
+  row, and no split receipt is hidden, summarised away or lost. The approved text above already
+  requires "access to each GRN, date/time and quantity"; this names the door. A single GRN keeps
+  its direct link into Receiving and opens nothing beneath.
+  **`Received Qty` here is the drill-down's fact, not a Register column** — the quantity words keep
+  their canonical home in PO detail and Receiving, and damaged, wrong or extra goods still never
+  reduce `Pending Delivery Qty`.
+  **ONE DOOR, NEVER TWO (Architecture Law C).** `{n} receipt dates` in the `Goods Received Date`
+  cell stays a plain FACT and does not become a second button onto the same list.
+  **Falsifier:** an operator walk where the receipts are wanted without leaving the row's own
+  context and the disclosure does not provide them.
 - `PO Version`: `PO V{n}` with `PO sent to supplier · {channel} · {date}` or `Sending not confirmed`
   for the current version. Earlier evidence stays in Revisions.
+
+**⭐ WHO OWNS THE SEND, AND WHAT `Sending not confirmed` MAY CLAIM — RESOLVED FROM AUTHORITY,
+re-confirmed 2026-09-18. No new mechanism, and none is wanted.** These words already exist in §5.6
+and COPY; this paragraph records the relationship the Register must not re-invent:
+
+```
+Workspace          assigns the person — PO Duty and its dated cover, through the shared resolver
+PoIssueEvidence    the ONE shared communication area: `PO sent to supplier` records which VERSION,
+                   the real actor, the recipient, the channel and the server time
+Purchase Orders    READS that same record. It writes no second confirmation and keeps no second
+                   owner list
+```
+
+**`Sending not confirmed` states one fact and no more: the system holds no send confirmation for
+THIS version.** It does not assert that the staff member did not send — §5.6 already rules that
+missing evidence does not prove no send — and it never claims anything about the supplier, who may
+have received, read or accepted nothing regardless of the mark. A sent mark is a person's statement
+of sending, never proof of receipt.
 
 **Groups — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, wording correction Jess 2026-09-17:** display `Confirm PO sent to supplier` and `Waiting for goods from supplier` as open headings, then `Completed` and
 `Cancelled` as collapsed buttons. Classify in priority order Cancelled → Completed → Waiting for goods from supplier
@@ -1936,6 +1968,34 @@ stay Completed. Search/filters cover all groups and reveal matching collapsed gr
 Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by confirmed supplier date, falling back to original PO date, ascending;
 Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
 
+**🔴 A RETIRED LABEL IS LIVE IN THE RAIL'S ACTIVE-CONDITION CHIP — MEASURED 2026-09-18.**
+`PurchaseOrdersPage.tsx:89` carries `chipLabel: "Supplier Delivery Date changed"`, and
+`Supplier Delivery Date` is named in COPY's own retired list for this exact fact; the governed word
+is `Supplier Confirmed Delivery Date`. **Fix:** the chip and the rail row both read
+`Supplier Confirmed Delivery Date changed`. This is a dictionary repair, not a new word.
+
+**🟡 RAIL WORDING PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** These rows are
+CONDITIONS THAT NARROW THE WHOLE REGISTER — they are not a column, not a display toggle and not a
+stock date. The short forms only read correctly under the `Supplier reply` heading, and a person
+arriving at a narrowed list sees the condition without its heading. **Recommendation:** the rail
+rows carry the complete dictionary names, which already exist in this file as the active-condition
+chip text:
+
+```text
+Supplier has not confirmed the PO date
+Supplier Confirmed Delivery Date changed
+Supplier delivery date passed
+```
+
+**These three conditions OVERLAP** — a date the supplier changed can also have passed — so their
+counts may exceed the group's purchase orders and **may never be added together or presented as a
+Register total**. The footer's single total remains the only count of purchase orders.
+**Trade-off, measured:** at the governed 240px rail each complete name wraps to two or three lines,
+so the section grows from three 36px rows to roughly three 48–66px rows. The rail law already
+requires a wrapped label to take its natural height and never be truncated or hidden behind a
+tooltip, so the cost is height, not legibility. **Falsifier:** an operator walk where the wrapped
+rail pushes `Receiving`, `Supplier` and `Supplier Deliver To` below the fold on a laptop.
+
 **Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
 `Date changed`, `Date passed`, using existing current-version sent/pending predicates.
 `Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
@@ -1943,8 +2003,70 @@ Use complete supplier-date labels outside the group context, including active-co
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
-**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
+**Expansion — the CONFIRMED shared goods composition, applied. Corrected 2026-09-18 after a
+planning round invented a third shape.** SO Batch (§9.1) and Manual Purchase (§9.2) draw ONE goods
+table:
+
+```text
+☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To
+```
+
+Manual Purchase adds `PO No · PO Default Delivery Date` because one request can span several
+purchase orders. **Purchase Orders reuses that composition and changes only its business content.**
+A page does not get a new column order because a planner re-derived one; the owner set this shape
+across two pages and consistency is the point of it.
+
+**`Item` carries the SKU on its 11px second line beside the configuration, and SKU stays
+searchable** — that is the confirmed rule on both sibling pages, not a Purchase Orders idea.
+
+**No checkbox.** This is a genuine business difference, not a redesign: a purchase order is never
+bought again, the Register carries no batch action, and UI MASTER forbids inventing one on a
+read-only register.
+
+**⛔ THREE COLUMNS NEED AN OWNER DECISION BEFORE THIS PAGE IS BUILT — the planner may not settle
+them by deleting them.** On this page each would print the same value on every row of one document,
+because `documentPartitionKey` (`packages/shared/src/so-batch-purchase.ts:1088`) is
+`supplier :: destination :: category :: (Source Order for one-PO-per-order categories)`:
+
+| Column | What it would print here | The real choice |
+|---|---|---|
+| `Category` | one repeated value — the document's own category | keep it for one shared composition across the module, or drop it on this page only |
+| `Supplier` | one repeated value — the document's own supplier | same choice |
+| `Ready Stock` | the shelf, for goods that are already on order | keep, or drop on this page only — it answers a buying question and nothing here is bought |
+
+`Status` stays in the composition. Its per-line values must resolve to existing words in the build
+(`Completed` · `Waiting for goods from supplier` · `Sending not confirmed` for the document, and
+`Partly received` already exists on the rail); no new status word is admitted here.
+
+`PO No` and `PO Default Delivery Date` are NOT repeated per line on this page: they identify the
+document the operator already has open, unlike Manual Purchase where one request spans several.
+
+**⭐ THE PARENT DESTINATION MUST NOT PICK ONE OF SEVERAL — MEASURED DEFECT, 2026-09-18.**
+`purchase_order_lines.destination_id` is `Where THIS line goes` (migration `0311`; NULL means the
+line follows the document), written by `purchasing_set_line_destination` /
+`purchasing_split_line_destination`. A purchase order is born with one destination, but a line may
+be re-routed afterwards, so its lines can legitimately disagree with the document and with each
+other. The built Register parent resolves
+`po.destination_id ?? the FIRST line that has one`
+(`apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx:327`), so a split purchase
+order prints ONE destination and the rail filters on that single value.
+
+The consequence is operational, not cosmetic: half the goods are instructed to a site the row never
+names, and the PO is missing from the destination filter that should find it.
+
+**Fix (proposal):** `Supplier Deliver To` on the parent prints the one value only when every line
+agrees — lines recording no destination inherit the document's — and otherwise prints the governed
+word `Multiple`, exactly as SO Batch and Manual Purchase already do for a parent cell over several
+values. The exact line-to-destination mapping lives in the expansion, which already carries it. The
+rail's destination facet matches a purchase order when ANY of its lines goes there. Falsifier: a
+production purchase order with two distinct line destinations whose parent already prints both
+truthfully today.
+
+**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity
+totals — unchanged approved text. **🟡 OPEN QUESTION, not a correction (2026-09-18):** this footer
+is lower case while its sibling listings print `27 Sales Orders` and `{n} Manual Purchases`. A
+planning round changed it unilaterally and that change is withdrawn; whether the family uses one
+casing is the owner's to settle.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
@@ -2033,7 +2155,12 @@ Warehouse submits count                (or Operation enters goods directly)
   - last row `Cancelled GRNs`.
   One choice per group; no `Any` or `All …` rows. Rail counts, table rows and the footer
   (`Showing 1–{n} of {total}`) come from the same complete server-side filtered set, never the
-  loaded page. `Clear filters` restores the complete listing.
+  loaded page.
+  **⭐ NO DATE NEED BE CHOSEN TO SEE RECORDS (owner acceptance 2026-09-18).** Opening Receiving
+  shows every permitted GRN under server pagination; date filtering is OPTIONAL and nothing is
+  preselected. **Every rail count counts GRN RECORDS** — never units, never product quantities and
+  never outstanding work. A GRN carrying two exception types appears under both `Received with`
+  rows, so those counts OVERLAP and may never be added into a total.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
@@ -2059,6 +2186,81 @@ Warehouse submits count                (or Operation enters goods directly)
   §12.8 `Return from repair`), so `RO No` applies. The header wording is the owner's; the build
   checks it against COPY before it reaches the screen. No word stands in for a missing number. Pin `GRN Date` and `GRN No` at canvas ≥768px, `GRN No` alone
   below 768px; no column hidden by width.
+- **🔴 FIVE RETIRED WORDS ARE IN THE REGISTER'S SOURCE — SOURCE READ 2026-09-18, PRODUCTION WALK
+  NOT DONE.** Evidence type matters and the two are not the same claim. What follows is a read of
+  `apps/web/src/pages/operation/OperationReceiving.tsx` on `origin/main`: it states what the
+  committed code renders, **not** that the deployed bundle was opened and seen.
+  A signed-in walk of the live page is OWED and is the only thing that turns this into a
+  production finding. Each word already has its governed replacement written down; nothing new is
+  invented and none of these is a redesign:
+
+  | Line | On screen today | Governed word | Where it was retired |
+  |---|---|---|---|
+  | 234 | `Supplier Delivery Date` | `Supplier Confirmed Delivery Date` | COPY's retired list for this exact fact |
+  | 263 | `Goods received on` | `Goods Received Date` | the same retired list |
+  | 335 | `Deliver To` | `Supplier Deliver To` | the dictionary replaces it on these four pages |
+  | 308 | `Product` | `Items` | owner ruling 2026-09-18 (`was Product`) |
+  | 386 | the `Status` column | no status label on a normal GRN; `Cancelled` under its `GRN No` | this section's own 2026-09-17 ruling retires `Valid` and the Status column |
+
+  **🟡 The date-first pair is not applied here.** The page passes `stickyIdentity` (line 683), not
+  `leadingColumns`, and carries no `GRN Date` column at all — so the approved `GRN Date · GRN No`
+  leading pair, which the shared listing contract pins at canvas ≥768px, has nothing to pin.
+  **🟡 `PO/CO No` is one merged column** (line 283) where the approved order carries the four-way
+  source reference and `PO No` as its own column.
+
+- **🟡 THREE GAPS IN THE SHARED FIELD-WIDTH REGISTRY — measured against this page's approved
+  columns.** The registry (UI MASTER §6.8) is the right mechanism and this page must use it; these
+  three fields have no entry it can answer with:
+
+  | Field | Why the registry cannot answer it yet |
+  |---|---|
+  | `SO No / MPR No / CO No / RO No` | the registry holds a two-way `SO No / MPR No mixed reference` at 176; this page's reference is FOUR-way and longer |
+  | `Goods arrived at` | a site name, with no entry of its own; it is not `Stock Location`, which names a stock position rather than a receiving site |
+  | `Wrong Item Qty` · `Damaged Qty` · `Extra Qty` | the `Qty` role is 64, but these carry two-line headers whose first line (`Wrong Item`) is wider than 64 at 11px — the registry's own rule is that a complete two-line header plus its controls sets the minimum |
+
+  **Fix:** add the three entries to the one registry rather than guessing them on this page. The
+  registry's own law already says a field that fails validation is fixed in the shared definition.
+
+- **THE READ-ONLY GOODS EXPANSION — APPROVED (Jess, 2026-09-18).** The question this section
+  raised is settled: the Register gets one, and its column order is the owner's:
+
+  ```text
+  Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID · Items ·
+  Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+  ```
+
+  - **The source number is the first line of its cell; the actual line-bound Unit IDs sit beneath
+    it** in the same cell. Configuration sits beneath the item name. Counted goods have no Unit ID
+    and keep the governed absence — a sample identity is never copied into real data.
+  - **No `Ready Stock`, no purchasing checkbox and no reservation control.** This is the read-only
+    expansion of a SAVED GRN, not a purchasing selector. Corrections go through `Amend Receiving`.
+  - **⭐ ONE ARITHMETIC, NOT TWO (Architecture Law D).** Every per-line quantity reads the SAME fact
+    source the formal GRN document prints. The expansion never re-derives a quantity, never nets
+    one against another and never introduces a second measure of the same fact; extra goods stay
+    separate from the ordered lines exactly as they are on the paper. If the expansion and the
+    document could ever disagree, the expansion is wrong by construction.
+  - Its columns are this section's own facts, never the SO Batch buying composition — that one
+    carries `Ready Stock` and a purchasing tick, which mean nothing on a receipt.
+
+  **What this fixes:** the parent's four quantity columns are AGGREGATES across the GRN's lines
+  while `Items` prints `{first item} + {n} more`, so a row could read `Damaged Qty 1` without
+  naming which of four items it was. The mapping now sits on the row that states the total.
+
+- **🟢 THE GROUP-LOCAL HEADER RULING HAS NOTHING TO GROUP HERE, AND THAT IS CORRECT.** Receiving is
+  a flat, SERVER-PAGED register: its filters live in the rail and its scope line is
+  `Showing 1–{n} of {total}`. The shared grouped-header work must not introduce groups on this page
+  to make it match its siblings. **`Clear filters` — TWO PLACES, ONE KEPT AND ONE NOT (owner correction 2026-09-18).** The
+  distinction is not "Receiving keeps it" or "Receiving loses it", and this section may not be read
+  either way:
+
+  | Where | Ruling |
+  |---|---|
+  | A permanent button living in the rail | **Not added.** A selected facet clears by clicking it again, and a permanent control on an unfiltered rail is a dead control |
+  | The toolbar's active-condition clearing | **Kept.** While search, rail or header filters narrow the list, the active conditions show with their clearing, per the shared listing standard |
+
+  Clearing still restores the complete listing and still speaks for the complete server-filtered
+  set, never the loaded page.
+
 - **The corrected location/date words (owner correction §3):** `Supplier Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods Received Date` = the physical arrival date and time, stored as a time point with time
@@ -2649,16 +2851,25 @@ optional facts are not promoted to permanent empty columns; measure before final
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-Supplier               Reported | Supplier Claim No. | Supplier | PO No | GRN No. | Product | Variant | Qty ...
-  actual suppliers     one row per supplier claim; facts and evidence only
-PROBLEM
-  observed types       footer: matching claims · affected Units/quantity with clear scope
+Supplier               Reported | Supplier Claim No. | Supplier | Product | Variant | Qty |
+  actual suppliers       Problem | Supplier Response | Claim status | PO No | GRN No
+PROBLEM                 one row per supplier claim; facts and evidence only
+  observed types       footer: {N} Supplier Claims — no quantity total
 CLAIM STATUS
-  Open / Closed / Cancelled
+  In progress / Closed / Cancelled
 SUPPLIER RESPONSE
   Not recorded / actual recorded answer
-Clear filters
 ```
+
+**🔴 THE SKETCH ABOVE WAS STALE AND IS CORRECTED IN PLACE, 2026-09-18.** It drew
+`… | Supplier | PO No | GRN No. | Product | Variant | Qty …` — the linked documents FOURTH and
+FIFTH — twenty lines below the ruling that puts linked documents LAST. Two orders for one listing
+in one section, and the built page follows the stale one (see the source read below). The old
+drawing is deleted rather than annotated. **`Clear filters` also leaves this sketch:** it is not a
+permanent row at the bottom of the rail. A selected facet clears by clicking it again, and the ONE
+`Clear filters` lives in the toolbar's active-condition bar (`activeConditions`), exactly as the
+approved region table below already states and as the 2026-09-18 Receiving correction draws the
+same distinction.
 
 The four rail groups are Supplier, Problem, Claim status and Supplier Response; presentation follows
 UI MASTER §6.7, with no page-local typography or widths. Customer Resolution and Carres Execution
@@ -2674,6 +2885,35 @@ missing-source/reply/credit facts and source-search doors in detail and their ow
 incomplete records remain visible. No formal issue passes without verified provenance. Facet
 counts cover the complete permitted searched/filtered set under shared facet semantics, not the
 loaded page; collapsed groups do not filter.
+
+**🔴 SOURCE READ OF THE BUILT REGISTER — 2026-09-18, PRODUCTION WALK NOT DONE.** What follows is a
+read of `apps/web/src/pages/operation/OperationSupplierClaims.tsx` on `origin/main`. It states what
+the committed code renders; it is **not** a claim that the deployed page was opened and seen, and a
+signed-in walk remains owed before any of it is called a production finding.
+
+| | Committed code | Approved |
+|---|---|---|
+| 🔴 | `Supplier Claim No.` (89) leads, `Reported` (90) second | `Reported · Supplier Claim No.` — the portal-wide date-first contract |
+| 🔴 | `PO No` (92) and `GRN No.` (93) sit FOURTH and FIFTH | linked documents LAST, after `Claim status` |
+| 🔴 | neither `leadingColumns` nor `stickyIdentity` is passed | `leadingColumns {date: Reported, identity: Supplier Claim No.}`, both pinned at canvas ≥768px and the identity alone below — today nothing pins at all |
+| 🟡 | `Customer Resolution` (104) and `Carres Execution` (105) exist as hidden columns | this section says they are **not listing columns**; hidden is still admitted to the Columns chooser |
+| 🟡 | `Units on hold` (102) | the approved optional list names `Units` |
+
+The built row expansion (`SupplierClaimInspector`, 138) already matches the approved one job: a
+read-only problem and evidence inspector with `Open Claim`, no editor.
+
+**🔴 THE WIDTH CANDIDATES IN THIS SECTION PREDATE THE SHARED REGISTRY.** The region table below
+offers a date column of ≈97px and a `SC-20260916-0007` column of ≈147px. The one shared
+field-width registry (UI MASTER §6.8) answers those same two roles with **Date 118** and a
+**document number 170**. One field may not have two starting widths in two documents.
+**Fix:** this section stops carrying its own candidates and cites the registry; if the registry's
+numbers fail this page's longest real values at 200% zoom, the registry entry is what gets
+repaired — never a Supplier-Claims-only width.
+
+**🟡 `GRN No.` HERE, `GRN No` IN §9.4 — one fact, two spellings.** The approved Receiving columns
+pin `GRN Date` and `GRN No`; this section's approved defaults end with `GRN No.`. The dictionary
+owns which one it is, and both sections then print that one. It is a trailing full stop, and it is
+exactly the kind of drift the shared dictionary exists to stop.
 
 **SUPPLIER CLAIMS PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18).** The owner
 approved the complete page after two correction rounds. The Blueprint is closed; implementation
@@ -2692,7 +2932,8 @@ Orders):*
 | Search and footer | Shared responsive search, condition bar and one `Clear filters` (grid `activeConditions`). Footer `{N} Supplier Claims` · `1 Supplier Claim` · filtered `{n} of {N} Supplier Claims`. No quantity total: `qty` is the reported quantity and held Units can be fewer or zero (`supplier-claims.ts` read), so it is not an independent Unit count |
 | Rail | `useFilterRailOpen` (starts hidden and overlays below 896px canvas); group state `carres.filterRail.<rail>.<group>`. Groups: Supplier · Problem · Claim status · Supplier Response |
 | States | Loading · `No Supplier Claims yet.` · `No Supplier Claims match these filters` · `Supplier Claims could not be loaded` + `Try again` inside the grid (toolbar stays) · no access · photo read failure `Photo {n} could not be loaded · Try again` — each distinct |
-| Row expansion | One job: short read-only problem/evidence inspector (problem and note, photo thumbnails, held Units, `Open Claim`). No editor. Selection is for export only |
+| Row expansion | **One job, PER UNIT (owner confirmation 2026-09-18).** The expansion lists the claim's held Units, one row each, with `PO No + Unit ID` in ONE cell — the document number on the first line, the Unit ID beneath it, the same identity pairing the sibling Purchasing pages use. Beside them sits the compact photo/video viewer. Read-only throughout: `Open Claim` is the one door out, there is no editor, and selection is for export only. The earlier per-claim "problem/evidence inspector" description is DELETED, not kept beside this one |
+| Evidence viewer | **Compact, in the expansion (owner confirmation 2026-09-18).** It states its count, tells a video from a photo, and names a file it could not read instead of showing one fewer. The governed words already exist and are not re-invented here: `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` · `Photo {n} of {total} could not be loaded` · `Try again`. It is read-only; uploading is a separate component and stays separate (Architecture Law B) |
 | Open and return | `Supplier Claim No.` opens the full-width object (`?claim=`, kept in the URL). The object has a visible back link to Supplier Claims and `‹ i of n ›`; the claim pack has a visible Close back to the object. Returning restores filters, scroll, row and focus on its Supplier Claim No. Esc is an extra shortcut, never the only way out. Object header follows Manual Purchase's pattern until the kit gains one shared object header |
 | Cross-links | PO No opens the Purchase Orders object (`?po=`); GRN No opens the Receiving record; Units open Stock |
 

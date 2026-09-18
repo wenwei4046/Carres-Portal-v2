@@ -727,3 +727,68 @@ moved onto `actor_display_names` in the same PR; other surfaces that read `app_u
 signed-in walk of a Manual Purchase Jess approved shows her name in History.
 
 - `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
+
+## `design-system-and-register-family-disagree` — SIX MEASURED CONTRADICTIONS, opened 2026-09-18
+
+**🔴 The frozen design system and the shipped register family give different answers to six
+questions, and every listing build must choose a file.** Found while drawing the Purchase Orders
+proposal from `01-design-tokens.md` instead of from the previous mockups. None is a Purchase Orders
+decision; all six reach SO Batch, Manual Purchase, Receiving, Supplier Claims and Sales Orders.
+Each carries its recommended fix. **No token VALUE is disputed** — the scale, the ramp and the
+palette stand; what disagrees is which step a table uses, and one stale sentence.
+
+| | Value | The two answers | Fix |
+|---|---|---|---|
+| 🔴 | Register frame | Purchasing §9.1 (owner correction **2026-08-29**): "the shared Register Kit's complete light four-sided frame". `DataGrid.module.css:44` (owner correction **2026-08-31**): "the full Register has no enclosing border … never a second outside rectangle", shipping `border:none` | The 08-31 correction is two days newer and is what production draws. **Delete the 08-29 frame sentence from §9.1 in place** — a MASTER holds one truth |
+| 🔴 | Table cell x-padding | `01-design-tokens.md` §3 names **16px** "table cell x-pad"; UI MASTER §6.8 (approved 2026-09-18) and the shipped CSS use **8px** | 8 is already a step on the frozen scale, so nothing is invented. Move the "table cell x-pad" use-note from the 16 row to the 8 row, naming the 2026-09-18 approval |
+| 🟡 | Row height | `01-design-tokens.md` §7: "Rows are **40px FIXED** and content adapts to the row, never the reverse." The register family ships **38px** rows that grow for two-line content | Two components, both governed: kit `DataTable` is 40 fixed, register `DataGrid` is 38 + growth. The token row must name which component it rules instead of stating a universal law it does not have |
+| 🟡 | Button sizes | `01-design-tokens.md` §7: button-sm/md/lg = **32/40/48**. `02-components.md` Button: "Sizes. sm **24** · md **32**" | The kit component is the implementation contract. `01` records 24/32 and drops the unbuilt 48; a third size is not added to make the rows agree |
+| 🟡 | 11px header weight | The only 11px token is `label` at weight **500**; the approved register header (§9.1 R5) is 11px/**600**, and a seventh type token cannot be written by design | Recommend the header take `label`'s **500**: it already separates from the body by fill and colour, and the ramp stays at six. The alternative moves every label to 600 |
+| 🟡 | Destination label | The Purchasing UI dictionary retired the bare `Deliver To` for `Supplier Deliver To` on these four pages; the built Purchase Orders column and its rail group still read `Deliver To` | The approved §9.3 column list already carries the corrected word; the rail group takes it in the same round |
+
+**Why reported and not fixed here:** §9.1 is the surface a BUILD card is executing right now, and
+`01-design-tokens.md` is FROZEN — editing either from a Purchase Orders planning round is how one
+card silently re-cuts another's floor. **Closes when the six land in one owner-approved round.**
+
+**Falsifier:** a reading of `01-design-tokens.md` and UI MASTER §6.7–6.9 on a later `main` in which
+a listing build can answer all six from one file without choosing.
+
+## `evidence-has-an-uploader-and-no-reader` — ASK FOR A KIT COMPONENT, opened 2026-09-18
+
+**🔴 Carres uploads evidence through ONE shared component and reads it through none.** Measured on
+`origin/main` (source read; no production walk):
+
+| Half | State |
+|---|---|
+| **Upload** | 🟢 `apps/web/src/components/EvidenceUploadField.tsx` (263 lines) is the one field; `ArrivalEvidenceUploadField.tsx` (75) is a thin wrapper that imports it. It already renders each file's own preview and already tells a photo from a video — `<img>` for one, `<video>` for the other, with the file name as the accessible name |
+| **Reading saved evidence** | 🔴 **No component exists.** The governed viewer words are written and implemented NOWHERE: `Photo {n} of {total}` · `Previous photo` · `Next photo` · `Close` · `← → change photo · Esc closes` · `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` return zero hits across `apps/web/src` and `packages/shared/src` |
+
+**The uploader's preview is not a reader.** Its `previewUrl` is `URL.createObjectURL(file)` — a
+local handle on a file being uploaded, alive only for that field's life. Nothing reads evidence
+back off a saved record through a shared surface.
+
+**At least six surfaces show saved evidence, each drawing its own:** Delivery proof (`delivery
+photo`, `Signed Delivery Order`, `Logistics confirmation`) · Receiving `Signed DO photo` ·
+Receiving `Arrival evidence` (photo AND video, APPEND-ONLY) · Supplier Claims problem photos ·
+Purchase Returns handover proof · Payment proof.
+
+**PROPOSAL / NOT LAW — one kit component, and this is the ask the Constitution requires.** A
+component that does not exist may not be drawn inline "just this once", so this is a request for
+`EvidenceStrip` (working name) to join the kit, not a page design. Its contract:
+
+| Rule | Why it is not optional |
+|---|---|
+| **Named by what it is a photo OF** | already the dictionary's rule (`Signed DO photo`). A flat pile of thumbnails loses which file answers which obligation, and Delivery's review depends on exactly that |
+| **A video is never drawn as a photo** | a still frame with no play affordance and no duration is a lie about what pressing it does. The uploader already splits them; the reader must too |
+| **Per-file failure, reported upward** | `Photo {n} of {total} could not be loaded`. Delivery's approved rule is that `Accept proof` is refused while ANY file in the latest package is unreadable, so the strip must report an unreadable file to its page rather than quietly showing one fewer |
+| **A missing file and an unread file are different** | the same law as every other absence on this portal: a failed read never renders as "no photo" |
+| **Keyboard is the governed path, not a nicety** | `← → change photo · Esc closes` is already approved copy |
+| **Read-only by default** | the uploader is a separate component and stays separate. A reader that grows a Remove button becomes a second writer (Architecture Law B) |
+| **Append-only where the record says so** | Receiving's arrival evidence is append-only; the component may never offer a control its record would refuse |
+
+**Trade-off:** one more kit component to own and test, and six surfaces to migrate — against six
+hand-rolled evidence displays that already disagree about failure, video and naming.
+**Falsifier:** a reading of `apps/web/src` that finds a shared saved-evidence reader already in
+use on two or more of those six surfaces — then this is a migration, not a new component.
+**Closes when** the owner accepts or refuses the component. If accepted, its contract moves into
+`docs/ui/MASTER.md` and this entry is deleted.
