@@ -727,3 +727,28 @@ moved onto `actor_display_names` in the same PR; other surfaces that read `app_u
 signed-in walk of a Manual Purchase Jess approved shows her name in History.
 
 - `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
+
+## `design-system-and-register-family-disagree` — SIX MEASURED CONTRADICTIONS, opened 2026-09-18
+
+**🔴 The frozen design system and the shipped register family give different answers to six
+questions, and every listing build must choose a file.** Found while drawing the Purchase Orders
+proposal from `01-design-tokens.md` instead of from the previous mockups. None is a Purchase Orders
+decision; all six reach SO Batch, Manual Purchase, Receiving, Supplier Claims and Sales Orders.
+Each carries its recommended fix. **No token VALUE is disputed** — the scale, the ramp and the
+palette stand; what disagrees is which step a table uses, and one stale sentence.
+
+| | Value | The two answers | Fix |
+|---|---|---|---|
+| 🔴 | Register frame | Purchasing §9.1 (owner correction **2026-08-29**): "the shared Register Kit's complete light four-sided frame". `DataGrid.module.css:44` (owner correction **2026-08-31**): "the full Register has no enclosing border … never a second outside rectangle", shipping `border:none` | The 08-31 correction is two days newer and is what production draws. **Delete the 08-29 frame sentence from §9.1 in place** — a MASTER holds one truth |
+| 🔴 | Table cell x-padding | `01-design-tokens.md` §3 names **16px** "table cell x-pad"; UI MASTER §6.8 (approved 2026-09-18) and the shipped CSS use **8px** | 8 is already a step on the frozen scale, so nothing is invented. Move the "table cell x-pad" use-note from the 16 row to the 8 row, naming the 2026-09-18 approval |
+| 🟡 | Row height | `01-design-tokens.md` §7: "Rows are **40px FIXED** and content adapts to the row, never the reverse." The register family ships **38px** rows that grow for two-line content | Two components, both governed: kit `DataTable` is 40 fixed, register `DataGrid` is 38 + growth. The token row must name which component it rules instead of stating a universal law it does not have |
+| 🟡 | Button sizes | `01-design-tokens.md` §7: button-sm/md/lg = **32/40/48**. `02-components.md` Button: "Sizes. sm **24** · md **32**" | The kit component is the implementation contract. `01` records 24/32 and drops the unbuilt 48; a third size is not added to make the rows agree |
+| 🟡 | 11px header weight | The only 11px token is `label` at weight **500**; the approved register header (§9.1 R5) is 11px/**600**, and a seventh type token cannot be written by design | Recommend the header take `label`'s **500**: it already separates from the body by fill and colour, and the ramp stays at six. The alternative moves every label to 600 |
+| 🟡 | Destination label | The Purchasing UI dictionary retired the bare `Deliver To` for `Supplier Deliver To` on these four pages; the built Purchase Orders column and its rail group still read `Deliver To` | The approved §9.3 column list already carries the corrected word; the rail group takes it in the same round |
+
+**Why reported and not fixed here:** §9.1 is the surface a BUILD card is executing right now, and
+`01-design-tokens.md` is FROZEN — editing either from a Purchase Orders planning round is how one
+card silently re-cuts another's floor. **Closes when the six land in one owner-approved round.**
+
+**Falsifier:** a reading of `01-design-tokens.md` and UI MASTER §6.7–6.9 on a later `main` in which
+a listing build can answer all six from one file without choosing.

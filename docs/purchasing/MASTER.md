@@ -1943,8 +1943,53 @@ Use complete supplier-date labels outside the group context, including active-co
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
-**Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
+**Expansion — ALIGNMENT PROPOSAL / NOT LAW (2026-09-18, awaiting owner approval).** Read-only
+ordered goods, in the approved SO Batch / Manual Purchase grammar for the facts they share:
+
+```text
+Qty · Item · Supplier Deliver To
+```
+
+- **`SKU` leaves the table and stays searchable**, printing as the 11px second line inside `Item`
+  beside the recorded configuration — the same two-line identity the approved sibling pages use.
+- **No `Category` column, and the reason is measured.** `documentPartitionKey`
+  (`packages/shared/src/so-batch-purchase.ts:1088`) is
+  `supplier :: destination :: category :: (Source Order for one-PO-per-order categories)`, so every
+  line of one purchase order carries the SAME category. The column would print one repeated value
+  down the whole expansion.
+- **No `Status`, no checkbox, no `Ready Stock`.** A purchase order line has no independent buying
+  state — the document's state is its Register group and `PO Version`; a PO is never bought again,
+  so there is nothing to tick; and the shelf answers nothing about goods already ordered.
+- **No `Unit ID` here, although this page is where Unit IDs are born (§6.2, migration 0443).** One
+  row is one PO LINE, and a line of `Qty 3` carries three Units — printing them would return the
+  row-height defect §9.1 removed. The exact Units stay on the PO object's goods lines and on the
+  official PDF. Falsifier: an operator walk showing Unit IDs are needed before the PO is opened.
+
+**⭐ THE PARENT DESTINATION MUST NOT PICK ONE OF SEVERAL — MEASURED DEFECT, 2026-09-18.**
+`purchase_order_lines.destination_id` is `Where THIS line goes` (migration `0311`; NULL means the
+line follows the document), written by `purchasing_set_line_destination` /
+`purchasing_split_line_destination`. A purchase order is born with one destination, but a line may
+be re-routed afterwards, so its lines can legitimately disagree with the document and with each
+other. The built Register parent resolves
+`po.destination_id ?? the FIRST line that has one`
+(`apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx:327`), so a split purchase
+order prints ONE destination and the rail filters on that single value.
+
+The consequence is operational, not cosmetic: half the goods are instructed to a site the row never
+names, and the PO is missing from the destination filter that should find it.
+
+**Fix (proposal):** `Supplier Deliver To` on the parent prints the one value only when every line
+agrees — lines recording no destination inherit the document's — and otherwise prints the governed
+word `Multiple`, exactly as SO Batch and Manual Purchase already do for a parent cell over several
+values. The exact line-to-destination mapping lives in the expansion, which already carries it. The
+rail's destination facet matches a purchase order when ANY of its lines goes there. Falsifier: a
+production purchase order with two distinct line destinations whose parent already prints both
+truthfully today.
+
+**Footer:** `{n} Purchase Orders` / `{n} of {m} Purchase Orders` / `1 Purchase Order`; no quantity
+totals. **Corrected 2026-09-18:** the built footer prints lower-case `purchase orders` while its
+sibling listings print `27 Sales Orders` and `{n} Manual Purchases`. One listing family may not
+carry two casings for its own record noun.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
 pending. Removing their listing columns does not remove evidence, validation or workflow guards.
