@@ -1975,6 +1975,39 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
+**Listing UI acceptance — Jess, 2026-09-18 · APPROVED · BUILT 2026-09-18, PRODUCTION VERIFICATION
+OWED.** The Receiving Register proposal is accepted and implemented in
+[PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
+This approval concerns the Register and its read-only goods expansion, not replacement of the
+formal GRN object/receiving engine. Default entry shows all permitted GRNs with server pagination;
+date filtering is optional. Date and exception counts count GRNs, not units or unfinished work.
+No normal Status column is added; PO Partial/Completed progress is not a GRN document state.
+The approved goods expansion is `Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty`.
+Use actual line-linked identity with source number above Unit IDs; preserve quantity-managed and
+extra-goods distinctions. Receiving remains ungrouped with a sticky header. Use shared heading
+icons and dimensions; no permanent bottom-rail Clear filters control. Full date and pagination
+behaviour below remains authoritative; abbreviated sample data is not a new rule.
+
+**BUILT 2026-09-18 — what is implemented, and what is still owed.** The register now draws the
+approved sixteen-column, date-first listing with `GRN Date` and `GRN No` pinned at a canvas
+≥768px (`leadingColumns`), the six rail groups, and the read-only goods expansion through the
+shared `GoodsMiniTable`. The five retired words measured on this page — `Supplier Delivery Date`,
+`Goods received on`, `Deliver To`, `Product` and the `Status` column — are gone, and the merged
+`PO/CO No` column is replaced by the four-way source reference plus `PO No`. Shared widths come
+from ONE registry in code (`apps/web/src/components/register/register-field-widths.ts`), which
+carries UI MASTER §6.8's approved values plus the four Receiving fields it could not answer.
+**Production verification is OWED** — deployed SHA, an authenticated walk and the
+1440/1180/820/390 · keyboard · 200% zoom pass. BUILT is not PRODUCTION-VERIFIED.
+
+**🟡 `CO No` HAS NO DOCUMENT TO NAME TODAY — measured 2026-09-18.** A consignment order is a FLAG
+on the purchase order (`purchase_orders.is_consignment`), not a separately numbered document, and
+§9.9 Consignment Orders is not built. The source column therefore prints the SO and MPR references
+a receipt genuinely carries, an arrival source's own number (`RO-…` for a repair return) where
+there is one, and stays blank where a CO number does not exist. **No word and no other document
+stands in for it.** When §9.9 mints CO numbers they join the same server-side reference list and
+this listing needs no change. **Falsifier:** a consignment receipt in production that already
+carries a distinct CO number this reader does not print.
+
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
 **State: PRODUCTION-VERIFIED 2026-09-06 — migrations 0425/0426/0427 APPLIED (tracker
@@ -2031,9 +2064,12 @@ Warehouse submits count                (or Operation enters goods directly)
   - `Goods arrived at` — the receiving locations present.
   - `Supplier` — the suppliers present.
   - last row `Cancelled GRNs`.
-  One choice per group; no `Any` or `All …` rows. Rail counts, table rows and the footer
-  (`Showing 1–{n} of {total}`) come from the same complete server-side filtered set, never the
-  loaded page. `Clear filters` restores the complete listing.
+  One choice per group; no `Any` or `All …` rows; pressing the chosen row again clears it. Rail
+  counts, table rows and the footer (`Showing 1–{n} of {total}`) come from the same complete
+  server-side filtered set, never the loaded page. **There is NO permanent `Clear filters` button
+  at the foot of the rail (owner correction 2026-09-18)** — the toolbar's active-condition chips
+  name what is on and clear it, one condition at a time or all of them. The earlier reading that
+  this removal was a Purchase Orders correction only is superseded.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered

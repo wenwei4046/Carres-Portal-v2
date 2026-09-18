@@ -563,6 +563,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
     /** `receipt id` → `po_line_id` → the Unit IDs THIS receiving answered. */
     const unitsByReceiptLine = new Map<string, Map<string, string[]>>();
+    /* A FAILED read is not an empty answer. When the Units could not be read
+       the register says so on the cell instead of printing `Counted stock`
+       over goods that are individually tracked (COPY-STANDARD). */
+    let unitReadFailed = false;
     if (view.pageIds.length > 0) {
       try {
         const results = await readByIds<{
@@ -609,6 +613,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         }
       } catch (e) {
         console.error("reading receiving unit results failed (non-fatal):", e);
+        unitReadFailed = true;
       }
     }
 
@@ -679,9 +684,12 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
               ...lines.flatMap((l) => refsByLine.get(l.id) ?? []),
             ]),
           ],
-          unit_ids_by_line: Object.fromEntries(
-            unitsByReceiptLine.get(r.id as string) ?? new Map<string, string[]>(),
-          ),
+          unit_ids_by_line: unitReadFailed
+            ? null
+            : Object.fromEntries(
+                unitsByReceiptLine.get(r.id as string) ??
+                  new Map<string, string[]>(),
+              ),
           submitted_by_name: r.submitted_by
             ? (userNames.get(r.submitted_by as string) ?? null)
             : null,

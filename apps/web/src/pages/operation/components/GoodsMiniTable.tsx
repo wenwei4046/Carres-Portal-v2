@@ -51,6 +51,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import type { ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -164,6 +165,49 @@ const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width
 const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
+/**
+ * ⭐ THE RECEIVING COMPOSITION — approved 2026-09-18 (Purchasing §9.4, CARD 12).
+ *
+ * ```
+ * Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID ·
+ * Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+ * ```
+ *
+ * A saved GRN is READ, never bought from: this layout carries no checkbox, no
+ * `Ready Stock` and no purchasing tick, because none of them means anything on
+ * a receipt. It is the same BOX every other caller draws — one implementation,
+ * per law ① above — asked for different columns, and every page that passes
+ * nothing renders byte-identically to what it rendered before.
+ *
+ * Widths come from the ONE shared registry (UI MASTER §6.8), never from a
+ * number typed here.
+ */
+const SOURCE_UNIT_COLUMN = {
+  key: "sourceUnit",
+  label: "PO No / Ref No",
+  width: REGISTER_FIELD_WIDTH.sourceAndUnitId,
+} as const;
+const RECEIVED_QTY_COLUMN = {
+  key: "receivedQty",
+  label: "Received Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const DAMAGED_QTY_COLUMN = {
+  key: "damagedQty",
+  label: "Damaged Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const WRONG_QTY_COLUMN = {
+  key: "wrongItemQty",
+  label: "Wrong Item Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const EXTRA_QTY_COLUMN = {
+  key: "extraQty",
+  label: "Extra Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+
 const SELECT_WIDTH = 36;
 
 /**
@@ -242,6 +286,22 @@ export interface GoodsMiniLine {
   /** The configuration facts that identify the exact goods, already joined. */
   itemDetail?: string;
   /**
+   * ⭐ RECEIVING (§9.4) — read only when the table is asked for that layout.
+   *
+   * `sourceNo` is the document this received line belongs to and it prints on
+   * the cell's FIRST line, with `unitIds` beneath it: the number the operator
+   * is looking for leads, and the exact Units it landed as follow. A counted
+   * (quantity-managed) line has no Unit IDs at all and says so — its register
+   * row carries a technical key, which is not an identity.
+   */
+  sourceNo?: string;
+  sourceNoAbsence?: string;
+  /** The receipt's own five quantity words, per line. */
+  receivedQty?: number | null;
+  damagedQty?: number | null;
+  wrongItemQty?: number | null;
+  extraQty?: number | null;
+  /**
    * FALSE = nothing can be bought for this line (a Service). It prints `—` in
    * the ☑ cell and select-all skips it. Ignored when the page passes no
    * `selection` at all.
@@ -270,6 +330,33 @@ function Absence({ children }: { children: ReactNode }) {
       {children}
     </span>
   );
+}
+
+/**
+ * A receipt quantity, per line. A quantity a line does not carry is an
+ * ABSENCE, not a zero: an extra-goods row never "received 0", it simply has
+ * no received quantity, and an ordered line has no extra quantity. The colours
+ * are the register's own — damage and wrong items read red, extra goods amber
+ * — and they never change the arithmetic (damaged/wrong/extra never reduce
+ * `Pending Delivery Qty`).
+ */
+function ReceiptQty({
+  value,
+  tone,
+}: {
+  value: number | null | undefined;
+  tone?: "issue" | "extra";
+}) {
+  if (value == null) return <Absence>—</Absence>;
+  const ink =
+    value > 0 && tone === "issue"
+      ? "text-kit-red-11"
+      : value > 0 && tone === "extra"
+        ? "text-kit-amber-11"
+        : value > 0
+          ? "text-base-900"
+          : "text-kit-slate-11";
+  return <span className={`tabular-nums ${ink}`}>{value}</span>;
 }
 
 /**
@@ -341,6 +428,8 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   showCategory = true,
+  receivingLayout = false,
+  deliverToHeading,
   itemHeading,
   onPoClick,
   onOpenPoDetails,
@@ -422,6 +511,20 @@ export default function GoodsMiniTable({
    * and names the item column for what it shows. Every other caller keeps both.
    */
   showCategory?: boolean;
+  /**
+   * ⭐ RECEIVING'S READ-ONLY GOODS EXPANSION — approved 2026-09-18 (§9.4).
+   *
+   * The saved GRN's own per-line truth, in the owner's order, with the source
+   * number above its line-bound Unit IDs. It carries no checkbox, no
+   * `Ready Stock` and no reservation control: nothing on a receipt is bought.
+   */
+  receivingLayout?: boolean;
+  /**
+   * The destination column's heading. The Purchasing dictionary retired the
+   * bare `Deliver To` for `Supplier Deliver To` on these four pages; a page
+   * that has not migrated passes nothing and keeps the built label.
+   */
+  deliverToHeading?: string;
   itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
@@ -457,8 +560,26 @@ export default function GoodsMiniTable({
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
+    sourceUnit: { ...SOURCE_UNIT_COLUMN },
+    receivedQty: { ...RECEIVED_QTY_COLUMN },
+    damagedQty: { ...DAMAGED_QTY_COLUMN },
+    wrongItemQty: { ...WRONG_QTY_COLUMN },
+    extraQty: { ...EXTRA_QTY_COLUMN },
   };
-  const order = salesOrderLayout
+  if (deliverToHeading) REGISTRY.deliverTo!.label = deliverToHeading;
+  const order = receivingLayout
+    ? [
+        "category",
+        "supplier",
+        "deliverTo",
+        "sourceUnit",
+        "item",
+        "receivedQty",
+        "damagedQty",
+        "wrongItemQty",
+        "extraQty",
+      ]
+    : salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
@@ -466,7 +587,15 @@ export default function GoodsMiniTable({
   const asked: Record<string, boolean> = {
     unit: showUnitId,
     category: showCategory,
-    supplier: showSupplier,
+    // The receipt columns exist only in the Receiving layout; the shared
+    // `supplier` flag is not re-used for it, because a receipt always names
+    // its supplier and the buying page's flag means something else.
+    sourceUnit: receivingLayout,
+    receivedQty: receivingLayout,
+    damagedQty: receivingLayout,
+    wrongItemQty: receivingLayout,
+    extraQty: receivingLayout,
+    supplier: showSupplier || receivingLayout,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
     fromStock: showFromStock,
@@ -675,6 +804,39 @@ export default function GoodsMiniTable({
                   ) : (
                     <Absence>{line.poNoAbsence ?? "—"}</Absence>
                   );
+                case "sourceUnit":
+                  /* THE SOURCE NUMBER LEADS, the exact Units follow beneath
+                     it (owner correction 2026-09-18). A counted line has no
+                     Unit IDs to name and says so instead of printing a
+                     technical register key as if it were an identity. */
+                  return (
+                    <>
+                      {line.sourceNo ? (
+                        <div className="font-medium">{line.sourceNo}</div>
+                      ) : (
+                        <Absence>{line.sourceNoAbsence ?? "—"}</Absence>
+                      )}
+                      {line.unitIds.length ? (
+                        line.unitIds.map((id) => (
+                          <div key={id} className="text-meta text-kit-slate-11">
+                            {id}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-meta">
+                          <Absence>{line.unitAbsence}</Absence>
+                        </div>
+                      )}
+                    </>
+                  );
+                case "receivedQty":
+                  return <ReceiptQty value={line.receivedQty} />;
+                case "damagedQty":
+                  return <ReceiptQty value={line.damagedQty} tone="issue" />;
+                case "wrongItemQty":
+                  return <ReceiptQty value={line.wrongItemQty} tone="issue" />;
+                case "extraQty":
+                  return <ReceiptQty value={line.extraQty} tone="extra" />;
                 case "poDeliveryDate":
                   return line.poDeliveryDate ? (
                     line.poDeliveryDate

@@ -372,6 +372,101 @@ export function FilterRailRow({
 }
 
 /**
+ * ── A RAIL ROW THAT CAN OPEN, WITHOUT FILTERING — owner ruling 2026-09-17 ───
+ * (Receiving's `GRN date` group, Purchasing MASTER §9.4.)
+ *
+ * ```
+ *   ▸  14 – 20 Sep                                                        7
+ *      └ pressing the LABEL filters the register by that week
+ *        pressing the ARROW only shows its days — it filters NOTHING
+ * ```
+ *
+ * The two jobs are two controls, because one control doing both is how a
+ * person loses a filter they meant to keep: an operator opening a week to see
+ * which day carried the GRNs would otherwise silently narrow the whole
+ * register to that week. Both are real buttons, both reachable by keyboard,
+ * and the arrow states what it is doing through `aria-expanded`.
+ *
+ * It is the `FilterRailRow` geometry unchanged — 36px minimum, wrapping label,
+ * right-aligned count, the same selected treatment — with the disclosure in
+ * front of it. A group that has nothing to open passes no `children` and gets
+ * an ordinary row.
+ */
+export function FilterRailExpandableRow({
+  label,
+  count,
+  active,
+  onClick,
+  testId,
+  expandLabel,
+  children,
+}: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+  testId: string;
+  /** The arrow's accessible name — `Show the days in 14 – 20 Sep`. */
+  expandLabel: string;
+  /** The rows revealed beneath. Absent = no arrow is drawn. */
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  useReportChosen(active ? label : null);
+  return (
+    <div>
+      <div className="relative flex items-start">
+        {active && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+          />
+        )}
+        {children ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            aria-label={expandLabel}
+            title={expandLabel}
+            data-testid={`${testId}-expand`}
+            onClick={() => setOpen((v) => !v)}
+            className="mt-[9px] grid h-[18px] w-4 shrink-0 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9"
+          >
+            <Icon name={open ? "expand" : "forward"} size={14} />
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" aria-hidden />
+        )}
+        <button
+          type="button"
+          onClick={onClick}
+          aria-pressed={active}
+          data-testid={testId}
+          className={[
+            "flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
+            active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3",
+          ].join(" ")}
+        >
+          <span className="min-w-0 flex-1 break-words">{label}</span>
+          {count != null && (
+            <span className="shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11">
+              {count}
+            </span>
+          )}
+        </button>
+      </div>
+      {children && (
+        <div id={bodyId} hidden={!open} className="ml-4 flex flex-col gap-0.5">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * ── THE COMPACT FACT DROPDOWN — owner ruling 2026-09-11 ─────────────────────
  *
  * A rail SECTION whose facts are a long, open-ended list collapses into one

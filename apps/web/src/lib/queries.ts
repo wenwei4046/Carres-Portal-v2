@@ -13,6 +13,7 @@ import {
   type AttachDoInput,
   type AwaitingStockShortageResponse,
   type DeliveryHandoverKind,
+  type GrnReceivedWith,
   type HandoverGoodsLine,
   type RecordHandoverInput,
   type DeliveryProofReviewRow,
@@ -3981,9 +3982,21 @@ export interface WarehouseReceiptQueueRow {
   /** The linked PO's governed `Supplier Delivery Date` (ISO) — the ONE reply
    *  arithmetic (`poSupplierDeliveryDateOf`), resolved server-side. */
   supplier_delivery_date?: string | null;
-  /** The Product cell's words — the GRN paper's own line description
+  /** The `Items` cell's words — the GRN paper's own line description
    *  (`product_skus.variant`, else the SKU), distinct, server-resolved. */
   product_labels?: string[];
+  /** `GRN Date` — when `Save Receiving` CREATED this document. It is never
+   *  inferred from `Goods Received Date`, which is the physical arrival. */
+  grn_date?: string | null;
+  /** The receipt's ACTUAL linked documents — `SO No / MPR No / CO No / RO No`
+   *  (owner ruling 2026-09-18). Empty when it genuinely has none; no word and
+   *  no other document ever stands in for a missing number. */
+  source_refs?: string[];
+  /** `po_line_id` → the Unit IDs THIS receiving answered for that line. A
+   *  quantity-managed line has no entry (its register row carries a technical
+   *  key, which is not an identity); `null` means the read FAILED and the
+   *  cell must say so rather than claim counted stock. */
+  unit_ids_by_line?: Record<string, string[]> | null;
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4281,8 +4294,14 @@ export interface GrnRegisterFilters {
   category: string | null;
   supplier: string | null;
   site: string | null;
-  /** The rail Calendar's picked `Supplier Delivery Date` (ISO). */
-  expected: string | null;
+  /** The rail's `Received with` row (owner ruling 2026-09-17). */
+  receivedWith: GrnReceivedWith | null;
+  /** The `GRN date` pick as one INCLUSIVE range — a day, a week, a month and
+   *  `Choose dates…` all arrive here as the same two facts. */
+  from: string | null;
+  to: string | null;
+  /** `Cancelled GRNs` — the rail's last row. */
+  cancelled: boolean;
   q: string;
 }
 export interface GrnRegisterResponse {
@@ -4292,7 +4311,16 @@ export interface GrnRegisterResponse {
     category: Record<string, number>;
     supplier: Record<string, number>;
     site: Record<string, number>;
+    /** GRN creation days, ISO → count; the rail folds them into weeks and
+     *  months, so a week's number is the whole filtered set's truth. */
+    grnDate: Record<string, number>;
+    /** OVERLAPPING by construction — never added into a total. */
+    receivedWith: Record<GrnReceivedWith, number>;
+    cancelled: number;
   };
+  /** The expansion's item words and governed categories, per SKU on this
+   *  page — the same two facts the official GRN document prints. */
+  line_info?: Record<string, { description: string | null; category: string }>;
   counts: { waiting: number };
 }
 
@@ -4312,10 +4340,16 @@ export function useOperationGrnRegister(
   if (filters.category) params.set("category", filters.category);
   if (filters.supplier) params.set("supplier", filters.supplier);
   if (filters.site) params.set("site", filters.site);
-  if (filters.expected) params.set("expected", filters.expected);
+  if (filters.receivedWith) params.set("receivedWith", filters.receivedWith);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (filters.cancelled) params.set("cancelled", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return useQuery({
-    queryKey: qk.operation.grnRegister({ ...filters }),
+    queryKey: qk.operation.grnRegister({
+      ...filters,
+      cancelled: filters.cancelled ? "1" : null,
+    }),
     queryFn: () =>
       apiFetch<GrnRegisterResponse>(
         `/api/operation/warehouse-receipts?${params.toString()}`,
