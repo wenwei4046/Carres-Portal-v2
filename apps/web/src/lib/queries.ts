@@ -11538,6 +11538,8 @@ export function useClearFinanceException(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId] });
+      // Clearing the last hold can issue the Delivery Order.
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
