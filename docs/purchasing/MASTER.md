@@ -257,20 +257,15 @@ purchase links the actual Case, an `Internal Staff Purchase` names the real staf
 emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. **A Manual Purchase has NO visible document number — owner correction
-2026-09-04 (Card 08); PRODUCTION-VERIFIED on `bc96a1e3`/`23ab3121` 2026-09-04** (0424
-applied through the governed path after the compatible app deployed; walked
-authenticated as `operation@`: a new Manual Purchase was created with `req_no NULL`,
-no number shown or announced anywhere, `—` in its PO No cell, business-fact object
-heading, and the two historical rows keeping their stored `MPR-…` values untouched).
-It is an internal way to prepare and approve a purchase, not a
-second supplier document: before `Issue PO` nothing shows, and after it the only visible
-purchasing document identity is the actual `PO No` (`PO-YYYYMMDD-RRRR`, the same formal
-document both buying doors produce). The canonical invisible identity is
-`purchase_requests.id`; migration 0424 retires the MPR allocator default and lets new
-rows carry a null `req_no`. Historical `REQ-####` / `MPR-YYYYMMDD-RRRR` values stay
-stored unchanged as legacy compatibility data — never displayed, never renumbered, and
-no operator-facing surface may consume them.
+vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (Jess, 2026-09-18);
+overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
+(`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
+reused. It names the request, not a supplier document: the supplier still receives only the PO
+(`PO-YYYYMMDD-RRRR`), and one request may become several POs. Consignment Orders, Repair Orders and
+other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
+`MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
+the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
+used — it is the Mattress Protector SKU code.
 **Approval — APPROVED / LOCKED (Jess, 2026-09-16); BUILT in Manual Purchase Round 2, migration
 0522.** Every Manual Purchase requires approval, whatever its purpose or amount; no purpose or
 amount bypass exists. `purchasing_create_request` always stores `approval_required = true` and no
@@ -550,7 +545,7 @@ permanent and are NOT renumbered.**
 | Prefix | Document |
 |---|---|
 | `PO` | Purchase Order |
-| `MPR` | Manual Purchase Request (purchases not from a Sales Order) |
+| `MPR` | Manual Purchase Request |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
 | `PRTN` | Purchase Return |
@@ -561,8 +556,8 @@ permanent and are NOT renumbered.**
 | `CSN` | Consignment Sale Notice |
 
 Internal records still use invisible permanent technical IDs. `MPR` is the Manual Purchase Request
-number (owner ruling 2026-09-18, reinstated after the 2026-09-04 retirement): every purchase not from a
-Sales Order carries one. Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable.
+number (owner ruling 2026-09-18, reinstated after the 2026-09-04 retirement): each Manual Purchase
+request has one; CO, RO and other documents keep their own numbers. Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable.
 
 ### 6.2 Unit ID
 
@@ -1758,9 +1753,8 @@ Supplier Deliver To · PO No · PO Default Delivery Date
 ```
 
 **Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
-the 2026-09-04 MPR retirement.** Every purchase that does not come from a Sales Order is a Manual
-Purchase Request and carries its own number `MPR-YYYYMMDD-RRRR` (§6.1), allocated when the request
-is created, permanent and never reused. `MPR` = Manual Purchase Request: it is requested and
+the 2026-09-04 MPR retirement.** Each Manual Purchase request has its own number `MPR-YYYYMMDD-RRRR`
+(§6.1), allocated when the request is created, permanent and never reused. `MPR` = Manual Purchase Request: it is requested and
 approved before it becomes one or more POs. `MP` is not used — it is already the Mattress Protector
 SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` values stay searchable.
 `MPR No` and `Proceed Date` pin at canvas ≥768px, `MPR No` alone below; `MPR No` opens the request.

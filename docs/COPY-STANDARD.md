@@ -1207,7 +1207,7 @@ connector line.
 | The states | `Waiting for approval` · `Sent back for changes` · `Withdrawn` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
 | The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
 | Retired purpose words — history only, never offered, never relabelled | `Display` · `Warranty` · `Office` · `Spare Parts` — a pre-ruling row keeps printing the word it was actually asked as; the doors refuse these values for a new request |
-| The document identity — owner correction 2026-09-04 (Card 08) | A Manual Purchase has NO visible document number: before `Issue PO` nothing shows; after it, only the actual `PO-YYYYMMDD-RRRR`. `MPR`, `MPR-…`, `Manual Purchase No`, `Request No` and `Draft PO` are banned words on every screen, message, export, browser title, Work action, PO source, PDF and Principal Audit presentation. Stored historical `MPR-…`/`REQ-…` values stay in the database untouched; a presentation surface translates them to `Manual Purchase`. |
+| The document identity — owner ruling 2026-09-18 (overwrites Card 08, 2026-09-04) | Each Manual Purchase request shows its `MPR No` (`MPR-YYYYMMDD-RRRR`); the supplier still receives only the PO. `Manual Purchase No`, `Request No`, `Draft PO` and `MP` stay banned. Historical `MPR-…` numbers show as they are; `REQ-…` stays searchable. |
 | Manual PO grouping | `Issue {p} PO(s)` counts Supplier × Category × Deliver To × Purpose × Delivery Date. Different Delivery Dates create different POs; each PO keeps that approved `PO Default Delivery Date`. |
 | The register's empty state | `No Manual Purchase yet.` |
 | The Object Detail sections — Card 05 (2026-08-29), exactly and in this order | `Request` · `Items Requested` · `What We Already Have` · `Approval` · `Purchase Orders` · `History` — one full-width scroll; no tabs, no split preview |
@@ -1848,7 +1848,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
 | `SO No / MPR No / CO No` | PO combined-reference header; actual linked references only, not invented mandatory relationships. |
 | `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
-| `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): every purchase not from a Sales Order. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
+| `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 
 Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date`, `Goods received on`.
