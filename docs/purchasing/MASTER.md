@@ -915,13 +915,17 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   a ticked row a link takes slate-12 ink with its underline, because blue-11 on blue-3 measured
   4.25:1.
 - **R6 · Footer** — one total: `27 Sales Orders` · `5 of 27 Sales Orders` · `1 Sales Order`.
-- **R7 · Widths.** A column's default width is its content; its minimum is the complete two-line
-  header plus its controls. Measured in the rendered portal (Inter): header chrome is 46px beyond the
-  header text; a cross-year date is 99px, so date columns are 120; `No delivery date yet` is 124px,
-  so Requested Delivery Date is 144; `PO-20260930-4827` is 127px, so PO No is 144. No quantity column
-  exists on this parent table, so no 88px value was adopted. Customer, Supplier, Delivery Location
-  and Deliver To never ellipsise: a long value takes an inline second line, so the full value is
-  readable by keyboard and touch with no hover title.
+- **R7 · Widths — the number lives in ONE registry (owner instruction 2026-09-18).** A column's
+  default width is its content; its minimum is the complete two-line header plus its controls. **The
+  width itself is [UI MASTER §6.8's shared field registry](../ui/MASTER.md), not this section's:**
+  a page MASTER that carries its own number for a registry field becomes a second authority, and
+  one fact then has four widths. This page's measurements are EVIDENCE the registry reads — measured
+  in the rendered portal (Inter): header chrome is 46px beyond the header text; a cross-year date is
+  99px; `No delivery date yet` is 124px; `PO-20260930-4827` is 127px. No quantity column exists on
+  this parent table, so no 88px value was adopted. Where this page's built width is narrower than the
+  registry, the registry names the convergence it owes; closing it is this page's own round.
+  Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
+  second line, so the full value is readable by keyboard and touch with no hover title.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
   and the list is re-read so a line bought meanwhile drops its tick. `Esc` closes only transient
@@ -1703,11 +1707,16 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   name is ONE server-resolved identity (`identityResolver` over the shared actor door, 0390) that
   the Register, the object, search and export all read; a shared or robot login and an unnamed
   account resolve to `Staff identity not recorded` on every surface.
-- **Built widths (measured 2026-09-17, rendered shell, Inter):** `Items` 180 (the longest live
+- **Built widths — evidence for the ONE registry, not a second one (owner instruction 2026-09-18).**
+  [UI MASTER §6.8](../ui/MASTER.md) holds the width; these are what this page MEASURED
+  (2026-09-17, rendered shell, Inter) and what the registry reads: `Items` 180 (the longest live
   model name is 18 characters; the sticky identity also fits beside the gutters at 390px) ·
   `Order By` 112 · `Purpose` 150 · `Supplier` 140 (longest live supplier 17 characters) ·
   `Approval Status` 188 (`Sent back for changes` pill 134px + requester avatar) · `Requested By`
-  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. Saved layout key
+  124 · dates 112 · `Supplier Deliver To` 132 · `PO No` 144. `Purpose` 150, `Approval Status` 188
+  and `Supplier` 140 were the WIDEST measurement of their field and are now the registry's number;
+  `Items`, `Supplier Deliver To`, `Requested By`, dates and `PO No` are narrower than the registry
+  and the convergence is named there, to be closed in this page's own round. Saved layout key
   `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
 - **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
   `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
@@ -1915,12 +1924,12 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
-**STATUS — approved specification synchronised from #1462; implementation remains on that unmerged PR. Main does not contain this new application build yet.**
+**STATUS — three different things, never one word (2026-09-18).**
 
 | | What it covers |
 |---|---|
 | **APPROVED / LOCKED** | The listing, its eleven columns, its four groups, the group-local header, the ordered-goods expansion, the rail and the sending-evidence reading below. Owner rulings 2026-09-17 and 2026-09-18. |
-| **IMPLEMENTED ON PR #1462 / NOT MERGED** | All of the above is implemented and covered by tests, and measured on the rendered register at 1440 / 1180 / 820 / 390. Personal saved layouts (2026-09-17) and the Slice 1 readability pass remain built as recorded. |
+| **BUILT 2026-09-18** | All of the above is implemented and covered by tests, and measured on the rendered register at 1440 / 1180 / 820 / 390. Personal saved layouts (2026-09-17) and the Slice 1 readability pass remain built as recorded. |
 | **PRODUCTION-VERIFIED** | **NOT YET.** No authenticated production walk of this build exists. The 2026-09-17 walk was of the previous nine-column register and does not carry forward. Until that walk is done, no line here may be quoted as production truth. |
 
 **Owner acceptance — 2026-09-18.** Jess confirmed the reviewed PO Register and goods expansion.
@@ -1943,7 +1952,7 @@ a layout and pressing `PO sent to supplier` on production.
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
 Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
-**Columns — APPROVED / LOCKED (Jess, 2026-09-18) · IMPLEMENTED ON PR #1462 / NOT MERGED, exactly in order:**
+**Columns — APPROVED / LOCKED (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in order:**
 
 ```text
 PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
@@ -2029,7 +2038,7 @@ own `Clear filters` are the shared listing standard's and are unchanged. No dupl
 a facet's number describes the whole register, never what another facet happens to have selected.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · IMPLEMENTED ON PR #1462 / NOT MERGED.** Read-only
+**Expansion — APPROVED / LOCKED, owner confirmation 2026-09-18 · BUILT 2026-09-18.** Read-only
 ordered goods, exactly in order:
 
 ```text

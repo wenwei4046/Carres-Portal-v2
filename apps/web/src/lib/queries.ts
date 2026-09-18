@@ -3457,16 +3457,32 @@ export interface operationPoListRow {
    *  the label matches), and bring the business facts that tell them apart. */
   sources?: Array<{
     kind: "sales_order" | "manual_purchase";
+    /** The visible document number: `SO-1319`, or the request's own
+     *  `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18, which overwrites the
+     *  2026-09-04 MPR retirement). A request with no stored number keeps the
+     *  governed label `Manual Purchase` — never a UUID, never an invention. */
     reference: string;
     /** A sales_order source's order id, so one SO number opens its order. */
     order_id?: string | null;
+    /** Manual Purchase only — the stored MPR number, null where there is none. */
+    req_no?: string | null;
     request_id?: string | null;
     purpose?: string | null;
     proceed_date?: string | null;
   }>;
   /** Posted receipts of this PO (`warehouse_receipts` with a GRN number),
-   *  oldest first. Absent on an older Worker — treat as unknown, not none. */
-  grns?: Array<{ id: string; grn_no: string }>;
+   *  oldest first. Absent on an older Worker — treat as unknown, not none.
+   *  `goods_received_at` is the PHYSICAL arrival day (0314), never the day the
+   *  record was filed and never a substitute for either delivery-date column;
+   *  `received_qty` is the shared `warehouseReceiptTotals` count of GOOD units
+   *  on that receipt. Both OPTIONAL so a browser on this build against an
+   *  older Worker prints the governed absence instead of crashing. */
+  grns?: Array<{
+    id: string;
+    grn_no: string;
+    goods_received_at?: string | null;
+    received_qty?: number | null;
+  }>;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
