@@ -2079,14 +2079,14 @@ now also shows actual Goods Received Date linked to each GRN; this does not add 
 **Columns — APPROVED / NOT BUILT (Jess, 2026-09-18), exactly in order:**
 
 ```text
-PO Date · PO No · SO No / MPR No / CO No · Supplier · Items · Supplier Deliver To ·
+PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
 PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
 ```
 
 Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The prior width measurements
 are implementation evidence, not dimensions for this expanded target; remeasure before build.
 - `PO Date`: authoritative PO document date, never sending confirmation time.
-- `SO No / MPR No / CO No`: actual structured linked references, individually reachable.
+- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18); a CO reference appears only if a real CO-to-PO link exists.
   Never invent a CO or Manual Purchase number. A multi-source PO preserves all line allocations.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
 - The three delivery-date columns use the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).

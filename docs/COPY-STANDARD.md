@@ -930,7 +930,7 @@ before marking; the Portal cannot observe WhatsApp sending without an API.
 
 **PURCHASE ORDERS REGISTER — APPROVED / NOT BUILT (Jess, 2026-09-18).**
 
-Columns, exactly: `PO Date · PO No · SO No / MPR No / CO No · Supplier · Items ·
+Columns, exactly: `PO Date · PO No · SO No / MPR No · Supplier · Items ·
 Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version`.
 
 | Fact | Exact copy |
@@ -1846,7 +1846,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `{n} receipt dates` | Multiple physical receipts on a PO; each GRN/date/time/quantity remains accessible. Never show one latest date as if all goods arrived then. |
 | `Goods arrived at` | Actual receiving location, including warehouse, showroom or other actual site. |
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
-| `SO No / MPR No / CO No` | PO combined-reference header; actual linked references only, not invented mandatory relationships. |
+| `SO No / MPR No` | PO combined-reference header (owner ruling 2026-09-18: no `CO No` — consignment marking is not a CO link); actual linked references only, not invented mandatory relationships. |
 | `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
 | `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
