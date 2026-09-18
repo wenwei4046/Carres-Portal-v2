@@ -2851,16 +2851,25 @@ optional facts are not promoted to permanent empty columns; measure before final
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-Supplier               Reported | Supplier Claim No. | Supplier | PO No | GRN No. | Product | Variant | Qty ...
-  actual suppliers     one row per supplier claim; facts and evidence only
-PROBLEM
-  observed types       footer: matching claims · affected Units/quantity with clear scope
+Supplier               Reported | Supplier Claim No. | Supplier | Product | Variant | Qty |
+  actual suppliers       Problem | Supplier Response | Claim status | PO No | GRN No
+PROBLEM                 one row per supplier claim; facts and evidence only
+  observed types       footer: {N} Supplier Claims — no quantity total
 CLAIM STATUS
   Open / Closed / Cancelled
 SUPPLIER RESPONSE
   Not recorded / actual recorded answer
-Clear filters
 ```
+
+**🔴 THE SKETCH ABOVE WAS STALE AND IS CORRECTED IN PLACE, 2026-09-18.** It drew
+`… | Supplier | PO No | GRN No. | Product | Variant | Qty …` — the linked documents FOURTH and
+FIFTH — twenty lines below the ruling that puts linked documents LAST. Two orders for one listing
+in one section, and the built page follows the stale one (see the source read below). The old
+drawing is deleted rather than annotated. **`Clear filters` also leaves this sketch:** it is not a
+permanent row at the bottom of the rail. A selected facet clears by clicking it again, and the ONE
+`Clear filters` lives in the toolbar's active-condition bar (`activeConditions`), exactly as the
+approved region table below already states and as the 2026-09-18 Receiving correction draws the
+same distinction.
 
 The four rail groups are Supplier, Problem, Claim status and Supplier Response; presentation follows
 UI MASTER §6.7, with no page-local typography or widths. Customer Resolution and Carres Execution
@@ -2876,6 +2885,35 @@ missing-source/reply/credit facts and source-search doors in detail and their ow
 incomplete records remain visible. No formal issue passes without verified provenance. Facet
 counts cover the complete permitted searched/filtered set under shared facet semantics, not the
 loaded page; collapsed groups do not filter.
+
+**🔴 SOURCE READ OF THE BUILT REGISTER — 2026-09-18, PRODUCTION WALK NOT DONE.** What follows is a
+read of `apps/web/src/pages/operation/OperationSupplierClaims.tsx` on `origin/main`. It states what
+the committed code renders; it is **not** a claim that the deployed page was opened and seen, and a
+signed-in walk remains owed before any of it is called a production finding.
+
+| | Committed code | Approved |
+|---|---|---|
+| 🔴 | `Supplier Claim No.` (89) leads, `Reported` (90) second | `Reported · Supplier Claim No.` — the portal-wide date-first contract |
+| 🔴 | `PO No` (92) and `GRN No.` (93) sit FOURTH and FIFTH | linked documents LAST, after `Claim status` |
+| 🔴 | neither `leadingColumns` nor `stickyIdentity` is passed | `leadingColumns {date: Reported, identity: Supplier Claim No.}`, both pinned at canvas ≥768px and the identity alone below — today nothing pins at all |
+| 🟡 | `Customer Resolution` (104) and `Carres Execution` (105) exist as hidden columns | this section says they are **not listing columns**; hidden is still admitted to the Columns chooser |
+| 🟡 | `Units on hold` (102) | the approved optional list names `Units` |
+
+The built row expansion (`SupplierClaimInspector`, 138) already matches the approved one job: a
+read-only problem and evidence inspector with `Open Claim`, no editor.
+
+**🔴 THE WIDTH CANDIDATES IN THIS SECTION PREDATE THE SHARED REGISTRY.** The region table below
+offers a date column of ≈97px and a `SC-20260916-0007` column of ≈147px. The one shared
+field-width registry (UI MASTER §6.8) answers those same two roles with **Date 118** and a
+**document number 170**. One field may not have two starting widths in two documents.
+**Fix:** this section stops carrying its own candidates and cites the registry; if the registry's
+numbers fail this page's longest real values at 200% zoom, the registry entry is what gets
+repaired — never a Supplier-Claims-only width.
+
+**🟡 `GRN No.` HERE, `GRN No` IN §9.4 — one fact, two spellings.** The approved Receiving columns
+pin `GRN Date` and `GRN No`; this section's approved defaults end with `GRN No.`. The dictionary
+owns which one it is, and both sections then print that one. It is a trailing full stop, and it is
+exactly the kind of drift the shared dictionary exists to stop.
 
 **SUPPLIER CLAIMS PAGE DESIGN — APPROVED / NOT BUILT (owner review 2026-09-18).** The owner
 approved the complete page after two correction rounds. The Blueprint is closed; implementation
