@@ -1641,7 +1641,8 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - `Order By` is derived for every line by walking Delivery Date backwards through supplier transit
   days on the Office calendar and Supplier × Category production days on that supplier's calendar.
   One request uses the earliest line result. It drives timing/work and the optional quiet
-  `Order by {date}` second line and the parent `Order By` column. It is not a stored date;
+  `Order by {date}` second line. It is NOT a parent column — the approved parent carries
+  `PO Safety Days` (the column list above); `Order By` stays an engine/detail date. It is not a stored date;
   missing setup prints `Not planned` in the column.
 - Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
   Carres. Missing production/transit Settings produce no default or Order By.
@@ -1652,8 +1653,10 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - Manual Purchase follows SO Batch's shared search, palette, column-width and responsive
   filter behavior. The toolbar retains Show filters when the rail is hidden. This approval
   does not change the Purchase Orders page's independent layout or business rules.
-- There is NO number column (Card 08). The row and its deep-link run on the invisible
-  request UUID; `req_no` is legacy database data no operator surface consumes.
+- **The identity column is `MPR No`** (the ruling above, 2026-09-18). Card 08's
+  "no number column" is DELETED, not kept beside it: it was written while a Manual Purchase had
+  no number of its own. The row's deep-link still runs on the invisible request UUID, and legacy
+  `req_no` values stay searchable without becoming a second visible identity.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
   `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
@@ -1687,16 +1690,30 @@ same toolbar, checkbox and expansion positions, the same active-filter treatment
 horizontal scrolling, the same footer and the locked token values. Necessary business
 differences are preserved as CAPABILITIES a page asks for, never as a second table.
 
-Manual Purchase asks for:
+**ALIGNMENT PROPOSAL — NOT LAW (2026-09-18, awaiting owner approval).** The goods table reads in
+the approved SO Batch order for the facts both pages share, then the two document facts Manual
+Purchase alone answers:
 
 ```text
-Category · Supplier Deliver To · SKU · Qty · Supplier · PO No · PO Default Delivery Date · Item
+Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date
 ```
 
-This is the owner's target — `SKU · Qty · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date
-· Item` — reconciled with `GoodsMiniTable`'s ruled positions (owner ruling 2026-08-15:
-`Category` first, `Supplier Deliver To` before `SKU`, and `Item` always last and flexible so two
-expansions opened together read as one listing).
+- **No goods-line checkbox.** Manual Purchase ticks the REQUEST on its parent row; SO Batch ticks
+  goods lines because a customer item line is the demand. This difference is business, not style.
+- **No generic `Status` column.** The parent carries `Approval Status`, the three groups carry the
+  buying state, and a goods row says which it is through `PO No` — `Not ordered yet` for the
+  remainder row, the actual number for an allocation row. A second status word here would repeat
+  the group heading.
+- **`SKU` leaves the table and stays searchable.** It prints as the 11px second line inside `Item`
+  beside the recorded configuration — the same two-line geometry the approved grammar uses for
+  `PO No / Ref No` + `Unit ID`. A column of codes was identifying two lines the configuration
+  already tells apart.
+- **The retired positional rule is DELETED, not kept beside this one.** The 2026-08-15 `Category`
+  first / `Supplier Deliver To` before `SKU` / `Item` always last ordering lived in the old
+  UI MASTER §6.8, which the 2026-09-18 approval rewrote. `Item` is no longer last; it sits where
+  SO Batch puts it, so two sibling expansions read as one listing.
+- Falsifier: an operator walk where a Manual Purchase goods line cannot be told from its sibling
+  without the SKU column, or where the missing tick is read as "this line cannot be bought".
 
 - **ONE ROW IS ONE ALLOCATION.** Each quantity is the quantity that document actually
   carries, read from `purchase_order_lines.qty` / `.destination_id` for that demand
@@ -1719,11 +1736,28 @@ expansions opened together read as one listing).
 - Read-only: no Approve/Refuse/Receive, no price editing, no PO creation, no PDF preview
   and no goods-line checkbox — this Register buys from its PARENT row.
 
-**READY STOCK — owner ruling 2026-09-11.** Directly beneath the goods table, and
-INDEPENDENTLY collapsible, sits `Ready Stock`: what is already on the shelf for this
-purchase. It is a sibling SECTION, never a column and never a second goods table. It shares
-the SO Batch table implementation (`ReadyStockTable`), the disclosure frame and the one
-condition vocabulary; the one difference is a business one.
+**READY STOCK — ALIGNMENT PROPOSAL, NOT LAW (2026-09-18, awaiting owner approval; overwrites the
+2026-09-11 placement, which is DELETED rather than kept beside it).** `Ready Stock` is a CELL on the
+item row — `{n} available` with its own borderless disclosure arrow, opening the read-only Unit
+table directly beneath that item, exactly as the approved SO Batch composition does. The separate
+sibling section beneath the goods table is retired: the operator had to match a grouped table back
+to the lines it answered, and the two sibling pages drew one shelf two ways.
+
+- **Only `{n} available`. There is no `{n} reserved` line**, because nothing is ever reserved for a
+  Manual Purchase — see the business rule below. A successful empty read with no saved choice reads
+  `0` with no arrow. Loading, failed or unknown never renders as `0`.
+- **Every business rule below is unchanged by the move.** What changed is where the shelf is read,
+  not what the read means or what it may do.
+- **The grouped question survives as the object's answer.** `What We Already Have` on the object
+  page remains the per-SKU, `stockMatchKey`-grouped, authoritative reference; two request lines of
+  the same goods still get ONE grouped answer there. The cell answers the narrower question — what
+  is on the shelf for THIS line — and prints the same true count on both lines, because the count
+  is what exists, never what is allocated.
+- Falsifier: an operator reads two lines of one SKU as two separate shelves and buys twice, or the
+  object's grouped figure and the cell's figure are read as two arithmetics.
+
+The stock table shares the SO Batch implementation (`ReadyStockTable`), the disclosure frame and
+the one condition vocabulary; the differences below are business, not style.
 
 - **VIEWING INVENTORY IS NEITHER PURCHASING SELECTION NOR RESERVATION.** There is no
   `Choose Ready Unit` here and nothing is tickable. The SO Batch sibling can commit a Unit
@@ -1738,7 +1772,21 @@ condition vocabulary; the one difference is a business one.
   configuration-aware rule, pinned to its SQL twin by a contract test over the live SKU
   corpus) — never SKU text, so a King never answers a Super King's request. Two request
   lines of the same goods are ONE shelf question.
-- Real `Unit ID`, `Condition`, `Qty`, `Where` and `Owner` are read from
+- **Heads — ALIGNMENT PROPOSAL, NOT LAW (2026-09-18).** The read-only table reads
+  `Goods Received Date · Stock Location · Supplier · PO No / Ref No (Unit ID on line two) ·
+  Condition · Owner` — the approved SO Batch stock-picker heads, minus its checkbox, plus `Owner`.
+  The retired `Unit ID · Condition · Qty · Where · Owner` heading set is DELETED, not kept beside
+  it. `Goods Received Date` is the physical receipt DATE only; a missing date reads `Not recorded`
+  and no time is invented. `Stock Location` is the Unit's actual current location.
+  **`Owner` (`Carres` · `Supplier`) is not optional here and it has no substitute:** `Supplier`
+  states PROVENANCE — who Carres bought from — while `Owner` states who owns the Unit today, and a
+  consignment Unit has a supplier owner with a Carres purchase behind it. 🔴 The approved SO Batch
+  picker (§9.1) requires that supplier-owned stock "remain distinguishable" but names no column
+  that carries it; this proposal is that both tables carry `Owner`.
+  A counted row (`identity_scope = 'quantity'`) prints its key with `Counted stock` on line two in
+  place of a Unit ID — it is never drawn as a choosable Unit.
+  No checkbox, no `Choose Ready Unit`, no `Save changes` and no `Cancel` appear on this table.
+  The facts are read from
   `stock_unit_register_v` filtered on `availability = 'available'` (0371) through the ONE
   `readFreeStock` reader — the same offer SO Batch shows. **Condition is a GRADE and is not
   availability:** a `Display` unit is fully available. A counted row (`identity_scope =
@@ -1772,7 +1820,9 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   Register state the operator left (the grid stays mounted underneath — rail filters, search,
   column filters, sort, scroll and expansion survive); the business heading
   `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context
-  (Card 08 §3.3 — no MPR, no UUID, and a browser title of `Manual Purchase — Carres`);
+  (Card 08 §3.3, corrected 2026-09-18: the heading now carries `MPR No` as the object's
+  identity — the "no MPR" clause is deleted, not kept beside it — still no UUID, and a browser
+  title of `Manual Purchase — Carres`);
   one derived
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
