@@ -1589,8 +1589,37 @@ second line; the PO detail page's local blue-grey stylesheet is retired (detail 
 **Detail pages are a separate template:** identity header → current action → facts and goods in
 `Panel`s → History. The SO Batch listing does not decide detail pages.
 
-**Acceptance:** SO Batch Purchase and each converted page compared side by side at the same canvas
-widths; the same function must look and behave the same.
+**Readiness — SO Batch is the base, not yet the template (review 2026-09-18: 7/10).** It becomes the
+template only when all ten pass:
+1. Fields and order: the approved 11-column order (Purchasing §9.1); `PO Safety Days` uses the COPY
+   calculation, not a renamed date column (built code still shows `Order By`).
+2. One listing frame: rail, toolbar and scroll container come from the kit; pages pass only their
+   fields, filters, groups and actions.
+3. One look: header, borders, spacing, type and buttons come from the kit; Purchasing business
+   styling is not moved into the kit.
+4. Rail: long names readable in full; selected conditions visible while collapsed; each page keeps
+   its approved filter content.
+5. Clear filters and counts: search + rail + header filters clear together; collapsing a group
+   never changes the total; paged registers count the whole result.
+6. Expansion: same indent, thin border, heading, spacing and column alignment; the item name never
+   pushes numbers to the far right; no box inside a box.
+7. PO and Unit: per-Unit rows show `PO No → Unit ID` side by side, real full numbers; quantity goods
+   get no invented number.
+8. Narrow canvas: the 896/768/640 behaviour moves from SO Batch's CSS (which today depends on test
+   markers `data-testid="sales-orders-grid"` / `"selection-bar"`) into the frame; below 768px only
+   the identity pins, other columns scroll; filters, Clear, owner and submit stay reachable.
+9. States and return: read failure keeps the toolbar and offers Try again; returning keeps filters,
+   position and focus; missing data never shows as 0.
+10. Real-page acceptance: signed-in 1440 / 1180 / 820 / 390, 200% zoom, long names, keyboard, touch
+    and failure states all pass before any page is scored 10/10.
+
+Order of work: correct SO Batch first → move its composition into the kit → connect pages one by
+one, each keeping its own content (SO Batch two groups and buying actions; Manual Purchase MPR,
+approval and three groups; Purchase Orders sending, arrival facts and four groups; Receiving GRN
+register, quantities and paging without purchasing work groups; Supplier Claims problem, supplier
+response and claim status; Purchase Returns its approved columns, no Finance; Repair Orders after
+its fields are approved). SO Batch and each converted page are compared side by side at the same
+canvas widths.
 
 ### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
 
