@@ -3577,3 +3577,17 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+## PROPOSAL — PENDING APPROVAL (bank-movement)
+
+Finance → Dashboard, per-account panel (RPT-3). Movement only: the ledger holds no opening balances, so the panel never says "balance".
+- Panel heading: `Cash and bank · Movement since go-live`
+- Note under it: `Money in and out of each account since {date}, when the ledger started. Money held before then is not counted.`
+- Table label (screen readers): `Movement since go-live`
+- Columns: `Account` · `Inflow` · `Outflow` · `Net` (Inflow and Outflow are the Cashflow chart's own words on the same page)
+
+Finance → Reports, twelve-month trend (RPT-6), read from gl_profit_and_loss one month at a time:
+- Panel heading: `Profit and Loss · Last 12 months`
+- Legend: `Income` · `Expense`; each month shows its net result under the bars
+- Screen-reader line per month: `Income {amount} · Expense {amount}`
+- Read failed: reuses `The profit and loss could not be loaded. Try again.`

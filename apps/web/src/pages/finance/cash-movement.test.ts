@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LedgerChart } from "@carres/shared/finance-ledger";
-import { cashAccounts, cashWeeks, parseAccountLedger, weeklyCashMovement, type CashLine } from "./cash-movement";
+import { accountMovement, cashAccounts, cashWeeks, parseAccountLedger, weeklyCashMovement, type CashLine } from "./cash-movement";
 
 const acct = (code: string, parent: string | null, over: Partial<LedgerChart["accounts"][number]> = {}) => ({
   code, name: `Account ${code}`, kind: "ASSET", parent_code: parent, is_control: false, control_for: null,
@@ -113,5 +113,22 @@ describe("reading one account", () => {
     ["a money figure that is not a number", body({}, [{ row_kind: "LINE", entry_no: "JE-1", entry_date: "2026-09-10", debit: null, credit: 0 }], { debit: 0, credit: 0 })],
   ])("refuses %s — never a zero", (_why, answer) => {
     expect(() => parseAccountLedger(answer, "1120", "2026-09-10", "2026-09-14")).toThrow("Cash and bank could not be loaded.");
+  });
+});
+
+describe("each account since go-live", () => {
+  it("counts a move between two cash accounts as Out on one and In on the other, and lists an idle account at 0.00", () => {
+    const lines = [
+      line("1110", "JE-1", "2026-09-10", 500, 0),
+      line("1110", "JE-2", "2026-09-11", 0, 200),
+      line("1120", "JE-2", "2026-09-11", 200, 0),
+      line("1120", "JE-3", "2026-09-12", 0, 50.1),
+    ];
+    const accts = cashAccounts(CHART).slice(0, 3);
+    expect(accountMovement(lines, accts)).toEqual([
+      { code: "1110", name: "Account 1110", moneyIn: 500, moneyOut: 200, net: 300 },
+      { code: "1120", name: "Account 1120", moneyIn: 200, moneyOut: 50.1, net: 149.9 },
+      { code: "1130", name: "Account 1130", moneyIn: 0, moneyOut: 0, net: 0 },
+    ]);
   });
 });
