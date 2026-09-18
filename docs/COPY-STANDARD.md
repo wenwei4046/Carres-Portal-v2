@@ -3577,3 +3577,16 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+## PROPOSAL — PENDING APPROVAL (commission-report)
+
+New on-screen words from Reports → Dealer commission (migration 0544). Not law until approved.
+
+| Where | Proposed words |
+|---|---|
+| Page and report door | `Dealer commission` |
+| Report columns and export | `Commission on collected` · `Commission still to collect` · `Rebate this month` · `Quota left` · `No quota` |
+| Report note | `Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.` |
+| Filters | `All` (as the no-filter choice for Dealer and Showroom) |
+| Rates section | `Commission rates` · `Default rate (%)` · `Product rate` · `Rate (%)` · `Add a product rate` · `Edit` · `Remove` |
+| Quota section | `Renovation quotas` · `Renovation quota` · `Add a renovation quota` · `Quota (RM)` · `Rebate rate (%)` · `Counts from` · `<RM> · <rate>% from <month>` |
