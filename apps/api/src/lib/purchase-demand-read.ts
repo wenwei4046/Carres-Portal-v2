@@ -288,6 +288,10 @@ export type FreeStockUnit = {
   supplier: string | null;
   identityScope: string;
   dateIn: string | null;
+  /** 0534 — the Unit's OWN source document, for the approved stock picker's
+   *  `PO No / Ref No` column. It is the goods' provenance, never the purchase
+   *  that happens to be looking at them. */
+  poNo: string | null;
 };
 
 export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
@@ -346,7 +350,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
     const { data: itemRows, error: itemErr } = await sb
       .from("stock_unit_register_v")
       .select(
-        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id",
+        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id, po_no",
       )
       .eq("availability", "available");
     if (itemErr) throw new Error(itemErr.message);
@@ -397,6 +401,7 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
         supplier: (it.supplier as string | null) ?? null,
         identityScope: scope,
         dateIn: (it.date_in as string | null) ?? null,
+        poNo: (it.po_no as string | null) ?? null,
       };
       freeUnitsByKey.set(key, [...(freeUnitsByKey.get(key) ?? []), unit]);
       /* The netting offer stays EXACT UNITS ONLY: a counted row cannot be

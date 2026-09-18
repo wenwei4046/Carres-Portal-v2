@@ -4615,6 +4615,14 @@ export interface PurchaseRequestLineRow {
   approved_qty: number | null;
   issued_qty: number;
   remaining_qty: number;
+  /**
+   * ⭐ Units of READY STOCK saved against this exact line (owner ruling
+   * 2026-09-18). It reduces what is still to BUY and never touches `qty`,
+   * which stays the original ask, or `approved_qty`, which stays the
+   * approver's number. Absent on a payload from a Worker before this ruling —
+   * treated as 0, which is what it was.
+   */
+  stock_reserved_qty?: number;
   required_by: string | null;
   remark: string | null;
   po_id: string | null;
@@ -4679,8 +4687,23 @@ export interface ManualPurchaseRegisterPayload {
     official_delivery_date?: string | null;
     supplier_id?: string | null;
   }>;
-  /** The linked Service Cases behind `for_service_case_id`. */
-  serviceCases: Array<{ id: string; case_no: string }>;
+  /**
+   * The linked Service Cases behind `for_service_case_id`, with the CUSTOMER
+   * facts the approved register columns print (owner ruling 2026-09-18).
+   *
+   * ⛔ THIS IS THE ONLY SOURCE OF A CUSTOMER ON THIS PAGE. Every other purpose
+   * has no customer, and those rows print the columns blank — never the
+   * requester, never the destination, never the supplier's town.
+   */
+  serviceCases: Array<{
+    id: string;
+    case_no: string;
+    customer_name?: string | null;
+    /** The linked Sales Order's own promised day; TBD is null, never a date. */
+    requested_delivery_date?: string | null;
+    delivery_city?: string | null;
+    delivery_state?: string | null;
+  }>;
   destinations: Array<{ id: string; name: string }>;
   /** The governed standing Deliver To (MASTER §5.4) — null means none is set. */
   defaultDestinationId?: string | null;

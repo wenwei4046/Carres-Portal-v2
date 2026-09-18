@@ -576,12 +576,19 @@ describe("the settled nine column words", () => {
     expect(words).not.toContain("Needed by");
   });
 
-  it("`For` survives as the OBJECT's fact and `Qty` leaves the dictionary", () => {
+  it("`For` survives as the OBJECT's fact, and `Qty` is the GOODS table's head", () => {
     /* The structured `For` still labels the object's Request section; it is
-       simply no longer a Register column. `colQty` is gone entirely — a word
-       nothing may print is a word that should not exist to be printed. */
+       simply no longer a Register column.
+
+       ⭐ `colQty` IS BACK, AND IT IS A DIFFERENT COLUMN (owner ruling
+       2026-09-18). It left the dictionary in 2026-09-11 because the PARENT row
+       may not carry a quantity — a request's total ask is not a buying
+       decision at row level, and that is still true. The approved goods table
+       carries `Qty` at the grain the quantity was actually allocated at, which
+       is where a number means something. A word earns its place by being
+       printed somewhere true. */
     expect(MANUAL_PURCHASE_WORDS.colFor).toBe("For");
-    expect("colQty" in MANUAL_PURCHASE_WORDS).toBe(false);
+    expect(MANUAL_PURCHASE_WORDS.colQty).toBe("Qty");
   });
 
   it("the form's date words and the lead-days Send gap are governed", () => {
@@ -859,11 +866,18 @@ import {
   manualPurchaseWorkContext,
 } from "./manual-purchase";
 
-describe("Card 08 · no visible number anywhere", () => {
-  it("the governed words carry no MPR and no Manual Purchase No", () => {
+describe("the document identity — MPR No, and the names still banned", () => {
+  it("⭐ `MPR No` IS THE IDENTITY AGAIN, and the banned names stay banned", () => {
+    /* Owner ruling 2026-09-18, which OVERWRITES Card 08 (2026-09-04): each
+       Manual Purchase request carries `MPR-YYYYMMDD-RRRR`, and it opens the
+       document. What Card 08 banned is still banned — a request is not a
+       `Manual Purchase No`, not a `Request No`, not a `Draft PO`, and never
+       `MP`, which is already the Mattress Protector SKU code. */
+    expect(MANUAL_PURCHASE_WORDS.colMprNo).toBe("MPR No");
     const words = JSON.stringify(MANUAL_PURCHASE_WORDS);
-    expect(words).not.toContain("MPR");
     expect(words).not.toContain("Manual Purchase No");
+    expect(words).not.toContain("Request No");
+    expect(words).not.toContain("Draft PO");
   });
 
   it("the Work context speaks business facts, empty facts dropped", () => {

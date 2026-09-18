@@ -343,18 +343,72 @@ describe("the approved columns, in the approved reading order", () => {
     "PO Delivery Date",
   ];
 
+  /**
+   * ⭐ A GROUPED REGISTER'S HEADER LIVES INSIDE ITS GROUPS (owner ruling
+   * 2026-09-18). It is still ONE header — one column definition, one set of
+   * widths, one sort — drawn where it is read instead of four groups above the
+   * rows it names. The assertions below are unchanged in what they protect;
+   * only where they look for the words has moved.
+   */
+  const headerRows = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"]')];
+  /** ONE group's header — every expanded group draws the identical set. */
+  const headerCells = (container: HTMLElement) =>
+    [...(headerRows(container)[0]?.querySelectorAll<HTMLElement>("th") ?? [])];
+
   it("draws exactly the ten business columns, date then identity first and documents last", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll("thead th")]
+    const heads = headerCells(container)
       .map((el) => el.textContent ?? "")
       .filter((t) => t.trim() !== "");
     expect(heads).toHaveLength(APPROVED.length);
     APPROVED.forEach((label, i) => expect(heads[i], label).toContain(label));
   });
 
+  it("EVERY expanded group draws the SAME header — one column definition, not one per group", () => {
+    const { container } = renderRegister();
+    const rows = headerRows(container);
+    /* The Register has more than one expanded group, or this proves nothing. */
+    expect(rows.length).toBeGreaterThan(1);
+    const titles = rows.map((row) =>
+      [...row.querySelectorAll<HTMLElement>("th")].map((th) => `${th.title}:${th.style.width}`),
+    );
+    for (const t of titles.slice(1)) expect(t).toEqual(titles[0]);
+  });
+
+  it("a COLLAPSED group is its heading and its count, and draws no header", () => {
+    const { container } = renderRegister();
+    const body = container.querySelector<HTMLElement>(
+      '[data-testid="grid-group-body-no-purchase-needed"]',
+    );
+    expect(body).not.toBeNull();
+    /* Expanded, it states its columns where they are read. */
+    expect(
+      body!.querySelector('[data-testid="grid-group-header-no-purchase-needed"]'),
+    ).not.toBeNull();
+    /* Collapsed, it is its heading and its count and nothing else — a header
+       naming columns for records nobody can see is a header for an empty
+       screen (owner ruling 2026-09-18). */
+    fireEvent.click(
+      within(body!).getByTestId("grid-group-toggle-no-purchase-needed"),
+    );
+    expect(
+      container.querySelector('[data-testid="grid-group-header-no-purchase-needed"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-testid="grid-group-no-purchase-needed"]'),
+    ).not.toBeNull();
+  });
+
+  it("the header above the groups is GONE — there is no second copy to disagree with", () => {
+    const { container } = renderRegister();
+    expect(container.querySelectorAll("thead th")).toHaveLength(0);
+  });
+
   it("has no Status column, and no Status cell on any row", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = headerCells(container).map((el) => el.textContent).join("|");
+    expect(text).not.toBe("");
     expect(text).not.toContain("Status");
     expect(screen.queryByTestId("so-batch-status-o1")).toBeNull();
     /* The FACT survives: eligibility still refuses the tick on an Ordered row. */
@@ -363,7 +417,8 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("the retired columns are gone from the Register", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = headerCells(container).map((el) => el.textContent).join("|");
+    expect(text).not.toBe("");
     for (const gone of [
       "Source SO",
       "Required For",
@@ -396,7 +451,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("reads Proceed Date · SO No first, both pinned on a wide canvas (§6.7 rule 2)", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll<HTMLElement>("thead th")];
+    const heads = headerCells(container);
     const data = heads.filter((th) => th.title);
     expect(data.slice(0, 3).map((th) => th.title)).toEqual(["Proceed Date", "SO No", "Order By"]);
     expect(data[0]!.style.left).not.toBe("");
@@ -2113,7 +2168,7 @@ describe("choosing a Ready Unit", () => {
     expect(within(shelf).getByRole("button", { name: /Ready Stock/ })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
     const row = await screen.findByTestId(
-      "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
+      "stock-picker-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
@@ -2134,7 +2189,7 @@ describe("choosing a Ready Unit", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
     fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
     const row = await screen.findByTestId(
-      "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
+      "stock-picker-unit-33333333-0000-0000-0000-00000000000a",
     );
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));

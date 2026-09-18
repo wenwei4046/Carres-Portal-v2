@@ -46,7 +46,20 @@ function mount(personal?: Partial<DataGridPersonalLayouts>, key = "test.personal
   );
   return { ...utils, props };
 }
-const heads = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+/**
+ * ⭐ THE HEADER OF A GROUPED REGISTER IS INSIDE ITS GROUPS (owner ruling
+ * 2026-09-18) — and there is still only ONE of it.
+ *
+ * These tests are about a layout the person saved: order, widths, visibility
+ * and sort. The ruling moved where that header is DRAWN, not what it contains,
+ * so the assertions read the first expanded group's header and the layout law
+ * they protect is unchanged. Reading `thead th` here would now find nothing —
+ * which is the point: a grouped Register has no header above its groups.
+ */
+const heads = (c: HTMLElement) =>
+  [...c.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"] th')]
+    .map((th) => th.title)
+    .filter(Boolean);
 const openColumns = () => fireEvent.click(screen.getByRole("button", { name: "Columns" }));
 
 afterEach(() => window.localStorage.clear());
@@ -100,7 +113,7 @@ describe("DataGrid · personalLayouts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load layout" }));
     fireEvent.click(screen.getByRole("button", { name: "Receiving view" }));
     expect(heads(container)).toEqual(["PO Date", "PO No", "GRN No"]);
-    const grn = [...container.querySelectorAll<HTMLElement>("thead th")].find((th) => th.title === "GRN No")!;
+    const grn = [...container.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"] th')].find((th) => th.title === "GRN No")!;
     expect(grn.style.width).toBe("200px");
   });
 
@@ -150,7 +163,7 @@ describe("DataGrid · personalLayouts", () => {
     const { container } = mount({});
     openColumns();
     fireEvent.click(screen.getByRole("button", { name: "Best fit" }));
-    const supplier = [...container.querySelectorAll<HTMLElement>("thead th")].find((th) => th.title === "Supplier")!;
+    const supplier = [...container.querySelectorAll<HTMLElement>('[data-testid^="grid-group-header-"] th')].find((th) => th.title === "Supplier")!;
     // `Hooka Furniture Manufacturing` = 29 characters → 29 × 7 + 17 = 220.
     expect(supplier.style.width).toBe("220px");
   });

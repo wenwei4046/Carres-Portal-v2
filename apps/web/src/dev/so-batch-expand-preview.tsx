@@ -2,7 +2,7 @@
  * SO BATCH EXPAND · THE THREE CONNECTED SECTIONS — DEV ONLY.
  *
  * The REAL components — `ConnectedSections`, `GoodsMiniTable`,
- * `ReadyStockDisclosure` + `ReadyStockTable`, `PoDetailsTable` — drawn the way
+ * `StockDisclosure` + `StockPickerTable`, `PoDetailsTable` — drawn the way
  * an expanded Sales Order row draws them, with a stand-in parent row above and
  * a second Sales Order below it, so the two things the drawing has to prove can
  * actually be LOOKED AT:
@@ -27,10 +27,10 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import GoodsMiniTable, { type GoodsMiniLine } from "@/pages/operation/components/GoodsMiniTable";
-import ReadyStockTable, {
-  ReadyStockDisclosure,
-  type ReadyStockTableRow,
-} from "@/pages/operation/components/ReadyStockTable";
+import StockPickerTable, {
+  StockDisclosure,
+  type StockPickerRow,
+} from "@/pages/operation/components/StockPickerTable";
 import ConnectedSections, {
   CONNECT_AT_DISCLOSURE,
   CONNECT_AT_TABLE_HEADER,
@@ -180,16 +180,18 @@ const PO_ROWS: PoDetailRow[] = [
   })),
 ];
 
-const STOCK_ROWS: ReadyStockTableRow[] = [
+const STOCK_ROWS: StockPickerRow[] = [
   {
     itemId: "1",
     unitCode: "id-vyf051985",
     identityScope: "unit",
     sku: "JAGER-SS",
     condition: "new",
-    siteName: "Carres Klang",
+    goodsReceivedDate: "2026-08-14",
+    stockLocation: "Carres Klang",
+    sourceRef: "PO-20260801-1121",
     ownership: "carres_owned",
-    supplier: null,
+    supplier: "Ohana",
     qty: 1,
   },
   {
@@ -198,7 +200,9 @@ const STOCK_ROWS: ReadyStockTableRow[] = [
     identityScope: "quantity",
     sku: "MP-K",
     condition: null,
-    siteName: "Carres Klang",
+    goodsReceivedDate: null,
+    stockLocation: "Carres Klang",
+    sourceRef: null,
     ownership: "carres_owned",
     supplier: null,
     qty: 893,
@@ -255,21 +259,21 @@ function Expansion() {
       key: "ready-stock",
       connectAt: CONNECT_AT_DISCLOSURE,
       node: (
-        <ReadyStockDisclosure
+        <StockDisclosure
           testId="preview-ready-stock"
           open={stockOpen}
           onToggle={() => setStockOpen((v) => !v)}
           className=""
         >
-          <ReadyStockTable label="Ready Stock for SO-1203" rows={STOCK_ROWS} />
-        </ReadyStockDisclosure>
+          <StockPickerTable label="Ready Stock for SO-1203" rows={STOCK_ROWS} />
+        </StockDisclosure>
       ),
     },
     {
       key: "po-details",
       connectAt: CONNECT_AT_DISCLOSURE,
       node: (
-        <ReadyStockDisclosure
+        <StockDisclosure
           testId="preview-po-details"
           open={poOpen}
           onToggle={() => setPoOpen((v) => !v)}
@@ -277,7 +281,7 @@ function Expansion() {
           className=""
         >
           <PoDetailsTable label="Purchase order details for SO-1203" rows={PO_ROWS} />
-        </ReadyStockDisclosure>
+        </StockDisclosure>
       ),
     },
   ];

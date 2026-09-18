@@ -1318,3 +1318,43 @@ div:first-child > .columnsMenuGroup {
   flex: 1 1 auto;
   min-height: 96px;
 }
+
+/* ── GROUP-LOCAL HEADERS — owner ruling 2026-09-18 ──────────────────────────
+ *
+ * `docs/ui/MASTER.md` §6.7. A grouped Register no longer carries one header
+ * above every group; each EXPANDED group states its columns immediately below
+ * its own heading, and a COLLAPSED group shows its heading and its count and
+ * nothing else.
+ *
+ * ⭐ THE STICKINESS IS THE WHOLE POINT, AND IT IS BOUNDED BY THE GROUP.
+ * Each group is its own `<tbody>`, so a sticky row inside it is held by TWO
+ * things: the scroll container, and the group's own box. It rides down while
+ * the operator reads that group's records and slides away at its last row —
+ * it can never run on over the next group's heading, because there is
+ * structurally nothing there for it to stick to.
+ *
+ * The heading sits at 0 and the header directly under it at the heading's own
+ * 38px, so the two travel as one block rather than overlapping.
+ */
+.groupBody {
+  position: relative;
+}
+.groupBody .fixedGroupRow .groupRowCell,
+.groupBody .groupRow .groupRowCell {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: theme("colors.white");
+}
+.groupHeaderRow > th {
+  position: sticky;
+  /* The group heading's own height — its ruled 38px (`.fixedGroupRow`). */
+  top: 38px;
+  z-index: 2;
+}
+/* A pinned identity cell inside a group header must out-rank its own row's
+   sticky, exactly as it does in the table's `<thead>`: it is sticky in TWO
+   axes at once, and the scrolled columns must pass under it. */
+.groupHeaderRow > th.stickyCell {
+  z-index: 4;
+}

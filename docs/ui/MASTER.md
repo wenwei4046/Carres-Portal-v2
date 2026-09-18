@@ -1520,7 +1520,41 @@ facts, permissions, complete-record populations or task ownership.
 7. **Expansion and states.** Reuse the governed expansion pattern and retain module-specific
    goods facts. Loading, failure, genuinely empty and filtered-empty states are distinct.
    Collapsed records remain in totals; missing/failed data must not imply zero or completion.
-8. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
+8. **GROUP-LOCAL HEADERS — OWNER RULING (Jess, 2026-09-18) · BUILT.** ⛔ **This REPLACES the
+   one-header-above-the-groups rule for every GROUPED Register**, which is superseded and is not
+   an alternative: a grouped listing no longer draws a header above its groups at all.
+
+   ```text
+   Need approval  3
+     Status │ Proceed Date │ MPR No │ …     ← its own header, sticky within THIS group
+     …records…
+   Need PO  2
+     Status │ Proceed Date │ MPR No │ …     ← the SAME header, drawn where it is read
+     …records…
+   No PO needed  8                          ← collapsed: heading and count only
+   ```
+
+   A **collapsed** group shows its heading and its count and nothing else — a header naming
+   columns for records nobody can see is a header for an empty screen. An **expanded** group states
+   its columns immediately below its own heading, then its records. **All groups share ONE column
+   definition, widths, visibility, sorting and resizing state**; they each show the one header, they
+   do not each own one. The current group's header stays sticky while the operator scrolls within
+   that group and **stops at the group boundary**. Pinned date/identity behaviour is unchanged
+   inside it. An **UNGROUPED Register keeps its single sticky header** and is byte-identical.
+
+   **Engine — BUILT 2026-09-18, once, in `DataGrid`.** The header cells are extracted to one
+   `headerCells()` and drawn either in the table's `<thead>` (ungrouped) or inside each expanded
+   group. Each group renders as **its own `<tbody>`**, and that is what makes the boundary real
+   rather than approximate: a `position: sticky` row is held by its scrolling ancestor AND by its
+   containing block, so inside one `<tbody>` every group's header would stick at the same offset
+   and stack on the last one. With a `<tbody>` per group the GROUP is the containing block, its
+   heading and header ride down with it and slide away at its last row, and there is structurally
+   nothing for them to run on into. Group headings sit at `top: 0`, the column header at the
+   heading's own 38px. **Adopted automatically by every grouped Register** — SO Batch Purchase,
+   Manual Purchase and Purchase Orders — because it is engine behaviour, not a page option; no
+   page-local copy exists and none may be written. Each page keeps its own business rules, default
+   group expansion and selection behaviour unchanged. **Owed:** the authenticated production walk.
+9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
 
@@ -1749,8 +1783,14 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 
 ## §6.8 · Shared goods tables — approved SO Batch reference
 
-**Jess, 2026-09-18 · APPROVED / NOT BUILT.** SO Batch listing and stock-picker composition is the
-approved reference for shared component work. Business columns remain owned by each module MASTER;
+**Jess, 2026-09-18 · APPROVED; the shared stock picker is BUILT.** SO Batch listing and
+stock-picker composition is the approved reference for shared component work.
+`components/StockPickerTable.tsx` is that ONE implementation — the six approved columns, the common
+two-line header height, 8px cell padding, 1px dividers, 13px/11px type, one row height and the blue
+selected row — and BOTH purchasing surfaces draw it. The retired `ReadyStockTable` (its
+`Unit ID · Condition · Qty · Where · Owner` order) is deleted, not deprecated.
+`Condition` is the flexible last column, which is the fix for the reviewed defect: as a fixed
+110px track at the end of a scrolling table a two-word grade was squeezed onto three lines. Business columns remain owned by each module MASTER;
 Manual Purchase capabilities are explicitly approved in Purchasing §9.2; other pages do not gain editing or reservation powers implicitly.
 Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not transplant mock HTML/CSS.
 
@@ -1773,7 +1813,7 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
 - Approval covers this composition and interaction, not production readiness or a 10/10 score.
   Production must verify 1440/1180/820/390, keyboard, 200% zoom, identity visibility and safe saves.
 
-Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
+Manual Purchase uses this same composition under Purchasing §9.2 (BUILT, migration 0534): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
 ## §6.9 · Connected expansion
 
@@ -1783,6 +1823,21 @@ TOP BORDER of its stock-detail frame. The line is 1px, visibly touches its desti
 the source under horizontal scrolling/resizing, and disappears when collapsed. No floating elbow,
 no line into the next item or SO. The active goods context has a blue boundary; the stock detail
 has a subtle bordered white frame. A context boundary is not evidence of a saved reservation.
+
+**HOW IT IS DRAWN — BUILT 2026-09-18, after two measured failures.** The line is rendered INSIDE
+the `Ready Stock` cell, hanging below it (`left: 11px; top: 100%; height: 13px` in a relatively
+positioned cell), and the stock frame spans the FULL goods row so the line always lands on its top
+border. Two earlier shapes were measured in the rendered shell and rejected:
+
+- **Summing the declared column widths** was wrong by ~900px on a wide canvas. The goods box is
+  `w-full table-fixed` with a `minWidth`, so a canvas wider than that minimum STRETCHES the columns
+  and the sum stops describing where anything is.
+- **Anchoring the frame at the `Ready Stock` column** put it beyond the fold whenever the goods box
+  scrolled sideways: pressing the disclosure gave a 300px white hole with the Units off-screen.
+
+Verified at 1440/1180/820/390px: the line starts within the cell's own bounds and touches the
+frame's top border at every width. **A connector may never be positioned by arithmetic over
+declared widths** — the table that placed the cell is the only thing that knows where it is.
 Other modules keep their existing business sections; do not recreate the retired three-sibling-section
 SO Batch arrangement. Use one component implementation, not page-local connector drawings.
 

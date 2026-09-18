@@ -82,14 +82,14 @@ const REGISTER = {
   requests: [
     // ① Other Purchase · Need approval (+ `Jess approves`) · Not ordered yet.
     req({
-      id: R1, req_no: null, purpose: "other_purchase",
+      id: R1, req_no: "MPR-20260829-7781", purpose: "other_purchase",
       why: "Spare castors for the delivery van",
       approval_required: true, required_by: "2026-09-05",
       created_at: "2026-08-29T03:10:00Z",
     }),
     // ② Service Case · Approved · Ready to order (SELECTABLE) · 2 items.
     req({
-      id: R2, req_no: null, purpose: "service_case",
+      id: R2, req_no: "MPR-20260829-4103", purpose: "service_case",
       for_service_case_id: SC_1, approval_required: true,
       approved_at: "2026-08-29T04:00:00Z", required_by: "2026-09-10",
       created_at: "2026-08-29T02:00:00Z",
@@ -104,7 +104,7 @@ const REGISTER = {
     }),
     // ④ Ready Stock · No approval needed · fully ordered on TWO POs.
     req({
-      id: R4, req_no: null, purpose: "ready_stock",
+      id: R4, req_no: "MPR-20260828-2210", purpose: "ready_stock",
       required_by: "2026-09-01", created_at: "2026-08-28T06:00:00Z",
     }),
     // ⑤ Internal Staff Purchase · Approved · part issued (one PO + remainder).
@@ -124,16 +124,21 @@ const REGISTER = {
   lines: [
     line({ request_id: R1, sku: "CASTOR-75", qty: 8, remaining_qty: 8,
       item_label: "Castor 75mm", category: null }),
-    line({ request_id: R2, sku: "5539-2NA", qty: 1, approved_qty: 1, remaining_qty: 1,
+    /* ⭐ THE ENGINE'S OWN Order By — so `PO Safety Days` can be walked as a
+       real MARGIN. One line is comfortable, one is already PAST its date; the
+       parent shows the TIGHTER of the two. */
+    line({ id: "l-r2-a", request_id: R2, sku: "5539-2NA", qty: 1, approved_qty: 1,
+      remaining_qty: 1, order_by: "2026-09-04",
       item_label: "Booqit 2 Seater", category: "sofa" }),
-    line({ request_id: R2, sku: "5539-CNR", qty: 1, approved_qty: 1, remaining_qty: 1,
+    line({ id: "l-r2-b", request_id: R2, sku: "5539-CNR", qty: 1, approved_qty: 1,
+      remaining_qty: 1, order_by: "2026-08-25",
       item_label: "Booqit Corner", category: "sofa" }),
     line({ request_id: R3, sku: "7011-3S", qty: 1, remaining_qty: 1,
       item_label: "Dorsett 3 Seater", category: "sofa", supplier_id: S_DORSETT }),
     /* ⭐ A LINE SPLIT ACROSS TWO POs — the case the settled goods table exists
        for. 3 units went onto PO_A and 1 onto PO_B; the expansion must print
        3 and 1, never 4 and 4. */
-    line({ request_id: R4, sku: "B1201S-K", qty: 4, issued_qty: 4, po_id: PO_A,
+    line({ id: "l-r4-a", request_id: R4, sku: "B1201S-K", qty: 4, issued_qty: 4, po_id: PO_A,
       po_ids: [PO_A, PO_B],
       allocations: [
         { poId: PO_A, qty: 3, destinationId: KLANG },
@@ -141,7 +146,7 @@ const REGISTER = {
       ],
       item_label: "Sonic K", category: "mattress" }),
     /* Part issued: ONE allocation row plus a `To purchase` remainder row. */
-    line({ request_id: R5, sku: "M1401F-Q", qty: 3, approved_qty: 2, issued_qty: 1,
+    line({ id: "l-r5-a", request_id: R5, sku: "M1401F-Q", qty: 3, approved_qty: 2, issued_qty: 1,
       po_id: PO_C, po_ids: [PO_C], remaining_qty: 1,
       allocations: [{ poId: PO_C, qty: 1, destinationId: KLANG }],
       item_label: "Atlas Q", category: "bedframe", supplier_id: S_OHANA }),
@@ -276,6 +281,141 @@ function detailAnswer(id: string) {
   };
 }
 
+/**
+ * WHAT THE PREVIEW HAS "SAVED", so `Change selection` · `Save changes` ·
+ * `Cancel` can actually be walked without a database.
+ */
+const SAVED: Record<string, string[]> = { "l-r2-a": ["unit-0001"] };
+
+const UNIT = (
+  itemId: string,
+  unitCode: string,
+  over: Record<string, unknown> = {},
+) => ({
+  itemId,
+  unitCode,
+  identityScope: "unit",
+  sku: "5539-2NA",
+  goodsReceivedDate: "2026-07-02",
+  stockLocation: "Carres Klang",
+  supplier: "Ohana",
+  sourceRef: "PO-20260701-8814",
+  condition: "new",
+  ownership: "carres_owned",
+  qty: 1,
+  reservedForThisLine: false,
+  blocked: null,
+  ...over,
+});
+
+function stockAnswer(requestId: string) {
+  /* ② Service Case — an approved CONCRETE NEED. One line already holds a Unit
+     (so `Change selection` is walkable), one is free to choose. */
+  if (requestId === R2) {
+    return {
+      requestId,
+      reference: "MPR-20260829-4103",
+      intent: "concrete_need",
+      approved: true,
+      lines: [
+        {
+          demandId: "l-r2-a",
+          sku: "5539-2NA",
+          item: "Booqit 2 Seater",
+          requestedQty: 1,
+          approvedQty: 1,
+          issuedQty: 0,
+          availableQty: 2,
+          reservedQty: SAVED["l-r2-a"]?.length ?? 0,
+          remainingQty: Math.max(0, 1 - (SAVED["l-r2-a"]?.length ?? 0)),
+          stockBlock: null,
+          units: [
+            UNIT("unit-0001", "U1-000-014", {
+              reservedForThisLine: (SAVED["l-r2-a"] ?? []).includes("unit-0001"),
+            }),
+            UNIT("unit-0002", "U1-000-021", {
+              goodsReceivedDate: "2026-06-11",
+              stockLocation: "AL Sungai Buloh",
+              supplier: "Hooka",
+              sourceRef: null,
+              condition: "exhibition",
+              ownership: "supplier_consignment",
+            }),
+            /* A counted row SHOWS and is not a Unit (0453 · 0368). */
+            UNIT("unit-0003", "QTY-5539-2NA", {
+              identityScope: "quantity",
+              condition: null,
+              sourceRef: null,
+              qty: 12,
+              blocked: "counted_stock",
+            }),
+          ],
+        },
+        {
+          demandId: "l-r2-b",
+          sku: "5539-CNR",
+          item: "Booqit Corner",
+          requestedQty: 1,
+          approvedQty: 1,
+          issuedQty: 0,
+          availableQty: 0,
+          reservedQty: 0,
+          remainingQty: 1,
+          stockBlock: null,
+          units: [],
+        },
+      ],
+    };
+  }
+  /* ⑤ Internal Staff Purchase — ADDITIONAL replenishment: the shelf shows
+     and is not netted against the ask. */
+  if (requestId === R5) {
+    return {
+      requestId,
+      reference: "MPR-20260827-0533",
+      intent: "additional_stock",
+      approved: true,
+      lines: [
+        {
+          demandId: "l-r5-a",
+          sku: "B1201S-K",
+          item: "Sonic K",
+          requestedQty: 4,
+          approvedQty: null,
+          issuedQty: 0,
+          availableQty: 14,
+          reservedQty: 0,
+          remainingQty: 4,
+          stockBlock: "additional_stock",
+          units: [UNIT("unit-0101", "U1-000-101", { sku: "B1201S-K" })],
+        },
+      ],
+    };
+  }
+  /* ① Other Purchase — approved nothing yet, and it recorded NO intent. */
+  return {
+    requestId,
+    reference: null,
+    intent: null,
+    approved: requestId !== R1,
+    lines: [
+      {
+        demandId: `l-${requestId}-a`,
+        sku: "CASTOR-75",
+        item: "Castor 75mm",
+        requestedQty: 8,
+        approvedQty: null,
+        issuedQty: 0,
+        availableQty: 0,
+        reservedQty: 0,
+        remainingQty: 8,
+        stockBlock: requestId === R1 ? "not_approved" : "intent_not_recorded",
+        units: [],
+      },
+    ],
+  };
+}
+
 /* The page's own reads, answered locally — nothing leaves the browser. */
 const realFetch = window.fetch.bind(window);
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
@@ -310,45 +450,31 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/purchasing/requests/issue")) {
     return answer({ poIds: [], documents: 1 });
   }
-  /* MANUAL PURCHASE · READY STOCK — the read the expansion's second section
-     makes when it is OPENED. It writes nothing and has no reservation twin,
-     so this preview seeds a read and nothing else. */
-  if (url.includes("/ready-stock")) {
-    return answer({
-      requestId: url.split("/requests/")[1]?.split("/")[0] ?? "",
-      groups: [
-        {
-          matchKey: "preview-1",
-          item: "Sonic K",
-          skus: ["B1201S-K"],
-          requestedQty: 4,
-          freeQty: 14,
-          units: [
-            { itemId: "aaaa0001-0000-4000-8000-000000000001", unitCode: "U1-000-014",
-              identityScope: "unit", sku: "B1201S-K", condition: "new",
-              siteName: "Carres Klang", holderName: null, ownership: "carres_owned",
-              supplier: null, qty: 1, dateIn: "2026-07-02" },
-            { itemId: "aaaa0001-0000-4000-8000-000000000002", unitCode: "U1-000-021",
-              identityScope: "unit", sku: "B1201S-K", condition: "exhibition",
-              siteName: "AL Sungai Buloh", holderName: null,
-              ownership: "supplier_consignment", supplier: "Hooka", qty: 1,
-              dateIn: "2026-06-11" },
-            { itemId: "aaaa0001-0000-4000-8000-000000000003", unitCode: "QTY-B1201S-K",
-              identityScope: "quantity", sku: "B1201S-K", condition: null,
-              siteName: "Carres Klang", holderName: null, ownership: "carres_owned",
-              supplier: null, qty: 12, dateIn: null },
-          ],
-        },
-        {
-          matchKey: "preview-2",
-          item: "Atlas Q",
-          skus: ["M1401F-Q"],
-          requestedQty: 3,
-          freeQty: 0,
-          units: [],
-        },
-      ],
-    });
+  /**
+   * MANUAL PURCHASE · READY STOCK ALLOCATION — the read each goods line's own
+   * `Ready Stock` cell makes when it is opened, and the ONE save.
+   *
+   * The fixtures deliberately hold every state the ruling names at once: an
+   * approved CONCRETE NEED that can choose, a saved allocation that can be
+   * changed, an ADDITIONAL replenishment that is read-only, and a request that
+   * recorded no intent at all.
+   */
+  if (url.includes("/stock-allocation")) {
+    const requestId = url.split("/requests/")[1]?.split("/")[0] ?? "";
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body ?? "{}"));
+      SAVED[body.demandId] = body.itemIds ?? [];
+      return answer({
+        demandId: body.demandId,
+        reference: "MPR-20260829-4103",
+        reserved: (body.itemIds ?? []).length,
+        added: 0,
+        removed: 0,
+        unitIds: body.itemIds ?? [],
+        remainingQty: 0,
+      });
+    }
+    return answer(stockAnswer(requestId));
   }
   if (url.includes("/purchasing/requests")) return answer(REGISTER);
   if (url.includes("pick-items")) return answer(PICK);

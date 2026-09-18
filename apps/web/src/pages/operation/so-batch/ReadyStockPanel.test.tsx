@@ -67,7 +67,8 @@ function response(over: Partial<ReadyStockResponse> = {}): ReadyStockResponse {
         ownership: "carres_owned",
         supplier: null,
         qty: 1,
-        dateIn: "2026-08-01",
+        poNo: null,
+      dateIn: "2026-08-01",
         matchingLineIds: [LINE_A, LINE_B],
         blocked: null,
       },
@@ -82,7 +83,8 @@ function response(over: Partial<ReadyStockResponse> = {}): ReadyStockResponse {
         ownership: "carres_owned",
         supplier: null,
         qty: 893,
-        dateIn: "2026-08-05",
+        poNo: null,
+      dateIn: "2026-08-05",
         matchingLineIds: [LINE_A, LINE_B],
         blocked: "counted_stock",
       },
@@ -97,7 +99,8 @@ function response(over: Partial<ReadyStockResponse> = {}): ReadyStockResponse {
         ownership: "supplier_consignment",
         supplier: "Dorsettloft",
         qty: 1,
-        dateIn: "2026-08-06",
+        poNo: null,
+      dateIn: "2026-08-06",
         matchingLineIds: [LINE_A, LINE_B],
         blocked: null,
       },
@@ -157,7 +160,7 @@ describe("viewing", () => {
     draw();
     await open();
     /* An Exhibition Unit is fully available and choosable. */
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     expect(within(row).getByText("Display")).toBeInTheDocument();
     expect(within(row).getByRole("checkbox")).toBeEnabled();
   });
@@ -180,7 +183,7 @@ describe("viewing", () => {
       }),
     );
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     expect(within(row).getByText("No item line needs it")).toBeInTheDocument();
     expect(within(row).queryByText(/Covered/)).toBeNull();
     expect(within(row).queryByRole("checkbox")).toBeNull();
@@ -189,8 +192,12 @@ describe("viewing", () => {
   it("says whose goods a consignment Unit is", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-000000000065");
-    expect(within(row).getByText("Supplier")).toBeInTheDocument();
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-000000000065");
+    /* ⭐ THE APPROVED PICKER NAMES THE SUPPLIER AND SAYS WHOSE THE GOODS ARE
+       (owner ruling 2026-09-18). The retired table had an `Owner` column that
+       printed the bare word `Supplier` and hid the name behind a tooltip; the
+       name is a decision fact and now prints, with the ownership beneath it. */
+    expect(within(row).getByText("Supplier-owned")).toBeInTheDocument();
   });
 });
 
@@ -200,7 +207,7 @@ describe("counted stock", () => {
   it("shows the row, refuses the choice, and never prints its key as a Unit ID", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000e");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000e");
     expect(within(row).queryByRole("checkbox")).toBeNull();
     expect(within(row).queryByText("QTY-000000001")).toBeNull();
     /* COPY-STANDARD: a quantity-scoped goods line has no Unit ID by law, so
@@ -209,7 +216,9 @@ describe("counted stock", () => {
     expect(within(row).getAllByText("—").length).toBeGreaterThan(0);
     expect(within(row).queryByText(/No Unit ID/)).toBeNull();
     expect(within(row).getByText("Counted stock")).toBeInTheDocument();
-    expect(within(row).getByText("893")).toBeInTheDocument();
+    /* `Qty` left the picker with the ruling's six columns; a counted row still
+       says how many pieces it stands for, beside its grade. */
+    expect(within(row).getByText("893 counted")).toBeInTheDocument();
   });
 });
 
@@ -219,7 +228,7 @@ describe("two item lines of one SKU", () => {
   it("makes the operator say which line the Unit answers", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     expect(within(row).getByRole("combobox")).toBeInTheDocument();
     expect(within(row).getAllByRole("option")).toHaveLength(2);
   });
@@ -227,7 +236,7 @@ describe("two item lines of one SKU", () => {
   it("sends the exact Unit and the exact line it was chosen for", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.change(within(row).getByRole("combobox"), { target: { value: LINE_B } });
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
@@ -248,7 +257,7 @@ describe("two item lines of one SKU", () => {
   it("keeps the line the operator picked BEFORE ticking the box", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.change(within(row).getByRole("combobox"), { target: { value: LINE_B } });
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
@@ -266,7 +275,7 @@ describe("two item lines of one SKU", () => {
       }),
     );
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     expect(within(row).queryByRole("combobox")).toBeNull();
     expect(within(row).getByText("Jager bedframe")).toBeInTheDocument();
   });
@@ -285,7 +294,7 @@ describe("selection", () => {
   it("enables the act and counts what is chosen", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     expect(screen.getByRole("button", { name: "Choose Ready Unit" })).toBeEnabled();
     expect(screen.getByText("1 chosen")).toBeInTheDocument();
@@ -294,7 +303,7 @@ describe("selection", () => {
   it("un-chooses on a second click", async () => {
     draw();
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(within(row).getByRole("checkbox"));
     expect(screen.getByText("No Unit chosen")).toBeInTheDocument();
@@ -342,7 +351,7 @@ describe("failure and retry", () => {
   it("prints the server's own refusal when a stale choice is refused", async () => {
     drawRefusing({ code: "unit_no_longer_free" });
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await waitFor(() =>
@@ -362,7 +371,7 @@ describe("failure and retry", () => {
       "33333333-0000-0000-0000-00000000000a",
       "33333333-0000-0000-0000-000000000065",
     ]) {
-      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+      fireEvent.click(within(screen.getByTestId(`stock-picker-unit-${id}`)).getByRole("checkbox"));
     }
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -381,7 +390,7 @@ describe("failure and retry", () => {
       "33333333-0000-0000-0000-00000000000a",
       "33333333-0000-0000-0000-000000000065",
     ]) {
-      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+      fireEvent.click(within(screen.getByTestId(`stock-picker-unit-${id}`)).getByRole("checkbox"));
     }
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -392,7 +401,7 @@ describe("failure and retry", () => {
     const onReserved = vi.fn();
     drawRefusing({ code: "unit_no_longer_free" }, onReserved);
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -420,7 +429,7 @@ describe("failure and retry", () => {
       </QueryClientProvider>,
     );
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -446,7 +455,7 @@ describe("failure and retry", () => {
     );
     await open();
     const before = reads.length;
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -459,7 +468,7 @@ describe("failure and retry", () => {
   it("drops last act's sentence the moment the choice moves", async () => {
     drawRefusing({ code: "unit_no_longer_free" });
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -506,7 +515,7 @@ describe("a successful act", () => {
       "33333333-0000-0000-0000-00000000000a",
       "33333333-0000-0000-0000-000000000065",
     ]) {
-      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+      fireEvent.click(within(screen.getByTestId(`stock-picker-unit-${id}`)).getByRole("checkbox"));
     }
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -523,7 +532,7 @@ describe("a successful act", () => {
       "33333333-0000-0000-0000-00000000000a",
       "33333333-0000-0000-0000-000000000065",
     ]) {
-      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+      fireEvent.click(within(screen.getByTestId(`stock-picker-unit-${id}`)).getByRole("checkbox"));
     }
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -546,7 +555,7 @@ describe("a successful act", () => {
       "33333333-0000-0000-0000-00000000000a",
       "33333333-0000-0000-0000-000000000065",
     ]) {
-      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+      fireEvent.click(within(screen.getByTestId(`stock-picker-unit-${id}`)).getByRole("checkbox"));
     }
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -556,7 +565,7 @@ describe("a successful act", () => {
   it("clears the stock choice, because those Units are no longer choosable", async () => {
     drawCommitting([{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_A }]);
     await open();
-    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    const row = screen.getByTestId("stock-picker-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await screen.findByTestId(`ready-stock-act-${ORDER}`);
@@ -604,11 +613,15 @@ describe("layout and keyboard", () => {
     expect(scroller!.querySelector("table")).not.toBeNull();
   });
 
-  it("holds every item row at the ruled 38px", async () => {
+  it("holds every Unit row at ONE ruled height", async () => {
     draw();
     await open();
-    for (const row of screen.getAllByTestId(/^ready-stock-unit-/)) {
-      expect(row).toHaveStyle({ height: "38px" });
+    /* 42px, not 38: the approved picker's document cell carries TWO lines —
+       `PO No / Ref No` over the Unit ID — and every row is that tall whether
+       or not it has a reference, so a Unit with no provenance does not sit
+       shorter than its neighbour (UI MASTER §6.8). */
+    for (const row of screen.getAllByTestId(/^stock-picker-unit-/)) {
+      expect(row).toHaveStyle({ height: "42px" });
     }
   });
 

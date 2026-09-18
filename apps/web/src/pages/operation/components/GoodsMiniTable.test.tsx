@@ -248,10 +248,10 @@ describe("the optional Ordered Qty column", () => {
 /**
  * ⭐ CARD 02-B — the exact-mapping columns, optional like everything else.
  * A sibling register that asks for nothing renders byte-identically; the
- * buying Register asks and gets `Supplier` and `PO Delivery Date` as fixed
+ * buying Register asks and gets `Supplier` and `PO Default Delivery Date` as fixed
  * columns BEFORE `Item`, which stays last (law ①).
  */
-describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
+describe("Card 02-B · optional Supplier and PO Default Delivery Date", () => {
   it("absent by default — Sales Orders and Delivery keep their ruled layout", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
@@ -288,7 +288,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
       "Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty",
-      "Supplier", "PO Delivery Date", "Item",
+      "Supplier", "PO Default Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();
     expect(screen.getByText("Fri, 18 Sep")).toBeInTheDocument();

@@ -1176,7 +1176,7 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
+**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / BUILT, exactly in this order:**
 
 ```text
 Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
@@ -1598,8 +1598,14 @@ Supplier Deliver To · PO No · PO Default Delivery Date
 ```
 
 **Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
-the 2026-09-04 MPR retirement.** Each Manual Purchase request has its own number `MPR-YYYYMMDD-RRRR`
-(§6.1), allocated when the request is created, permanent and never reused. `MPR` = Manual Purchase Request: it is requested and
+the 2026-09-04 MPR retirement. BUILT in 0534.** Each Manual Purchase request has its own number
+`MPR-YYYYMMDD-RRRR` (§6.1), allocated when the request is created, permanent and never reused.
+0534 restores the `allocate_formal_document_code('MPR')` default that 0424 dropped. **Rows raised
+between 0424 and 0534 stored NULL and are NOT backfilled** (CLAUDE.md §6): they print the governed
+absence `Not recorded`, open from the row and its menu, and no number is invented to fill a column.
+A stored `REQ-####` does not print under `MPR No` either — the ruling promises those "stay
+searchable", a weaker promise than the one it makes for MPR, and Card 08 retired the series from
+every operator-facing surface; the search still finds it. `MPR` = Manual Purchase Request: it is requested and
 approved before it becomes one or more POs. `MP` is not used — it is already the Mattress Protector
 SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` values stay searchable.
 `MPR No` and `Proceed Date` pin at canvas ≥768px, `MPR No` alone below; `MPR No` opens the request.
@@ -1680,7 +1686,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   (0422), never a hard-coded 14 days. `Edit and send again` opens the same form on the returned
   request, prefilled once, purpose locked, sending `Send again for approval`.
 
-**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / NOT BUILT.**
+**Manual Purchase aligned UI — Jess, 2026-09-18 · APPROVED / BUILT (migration 0534).**
 The parent has checkbox and a separate goods-disclosure button before Status. Approval Status
 and Status are independent. For a known outstanding request, Status is `Need PO` even while
 Approval Status is `Need approval`; neither the PO tick nor stock Save is allowed before approval.
@@ -1691,7 +1697,7 @@ stay in Need approval regardless of unknown remainder. Empty historical groups a
 No PO needed remains collapsed and counted. This changes Manual Purchase labels only, not SO Batch
 register groups.
 
-**Goods order:** `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date`.
+**Goods order — BUILT:** `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date`.
 Use the SO Batch shared presentation: 8px horizontal padding, two-line headers, two-line item identity,
 blue selection, consistent field widths and the connected stock frame (UI MASTER §6.8–6.9).
 No SKU column; SKU remains searchable. Parent tick selects eligible remaining goods, not an
@@ -1718,17 +1724,46 @@ Count-managed goods remain identifiable as counted and not falsely offered as ex
 Show available and this-MPR-line reserved counts on separate lines, with a separate cell disclosure.
 Saved choices remain reachable even at zero available. Unknown/error/loading never become zero.
 Stock selection is disabled for unapproved and additional-replenishment requests, with a reason.
+The cell answers FOUR ways and never merges them: `Loading…` · `Could not be loaded` (the read
+failed) · `Not checked` (the read answered for the request and carried no entry for this line) ·
+`{n} available`, which is the only place `0` may print.
 
 **Stock selection:** tick/untick edits a draft; `Choose Ready Unit` saves the initial allocation;
 `Change selection` reopens it; `Save changes` commits additions/removals, including all removed;
 `Cancel` restores saved choices. No per-Unit Undo. Pending edits must be saved/cancelled before Issue PO.
 All-stock fulfillment must save without creating a PO. Bind allocation to the exact MPR item line,
-NEVER fabricate an SO binding or call an SO-only reservation endpoint with an MPR ID. The current
-MPR allocation backend is NOT claimed built. Extend the governed stock authority with provenance,
-permission/approval checks, atomic stock availability and release/downstream checks, version/concurrency
-validation and audit. Any invalid Unit refuses the entire save; no partial releases or reservations.
-No second stock totals or duplicate writer. Persisted server results drive counters, Status and buying
-quantities after refresh. Refusal preserves the unsaved choices with the governed explanation.
+NEVER fabricate an SO binding or call an SO-only reservation endpoint with an MPR ID.
+
+**BUILT — migration 0534, the allocation backend the approval called for.**
+`ops_stock_items.reserved_purchase_demand_id` names the exact `purchase_demands` line a Unit
+answers; it is mutually exclusive with `reserved_order_line_id` by table CHECK, so one Unit can
+never answer a customer line and an internal purchase line at once. The ONE writer is still
+`ops_stock_pool_draw`, extended with `p_purchase_demand_id` and the Manual Purchase branch (exact
+Unit, not counted stock, goods match by `stock_match_key`, available by the one availability
+arithmetic, remaining requirement above zero, the request APPROVED, and the request's recorded
+intent `concrete_need`); `ops_stock_release` clears the new binding beside the old one.
+`purchasing_allocate_ready_units(demand, item_ids, expected_item_ids)` is the one save: it takes
+the COMPLETE desired set, releases what left, draws what joined, all or none — an empty set
+releases everything — under the request → demand → unit lock order the issue door already uses,
+and refuses `stock_selection_changed` when the saved set moved since the browser read it. Every
+save appends a `purchase_request_events` row (`stock_allocated`, actor, added/removed/reserved).
+`purchasing_mpr_line_remaining_requirement` is the one arithmetic, and
+`purchasing_demand_record_issue` now subtracts the saved allocation from its ceiling, so a Unit
+taken off the shelf is never bought again. Any invalid Unit refuses the entire save; no partial
+releases or reservations. No second stock totals or duplicate writer. Persisted server results
+drive counters, Status and buying quantities after refresh (`stock_reserved_qty` on the register
+read). Refusal preserves the unsaved choices with the governed explanation.
+
+**THE RECORDED INTENT — `purchase_requests.fulfilment_intent` (0534).**
+`concrete_need` = existing Units may answer this request and a saved allocation reduces the
+remaining procurement quantity. `additional_stock` = buying EXTRA; existing stock is reference and
+is never netted. **NULL = not recorded**, which is its own state: the stock section shows read-only
+and says so. It is never inferred from the SKU, the shelf count or the purpose.
+**PROPOSAL / NOT LAW — the create form asks the question.** The ruling requires a RECORDED intent
+but does not say where it is recorded; `purchasing_create_request` therefore takes an optional
+`p_fulfilment_intent`, and every request raised before 0534 keeps NULL and states the gap.
+Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
+column is dropped and the derivation replaces it.
 
 The formal Issue PO workspace follows §8.2; the HTML quantity dialog is not its replacement.
 Replenishment advice based on history is deferred. No new automatic ordering or Finance scope.
@@ -1775,6 +1810,8 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   Catalog human words beside the explicit SKU; a missing Catalog supplier is a named fact on
   the line (`No supplier yet` + the Catalog act) and may be filtered through `Supplier not set` under `SETUP TO FIX`.
 - **What We Already Have** — `SKU · Free Stock · Already On PO · Still Needed` per live SKU,
+  and since 2026-09-18 it is explicitly the SKU-wide REFERENCE beside the Register's own per-line
+  allocation: this section still writes nothing and still nets nothing,
   through the one shared arithmetic (`stillNeededOf`) and the same stock/open-PO reads the
   create workspace uses. Decision facts, not buttons and not Work rows. **D3 (Round 2):** a
   sentence above the table labels these figures a SKU REFERENCE across Carres, separate from this

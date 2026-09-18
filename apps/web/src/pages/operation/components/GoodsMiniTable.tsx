@@ -48,7 +48,7 @@ import { fmtDate } from "@/lib/fmt-date";
 // a page. It has no destination, no toolbar and no header of its own; the
 // register above it owns all three, and wrapping a disclosure in ListPageShell
 // would draw a second page chrome inside one table cell.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
 import { lineClass } from "@carres/shared";
@@ -147,7 +147,35 @@ const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 148 } as const;
  * and Delivery pass neither and render byte-identically.
  */
 const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
-const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
+/**
+ * ⭐ `PO Default Delivery Date`, NOT `PO Delivery Date` — Purchasing UI
+ * dictionary, owner ruling 2026-09-18. It is the ORIGINAL planned date the PO
+ * was issued with, and it survives the supplier moving it; the supplier's own
+ * answer is a different column with a different name. The old label was one
+ * word for two facts, which is how a screen comes to show a promise nobody
+ * made. 176px holds the two-line heading and a cross-year date.
+ */
+const PO_DATE_COLUMN = {
+  key: "poDeliveryDate",
+  label: "PO Default Delivery Date",
+  width: 176,
+} as const;
+/**
+ * THE PURCHASE-NEED STATUS OF ONE GOODS LINE — `Need PO` · `No PO needed`
+ * (owner ruling 2026-09-18). It is NOT the approval state and never borrows
+ * its words: a line can read `Need PO` while its request reads
+ * `Need approval`, because the goods are needed and the decision is separate.
+ */
+const STATUS_COLUMN = { key: "status", label: "Status", width: 116 } as const;
+/**
+ * `Ready Stock` AS A CELL, not a number (owner ruling 2026-09-18). Available
+ * on line one, reserved-for-THIS-line on line two, and a separate borderless
+ * disclosure button that opens the Unit table directly beneath this item. The
+ * owning page supplies the whole cell, because only it knows what it may
+ * offer; this box gives it the column and its measured width (the reviewed
+ * sample's 136px with two-line counts).
+ */
+const READY_STOCK_CELL_COLUMN = { key: "readyStockCell", label: "Ready Stock", width: 136 } as const;
 
 /**
  * ⭐ `PO No` — MANUAL PURCHASE'S OWN COLUMN (settled design, owner ruling
@@ -196,6 +224,33 @@ export interface GoodsMiniLine {
   deliverToNode?: ReactNode;
   /** Units of this line already answered off the shelf. Read with `showFromStock`. */
   fromStock?: number | null;
+  /**
+   * ⭐ THE PURCHASE-NEED STATUS AND THE READY STOCK CELL, both supplied WHOLE
+   * by the owning page (owner ruling 2026-09-18).
+   *
+   * They are nodes rather than values on purpose. `Status` carries a pill and
+   * may carry the row's own refusal sentence beneath it; `Ready Stock` carries
+   * two counts and a disclosure button that the page — not this box — knows
+   * how to open. A box that assembled either from primitives would have to
+   * learn business rules it has no business knowing, which is exactly how the
+   * `Category` cell grew a second, worse implementation.
+   */
+  statusNode?: ReactNode;
+  readyStockNode?: ReactNode;
+  /**
+   * ⭐ THE STOCK FRAME, OPENED DIRECTLY BENEATH THIS ITEM (UI MASTER §6.9).
+   *
+   * Not a sibling section at the bottom of the expansion and not a dialog: the
+   * Units that could answer THIS line belong under THIS line, or the operator
+   * has to hold a mapping in their head while they choose. It renders as a
+   * spanning row, so it scrolls horizontally WITH the table — which is what
+   * keeps the connector attached at every width without measuring anything.
+   */
+  detailNode?: ReactNode;
+  /** What the detail row and its connector are NAMED after. Defaults to the
+   *  row key; a page whose rows are keyed by allocation names the business
+   *  line instead, so the frame and its connector share one identity. */
+  detailKey?: string;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
   orderBy?: string | null;
@@ -341,6 +396,8 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   showCategory = true,
+  manualPurchaseLayout = false,
+  deliverToHeading,
   itemHeading,
   onPoClick,
   onOpenPoDetails,
@@ -422,6 +479,22 @@ export default function GoodsMiniTable({
    * and names the item column for what it shows. Every other caller keeps both.
    */
   showCategory?: boolean;
+  /**
+   * ⭐ MANUAL PURCHASE'S OWN READING ORDER — owner ruling 2026-09-18.
+   *
+   * It asks for `Status` and a `Ready Stock` CELL, which no other caller has,
+   * and it drops `SKU` and `Unit ID`, which it cannot answer at this grain.
+   * Every other page passes nothing and renders byte-identically.
+   */
+  manualPurchaseLayout?: boolean;
+  /**
+   * The four reviewed PURCHASING listings name this destination
+   * `Supplier Deliver To` — the address the SUPPLIER is instructed to deliver
+   * to, which is neither the customer's address nor the site the goods
+   * actually reach (Purchasing UI dictionary, 2026-09-18). Sales Orders and
+   * Delivery keep `Deliver To`, because on those pages it IS the customer's.
+   */
+  deliverToHeading?: string;
   itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
@@ -446,19 +519,53 @@ export default function GoodsMiniTable({
   const REGISTRY: Record<string, Column> = {
     category: { ...CHILD_COLUMNS[0] },
     unit: { ...CHILD_COLUMNS[1] },
-    deliverTo: { ...CHILD_COLUMNS[2] },
+    deliverTo: {
+      ...CHILD_COLUMNS[2],
+      ...(deliverToHeading ? { label: deliverToHeading } : {}),
+      /* The two-word heading needs the room the one-word one did not. */
+      ...(deliverToHeading ? { width: 176 } : {}),
+    },
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
     item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
+    status: { ...STATUS_COLUMN },
+    readyStockCell: { ...READY_STOCK_CELL_COLUMN },
     fromStock: { ...FROM_STOCK_COLUMN },
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
   };
-  const order = salesOrderLayout
+  /**
+   * ⭐ THE MANUAL PURCHASE ORDER — owner ruling 2026-09-18, exactly:
+   *
+   * ```
+   * ☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   *     Supplier Deliver To · PO No · PO Default Delivery Date
+   * ```
+   *
+   * Law ① still holds — exactly ONE flexible column, and here it is `Item`,
+   * which is why it keeps a fixed width in this order while the others do too
+   * and the box scrolls rather than crushing anything. No SKU column: the SKU
+   * stays SEARCHABLE and prints under the item, which is where a person reads
+   * it. `To buy` and `Ordered Qty` do not return — every quantity here is the
+   * one the line was allocated at.
+   */
+  const order = manualPurchaseLayout
+    ? [
+        "status",
+        "category",
+        "qty",
+        "item",
+        "readyStockCell",
+        "supplier",
+        "deliverTo",
+        "poNo",
+        "poDeliveryDate",
+      ]
+    : salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
@@ -466,6 +573,8 @@ export default function GoodsMiniTable({
   const asked: Record<string, boolean> = {
     unit: showUnitId,
     category: showCategory,
+    status: manualPurchaseLayout,
+    readyStockCell: manualPurchaseLayout,
     supplier: showSupplier,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
@@ -497,6 +606,32 @@ export default function GoodsMiniTable({
   /* Below this the box scrolls sideways rather than crushing a column. */
   const minWidth =
     columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
+  /**
+   * ⭐ THE CONNECTOR HANGS FROM THE CELL; THE FRAME TAKES THE WHOLE ROW
+   * (UI MASTER §6.9 — a VERTICAL line from beneath the cell to the frame's
+   * TOP BORDER, which "moves with the source under horizontal scrolling and
+   * resizing").
+   *
+   * ⚠️ TWO EARLIER SHAPES WERE MEASURED AND REJECTED, both on the rendered
+   * shell, 2026-09-18:
+   *
+   *   · SUMMING THE DECLARED WIDTHS was wrong by ~900px on a wide canvas. The
+   *     box is `w-full table-fixed` with a `minWidth`, so when the canvas is
+   *     wider than that minimum the columns STRETCH and the sum stops being
+   *     where anything is.
+   *   · ANCHORING THE FRAME AT THE `Ready Stock` COLUMN put it beyond the fold
+   *     whenever the goods table scrolls sideways: the operator pressed the
+   *     disclosure and got a 300px white hole, with the Units they had asked
+   *     for off-screen to the right.
+   *
+   * So the line is drawn INSIDE the `Ready Stock` cell, hanging below it —
+   * the table itself positions that cell, so the line is under it at every
+   * width, after every resize and at every scroll offset, with no arithmetic
+   * left to drift — and the frame spans the full row, so what the operator
+   * opened is where they are looking. The vertical line still lands on the
+   * frame's top border, because that border now runs the whole width.
+   */
+  const bodyColumnCount = columns.length + (selection ? 1 : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -589,6 +724,33 @@ export default function GoodsMiniTable({
                   );
                 case "qty":
                   return <span className="tabular-nums">{line.qty}</span>;
+                case "status":
+                  /* THE PAGE SUPPLIES THE WHOLE CELL. An absent node is an
+                     absent FACT — unknown coverage prints neither `Need PO`
+                     nor `No PO needed`, because guessing either would tell an
+                     operator to buy, or to stop, on evidence nobody has. */
+                  return line.statusNode ?? <Absence>—</Absence>;
+                case "readyStockCell":
+                  return (
+                    <>
+                      {line.readyStockNode ?? <Absence>—</Absence>}
+                      {/* 1px, hanging from beneath this cell to the TOP BORDER
+                          of the frame below — it visibly touches its
+                          destination rather than stopping short of it, and it
+                          disappears with the frame, so there is structurally
+                          nothing to leak into the next item. 11px in is the
+                          cell's own 8px padding plus half the rule, so the
+                          line leaves the disclosure rather than the divider. */}
+                      {line.detailNode != null ? (
+                        <span
+                          aria-hidden
+                          data-testid={`goods-detail-connector-${line.detailKey ?? line.key}`}
+                          className="absolute w-px bg-kit-slate-6"
+                          style={{ left: 11, top: "100%", height: 13 }}
+                        />
+                      ) : null}
+                    </>
+                  );
                 case "fromStock":
                   return !line.fromStock ? (
                     <Absence>—</Absence>
@@ -685,7 +847,7 @@ export default function GoodsMiniTable({
                   return null;
               }
             };
-            return (
+            const row = (
               <tr
                 key={line.key}
                 data-testid={line.testId}
@@ -719,6 +881,11 @@ export default function GoodsMiniTable({
                         ? `px-2 py-2 whitespace-normal break-words${c.key === "unit" || c.key === "qty" ? " tabular-nums" : ""}`
                         : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
                         ? "px-2 py-2 tabular-nums"
+                        /* `relative`, so the Ready Stock cell can hang its own
+                           connector below itself — the table positions the
+                           cell, so the line needs no arithmetic of its own. */
+                        : c.key === "readyStockCell"
+                        ? "relative px-2 py-2"
                         : "px-2 py-2"
                     }
                   >
@@ -726,6 +893,21 @@ export default function GoodsMiniTable({
                   </td>
                 ))}
               </tr>
+            );
+            /* THE FRAME AND ITS LINE, or neither. A collapsed cell draws no
+               connector at all — there is nothing there to leak into the next
+               item (UI MASTER §6.9). */
+            return line.detailNode == null ? (
+              row
+            ) : (
+              <Fragment key={`${line.key}-with-detail`}>
+                {row}
+                <tr data-row="stock-detail" data-testid={`goods-detail-${line.detailKey ?? line.key}`}>
+                  <td colSpan={bodyColumnCount} className="p-0">
+                    <div className="px-2 pb-2 pt-3">{line.detailNode}</div>
+                  </td>
+                </tr>
+              </Fragment>
             );
           })}
         </tbody>

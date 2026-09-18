@@ -53,7 +53,7 @@ import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import ReadyStockPanel from "./ReadyStockPanel";
-import { ReadyStockDisclosure } from "../components/ReadyStockTable";
+import { StockDisclosure } from "../components/StockPickerTable";
 import ConnectedSections, {
   CONNECT_AT_DISCLOSURE,
   CONNECT_AT_TABLE_HEADER,
@@ -1618,7 +1618,7 @@ function SoBatchOrderExpansion({
             key: "po-details",
             connectAt: CONNECT_AT_DISCLOSURE,
             node: (
-              <ReadyStockDisclosure
+              <StockDisclosure
                 testId={`so-batch-po-details-${order.orderId}`}
                 open={poOpen}
                 onToggle={() => setPoOpen((v) => !v)}
@@ -1637,7 +1637,7 @@ function SoBatchOrderExpansion({
                     navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
                   }
                 />
-              </ReadyStockDisclosure>
+              </StockDisclosure>
             ),
           },
         ]

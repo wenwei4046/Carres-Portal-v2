@@ -16,10 +16,10 @@ import {
 } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 import { toast } from "sonner";
-import ReadyStockTable, {
-  ReadyStockDisclosure,
-  type ReadyStockTableRow,
-} from "../components/ReadyStockTable";
+import StockPickerTable, {
+  StockDisclosure,
+  type StockPickerRow,
+} from "../components/StockPickerTable";
 
 /**
  * ⭐ READY STOCK — the collapsible table directly under a Sales Order's goods
@@ -254,7 +254,7 @@ export default function ReadyStockPanel({
   const chosenCount = chosen.size;
 
   return (
-    <ReadyStockDisclosure
+    <StockDisclosure
       className={frameClassName}
       testId={`ready-stock-${orderId}`}
       open={open}
@@ -281,9 +281,29 @@ export default function ReadyStockPanel({
           <div className="px-3 py-2 text-meta text-base-500">
             Choose the Unit that answers an item line. Viewing does not reserve.
           </div>
-          <ReadyStockTable
+          <StockPickerTable
             label={so == null ? "Ready Stock for this order" : `Ready Stock for SO-${so}`}
-            rows={q.data!.units as ReadyStockTableRow[]}
+            /* ⭐ THE APPROVED SIX COLUMNS ARE SHARED (UI MASTER §6.8); the
+               TRAILING column stays this page's own, because only SO Batch has
+               a customer item line to name. The shape is mapped here rather
+               than in the contract: the wire shape is the order's, the table's
+               shape is the picker's, and one of them changing must not silently
+               change the other. */
+            rows={q.data!.units.map(
+              (u): StockPickerRow => ({
+                itemId: u.itemId,
+                unitCode: u.unitCode,
+                identityScope: u.identityScope,
+                sku: u.sku,
+                goodsReceivedDate: u.dateIn ? u.dateIn.slice(0, 10) : null,
+                stockLocation: u.siteName,
+                supplier: u.supplier,
+                sourceRef: u.poNo,
+                condition: u.condition,
+                ownership: u.ownership,
+                qty: u.qty,
+              }),
+            )}
             selection={{
               isChosen: (itemId) => chosen.has(itemId),
               onToggle: toggle,
@@ -300,6 +320,7 @@ export default function ReadyStockPanel({
             }}
             extraColumn={{
               header: "For item line",
+              headerLines: ["For item", "line"],
               width: 170,
               cell: (row) => {
                 const unit = unitById.get(row.itemId);
@@ -412,6 +433,6 @@ export default function ReadyStockPanel({
           ) : null}
         </>
       )}
-    </ReadyStockDisclosure>
+    </StockDisclosure>
   );
 }

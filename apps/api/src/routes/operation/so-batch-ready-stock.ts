@@ -186,6 +186,10 @@ soBatchReadyStockRouter.get("/:orderId/ready-stock", requireOperation, async (c)
         supplier: u.supplier,
         qty: u.qty,
         dateIn: u.dateIn,
+        /* The Unit's OWN source document, for the approved picker's
+           `PO No / Ref No` column. Missing provenance stays missing — this
+           order's own number is not the goods' provenance. */
+        poNo: u.poNo,
         matchingLineIds: needing.map((l) => l.orderLineId),
         /* 0368: bulk is not bindable. The row still shows — hiding the 893
            counted pieces would make a full shelf read as an empty one. */
