@@ -1857,14 +1857,19 @@ Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date
 
 ### Purchase Returns words — PROPOSAL / NOT LAW (awaiting owner confirmation, 2026-09-18)
 
-Purchasing MASTER §9.6 words are reused as written (`Return No.` · `Collect From` · `Collection Date`
-· `Handover` · `Credit Consequence` · `Collection date missing` · `Handover proof missing` · `Part
-collected` · `Collected`). §9.6's `PDF not sent` is replaced by the PO sending law's `Sending not
+Columns (owner ruling 2026-09-18): `Return Date` · `Return No.` · `PO No` · `GRN No.` · `Supplier Claim
+No.` · `Supplier` · `Items` · `Qty` · `Goods Collect From` · `Goods Collection Date` · `Goods Return
+Status`. These three replace §9.6's `Collect From` · `Collection Date` · `Handover` on this page;
+`Credit Consequence` is not a column. Rail words stay: `Collection date missing` · `Handover proof
+missing` · `Part collected` · `Collected`. §9.6's `PDF not sent` is replaced by the PO sending law's `Sending not
 confirmed`. Groups reuse `Open` · `Closed` · `Cancelled`. Added:
 
 | Word | Meaning |
 |---|---|
 | `Return Date` | The date the approved outcome created the return (its leading register date). Never a collection or handover date |
+| `Goods Collect From` | Where the goods are picked up (the Carres site holding them) |
+| `Goods Collection Date` | The agreed pickup date, with the supplier's agreement evidence; otherwise `Not recorded` |
+| `Goods Return Status` | Actual return progress per Unit: `Not collected` · with `NETS Logistics` · `Part collected` · `Collected` (the supplier has it). Handing to Logistics is not supplier receipt |
 | `Not collected` | No Unit of the return has been collected yet |
 | `Return sent to supplier` | Staff confirm they really sent the return; records version, channel, recipient, actor and time. Never claims supplier receipt (same pattern as `PO sent to supplier`) |
 | `Who has it` | The current holder of a Unit, read from Stock (e.g. `NETS Warehouse`, `NETS Logistics`, the supplier) |

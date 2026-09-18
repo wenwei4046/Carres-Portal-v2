@@ -3146,19 +3146,22 @@ never derived from another date.
 **Register — the SO Batch Purchase listing is the reference; only fields and rail differ:** grid in
 the white panel with the 8px canvas gap; checkbox (export only) and expand columns; `leadingColumns`
 {`Return Date`, `Return No.`} pinned at canvas ≥768px, `Return No.` alone below; no column hidden by
-width. Columns, in reading order (date → number → supplier → goods → quantity → collection facts →
-linked documents): Return Date · Return No. · Supplier · Items (`{first item} + {n} more`) · Qty ·
-Collect From · Collection Date · Handover · Supplier Claim No. · PO No · GRN No. · Credit Consequence.
+width. **Columns — OWNER RULING (Jess, 2026-09-18), exactly in this order:** Return Date · Return No. ·
+PO No · GRN No. · Supplier Claim No. · Supplier · Items (`{first item} + {n} more`) · Qty · Goods
+Collect From · Goods Collection Date · Goods Return Status. No Finance column in this round; the
+supplier credit stays on the Supplier Claim and Finance and is read in the object only. The return is
+generated automatically when the Supplier Claim's `Return` outcome is approved: staff never re-enter
+goods, Units, supplier or source, and `Return No.` and `Supplier Claim No.` are linked by the system.
 One fact per column; no Work column. One row is one return document.
 **Groups — every return in exactly one:** `Open` (any Unit not yet collected and not cancelled) ·
 `Closed` (every Unit Collected or cancelled with a reason, at least one Collected; starts collapsed)
 · `Cancelled` (cancelled before any Unit left Carres; starts collapsed).
 Footer `{N} Purchase Returns` / `1 Purchase Return` / `{n} of {N} Purchase Returns`; no quantity total.
 **Left rail:** Return — `Sending not confirmed` · `Collection date missing` · `Handover proof
-missing` · `Part collected` · `Collected` (missing facts are facts); Supplier; Collect From.
+missing` · `Part collected` · `Collected` (missing facts are facts); Supplier; Goods Collect From.
 Sending follows the PO sending law: no send record is `Sending not confirmed`, never `PDF not sent`.
 
-**Handover, per Unit:** `Not collected` (still at Carres) · with Logistics (`Who has it: NETS
+**Goods Return Status, per Unit:** `Not collected` (still at Carres) · with Logistics (`Who has it: NETS
 Logistics`, in transit, not yet Collected) · `Collected` (the supplier has it, with supplier receipt
 evidence). The return reads `Part collected` with `{n} of {N}` until every Unit is Collected or
 cancelled. Warehouse Outbound scans and records every handover; issuing the document never moves
