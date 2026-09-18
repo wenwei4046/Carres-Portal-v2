@@ -328,6 +328,13 @@ const source = () => readFileSync(join(HERE, "SoBatchRegister.tsx"), "utf8");
  * it arrived, when the customer wants it, where it goes, who supplies it,
  * where the goods land, and finally the documents.
  */
+/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
+   `<thead>` — every OPEN group draws the same header between its heading and
+   its records. One `<colgroup>` and one layout serve them all, so reading the
+   first group's header reads the layout. */
+const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
+  ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+];
 describe("the approved columns, in the approved reading order", () => {
   /* Date first, then identity (purchasing MASTER §9.1, Jess 2026-09-17). */
   const APPROVED = [
@@ -345,7 +352,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("draws exactly the ten business columns, date then identity first and documents last", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll("thead th")]
+    const heads = groupHeaderCells(container)
       .map((el) => el.textContent ?? "")
       .filter((t) => t.trim() !== "");
     expect(heads).toHaveLength(APPROVED.length);
@@ -354,7 +361,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("has no Status column, and no Status cell on any row", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     expect(text).not.toContain("Status");
     expect(screen.queryByTestId("so-batch-status-o1")).toBeNull();
     /* The FACT survives: eligibility still refuses the tick on an Ordered row. */
@@ -363,7 +370,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("the retired columns are gone from the Register", () => {
     const { container } = renderRegister();
-    const text = [...container.querySelectorAll("thead th")].map((el) => el.textContent).join("|");
+    const text = groupHeaderCells(container).map((el) => el.textContent).join("|");
     for (const gone of [
       "Source SO",
       "Required For",
@@ -396,7 +403,7 @@ describe("the approved columns, in the approved reading order", () => {
 
   it("reads Proceed Date · SO No first, both pinned on a wide canvas (§6.7 rule 2)", () => {
     const { container } = renderRegister();
-    const heads = [...container.querySelectorAll<HTMLElement>("thead th")];
+    const heads = groupHeaderCells(container);
     const data = heads.filter((th) => th.title);
     expect(data.slice(0, 3).map((th) => th.title)).toEqual(["Proceed Date", "SO No", "Order By"]);
     expect(data[0]!.style.left).not.toBe("");

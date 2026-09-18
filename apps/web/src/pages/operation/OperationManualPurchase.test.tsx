@@ -1698,11 +1698,18 @@ describe("Card 03 §3 · the approval owner's name", () => {
  * shared read-only goods table · selection admitting only Ready-to-order
  * remainder · PO Duty existing ONLY beside a selection.
  */
+/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
+   `<thead>` — every OPEN group draws the same header between its heading and
+   its records. One `<colgroup>` and one layout serve them all, so reading the
+   first group's header reads the layout. */
+const groupHeaderCells = (root: ParentNode): HTMLElement[] => [
+  ...(root.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+];
 describe("R2 · the ten columns, in the approved order", () => {
   it("renders the exact heads, in order — and none of the banned columns", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    const heads = [...grid.querySelectorAll("thead th")]
+    const heads = groupHeaderCells(grid)
       .map((th) => (th.textContent ?? "").replace(/[AV]$/, "").replace(/\s+/g, " ").trim())
       .filter((t) => t !== "");
     expect(heads).toEqual([

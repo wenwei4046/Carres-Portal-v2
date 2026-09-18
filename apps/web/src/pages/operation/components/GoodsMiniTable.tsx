@@ -163,6 +163,21 @@ const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width
  */
 const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 
+/**
+ * ⭐ `PO No / Unit ID` — ONE CELL, TWO LINES (Purchasing §9.3, Jess
+ * 2026-09-18; the same shape UI MASTER §6.8 already approved for the SO Batch
+ * stock table's `PO No / Ref No` + Unit ID cell).
+ *
+ * The document is on the first line and the pieces it bought are underneath
+ * it, because on an ordered-goods table they are ONE identity read together:
+ * "these units, on this PO". Splitting them into two columns puts a document
+ * number in one place and the units it minted 200px away, and a reader
+ * comparing two expansions has to carry the number across the gap.
+ *
+ * 230px is the shared registry's width for this combined role.
+ */
+const PO_UNIT_COLUMN = { key: "poUnit", label: "PO No / Unit ID", width: 230 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -341,7 +356,9 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   showCategory = true,
+  purchaseOrderLayout = false,
   itemHeading,
+  deliverToHeading,
   onPoClick,
   onOpenPoDetails,
 }: {
@@ -422,7 +439,26 @@ export default function GoodsMiniTable({
    * and names the item column for what it shows. Every other caller keeps both.
    */
   showCategory?: boolean;
+  /**
+   * ⭐ THE ORDERED-GOODS READING ORDER — Purchase Orders (Purchasing §9.3,
+   * Jess 2026-09-18):
+   *
+   * ```
+   * Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+   * ```
+   *
+   * A third reading order, not a third table: the same registry, the same
+   * geometry, the same one flexible column last. It exists because this page
+   * reads a PO's goods from the DOCUMENT outwards — what kind of thing, who
+   * makes it, where they were told to send it, which units it bought — where
+   * the buying page reads from the goods outwards. Sales Orders, Delivery, SO
+   * Batch and Manual Purchase pass nothing and render byte-identically.
+   */
+  purchaseOrderLayout?: boolean;
   itemHeading?: string;
+  /** `Supplier Deliver To` where the dictionary names that fact for the page
+   *  (Purchasing §9.3). Absent = the ruled `Deliver To`. */
+  deliverToHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
@@ -450,6 +486,7 @@ export default function GoodsMiniTable({
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
     item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
+    poUnit: { ...PO_UNIT_COLUMN },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -458,12 +495,16 @@ export default function GoodsMiniTable({
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
   };
-  const order = salesOrderLayout
+  if (deliverToHeading) REGISTRY.deliverTo = { ...REGISTRY.deliverTo!, label: deliverToHeading };
+  const order = purchaseOrderLayout
+    ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
+    : salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
+    poUnit: purchaseOrderLayout,
     unit: showUnitId,
     category: showCategory,
     supplier: showSupplier,
@@ -669,6 +710,31 @@ export default function GoodsMiniTable({
                   ) : (
                     <Absence>{line.supplierAbsence ?? "—"}</Absence>
                   );
+                case "poUnit":
+                  /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
+                     box's 13px; the pieces it minted underneath at the
+                     governed 11px second-line treatment (ui MASTER §6.8).
+                     Whatever the owning page put in `unitNode` — a governed
+                     absence, an integrity refusal, a read failure — is printed
+                     as it stands: this box never decides what a missing Unit
+                     ID MEANS, because only the line's own identity mode and
+                     the state of the read can say. */
+                  return (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-mono">
+                        {line.poNos?.length
+                          ? line.poNos.map((po) => <span key={po} className="block">{poLink(po)}</span>)
+                          : <Absence>{line.poNoAbsence ?? "—"}</Absence>}
+                      </span>
+                      <span className="font-mono text-meta text-kit-slate-11">
+                        {line.unitNode != null ? line.unitNode : line.unitIds.length ? (
+                          line.unitIds.map((id) => <span key={id} className="block">{id}</span>)
+                        ) : (
+                          <Absence>{line.unitAbsence}</Absence>
+                        )}
+                      </span>
+                    </span>
+                  );
                 case "poNo":
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
@@ -717,7 +783,7 @@ export default function GoodsMiniTable({
                     className={
                       salesOrderLayout
                         ? `px-2 py-2 whitespace-normal break-words${c.key === "unit" || c.key === "qty" ? " tabular-nums" : ""}`
-                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
+                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo" || c.key === "poUnit"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }

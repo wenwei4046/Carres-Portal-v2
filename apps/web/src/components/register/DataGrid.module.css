@@ -1318,3 +1318,35 @@ div:first-child > .columnsMenuGroup {
   flex: 1 1 auto;
   min-height: 96px;
 }
+
+/* ── Group-local headers — owner ruling, Jess 2026-09-18 ──────────────────
+   Supersedes the single header above all groups. Each governed group is its
+   own `<tbody>`, and a sticky cell is held by its table SECTION: that is what
+   makes the group's heading and its column header travel with the operator
+   through the group's own records and then STOP at the boundary, instead of
+   standing over the next group's rows.
+
+   Two stacked stops, in the order they are read:
+     0   the group heading (38px, the governed band)
+     38  that group's column header
+
+   Widths, visibility, sorting and resizing are not repeated here — one
+   `<colgroup>` and one `layout` serve every section, so there is nothing for
+   four headers to disagree about. */
+.fixedGroupRow .groupRowCell {
+  position: sticky;
+  top: 0;
+  /* Above the column header below it, and above every pinned body cell. */
+  z-index: 5;
+  background: theme("colors.white");
+}
+.thInGroup {
+  position: sticky;
+  top: 38px;
+  z-index: 3;
+}
+/* A pinned identity column is sticky on BOTH axes here, so it has to outrank
+   the header cells that slide under it sideways. */
+.thInGroup.stickyCell {
+  z-index: 4;
+}

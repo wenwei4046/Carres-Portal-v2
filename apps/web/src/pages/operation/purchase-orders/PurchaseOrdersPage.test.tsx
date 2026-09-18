@@ -3,6 +3,12 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigate = vi.fn();
+/* The page's own doors are asserted, not React Router's: `useNavigate` is the
+   one thing stubbed so a click can be read as the destination it asks for. */
+vi.mock("react-router-dom", async () => ({
+  ...(await vi.importActual<typeof import("react-router-dom")>("react-router-dom")),
+  useNavigate: () => navigate,
+}));
 const refetch = vi.fn();
 const reviseMutate = vi.fn();
 const termsMutate = vi.fn();
@@ -140,7 +146,7 @@ const queryData = {
 };
 
 vi.mock("@/components/register/DataGrid", () => ({
-  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions }: any) => (
+  DataGrid: ({ rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable }: any) => (
     <div
       data-testid="register-grid"
       data-groups={fixedGroups?.groups.map((g: any) => g.key).join(",")}
@@ -156,6 +162,9 @@ vi.mock("@/components/register/DataGrid", () => ({
           {columns.filter((c: any) => !c.defaultHidden).map((column: any) => (
             <div key={column.key}>{column.accessor?.(row)}</div>
           ))}
+          {/* The real engine draws this behind the goods disclosure; the stub
+              draws it always, so the expansion's own contract is testable. */}
+          {expandable?.renderExpansion?.(row)}
         </div>
       ))}
       {statusSummary?.(rows, [])}
@@ -220,7 +229,7 @@ vi.mock("@/lib/queries", () => ({
     isError: false,
     refetch,
   }),
-  useOperationPoUnits: () => ({ isLoading: connectionLoading, isError: false, refetch, data: connectionLoading ? undefined : { units: connectionEmpty ? [] : [{ unit_code: "U1-000-001", sku: "MAT-K-001", status: "incoming" }] } }),
+  useOperationPoUnits: () => ({ isLoading: connectionLoading, isError: false, refetch, data: connectionLoading ? undefined : { units: connectionEmpty ? [] : [{ unit_code: "U1-000-001", sku: "MAT-K-001", status: "incoming", po_line_id: "line-1" }, { unit_code: "U1-000-002", sku: "MAT-K-001", status: "incoming", po_line_id: "line-1" }] } }),
   usePoReceiving: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { sessions: connectionEmpty ? [] : [{ id: "receipt-1", do_number: "DO-SUP-9", status: "posted", goods_received_at: "2026-08-28", return_reason: receivingReturnReason }], events: [] } }),
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
@@ -294,13 +303,16 @@ beforeEach(() => {
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and a footer
    without quantity totals. */
 describe("Purchase Orders Register", () => {
-  it("draws exactly the nine approved columns, date first, and none of the retired ones", () => {
+  it("draws exactly the eleven approved columns, date first, and none of the retired ones", () => {
     renderPage();
     const grid = screen.getByTestId("register-grid");
     expect(screen.getByTestId("register-columns")).toHaveTextContent(
-      /^PO Date \| PO No \| Supplier \| SO No \| Items \| Expected Delivery Date \| Deliver To \| GRN No \| PO Version$/,
+      /^PO Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Default Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
     );
-    for (const retired of ["PO Issued", "PO Delivery Date", "Supplier Delivery Date", "Order Qty", "Received Qty", "Pending Delivery Qty", "Sent to Supplier", "Source"]) {
+    /* `Expected Delivery Date` is retired BY NAME: what we planned and what
+       the factory promised are two facts, and one cell holding whichever it
+       had could never be compared, sorted or filtered against the other. */
+    for (const retired of ["PO Issued", "Expected Delivery Date", "Order Qty", "Received Qty", "Pending Delivery Qty", "Sent to Supplier", "Source"]) {
       expect(screen.getByTestId("register-columns")).not.toHaveTextContent(retired);
     }
     expect(grid).toHaveAttribute("data-leading", "po_date,po");
@@ -324,37 +336,59 @@ describe("Purchase Orders Register", () => {
     marked.unmount();
   });
 
-  it("the rail is Supplier reply · Receiving · Supplier · Deliver To — no All row, no DOCUMENT group", () => {
+  it("the rail is Supplier reply · Receiving · Supplier · Supplier Deliver To, with complete labels and its four kit icons", () => {
     renderPage();
     const railEl = screen.getByTestId("po-filter-rail");
-    const headings = ["Supplier reply", "Receiving", "Supplier", "Deliver To"];
+    const headings = ["Supplier reply", "Receiving", "Supplier", "Supplier Deliver To"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
-    for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled"]) {
+    for (const gone of ["All purchase orders", "PDF not sent", "Version changed", "DOCUMENT STATE", "Completed", "Cancelled", "Clear filters"]) {
       expect(railEl).not.toHaveTextContent(gone);
     }
     const rail = within(railEl);
-    for (const word of ["Date not confirmed", "Date changed", "Date passed", "Partly received"]) {
-      expect(rail.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
+    /* ⭐ THE COMPLETE SENTENCE, IN THE ROW ITSELF (owner correction
+       2026-09-18). The page carries three different dates; a row that says
+       only `Date changed` names none of them, and the group heading that was
+       meant to qualify it scrolls away. */
+    for (const label of [
+      "Supplier has not confirmed the PO date",
+      "Supplier Confirmed Delivery Date changed",
+      "Supplier delivery date passed",
+      "Partly received",
+    ]) {
+      expect(rail.getByRole("button", { name: new RegExp(label) })).toBeInTheDocument();
     }
-    // Inside the Supplier reply group the row says only what changed.
-    for (const long of ["Supplier has not confirmed the PO date", "Supplier Delivery Date changed", "Supplier delivery date passed"]) {
-      expect(railEl).not.toHaveTextContent(long);
+    for (const shortened of ["Date not confirmed", "Date changed", "Date passed"]) {
+      expect(railEl).not.toHaveTextContent(new RegExp(`(^|[^ ])${shortened}`));
     }
     expect(rail.getByRole("combobox", { name: "Supplier" })).toBeInTheDocument();
-    expect(rail.getByRole("combobox", { name: "Deliver To" })).toBeInTheDocument();
+    expect(rail.getByRole("combobox", { name: "Supplier Deliver To" })).toBeInTheDocument();
+    /* Supplier reply → message · Receiving → goods · Supplier → supplier ·
+       Supplier Deliver To → warehouse, from the shared kit. */
+    expect([...railEl.querySelectorAll("[data-icon]")].map((el) => el.getAttribute("data-icon")))
+      .toEqual(expect.arrayContaining(["message", "goods", "supplier", "warehouse"]));
+  });
+
+  it("a chosen facet clears by clicking it again, and the rail has no Clear filters control", () => {
+    renderPage();
+    const rail = within(screen.getByTestId("po-filter-rail"));
+    const facet = rail.getByTestId("po-filter-partly_received");
+    fireEvent.click(facet);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^1 of 2 purchase orders$/);
+    fireEvent.click(facet);
+    expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
   });
 
   it("SUPPLIER REPLY counts only the current version marked as sent with goods pending", () => {
     renderPage();
     // V2 is not marked: it is nobody's supplier chase yet.
     const rail = within(screen.getByTestId("po-filter-rail"));
-    expect(within(rail.getByRole("button", { name: /Date not confirmed/ })).getByText("0")).toBeInTheDocument();
+    expect(within(rail.getByRole("button", { name: /Supplier has not confirmed the PO date/ })).getByText("0")).toBeInTheDocument();
   });
 
-  it("an active supplier-reply condition outside the group uses the complete label", () => {
+  it("the row's label and its active-condition chip are one sentence, written once", () => {
     renderPage();
     const railEl = screen.getByTestId("po-filter-rail");
-    fireEvent.click(within(railEl).getByRole("button", { name: /Date passed/ }));
+    fireEvent.click(within(railEl).getByRole("button", { name: /Supplier delivery date passed/ }));
     expect(screen.getByTestId("register-conditions")).toHaveTextContent(/^Supplier delivery date passed$/);
   });
 
@@ -368,7 +402,7 @@ describe("Purchase Orders Register", () => {
     fireEvent.click(rail.getByTestId("po-filter-partly_received"));
     expect(screen.getByTestId("grid-row-PO-LEGACY")).toBeInTheDocument();
     // Both POs deliver to Carres Klang: the facet says so, and choosing it keeps both.
-    const deliverTo = rail.getByRole("combobox", { name: "Deliver To" });
+    const deliverTo = rail.getByRole("combobox", { name: "Supplier Deliver To" });
     expect(within(deliverTo).getByRole("option", { name: "Carres Klang · 2" })).toBeInTheDocument();
     fireEvent.change(deliverTo, { target: { value: "Carres Klang" } });
     expect(screen.getByTestId("po-footer")).toHaveTextContent(/^2 purchase orders$/);
@@ -378,10 +412,17 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("register-grid")).not.toHaveTextContent("Order Qty");
   });
 
-  it("Expected Delivery Date: the supplier's evidenced date first, and which it is on line two", () => {
+  it("⭐ three dates, three columns — and one is NEVER filled in from another", () => {
     renderPage();
-    expect(screen.getByTestId("po-expected-PO-20260828-4827")).toHaveTextContent("Thu, 10 SepConfirmed by supplier");
-    expect(screen.getByTestId("po-expected-PO-LEGACY")).toHaveTextContent("Not recordedNot confirmed by supplier");
+    const row = screen.getByTestId("grid-row-PO-20260828-4827");
+    /* What WE planned, preserved whatever the supplier later answers. */
+    expect(row).toHaveTextContent("Thu, 10 Sep");
+    /* What the FACTORY confirmed, for the current version. */
+    expect(screen.getByTestId("po-supplier-date-PO-20260828-4827")).toHaveTextContent("Thu, 10 Sep");
+    /* No answer is an absence, never the PO default wearing the supplier's
+       name — that substitution is the reason these are two columns. */
+    expect(screen.getByTestId("po-supplier-date-PO-LEGACY")).toHaveTextContent("Not confirmed by supplier");
+    expect(screen.getByTestId("po-supplier-date-PO-LEGACY")).not.toHaveTextContent("Sep");
 
     queryData.pos[0]!.promises.push({
       po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
@@ -395,8 +436,44 @@ describe("Purchase Orders Register", () => {
       recorded_at: "2026-09-09T10:00:00Z",
     });
     const changed = renderPage();
-    expect(screen.getAllByTestId("po-expected-PO-20260828-4827").at(-1)).toHaveTextContent("Mon, 14 SepSupplier changed from Thu, 10 Sep");
+    const moved = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    expect(screen.getAllByTestId("po-supplier-date-PO-20260828-4827").at(-1))
+      .toHaveTextContent("Mon, 14 SepSupplier changed from Thu, 10 Sep");
+    /* The original stays exactly where it was. A supplier moving a date does
+       not rewrite what Carres planned. */
+    expect(moved).toHaveTextContent("Thu, 10 Sep");
     changed.unmount();
+  });
+
+  it("Goods Received Date and GRN No: one receipt each, several a count link into every receipt", () => {
+    const po = queryData.pos[0]! as typeof queryData.pos[0] & { grns?: unknown };
+    po.grns = [{ id: "r1", grn_no: "GRN-20260910-1001", goods_received_at: "2026-09-09", received_qty: 2 }];
+    const one = renderPage();
+    const oneRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    /* The receipt record carries a date and no clock (0314): the time is
+       stated as missing, never guessed from when the paperwork was filed. */
+    expect(within(oneRow).getByTestId("po-received-PO-20260828-4827")).toHaveTextContent("Wed, 9 SepTime not recorded");
+    expect(within(oneRow).getByRole("button", { name: "GRN-20260910-1001" })).toBeInTheDocument();
+    one.unmount();
+
+    po.grns = [
+      { id: "r1", grn_no: "GRN-20260910-1001", goods_received_at: "2026-09-09", received_qty: 2 },
+      { id: "r2", grn_no: "GRN-20260912-1002", goods_received_at: "2026-09-12", received_qty: 1 },
+    ];
+    const many = renderPage();
+    const manyRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    /* ⭐ NEVER ONE DATE FOR TWO TRUCKS. */
+    fireEvent.click(within(manyRow).getByRole("button", { name: "2 receipt dates" }));
+    const dialog = screen.getByTestId("po-receipts-dialog");
+    expect(within(dialog).getByTestId("po-receipt-GRN-20260910-1001")).toHaveTextContent("Wed, 9 Sep");
+    expect(within(dialog).getByTestId("po-receipt-GRN-20260910-1001")).toHaveTextContent("2");
+    expect(within(dialog).getByTestId("po-receipt-GRN-20260912-1002")).toHaveTextContent("Sat, 12 Sep");
+    expect(within(dialog).getByTestId("po-receipt-GRN-20260912-1002")).toHaveTextContent("1");
+    /* Each row keeps the door to the actual receipt. */
+    fireEvent.click(within(dialog).getByRole("button", { name: "GRN-20260912-1002" }));
+    expect(navigate).toHaveBeenCalledWith("/operation?tab=receiving&session=r2");
+    many.unmount();
+    delete po.grns;
   });
 
   it("PO Version reads the CURRENT version and its sent mark only", () => {
@@ -409,34 +486,103 @@ describe("Purchase Orders Register", () => {
     marked.unmount();
   });
 
-  it("SO No, Items and GRN No state the documents without a Source column", () => {
-    renderPage();
-    const row = screen.getByTestId("grid-row-PO-20260828-4827");
-    expect(within(row).getByText("SO-4001")).toBeInTheDocument();
-    expect(row).toHaveTextContent("Cody · King");
-    // Every governed and legacy reference stays searchable.
-    expect(screen.getByTestId("register-search-index")).toHaveTextContent("Manual Purchase");
-    expect(screen.getByTestId("register-search-index")).not.toHaveTextContent("MPR-");
-
+  it("SO No / MPR No names the REAL documents behind the PO, each one reachable", () => {
     const po = queryData.pos[0]! as typeof queryData.pos[0] & { grns?: unknown };
     const sources = po.sources;
-    po.sources = [{ kind: "sales_order", reference: "SO-4001" }, { kind: "sales_order", reference: "SO-4002" }] as typeof sources;
-    po.grns = [{ id: "r1", grn_no: "GRN-20260910-1001" }, { id: "r2", grn_no: "GRN-20260912-1002" }];
+
+    /* One Sales Order: its own number, its own door. */
+    po.sources = [{ kind: "sales_order", reference: "SO-4001", order_id: "order-1" }] as typeof sources;
+    const single = renderPage();
+    const singleRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    expect(within(singleRow).getByRole("button", { name: "SO-4001" })).toBeInTheDocument();
+    expect(singleRow).toHaveTextContent("Cody · King");
+    fireEvent.click(within(singleRow).getByRole("button", { name: "SO-4001" }));
+    expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
+    single.unmount();
+
+    /* ⭐ MPR IS THE MANUAL PURCHASE'S VISIBLE IDENTITY AGAIN (owner ruling
+       2026-09-18). The number comes from the request; it is never minted here
+       and a UUID never stands in for it. */
+    po.sources = [{ kind: "manual_purchase", reference: "MPR-20260828-0533", req_no: "MPR-20260828-0533", request_id: "request-1" }] as typeof sources;
+    const mpr = renderPage();
+    const mprRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    expect(within(mprRow).getByRole("button", { name: "MPR-20260828-0533" })).toBeInTheDocument();
+    expect(mprRow).not.toHaveTextContent("request-1");
+    mpr.unmount();
+
+    /* A request with no stored number keeps the governed label — and, having
+       nothing to open, is a fact rather than a dead control. */
+    po.sources = [{ kind: "manual_purchase", reference: "Manual Purchase", req_no: null, request_id: null }] as typeof sources;
+    const unnumbered = renderPage();
+    const unnumberedRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
+    expect(unnumberedRow).toHaveTextContent("Manual Purchase");
+    expect(within(unnumberedRow).queryByRole("button", { name: "Manual Purchase" })).toBeNull();
+    unnumbered.unmount();
+
+    /* Several: the approved count, and the PO's Order Route, where each one is
+       a row — the listing never picks one to stand for the rest. */
+    po.sources = [
+      { kind: "sales_order", reference: "SO-4001", order_id: "order-1" },
+      { kind: "sales_order", reference: "SO-4002", order_id: "order-2" },
+    ] as typeof sources;
     const many = renderPage();
     const manyRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
     expect(manyRow).toHaveTextContent("2 SOs");
-    expect(within(manyRow).getByRole("button", { name: "2 GRNs" })).toBeInTheDocument();
+    expect(screen.getByTestId("register-search-index")).toHaveTextContent("SO-4002");
     many.unmount();
 
-    po.sources = [{ kind: "manual_purchase", reference: "Manual Purchase", request_id: "request-1" }] as typeof sources;
-    po.grns = [{ id: "r1", grn_no: "GRN-20260910-1001" }];
-    const manual = renderPage();
-    const manualRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
-    expect(manualRow).toHaveTextContent("Manual Purchase");
-    expect(within(manualRow).getByRole("button", { name: "GRN-20260910-1001" })).toBeInTheDocument();
-    manual.unmount();
     po.sources = sources;
     delete po.grns;
+  });
+
+  it("the goods expansion reads Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items, read-only", () => {
+    renderPage();
+    const goods = screen.getByTestId("po-goods-PO-20260828-4827");
+    const heads = [...goods.querySelectorAll("th")].map((th) => th.textContent);
+    expect(heads).toEqual(["Category", "Supplier", "Supplier Deliver To", "PO No / Unit ID", "Qty", "Items"]);
+    /* A TRUTH table: nothing here can commit a unit or buy anything. */
+    expect(goods.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(goods).not.toHaveTextContent("Ready Stock");
+    expect(goods).not.toHaveTextContent("To buy");
+  });
+
+  it("the PO No / Unit ID cell carries the document, then its REAL line-bound Unit IDs", () => {
+    renderPage();
+    const goods = screen.getByTestId("po-goods-PO-20260828-4827");
+    expect(goods).toHaveTextContent("PO-20260828-4827");
+    /* Minted at official PO issue, bound to this line (§6.2, 0442–0444) —
+       never generated for a screen and never copied from a sample. */
+    expect(goods).toHaveTextContent("U1-000-001");
+    expect(goods).toHaveTextContent("U1-000-002");
+  });
+
+  it("a quantity line has no Unit IDs by law; an exact-unit line with none is an integrity failure", () => {
+    const line = queryData.pos[0]!.purchase_order_lines[0]!;
+    connectionEmpty = true;
+
+    line.identity_mode = "quantity";
+    const counted = renderPage();
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("—");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
+    counted.unmount();
+
+    line.identity_mode = "exact_unit";
+    const missing = renderPage();
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1))
+      .toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+    missing.unmount();
+
+    /* A read that has not answered is not the same fact as a Unit that is
+       missing, and it may never be printed as one. */
+    connectionLoading = true;
+    const reading = renderPage();
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).toHaveTextContent("Reading Unit IDs…");
+    expect(screen.getAllByTestId("po-goods-PO-20260828-4827").at(-1)).not.toHaveTextContent("do not send this PO");
+    reading.unmount();
+
+    connectionLoading = false;
+    connectionEmpty = false;
+    line.identity_mode = null;
   });
 
   it("offers the personal saved layouts on this listing", () => {
