@@ -23,6 +23,8 @@ export interface DealerListItem {
   /** Branches under this account. Shown on the Dealers page only — our own
    *  showrooms ARE the branch, so the column would read "1" for every row. */
   outletCount: number;
+  /** 0543 — dealer code (JB1). */
+  code?: string | null;
 }
 
 interface Props {
@@ -39,7 +41,10 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
       className="border-t border-base-100 cursor-pointer hover:bg-base-50"
     >
       <td className="px-4 py-3">
-        <div className="font-semibold">{d.name}</div>
+        <div className="font-semibold">
+          {d.code && <span className="font-mono text-base-500 mr-1.5">{d.code}</span>}
+          {d.name}
+        </div>
         <div className="text-label text-base-500 mt-0.5">{d.contact ?? "—"}</div>
       </td>
       <td className="px-4 py-3 text-base-700">{d.region}</td>

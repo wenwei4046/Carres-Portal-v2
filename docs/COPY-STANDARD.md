@@ -3577,3 +3577,10 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+### PROPOSAL — PENDING APPROVAL (dealer-maintenance)
+
+Finance sidebar entry `Dealers` (opens the same dealer list as Admin > Dealers; Finance has no
+`+ Invite dealer` button and no Suspend / Reactivate). Dealer drawer fields: `Dealer code` with
+placeholder `e.g. JB1`, and `State` with the first option `Not set`. A dealer's code, when set,
+shows before its name in the list and replaces the id at the top of the drawer.

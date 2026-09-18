@@ -29,10 +29,12 @@ import type { AppEnv } from "../../types";
  */
 const principalDealersRouter = new Hono<AppEnv>();
 
-// Inline principal-only guard (matches dashboard.ts/approvals.ts pattern).
+// 0543 — Finance may view the list and detail and edit the master fields
+// (PATCH). Inviting a dealer and changing its status stay principal-only.
 principalDealersRouter.use("*", async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "principal") {
+  const financeMayUse = role === "finance" && c.req.method !== "POST";
+  if (role !== "principal" && !financeMayUse) {
     throw new HTTPException(403, { message: "Principal only" });
   }
   await next();
@@ -56,7 +58,7 @@ principalDealersRouter.get("/", async (c) => {
   // stores gone from the portal) and every dealer row would raise a false
   // "no outlet" alarm. A visible error beats confidently wrong data.
   const [chanRes, outletRes] = await Promise.all([
-    sb.from("dealers").select("id, channel"),
+    sb.from("dealers").select("id, channel, code"),
     sb.from("outlets").select("dealer_id"),
   ]);
   const joinErr = chanRes.error ?? outletRes.error;
@@ -65,6 +67,9 @@ principalDealersRouter.get("/", async (c) => {
   const outletRows = outletRes.data;
   const channelById = new Map<string, string>(
     (chanRows ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
+  );
+  const codeById = new Map<string, string | null>(
+    (chanRows ?? []).map((r) => [r.id as string, (r.code as string | null) ?? null]),
   );
   const outletCountById = new Map<string, number>();
   for (const o of outletRows ?? []) {
@@ -89,6 +94,7 @@ principalDealersRouter.get("/", async (c) => {
     // Unknown id → 'dealer', matching the column's own DB default.
     channel: channelById.get(d.id) === "showroom" ? "showroom" : "dealer",
     outletCount: outletCountById.get(d.id) ?? 0,
+    code: codeById.get(d.id) ?? null,
   }));
   return c.json({ dealers });
 });
@@ -116,7 +122,7 @@ principalDealersRouter.get("/:id", async (c) => {
   // dealer or one of Carres' own showrooms (which carry no SSM / PIC).
   const { data: extra } = await sb
     .from("dealers")
-    .select("address, ssm_code, contact_name, contact_phone, channel")
+    .select("address, ssm_code, contact_name, contact_phone, channel, code, state")
     .eq("id", id)
     .maybeSingle();
   // Always present, so the drawer's `channel` is never undefined; an absent
@@ -133,6 +139,10 @@ principalDealersRouter.get("/:id", async (c) => {
     (dealer as any).contact_name  = extra.contact_name ?? null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dealer as any).contact_phone = extra.contact_phone ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).code          = extra.code ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dealer as any).state         = extra.state ?? null;
   }
 
   // 2. Fetch last 8 orders with line/addon for total computation.
@@ -205,6 +215,8 @@ principalDealersRouter.patch("/:id", async (c) => {
   if (body.ssmCode     !== undefined) patch.ssm_code = body.ssmCode;
   if (body.contactName !== undefined) patch.contact_name = body.contactName;
   if (body.contactPhone !== undefined) patch.contact_phone = body.contactPhone;
+  if (body.code        !== undefined) patch.code = body.code;
+  if (body.state       !== undefined) patch.state = body.state;
 
   // Legacy `contact` text column mirrors contact_name + contact_phone for
   // back-compat reads. Recompute only when one of the two changed (otherwise
@@ -226,13 +238,13 @@ principalDealersRouter.patch("/:id", async (c) => {
     return c.json({ ok: true, dealer: null });
   }
 
+  // 0543 — one write door for principal and finance; it touches the master
+  // columns only (finance has no direct write on dealers).
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("dealers")
-    .update(patch)
-    .eq("id", id)
-    .select("id, name, region, contact, address, ssm_code, contact_name, contact_phone")
-    .maybeSingle();
+  const { data, error } = await sb.rpc("dealer_save_master", {
+    p_dealer_id: id,
+    p_patch: patch,
+  });
   if (error) return fail(c, error);
   return c.json({ ok: true, dealer: data });
 });
