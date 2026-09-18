@@ -155,7 +155,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
 | Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available and reports a source-linked Purchasing claim; later discovery on a Stock Unit/receipt opens a Purchasing stock claim directly | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Purchasing claim authority; GRN/Unit evidence; related customer Service Case read-only; Finance credit read-only |
 | Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
-| Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Approved repair outcome creates RO; same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Approved stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
+| Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Authorised inventory repair or Claim outcome creates RO (§9.7); same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Authorised inventory repair or stock-claim outcome; Stock custody; Goods Receipt/inspection on return |
 | Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
 | Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
 | Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
@@ -3337,25 +3337,151 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Local physical-chain implementation — 2026-09-07, not deployed:** an authorised Claim repair or
-replacement outcome can now open exact-Unit arrival source work, with recorded handover and return
-Receiving through the existing GRN/result ledger and GRN Duty. Repair preserves identity;
-replacement allocates a new Unit linked to the original. This does not complete the formal Repair
-Order/Purchase Return document target below. Database draft readiness and local evidence are
-recorded once in `docs/stock/MASTER.md` under Inbound local implementation.
+**Owner-confirmed business blueprint — 2026-09-18. APPROVED TARGET / NOT BUILT.**
+This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
+ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
+The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
+merely because they appeared there. No application implementation or deployment is claimed.
 
+**Purpose:** commission a selected Supplier to repair identified existing goods, record the agreed
+scope and cost responsibility, and follow the same Units out, back and through inspection.
+Supplier Claim addresses alleged supplier responsibility and its agreed outcome; RO executes a
+repair commission. A Claim does not prove fault has been admitted. An RO does not imply either
+free warranty service or a charge to Carres. Supplier may differ from the original PO supplier.
 
-**Purpose / source:** send a specific Carres-owned Unit for approved supplier/repairer work; no blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Handover out missing`, `Expected back date missing`, `Expected back date passed`, `Return inspection missing`, `Closed`.
-**Columns:** RO No, Repairer, Source Stock Claim, Unit, Problem, Sent Out, Expected Back, Returned,
-Inspection, Work.
-**Journey:** create from approved repair outcome → issue → prove same Unit handed out → chase actual
-date → receive/inspect same Unit → close or route failed repair.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** cannot repair, repairer returns a different physical Unit, date changed, damage added,
-replacement offered.
-**Connections:** Purchasing stock claim, Stock custody/history, Goods Receipt/inspection.
+#### Creation sources and eligible goods
+
+1. **Direct inventory repair:** `Create Repair Order` on this register, or the linked action on an
+   inventory Unit, opens selection of existing Units. Supplier Claim is not required.
+2. **Claim-linked repair:** an authorised repair decision opens the same RO flow with the Claim,
+   exact Units, requirements and evidence prefilled. Retain the source links; do not ask staff to
+   report the same problem again. Creating or issuing RO does not itself close the Claim.
+
+Eligible selection locations include **Warehouse, Showroom and Dealer**, including **Display**
+goods. Display is a use of the goods, not a separate ownership class. Showroom/Dealer are actual
+recorded locations, not proof of ownership. This is not permission to commission repair for any
+untracked product owned by a dealer or customer.
+
+Select existing, accessible Unit records; do not type a product into an RO and thereby invent
+stock. Bring in Category, Items/configuration, original PO/source, Unit ID and current recorded
+Stock Location. If an original PO is absent, retain the genuine source and missing-reference fact;
+never fabricate a PO. The selected repair Supplier does not rewrite the original purchase source.
+
+Carres-owned stock follows the normal authority and cost-approval rules. Consignment or other
+non-Carres-owned goods require the owner's authority and explicit cost responsibility before
+commitment. Do not silently treat supplier-owned Display goods as Carres assets. Sold/reserved,
+held, already-out, or already-in-repair Units require the owning workflow's eligibility checks;
+selection must not bypass commitments, controls, permissions or create duplicate active repair.
+A photo or free-text item is not a substitute for a real Unit. Untracked/count-managed repair is
+not admitted by this exact-Unit blueprint; resolve identity in the owning inventory process.
+
+#### Required record and location meanings
+
+| Field / fact | Meaning and source |
+|---|---|
+| RO Doc Date / RO No | Repair document date and governed RO identity; not the pickup date. Follow the existing number-allocation policy; do not invent a sequence in the UI |
+| Supplier | Supplier accepting this repair commission; selected independently of the original seller |
+| Supplier Claim No | Optional related Claim; prefilled for Claim-origin repairs, empty for direct inventory repairs |
+| Category / PO No + Unit ID / Items / Qty | Existing goods facts; PO on line one and Unit ID beneath in one cell; model then configuration; one tracked Unit per detail row, Qty 1 |
+| Repair Requirement / Problem | Observed fault, required repair and expected result, attributable to each Unit |
+| Evidence | Per-Unit photos/videos with their source and purpose; retain existing Claim evidence links |
+| Supplier Pickup Location | Recorded place from which these goods are to be collected for repair; default from the Unit's actual Stock Location |
+| Supplier Return Location | Intended place to receive the goods after repair; can differ from pickup location; not evidence of receipt |
+| Expected Return Date | Recorded expected return with its provider/evidence; do not imply supplier confirmation where none exists |
+| Repair Quotation / Cost Responsibility | Supplier's quoted scope and charges, and who will bear them; an unknown cost is not zero |
+| Approval | Actual authorised actor, time and scope, according to existing approval policy |
+
+Supplier Pickup Location and Supplier Return Location apply equally to Warehouse, Showroom and
+Dealer sites. Record actual collector/carrier separately; these labels do not require the supplier
+to transport personally. Changing a planned location never moves a Unit or overwrites Stock's
+current-location fact. A pickup-location mismatch must be resolved against actual custody.
+Do not add `Repair Location`: this register does not track where the supplier performs the repair.
+
+#### Quotation, approval and issue
+
+Save an incomplete quotation as a draft. If Carres pays, obtain the supplier quotation and the
+required approval before committing or issuing the order. If Supplier pays, retain its evidenced
+agreement; never infer free repair from a Claim link. Use existing approval roles/limits, not a new
+threshold invented by this page. Missing applicable authority prevents commitment and explains
+what is needed. Any charge or repair-scope increase needs the applicable approval; keep the old
+quote, new proposal and decision rather than overwriting them.
+
+If a supplier rejects warranty liability and proposes paid repair, keep its reply and the original
+Claim history. Carres must expressly approve the paid commission; do not auto-convert the Claim
+or accept the quotation. Decide outstanding Claim matters under §9.5 independently.
+
+Issue uses the shared formal-document flow: staff actually send the approved document and record
+version, recipient, channel, actor and time. Generating/downloading PDF proves neither sending
+nor supplier acceptance. Preserve sent revisions and corrections. Quote/approval is a purchasing
+commitment fact; payment, balance and credit processing remain in Finance, outside the register.
+
+#### Physical execution and completion
+
+Outbound records exact Units actually handed out, actual recipient/collector, time and evidence.
+Document issue never moves inventory. Track the expected return and evidenced changes. Receiving
+records actual returned Units, receipt date, receiving location and evidence through the one receipt
+engine; the expected destination is not substituted for the actual one. Inspect the returned goods,
+record actual inspector, date, result and supporting media before restoring availability.
+
+Repair retains the original Unit ID. A different replacement is a linked replacement with a new
+identity, not a repaired original. Partial return/inspection completes only the actual Units; keep
+remaining quantities and dates visible. Failed repair, new damage, refusal, cancellation or inability
+to repair needs its owning authorised outcome. Closure does not erase stock obligations or restore
+availability. A supplier saying the work is finished is not receipt or inspection evidence.
+
+#### Register, detail and shared UI
+
+Keep Repair Orders as a separate register for both creation sources. Supplier Claim opens its
+related RO directly. Register expansion is read-only per-Unit inspection; RO No opens the one formal
+record. Ordinary detail is full-width; only document issue/revision uses governed 50/50 preview.
+Use shared grid/rail geometry and width registry, Supplier-name/count filters, Category immediately
+before PO No / Unit ID, Items/configuration and Qty. Counts distinguish RO documents from Units.
+Problem and Evidence are separate columns. Evidence actions are compact icon/text controls;
+expand by Unit and distinguish original fault, dispatch and receipt/inspection evidence. Use the
+shared viewer contract for photo zoom/pan/reset/navigation and video playback/fullscreen.
+No Work, Finance, Credit or Payment column. No invented editable lifecycle, supplier progress or
+ambiguous dash-joined status. The old §9.7 field/rail list is superseded; remaining exact filter copy
+and layout require a fresh preview against this business scope, not reuse of the rejected HTML.
+
+#### Whole-Portal ownership and Workspace integration
+
+This is one connected workflow, not a standalone repair tracker. Workspace My Work / Team Work
+coordinates admitted obligations from the owning records; it does not keep a second RO, quote,
+status or stock ledger. Each work occurrence must satisfy Workspace MASTER §6 before build admission:
+stable source/rule/occurrence, authoritative trigger/completion, resolved Duty/person and cover,
+governed date/calendar, permission, actual-actor history and a direct link to the owning action.
+Do not invent a new approval holder or deadline; unresolved ownership remains explicit.
+
+| Portal owner | Repair connection |
+|---|---|
+| Purchasing / RO | Requirements, chosen Supplier, quote/cost responsibility, authorised scope, Issue and supplier follow-up |
+| Workspace / Staff & Duties | Resolve who must approve, issue or follow up; My Work/Team Work shows the same source-owned outstanding act and removes it only after proved completion |
+| Inventory / Stock | Select existing Units and actual locations, verify ownership/holds/reservations, retain identity and custody history |
+| Outbound / transport | Actual Unit dispatch, collector/recipient and proof; existing delivery/transport records when applicable, no second logistics engine |
+| Receiving / inspection | Authorised RO-linked receipt, original identity, partial quantities, actual receiving site and inspection result |
+| Supplier Claim | Optional source and supplier-responsibility follow-through; no fabricated Claim for direct inventory repair |
+| Finance | Consume authorised cost/source facts for its existing payable/payment process; RO never posts payment or duplicates approval/financial ledgers |
+| Linked customer order / Service Case | Preserve any actual reservation/customer relationship and outstanding service obligations; RO completion cannot silently complete a different record |
+| Portal history / documents | Trace source, Unit, quote, approval, sent revision, physical movements and actual actors across the linked records |
+
+Potential Work obligations include completing a required quote/approval, issuing the approved RO,
+following up a recorded return date, and completing receiving/inspection in the owning module.
+A register filter is not itself a Work obligation. Reuse existing stock/receiving tasks rather than
+create duplicate RO tasks for the same physical act. Tests must prove permission/cover behaviour,
+partial completion, stale-state handling and disappearance of exactly the completed occurrence.
+These integrations are approved targets, not claims that Work projections are already admitted.
+
+#### Build implications and validation boundary
+
+Existing migration 0490 repair-return sources require a Claim or Case and are not proof of a formal
+RO implementation. Stock/Receiving must accept an authorised direct-stock RO as a governed source
+without fake Claims/Cases, while preserving permissions, ownership, exact-Unit identity and receipt
+checks. Do not weaken constraints globally or implement independent custody writers.
+
+Build must verify both sources, warehouse/showroom/dealer Display selection, owner authority for
+consignment, Supplier different from original PO supplier, missing quote, denied approval, duplicate
+active repair, partial return, failed inspection, replacement identity and receipt-source compatibility.
+This document authorises the target, not a migration, build-card creation or production rollout.
 
 ### 9.8 Display Requests
 
