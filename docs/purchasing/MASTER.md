@@ -1936,14 +1936,23 @@ stay Completed. Search/filters cover all groups and reveal matching collapsed gr
 Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by confirmed supplier date, falling back to original PO date, ascending;
 Completed/Cancelled newest first. Unknown dates remain explicit, not invented.
 
-**Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Date not confirmed`,
-`Date changed`, `Date passed`, using existing current-version sent/pending predicates.
+**Rail — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED, Jess 2026-09-17:** `Supplier reply` contains `Supplier has not confirmed the PO date`,
+`Supplier Confirmed Delivery Date changed`, `Supplier delivery date passed`, using existing current-version sent/pending predicates.
 `Receiving` contains `Partly received`; retain Supplier and Deliver To facts and selection rules.
 Use complete supplier-date labels outside the group context, including active-condition chips.
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
+**Expansion — APPROVED / NOT BUILT, owner confirmation 2026-09-18:** read-only ordered goods:
+`Item / configuration · Qty · Unit ID · Supplier Deliver To`. Exact-unit lines show actual
+line-bound Unit IDs allocated at official PO issue (§6.2), one per line within the cell; counted
+lines show `—`. Missing required IDs is an integrity error, never invented or deferred to receipt.
+The parent remains one row per PO. Shared dimensions and sticky-header behaviour are owned by
+UI MASTER §6.8. The rail has no Clear filters button; selected facets toggle off. Supplier reply
+facets use full dictionary labels to make the delivery-date meaning explicit. Sending evidence
+still reads the shared current-version record; Workspace routes ownership, no duplicate task or
+confirmation store is introduced. Multiple GRNs remain a count link; opening it lists each GRN,
+Goods Received Date and Received Qty on its own row.
 **Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce

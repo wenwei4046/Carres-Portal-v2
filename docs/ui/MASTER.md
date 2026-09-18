@@ -1775,6 +1775,64 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
+### Shared Purchasing geometry — owner-approved consolidation, 2026-09-18
+
+One registry governs SO Batch, Manual Purchase and Purchase Orders. Existing page-local widths
+must converge; approval of this contract does not claim the three pages are already built or
+production-verified. Other Registers inherit the shared padding, typography and sticky-header
+behaviour, not Purchasing business fields or page-specific colours.
+
+| Geometry | Shared value / behaviour |
+|---|---|
+| Cell horizontal padding | 8px per side; adjacent content separated by 16px plus divider |
+| Dividers / connector | 1px |
+| Header | 36px minimum, two 14px lines; 4px vertical padding; 11px/600 |
+| Single-line parent row | 38px minimum, existing density law |
+| Two-line goods / Unit rows | 54px minimum, shared across the same table; grow together if content requires |
+| Main / secondary type | 13px / 18px line height; 11px / 14px secondary |
+| Standard control | 32px minimum; checkbox 16px, vertically centred |
+| Toolbar / footer | 45px / 32px minimum |
+| Expansion | 12px above, 16px below; begins after the parent's control gutter |
+| Sticky header | Each Register keeps its header inside its scrolling viewport; groups share it |
+| Pinned identity | Date + number at canvas >=768px; number only below; headers and cells scroll together |
+
+The following are the common **prototype starting widths**, not verified production maxima.
+Use one field-width registry, never a fresh per-page guess. Validate actual fonts, longest values,
+200% zoom and 1440/1180/820/390 before production; fix the shared field definition when it fails.
+Required numbers never truncate; content may wrap, and user resizing remains available.
+
+| Field / role | Starting width (px) |
+|---|---:|
+| Checkbox / disclosure (each) | 40 |
+| Date (short date) | 118 |
+| PO No / MPR No / GRN No | 170 |
+| SO No | 90 |
+| SO No / MPR No mixed reference | 176 |
+| Status / Approval Status | 144 |
+| PO Safety Days | 110 |
+| Category | 112 |
+| Qty | 64 |
+| Item / Items | 208 |
+| Supplier / Ready Stock | 136 |
+| Supplier Deliver To | 150 |
+| Customer | 150 |
+| Customer Delivery Location | 176 |
+| Customer Requested Delivery Date | 180 |
+| PO Default Delivery Date | 150 |
+| Supplier Confirmed Delivery Date | 180 |
+| Goods Received Date | 140 |
+| Stock Location | 160 |
+| PO No / Ref No + Unit ID | 230 |
+| Unit ID standalone | 140 |
+| Condition | 120 |
+| Purpose / Requested By | 144 |
+| PO Version with send evidence | 238 |
+
+Repeat no page title inside the toolbar. PO's rail has no Clear filters button (owner correction);
+clicking a selected facet again clears that facet. Selects retain their All option. The shared
+active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
+Purchasing §9.3; quantity-managed lines have none. Do not infer new selection capabilities.
+
 ## §6.9 · Connected expansion
 
 Use the existing shared connector primitives. The SO row connects to its goods expansion.

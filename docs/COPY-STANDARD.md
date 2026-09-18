@@ -951,17 +951,16 @@ Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery D
 
 Groups: `Confirm PO sent to supplier` · `Waiting for goods from supplier` · `Completed` · `Cancelled`; membership and sorting are
 owned by Purchasing MASTER §9.3. No quantity totals in the PO listing footer.
-Expansion: `SKU · Item / configuration · Qty · Deliver To` (read-only).
+Expansion: `Item / configuration · Qty · Unit ID · Supplier Deliver To` (read-only; approved 2026-09-18). Exact IDs exist at official PO issue; quantity goods display `—`.
 
 | Rail group | Visible rows |
 |---|---|
-| `Supplier reply` | `Date not confirmed` · `Date changed` · `Date passed` |
+| `Supplier reply` | `Supplier has not confirmed the PO date` · `Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed` |
 | `Receiving` | `Partly received` |
 | `Supplier` | Supplier facts |
 | `Deliver To` | Destination facts |
 
-Inside the `Supplier reply` group the short rows are used. Outside that group context — including
-active-condition chips — use the complete labels `Supplier has not confirmed the PO date` ·
+In the PO `Supplier reply` rail and active-condition chips use the complete labels `Supplier has not confirmed the PO date` ·
 `Supplier Confirmed Delivery Date changed` · `Supplier delivery date passed`.
 Supplier-reply conditions require the current version marked as sent and goods pending.
 Retire on this listing: `PO Issued`, separate `Sent to Supplier`, `Source`, combined `Expected Delivery Date`,
@@ -3582,7 +3581,6 @@ Canonical PO group labels: `Confirm PO sent to supplier` · `Waiting for goods f
 `Sending not confirmed` or `PO sent to supplier · {channel} · {date}`. Channel is recorded data,
 never hardcoded WhatsApp. Shared completion: `Current PO version marked as sent`.
 `Waiting for goods from supplier` is an exact approved exception, not permission for vague Waiting.
-Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`; outside that group
-use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
+Under `Supplier reply` and in chips use the complete supplier-date labels defined in the PO Register dictionary (owner correction 2026-09-18). Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
