@@ -1855,7 +1855,7 @@ Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date
 `Order By` remains an internal planning/detail fact, not the SO Batch/Manual Purchase parent column.
 `Expected Delivery Date` no longer merges default and confirmed dates in the PO register.
 
-### Purchase Returns words — PROPOSAL / NOT LAW (awaiting owner confirmation, 2026-09-18)
+### Purchase Returns words — list words APPROVED (Jess, 2026-09-18); detail-page words PROPOSAL
 
 Columns (owner ruling 2026-09-18): `Return Date` · `Return No.` · `PO No` · `GRN No.` · `Supplier Claim
 No.` · `Supplier` · `Items` · `Qty` · `Goods Collect From` · `Goods Collection Date` · `Goods Return
@@ -1869,7 +1869,7 @@ confirmed`. Groups reuse `Open` · `Closed` · `Cancelled`. Added:
 | `Return Date` | The date the approved outcome created the return (its leading register date). Never a collection or handover date |
 | `Goods Collect From` | Where the goods are picked up (the Carres site holding them) |
 | `Goods Collection Date` | The agreed pickup date, with the supplier's agreement evidence; otherwise `Not recorded` |
-| `Goods Return Status` | Actual return progress per Unit: `Not collected` · with `NETS Logistics` · `Part collected` · `Collected` (the supplier has it). Handing to Logistics is not supplier receipt |
+| `Goods Return Status` | Actual return progress per Unit: `Not collected` · with the actual logistics company (named from the handover record, never hard-coded) · `Part collected` · `Collected` (the supplier has it). Handed to Logistics and received by the supplier are separate facts |
 | `Not collected` | No Unit of the return has been collected yet |
 | `Return sent to supplier` | Staff confirm they really sent the return; records version, channel, recipient, actor and time. Never claims supplier receipt (same pattern as `PO sent to supplier`) |
 | `Who has it` | The current holder of a Unit, read from Stock (e.g. `NETS Warehouse`, `NETS Logistics`, the supplier) |

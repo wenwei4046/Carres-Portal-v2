@@ -3127,7 +3127,8 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**PAGE DESIGN — PROPOSAL / NOT LAW (awaiting owner confirmation of this corrected text, 2026-09-18).**
+**STATUS (2026-09-18): the register list is APPROVED / NOT BUILT (owner ruling below); the object
+(detail) page and the Issue / revise view are PROPOSAL / NOT LAW, awaiting owner review of the mockup.**
 Mockup: https://claude.ai/artifact/RFt7X6cz9gKaVvH1brzxFV (sample data). Widths are candidates until
 the build measures them in the real DOM; the signed-in 1440/1180/820/390 walk is owed.
 
@@ -3148,8 +3149,8 @@ the white panel with the 8px canvas gap; checkbox (export only) and expand colum
 {`Return Date`, `Return No.`} pinned at canvas ≥768px, `Return No.` alone below; no column hidden by
 width. **Columns — OWNER RULING (Jess, 2026-09-18), exactly in this order:** Return Date · Return No. ·
 PO No · GRN No. · Supplier Claim No. · Supplier · Items (`{first item} + {n} more`) · Qty · Goods
-Collect From · Goods Collection Date · Goods Return Status. No Finance column in this round; the
-supplier credit stays on the Supplier Claim and Finance and is read in the object only. The return is
+Collect From · Goods Collection Date · Goods Return Status. No Finance column and no new Finance
+function in this round; existing links (e.g. to the Supplier Claim) may stay. The return is
 generated automatically when the Supplier Claim's `Return` outcome is approved: staff never re-enter
 goods, Units, supplier or source, and `Return No.` and `Supplier Claim No.` are linked by the system.
 One fact per column; no Work column. One row is one return document.
@@ -3161,9 +3162,11 @@ Footer `{N} Purchase Returns` / `1 Purchase Return` / `{n} of {N} Purchase Retur
 missing` · `Part collected` · `Collected` (missing facts are facts); Supplier; Goods Collect From.
 Sending follows the PO sending law: no send record is `Sending not confirmed`, never `PDF not sent`.
 
-**Goods Return Status, per Unit:** `Not collected` (still at Carres) · with Logistics (`Who has it: NETS
-Logistics`, in transit, not yet Collected) · `Collected` (the supplier has it, with supplier receipt
-evidence). The return reads `Part collected` with `{n} of {N}` until every Unit is Collected or
+**Goods Return Status, per Unit:** `Not collected` (still at Carres) · handed to Logistics (the actual
+logistics company named from the handover record, e.g. `Who has it: {logistics company}`; in
+transit, not yet Collected) · `Collected` (the supplier has it, with supplier receipt evidence).
+Handed to Logistics and received by the supplier are always two separate facts; no company name is
+hard-coded. The return reads `Part collected` with `{n} of {N}` until every Unit is Collected or
 cancelled. Warehouse Outbound scans and records every handover; issuing the document never moves
 goods.
 
@@ -3174,7 +3177,7 @@ Purchasing goods-table appearance (§8.1).
 **Object (one scroll, full width, no tabs):** the shared object template — identity header (back,
 `Return No. · Supplier`, meta `V{n} · sending fact · Handover`, ‹ n of N ›, neutral Revise /
 Download PDF) → current action (amber work card, the one blue button) → facts in kit `Panel`s:
-Return (supplier, Return Date, source Claim + Authorised Outcome, Credit Consequence) · Goods (per
+Return (supplier, Return Date, source Claim + Authorised Outcome) · Goods (per
 Unit) · Collection (Collect From, Collection Date with the supplier's agreement evidence or `Not
 recorded`, Handover, proof, door to Outbound) → History.
 
@@ -3188,7 +3191,7 @@ owner). Collected facts never change.
 
 **Exceptions:** supplier refuses collection → back to the Supplier Claim decision; wrong Unit
 collected → Outbound exception + Stock; goods stuck with Logistics → Delivery/Outbound exception;
-credit note missing/different → Supplier Claim + Finance.
+credit note missing/different → stays with the Supplier Claim (not handled on the return).
 **Connections:** Supplier Claim (source and credit), Stock ownership/custody, Outbound, supplier,
 Finance credit read-only.
 
