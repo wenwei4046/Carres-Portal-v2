@@ -14,8 +14,11 @@
  * Account, Name, Kind, Status, Active, Not active, Save, Cancel, and the pay
  * method words Cash · Bank transfer · Online payment for the kinds). A row
  * click opens it; the only new phrases are the page word and the add button.
+ *
+ * A second tab, `?tab=chart`, holds the chart of accounts (ChartOfAccounts.tsx).
  */
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MONEY_ACCOUNT_KIND_WORD,
   type MoneyAccountRow,
@@ -25,12 +28,19 @@ import Checkbox from "@/components/kit/Checkbox";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
+import Tabs from "@/components/kit/Tabs";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { LoadFailed } from "../other-money-in/parts";
 import { useMoneyAccounts, useSaveMoneyAccount } from "./api";
 import { FieldError } from "@/components/kit/FieldFrame";
+import ChartOfAccounts from "./ChartOfAccounts";
+
+const TABS = [
+  { value: "money", label: "Money accounts" },
+  { value: "chart", label: "Chart of accounts" },
+] as const;
 
 const KIND_OPTIONS = [
   { value: "BANK", label: MONEY_ACCOUNT_KIND_WORD.BANK },
@@ -40,6 +50,20 @@ const KIND_OPTIONS = [
 const statusWord = (r: MoneyAccountRow) => (r.is_active ? "Active" : "Not active");
 
 export default function FinanceSettings() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "chart" ? "chart" : "money";
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings — Carres" />
+      <div className="px-6">
+        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "chart" ? { tab: v } : {})} />
+      </div>
+      <div className="min-h-0 flex-1">{tab === "chart" ? <ChartOfAccounts /> : <MoneyAccounts />}</div>
+    </div>
+  );
+}
+
+function MoneyAccounts() {
   const query = useMoneyAccounts();
   /* `undefined` = closed; `null` = a new account; a row = that account. */
   const [editing, setEditing] = useState<MoneyAccountRow | null | undefined>(undefined);
@@ -54,8 +78,7 @@ export default function FinanceSettings() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings — Carres" />
+    <>
       {query.isError ? (
         <LoadFailed what="The accounts" onRetry={() => void query.refetch()} />
       ) : (
@@ -81,7 +104,7 @@ export default function FinanceSettings() {
           )}
         </ListPageShell>
       )}
-    </div>
+    </>
   );
 }
 

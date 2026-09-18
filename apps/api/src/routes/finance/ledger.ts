@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
   ledgerAccountLedgerQuery,
+  ledgerAccountRenameInput,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
   ledgerEntryRef,
@@ -31,7 +32,7 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { requireFinance } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -44,11 +45,12 @@ import financeMoneyAccountsRouter from "./money-accounts";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the account rename. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
  *   GET /accounts           the chart, and the day the ledger started
+ *   PATCH /accounts/:code   rename one account (gl_account_rename, 0539) — the code never changes
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -345,6 +347,22 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const read = await readChart(sb);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   return c.json(read.chart);
+});
+
+financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  if (!/^\d{4}$/.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountRenameInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_rename", { p_code: code, p_name: body.data.name });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ code: data as string });
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────

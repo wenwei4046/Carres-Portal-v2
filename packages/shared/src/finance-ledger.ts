@@ -281,6 +281,27 @@ export const LEDGER_KIND_WORDS: Readonly<Record<string, string>> = {
   EXPENSE: "Expense",
 };
 
+/** The chart as a tree: every account right after its parent, siblings by
+ *  code, each with its depth (0 = top). An account whose parent is not in the
+ *  list sits at the top. */
+export function chartTree(accounts: readonly LedgerAccount[]): Array<LedgerAccount & { depth: number }> {
+  const codes = new Set(accounts.map((a) => a.code));
+  const kids = new Map<string | null, LedgerAccount[]>();
+  for (const a of [...accounts].sort((x, y) => x.code.localeCompare(y.code))) {
+    const p = a.parent_code && codes.has(a.parent_code) ? a.parent_code : null;
+    kids.set(p, [...(kids.get(p) ?? []), a]);
+  }
+  const out: Array<LedgerAccount & { depth: number }> = [];
+  const walk = (parent: string | null, depth: number) => {
+    for (const a of kids.get(parent) ?? []) {
+      out.push({ ...a, depth });
+      walk(a.code, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
+}
+
 export function ledgerKindWord(kind: string | null | undefined): string {
   return (kind && LEDGER_KIND_WORDS[kind]) || "Other account";
 }
