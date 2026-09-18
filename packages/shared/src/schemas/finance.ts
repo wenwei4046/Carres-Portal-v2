@@ -342,7 +342,6 @@ export const ledgerEntryRef = z.union([
 export const ledgerAccountRenameInput = z.object({
   name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
 }).strict();
-export type LedgerAccountRenameInput = z.infer<typeof ledgerAccountRenameInput>;
 
 /** A trial balance or a balance sheet as it stood at the end of one day.
  *  Omitted = today in Malaysia. */

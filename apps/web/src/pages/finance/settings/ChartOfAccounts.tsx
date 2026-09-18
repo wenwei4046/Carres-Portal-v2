@@ -37,7 +37,6 @@ export default function ChartOfAccounts() {
           </span>
         ),
         searchValue: (r) => `${r.code} ${r.name}`,
-        exportValue: (r) => `${r.code} ${r.name}`,
         filterable: false,
       },
       { key: "kind", label: "Kind", width: 140, sortable: false, accessor: (r) => ledgerKindWord(r.kind), filterType: "enum" },

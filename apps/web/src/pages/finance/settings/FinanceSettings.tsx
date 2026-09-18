@@ -77,34 +77,29 @@ function MoneyAccounts() {
     [],
   );
 
+  if (query.isError) return <LoadFailed what="The accounts" onRetry={() => void query.refetch()} />;
   return (
-    <>
-      {query.isError ? (
-        <LoadFailed what="The accounts" onRetry={() => void query.refetch()} />
-      ) : (
-        <ListPageShell register>
-          <DataGrid
-            rows={query.data ?? []}
-            columns={columns}
-            rowKey={(r) => r.code}
-            storageKey="carres.finance.money-accounts.v1"
-            appearance="reference"
-            groupBanner={false}
-            stickyIdentity
-            isLoading={!query.isSuccess}
-            toolbarStart={
-              <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
-                Add a money account
-              </Button>
-            }
-            onRowClick={(r) => setEditing(r)}
-          />
-          {editing !== undefined && (
-            <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
-          )}
-        </ListPageShell>
+    <ListPageShell register>
+      <DataGrid
+        rows={query.data ?? []}
+        columns={columns}
+        rowKey={(r) => r.code}
+        storageKey="carres.finance.money-accounts.v1"
+        appearance="reference"
+        groupBanner={false}
+        stickyIdentity
+        isLoading={!query.isSuccess}
+        toolbarStart={
+          <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
+            Add a money account
+          </Button>
+        }
+        onRowClick={(r) => setEditing(r)}
+      />
+      {editing !== undefined && (
+        <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
       )}
-    </>
+    </ListPageShell>
   );
 }
 
