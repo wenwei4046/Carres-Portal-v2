@@ -3590,3 +3590,5 @@ New on-screen words from Reports → Dealer commission (migration 0544). Not law
 | Filters | `All` (as the no-filter choice for Dealer and Showroom) |
 | Rates section | `Commission rates` · `Default rate (%)` · `Product rate` · `Rate (%)` · `Add a product rate` · `Edit` · `Remove` |
 | Quota section | `Renovation quotas` · `Renovation quota` · `Add a renovation quota` · `Quota (RM)` · `Rebate rate (%)` · `Counts from` · `<RM> · <rate>% from <month>` |
+| Quota list, dealer gone | `Dealer not available` |
+| API refusals | `Pick a month.` · `That product is not on the list.` · `That dealer is not on the list.` |

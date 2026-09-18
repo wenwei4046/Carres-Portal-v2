@@ -30,7 +30,10 @@ describe("dealer commission", () => {
   });
 
   it("caps the rebate at the quota left", () => {
-    expect(rebateByMonth(45, 5, [["2026-09", 500]])).toEqual([{ month: "2026-09", rebate: 25, quotaLeft: 20 }]);
-    expect(rebateByMonth(45, 5, [["2026-09", 1200]])).toEqual([{ month: "2026-09", rebate: 45, quotaLeft: 0 }]);
+    // Quota left 45: a month that earns 25, then a month that earns 60, pays 25 then only the 20 left.
+    expect(rebateByMonth(45, 5, [["2026-09", 500], ["2026-10", 1200]])).toEqual([
+      { month: "2026-09", rebate: 25, quotaLeft: 20 },
+      { month: "2026-10", rebate: 20, quotaLeft: 0 },
+    ]);
   });
 });
