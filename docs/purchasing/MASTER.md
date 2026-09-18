@@ -1173,17 +1173,27 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — APPROVED, date-first owner ruling 2026-09-17 · BUILT 2026-09-17:** Proceed Date · SO No · Order By ·
-Customer · Supplier · Requested Delivery Date · Delivery Location · Deliver To · PO No ·
-PO Delivery Date. Read the actual Proceed Date first, then identity, buying deadline and the remaining facts. Supplier sits beside Customer because it names who to
-buy from; a multi-supplier order still answers exactly what to buy from each in its Goods expansion. `Proceed Date` and `SO No` pin at canvas ≥768px; below768px only `SO No` pins. `Proceed Date`
-reads `orders.proceeded_at`: the actual date Sales handed the complete order to Operations. It
-never reads `orders.proceed_date`, the planned production-start date. The saved column layout key
-is `…register.v6` for the date-first order, because a stored arrangement would otherwise pin a
-returning operator to the retired order; the engine's `leadingColumns` also refuses to let any saved
-layout hide or move the pair. Rendered at 1440 in the shell with the rail open (885px grid):
-Proceed Date · SO No pinned, Order By · Customer · Supplier · Requested Delivery Date fully visible,
-no cut value; Delivery Location onward scrolls under the pinned pair.
+**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
+
+```text
+Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
+PO Delivery Date
+```
+
+This overwrites the 2026-09-17 order (built: Proceed Date · SO No · Order By · Customer · Supplier ·
+Requested Delivery Date · Delivery Location · Deliver To · PO No · PO Delivery Date). Changes to
+build: `PO Safety Days` takes the Order By position; the customer's requested date and location move
+ahead of Customer; `Items` is a new default column (`{first item} + {n} more`, like Purchase Orders);
+`Delivery Location` reads `Customer Delivery Location`; `Deliver To` reads `Supplier Deliver To`.
+The default sort is unchanged — groups, then the Order By urgency, then SO No — and the `To buy` /
+`No purchase needed` groups stay. `PO Safety Days` reads the governed Safety-days fact (COPY
+`Safety days`; the rail's `ORDER TIMING` words); the Order By date stays available in the goods
+expansion and detail. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
+pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
+`orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
+order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
+shell with the rail open during the build.
 
 - **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
   `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
@@ -1736,18 +1746,30 @@ Use earliest Order By first for pending/buying work, undated `Not planned` after
 then newest Proceed Date; the lower history group uses newest Proceed Date. Header sorting
 acts within groups. Search, column filters and export retain accurate source values.
 
-**Columns — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17, exactly in this order:**
+**Columns — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT, exactly in this order:**
 
 ```text
-Proceed Date · Items · Order By · Purpose · Supplier · Approval Status · Requested By ·
-Delivery Date · Deliver To · PO No
+Proceed Date · Manual Purchase No. · Approval Status · Purpose · Requested By · PO Safety Days ·
+Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · Supplier ·
+Supplier Deliver To · PO No · PO Delivery Date
 ```
 
-`Proceed Date` and `Items` are pinned at canvas ≥768px; below that only `Items` is pinned
-(engine `leadingColumns`, layout key `carres.manualPurchase.register.v6`). Rendered at 1440 in the
-shell with the rail open (900px grid): Proceed Date · Items · Order By · Purpose · Supplier fully
-visible, no cut value; Approval Status onward scrolls. 🟡 Approval Status was visible before the date
-joined and is now 50px past the edge; the group headings still state `Need approval`.
+This overwrites the 2026-09-17 order (built: Proceed Date · Items · Order By · Purpose · Supplier ·
+Approval Status · Requested By · Delivery Date · Deliver To · PO No). The customer and supplier
+columns use the same words and meaning as SO Batch Purchase. Sort and groups (`Need approval` ·
+`To buy` · `No purchase needed`) are unchanged.
+
+**REAL GAP / CONTRADICTION — owner to confirm before build.** The owner marked the second column
+"number and official name to be verified". §6.1 (Card 08, owner ruling 2026-09-04) retired `MPR`: a
+Manual Purchase is an internal record with no visible number, and PO No is the only purchasing
+document number; its stored `MPR-…`/`REQ-…` values are never displayed. Until the owner either
+reinstates a visible Manual Purchase number or keeps `Items`, the built identity stays
+`Proceed Date · Items` (pinned ≥768px; `Items` alone below).
+
+**Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
+(`Ready Stock`, `Showroom Display`, `Service Case`, …); most have no customer. Those rows show the
+customer columns blank, never an invented customer; a customer appears only where the purpose's
+structured record names one.
 `Items` is the business identity and single-click entrance to the object. Use the same
 responsive search, palette and measured column-width rules as SO Batch Purchase. Content
 sets default width; a complete two-line header and its controls set the minimum. Reuse the

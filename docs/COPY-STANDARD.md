@@ -1821,6 +1821,16 @@ APPROVED / NOT BUILT (Purchasing MASTER §9.5, owner review 2026-09-18).
 | Supplier Claims footer | `{N} Supplier Claims` · `1 Supplier Claim` · `{n} of {N} Supplier Claims` | Claim count only; no quantity total |
 | History identity of a fact the system itself wrote | `Recorded automatically` | Only for a record CONFIRMED as system-written (for example by the retired late-delivery sweep). Never inferred merely because no staff name is stored; an unknown individual stays `Staff identity not recorded` |
 
+### SO Batch Purchase / Manual Purchase column words — OWNER RULING (Jess, 2026-09-18) · NOT BUILT
+
+| Column | Meaning |
+|---|---|
+| `PO Safety Days` | The governed Safety-days fact for buying this order in time (see `Safety days`); replaces the `Order By` column position. `buffer` never reaches a screen |
+| `Customer Requested Delivery Date` | The date the customer asked for delivery (was `Requested Delivery Date` on these two lists) |
+| `Customer Delivery Location` | Where the customer's goods go (was `Delivery Location` on these two lists) |
+| `Supplier Deliver To` | Where the supplier delivers the purchased goods (was `Deliver To` on these two lists) |
+| `Manual Purchase No.` | **Pending** — conflicts with the retired `MPR` number (Purchasing §6.1); not shown until the owner confirms |
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.
