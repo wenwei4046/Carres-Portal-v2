@@ -38,6 +38,7 @@ import {
   SlidersHorizontal,
   Receipt,
   Banknote,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -599,6 +600,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: UserCheck,
         financePath: "/finance/rental-approver",
       },
+      // 0538 — due, collected and unpaid subscription months across every agreement.
+      { key: "subscriptions", label: "Subscriptions", icon: CalendarClock, financePath: "/finance/subscriptions" },
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.

@@ -11,6 +11,7 @@ import LegacyPaymentRedirect from "./LegacyPaymentRedirect";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
+import FinanceSubscriptionMonth from "./FinanceSubscriptionMonth";
 import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
 import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import MoneyMovesPage from "./money-moves/MoneyMovesPage";
@@ -99,6 +100,8 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          {/* 0538 — one month of subscription billing across every agreement. */}
+          <Route path="subscriptions" element={financeOnly(<FinanceSubscriptionMonth />)} />
           {/* 0478 — money in that is not a sale: other debtor invoices and
               other receipts. Finance only; customer money stays in Payments. */}
           <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />

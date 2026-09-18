@@ -3577,3 +3577,18 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+### PROPOSAL — PENDING APPROVAL (subscription-views, migration 0538, 18 Sep 2026)
+
+Page: Finance → `Subscriptions` at `/finance/subscriptions` (sidebar word and page header, both
+PROPOSAL). One calendar month across every subscription agreement. Month picker label `Month`.
+Totals: `Due` · `Collected` · `Outstanding`. Columns of the unpaid list: `Customer` · `Phone` ·
+`Sales Order` · `Agreement` · `Amount` · `Due Date` · `Days Late` (a month not yet late reads
+`Not late`) · `Salesperson`. Search hint `Search customer, SO or agreement…`. Footer
+`{n} unpaid · {amount}`. Export name `Unpaid subscriptions`. Empty state
+`Every subscription month due in this month is paid.` Failure
+`The subscription months could not be loaded. Try again.` Nothing on this page says how the
+monthly money arrives; that is not settled.
+
+Rental Approver card, two optional fields kept with approve or reject: `Credit check used`
+(hint `e.g. CTOS`) · `Check reference`.
