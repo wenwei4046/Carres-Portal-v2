@@ -2454,8 +2454,6 @@ export {
   READY_STOCK_CONDITION_ABSENT,
   READY_STOCK_CONDITION_WORDS,
   READY_STOCK_REFUSAL_WORDS,
-  manualPurchaseReadyStockGroupSchema,
-  manualPurchaseReadyStockResponseSchema,
   readyStockConditionWord,
   readyStockIdentityScopeSchema,
   readyStockLineSchema,
@@ -2468,8 +2466,6 @@ export {
   readyStockSaveResultSchema,
   readyStockResponseSchema,
   readyStockUnitSchema,
-  type ManualPurchaseReadyStockGroup,
-  type ManualPurchaseReadyStockResponse,
   type ReadyStockLine,
   type ReadyStockPick,
   type ReadyStockReserveInput,
@@ -2479,6 +2475,45 @@ export {
   type ReadyStockResponse,
   type ReadyStockUnit,
 } from "./so-batch-ready-stock";
+/* ── MANUAL PURCHASE · READY STOCK ALLOCATION (owner ruling 2026-09-18) ─────
+   Its own module, because it is a CAPABILITY the SO Batch contract explicitly
+   said Manual Purchase did not have. Folding it into that file would leave the
+   two rulings arguing inside one set of comments. */
+export {
+  MANUAL_PURCHASE_NEED_STATUS_WORDS,
+  MANUAL_PURCHASE_STOCK_BLOCK_WORDS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_ACTS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_WORDS,
+  MANUAL_PURCHASE_STOCK_UNIT_BLOCKED_WORDS,
+  manualPurchaseIntentSchema,
+  manualPurchaseLineStockRemaining,
+  manualPurchaseNeedStatusOf,
+  manualPurchaseStockBlockOf,
+  manualPurchaseStockBlockSchema,
+  manualPurchaseStockBlockWord,
+  manualPurchaseStockCounts,
+  manualPurchaseStockLineSchema,
+  manualPurchaseStockRefusal,
+  manualPurchaseStockResponseSchema,
+  manualPurchaseStockSaveInputSchema,
+  manualPurchaseStockSaveResultSchema,
+  manualPurchaseStockUnitSchema,
+  type ManualPurchaseIntent,
+  type ManualPurchaseNeedStatus,
+  type ManualPurchaseStockBlock,
+  type ManualPurchaseStockLine,
+  type ManualPurchaseStockResponse,
+  type ManualPurchaseStockSaveInput,
+  type ManualPurchaseStockSaveResult,
+  type ManualPurchaseStockUnit,
+} from "./manual-purchase-stock";
+export {
+  PO_SAFETY_DAYS_NONE,
+  poSafetyDaysOf,
+  poSafetyDaysWord,
+  tightestPoSafetyDays,
+  type PoSafetyDays,
+} from "./purchasing-safety-days";
 export {
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,

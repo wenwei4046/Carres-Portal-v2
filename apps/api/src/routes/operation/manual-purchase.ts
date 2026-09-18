@@ -16,8 +16,13 @@ import {
   railItemLabel,
   stockMatchKey,
   transitDaysFor,
-  type ManualPurchaseReadyStockGroup,
-  type ManualPurchaseReadyStockResponse,
+  manualPurchaseLineStockRemaining,
+  manualPurchaseStockBlockOf,
+  manualPurchaseStockSaveInputSchema,
+  type ManualPurchaseIntent,
+  type ManualPurchaseStockLine,
+  type ManualPurchaseStockResponse,
+  type ManualPurchaseStockUnit,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -27,7 +32,8 @@ import {
   loadPurchasingSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
-import { fail } from "../../lib/route-helpers";
+import { fail, mapPgError } from "../../lib/route-helpers";
+import { readyStockRefusedUnitId } from "./so-batch-ready-stock";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -544,6 +550,50 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
   if (enriched && !enriched.error) {
     lines = enriched.lines;
 
+    /**
+     * ⭐ WHAT READY STOCK ALREADY ANSWERS, PER LINE (owner ruling 2026-09-18).
+     *
+     * The Register's `Status`, its `PO Safety Days` margin and its tick all
+     * read what is still to BUY, and after this ruling that is the approved
+     * quantity less what purchase orders took AND less the Units saved against
+     * the exact line. Reading it here is what makes the server's saved result
+     * drive the screen after a refresh — the browser never nets a number the
+     * server has not confirmed.
+     *
+     * A failed read is UNKNOWN, not zero: it sets `linesUnavailable`, which
+     * keeps the row out of `No PO needed` and refuses its tick by name. The ONE
+     * exception is the deploy window before 0546 (`isMissingAllocationColumn`),
+     * where no allocation can exist because there is nowhere to store one.
+     */
+    const lineIds = lines.map((l) => l.id as string);
+    if (lineIds.length > 0) {
+      const held = await sb
+        .from("ops_stock_items")
+        .select("reserved_purchase_demand_id, qty")
+        .in("reserved_purchase_demand_id", lineIds)
+        .in("status", ["reserved", "sold"]);
+      if (held.error && !isMissingAllocationColumn(held.error)) {
+        linesUnavailable = true;
+        console.error(
+          "manual purchase — saved stock unavailable",
+          held.error.message,
+        );
+      } else if (held.error) {
+        /* Pre-0546: the column is not there, so nothing is allocated. */
+        lines = lines.map((l) => ({ ...l, stock_reserved_qty: 0 }));
+      } else {
+        const byLine = new Map<string, number>();
+        for (const u of (held.data ?? []) as Array<Record<string, unknown>>) {
+          const key = u.reserved_purchase_demand_id as string;
+          byLine.set(key, (byLine.get(key) ?? 0) + Math.max(1, Number(u.qty ?? 1)));
+        }
+        lines = lines.map((l) => ({
+          ...l,
+          stock_reserved_qty: byLine.get(l.id as string) ?? 0,
+        }));
+      }
+    }
+
     /* Card 06 §7 — issuance work completes ONLY on the current PO version's
        confirmed-sent evidence (`po_sends`, 0378). A numbered PO or an opened
        WhatsApp/email completes nothing. */
@@ -598,12 +648,57 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
-      ? sb.from("service_cases").select("id, case_no").in("id", forCaseIds)
+      ? sb
+          .from("service_cases")
+          /* ⭐ THE CUSTOMER COLUMNS HAVE EXACTLY ONE SOURCE (owner ruling
+             2026-09-18). Most Manual Purchases serve `Ready Stock`,
+             `Showroom Display` or an internal purpose and have NO customer;
+             those rows print blank. A `Service Case` purchase is the one
+             purpose whose structured record names a real person, so the case's
+             own snapshot and its linked Sales Order answer — and nothing else
+             may. */
+          .select("id, case_no, customer_name, order_id")
+          .in("id", forCaseIds)
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
   ]);
   for (const r of [dests, sups, users, cases]) {
     if (r.error) return fail(c, r.error);
   }
+  /* The linked order's OWN facts — the date the customer asked for and where
+     they are. Read from `orders`, never copied onto the request: a summary is
+     read-only (Law B) and a stale copy of a customer's date is worse than no
+     date at all. */
+  const caseOrderIds = [
+    ...new Set(
+      (cases.data ?? [])
+        .map((sc) => (sc as Record<string, unknown>).order_id as string | null)
+        .filter((v): v is string => v != null),
+    ),
+  ];
+  const caseOrders =
+    caseOrderIds.length > 0
+      ? await sb
+          .from("orders")
+          .select(
+            "id, customer_name, delivery_date, delivery_date_tbd, customer_address_city, customer_address_state",
+          )
+          .in("id", caseOrderIds)
+      : { data: [] as Array<Record<string, unknown>>, error: null };
+  if (caseOrders.error) return fail(c, caseOrders.error);
+  const orderFactById = new Map(
+    (caseOrders.data ?? []).map((o) => [
+      o.id as string,
+      {
+        customerName: (o.customer_name as string | null) ?? null,
+        /* TBD is not a date, and a TBD order must never print one. */
+        requestedDeliveryDate: o.delivery_date_tbd
+          ? null
+          : (((o.delivery_date as string | null) ?? null)?.slice(0, 10) ?? null),
+        city: (o.customer_address_city as string | null) ?? null,
+        state: (o.customer_address_state as string | null) ?? null,
+      },
+    ]),
+  );
   const approvers = await resolveApprovers(c);
   /* D2 — the ONE requester identity (see `identityResolver`). */
   const requesterOf = identityResolver(
@@ -671,10 +766,23 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
        never zero. */
     linesUnavailable,
     pos,
-    serviceCases: (cases.data ?? []).map((sc) => ({
-      id: sc.id as string,
-      case_no: sc.case_no as string,
-    })),
+    serviceCases: (cases.data ?? []).map((sc) => {
+      const order = sc.order_id ? orderFactById.get(sc.order_id as string) : undefined;
+      return {
+        id: sc.id as string,
+        case_no: sc.case_no as string,
+        /* The case's own snapshot first (it is what Service recorded), the
+           linked order second. Neither is invented, and a case with neither
+           simply has no customer name. */
+        customer_name:
+          ((sc.customer_name as string | null) ?? "").trim() ||
+          order?.customerName ||
+          null,
+        requested_delivery_date: order?.requestedDeliveryDate ?? null,
+        delivery_city: order?.city ?? null,
+        delivery_state: order?.state ?? null,
+      };
+    }),
     destinations: (dests.data ?? []).map((d) => ({ id: d.id, name: d.name })),
     /* ⭐ THE TWO GOVERNED DELIVER TO FACTS (owner, 2026-09-03). Until now the
        create form defaulted Deliver To to whichever destination came first
@@ -1021,41 +1129,167 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
 });
 
 /**
- * GET /:id/ready-stock — MANUAL PURCHASE · READY STOCK (settled design,
- * owner ruling 2026-09-11).
+ * ⭐ THE DEPLOY WINDOW — 0546 IS NOT APPLIED YET, AND THAT MUST NOT BREAK THE
+ * REGISTER.
  *
- * ONE QUESTION: *is the product this internal purchase asks for already on
- * our shelf, and exactly which Units are they?*
+ * `main` deploys the code; the migration is applied through its own governed
+ * path, and the two do not land in the same second. Between them
+ * `ops_stock_items.reserved_purchase_demand_id` does not exist, and PostgREST
+ * answers the read below with `42703` / `PGRST204`.
  *
- * ── THIS DOOR WRITES NOTHING, AND THAT IS THE DESIGN ────────────────────────
+ * Treating THAT as unknown would have been a portal-wide P1: `linesUnavailable`
+ * makes every remainder unknown, so every Manual Purchase row would read
+ * `Remaining quantity not checked` and NOTHING could be ticked — Issue PO
+ * unusable for the whole module until the migration landed.
  *
- * The SO Batch sibling can commit a Unit to a customer's item line, because a
- * customer item line is OWED goods. An internal replenishment is owed by
- * nobody: no Unit on the shelf answers "buy ten more pillows for stock". So
- * this route has no reservation twin, the section it feeds has no `Choose
- * Ready Unit`, and the requested quantity is never netted against `freeQty`.
- * Seeing stock is information for the approver, not an allocation.
+ * ⛔ AND IT IS NOT "UNKNOWN IS ZERO" EITHER, which the ruling forbids. Before
+ * the column exists, NO allocation can exist: there is nowhere to store one and
+ * no door that writes one. Zero is the TRUE answer by construction, not a
+ * guess — which is exactly why this narrow code, and only this code, is
+ * tolerated. Every OTHER failure stays UNKNOWN and still refuses the tick.
  *
- * A specific internal need may only be reduced once an authoritative
- * allocation, transfer or usage record actually covers it — none of which is
- * this read.
+ * DELETE THIS the day 0546 is verified applied in production. It is a
+ * deploy-window tolerance, not a permanent rule (0471's delegator, same debt,
+ * paid the same day).
+ */
+function isMissingAllocationColumn(error: {
+  code?: string | null;
+  message?: string | null;
+}): boolean {
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return /reserved_purchase_demand_id/.test(error.message ?? "");
+}
+
+/**
+ * THE STOCK PICKER'S SIX FACTS, read from ONE place.
  *
- * ── WHAT IT DOES DECIDE: NOTHING ────────────────────────────────────────────
+ * The approved columns are `Goods Received Date · Stock Location · Supplier ·
+ * PO No / Ref No (Unit ID on line two) · Condition`, so this is exactly what
+ * the register view is asked for. `reserved_ref` rides along because a Unit
+ * this request does NOT hold may still carry somebody else's reference, and
+ * `po_no` is the Unit's OWN source document — never the purchase looking at it.
+ */
+const STOCK_UNIT_COLUMNS =
+  "id, unit_code, sku, qty, date_in, condition, site_name, supplier, po_no, ownership, identity_scope, reserved_ref, reserved_purchase_demand_id";
+
+type StockRegisterRow = {
+  id: string;
+  unit_code: string | null;
+  sku: string;
+  qty: number | null;
+  date_in: string | null;
+  condition: string | null;
+  site_name: string | null;
+  supplier: string | null;
+  po_no: string | null;
+  ownership: string | null;
+  identity_scope: string | null;
+  reserved_ref: string | null;
+  reserved_purchase_demand_id?: string | null;
+};
+
+/**
+ * ⚠️ THE RECEIPT DATE IS A DATE ON THIS PICKER, AND THE STORED TIMESTAMP IS
+ * NOT TOUCHED (owner ruling 2026-09-18).
+ *
+ * `date_in` is stored as a date or a timestamp depending on how the goods were
+ * recorded. The picker shows the DAY; taking the first ten characters reads the
+ * day off both shapes without rewriting either. The Receiving surfaces keep
+ * printing the full `Goods Received Date` with its time, which is a different
+ * column on a different page answering a different question.
+ */
+function receiptDateOf(raw: string | null): string | null {
+  if (!raw) return null;
+  return raw.slice(0, 10);
+}
+
+/**
+ * WHERE THE UNIT CAME FROM — its own purchase order, or the reference it is
+ * held against, or nothing.
+ *
+ * ⛔ IT NEVER FALLS BACK TO THE MANUAL PURCHASE READING IT. A Unit that
+ * records no provenance has none, and printing this request's own number there
+ * would manufacture a document lineage that does not exist.
+ */
+function sourceRefOf(u: StockRegisterRow): string | null {
+  const po = (u.po_no ?? "").trim();
+  if (po !== "") return po;
+  const ref = (u.reserved_ref ?? "").trim();
+  return ref !== "" ? ref : null;
+}
+
+function stockUnitOf(
+  u: StockRegisterRow,
+  reservedForThisLine: boolean,
+  blocked: ManualPurchaseStockUnit["blocked"],
+): ManualPurchaseStockUnit {
+  return {
+    itemId: u.id,
+    unitCode: u.unit_code,
+    identityScope: u.identity_scope === "quantity" ? "quantity" : "unit",
+    sku: u.sku,
+    goodsReceivedDate: receiptDateOf(u.date_in),
+    stockLocation: u.site_name,
+    supplier: u.supplier,
+    sourceRef: sourceRefOf(u),
+    /* A GRADE, not availability (0371), through the ONE shared vocabulary so
+       `exhibition` cannot read `Display` here and `Exhibition` there. The raw
+       value rides to the browser; the word is composed there. */
+    condition: u.condition,
+    ownership:
+      u.ownership === "supplier_consignment" ? "supplier_consignment" : "carres_owned",
+    qty: Math.max(1, Number(u.qty ?? 1)),
+    reservedForThisLine,
+    blocked,
+  };
+}
+
+/**
+ * ── MANUAL PURCHASE · READY STOCK ALLOCATION ────────────────────────────────
+ * GET  /:id/stock-allocation   what is on the shelf for each line, and what
+ *                              this line already holds
+ * POST /:id/stock-allocation   the one save — the COMPLETE desired set for one
+ *                              line, reconciled in one transaction
+ *
+ * ⭐ THIS REPLACES THE READ-ONLY `ready-stock` DOOR, AND THE REPLACEMENT IS AN
+ * OWNER RULING, NOT A REFACTOR (Jess, 2026-09-18; MASTER §9.2).
+ *
+ * The retired door was built on one sentence — *an internal replenishment is
+ * owed by nobody on the shelf, so there is nothing to bind and nothing to
+ * press* — and that sentence described ONE kind of Manual Purchase while being
+ * written as though it described all of them. A `Service Case` buy, an
+ * `Internal Staff Purchase`, a `Showroom Display`: each is a CONCRETE NEED
+ * that the exact sofa standing in Klang can answer today. The ruling keeps the
+ * other half intact: buying EXTRA stock is never reduced by what is already
+ * there.
+ *
+ * WHICH OF THE TWO A REQUEST IS, IS READ, NEVER GUESSED
+ * (`purchase_requests.fulfilment_intent`, 0546). Not from the SKU, not from
+ * the shelf count, and not from the purpose — `Other Purchase` answers
+ * nothing. A request that recorded neither gets the goods READ-ONLY and a
+ * sentence saying so.
+ *
+ * ── WHAT THIS ROUTE DECIDES: NOTHING ────────────────────────────────────────
  *
  * Availability is `stock_unit_register_v`'s (0371) through the ONE
- * `readFreeStock` reader — the same offer the SO Batch section shows, so two
+ * `readFreeStock` reader — the same offer SO Batch Purchase shows, so two
  * purchasing pages cannot disagree about what is free. Matching is
- * `stockMatchKey`, the portal's one configuration-aware rule (pinned to its
- * SQL twin by a contract test): the SKU TEXT alone would match a King to a
- * Super King.
+ * `stockMatchKey`. The remaining quantity is
+ * `purchasing_mpr_line_remaining_requirement`'s, restated here only so the
+ * table can explain itself before anything is pressed; the door re-derives it
+ * on the locked row, so a tab left open across somebody else's purchase order
+ * is refused by name rather than allowed to over-commit.
  *
- * ── LAZY, LIKE ITS SIBLING ──────────────────────────────────────────────────
+ * ── AND AN MPR IS NEVER AN SO ───────────────────────────────────────────────
  *
- * Read only when a row is opened. The Register answers for every request at
- * once; counting the whole warehouse for rows nobody expanded would be work
- * done for nothing.
+ * The save calls `purchasing_allocate_ready_units`, which binds
+ * `ops_stock_items.reserved_purchase_demand_id`. It does NOT call
+ * `so_batch_reserve_ready_units`, and a Manual Purchase id never reaches
+ * `p_order_line_id`. Those are two different business bindings and the day one
+ * is passed to the other's door is the day a customer's sofa answers an office
+ * chair request.
  */
-manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
+manualPurchaseRouter.get("/:id/stock-allocation", requireOperation, async (c) => {
   const id = c.req.param("id");
   if (!z.string().uuid().safeParse(id).success) {
     return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
@@ -1064,7 +1298,9 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
 
   const { data: request, error: reqErr } = await sb
     .from("purchase_requests")
-    .select("id")
+    .select(
+      "id, req_no, fulfilment_intent, approved_at, refused_at, withdrawn_at, sent_back_at",
+    )
     .eq("id", id)
     .maybeSingle();
   if (reqErr) return fail(c, reqErr);
@@ -1072,18 +1308,23 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
     return c.json({ error: "request_not_found", code: "request_not_found" }, 404);
   }
 
-  /* LIVE lines only. A line somebody marked not going ahead asks for nothing,
-     so offering shelf stock against it would be an answer to a dead question. */
   const { data: lineRows, error: lineErr } = await sb
     .from("purchase_demands")
-    .select("id, sku, qty, cancelled_at")
+    .select("id, sku, qty, approved_qty, issued_qty, cancelled_at")
     .eq("request_id", id);
   if (lineErr) return fail(c, lineErr);
-  const live = (lineRows ?? []).filter((l) => l.cancelled_at === null);
+  const lines = (lineRows ?? []) as Array<{
+    id: string;
+    sku: string;
+    qty: number;
+    approved_qty: number | null;
+    issued_qty: number;
+    cancelled_at: string | null;
+  }>;
 
-  /* The Catalog's human words, read the same way the Register reads them —
-     whole and matched here, never `.in()` over free-text SKUs (a live row
-     carries a double quote, `Leg 4"`, which breaks the filter). */
+  /* The Catalog's human words, read whole and matched here — never `.in()`
+     over free-text SKUs (a live row carries a double quote, `Leg 4"`, which
+     breaks the filter). */
   const { data: catRows, error: catErr } = await sb
     .from("product_skus")
     .select("sku, variant, variant_kind, product_models(name)");
@@ -1101,58 +1342,192 @@ manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
     }),
   );
 
-  /* One group per matching product/configuration — never per SKU string, and
-     never per request line: two lines of the same goods are one shelf
-     question. */
-  const asked = new Map<string, { item: string; skus: Set<string>; qty: number }>();
-  for (const l of live) {
-    const sku = l.sku as string;
-    const key = stockMatchKey(sku);
-    const group = asked.get(key) ?? {
-      item: itemLabelBySku.get(sku) ?? sku,
-      skus: new Set<string>(),
-      qty: 0,
-    };
-    group.skus.add(sku);
-    group.qty += Math.max(0, Number(l.qty) || 0);
-    asked.set(key, group);
+  /**
+   * WHAT THIS REQUEST ALREADY HOLDS, per line and by Unit.
+   *
+   * Read from the authoritative register view, so a saved Unit prints the same
+   * provenance the free ones do. `reserved` AND `sold` both count: the binding
+   * survives the sale, and a Unit that has left the building must not return
+   * to the Register as something still to buy.
+   */
+  const demandIds = lines.map((l) => l.id);
+  const heldByLine = new Map<string, StockRegisterRow[]>();
+  if (demandIds.length > 0) {
+    const { data: held, error: heldErr } = await sb
+      .from("stock_unit_register_v")
+      .select(STOCK_UNIT_COLUMNS)
+      .in("reserved_purchase_demand_id", demandIds)
+      .in("status", ["reserved", "sold"]);
+    if (heldErr) return fail(c, heldErr);
+    for (const row of (held ?? []) as StockRegisterRow[]) {
+      const key = row.reserved_purchase_demand_id as string;
+      heldByLine.set(key, [...(heldByLine.get(key) ?? []), row]);
+    }
   }
 
   const { freeUnitsByKey } = await readFreeStock(sb);
 
-  const groups: ManualPurchaseReadyStockGroup[] = [...asked.entries()].map(
-    ([matchKey, group]) => {
-      const units = freeUnitsByKey.get(matchKey) ?? [];
-      return {
-        matchKey,
-        item: group.item,
-        skus: [...group.skus].sort(),
-        /* The ASK, printed beside the shelf and never reduced by it. */
-        requestedQty: group.qty,
-        freeQty: units.reduce((n, u) => n + Math.max(1, u.qty), 0),
-        units: units.map((u) => ({
-          itemId: u.id,
-          unitCode: u.unitCode,
-          identityScope: u.identityScope === "quantity" ? ("quantity" as const) : ("unit" as const),
-          sku: u.sku,
-          condition: u.condition,
-          siteName: u.siteName,
-          holderName: u.holderName,
-          ownership:
-            u.ownership === "supplier_consignment"
-              ? ("supplier_consignment" as const)
-              : ("carres_owned" as const),
-          supplier: u.supplier,
-          qty: u.qty,
-          dateIn: u.dateIn,
-        })),
-      };
-    },
-  );
-  groups.sort((a, b) => a.item.localeCompare(b.item));
+  const approved =
+    request.approved_at != null &&
+    request.refused_at == null &&
+    request.withdrawn_at == null &&
+    request.sent_back_at == null;
+  const intent = (request.fulfilment_intent as ManualPurchaseIntent | null) ?? null;
+  const reference = (request.req_no as string | null) ?? null;
 
-  const body: ManualPurchaseReadyStockResponse = { requestId: id, groups };
+  const outLines: ManualPurchaseStockLine[] = lines.map((l) => {
+    const held = heldByLine.get(l.id) ?? [];
+    const reservedQty = held.reduce((n, u) => n + Math.max(1, Number(u.qty ?? 1)), 0);
+    const remainingQty = manualPurchaseLineStockRemaining({
+      qty: Math.max(0, Number(l.qty) || 0),
+      approvedQty: l.approved_qty,
+      issuedQty: Math.max(0, Number(l.issued_qty) || 0),
+      reservedQty,
+      cancelled: l.cancelled_at != null,
+    });
+    const free = freeUnitsByKey.get(stockMatchKey(l.sku)) ?? [];
+    const availableQty = free.reduce((n, u) => n + Math.max(1, u.qty), 0);
+    const stockBlock = manualPurchaseStockBlockOf({
+      approved,
+      intent,
+      hasReference: reference != null,
+      cancelled: l.cancelled_at != null,
+      remainingQty,
+      reservedQty,
+    });
+    /* ⭐ THE SAVED UNITS COME FIRST AND THEY ARE NEVER HIDDEN. A line whose
+       free availability has fallen to zero still has to show what it holds —
+       otherwise the one journey that takes a choice BACK disappears exactly
+       when the operator needs it (MASTER §9.2: "saved choices remain reachable
+       even at zero available"). */
+    const units: ManualPurchaseStockUnit[] = [
+      ...held.map((u) => stockUnitOf(u, true, null)),
+      ...free.map((u) =>
+        stockUnitOf(
+          {
+            id: u.id,
+            unit_code: u.unitCode,
+            sku: u.sku,
+            qty: u.qty,
+            date_in: u.dateIn,
+            condition: u.condition,
+            site_name: u.siteName,
+            supplier: u.supplier,
+            po_no: u.poNo,
+            ownership: u.ownership,
+            identity_scope: u.identityScope,
+            reserved_ref: null,
+            reserved_purchase_demand_id: null,
+          },
+          false,
+          /* 0368: bulk is not bindable, and it SHOWS rather than being hidden —
+             hiding the 893 counted pieces would make a full shelf read empty.
+             A line with nothing left to buy still shows the shelf; what it
+             loses is the tick. */
+          u.identityScope !== "unit"
+            ? "counted_stock"
+            : remainingQty <= 0
+              ? "nothing_left_to_buy"
+              : null,
+        ),
+      ),
+    ];
+
+    return {
+      demandId: l.id,
+      sku: l.sku,
+      item: itemLabelBySku.get(l.sku) ?? l.sku,
+      requestedQty: Math.max(0, Number(l.qty) || 0),
+      approvedQty: l.approved_qty,
+      issuedQty: Math.max(0, Number(l.issued_qty) || 0),
+      availableQty,
+      reservedQty,
+      remainingQty,
+      stockBlock,
+      units,
+    };
+  });
+
+  const body: ManualPurchaseStockResponse = {
+    requestId: id,
+    reference,
+    intent,
+    approved,
+    lines: outLines,
+  };
   return c.json(body);
+});
+
+/**
+ * POST /:id/stock-allocation — ONE ACT, ONE TRANSACTION.
+ *
+ * The browser states the COMPLETE set it wants this line to hold. The door
+ * reconciles: releases what left, draws what joined, all or none — including
+ * an empty set, which releases everything. There is no partial success to
+ * explain, no per-Unit release button and no second stock writer.
+ *
+ * The browser names Units; it decides NOTHING. Approval, intent, availability,
+ * the goods match and the remaining requirement are all re-derived in SQL on
+ * the locked rows.
+ */
+manualPurchaseRouter.post("/:id/stock-allocation", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json", code: "invalid_json" }, 400);
+  }
+  const parsed = manualPurchaseStockSaveInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { demandId, itemIds, expectedItemIds } = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* THE LINE MUST BELONG TO THE REQUEST IN THE URL. Without this a caller
+     could save Units against any line in the portal by naming somebody else's
+     request — the door would happily bind them, because it only asks about the
+     LINE. The route owns the relationship between its own two identities. */
+  const { data: line, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select("id, request_id")
+    .eq("id", demandId)
+    .maybeSingle();
+  if (lineErr) return fail(c, lineErr);
+  if (!line || line.request_id !== id) {
+    return c.json(
+      { error: "mpr_line_not_found", code: "mpr_line_not_found" },
+      404,
+    );
+  }
+
+  const { data, error } = await sb.rpc("purchasing_allocate_ready_units", {
+    p_demand_id: demandId,
+    p_item_ids: itemIds,
+    p_expected_item_ids: expectedItemIds ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    /* The door's own code, so the browser prints the sentence for THAT refusal
+       rather than a generic one; and WHICH Unit stopped it, which the loop
+       re-raises as `unit_id=<uuid>` because it is the only place that knows.
+       `null` is a real answer — a refusal raised before the loop is about no
+       Unit at all. */
+    const code =
+      (error as { message?: string }).message?.match(
+        /(mpr_line_not_found|mpr_line_has_no_request|mpr_line_not_going_ahead|mpr_line_already_covered|mpr_line_needs_request_ref|request_not_approved|request_not_a_concrete_need|request_has_no_number|unit_not_found|unit_does_not_match_line|unit_not_available|unit_no_longer_free|unit_cannot_be_released|quantity_row_not_bindable|stock_selection_changed|duplicate_unit_chosen|too_many_units|one_binding_only)/,
+      )?.[1] ?? null;
+    const itemId = readyStockRefusedUnitId(error);
+    return c.json(
+      { ...(m.body as object), ...(code ? { code } : {}), ...(itemId ? { itemId } : {}) },
+      m.status,
+    );
+  }
+  return c.json(data);
 });
 
 const decideBody = z.object({
@@ -1825,6 +2200,18 @@ const issueBody = z.object({
   /** The consolidation OFFER's answer. Declinable by design (card §6):
    *  `false` issues one document per request. */
   together: z.boolean(),
+  /**
+   * ⭐ THE CHOSEN GOODS LINES (owner ruling 2026-09-18) — optional, and its
+   * absence means *every eligible line of the named requests*, which is what
+   * the parent tick has always meant.
+   *
+   * A request that carries three items and needs two of them bought could not
+   * say so while the tick lived only on the parent row. A line named here that
+   * does not belong to a named request is refused; the server still recomputes
+   * every quantity from its own read, so this NARROWS the issue and can never
+   * widen it.
+   */
+  demandIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
 /**
@@ -1853,7 +2240,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { requestIds, together } = parsed.data;
+  const { requestIds, together, demandIds } = parsed.data;
 
   /* Manual Purchase and SO Batch Purchase ask the same governed capability;
      the creation RPC asks again at the database boundary. */
@@ -1919,15 +2306,54 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   // already issued — never the original ask. THE one remainder arithmetic
   // (`manualPurchaseLineRemainingOf`, Law D — the Register expansion reads
   // the same function).
+  /* ⭐ WHAT READY STOCK ALREADY ANSWERS — subtracted here so the PREVIEW and
+     the document agree with the door. `purchasing_demand_record_issue` applies
+     the same reduction on the locked row (0546), so a stale tab is refused
+     rather than allowed to buy a sofa that is already standing in Klang. */
+  const heldByDemand = new Map<string, number>();
+  const liveLineIds = (allLines ?? [])
+    .filter((l) => l.cancelled_at === null)
+    .map((l) => l.id as string);
+  if (liveLineIds.length > 0) {
+    const { data: heldUnits, error: heldErr } = await sb
+      .from("ops_stock_items")
+      .select("reserved_purchase_demand_id, qty")
+      .in("reserved_purchase_demand_id", liveLineIds)
+      .in("status", ["reserved", "sold"]);
+    /* Pre-0546 the column is not there and nothing is allocated, so there is
+       nothing to subtract; any OTHER failure still stops the issue, because
+       issuing against an unread allocation would buy goods twice. */
+    if (heldErr && !isMissingAllocationColumn(heldErr)) return fail(c, heldErr);
+    for (const u of (heldUnits ?? []) as Array<Record<string, unknown>>) {
+      const key = u.reserved_purchase_demand_id as string;
+      heldByDemand.set(key, (heldByDemand.get(key) ?? 0) + Math.max(1, Number(u.qty ?? 1)));
+    }
+  }
+
+  /* THE OPERATOR'S CHOSEN LINES, when they named any. A line that is not on a
+     named request is refused by name: the route owns the relationship between
+     its own two identities. */
+  const chosenLines = demandIds ? new Set(demandIds) : null;
+  if (chosenLines) {
+    const known = new Set((allLines ?? []).map((l) => l.id as string));
+    for (const id of chosenLines) {
+      if (!known.has(id)) return refuse(c, 404, "unknown_request");
+    }
+  }
+
   const toIssue = (allLines ?? [])
     .filter((l) => l.cancelled_at === null)
+    .filter((l) => chosenLines == null || chosenLines.has(l.id as string))
     .map((l) => ({
       ...l,
-      issueQty: manualPurchaseLineRemainingOf({
-        qty: Number(l.qty),
-        approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
-        issuedQty: Number(l.issued_qty ?? 0),
-      }),
+      issueQty: Math.max(
+        0,
+        manualPurchaseLineRemainingOf({
+          qty: Number(l.qty),
+          approvedQty: l.approved_qty == null ? null : Number(l.approved_qty),
+          issuedQty: Number(l.issued_qty ?? 0),
+        }) - (heldByDemand.get(l.id as string) ?? 0),
+      ),
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
