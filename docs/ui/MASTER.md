@@ -1576,11 +1576,20 @@ rail groups, fixed groups, sort, expansion content, footer noun, empty sentences
 | Identity link | blue mono, no underline | blue text | blue mono, cut | mono, not a link | blue mono, underlined |
 | Footer | `27 Sales Orders` | `18 Manual Purchases` | `26 purchase orders` (lower case) | `Showing 1–2 of 2` + Previous/Next | `3 claims · 4 units` |
 
-Additional template rules from this measurement: one text-overflow rule for every listing (wrap
-within the cell, never cut an identity or a name); one status style (plain text, or the shared
-StatusPill everywhere — not pills on one page only); identity links look the same everywhere
-(blue mono, no underline). The Receiving and Supplier Claims dev previews also print the wrong page
-title ("SO Batch Purchase") — a preview-harness defect to fix with the conversion.
+Reading the table: differences that follow each page's approved business design are NOT template
+errors — Receiving is a complete GRN register with server paging and needs no work groups,
+checkboxes or batch actions; an expansion is added only where that page's approved design has one;
+Manual Purchase's approval status has no counterpart on SO Batch. Template corrections that do follow
+from the measurement: (1) identity numbers get enough width to show in full and are never cut or
+split across lines; names and items may wrap; multiple documents keep the approved summary +
+expansion; (2) row height: one default height, and a row may grow only for necessary two-line
+content; (3) the same status uses the same component everywhere — no new "all plain text" rule this
+round; (4) links share one default look and keep visible hover and keyboard focus; (5) Receiving
+takes the slate palette, responsive search, date + GRN No pinning and an identity link into its
+detail, and keeps paging with the shared footer look and wording; (6) Supplier Claims pins date +
+Supplier Claim No. and its footer counts claims only (reported qty is not a Unit count); (7) preview
+titles are fixed and every comparison screenshot states the code version it came from. Evidence
+(measurements and screenshots) lives in the PR, not in a second rules file.
 
 **Kit fixes that come with it:** `Clear filters` and sort arrows leave the retired flame colour for
 blue-11; `GoodsMiniTable` content-width, capped Item column, two-line minimum row height, 11px
@@ -1613,8 +1622,8 @@ template only when all ten pass:
 10. Real-page acceptance: signed-in 1440 / 1180 / 820 / 390, 200% zoom, long names, keyboard, touch
     and failure states all pass before any page is scored 10/10.
 
-Order of work: correct SO Batch first → move its composition into the kit → connect pages one by
-one, each keeping its own content (SO Batch two groups and buying actions; Manual Purchase MPR,
+Order of work: correct SO Batch first and finish the shared template → move Receiving and Supplier
+Claims onto it → then check Manual Purchase and Purchase Orders; each keeps its own content (SO Batch two groups and buying actions; Manual Purchase MPR,
 approval and three groups; Purchase Orders sending, arrival facts and four groups; Receiving GRN
 register, quantities and paging without purchasing work groups; Supplier Claims problem, supplier
 response and claim status; Purchase Returns its approved columns, no Finance; Repair Orders after
