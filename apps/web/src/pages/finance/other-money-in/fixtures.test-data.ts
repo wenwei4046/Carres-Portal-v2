@@ -20,6 +20,12 @@ export const I_CANCELLED = "aaaaaaaa-0000-4000-8000-000000000004";
 export const R1 = "bbbbbbbb-0000-4000-8000-000000000001";
 export const R2 = "bbbbbbbb-0000-4000-8000-000000000002";
 
+/** 0540: the department list the line pickers read. */
+export const DEPARTMENTS = { rows: [
+  { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+  { department_type: "OFFICE", department_id: null, name: "Office" },
+] };
+
 export const ACCOUNTS: MoneyInAccountOption[] = [
   { code: "1110", name: "Cash on hand", kind: "ASSET", parent_code: "1100", for_money: true, for_receipt_line: false, for_invoice_line: false },
   { code: "1120", name: "Bank — current account", kind: "ASSET", parent_code: "1100", for_money: true, for_receipt_line: false, for_invoice_line: false },
@@ -108,8 +114,8 @@ const detailExtras = {
 export const DRAFT_DETAIL: OtherDebtorInvoiceDetail = {
   invoice: { ...INVOICES[0], ...detailExtras },
   lines: [
-    { line_no: 1, account_code: "6200", account_name: "Rent", description: "Office rent September", amount: 1400 },
-    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Service charge", amount: 100 },
+    { line_no: 1, account_code: "6200", account_name: "Rent", description: "Office rent September", amount: 1400, department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "4900", account_name: "Other income", description: "Service charge", amount: 100, department_type: "SUBSCRIPTION", department_id: null },
   ],
   receipts: [],
 };

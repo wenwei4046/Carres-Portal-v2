@@ -20,6 +20,7 @@ import {
   type SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
 import { apiFetch, ApiError } from "./api";
+import { withDepartment } from "@/pages/finance/department";
 import { supabase } from "./supabase";
 
 /**
@@ -90,10 +91,11 @@ export function useApBillOutstanding(supplierId: string | null, enabled = true) 
   });
 }
 
-export function useSupplierBills() {
+export function useSupplierBills(dept = "") {
+  const d = withDepartment(payablesKeys.bills(), `${BASE}/bills`, dept);
   return useQuery({
-    queryKey: payablesKeys.bills(),
-    queryFn: async () => (await apiFetch<Rows<SupplierBillRegisterRow>>(`${BASE}/bills`)).rows,
+    queryKey: d.queryKey,
+    queryFn: async () => (await apiFetch<Rows<SupplierBillRegisterRow>>(d.url)).rows,
     staleTime: 15_000,
   });
 }
@@ -117,10 +119,11 @@ export function useGrnCandidates(supplierId: string | null, enabled = true) {
   });
 }
 
-export function usePaymentVouchers() {
+export function usePaymentVouchers(dept = "") {
+  const d = withDepartment(payablesKeys.vouchers(), `${BASE}/vouchers`, dept);
   return useQuery({
-    queryKey: payablesKeys.vouchers(),
-    queryFn: async () => (await apiFetch<Rows<PaymentVoucherRegisterRow>>(`${BASE}/vouchers`)).rows,
+    queryKey: d.queryKey,
+    queryFn: async () => (await apiFetch<Rows<PaymentVoucherRegisterRow>>(d.url)).rows,
     staleTime: 15_000,
   });
 }

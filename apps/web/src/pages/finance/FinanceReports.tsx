@@ -28,6 +28,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
 import { useBalanceSheet, useProfitAndLoss } from "./reports/report-queries";
+import { DepartmentFilter, useDepartmentParam } from "./department";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -101,8 +102,9 @@ export default function FinanceReports() {
   const { from, to } = readPeriod(params, today);
   const asOf = readDay(params.get("asOf")) ?? today;
 
-  const pl = useProfitAndLoss(from, to);
-  const bs = useBalanceSheet(asOf);
+  const [, setDept, dept] = useDepartmentParam();
+  const pl = useProfitAndLoss(from, to, dept);
+  const bs = useBalanceSheet(asOf, dept);
   const notStarted = notStartedError(pl.error) || notStartedError(bs.error);
   const goLive = pl.data?.goLiveOn ?? bs.data?.goLiveOn ?? null;
   const plReport = pl.data;
@@ -165,6 +167,7 @@ export default function FinanceReports() {
           {goLive && <p className="text-body text-kit-slate-11" data-testid="reports-go-live">
             Since {fmtDate(goLive)} · No opening balances
           </p>}
+          <DepartmentFilter value={dept} onChange={setDept} />
 
           <div className="grid items-start gap-6 xl:grid-cols-2">
             <Panel title="Profit and Loss">

@@ -15,6 +15,8 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
+import type { DepartmentType } from "@carres/shared";
+import { DepartmentFilter, DepartmentName, DepartmentPicker, useDepartmentParam } from "../department";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
@@ -74,7 +76,8 @@ export default function SupplierBills() {
 
 function BillRegister() {
   const navigate = useNavigate();
-  const query = useSupplierBills();
+  const [, setDept, dept] = useDepartmentParam();
+  const query = useSupplierBills(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierBillRegisterRow>[]>(() => [
     { key: "bill", label: "Bill No", width: 170,
@@ -126,6 +129,7 @@ function BillRegister() {
             searchPlaceholder="Search bills…"
             toolbarStart={
               <span className="flex items-center gap-4">
+                <DepartmentFilter value={dept} onChange={setDept} />
                 <button
                   type="button"
                   data-testid="new-bill"
@@ -401,6 +405,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
               <th className="py-1 pr-3 text-right">Qty</th>
               <th className="py-1 pr-3 text-right">Unit price</th>
               <th className="py-1 pr-3">Against PO</th>
+              <th className="py-1 pr-3">Department</th>
               <th className="py-1 text-right">Amount</th>
             </tr>
           </thead>
@@ -414,6 +419,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
                 <td className="py-1 pr-3 text-right">{l.qty ?? "—"}</td>
                 <td className="py-1 pr-3 text-right">{money(l.unit_price)}</td>
                 <td className="py-1 pr-3">{l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}</td>
+                <td className="py-1 pr-3"><DepartmentName type={l.department_type} id={l.department_id} /></td>
                 <td className="py-1 text-right">{money(l.amount)}</td>
               </tr>
             ))}
@@ -439,6 +445,8 @@ type LineDraft = {
   amount: string;
   poUnitCost: number | null;
   openQty: number | null;
+  departmentType: DepartmentType | null;
+  departmentId: string | null;
 };
 
 let lineSeq = 0;
@@ -447,7 +455,7 @@ function newKey() { lineSeq += 1; return `l${lineSeq}`; }
 function blankLine(): LineDraft {
   return {
     key: newKey(), warehouseReceiptId: null, poLineId: null, grnNo: null, sku: "", description: "",
-    accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null,
+    accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null, departmentType: null, departmentId: null,
   };
 }
 
@@ -466,12 +474,12 @@ function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
     return {
       warehouseReceiptId: l.warehouseReceiptId, poLineId: l.poLineId,
       accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
-      qty: q, unitPrice: p,
+      qty: q, unitPrice: p, departmentType: l.departmentType, departmentId: l.departmentId,
     };
   }
   return {
     accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
-    qty: q, unitPrice: p,
+    qty: q, unitPrice: p, departmentType: l.departmentType, departmentId: l.departmentId,
     amount: q !== null && p !== null ? null : (l.amount.trim() === "" ? null : Number(l.amount)),
   };
 }
@@ -524,6 +532,8 @@ function BillForm() {
       amount: String(l.amount),
       poUnitCost: num(l.po_unit_cost),
       openQty: null,
+      departmentType: (l.department_type ?? null) as DepartmentType | null,
+      departmentId: l.department_id ?? null,
     })));
     setLoaded(true);
   }, [id, loaded, existing.data]);
@@ -566,7 +576,7 @@ function BillForm() {
   }
 
   const ready = supplierId !== "" && invoiceNo.trim() !== "" && /^\d{4}-\d{2}-\d{2}$/.test(billDate)
-    && lines.length > 0 && lines.every((l) => (lineAmount(l) ?? 0) > 0);
+    && lines.length > 0 && lines.every((l) => (lineAmount(l) ?? 0) > 0 && l.departmentType !== null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -655,6 +665,7 @@ function BillForm() {
                         <th className="py-1 pr-2">Unit price</th>
                         <th className="py-1 pr-2">Amount</th>
                         <th className="py-1 pr-2">Against PO</th>
+                        <th className="py-1 pr-2">Department</th>
                         <th className="py-1" />
                       </tr>
                     </thead>
@@ -756,6 +767,10 @@ function BillLineRow({ line, index, accounts, onChange, onRemove }: {
       <td className="py-1 pr-2" data-testid={`line-${n}-price-check`}>
         {fromGrn ? priceDiffWord(diff) : "No PO price"}
       </td>
+      <td className="py-1 pr-2">
+        <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
+          income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />
+      </td>
       <td className="py-1">
         <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
       </td>
@@ -794,6 +809,8 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
           amount: "",
           poUnitCost: num(l.po_unit_cost),
           openQty: num(l.open_qty),
+          departmentType: (l.department_type ?? null) as DepartmentType | null,
+          departmentId: l.department_id ?? null,
         }));
       if (picked.length === 0) toast.error("Everything on that GRN is already billed.");
       else onPick(picked, g.supplier_id, g.po_terms_days ?? null);

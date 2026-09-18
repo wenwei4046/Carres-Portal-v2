@@ -3593,3 +3593,6 @@ reads "Department" as the HR department (org_departments) on a Finance page.
 | Choose the department. | Line refusal | A new line was saved without a department |
 | That department is not on the list. | Line refusal | The chosen outlet or dealer is not a department |
 | Office has expenses only. Choose another department for income. | Line refusal | Office was picked on an income account |
+| All | Department filter | Every department; the filter is off |
+| All Showroom · All Dealer | Department filter | Every outlet (or every dealer) of that type |
+| Department… · Choose the department | Line picker placeholder | No department picked yet on this line |

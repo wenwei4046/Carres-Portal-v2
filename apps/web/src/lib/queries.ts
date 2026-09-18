@@ -316,6 +316,7 @@ import {
 } from "@carres/shared";
 import { operationWorkResponseSchema } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
+import { withDepartment } from "@/pages/finance/department";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
@@ -8061,15 +8062,16 @@ export function usePaymentRegister() {
 
 /** The Invoices Register — the same fail-closed complete read as Payments:
  *  a page that cannot be completed is an error, never a shorter list. */
-export function useInvoiceRegister() {
+export function useInvoiceRegister(dept = "") {
+  const d = withDepartment(qk.finance.invoiceRegister(), "/api/finance/invoices/register", dept);
   return useQuery({
-    queryKey: qk.finance.invoiceRegister(),
+    queryKey: d.queryKey,
     queryFn: async () => {
       const rows: import("@carres/shared/payment-invoice-register").InvoiceRegisterRow[] = [];
       let total: number | null = null;
       do {
         const page = await apiFetch<import("@carres/shared/payment-invoice-register").InvoiceRegisterPage>(
-          `/api/finance/invoices/register?offset=${rows.length}&limit=200`,
+          `${d.url}${d.url.includes("?") ? "&" : "?"}offset=${rows.length}&limit=200`,
         );
         if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Invoices could not be loaded. Try again.");
         if (total !== null && total !== page.total) throw new Error("Invoices changed. Try again.");

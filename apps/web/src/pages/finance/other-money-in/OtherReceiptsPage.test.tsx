@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OtherReceiptsPage from "./OtherReceiptsPage";
-import { ACCOUNTS, I_OPEN, MONEY_ACCOUNTS, INVOICES, P1, PARTIES, R1, RECEIPT_DETAIL, RECEIPTS } from "./fixtures.test-data";
+import { ACCOUNTS, DEPARTMENTS, I_OPEN, MONEY_ACCOUNTS, INVOICES, P1, PARTIES, R1, RECEIPT_DETAIL, RECEIPTS } from "./fixtures.test-data";
 
 const net = vi.hoisted(() => ({
   routes: {} as Record<string, unknown>,
@@ -36,6 +36,7 @@ beforeEach(() => {
     "GET /invoices": INVOICES,
     "GET /parties": PARTIES,
     "GET /accounts": ACCOUNTS,
+    "GET /api/finance/ledger/departments": DEPARTMENTS,
     "GET /api/finance/ledger/money-accounts": MONEY_ACCOUNTS,
     "GET /me": { mayCancel: false },
     [`GET /receipts/${R1}`]: RECEIPT_DETAIL,
@@ -151,6 +152,7 @@ describe("Other receipts — the form", () => {
     await choose(/Received into/, "1120 · Bank — current account");
     await choose(/^Account/, "2360 · Loans received");
     fireEvent.change(screen.getByLabelText("Amount (RM)"), { target: { value: "10,000" } });
+    await choose(/^Department/, "Office");
     fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
     expect(await screen.findByText("Type who paid, or choose a party.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Payer name/), { target: { value: "Example Lender Bhd" } });
@@ -162,7 +164,7 @@ describe("Other receipts — the form", () => {
       party_id: null,
       payer_name: "Example Lender Bhd",
       money_account_code: "1120",
-      lines: [{ account_code: "2360", amount: 10000, description: null }],
+      lines: [{ account_code: "2360", amount: 10000, description: null, department_type: "OFFICE", department_id: null }],
       allocations: [],
     });
   });

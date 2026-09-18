@@ -14,6 +14,7 @@
  */
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { DepartmentFilter } from "../department";
 import type { LedgerEntryRow } from "@carres/shared/finance-ledger";
 import {
   ledgerDocWord,
@@ -53,6 +54,7 @@ export default function LedgerJournal() {
     account: params.get("account"),
     from: isoOrNull(params.get("from")),
     to: isoOrNull(params.get("to")),
+    dept: params.get("dept") ?? "",
   }), [params]);
 
   const edit = (change: (next: URLSearchParams) => void) => setParams((before) => {
@@ -63,7 +65,7 @@ export default function LedgerJournal() {
   const pickAccount = (code: string) => edit((n) => {
     if (code === ALL_ACCOUNTS) n.delete("account"); else n.set("account", code);
   });
-  const showAll = () => edit((n) => { n.delete("account"); n.delete("from"); n.delete("to"); });
+  const showAll = () => edit((n) => { n.delete("account"); n.delete("from"); n.delete("to"); n.delete("dept"); });
 
   // The manual journal door (ruling M): the principal only. The API and the
   // database refuse everyone else as well; hiding the door is the courtesy.
@@ -77,12 +79,14 @@ export default function LedgerJournal() {
 
   if (entryRef === NEW_ENTRY && mayRecord) return <ManualJournalForm onBack={close} onRecorded={recorded} />;
   if (entryRef) return <EntryPage entryRef={entryRef} search={params} onClose={close} />;
-  return <JournalRegister scope={scope} search={params} onOpen={open}
+  const pickDept = (v: string) => edit((n) => { if (v) n.set("dept", v); else n.delete("dept"); });
+  return <JournalRegister scope={scope} search={params} onOpen={open} onPickDept={pickDept}
     onPickAccount={pickAccount} onShowAll={showAll} onNew={mayRecord ? startEntry : undefined} />;
 }
 
-function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll, onNew }: {
+function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onShowAll, onNew }: {
   scope: JournalScope;
+  onPickDept: (v: string) => void;
   search: URLSearchParams;
   onOpen: (entryNo: string) => void;
   onPickAccount: (code: string) => void;
@@ -97,7 +101,7 @@ function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll, onNe
     [chart.data],
   );
   const scopedAccount = scope.account ? accounts.find((a) => a.code === scope.account) : undefined;
-  const scoped = scope.account !== null || scope.from !== null || scope.to !== null;
+  const scoped = scope.account !== null || scope.from !== null || scope.to !== null || !!scope.dept;
 
   const columns = useMemo<DataGridColumn<LedgerEntryRow>[]>(() => [
     { key: "entry", label: "Entry No", width: 150, accessor: (r) => r.entry_no,
@@ -153,6 +157,7 @@ function JournalRegister({ scope, search, onOpen, onPickAccount, onShowAll, onNe
               <Select id="journal-account" value={scope.account ?? ALL_ACCOUNTS}
                 onValueChange={onPickAccount} placeholder="All accounts" options={accountOptions} />
             </span>
+            <DepartmentFilter value={scope.dept ?? ""} onChange={onPickDept} />
             {scoped && <span className="flex items-center gap-2" data-testid="journal-scope">
               <span>{scopeWords}</span>
               <button type="button" className="underline underline-offset-2" onClick={onShowAll}>Show all entries</button>

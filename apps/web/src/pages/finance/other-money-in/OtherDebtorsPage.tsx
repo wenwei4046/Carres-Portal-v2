@@ -31,6 +31,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useOtherDebtorInvoices, useOtherDebtorParties } from "./api";
+import { DepartmentFilter, useDepartmentParam } from "../department";
 import InvoicePage from "./InvoicePage";
 import PartyModal from "./PartyModal";
 import { LoadFailed } from "./parts";
@@ -126,7 +127,8 @@ function Siblings({ current }: { current: "invoices" | "parties" }) {
 /* ── the invoice Register ──────────────────────────────────────────────────── */
 
 function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
-  const query = useOtherDebtorInvoices();
+  const [, setDept, dept] = useDepartmentParam();
+  const query = useOtherDebtorInvoices(dept);
   const columns = useMemo<DataGridColumn<OtherDebtorInvoiceRow>[]>(
     () => [
       {
@@ -233,6 +235,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
               New invoice
             </Button>
             <Siblings current="invoices" />
+            <DepartmentFilter value={dept} onChange={setDept} />
           </span>
         }
         emptyMessage="No other debtor invoice yet. Press New invoice to bill a party that is not a customer."
