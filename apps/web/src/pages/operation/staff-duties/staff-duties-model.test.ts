@@ -3,6 +3,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import type { WorkspaceDutiesResponse } from "@/lib/queries";
 import {
   dutyDisplayState,
+  dutyRefusalSentence,
   matchesDutySearch,
   matchesDutyState,
   type DutyStateFilter,
@@ -270,4 +271,19 @@ describe("matchesDutyState", () => {
       expect(matchesDutyState(subject, filter, TODAY)).toBe(expected);
     });
   }
+});
+
+describe("dutyRefusalSentence — nobody names themself (0533)", () => {
+  const facts = { duty: "Purchasing Approver", name: "Jess" };
+  const refused = (code: string) => ({ body: { code } });
+  it("a self-assignment reads as the holder sentence", () => {
+    expect(dutyRefusalSentence("assign", refused("self_assignment_refused"), facts)).toBe(
+      "Jess cannot hold Purchasing Approver. Choose an eligible active staff member.",
+    );
+  });
+  it("a self-cover reads as the cover sentence", () => {
+    expect(dutyRefusalSentence("cover", refused("self_assignment_refused"), facts)).toBe(
+      "Jess can no longer cover Purchasing Approver. Choose another eligible staff member.",
+    );
+  });
 });

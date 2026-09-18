@@ -1404,7 +1404,6 @@ export {
   isOpsManagerRow,
   isStockPlanner,
   LEGACY_OPS_MANAGER_EMAILS,
-  LEGACY_PO_DUTY_EDITOR_EMAILS,
   type DutyKey,
   type DutyHolderMap,
   type DutyGrant,

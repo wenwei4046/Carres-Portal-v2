@@ -71,7 +71,7 @@ describe.skipIf(!URL)("a cover never overlaps and needs one holder every day (re
     for (const [id, role, status, name] of people) {
       const email = `it-cover-${id.slice(-4)}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
-      await q("insert into app_users (id, email, name, role, status) values ($1, $2, $3, $4, $5)", [
+      await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, $5, true)", [
         id, email, name, role, status,
       ]);
     }

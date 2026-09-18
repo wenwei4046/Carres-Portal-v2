@@ -16,6 +16,7 @@ const FIONA = "00000000-0000-4000-8000-00000000000f";
 const AINA = "00000000-0000-4000-8000-00000000000a";
 const KHOR = "00000000-0000-4000-8000-00000000000b";
 const SHARED = "00000000-0000-4000-8000-00000000000c";
+const SHARED_CODED = "00000000-0000-4000-8000-00000000000d";
 
 const rpc = vi.fn();
 const eq = vi.fn();
@@ -28,8 +29,11 @@ const from = vi.fn((table: string) => ({
             return {
               order: async () => ({
                 data: [
-                  { id: AINA, email: "aina@x", name: "Aina", status: "active", staff_code: "CR004", last_seen_at: null },
-                  { id: KHOR, email: "khoryee@x", name: "Khor Yee", status: "disabled", staff_code: "CR003", last_seen_at: null },
+                  { id: AINA, email: "aina@x", name: "Aina", status: "active", staff_code: "CR004", is_person: true, last_seen_at: null },
+                  { id: KHOR, email: "khoryee@x", name: "Khor Yee", status: "disabled", staff_code: "CR003", is_person: true, last_seen_at: null },
+                  // 0533: a shared login may carry a staff_code (production's
+                  // principal@ is CR001) — only the person marker admits.
+                  { id: SHARED_CODED, email: "principal@x", name: "principal", status: "active", staff_code: "CR001", is_person: false, last_seen_at: null },
                   { id: SHARED, email: "operation@x", name: "Operations", status: "active", staff_code: null, last_seen_at: null },
                 ],
                 error: null,
@@ -81,7 +85,7 @@ describe("GET /staff — the Staff & Duties pickers", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("S2-A · a duty picker offers only active individual staff — never a departed or shared login", async () => {
+  it("S2-A · a duty picker offers only active individual staff — never a departed or shared login, even one with a staff_code (0533)", async () => {
     const res = await app().request("/staff?duty=grn_duty");
     const body = (await res.json()) as { staff: { name: string }[] };
     expect(body.staff.map((s) => s.name)).toEqual(["Aina"]);

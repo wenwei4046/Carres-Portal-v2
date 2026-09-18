@@ -522,10 +522,19 @@ describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name"
             return tableStub([]);
         }
       }),
-      rpc: vi.fn(),
+      rpc: vi.fn(async (fn: string) => {
+        if (fn === "workspace_resolve_duty") {
+          return { data: { duty_key: "purchasing_approver", actor_user_id: resolved }, error: null };
+        }
+        if (fn === "actor_display_names") {
+          return { data: [{ id: U_JESS, name: "Jess" }], error: null };
+        }
+        return { data: null, error: null };
+      }),
     } as unknown as ReturnType<typeof userClient>;
   }
 
+  let resolved: string | null = null;
   async function readRegister() {
     vi.mocked(userClient).mockReturnValue(makeApproverSb());
     const jwt = await makeJwt("operation");
@@ -538,23 +547,22 @@ describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name"
     );
   }
 
-  it("names the resolved ops_manager duty holder — the shared login excluded beside a named person", async () => {
-    vi.mocked(dutyHolders).mockResolvedValueOnce({
-      [U_JESS]: ["ops_manager"],
-      [U_SHARED]: ["ops_manager"],
-    });
+  it("names today's resolved Purchasing Approver through the governed name read", async () => {
+    resolved = U_JESS;
     const res = await readRegister();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
     expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
   });
 
-  it("falls back to the governed legacy list while the duty seat is empty", async () => {
-    // dutyHolders resolves {} (the file-level mock): the legacy emails hold
-    // the gate, and the shared login is still excluded beside a named one.
+  it("0533 · names NOBODY while the duty is unheld — no ops_manager rung, no email list", async () => {
+    // jess@carres.com sits in the users read AND holds the ops_manager
+    // position duty: neither may name an approver any more.
+    resolved = null;
+    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
     const res = await readRegister();
     const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
-    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
+    expect(body.approvers).toEqual([]);
   });
 });
 
@@ -752,26 +760,48 @@ describe("the decision gate — render asks what the door asks", () => {
     expect(body.canApprove).toBe(false);
   });
 
-  it("a real ops_manager duty holder IS offered the decision", async () => {
+  it("0533 · the ops_manager position no longer decides — only the resolved Purchasing Approver", async () => {
     vi.mocked(myDuties).mockResolvedValueOnce(["ops_manager"]);
     const res = await readRegister("operation");
     const body = (await res.json()) as { canApprove: boolean };
-    expect(body.canApprove).toBe(true);
+    expect(body.canApprove).toBe(false);
   });
 
-  it("the principal role passes, as it does at the SQL gate", async () => {
+  it("0533 · the principal ROLE alone does not decide — the shared owner login executes no duty", async () => {
     const res = await readRegister("principal");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+  });
+
+  it("today's resolved Purchasing Approver IS offered the decision", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeGateSb(
+        vi.fn(async (fn: string) =>
+          fn === "workspace_resolve_duty"
+            ? { data: { actor_user_id: "11111111-1111-1111-1111-000000000999" }, error: null }
+            : { data: null, error: null },
+        ),
+      ),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
     const body = (await res.json()) as { canApprove: boolean };
     expect(body.canApprove).toBe(true);
   });
 
   it("the door's 42501 leaves as the approved two lines, naming the real approver", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "42501", message: "forbidden" },
+    const rpc = vi.fn(async (fn: string) => {
+      if (fn === "workspace_resolve_duty") return { data: { actor_user_id: U_JESS }, error: null };
+      if (fn === "actor_display_names") return { data: [{ id: U_JESS, name: "Jess" }], error: null };
+      return { data: null, error: { code: "42501", message: "forbidden", details: "not_purchase_approver" } };
     });
     vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
-    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(
@@ -863,22 +893,33 @@ describe("the decision gate — render asks what the door asks", () => {
     expect(JSON.stringify(body)).not.toContain("deadlock");
   });
 
+  it("0533 · the requester deciding their own purchase leaves as its own governed two lines", async () => {
+    const res = await decideWith({ code: "42501", message: "you cannot decide a purchase you raised", details: "own_request" });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("own_request");
+    expect(body.message).toBe("You cannot decide a purchase you raised.");
+    expect(body.action).toBe("Withdraw it if the goods are no longer needed.");
+  });
+
   it("42501 with NO resolvable approver names the configuration hole", async () => {
-    // Nobody holds the duty AND no legacy manager email exists among the
-    // users: the refusal must say no approver is SET, never invent a name.
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "42501", message: "forbidden" },
-    });
+    // Nobody holds the duty, though jess@carres.com is among the users and
+    // holds the ops_manager position: the refusal says nobody holds it —
+    // no email list and no position rung may invent a name (0533).
+    const rpc = vi.fn(async (fn: string) =>
+      fn === "workspace_resolve_duty"
+        ? { data: { actor_user_id: null, source: "not_assigned" }, error: null }
+        : { data: null, error: { code: "42501", message: "Nobody holds Purchasing Approver.", details: "no_purchase_approver" } },
+    );
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) =>
         table === "app_users"
-          ? tableStub([{ id: U_JESS, name: "Siti", email: "siti@carres.com" }])
+          ? tableStub([{ id: U_JESS, name: "Jess", email: "jess@carres.com" }])
           : tableStub([]),
       ),
       rpc,
     } as unknown as ReturnType<typeof userClient>);
-    vi.mocked(dutyHolders).mockResolvedValueOnce({});
+    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(
@@ -895,8 +936,8 @@ describe("the decision gate — render asks what the door asks", () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code: string; message: string; action: string };
     expect(body.code).toBe("no_purchase_approver");
-    expect(body.message).toBe("No purchase approver is set.");
-    expect(body.action).toBe("Ask management to set the purchase approver.");
+    expect(body.message).toBe("Nobody holds Purchasing Approver.");
+    expect(body.action).toBe("Set the holder in Workspace → Staff & Duties.");
   });
 });
 
@@ -932,12 +973,14 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
     created_at: "2026-08-29T01:00:00Z",
   };
 
+  let detailActor: string | null = null;
+  let detailCreatedBy: string = U_SHARED;
   function makeDetailSb() {
     return {
       from: vi.fn((table: string) => {
         switch (table) {
           case "purchase_requests":
-            return tableStub(REQ_D);
+            return tableStub({ ...REQ_D, created_by: detailCreatedBy });
           case "purchase_demands":
             return tableStub([
               { id: LINE_D, sku: "5539-2NA", supplier_id: SUP, destination_id: DEST,
@@ -983,7 +1026,9 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
       /* D2 — names resolve through the shared actor door (0390), exactly as
          production does; every other RPC answers nothing. */
       rpc: vi.fn(async (name: string) =>
-        name === "actor_display_names"
+        name === "workspace_resolve_duty"
+          ? { data: { actor_user_id: detailActor }, error: null }
+          : name === "actor_display_names"
           ? {
               data: [
                 { id: U_JESS, name: "Jess" },
@@ -1069,8 +1114,8 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
   });
 
   it("the approver's money rides the line; lineage and item words ride every line", async () => {
-    vi.mocked(myDuties).mockResolvedValueOnce(["ops_manager"]);
-    const res = await readDetail("operation");
+    detailActor = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
+    const res = await readDetail("principal");
     const body = (await res.json()) as {
       canApprove: boolean;
       lines: Array<{ unit_cost?: number | null; item_label?: string; po_ids?: string[]; destination_id?: string }>;
@@ -1080,6 +1125,17 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
     expect(body.lines[0].item_label).toBe("Ohana 2 Seater");
     expect(body.lines[0].po_ids).toEqual([PO_D]);
     expect(body.lines[0].destination_id).toBe(DEST);
+    detailActor = null;
+  });
+
+  it("0533 · the resolved approver is NOT offered the decision on a purchase they raised", async () => {
+    detailActor = "11111111-1111-1111-1111-000000000999";
+    detailCreatedBy = "11111111-1111-1111-1111-000000000999";
+    const res = await readDetail("principal");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+    detailActor = null;
+    detailCreatedBy = U_SHARED;
   });
 });
 
@@ -2179,12 +2235,12 @@ describe("GET /purchasing/requests — who the Register names as approver", () =
     expect(body.approvers.map((a) => a.id)).toEqual([YJ]);
   });
 
-  it("falls back to the ops_manager holder ONLY while the duty resolves to nobody", async () => {
+  it("0533 · names nobody while the duty resolves to nobody — the ops_manager rung is gone", async () => {
     const body = await register(null, [JESS]);
-    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
+    expect(body.approvers).toEqual([]);
   });
 
-  it("a resolver that cannot answer fails soft onto the same rung, never wider", async () => {
+  it("a resolver that cannot answer fails soft to NOBODY, never wider", async () => {
     vi.mocked(dutyHolders).mockResolvedValue({ [JESS]: ["ops_manager"] });
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) =>
@@ -2206,9 +2262,8 @@ describe("GET /purchasing/requests — who the Register names as approver", () =
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { approvers: Array<{ id: string }>; canApprove: boolean };
-    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
-    /* This account holds neither, so it is still offered no decision — a
-       failed read must never widen the gate. */
+    expect(body.approvers).toEqual([]);
+    /* A failed read must never widen the gate. */
     expect(body.canApprove).toBe(false);
   });
 });

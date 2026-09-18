@@ -406,7 +406,7 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
   it("names one holder, joins several with `or`, and prints nothing for nobody", () => {
     expect(manualPurchaseApproverLine(["Jess"])).toBe("Jess approves");
     expect(manualPurchaseApproverLine(["Jess", "YJ"])).toBe("Jess or YJ approves");
-    expect(manualPurchaseApproverLine([])).toBeNull();
+    expect(manualPurchaseApproverLine([])).toBe("Nobody holds Purchasing Approver.");
     expect(manualPurchaseApproverLine([null, "", "  "])).toBeNull();
   });
 });

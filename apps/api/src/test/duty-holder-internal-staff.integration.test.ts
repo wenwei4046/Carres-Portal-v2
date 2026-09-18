@@ -30,6 +30,7 @@ const uid = (tail: string) => `dddddddd-0000-4000-8000-${HEX}${tail.padStart(7, 
 
 const U = {
   principal: uid("1"),
+  principal2: uid("b"), // a second principal PERSON — nobody assigns themself (0533)
   operation: uid("2"),
   finance: uid("3"),
   finance2: uid("a"),
@@ -71,6 +72,7 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
     await q("begin");
     const people: Array<[string, string, string]> = [
       [U.principal, "principal", "active"],
+      [U.principal2, "principal", "active"],
       [U.operation, "operation", "active"],
       [U.finance, "finance", "active"],
       [U.finance2, "finance", "active"],
@@ -84,7 +86,7 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
     for (const [id, role, status] of people) {
       const email = `it-duty-${role}-${id.slice(-4)}-${RUN}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
-      await q("insert into app_users (id, email, name, role, status) values ($1, $2, $3, $4, $5)", [
+      await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, $5, true)", [
         id, email, `IT ${role} ${id.slice(-4)}`, role, status,
       ]);
     }
@@ -106,9 +108,12 @@ describe.skipIf(!URL)("a duty holder or cover is active internal staff (real Pos
   });
 
   it("takes an active principal, operation, finance or bd holder", async () => {
-    for (const holder of [U.principal, U.finance, U.bd, U.operation]) {
+    for (const holder of [U.principal2, U.finance, U.bd, U.operation]) {
       expect(await assign(holder)).toBe("ok");
     }
+    // 0533 (owner ruling 2026-09-18): nobody assigns a duty to themself — the
+    // principal exception is gone.
+    expect(await assign(U.principal)).toBe("self_assignment_refused");
   });
 
   it("refuses a cover who is not internal staff or disabled, and takes one who is", async () => {

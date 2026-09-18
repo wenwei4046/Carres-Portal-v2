@@ -187,8 +187,12 @@ export function dutyRefusalSentence(
       return `Choose another person to cover ${duty}.`;
     case "invalid_cover":
       return `${name} can no longer cover ${duty}. Choose another eligible staff member.`;
-    case "invalid_holder":
     case "self_assignment_refused":
+      // 0533: nobody names themself — as holder or as cover.
+      return act === "cover"
+        ? `${name} can no longer cover ${duty}. Choose another eligible staff member.`
+        : `${name} cannot hold ${duty}. Choose an eligible active staff member.`;
+    case "invalid_holder":
       return `${name} cannot hold ${duty}. Choose an eligible active staff member.`;
     case "invalid_dates":
       return act === "assign" ? "Choose when this holder starts." : "Choose valid cover dates.";

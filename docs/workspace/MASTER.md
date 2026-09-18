@@ -94,6 +94,22 @@ Duty, normal owner, active cover, acting person and actual actor are separate fa
 the effective assignment, cover, actor, decision and time. A later holder change updates current and
 future routing everywhere but never rewrites history.
 
+**A DUTY BELONGS TO A PERSON — APPROVED / LOCKED, owner rulings (Jess) 2026-09-18, migration 0533.**
+
+- Every Duty holder, cover, assigner and executor is an **active person**: an account whose governed
+  person marker `app_users.is_person` is true. The marker — not `staff_code` (the shared owner login
+  carries `CR001`) and not an HR row (the shared login has one too) — separates a person from a
+  shared or generic login. People/HR sets it when it creates an internal person; no signed-in caller
+  may set or clear it (`person_marker_governed`).
+- The shared owner login `principal@carres.com` is **not a person**. It may read everything its role
+  reads, but it never holds, covers, assigns or executes any Duty. The principal role's "decides
+  anything" rung on an approver Duty now requires a principal **person**.
+- `jess@carres.com` is Jess's **personal management identity**, role `principal`, person, `CR002`.
+- **Nobody assigns a Duty to themself or names themself as cover** — every role, the principal
+  included (`self_assignment_refused`). This is the daily control.
+- Absence is expressed as a dated Buddy cover. With no eligible cover, the action **waits** for its
+  normal holder; it is never downgraded to another role, a position rung or an email list.
+
 ## 4 · Staff & Duties
 
 `Workspace → Staff & Duties` is the only assignment surface. An authorised manager assigns one
@@ -126,6 +142,19 @@ second owner list (`../delivery/MASTER.md` §13.1).
 **Reason for the ruling:** the PIC sweep shares open orders between the two active operators,
 Shasha and Yu Jun, at roughly 50/50. A single Delivery Duty instead left 101 routine Delivery
 actions unowned in production and broke the one-person customer/order follow-through.
+
+**`Purchasing Approver` (`purchasing_approver`) takes an active Principal person only** (owner
+rulings 2026-09-18, 0533). Its pickers list Principal people; the doors refuse every Operation
+account — Shasha and Yu Jun included — as holder (`invalid_holder`) or cover (`invalid_cover`).
+Deciding a Manual Purchase admits only today's resolved actor — the holder, or their dated Principal
+cover — and never the principal role alone, the `ops_manager` position or an email list. Unheld
+answers `Nobody holds Purchasing Approver.` · `Set the holder in Workspace → Staff & Duties.` Nobody
+decides a Manual Purchase they raised (`own_request`), and the principal role no longer raises one.
+**Bootstrap:** no door can name the first holder (self-assignment is refused and the shared login
+may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` NULL, note `Bootstrap
+— owner ruling 2026-09-18 (no second Principal person)` and an audit row naming the migration. It
+runs only when the Duty has no assignment history; it created no cover. Until a second Principal
+person exists, Jess has no eligible cover: her approvals wait while she is away.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
 list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
@@ -228,7 +257,8 @@ history.
 | Holder missing | (form) | `Choose a holder.` |
 | Assignment start missing | `invalid_dates` on assign | `Choose when this holder starts.` |
 | Assignment end before start | (form) | `Until must be on or after Effective from.` |
-| Ineligible/inactive holder, or a manager naming themself | `invalid_holder` · `self_assignment_refused` | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
+| Ineligible/inactive/non-person holder, or anyone naming themself as holder | `invalid_holder` · `self_assignment_refused` on assign | `{name} cannot hold {Duty}. Choose an eligible active staff member.` |
+| Anyone naming themself as cover | `self_assignment_refused` on cover | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
 | Conflicting primary period | (newest assignment wins; no refusal today) | `{Duty} already has a holder for these dates. Choose different dates.` |
 | Cover person missing | (form) | `Choose who will cover this duty.` |
 | Cover is normal holder | `cover_is_holder` | `Choose another person to cover {Duty}.` |
@@ -236,7 +266,7 @@ history.
 | No one normal owner for every day of the cover | `no_duty_holder` | `{Duty} has no normal holder for all these dates. Assign the holder first.` |
 | Conflicting cover | `cover_overlap` | `{Duty} already has cover for these dates. Choose different dates.` |
 | Eligibility changed before save | `invalid_cover` | `{name} can no longer cover {Duty}. Choose another eligible staff member.` |
-| Caller is not a duty manager | `not_duty_manager` | `Duty assignments are set by the manager.` |
+| Caller is not a duty manager, or is a shared login (0533) | `not_duty_manager` | `Duty assignments are set by the manager.` |
 | Unknown failure | `unknown` (any other error, a network failure included) | `{Duty} could not be updated. Try again.` |
 
 The API returns only the code; the page maps it to the sentence above and never renders the
@@ -1174,10 +1204,24 @@ honest Work for admitted modules.
   the door wrote in the cover success sentence, and exposes `scheduled_cover_id` asked of the
   resolver on the next cover's first day; the detail shows the resolver's cover by `cover_id` /
   `scheduled_cover_id` with `{acting} covering for {normal}`, dates and reason. Duty pickers list
-  active individuals only (a `staff_code`, as 0504 requires); shared logins and disabled accounts are
-  not offered. Staff avatars use the one `personInitials` rule (`Shasha → SH`, `Yu Jun → YJ`) on
+  active people only — since 0533 the governed `is_person` marker, not `staff_code`; shared logins
+  and disabled accounts are not offered. Staff avatars use the one `personInitials` rule (`Shasha → SH`, `Yu Jun → YJ`) on
   Staff & Duties, Purchase Orders, HR People and Principal Accounts. Real-PostgreSQL proof:
   `duty-cover-integrity.integration.test.ts` red on 0531, green on 0532.
+- **Personal approval identity + Purchasing Approver bootstrap (S2-D) — migration 0533.** Adds the
+  guarded `app_users.is_person` marker (true for Jess, Shasha, Yu Jun; false for
+  `principal@carres.com`); moves `jess@carres.com` to `principal` in the database (her token already
+  said `principal`, so API and SQL had disagreed about her); makes `workspace_is_internal_staff`,
+  the duty-settings gate and the duty pickers person-only; removes the principal self-assignment
+  exception and refuses self-cover; restricts Purchasing Approver to Principal people; narrows
+  `purchasing_approver_gate` to today's resolved actor; adds the `own_request` refusal to
+  `purchasing_decide_request`; makes the principal rung of the Payment, Storage Waiver and Finance
+  approver doors person-only; removes the principal role from Manual Purchase raise/resubmit; and
+  narrows `is_operations_superuser` from "every principal" to the flag or a principal person, so
+  the shared owner login loses the PO/GRN doors while Jess keeps them (Purchasing MASTER §5.3). The API Manual Purchase ladder reads only the resolver — no
+  `ops_manager` rung and no email list — and names the approver through `actor_display_names`.
+  Real-PostgreSQL proof: `personal-approver-identity.integration.test.ts` 9/10 red on 0532, 10/10
+  green on 0533.
 - Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.

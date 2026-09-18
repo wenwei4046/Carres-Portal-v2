@@ -689,37 +689,41 @@ primitive fixes it in the same move.
 
 ---
 
-## `purchasing-approver-duty-has-no-holder` — OWNER ACTION OWED, opened 2026-09-11
+## `purchasing-approver-single-person` — OPEN BY OWNER RULING, opened 2026-09-18
 
-**🟡 The Purchasing Approver duty now REACHES the door, and nobody holds it.** Migration
-`0474` moves `purchasing_decide_request` onto `purchasing_approver_gate`, which resolves
-`purchasing_approver` through `workspace_resolve_duty` — the Shared Duty Resolver Staff &
-Duties actually writes. It closes a gap measured on production the same day: the key was
-offered in Staff & Duties and named by the Work Engine as `manual_purchase.approve`'s owner
-duty, but the door gated on `org_position_duties` (`ops_manager`), a DIFFERENT system — so
-`Approve purchase` had no owner in Work, and an assignment made on the Staff & Duties screen
-could never have reached the decision.
+**🟡 Jess is the only Purchasing Approver and has no eligible cover.** 0533 (owner rulings
+2026-09-18) bootstrapped her as the first holder and restricted holder and cover to active
+Principal **people**. Today she is the only one, so while she is away every Manual Purchase
+approval **waits** — by ruling 6 it is never downgraded to Operation. This replaces the closed
+`purchasing-approver-duty-has-no-holder` item: the duty now has a holder and the `ops_manager`
+fallback is gone.
 
-**Nothing changed on the day it landed, and that is deliberate.** The gate's third rung lets the
-`ops_manager` holder (Jess, the one active holder) keep deciding **while `purchasing_approver`
-has no active holder**, so behaviour is identical until the duty is assigned. This file exists
-so the assignment is not forgotten.
+**Closes when** a second Principal person exists (People/HR creates the account; the person
+marker is set there) and holds a dated cover in `Workspace → Staff & Duties`.
+**Falsifier:** `select public.workspace_duty_staff(array['principal'])` run as a duty manager
+returns more than one person.
 
-**What is owed, and by whom:** Jess (or whoever holds `account_creator`/HR) assigns
-**Purchasing Approver** to a position in `Workspace → Staff & Duties`. No migration, no deploy
-and no code change is involved — it is configuration, and CLAUDE.md §6 is explicit that
-configuration is what must survive go-live.
+## `operation-shared-login-email-fallback` — NON-APPROVAL, opened 2026-09-18
 
-**What happens the moment it is assigned:** the assigned holder becomes the approver in the SQL
-door, in `canApprove` (which draws the controls and the approver-only money) and in the Work
-row's owner — all three read the same three rungs in the same order. The `ops_manager` fallback
-disappears by itself, in the gate and in the reader, with no further migration.
+**🟡 The shared `operation@carres.com` login is still a Sales Orders Team manager through an email
+list.** 0533 removed every email from approval routes and removed `jess@carres.com` from both
+legacy lists. `LEGACY_OPS_MANAGER_EMAILS = ["operation@carres.com"]` survives only inside
+`checkDuty` for `ops_manager` (PIC reassign, pool settings, Purchasing Settings render, stock-plan
+consolidate) — none is an approval. Removing it silently would take a daily surface away from
+whoever uses the shared login, which is a business change nobody ruled.
 
-**Falsifier / how to close this:**
-```sql
-select public.workspace_resolve_duty('purchasing_approver');
-```
-`source = 'assignment'` with a non-null `actor_user_id` = closed. `not_assigned` = the
-`ops_manager` fallback is still carrying the approval.
+**Fix:** either give the shared login a governed flag for those surfaces (like
+`operations_superuser`) or retire the surfaces from it by owner ruling; then delete the list and
+`LEGACY_EMAILS_BY_DUTY`. **Falsifier:** `git grep LEGACY_OPS_MANAGER_EMAILS` returns nothing.
+
+## `operation-cannot-read-principal-rows` — CHECK IN THE SIGNED-IN WALK, opened 2026-09-18
+
+**🟡 `app_users_operation_peers_read` lets an Operation reader see only `operation` rows.** Jess
+became `principal` in 0533, so any Operation screen that names her through a plain `app_users`
+read (not `actor_display_names`) prints no name for her. The Manual Purchase approver name was
+moved onto `actor_display_names` in the same PR; other surfaces that read `app_users` directly
+(e.g. a users map used for `approved_by` history) were not all re-read. No RLS was changed.
+**Fix when seen:** read the name through `actor_display_names`. **Falsifier:** an Operation
+signed-in walk of a Manual Purchase Jess approved shows her name in History.
 
 - `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
