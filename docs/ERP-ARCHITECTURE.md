@@ -736,7 +736,9 @@ do not chase payment for goods you cannot deliver).
 - The **stock/product Supplier Claim** — owned by Purchasing and opened from the affected
   Stock Unit, PO line or receipt evidence, bound to its supplier and item/source. It does not
   originate from Service Case and has no mandatory Service Case parent (owner ruling 2026-09-14).
-- What we asked, what the supplier answered, **Carres' own resolution**, and the item's outcome.
+- What we asked, what the supplier answered, **Carres' authorised supplier/stock-claim outcome**,
+  and the item's outcome. Customer collection/replacement order is owned by Service Case;
+  supplier execution follows Purchasing §9.5. Delivery/Stock prove physical movements.
 - The supplier recovery obligation and its outstanding evidence. Finance owns credit/debit-note,
   settlement and payment facts; the Claim reads/links that external evidence, never a second
   financial ledger or a completion tick-box.

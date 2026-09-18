@@ -96,6 +96,23 @@ rekeys the complaint, pictures, video, item or history.
 `Purchasing → Supplier Claims` is Purchasing's independent stock-claim Register, not a Case work
 view. When a related stock claim exists, the Case shows a read-only link to its progress.
 
+### Customer collection and replacement arrangement
+
+**APPROVED / NOT BUILT — Blueprint completion, Jess 2026-09-18.** Service owns
+`Collect Defective Item`, `Replace First`, `Collect First` and `Exchange on Collection` for the
+customer leg. Reuse the existing Case decision/entitlement gates and Service Case Approver;
+these choices do not grant new eligibility, override collection safety or execute stock changes.
+Delivery arranges and records customer collection/replacement legs; Warehouse records physical
+receipt, inspection and custody. Separate incoming and outgoing Units and partial results persist.
+
+Purchasing owns supplier return/repair/replacement execution under Purchasing MASTER §9.5.
+If investigation identifies supplier recovery, Purchasing verifies Stock/PO/receipt provenance and
+opens or matches the Claim from its source, then links the Case read-only. Keep the existing
+returned-goods condition where that journey requires it. Service never creates/approves/closes
+the Claim, nor waits for supplier recovery to provide already-authorised customer help.
+No forced one-to-one linkage or duplicate customer arrangement writer exists on Supplier Claim.
+Legacy Claim customer-execution entries remain historical facts; do not invent Cases to migrate them.
+
 ### DOCUMENT DECISION AND PRINT CONTROL
 
 The system derives documents from an approved outcome plus execution facts. Examples:
