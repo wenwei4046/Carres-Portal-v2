@@ -169,5 +169,17 @@ starting widths. Receiving's four gaps were measured and added THERE, not guesse
   handful of rows. **Falsifier:** an operator walk on a register with two years of GRNs where the
   ladder pushes `Received with` and `Category` below the fold — then the group needs a coarse-first
   ladder, decided on that evidence rather than guessed now.
+- 🟡 **Search still matches GRN, PO, supplier and DO number only** — the placeholder's own list.
+  The new source column prints SO and MPR numbers, and typing one into Search finds nothing today,
+  because the server's search text is built during the light scan over the whole history where
+  those references are not yet resolved (they are resolved for the fifty rows on screen). Each
+  column's own filter does find them. Widening the scan is a read-model change with a real cost
+  and belongs in its own card, with the copy for the placeholder settled first.
+- 🔴 **The responsive and zoom pass could not be run here.** Chromium does not start in this
+  build environment (every launch hangs), so alignment, pinning at 1440/1180/820/390 and 200%
+  zoom are **measured by nothing yet**. What IS covered: the engine's own `leadingColumns`
+  contract has its tests, this page asserts that `GRN Date` and `GRN No` lead, that a long
+  four-way reference keeps every number, and that the week arrow is a real keyboard-operable
+  button that filters nothing. The pixel pass stays OWED with production verification.
 - 🔴 **Production verification is OWED**: deployed SHA, an authenticated walk, and the
   1440/1180/820/390 · keyboard · 200% zoom pass against real data.

@@ -1775,6 +1775,31 @@ Use the existing DataGrid, GoodsMiniTable, controls and connector kit; do not tr
 
 Manual Purchase uses this same composition under Purchasing §9.2 (APPROVED / NOT BUILT): independent Status and Approval Status, parent/child purchase selection, and stock allocation only for eligible approved concrete needs. Its six-column stock picker uses the same geometry and edit/save/cancel controls; business guards stay in Purchasing, not duplicated here.
 
+### The field-width registry is CODE — Receiving's additions, 2026-09-18
+
+The approved shared geometry is only worth what the pages actually draw, so the registry lives in
+one module the registers import — `apps/web/src/components/register/register-field-widths.ts`. A
+page passes `REGISTER_FIELD_WIDTH.poNo`, never `168`, which is what makes the next divergence a
+one-line change instead of an audit. **The values there are the prototype STARTING widths, not
+verified production maxima:** required numbers never truncate, content may wrap, user resizing
+stays, and a field that fails validation at 1440/1180/820/390, in the real font or at 200% zoom is
+fixed in the shared definition rather than nudged on the page that noticed.
+
+Receiving (Purchasing §9.4, PURCHASING CARD 12) measured four fields the registry could not
+answer. They are added THERE, to the one registry:
+
+| Field / role | Starting width (px) | Why this number |
+|---|---:|---|
+| `SO No / MPR No / CO No / RO No` | 176 | the four-way header wraps inside the shared two-line header height, so the header does not set the width; the CONTENT does, and it is the same 17-character document number as the existing two-way `SO No / MPR No` entry. Several references stack as lines in the cell and never widen it |
+| `Goods arrived at` | 150 | a receiving SITE name. Deliberately NOT `Stock Location` (160): that names a stock position, this names where goods physically arrived, and §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same width |
+| `Received Qty` · `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | 112 | four adjacent quantity columns that read as one family, so they share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it |
+| `Supplier DO No.` | 150 | the supplier's own reference, which obeys no Carres format and has no upper bound the registry can prove. 150 holds every value measured; a longer one wraps rather than truncating |
+
+**Coordination note.** The shared geometry table this registry implements is the owner-approved
+consolidation of 2026-09-18; while the document half of it is still in flight, the CODE registry
+is the one implementation, and any listing build that needs a width adds it here rather than
+starting a second table.
+
 ## §6.9 · Connected expansion
 
 Use the existing shared connector primitives. The SO row connects to its goods expansion.

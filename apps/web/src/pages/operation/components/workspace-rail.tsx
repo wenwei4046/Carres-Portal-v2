@@ -164,12 +164,16 @@ export function FilterRail({
   ariaLabel?: string;
   onHide?: () => void;
   /**
-   * Owner correction 2026-09-06 (Delivery Monitor + Receiving — the two
-   * corrections landed the same day and share this one slot): a FIXED region
-   * above the scrolling filter groups — the rail's month calendar lives
-   * here. It never scrolls away; the groups below scroll independently.
-   * The two regions carry `{testId}-fixed` / `{testId}-scroll` so a page can
-   * assert the independence.
+   * Owner correction 2026-09-06 (Delivery Monitor): a FIXED region above the
+   * scrolling filter groups — Delivery's month calendars live here. It never
+   * scrolls away; the groups below scroll independently. The two regions
+   * carry `{testId}-fixed` / `{testId}-scroll` so a page can assert the
+   * independence.
+   *
+   * RECEIVING NO LONGER USES IT (owner ruling 2026-09-17): its month calendar
+   * is retired and the expected-arrival view lives in Warehouse Arrival
+   * Schedule, so that rail is one scrolling column of groups. Omitted = that
+   * shape, which is the Portal default.
    */
   header?: ReactNode;
 }) {

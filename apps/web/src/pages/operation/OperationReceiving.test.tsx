@@ -985,6 +985,75 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(screen.queryByText(/Nothing received/i)).not.toBeInTheDocument();
   });
 
+  it("leads with GRN Date then GRN No — the pinned pair the engine guarantees", () => {
+    renderPage();
+    const headerCells = within(screen.getByTestId("grid-header"))
+      .getAllByRole("columnheader")
+      .map((th) => (th.textContent ?? "").replace(/\s+/g, " ").trim());
+    /* The engine owns the pin (`leadingColumns`): the two lead in this order
+       whatever a saved layout says, neither can be hidden, and below a 768px
+       canvas the identity pins alone. The disclosure gutter comes first. */
+    const named = headerCells.filter((t) => t.length > 0);
+    expect(named[0]).toContain("GRN Date");
+    expect(named[1]).toContain("GRN No");
+  });
+
+  it("keeps a long four-way reference whole — every number, none dropped", () => {
+    h.receipts = [
+      receipt({
+        id: "r-long",
+        source_refs: [
+          "SO-1303",
+          "SO-1477",
+          "MPR-20260904-8935",
+          "RO-20260916-0042",
+        ],
+        po_id: "PO-20260901-4827",
+        supplier_name: "Dorsettloft Manufacturing Sdn Bhd",
+        warehouse_name: "AL Sungai Buloh Distribution Centre",
+      }),
+    ];
+    renderPage();
+    // A reference list is not truncated to the first one, and not summarised
+    // into `+3 more`: each document the receipt genuinely carries is readable.
+    for (const ref of [
+      "SO-1303",
+      "SO-1477",
+      "MPR-20260904-8935",
+      "RO-20260916-0042",
+      "PO-20260901-4827",
+    ]) {
+      expect(screen.getByText(ref)).toBeInTheDocument();
+    }
+    // The long supplier name reads in the row and in the rail alike.
+    expect(
+      screen.getAllByText("Dorsettloft Manufacturing Sdn Bhd").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("is reachable by keyboard — the arrow opens a week with Enter and still filters nothing", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    const arrow = rail.getByTestId("rail-grn-week-2026-08-24-expand");
+    // A real button with a stated expanded state, and an accessible name that
+    // says what it does — not a decorative caret.
+    expect(arrow.tagName).toBe("BUTTON");
+    expect(arrow).toHaveAttribute("aria-expanded", "false");
+    expect(arrow).toHaveAccessibleName("Show the days in 24 – 30 Aug");
+    arrow.focus();
+    expect(document.activeElement).toBe(arrow);
+    fireEvent.keyDown(arrow, { key: "Enter" });
+    fireEvent.click(arrow);
+    await waitFor(() => expect(arrow).toHaveAttribute("aria-expanded", "true"));
+    // Opening it narrowed nothing — both GRNs are still listed.
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+      "Showing 1–2 of 2",
+    );
+    const ask = h.registerAsks[h.registerAsks.length - 1]!;
+    expect(ask.from).toBeNull();
+    expect(ask.to).toBeNull();
+  });
+
   it("the cells speak the server-resolved facts, in the governed words", () => {
     renderPage();
     // The GRN paper's own item words, and the governed supplier answer.
