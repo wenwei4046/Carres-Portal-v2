@@ -11,7 +11,6 @@ export function paymentVoucherPrint(doc: PaymentVoucherDocument): PaymentVoucher
   const v = doc.voucher;
   if (!v.voucher_no) return null;
   const advance = num(v.advance_amount) ?? 0;
-  const day = (at: string | null) => (at ? at.slice(0, 10) : null);
   return {
     voucher_no: v.voucher_no,
     voucher_date: v.voucher_date,
@@ -36,9 +35,9 @@ export function paymentVoucherPrint(doc: PaymentVoucherDocument): PaymentVoucher
     cancelled: v.status === "cancelled",
     cancel_reason: v.cancel_reason,
     signatures: [
-      { label: "Prepared By", name: v.prepared_by_name, at: day(v.prepared_at) },
-      { label: "Checked By", name: v.checked_by_name, at: day(v.checked_at) },
-      { label: "Approved By", name: v.approved_by_name, at: day(v.approved_at) },
+      { label: "Prepared By", name: v.prepared_by_name, at: v.prepared_at },
+      { label: "Checked By", name: v.checked_by_name, at: v.checked_at },
+      { label: "Approved By", name: v.approved_by_name, at: v.approved_at },
     ],
   };
 }

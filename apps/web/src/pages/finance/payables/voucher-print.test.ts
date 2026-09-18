@@ -41,8 +41,8 @@ describe("paymentVoucherPrint", () => {
     expect(p.pay_from).toBe("1120 Bank");
     expect(p.pay_method).toBe("Bank transfer");
     expect(p.signatures).toEqual([
-      { label: "Prepared By", name: "Aina", at: "2026-09-11" },
-      { label: "Checked By", name: "Boon", at: "2026-09-12" },
+      { label: "Prepared By", name: "Aina", at: "2026-09-11T02:00:00Z" },
+      { label: "Checked By", name: "Boon", at: "2026-09-12T03:00:00Z" },
       { label: "Approved By", name: null, at: null },
     ]);
     expect(p.cancelled).toBe(false);

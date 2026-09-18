@@ -514,11 +514,7 @@ function VoucherForm() {
   const pickedCount = Object.values(picks).filter((p) => p.on).length;
   // The bill's own price check (the Bills register's Price Check), so Finance
   // sees it where it decides to pay. A flag, never a block (0477).
-  const registerBills = useSupplierBills();
-  const billChecks = useMemo(
-    () => Object.fromEntries((registerBills.data ?? []).map((b) => [b.id, b])),
-    [registerBills.data],
-  );
+  const billChecks = Object.fromEntries((useSupplierBills().data ?? []).map((b) => [b.id, b]));
 
   const submit = () => {
     const input: PaymentVoucherDraftInput = {
