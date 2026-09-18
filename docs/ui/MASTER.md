@@ -1828,6 +1828,8 @@ Required numbers never truncate; content may wrap, and user resizing remains ava
 | Purpose / Requested By | 144 |
 | PO Version with send evidence | 238 |
 
+PO rail section titles use the shared 16px Icon, Lucide stroke 2, inherited neutral colour and an 8px text gap: Supplier reply → message; Receiving → goods; Supplier → supplier; Supplier Deliver To → warehouse (the current Site destination filter). Keep the full visible label; icons are supplementary and aria-hidden when text already names the section. Do not add decorative icons to every filter row.
+
 Repeat no page title inside the toolbar. PO's rail has no Clear filters button (owner correction);
 clicking a selected facet again clears that facet. Selects retain their All option. The shared
 active-filter toolbar behaviour is unchanged. PO expansion gains real line-bound Unit IDs under
