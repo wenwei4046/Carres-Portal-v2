@@ -37,21 +37,24 @@ export function outstandingTotal(rows: readonly CustomerOwingRow[]): { orders: n
 
 // ── A/R Aging — how long each owing order has been open ─────────────────────
 //
-// The definition finance_ar_aging used (0062, and 0125's body, which only
-// renamed `dl` to `so`), reproduced over the rows above rather than read from
-// that function:
+// The buckets finance_ar_aging used (0062, and 0125's body, which only renamed
+// `dl` to `so`), reproduced over the rows above rather than read from that
+// function, with the age counted from the invoice (owner ruling, YH 18 Sep 2026):
 //
-//   age      today − the day the order was placed, never below 0
+//   age      today − the day the order's sales invoice was issued, never below 0
 //   buckets  0-30 · 31-60 · 61-90 · 90+ days, each upper edge inclusive
-//   counted  only orders that still owe (outstanding > 0)
+//   counted  only orders that still owe (outstanding > 0) on an issued invoice
 //   Overdue  the 31-60, 61-90 and 90+ buckets together: older than 30 days
 //
-// One change from the SQL: both days are Malaysia days (UTC+8). The old body
-// compared the database's UTC `current_date` with `placed_at::date` in UTC, so
-// an order placed before 8 a.m. Malaysia time aged a day early.
+// An order whose sales invoice is still a draft (or was voided and not yet
+// reissued) has no age: it stays in Outstanding but is in no bucket and never
+// Overdue, so the buckets add up to what is owed on issued invoices.
 //
-// There is no due date here, and none is invented: "overdue" keeps the old
-// meaning — placed more than 30 days ago and still owing.
+// Both days are Malaysia days (UTC+8): a timestamp before 8 a.m. Malaysia
+// time is still that Malaysia day, not the UTC day before.
+//
+// There is no due date here, and none is invented: "overdue" means invoiced
+// more than 30 days ago and still owing.
 
 export const AGE_BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
 export type AgeBucket = (typeof AGE_BUCKETS)[number];
@@ -70,11 +73,11 @@ export function malaysiaDay(value: string | null | undefined): string | null {
 
 const dayNumber = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000;
 
-/** Whole days from the order's placing to `today` (both Malaysia days). Null when the order has no readable date. */
-export function orderAgeDays(placedAt: string | null | undefined, today: string): number | null {
-  const placed = malaysiaDay(placedAt);
-  if (!placed || !ISO_DAY.test(today)) return null;
-  return Math.max(0, dayNumber(today) - dayNumber(placed));
+/** Days since the invoice was issued, to `today` (both Malaysia days). Null when there is no readable issue date. */
+export function invoiceAgeDays(issuedAt: string | null | undefined, today: string): number | null {
+  const issued = malaysiaDay(issuedAt);
+  if (!issued || !ISO_DAY.test(today)) return null;
+  return Math.max(0, dayNumber(today) - dayNumber(issued));
 }
 
 /** The bucket an age falls in; each upper edge belongs to its own bucket (30 → 0-30, 31 → 31-60). */
@@ -100,7 +103,7 @@ export function inAgeScope(days: number, scope: AgeScope): boolean {
 /** The owing orders in one age scope — what AR · Receivables lists behind `?age=`. */
 export function rowsInAgeScope(rows: readonly CustomerOwingRow[], scope: AgeScope, today: string): CustomerOwingRow[] {
   return rows.filter((r) => {
-    const days = orderAgeDays(r.placedAt, today);
+    const days = invoiceAgeDays(r.issuedAt, today);
     return days !== null && inAgeScope(days, scope);
   });
 }
@@ -112,13 +115,13 @@ export interface ArAging {
 }
 
 /**
- * The four buckets and Overdue, over the rows `customerOwingRows` returns, so
- * the buckets add up to Outstanding. Null when any owing order has no readable
- * placing date: a bucket that silently dropped an order would not add up, and
- * a partial answer must not print as a whole one.
+ * The four buckets and Overdue, over the rows `customerOwingRows` returns.
+ * An order with no issued invoice is in no bucket. Null when an issued
+ * invoice's date cannot be read: a bucket that silently dropped it would not
+ * add up, and a partial answer must not print as a whole one.
  */
 export function arAging(rows: readonly CustomerOwingRow[], today: string): ArAging | null {
-  if (rows.some((r) => orderAgeDays(r.placedAt, today) === null)) return null;
+  if (rows.some((r) => r.issuedAt !== null && invoiceAgeDays(r.issuedAt, today) === null)) return null;
   const pick = (scope: AgeScope) => outstandingTotal(rowsInAgeScope(rows, scope, today));
   const buckets = Object.fromEntries(AGE_BUCKETS.map((b) => [b, pick(b)])) as ArAging["buckets"];
   return { buckets, overdue: pick("over-30") };

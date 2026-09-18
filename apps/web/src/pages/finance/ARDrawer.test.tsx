@@ -39,7 +39,7 @@ const BAL: CustomerOwingRow = {
   outstanding: 2500,
   storageOwing: 0,
   overpaid: 0,
-  placedAt: "2026-09-01T02:00:00Z",
+  issuedAt: "2026-09-01",
 };
 
 const HISTORY: OrderPaymentRow[] = [

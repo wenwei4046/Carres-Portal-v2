@@ -71,7 +71,7 @@ export default function FinanceDashboard() {
   const startsOn = cash.data && cashOk && cash.data.weeks.length === 0 ? cash.data.goLiveOn : null;
   const cashData = cash.data && cashOk && !startsOn ? cash.data : null;
 
-  // An owing order whose placing date did not arrive makes the aging unreadable, not zero.
+  // An issued invoice whose date cannot be read makes the aging unreadable, not zero.
   const agingRead = aging === null && owingRows !== null
     ? { isError: true, dataUpdatedAt: 0, refetch: invoices.refetch }
     : invoices;

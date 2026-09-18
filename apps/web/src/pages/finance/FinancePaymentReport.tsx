@@ -63,8 +63,8 @@ export function moneyReceivedLine(rows: readonly PaymentRegisterRow[]): string {
 export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<{
   orderId: string; so: number | null; customer: string; doorId: string;
   outstanding: number; storageOwing: number; overpaid: number;
-  /** When the order was placed; null when the read did not carry it. */
-  placedAt: string | null;
+  /** When the order's sales invoice was issued; null while it is a draft, voided or missing. */
+  issuedAt: string | null;
 }> {
   const byOrder = new Map<string, InvoiceRegisterRow[]>();
   for (const r of rows) {
@@ -85,7 +85,7 @@ export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<
       outstanding: money.outstanding,
       storageOwing: money.storageOwing,
       overpaid: money.overpaid,
-      placedAt: door.orders?.placed_at ?? null,
+      issuedAt: mine.find((r) => r.kind === "sales" && r.status === "issued")?.issued_at ?? null,
     });
   }
   return out.sort((a, b) => b.outstanding - a.outstanding);

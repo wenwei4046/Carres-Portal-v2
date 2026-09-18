@@ -10,7 +10,7 @@ import ARDrawer, { type OrderPaymentRow } from "./ARDrawer";
 import {
   customerOwingRows,
   isAgeScope,
-  orderAgeDays,
+  invoiceAgeDays,
   outstandingTotal,
   rowsInAgeScope,
   type AgeScope,
@@ -19,7 +19,7 @@ import {
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
 const ageWord = (days: number | null) =>
-  days === null ? "Order date not available" : `${days} ${days === 1 ? "day" : "days"}`;
+  days === null ? "Not issued yet" : `${days} ${days === 1 ? "day" : "days"}`;
 
 /** The words for an age scope — the same words the Dashboard's tile and A/R Aging rows print. */
 export function ageScopeWord(scope: AgeScope): string {
@@ -70,13 +70,13 @@ export default function FinanceAR() {
     { key: "so", label: "SO No", width: 120, accessor: soWord, searchValue: soWord },
     { key: "customer", label: "Customer", width: 240, accessor: (r) => r.customer,
       searchValue: (r) => r.customer },
-    // Days since the order was placed, Malaysia time — the age the Dashboard's A/R Aging buckets by.
+    // Days since the invoice was issued, Malaysia time — the age the Dashboard's A/R Aging buckets by.
     { key: "age", label: "Age", width: 110, align: "right",
-      accessor: (r) => ageWord(orderAgeDays(r.placedAt, today)),
-      numberValue: (r) => orderAgeDays(r.placedAt, today), filterType: "number",
-      // By the number of days, never the words: "120 days" sorts after "45 days". No date sorts first.
-      sortFn: (a, b) => (orderAgeDays(a.placedAt, today) ?? -1) - (orderAgeDays(b.placedAt, today) ?? -1),
-      exportValue: (r) => orderAgeDays(r.placedAt, today) ?? "", searchValue: () => "" },
+      accessor: (r) => ageWord(invoiceAgeDays(r.issuedAt, today)),
+      numberValue: (r) => invoiceAgeDays(r.issuedAt, today), filterType: "number",
+      // By the number of days, never the words: "120 days" sorts after "45 days". No issued invoice sorts first.
+      sortFn: (a, b) => (invoiceAgeDays(a.issuedAt, today) ?? -1) - (invoiceAgeDays(b.issuedAt, today) ?? -1),
+      exportValue: (r) => invoiceAgeDays(r.issuedAt, today) ?? "", searchValue: () => "" },
     { key: "outstanding", label: "Outstanding", width: 180, align: "right",
       accessor: (r) => (
         <span className="flex flex-col items-end">
