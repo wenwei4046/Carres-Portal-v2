@@ -1476,10 +1476,10 @@ facts, permissions, complete-record populations or task ownership.
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
    Other listings use their governed record date and identity, without inventing date facts.
    PO Date is the PO issue/document date represented in its number, not the sent-mark date.
-   GRN Date is record creation; physical `Goods received on` is its own Receiving column (owner
+   GRN Date is record creation; physical `Goods Received Date` is its own Receiving column (owner
    ruling 2026-09-18). Full per-page column orders live in the module MASTERs (Purchasing §9.1–9.5);
-   every listing reads date → identity → customer/supplier → goods → quantity → other facts →
-   later progress and linked documents.
+   exact owner-approved page orders must not be rearranged by a general ordering heuristic.
+   Purchasing labels are owned by [COPY-STANDARD: Purchasing UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
    DO Date is the DO issue date. Use authoritative stored facts; never invent a missing date.
    **Engine — BUILT 2026-09-17:** `DataGrid leadingColumns={{ date, identity }}` (opt-in) forces
    the pair to lead whatever a saved layout or a drag says, removes them from the Columns chooser
