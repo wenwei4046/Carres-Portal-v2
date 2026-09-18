@@ -2086,7 +2086,7 @@ PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received D
 Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The prior width measurements
 are implementation evidence, not dimensions for this expanded target; remeasure before build.
 - `PO Date`: authoritative PO document date, never sending confirmation time.
-- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18); a CO reference appears only if a real CO-to-PO link exists.
+- `SO No / MPR No`: the SO or Manual Purchase request behind the PO, individually reachable. No `CO No`: a PO marked consignment does not prove a separate CO created it (owner ruling 2026-09-18). The header is fixed as agreed; any later change needs a deliberate Blueprint update, never an automatic one.
   Never invent a CO or Manual Purchase number. A multi-source PO preserves all line allocations.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
 - The three delivery-date columns use the [shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary).
