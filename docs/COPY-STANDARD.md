@@ -1862,6 +1862,30 @@ documents, with the same column words: Sales Orders now uses `Customer Requested
 `Customer Delivery Location` like SO Batch Purchase and Manual Purchase (orders MASTER); Supplier
 Claims puts `PO No` · `GRN No.` last (Purchasing §9.5).
 
+### Purchase Returns words — list words APPROVED (Jess, 2026-09-18); detail-page words PROPOSAL
+
+Columns (owner ruling 2026-09-18): `Return Date` · `Return No.` · `PO No` · `GRN No.` · `Supplier Claim
+No.` · `Supplier` · `Items` · `Qty` · `Goods Collect From` · `Goods Collection Date` · `Goods Return
+Status`. These three replace §9.6's `Collect From` · `Collection Date` · `Handover` on this page;
+`Credit Consequence` is not a column. Rail words stay: `Collection date missing` · `Handover proof
+missing` · `Part collected` · `Collected`. §9.6's `PDF not sent` is replaced by the PO sending law's `Sending not
+confirmed`. Groups reuse `Open` · `Closed` · `Cancelled`. Added:
+
+| Word | Meaning |
+|---|---|
+| `Return No.` | The Purchase Return number `PR-YYYYMMDD-RRRR` (owner ruling 2026-09-18; `PR` as in AutoCount and 2990, replaces `PRTN`). Manual Purchase requests use `MPR`, so the two never mix |
+| `Return Date` | The date the approved outcome created the return (its leading register date). Never a collection or handover date |
+| `Goods Collect From` | Where the goods are picked up (the Carres site holding them) |
+| `Goods Collection Date` | The agreed pickup date, with the supplier's agreement evidence; otherwise `Not recorded` |
+| `Goods Return Status` | Actual return progress per Unit: `Not collected` · with the actual logistics company (named from the handover record, never hard-coded) · `Part collected` · `Collected` (the supplier has it). Handed to Logistics and received by the supplier are separate facts |
+| `Not collected` | No Unit of the return has been collected yet |
+| `Return sent to supplier` | Staff confirm they really sent the return; records version, channel, recipient, actor and time. Never claims supplier receipt (same pattern as `PO sent to supplier`) |
+| `Who has it` | The current holder of a Unit, read from Stock (e.g. `NETS Warehouse`, `NETS Logistics`, the supplier) |
+| `No Purchase Returns yet.` · `No Purchase Returns match these filters` · `Purchase Returns could not be loaded` | Register empty / filtered-empty / read-failure states |
+| `{N} Purchase Returns` · `1 Purchase Return` · `{n} of {N} Purchase Returns` | Footer; returns only, no quantity total |
+
+A transport company is `Logistics` (e.g. `NETS Logistics`), never `Carrier`.
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

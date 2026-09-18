@@ -548,7 +548,7 @@ permanent and are NOT renumbered.**
 | `MPR` | Manual Purchase Request |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
-| `PRTN` | Purchase Return |
+| `PR` | Purchase Return (owner ruling 2026-09-18: `PR` as in AutoCount and 2990; replaces `PRTN`) |
 | `RO` | Repair Order |
 | `DR` | Display Request |
 | `CO` | Consignment Order |
@@ -799,6 +799,23 @@ correction preserves lineage.
 
 The local rail helps find records and work; it does not become a second Work Engine or show PIC
 summary. Action ownership uses structured avatar metadata.
+
+**SHARED PURCHASING GOODS-TABLE APPEARANCE — PROPOSAL / NOT LAW (awaiting owner confirmation, 2026-09-18).** The
+Purchase Orders expansion is the accepted sample; SO Batch Purchase, Manual Purchase and Purchase
+Returns reuse the appearance and keep their own fields (SO Batch/Manual Purchase keep Ready Stock,
+Ordered Qty, To buy and the other buying facts; Purchase Returns keeps Unit ID, Who has it and
+Handover). Sales Orders and Delivery Orders are unchanged this round: the look is opt-in per page,
+never a changed `GoodsMiniTable` default.
+- Item comes first where the page shows it; the table is content-width and starts under the
+  parent's first data column, never stretched across the whole row.
+- One set of column widths per page, so expansions opened together line up.
+- Item column capped (candidate 336px = 320 text + 16 padding; longest sample name ~285px at 13px
+  Inter); longer names wrap in full — never cut.
+- Minimum row height of two lines (item main text + variant as the table second line, both from the
+  shared text rule in UI MASTER §6.7, plus 8px cell padding); rows grow for wrapped names or larger
+  text, never fixed-height truncation.
+- Kit look: white, 6px radius, light border, slate-3 header with 11/600 slate-11 normal-case labels,
+  8px cells, column dividers.
 
 ### 8.2 Object Detail
 
@@ -2112,7 +2129,9 @@ Use complete supplier-date labels outside the group context, including active-co
 No duplicate All purchase orders row, DOCUMENT group or action line. Preserve counts and predicates.
 Appearance follows UI MASTER §6.7 Portal-wide readability; do not duplicate its styling here.
 
-**Expansion:** read-only ordered goods: `SKU · Item / configuration · Qty · Supplier Deliver To`.
+**Expansion — PROPOSAL / NOT LAW (awaiting owner confirmation, 2026-09-18):** read-only ordered goods `Item · Qty ·
+Supplier Deliver To` (SKU stays in the PO object's Goods lines), drawn with the shared Purchasing goods-table
+appearance (§8.1). Sample: https://claude.ai/artifact/V1J8orWZAoyzjRTV3kws8k.
 **Footer:** `{n} purchase orders` / `{n} of {m} purchase orders` / `1 purchase order`; no quantity totals.
 **Quantity facts elsewhere:** Order Qty, correct/accepted Received Qty and Pending Delivery Qty
 retain their canonical engine meanings in PO detail and Receiving. Damaged/wrong/extra never reduce
@@ -2396,7 +2415,7 @@ receipt is not a delivery to the customer.
 
 Delivery owns customer collection/replacement DOs, arrangement and actual visit results; Warehouse
 owns receipt, inspection, custody and availability. The Claim's `Carres Execution` summary is
-read-only supplier-side scope and links to PRTN/CRTN, Repair Order, replacement PO/CO and physical
+read-only supplier-side scope and links to PR/CRTN, Repair Order, replacement PO/CO and physical
 execution records. Any customer arrangement is read from its Service Case through a related link.
 Legacy customer-execution values remain historical evidence, never silently deleted, translated
 into supplier movements or copied into newly created Cases. A future change goes through its
@@ -2474,7 +2493,7 @@ validation remain measurement gates, not invented percentages based on two test 
 | BUILT — source measured | `0288_supplier_claims.sql:70` has required PO, nullable PO line, supplier/SKU snapshot, quantity, photo array and open/closed status; `0302_warehouse_files_its_own_receiving.sql:228` adds receipt link | Source integrity and exact affected-Unit scope need convergence |
 | BUILT — source measured | `apps/api/src/routes/operation/supplier-claims.ts:133,411,431,451,485,532,576` exposes list/photos, request, response, close, stock outcome, customer resolution and execution | No Stock-Unit intake, split, reopen, formal claim-version/send or Finance completion door was found in this router |
 | APPROVED TARGET / NOT BUILT | Claim intake from a Stock Unit found after acceptance; read-only related-Case link. `supplier_claim_close` in `0291_supplier_claim_lifecycle.sql:389` checks ask + answer, not completion of promised goods/money | Add the Stock-source door; strengthen closure to the approved full outcome boundary |
-| APPROVED TARGET / NOT BUILT | Source-linked PRTN/RO and shared Claim Work projection: §9.6–9.7 and Workspace §6, §10 | Reuse owning documents and shared Work contract |
+| APPROVED TARGET / NOT BUILT | Source-linked PR/RO and shared Claim Work projection: §9.6–9.7 and Workspace §6, §10 | Reuse owning documents and shared Work contract |
 | RESOLVED — owner approved 2026-09-06 | The former consequence gap is settled by the scoped outcome contract below | Preserve independent facts; only approved future legs create owning-module work |
 | RESOLVED — owner approved 2026-09-06 | Formal Claim requires verified purchase provenance | Keep the problem/evidence and Purchasing source-search work; do not fabricate a PO or formal supplier claim |
 | RESOLVED — owner approved 2026-09-06 | Claim commercial remedy and Finance acceptance are separate authorities | Claim owns requested/agreed remedy; Finance owns accepted amounts, credit, cash, application and ledger evidence under the closure contract below |
@@ -2497,7 +2516,7 @@ Primary references checked on 2026-09-06:
 
 | Capability / lesson | Current Carres and owner | Disposition and why | Approved journey / placement / connection |
 |---|---|---|---|
-| Source-based return and original cost (M1/M3) | Claim has PO/line; Receiving has GRN; Finance owns value | KEEP source; IMPROVE exact scope | Open source evidence on Claim; derived PRTN retains Units and Finance source links |
+| Source-based return and original cost (M1/M3) | Claim has PO/line; Receiving has GRN; Finance owns value | KEEP source; IMPROVE exact scope | Open source evidence on Claim; derived PR retains Units and Finance source links |
 | Source problem with execution documents (M2) | Claim writer starts from PO/receipt; no Stock-Unit door yet | KEEP source; BUILD Stock-Unit door | Report at Stock/PO/receipt → source-linked Claim → execution documents; one evidence set; related customer Case links read-only |
 | Partial replacement/return (M1/M3) | Current Claim has one quantity/answer | ADAPT line/Unit allocations | Supplier may agree different results for different Units; details show each remainder |
 | Replacement before/after collection (M2) | Four-layer model is built | KEEP independence; IMPROVE executable scope | Stock claim authorises the supplier leg; a related customer Case owns the customer remedy; separate old/new Unit legs in Delivery/Stock |
@@ -2651,7 +2670,7 @@ An obsolete instruction is explicitly cancelled/replaced with its consequence re
 | Exchange on collection | One arranged visit carries separate incoming/outgoing Units and separate results | Delivery may report a partial result; failed old-item collection cannot be concealed by successful replacement |
 | Accept As-Is | Customer acceptance in a related Service Case, plus authorised conditions; Stock separately confirms suitability for any retained stock | Case records customer result; Finance records any agreed allowance. No stock release from a Claim picker |
 | No Replacement Required | Preserve explicit customer decision; review any outstanding goods or money commitment through its owner | Sales/Case may cancel the remaining obligation through its governed path; never delete PO demand, refund or loan debt by selecting this value |
-| Return purchased goods | Approved PRTN → actual collector/date/Unit handover → supplier-return result | Purchasing document, Warehouse physical proof, Finance credit/cash evidence separate |
+| Return purchased goods | Approved PR → actual collector/date/Unit handover → supplier-return result | Purchasing document, Warehouse physical proof, Finance credit/cash evidence separate |
 | Return unsold consignment | CRTN, or combined CO swap with linked outgoing return | Supplier ownership preserved; no purchase refund/credit/payable is created |
 | Put back in stock / refurbish | Goods are present, repaired/checked, complete and eligible; reservation and ownership checked | Stock inspection/eligibility authority; refurbish retains Unit identity and repair history, never a new “good” Unit to erase the fault |
 | Write-off / disposal | Stock Adjustment Approver decision and Finance value consequence; separate disposal authorisation/proof | Stock owns outcome; disposal remains open if required. Claim cannot erase the item or write off value |
@@ -2873,7 +2892,7 @@ Orders):*
 The Item      product · variant · SKU · reported Qty · held Units (own count, separate)
 Problem       type · note · photo thumbnails · reported date and reporter
 Supplier      what we asked · sending evidence · supplier reply · Reply expected
-Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PRTN / replacement
+Result        Authorised Outcome · Item Outcome (Stock, read-only) · RO / PR / replacement
               doors · supplier money (Finance, read-only)
 Related       Service Case, read-only (hidden only when there is no linked Case)
 Documents     pack versions · Claim sent to supplier · channel · recipient · actor · time
@@ -2887,7 +2906,7 @@ History       three-rank records
   recipient, actor and time. `Prepare supplier claim`, copying or opening WhatsApp is history,
   never sending.
 - **Result does not depend on a reply.** The Result section shows whenever any authorised outcome,
-  receipt/inspection, RO/PRTN/replacement or Finance record exists, with or without a supplier
+  receipt/inspection, RO/PR/replacement or Finance record exists, with or without a supplier
   reply.
 - **Repair execution is server-checked.** A supplier's `Repair` answer is an offer. `Plan Repair`
   is offered only when the server confirms Authorised Outcome = Repair, the exact Units, and the
@@ -2925,7 +2944,7 @@ Order Route is a graph of real linked records, not an invented single sequence:
 
 ```text
 PO / CO → Receiving / GRN → original Unit → Supplier Claim
-                                            ├→ PRTN / CRTN → actual handover
+                                            ├→ PR / CRTN → actual handover
                                             ├→ RO → same Unit out / back / check
                                             ├→ replacement instruction / PO → new Unit / GRN
                                             │                                  → replacement DO / proof
@@ -2986,7 +3005,7 @@ These are dependency relationships, not build scopes or implementation sequencin
 | Claim identity and communication | Shared number/version authority, Supplier Master contact, exact sent evidence | Retrying an uncertain send keeps the same claim/version; opening WhatsApp alone completes nothing |
 | Scoped outcomes | Purchasing stock-claim approval, original source coverage and exact Unit identity | Three damaged Units: two repaired, one replaced; every Unit and remainder stays visible without a second buy |
 | Replacement fulfilment | Authorised instruction, one purchase-demand coverage, Receiving and Stock | New physical replacement gets a new Unit and new receipt; the original damaged Unit remains traceable |
-| Repair/return | Owning RO/PRTN/CRTN plus physical Outbound/Inbound evidence | One of two Units collected leaves the other open; a repaired Unit is not usable until inspection passes |
+| Repair/return | Owning RO/PR/CRTN plus physical Outbound/Inbound evidence | One of two Units collected leaves the other open; a repaired Unit is not usable until inspection passes |
 | Supplier money completion | Finance-owned acceptance, external evidence and unique scoped allocation | RM80 agreed and RM50 received leaves RM30 open; credit is never displayed as received cash |
 | Dated Work | Shared Duty resolver, admitted source projection and approved date policy | Buddy cover sees the same obligation; the actual actor and normal owner remain separate in History |
 | Closure/correction | All required owner completion facts and append-only history | Customer served first; supplier collection still open keeps that work visible; reopen preserves the first close and original age |
@@ -3104,17 +3123,73 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
-`+ New`.
-**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source Claim/PO/GRN, Units/Qty, Collect From, Collection Date,
-Handover, Credit Consequence, Work.
-**Journey:** system creates from outcome → check exact goods → send return PDF → record collection
-date → scan/count at handover → upload proof.
-**Object/placement:** full-width view; 50/50 while issuing/revising.
-**Exceptions:** supplier refuses collection, partial collection, wrong Unit collected, credit note
-missing/different.
-**Connections:** Purchasing stock claim, Stock custody, supplier, Finance credit read-only.
+**STATUS (2026-09-18): the register list is APPROVED / NOT BUILT (owner ruling below); the object
+(detail) page and the Issue / revise view are PROPOSAL / NOT LAW, awaiting owner review of the mockup.**
+Mockup: https://claude.ai/artifact/RFt7X6cz9gKaVvH1brzxFV (sample data). Widths are candidates until
+the build measures them in the real DOM; the signed-in 1440/1180/820/390 walk is owed.
+
+**Purpose / source:** return Carres-owned purchased goods to the supplier. A return is born only
+from an approved Supplier Claim outcome `Return` on Units whose ownership Stock records as Carres
+and whose purchase source is verified (PO/CO line). A GRN is a receipt record; it never proves
+ownership on its own. No blank `+ New`. Goods rejected at arrival never became Carres stock — no
+Purchase Return. Extra/unordered goods are not assumed to be anyone's: Receiving keeps the extra
+record and Purchasing decides return or acceptance under §9.5 (no invented PO line, stock or
+source). Consignment goods use Consignment Returns.
+
+**Identity and dates:** the Return No. and `Return Date` are born together when the approved outcome
+creates the return. `Return Date` is that creation date — never a collection or handover date and
+never derived from another date.
+
+**Register — the SO Batch Purchase listing is the reference; only fields and rail differ:** grid in
+the white panel with the 8px canvas gap; checkbox (export only) and expand columns; `leadingColumns`
+{`Return Date`, `Return No.`} pinned at canvas ≥768px, `Return No.` alone below; no column hidden by
+width. **Columns — OWNER RULING (Jess, 2026-09-18), exactly in this order:** Return Date · Return No. ·
+PO No · GRN No. · Supplier Claim No. · Supplier · Items (`{first item} + {n} more`) · Qty · Goods
+Collect From · Goods Collection Date · Goods Return Status. No Finance column and no new Finance
+function in this round; existing links (e.g. to the Supplier Claim) may stay. The return is
+generated automatically when the Supplier Claim's `Return` outcome is approved: staff never re-enter
+goods, Units, supplier or source, and `Return No.` and `Supplier Claim No.` are linked by the system.
+One fact per column; no Work column. One row is one return document.
+**Groups — every return in exactly one:** `Open` (any Unit not yet collected and not cancelled) ·
+`Closed` (every Unit Collected or cancelled with a reason, at least one Collected; starts collapsed)
+· `Cancelled` (cancelled before any Unit left Carres; starts collapsed).
+Footer `{N} Purchase Returns` / `1 Purchase Return` / `{n} of {N} Purchase Returns`; no quantity total.
+**Left rail:** Return — `Sending not confirmed` · `Collection date missing` · `Handover proof
+missing` · `Part collected` · `Collected` (missing facts are facts); Supplier; Goods Collect From.
+Sending follows the PO sending law: no send record is `Sending not confirmed`, never `PDF not sent`.
+
+**Goods Return Status, per Unit:** `Not collected` (still at Carres) · handed to Logistics (the actual
+logistics company named from the handover record, e.g. `Who has it: {logistics company}`; in
+transit, not yet Collected) · `Collected` (the supplier has it, with supplier receipt evidence).
+Handed to Logistics and received by the supplier are always two separate facts; no company name is
+hard-coded. The return reads `Part collected` with `{n} of {N}` until every Unit is Collected or
+cancelled. Warehouse Outbound scans and records every handover; issuing the document never moves
+goods.
+
+**Row expansion (one job):** the goods per Unit — Item (name; variant as the table second line under
+the shared text rule, UI MASTER §6.7) · Qty · Unit ID · Who has it · Handover, in the shared
+Purchasing goods-table appearance (§8.1).
+
+**Object (one scroll, full width, no tabs):** the shared object template — identity header (back,
+`Return No. · Supplier`, meta `V{n} · sending fact · Handover`, ‹ n of N ›, neutral Revise /
+Download PDF) → current action (amber work card, the one blue button) → facts in kit `Panel`s:
+Return (supplier, Return Date, source Claim + Authorised Outcome) · Goods (per
+Unit) · Collection (Collect From, Collection Date with the supplier's agreement evidence or `Not
+recorded`, Handover, proof, door to Outbound) → History.
+
+**Issue / revise:** 50/50 only while issuing or revising (stacks below 1130px, §8.2). Staff confirm
+`Return sent to supplier` after they really sent it (version, channel, recipient, actor, time).
+
+**Cancel / revise:** only Units still at Carres (`Not collected`) may be removed or cancelled. A Unit
+already with Logistics cannot be cancelled from the return: it keeps its destination and needs a
+recorded outcome (delivered to supplier, brought back through Inbound, or an exception with its
+owner). Collected facts never change.
+
+**Exceptions:** supplier refuses collection → back to the Supplier Claim decision; wrong Unit
+collected → Outbound exception + Stock; goods stuck with Logistics → Delivery/Outbound exception;
+credit note missing/different → stays with the Supplier Claim (not handled on the return).
+**Connections:** Supplier Claim (source and credit), Stock ownership/custody, Outbound, supplier,
+Finance credit read-only.
 
 ### 9.7 Repair Orders
 
