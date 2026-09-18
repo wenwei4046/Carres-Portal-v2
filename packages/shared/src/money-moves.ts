@@ -5,6 +5,8 @@
  *   · CARD_PAYOUT  a card company's holding account → a bank, less its fee.
  *                  `amount` is what reached the bank; the holding account
  *                  gives up amount + fee.
+ *   · BANK_CHARGE  money the bank took (0537): a bank → 6500 Bank and payment charges.
+ *   · BANK_CREDIT  money the bank added with no document (0537): 4900 Other income → a bank.
  *
  * Prepared by Finance, approved (and so posted) by a different finance
  * approver. The database refuses every rule here; these only keep the form
@@ -16,20 +18,28 @@ import { z } from "zod";
 import { moneyInAmount } from "./other-money-in";
 import type { MoneyAccountRow } from "./money-accounts";
 
-export const MONEY_MOVE_KINDS = ["TRANSFER", "CARD_PAYOUT"] as const;
+export const MONEY_MOVE_KINDS = ["TRANSFER", "CARD_PAYOUT", "BANK_CHARGE", "BANK_CREDIT"] as const;
 export type MoneyMoveKind = (typeof MONEY_MOVE_KINDS)[number];
 export type MoneyMoveStatus = "prepared" | "approved" | "reversed" | "cancelled";
 
 export const MONEY_MOVE_KIND_WORD: Record<MoneyMoveKind, string> = {
   TRANSFER: "Bank transfer",
   CARD_PAYOUT: "Card payout",
+  BANK_CHARGE: "Bank charge",
+  BANK_CREDIT: "Bank credit",
+};
+
+/** The side a kind fixes to one ledger account (0537); the other side is a bank. */
+export const MONEY_MOVE_FIXED: Partial<Record<MoneyMoveKind, { side: "from" | "to"; code: string }>> = {
+  BANK_CHARGE: { side: "to", code: "6500" },
+  BANK_CREDIT: { side: "from", code: "4900" },
 };
 
 const accountCode = (msg: string) => z.string().regex(/^\d{4}$/, msg);
 
 export const moneyMoveInput = z
   .object({
-    kind: z.enum(MONEY_MOVE_KINDS, { errorMap: () => ({ message: "Choose a bank transfer or a card payout." }) }),
+    kind: z.enum(MONEY_MOVE_KINDS, { errorMap: () => ({ message: "Choose a bank transfer, a card payout, a bank charge or a bank credit." }) }),
     move_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date."),
     from_account_code: accountCode("Choose where the money came from."),
     to_account_code: accountCode("Choose where the money went."),
@@ -46,7 +56,7 @@ export const moneyMoveInput = z
   .refine((m) => m.from_account_code !== m.to_account_code, {
     message: "The money must move between two different accounts.",
   })
-  .refine((m) => m.kind !== "TRANSFER" || m.fee === 0, { message: "A bank transfer has no fee." });
+  .refine((m) => m.kind === "CARD_PAYOUT" || m.fee === 0, { message: "Only a card payout has a fee." });
 export type MoneyMoveInput = z.input<typeof moneyMoveInput>;
 
 /** One row of `gl_money_move_list()`. */
@@ -79,6 +89,7 @@ export function moveAccounts(kind: MoneyMoveKind, side: "from" | "to", rows: Mon
   return rows.filter((a) => {
     if (!a.is_active) return false;
     if (kind === "TRANSFER") return a.money_kind === "CASH" || a.money_kind === "BANK";
+    if (kind === "BANK_CHARGE" || kind === "BANK_CREDIT") return a.money_kind === "BANK";
     return side === "from" ? a.money_kind === "HOLDING" : a.money_kind === "BANK";
   });
 }

@@ -45,6 +45,14 @@ describe("money moves", () => {
     expect(moneyMoveInput.parse({ ...good, kind: "TRANSFER", fee: undefined }).fee).toBe(0);
   });
 
+  it("a bank charge or credit offers only banks in use, and has no fee", () => {
+    expect(codes(moveAccounts("BANK_CHARGE", "from", rows))).toEqual(["1121", "1123"]);
+    expect(codes(moveAccounts("BANK_CREDIT", "to", rows))).toEqual(["1121", "1123"]);
+    const charge = { ...good, kind: "BANK_CHARGE", from_account_code: "1121", to_account_code: "6500", fee: 0 };
+    expect(moneyMoveInput.safeParse(charge).success).toBe(true);
+    expect(moneyMoveInput.safeParse({ ...charge, fee: 1 }).success).toBe(false);
+  });
+
   it("offers Approve only to another approver, and Cancel on a posted move only to the approver", () => {
     expect(moneyMoveActions({ status: "prepared", prepared_by_me: false }, true)).toEqual({ approve: true, cancel: true });
     expect(moneyMoveActions({ status: "prepared", prepared_by_me: true }, true)).toEqual({ approve: false, cancel: true });
