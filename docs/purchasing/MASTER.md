@@ -958,7 +958,7 @@ supplier and delivery region — with every label fully readable. It does not re
 expose Sales/Catalog actions to Operation. Six sections, in this exact order:
 
 An unavailable row explains its own blocker inside that Sales Order's framed expansion. Missing
-Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
+Catalog cost therefore reads `{sku} has no transaction cost.` plus `Set the cost of {sku} in Catalog.` on
 the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
 
 ```text
@@ -1200,29 +1200,8 @@ pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
 order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
 shell with the rail open during the build.
 
-**Goods expansion — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT (on the to-do list; no
-code yet).** One row per goods line, exactly in this order:
-
-```text
-☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To
-```
-
-- `To buy` and `Ordered Qty` leave the goods table, so it no longer shows three look-alike
-  quantities (`To buy` / `Ordered Qty` / PO qty). The quantity this purchase buys appears after
-  ticking — in the selection bar and the `Issue PO` preview — already net of the Ready Units chosen
-  and of quantities an existing PO covers, so nothing is bought twice. The duplicate-buy guard
-  (`isSelectableForOrder`) is unchanged.
-- `Ready Stock` cell: stock available → `▸ Ready Stock · {n}`; pressing it opens the choosable
-  Units directly under that goods line. No stock → `0`, no button. Reading or read failure → never
-  `0` (existing `Reading the stock register…` / `Ready Stock could not be read. Try again`).
-- In the opened list staff pick exact Units and confirm with the existing `Choose Ready Unit`; the
-  line then shows the chosen Unit IDs and the quantity used, for checking.
-- `Status` uses existing line words only (resolved against COPY in the build; no new status word).
-- Item: name, with its configuration as the 11px table second line; the tick sits vertically
-  centred with the quantity.
-- The shared goods-table look applies (§8.1): content width, same minimum row height, shared control
-  sizes (the `Split` control and the destination dropdown get the shared control size and touch
-  area), no box inside a box.
+**Goods expansion — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT BUILT.** The expanded row's
+goods table is rewritten once, below, under THE ACTIONABLE TABLE; no second copy of the order lives here.
 
 - **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
   `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
@@ -1287,18 +1266,18 @@ widened with the optional mapping columns 2026-08-27, and with an optional `PO N
 `Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
 actually answer, and siblings that do not ask render byte-identically).
 
-**⭐ ONE EXPANDED ROW, THREE CONNECTED SECTIONS — owner correction 2026-09-11.**
+**⭐ ONE EXPANDED ROW, TWO CONNECTED SECTIONS — owner ruling 2026-09-18 (overwrites the
+three-section placement of 2026-09-11).**
 
-An expanded Sales Order holds exactly three sections, in this order, joined to their parent by the
+An expanded Sales Order holds exactly two sections, in this order, joined to their parent by the
 portal navigation's own connector (`docs/ui/MASTER.md` §6.9 — the same subtle curve, one drawing,
 called by both surfaces):
 
 ```text
 ▼ SO-1303
   │
-  ├─ Goods on SO-1303            ACTIONABLE demand — one tick, one destination editor per demand
-  │
-  ├─ ▸ Ready Stock               what is on the shelf for it
+  ├─ Goods on SO-1303            ACTIONABLE demand — one tick, one destination editor per demand;
+  │                              `▸ Ready Stock · n` opens that line's choosable Units right under it
   │
   ╰─ ▾ Purchase order details    the READ-ONLY record — PO No · Unit ID · no control at all
 ▸ SO-1302                        the line NEVER reaches the next Sales Order
@@ -1308,80 +1287,84 @@ The connector starts beneath the parent, lands on each section's own heading, an
 at the last section** — every section draws its own elbow and its own trunk to the NEXT one, and the
 last draws no trunk, so nothing can run on into the following record. The sections keep their own
 ordinary table borders; **they are not wrapped in a large nested card**, and no section is tinted to
-look disabled. Ready Stock sits BETWEEN the two tables: after the compact demand it can answer, and
-before the record, which is the section that grows without limit.
+look disabled. The former stand-alone `▸ Ready Stock` section between the two tables is retired:
+what is on the shelf for a line is answered on that line, where the tick and the destination are.
+Every READY STOCK door rule below (reads reserve nothing · one act, one transaction · a refusal names
+its Unit · a timeout is not a refusal · a tick dies with its number) is unchanged; only the placement
+moved.
 
-**THE ACTIONABLE TABLE (`GoodsMiniTable`), and why it is compact.**
+**THE ACTIONABLE TABLE (`GoodsMiniTable`) — OWNER RULING (Jess, 2026-09-18) · APPROVED / NOT
+BUILT.** One row per goods line, exactly in this order:
 
 ```text
-☑  SKU   Item / configuration   Qty  Ready Stock  Ordered Qty  To buy               Deliver To   Supplier  Category
-☑  L12…  Laveo · King · Fab 3    4        1            2         1                 ▾ + Split    Nice F…   Mattress
-☐  JAG…  Jager · SS · Fab 1      1        —           14         1                 ▾ + Split    Ohana     Bedframe
-                                                                 Already on a PO
-                                                                 Issue PO buys again
+☐  Status                            Category  Qty  Item                        Ready Stock          Supplier     Supplier Deliver To
+☑  Not ordered yet                   Mattress    4  Laveo                       ▸ Ready Stock · 1    Nice Future  ▾ Carres Klang  + Split
+                                                    King · Fabric 3
+☐  Already on a PO                   Bedframe    1  Jager                       0                    Ohana        Ohana
+   PO-20260907-1874                                 Super Single · Fabric 1
+   Waiting for goods from supplier   Mattress    1  M1401F                      0                    Nice Future  Carres Klang
+   PO-20260903-7907                                 Queen
 ```
 
-- **⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY — owner correction
-  2026-09-11.** The engine prints the COVERING document's quantity under `To buy` when the open-PO
-  pool covers every unit of a build (T6 — a receipt states what it bought, and `0` would answer a
-  question nobody asked). Drawing that figure on a row nobody may tick presented **a covering
-  quantity as a purchasing quantity**, under a heading that means *what is left to buy*. So the cell
-  prints its existing governed absence in every non-actionable state and the row says which state it
-  is in — `soBatchToBuyState` gives the four, and a figure appears on exactly the rows
-  `isSelectableForOrder` offers:
-  | State | `To buy` | Tick |
-  |---|---|---|
-  | verified uncovered (`fullyOnPo === false`) | the remainder | offered |
-  | covered (`fullyOnPo === true`) | `—` · `Already on a PO` · `Nothing to buy here` | none |
-  | not checked (no flag in the payload) | `—` · `Coverage not checked` | none |
-  | nothing to buy / order finished | `—` | none |
-  **No arithmetic is invented and no server number is changed.** The customer's original `Qty` and
-  the historical `Ordered Qty` are two columns away and untouched, and the documents themselves are
-  one section below — nothing is hidden, only nothing is claimed.
-- **⭐ THE COLUMN IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.** `On PO` is the
-  dictionary's head for *how many of this item an **open** purchase order already covers* — the
-  engine's pooled, netted, still-outstanding coverage. The figure this cell prints is a different
-  number: the exact `po_line_sources` lineage for the item line, which counts every **non-cancelled**
-  document, `Completed` ones included, and is never netted by what has already arrived. Printing it
-  under `On PO` said *still on order* about goods that may be in the warehouse. **`Ordered Qty` is
-  the approved word for exactly that**, already in the dictionary and already used by Manual
-  Purchase's own purchase-order lineage table for the same relationship — beside `Already On PO`,
-  the head for the effective coverage it deliberately is not. One figure, one head, the same door;
-  no second number was added to explain the first.
-- **⭐ IT IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
-  purchase order inside the cell, so a line fourteen documents touch drew a fourteen-line-tall item
-  row that filled the screen — and the same fourteen numbers were repeated underneath it. **A
-  collection of documents may never decide how tall an item row is.** The cell states the units
-  documents have ordered, and pressing it opens the details below. **Nothing is truncated to tidy
-  the screen**: every reference is still on the page, in the section that is about references. An
-  item description may wrap; a PO collection may not.
-- **Exactly one checkbox and one arrangement editor per real purchasing demand**, on the item table
-  and nowhere else. A ticked demand row carries the register's own selected fill — the selected
-  styling belongs to the compact row, never to a block that also holds history.
+- **`To buy` and `Ordered Qty` leave this table**, so it no longer shows three look-alike quantities
+  (`To buy` / `Ordered Qty` / PO qty). `SKU` leaves with them: it stays on the Sales Order and in the
+  read-only `Purchase order details` below, where a document line is identified. The quantity this
+  purchase buys appears **after ticking** — in the selection bar (`{n} selected · {u} unit(s) · Issue
+  {p} PO(s)`) and in the `Issue PO` preview — already net of the Ready Units chosen and of quantities
+  an existing PO covers, so nothing is bought twice. The number is the server's own recomputation;
+  the browser prints it and never derives a second one. The duplicate-buy guard
+  (`isSelectableForOrder`) and the leaf issue contract (`SoBatchSelection[]`) are unchanged.
+- **`Status` uses existing line words only — PROPOSAL / NOT LAW for the exact mapping (planner,
+  2026-09-18); no new status word.** One word per line, and the document it refers to as the 11px
+  table second line, so the buyer knows what to chase instead of what to buy:
+
+  | Line fact | `Status` | Second line | Tick |
+  |---|---|---|---|
+  | no document carries it, verified uncovered (`fullyOnPo === false`) | `Not ordered yet` | — | offered |
+  | own `po_line_sources` lineage, current version marked sent, goods pending | `Waiting for goods from supplier` | the PO No | none |
+  | own lineage, current version not marked sent | `Sending not confirmed` | the PO No | none |
+  | own lineage, goods received | `Completed` | the PO No | none |
+  | several documents carry it | `{n} POs` | — (the mapping is in `Purchase order details`) | none |
+  | the open-PO pool covers it (`fullyOnPo === true`) | `Already on a PO` | the covering PO No(s) from the server's `coveredByOpenPoPos` | none |
+  | coverage flag absent from the payload | `Coverage not checked` | — | none |
+  | the shelf fully answered it | `—` | — | none |
+  | setup blocks it | the blocker's own governed sentence (`Production days not set` · `{sku} has no transaction cost.` · `SKU not found`) | its fix sentence | none |
+
+  Falsifier: an operator walk where a line reading `Already on a PO · PO-…` is chased on the wrong
+  document, or where two words are needed for one line.
+- **`Ready Stock` cell.** Stock available → `▸ Ready Stock · {n}`; pressing it opens that line's
+  choosable Units directly under the line (the existing Ready Stock table: `Unit ID` · `Condition` ·
+  `Qty` · `Where` · `Owner`). No stock → `0`, no button. In flight or failed → never `0`: the existing
+  `Reading the stock register…` / `Ready Stock could not be read. Try again`. Staff pick exact Units
+  and confirm with the existing `Choose Ready Unit`; the cell then prints the number chosen and the
+  chosen Unit IDs as its second line, for checking.
+- **`Supplier Deliver To`** is the one arrangement editor: the destination dropdown and `Split` live
+  on the line the page offers to buy, and nowhere else. A line no tick is offered reads its issued
+  document's destination as plain text.
+- **Exactly one checkbox and one arrangement editor per real purchasing demand**, on this table and
+  nowhere else. A ticked demand row carries the register's own selected fill. The tick sits
+  vertically centred with the quantity.
 - **A matched set is ONE demand across several of the customer's item lines.** It is ticked once
   and arranged once, on the first of its lines, which names what the tick covers
   (`With {n} more lines in this set`); its other lines are listed with their own goods and print
-  the absence in the tick column. The issue contract is unchanged — the leaf `SoBatchSelection[]`.
-- **⭐ `Covered by` IS RETIRED.** One heading answered three different questions — units drawn from
-  the shelf, documents already carrying quantity, and `Not ordered yet` — so a half-bought line
-  read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
-  front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
-  already answered · **`Ordered Qty`** how many units documents have ordered for this line ·
-  **`To buy`** the remainder this page may still act on.
-- **Identity leads.** `SKU` then the item and its recorded configuration come first, so two lines of
-  one model are told apart by the goods rather than by position. The configuration is the line's own
-  recorded variant, never re-derived from the SKU text. Exactly one column is flexible, so two
-  expansions opened together still line up column for column.
-- **No `Unit ID` column and no `PO Default Delivery Date` column here.** Both describe a DOCUMENT's goods,
-  so on the actionable table they printed an absence on every row of every unbought order — a column
-  of dashes in the width of a real answer. Both belong to the record below, where the Unit sits
-  beside the purchase order it came in on.
+  the absence in the tick column.
+- **Item.** The name, with its recorded configuration as the 11px table second line — never
+  re-derived from the SKU text. Two lines of one model are told apart by the goods, not by position.
+  Exactly one column is flexible, so two expansions opened together still line up column for column.
+- **The shared goods-table look applies (§8.1):** content width, the same minimum row height, shared
+  control sizes (the `Split` control and the destination dropdown get the shared control size and
+  touch area), no box inside a box.
+- **No `Unit ID` and no `PO Default Delivery Date` column here.** Both describe a DOCUMENT's goods and
+  belong to the record below, where the Unit sits beside the purchase order it came in on.
+- **Retired from this table, never to return:** `To buy` · `Ordered Qty` · `On PO` · `SKU` ·
+  `Deliver To` (the dictionary word is `Supplier Deliver To`) · `Covered by` · `Issue PO buys again` ·
+  `Nothing to buy here` as a second line (the document number is the second line now).
 - Batch Purchase owns no duplicate demand editor and no second mini-table.
 
 **THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
 
 ```text
-PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Default Delivery Date
+PO No              Unit ID              SKU       Item              Qty  Supplier Deliver To  Supplier  PO Default Delivery Date
 PO-20260820-4827   U1-000-078           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
 PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
                    Item line not recorded
@@ -1583,11 +1566,11 @@ business. Selection is summarised once, in the toolbar, and never repeated at th
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
-**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10/11 (migrations 0471 · 0472 · 0473).** Directly beneath
-`GoodsMiniTable`, and INDEPENDENTLY collapsible, sits `Ready Stock`: the free stock that could
-answer this Sales Order's item lines. It is a sibling SECTION, never a column and never a second
-mini-table — the goods table answers *what was ordered and what covers it*, this one answers *what
-is on the shelf for it*.
+**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10/11 (migrations 0471 · 0472 · 0473);
+placement overwritten by the owner ruling 2026-09-18.** `Ready Stock` is the free stock that could
+answer this Sales Order's item lines. Built today as a sibling section beneath `GoodsMiniTable`; the
+approved target opens it from the line's own `▸ Ready Stock · {n}` cell, directly under that goods
+line, and never as a second goods table. Every door rule below is unchanged by the move.
 
 - **Reading it reserves nothing.** The read is lazy (opened rows only) and writes no row. Selecting
   a Unit still writes nothing. Only `Choose Ready Unit` writes, and its selection is entirely
