@@ -3586,7 +3586,7 @@ Payables, 18 Sep 2026. Words new to this standard:
   (a flag, never a block).
 - Payment voucher line without a description (0536): `Line {n}: say what this payment is for.`
   and, before the request is sent, `Say what this payment is for`.
-- Unpaid by Supplier, under a supplier: heading `Advances`; one line per approved advance
+- Unpaid by Supplier, under a supplier: heading `Advances`; one line per advance with money left
   `{voucher No} · {date} · RM {x} left of RM {y}`; failure `The advances could not be loaded. Try again.`
 - Payment voucher detail: button `Print`; failure toast `The voucher could not be opened — {error}`.
 - Payment voucher PDF: `PAYMENT VOUCHER` · `PAYMENT VOUCHER · CANCELLED` · `CANCELLED · {reason}` ·
