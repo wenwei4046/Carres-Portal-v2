@@ -3577,3 +3577,21 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+### PROPOSAL — PENDING APPROVAL (pv-checks-print)
+
+Payables, 18 Sep 2026. Words new to this standard:
+- Payment voucher form, the bill list: column `Price Check`, with the Bills register's own cells
+  `{n} line differs from PO` · `{n} lines differ from PO` · `Matches PO` · `No PO price`
+  (a flag, never a block).
+- Payment voucher line without a description (0536): `Line {n}: say what this payment is for.`
+  and, before the request is sent, `Say what this payment is for`.
+- Unpaid by Supplier, under a supplier: heading `Advances`; one line per approved advance
+  `{voucher No} · {date} · RM {x} left of RM {y}`; failure `The advances could not be loaded. Try again.`
+- Payment voucher detail: button `Print`; failure toast `The voucher could not be opened — {error}`.
+- Payment voucher PDF: `PAYMENT VOUCHER` · `PAYMENT VOUCHER · CANCELLED` · `CANCELLED · {reason}` ·
+  `Pay To` · `Voucher Details` · `Payee` · `Supplier` · `Voucher No` · `Date` · `Paid from` ·
+  `Method` · `Reference` · `Description` · `Amount (RM)` · `TOTAL` · `Note: {narration}` ·
+  `{bill No} · Supplier invoice {No}` · `Advance` · signature blocks `Prepared By` (left),
+  `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
+  not yet signed. A draft voucher has no number and no PDF.

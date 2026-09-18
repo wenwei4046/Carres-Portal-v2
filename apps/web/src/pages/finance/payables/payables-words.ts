@@ -100,6 +100,13 @@ export function priceDiffWord(diff: number | null): string {
   return diff > 0 ? `${rm(diff)} above PO price` : `${rm(-diff)} below PO price`;
 }
 
+/** A bill's Price Check: how many of its lines differ from the PO price. The
+ *  Bills register and the voucher's bill list say it the same way. */
+export function priceCheckWord(r: { price_flags: number; grn_nos: string | null }): string {
+  if (r.price_flags > 0) return `${r.price_flags} ${r.price_flags === 1 ? "line differs" : "lines differ"} from PO`;
+  return r.grn_nos ? "Matches PO" : "No PO price";
+}
+
 /** Refusals the database words for a developer, re-worded for the operator.
  *  Everything else keeps the database's own sentence, which is already
  *  written for the person at the desk. */

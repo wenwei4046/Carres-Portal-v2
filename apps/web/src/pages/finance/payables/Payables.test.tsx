@@ -305,7 +305,13 @@ describe("Payment voucher form", () => {
     fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "1" } });
     expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 1,226.00");
 
+    // The bill's price check shows where Finance ticks it (P2P-4).
+    expect(await screen.findByTestId(`price-check-${BILL1}`)).toHaveTextContent("1 line differs from PO");
+
     fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    // 0536: a line without a description cannot be saved.
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Line 1 description"), { target: { value: "Transfer fee" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     const w = writes()[0]!;
@@ -313,7 +319,7 @@ describe("Payment voucher form", () => {
     expect(w.body).toMatchObject({
       purpose: "SUPPLIER_BILLS", supplierId: SUP, payFromAccountCode: "1120", payMethod: "BANK_TRANSFER",
       allocations: [{ billId: BILL1, amount: 1025 }, { billId: BILL2, amount: 200 }],
-      lines: [{ accountCode: "6500", amount: 1 }],
+      lines: [{ accountCode: "6500", description: "Transfer fee", amount: 1 }],
     });
     expect(w.body).not.toHaveProperty("amount");
     expect(w.body).toMatchObject({ advanceAmount: 0 });
@@ -346,6 +352,7 @@ describe("Payment voucher form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
     fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
     fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "150" } });
+    fireEvent.change(screen.getByLabelText("Line 1 description"), { target: { value: "Pipe repair" } });
     fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1110" } });
     fireEvent.change(screen.getByLabelText("Method"), { target: { value: "CASH" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -367,6 +374,7 @@ describe("Payment voucher detail", () => {
     expect(screen.queryByRole("button", { name: "Check voucher" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Return to draft" })).toBeInTheDocument();
     expect(screen.getByTestId("voucher-bills")).toHaveTextContent("BILL-8PZ7");
+    expect(screen.getByRole("button", { name: "Print" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Approve payment" }));
     const dialog = await screen.findByRole("dialog");
@@ -556,6 +564,14 @@ describe("Unpaid by Supplier", () => {
     // 0484: the advance left and what is owed after it, both from the database.
     expect(screen.getByText("RM 300.00")).toBeInTheDocument();
     expect(screen.getByText("RM 925.00")).toBeInTheDocument();
+  });
+
+  it("under a supplier, every advance and what is left of it (P2P-12)", async () => {
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`ap-outstanding-advances-${SUP}`))
+      .toHaveTextContent("PV-9M3Q · Fri, 11 Sep · RM 300.00 left of RM 500.00");
   });
 });
 
