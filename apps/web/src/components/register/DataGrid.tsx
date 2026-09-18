@@ -1435,6 +1435,13 @@ function DataGridInner<T>({
    */
   const groupLocalHeaders = fixedGroups != null && !embedded;
 
+  /** Every group table is exactly as wide as the columns, so the groups line
+   *  up with each other and with the horizontal scrollbar under them. */
+  const groupedTableWidth = useMemo(
+    () => visibleColumns.reduce((sum, col) => sum + Number(layout.widths[col.key] ?? col.width ?? 140), 0),
+    [visibleColumns, layout.widths],
+  );
+
   /** One section per governed group: its heading, then the rows under it. */
   const groupSections = useMemo(() => {
     if (!groupLocalHeaders) return [];
@@ -3019,10 +3026,56 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}>
-          {/* ⭐ NO HEADER ABOVE ALL GROUPS (Jess, 2026-09-18). A grouped
-              listing draws its header inside each open group instead; a flat
-              register keeps the one sticky header it has always had. */}
+        {/* ⭐ NO HEADER ABOVE ALL GROUPS — owner ruling, Jess 2026-09-18.
+            This SUPERSEDES the single global header.
+
+            A governed grouped listing is one table PER GROUP, in one scroll
+            container. That structure is not decoration: a sticky cell is held
+            by the table it is in, so each group's heading and column header
+            travel with the operator through that group's OWN records and stop
+            dead at its boundary, instead of standing over the next group's
+            rows. (A shared `<tbody>` per group does not do this — a table
+            cell's containing block is the table, and the header simply
+            escapes into the group below. Measured in Chromium, 2026-09-18.)
+
+            What the groups SHARE is the whole point, and it is shared by
+            construction rather than by agreement: one `visibleColumns`, one
+            `layout.widths` `<colgroup>`, one `layout.sort`, one resize handle,
+            `table-layout: fixed` so a long value in one group cannot widen a
+            column in that group alone. Four headers have nothing left to
+            disagree about. */}
+        {groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0
+          ? groupSections.map((section) => (
+              <table
+                key={`gs-${section.group.path}`}
+                className={`${styles.table} ${styles.tablePinnedBlock} ${styles.tableGrouped}`}
+                style={{ width: groupedTableWidth }}
+                data-testid={`grid-section-${section.group.path}`}
+              >
+                <colgroup>
+                  {visibleColumns.map((col) => (
+                    <col key={col.key} style={{ width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                  ))}
+                </colgroup>
+                <thead className={styles.thead}>
+                  {renderGridRow(section.group, section.index)}
+                  {/* A collapsed group is its heading and its count. A column
+                      header over no records names columns nobody is reading. */}
+                  {!section.group.collapsed && (
+                    <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
+                  )}
+                </thead>
+                <tbody className={styles.tbody}>
+                  {section.rows.map((item, i) => renderGridRow(item, section.index + 1 + i))}
+                </tbody>
+              </table>
+            ))
+          : null}
+        <table
+          className={`${styles.table}${leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
+          hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
+        >
+          {/* A flat register keeps the one sticky header it has always had. */}
           {!groupLocalHeaders && (
             <thead
               className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
@@ -3050,6 +3103,9 @@ function DataGridInner<T>({
             {/* Small / grouped / expandable lists: render every row (unchanged). */}
             {!isLoading && errorState == null && !canVirtualize && !groupLocalHeaders &&
               renderList.map((item, idx) => renderGridRow(item, idx))}
+            {/* A grouped listing with nothing to show still needs its loading,
+                failure and empty states, and they belong in one table across
+                the whole width — not repeated once per group. */}
             {/* Large flat lists: windowed — only the visible slice is in the DOM,
                with spacer rows reserving the scroll height above and below. */}
             {!isLoading && errorState == null && canVirtualize && (
@@ -3068,32 +3124,6 @@ function DataGridInner<T>({
               </>
             )}
           </tbody>
-          {/* ⭐ ONE GROUP, ONE `<tbody>` — heading, its own column header, its
-              records (Jess, 2026-09-18). The section is what makes the sticky
-              header STOP at the group boundary instead of following the
-              operator into the next group, and one `<colgroup>` above them all
-              is what keeps every group's widths, visibility, sorting and
-              resizing the same settings rather than four copies of them. A
-              collapsed group is its heading and its count, nothing else. */}
-          {!isLoading && errorState == null && groupLocalHeaders &&
-            groupSections.map((section) => (
-              <tbody
-                key={`gs-${section.group.path}`}
-                className={styles.tbody}
-                data-testid={`grid-section-${section.group.path}`}
-              >
-                {renderGridRow(section.group, section.index)}
-                {!section.group.collapsed && (
-                  <tr
-                    className={styles.groupHeaderRow}
-                    data-testid={`grid-header-${section.group.path}`}
-                  >
-                    {headerCells(true)}
-                  </tr>
-                )}
-                {section.rows.map((item, i) => renderGridRow(item, section.index + 1 + i))}
-              </tbody>
-            ))}
           {/* STAGE 1 engine extension (Law 13) — FOOTER TOTALS over the
               FILTERED list (`sortedRows`), never the visible window. Sticky
               to the scroll container's bottom so it stays on screen however

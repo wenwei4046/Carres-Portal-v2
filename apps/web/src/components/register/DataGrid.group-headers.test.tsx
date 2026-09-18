@@ -58,20 +58,34 @@ const widthsOf = (row: HTMLElement) =>
   [...row.querySelectorAll<HTMLElement>("th")].map((th) => th.style.width);
 
 describe("DataGrid · group-local headers", () => {
-  it("draws no header above all groups", () => {
+  it("draws no header above all groups — every header belongs to a group", () => {
     const { container } = mount();
-    expect(container.querySelector("thead")).toBeNull();
     expect(screen.queryByTestId("grid-header")).toBeNull();
+    /* Each group is its own table, which is what makes a sticky header stop at
+       the group boundary; so every `<thead>` in the register is inside one. */
+    for (const head of container.querySelectorAll("thead")) {
+      expect(head.closest("table")?.getAttribute("data-testid")).toMatch(/^grid-section-/);
+    }
+    expect(container.querySelectorAll('table[data-testid^="grid-section-"]')).toHaveLength(2);
   });
 
   it("an OPEN group reads heading → column header → records", () => {
     const { container } = mount("k.open");
     const section = screen.getByTestId("grid-section-waiting");
-    const order = [...section.children].map((el) => el.getAttribute("data-testid") ?? el.className);
-    expect(order[0]).toBe("grid-group-waiting");
-    expect(order[1]).toBe("grid-header-waiting");
+    const head = [...section.querySelectorAll("thead tr")].map((tr) => tr.getAttribute("data-testid"));
+    expect(head).toEqual(["grid-group-waiting", "grid-header-waiting"]);
     expect(within(section).getByText("PO-20260901-1001")).toBeInTheDocument();
     expect(labelsOf(headerRows(container)[0]!)).toEqual(["PO Date", "PO No", "Supplier"]);
+  });
+
+  it("one colgroup per group, all from the same widths, so the groups line up", () => {
+    const { container } = mount("k.cols");
+    fireEvent.click(screen.getByTestId("grid-group-toggle-completed"));
+    const colSets = [...container.querySelectorAll('table[data-testid^="grid-section-"]')].map((t) =>
+      [...t.querySelectorAll("col")].map((c) => (c as HTMLElement).style.width));
+    expect(colSets).toHaveLength(2);
+    expect(colSets[0]).toEqual(["118px", "170px", "136px"]);
+    expect(colSets[1]).toEqual(colSets[0]);
   });
 
   it("a COLLAPSED group is its heading and its count, and nothing else", () => {
@@ -116,6 +130,12 @@ describe("DataGrid · group-local headers", () => {
       expect(cells[1]!.style.left).toBe("118px");
       expect(cells[2]!.style.left).toBe("");
     }
+  });
+
+  it("a collapsed group's table still carries the shared columns, so nothing shifts when it opens", () => {
+    mount("k.collapsed-cols");
+    const collapsed = screen.getByTestId("grid-section-completed");
+    expect([...collapsed.querySelectorAll("col")]).toHaveLength(3);
   });
 
   it("a register with no governed groups keeps the one header it always had", () => {

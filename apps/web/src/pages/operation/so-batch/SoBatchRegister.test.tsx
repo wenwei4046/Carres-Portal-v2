@@ -2215,8 +2215,11 @@ describe("search, clear and default buying order", () => {
 });
 
 describe("owner rulings R1–R6, 2026-09-16 — one table, two groups", () => {
+  /* Group-local headers (Jess, 2026-09-18): each group is its own table, its
+     heading riding in that table's `<thead>` beside its column header. Reading
+     both sections keeps the document order this test is about. */
   const rowsIn = (container: HTMLElement) =>
-    [...container.querySelectorAll("tbody tr")].map((tr) =>
+    [...container.querySelectorAll("thead tr, tbody tr")].map((tr) =>
       tr.getAttribute("data-testid") ?? tr.textContent ?? "");
 
   it("R1 — To buy is a heading above; No purchase needed is a collapsed button below", () => {

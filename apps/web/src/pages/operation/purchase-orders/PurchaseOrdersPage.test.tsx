@@ -421,7 +421,7 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("po-supplier-date-PO-20260828-4827")).toHaveTextContent("Thu, 10 Sep");
     /* No answer is an absence, never the PO default wearing the supplier's
        name — that substitution is the reason these are two columns. */
-    expect(screen.getByTestId("po-supplier-date-PO-LEGACY")).toHaveTextContent("Not confirmed by supplier");
+    expect(screen.getByTestId("po-supplier-date-PO-LEGACY")).toHaveTextContent("Not confirmed");
     expect(screen.getByTestId("po-supplier-date-PO-LEGACY")).not.toHaveTextContent("Sep");
 
     queryData.pos[0]!.promises.push({

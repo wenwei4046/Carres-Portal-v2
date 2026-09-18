@@ -1333,20 +1333,22 @@ div:first-child > .columnsMenuGroup {
    Widths, visibility, sorting and resizing are not repeated here — one
    `<colgroup>` and one `layout` serve every section, so there is nothing for
    four headers to disagree about. */
-.fixedGroupRow .groupRowCell {
-  position: sticky;
-  top: 0;
-  /* Above the column header below it, and above every pinned body cell. */
-  z-index: 5;
+/* One table per group: `table-layout: fixed` so a long value in one group can
+   never widen a column in that group alone, and the width is the columns' own
+   sum so every group lines up with every other and with the scrollbar. */
+.tableGrouped {
+  table-layout: fixed;
+  min-width: 100%;
+}
+/* The group's heading rides in its own `<thead>` beside the column header, so
+   the two travel together and stop together. The band stays white against the
+   header's slate fill. */
+.tableGrouped .fixedGroupRow .groupRowCell {
   background: theme("colors.white");
 }
-.thInGroup {
-  position: sticky;
-  top: 38px;
+/* The header cell is already sticky through `.thead`; `.thInGroup` marks it
+   for the pinned-identity fill so a scrolled group header is opaque where the
+   columns slide under it. */
+.tableGrouped .thInGroup.stickyCell {
   z-index: 3;
-}
-/* A pinned identity column is sticky on BOTH axes here, so it has to outrank
-   the header cells that slide under it sideways. */
-.thInGroup.stickyCell {
-  z-index: 4;
 }

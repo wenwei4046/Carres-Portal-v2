@@ -740,7 +740,11 @@ export default function PurchaseOrdersPage() {
       accessor: (row) => (
         <span className="flex flex-col leading-4" data-testid={`po-supplier-date-${row.id}`}>
           <span className="tabular-nums">
-            {row.supplierDate ? fmtDate(row.supplierDate) : <Absence>Not confirmed by supplier</Absence>}
+            {/* The dictionary's word for THIS column (COPY-STANDARD,
+                Purchasing UI dictionary). `Not confirmed by supplier` was the
+                second line of the retired merged cell, where the column head
+                did not say whose date it was; here the head already does. */}
+            {row.supplierDate ? fmtDate(row.supplierDate) : <Absence>Not confirmed</Absence>}
           </span>
           {row.facts.expected.supplier === "changed" ? (
             <span className={supporting}>
@@ -749,9 +753,9 @@ export default function PurchaseOrdersPage() {
           ) : null}
         </span>
       ),
-      searchValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed by supplier"),
-      filterValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed by supplier"),
-      exportValue: (row) => row.supplierDate ?? "Not confirmed by supplier",
+      searchValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
+      filterValue: (row) => (row.supplierDate ? fmtDate(row.supplierDate) : "Not confirmed"),
+      exportValue: (row) => row.supplierDate ?? "Not confirmed",
       dateValue: (row) => row.supplierDate,
       filterType: "date",
       sortFn: (a, b) => (a.supplierDate ?? "9999").localeCompare(b.supplierDate ?? "9999"),
@@ -845,7 +849,12 @@ export default function PurchaseOrdersPage() {
       key: "current_version",
       chooserGroup: "Document",
       label: "PO Version",
-      width: 238,
+      /* MEASURED, not the registry's prototype 238: the longest evidence line
+         `PO sent to supplier · WhatsApp · Wed, 28 Sep` needs 247px of content
+         at the register's 11px second line, and 238 clipped it. Content
+         decides the width (CLAUDE.md §2); the registry entry is corrected in
+         ui MASTER §6.8 rather than the cell being squeezed to fit it. */
+      width: 265,
       sortable: true,
       /* The CURRENT version only; earlier marks stay in Revisions. A mark is
          a person's statement of sending, never supplier receipt — and its

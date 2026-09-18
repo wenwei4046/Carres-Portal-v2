@@ -1887,12 +1887,12 @@ describe("R2 · group membership", () => {
       return base(url, init);
     });
   }
+  /* Group-local headers (Jess, 2026-09-18): a row's group is the table it is
+     in — each governed group is its own table, so the answer is structural
+     rather than a walk back through siblings. */
   const groupOfRow = (id: string) => {
-    let el = screen.getByTestId(`mp-row-${id}`).previousElementSibling;
-    while (el && !(el.getAttribute("data-testid") ?? "").startsWith("grid-group-")) {
-      el = el.previousElementSibling;
-    }
-    return el?.getAttribute("data-testid");
+    const section = screen.getByTestId(`mp-row-${id}`).closest("table")?.getAttribute("data-testid");
+    return section?.replace("grid-section-", "grid-group-");
   };
 
   it("⭐ an approved request whose lines could not be read stays in To buy, says so, and refuses the tick", async () => {
