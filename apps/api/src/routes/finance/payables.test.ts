@@ -185,10 +185,12 @@ describe("bills", () => {
         {
           warehouse_receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, account_code: null,
           description: null, sku: null, qty: 5, unit_price: 105, amount: null,
+          department_type: null, department_id: null,
         },
         {
           warehouse_receipt_id: null, po_line_id: null, account_code: "6200",
           description: "Rent", sku: null, qty: null, unit_price: null, amount: 3000,
+          department_type: null, department_id: null,
         },
       ],
       p_due_date: null,
@@ -273,7 +275,7 @@ describe("payment vouchers", () => {
       p_payee_name: null,
       p_voucher_date: "2026-09-11",
       p_pay_from_account_code: "1120",
-      p_lines: [{ account_code: "6500", description: "Bank charge", amount: 5 }],
+      p_lines: [{ account_code: "6500", description: "Bank charge", amount: 5, department_type: null, department_id: null }],
       p_allocations: [{ bill_id: BILL_ID, amount: 1025 }],
       p_pay_method: "BANK_TRANSFER",
       p_pay_reference: "TT-1",
@@ -548,5 +550,29 @@ describe("files", () => {
     expect(res.status).toBe(200);
     expect(createSignedUrl).toHaveBeenCalledWith(path, 300);
     expect(await res.json()).toEqual({ url: "https://t.x/signed" });
+  });
+});
+
+describe("departments (0540)", () => {
+  it("GET /bills?departmentType= keeps the bills with a line in that department", async () => {
+    const eq = vi.fn();
+    const q = { eq, then: (r: (v: unknown) => void) => r({ data: [{ bill_id: BILL_ID }], error: null }) };
+    eq.mockReturnValue(q);
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: [{ id: BILL_ID }, { id: VOUCHER_ID }], error: null }),
+      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(q) }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await call("/bills?departmentType=OFFICE");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ rows: [{ id: BILL_ID }] });
+    expect(sb.from).toHaveBeenCalledWith("supplier_bill_lines");
+    expect(eq).toHaveBeenCalledWith("department_type", "OFFICE");
+  });
+
+  it("GET /bills refuses an Office department with an id", async () => {
+    mockRpc({ data: [], error: null });
+    expect((await call(`/bills?departmentType=OFFICE&departmentId=${BILL_ID}`)).status).toBe(422);
   });
 });

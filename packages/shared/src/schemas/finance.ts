@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { departmentFilterFields, departmentFilterMessage, departmentFilterOk } from '../department';
 import { paymentMethodKeySchema } from './order-payments';
 
 /**
@@ -327,8 +328,11 @@ export const ledgerEntriesQuery = z.object({
              .optional(),
   offset:  z.coerce.number().int().min(0).default(0),
   limit:   z.coerce.number().int().min(1).max(1000).default(500),
+  ...departmentFilterFields,
 }).strict().refine((v) => !v.from || !v.to || v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerEntriesQuery = z.infer<typeof ledgerEntriesQuery>;
 
@@ -342,15 +346,21 @@ export const ledgerEntryRef = z.union([
  *  Omitted = today in Malaysia. */
 export const ledgerAsOfQuery = z.object({
   asOf: ledgerIsoDate.optional(),
-}).strict();
+  ...departmentFilterFields,
+}).strict().refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
+});
 export type LedgerAsOfQuery = z.infer<typeof ledgerAsOfQuery>;
 
 /** A profit and loss for a period, both days included. */
 export const ledgerPeriodQuery = z.object({
   from: ledgerIsoDate,
   to:   ledgerIsoDate,
+  ...departmentFilterFields,
 }).strict().refine((v) => v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerPeriodQuery = z.infer<typeof ledgerPeriodQuery>;
 
@@ -359,7 +369,10 @@ export const ledgerAccountLedgerQuery = z.object({
   account: ledgerAccountCode,
   from:    ledgerIsoDate,
   to:      ledgerIsoDate,
+  ...departmentFilterFields,
 }).strict().refine((v) => v.from <= v.to, {
   message: 'The start date is after the end date', path: ['to'],
+}).refine(departmentFilterOk, {
+  message: departmentFilterMessage, path: ['departmentId'],
 });
 export type LedgerAccountLedgerQuery = z.infer<typeof ledgerAccountLedgerQuery>;

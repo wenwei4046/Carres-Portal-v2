@@ -3143,3 +3143,5 @@ export * from "./warehouse-settings";
 export * from "./warehouse-schedule";
 
 export { stockSiteVisits, type StockMovementEvidence, type StockSiteVisit } from "./stock-site-visits";
+
+export * from "./department";

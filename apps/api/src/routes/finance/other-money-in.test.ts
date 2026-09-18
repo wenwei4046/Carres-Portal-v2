@@ -163,7 +163,7 @@ describe("other debtor invoices", () => {
     expect(sb.rpc).toHaveBeenCalledWith("other_debtor_invoice_create", {
       p_party_id: PARTY,
       p_invoice_date: "2026-09-10",
-      p_lines: [{ account_code: "4900", description: "Office rent, September", amount: 1500 }],
+      p_lines: [{ account_code: "4900", description: "Office rent, September", amount: 1500, department_type: null, department_id: null }],
       p_due_date: null,
       p_reference: null,
       p_narration: null,
@@ -250,7 +250,7 @@ describe("receipts", () => {
     expect(sb.rpc).toHaveBeenCalledWith("other_receipt_create", {
       p_receipt_date: "2026-09-10",
       p_money_account_code: "1120",
-      p_lines: [{ account_code: "2360", description: "Loan in", amount: 10000 }],
+      p_lines: [{ account_code: "2360", description: "Loan in", amount: 10000, department_type: null, department_id: null }],
       p_allocations: [],
       p_party_id: null,
       p_payer_name: "A lender",

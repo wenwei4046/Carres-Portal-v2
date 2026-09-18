@@ -3577,3 +3577,19 @@ Under `Supplier reply`: `Date not confirmed` · `Date changed` · `Date passed`;
 use full supplier-date meanings. Shortening never changes the existing predicate or evidence.
 UI MASTER §6.7 owns Portal-wide readability (13 main/11 fact/12 helper/13 error or cannot-act).
 No page-local copies of its appearance rules; this does not authorize new business copy.
+
+## PROPOSAL — PENDING APPROVAL (departments)
+
+NOT LAW. Words the 0540 departments slice puts on screen. Falsifier: Jess or Finance
+reads "Department" as the HR department (org_departments) on a Finance page.
+
+| Word / sentence | Where | Meaning |
+|---|---|---|
+| Department | Finance line pickers, Journal, Trial Balance, P&L, Balance Sheet, Finance lists | Which part of the business an income or expense line belongs to |
+| Showroom | Department type | One outlet of a showroom-channel dealer |
+| Dealer | Department type | One dealer that is not a showroom |
+| Subscription | Department type | Rental / subscription business, one department |
+| Office | Department type | Head office costs, one department; expenses only |
+| Choose the department. | Line refusal | A new line was saved without a department |
+| That department is not on the list. | Line refusal | The chosen outlet or dealer is not a department |
+| Office has expenses only. Choose another department for income. | Line refusal | Office was picked on an income account |

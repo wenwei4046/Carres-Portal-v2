@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lineDepartmentFields } from "../department";
 
 /**
  * Supplier bills and payment vouchers — the wire contract (migration 0477).
@@ -59,6 +60,7 @@ export const supplierBillLineInput = z
     qty: money.nullable().optional(),
     unitPrice: money.nullable().optional(),
     amount: money.nullable().optional(),
+    ...lineDepartmentFields,
   })
   .strict();
 export type SupplierBillLineInput = z.infer<typeof supplierBillLineInput>;
@@ -99,6 +101,7 @@ export const paymentVoucherLineInput = z
     accountCode: z.string().trim().min(1, "Choose an account").max(10),
     description: optText(300),
     amount: money,
+    ...lineDepartmentFields,
   })
   .strict();
 

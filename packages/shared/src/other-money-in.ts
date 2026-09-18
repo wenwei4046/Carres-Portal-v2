@@ -15,6 +15,7 @@
  *
  * PURE — no clock, no I/O.
  */
+import { lineDepartmentFieldsSnake } from "./department";
 import { z } from "zod";
 
 /* ── input ─────────────────────────────────────────────────────────────────── */
@@ -50,6 +51,7 @@ export const moneyInLineInput = z.object({
   account_code: accountCode,
   description: optionalText(500),
   amount: moneyInAmount,
+  ...lineDepartmentFieldsSnake,
 });
 export type MoneyInLineInput = z.infer<typeof moneyInLineInput>;
 

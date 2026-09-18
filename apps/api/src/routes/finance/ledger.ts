@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
+  departmentRpcArgs,
   ledgerAccountLedgerQuery,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
@@ -193,16 +194,23 @@ function toEntryRow(r: Json, numbers: Map<string, string>): LedgerEntryRow {
 financeLedgerRouter.get("/entries", requireFinance, async (c) => {
   const parsed = ledgerEntriesQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
-  const { from, to, account, source, q, offset, limit } = parsed.data;
+  const { from, to, account, source, q, offset, limit, departmentType, departmentId } = parsed.data;
   const sb = userClient(c.env, c.var.auth.jwt);
 
   // An account narrows to the entries with at least one line on it. `!inner`
   // makes the embedded filter a filter on the entries, and the count follows.
+  // 0540: a department narrows the same way, through gl_entry_departments.
+  const embeds = [
+    account ? "gl_entry_lines!inner(account_code)" : null,
+    departmentType ? "gl_entry_departments!inner(department_type,department_id)" : null,
+  ].filter(Boolean);
   let req = sb
     .from("gl_entries")
-    .select(account ? `${ENTRY_COLUMNS},gl_entry_lines!inner(account_code)` : ENTRY_COLUMNS, { count: "exact" })
+    .select([ENTRY_COLUMNS, ...embeds].join(","), { count: "exact" })
     .eq("posted", true);
   if (account) req = req.eq("gl_entry_lines.account_code", account);
+  if (departmentType) req = req.eq("gl_entry_departments.department_type", departmentType);
+  if (departmentId) req = req.eq("gl_entry_departments.department_id", departmentId);
   if (from) req = req.gte("entry_date", from);
   if (to) req = req.lte("entry_date", to);
   if (source) req = req.eq("source_type", source);
@@ -340,6 +348,14 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
   };
 }
 
+// 0540: the finance departments, for every Department filter and line picker.
+financeLedgerRouter.get("/departments", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_departments");
+  if (error) return ledgerError(c, error, "The department list");
+  return c.json({ rows: Array.isArray(data) ? data : [] });
+});
+
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const read = await readChart(sb);
@@ -355,7 +371,7 @@ financeLedgerRouter.get("/trial-balance", requireFinance, async (c) => {
   const asOf = parsed.data.asOf ?? todayIsoMYT();
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const [tb, chart] = await Promise.all([sb.rpc("gl_trial_balance", { p_as_of: asOf }), readChart(sb)]);
+  const [tb, chart] = await Promise.all([sb.rpc("gl_trial_balance", { p_as_of: asOf, ...departmentRpcArgs(parsed.data) }), readChart(sb)]);
   if (tb.error) return ledgerError(c, tb.error, "The trial balance");
   if ("error" in chart) return ledgerError(c, chart.error, "The trial balance");
   const rows = (Array.isArray(tb.data) ? tb.data : []) as Json[];
@@ -405,9 +421,10 @@ financeLedgerRouter.get("/account-ledger", requireFinance, async (c) => {
   const parsed = ledgerAccountLedgerQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const { account, from, to } = parsed.data;
+  const dept = departmentRpcArgs(parsed.data);
   const sb = userClient(c.env, c.var.auth.jwt);
   const read = await readAllPages((a, b) => sb
-    .rpc("gl_account_ledger", { p_account_code: account, p_from: from, p_to: to })
+    .rpc("gl_account_ledger", { p_account_code: account, p_from: from, p_to: to, ...dept })
     .order("ordinal", { ascending: true })
     .range(a, b));
   if ("tooMany" in read) {
@@ -726,7 +743,7 @@ financeLedgerRouter.get("/profit-and-loss", requireFinance, async (c) => {
   const parsed = ledgerPeriodQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_profit_and_loss", { p_from: parsed.data.from, p_to: parsed.data.to });
+  const { data, error } = await sb.rpc("gl_profit_and_loss", { p_from: parsed.data.from, p_to: parsed.data.to, ...departmentRpcArgs(parsed.data) });
   if (error) return ledgerError(c, error, "The profit and loss");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The profit and loss");
   return c.json({ rows: data });
@@ -736,7 +753,7 @@ financeLedgerRouter.get("/balance-sheet", requireFinance, async (c) => {
   const parsed = ledgerAsOfQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayIsoMYT() });
+  const { data, error } = await sb.rpc("gl_balance_sheet", { p_as_of: parsed.data.asOf ?? todayIsoMYT(), ...departmentRpcArgs(parsed.data) });
   if (error) return ledgerError(c, error, "The balance sheet");
   if (!Array.isArray(data) || data.length === 0) return failed(c, "The balance sheet");
   return c.json({ rows: data });
