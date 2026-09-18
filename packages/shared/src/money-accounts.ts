@@ -69,6 +69,7 @@ export type MoneyAccountUpdateInput = z.infer<typeof moneyAccountUpdateInput>;
 /** 0541 — where a card machine sits: the place its money is routed by. */
 export const CARD_CHANNELS = ["showroom", "dealer"] as const;
 export type CardChannel = (typeof CARD_CHANNELS)[number];
+export const CARD_CHANNEL_WORD: Record<CardChannel, string> = { showroom: "Showroom", dealer: "Dealer" };
 
 /** One row of `card_settlement_routes`: a holding account pays out to a bank. */
 export interface CardRouteRow {

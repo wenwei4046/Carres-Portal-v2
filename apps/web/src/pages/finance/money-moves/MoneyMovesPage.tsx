@@ -22,7 +22,7 @@ import {
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
 import { parseTypedAmount } from "@carres/shared/other-money-in";
-import { settlementBank, type CardChannel } from "@carres/shared/money-accounts";
+import { CARD_CHANNELS, CARD_CHANNEL_WORD, settlementBank, type CardChannel } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -338,10 +338,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
               setChannel(v as CardChannel);
               routeBank(fromCode, v as CardChannel);
             }}
-            options={[
-              { value: "showroom", label: "Showroom" },
-              { value: "dealer", label: "Dealer" },
-            ]}
+            options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
           />
         )}
         <Select

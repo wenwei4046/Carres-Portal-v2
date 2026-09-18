@@ -17,6 +17,8 @@
  */
 import { useMemo, useState } from "react";
 import {
+  CARD_CHANNELS,
+  CARD_CHANNEL_WORD,
   MONEY_ACCOUNT_KIND_WORD,
   type CardChannel,
   type CardRouteRow,
@@ -30,7 +32,7 @@ import Select from "@/components/kit/Select";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import { LoadFailed } from "../other-money-in/parts";
+import { accountLabel, LoadFailed } from "../other-money-in/parts";
 import { useCardRoutes, useMoneyAccounts, useSaveCardRoute, useSaveMoneyAccount } from "./api";
 import { FieldError } from "@/components/kit/FieldFrame";
 
@@ -149,8 +151,7 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
   );
 }
 
-const CHANNEL_WORD: Record<CardChannel, string> = { showroom: "Showroom", dealer: "Dealer" };
-const CHANNEL_OPTIONS = (["showroom", "dealer"] as const).map((v) => ({ value: v, label: CHANNEL_WORD[v] }));
+const CHANNEL_OPTIONS = CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }));
 
 /**
  * 0541 — Card payout banks: which bank each card holding account pays out to,
@@ -163,7 +164,7 @@ function CardRoutes({ accounts }: { accounts: MoneyAccountRow[] }) {
   const [editing, setEditing] = useState<CardRouteRow | null | undefined>(undefined);
   const name = (code: string) => {
     const a = accounts.find((x) => x.code === code);
-    return a ? `${a.code} · ${a.name}` : code;
+    return a ? accountLabel(a) : code;
   };
   return (
     <section className="border-t border-kit-slate-5 p-5" data-testid="card-routes">
@@ -183,7 +184,7 @@ function CardRoutes({ accounts }: { accounts: MoneyAccountRow[] }) {
             data-testid={`card-route-${r.holding_code}-${r.channel}`}
             onClick={() => setEditing(r)}
           >
-            {name(r.holding_code)} · {CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
+            {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
           </button>
         ))}
       </div>
@@ -201,7 +202,7 @@ function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | nu
   const [bank, setBank] = useState(route?.bank_code);
   const [refusal, setRefusal] = useState<string | null>(null);
   const opts = (kind: MoneyAccountRow["money_kind"]) =>
-    accounts.filter((a) => a.is_active && a.money_kind === kind).map((a) => ({ value: a.code, label: `${a.code} · ${a.name}` }));
+    accounts.filter((a) => a.is_active && a.money_kind === kind).map((a) => ({ value: a.code, label: accountLabel(a) }));
   const submit = () => {
     setRefusal(null);
     save.mutate(
