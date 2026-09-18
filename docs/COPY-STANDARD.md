@@ -1808,6 +1808,14 @@ Rail heads: `Supplier` · `Problem` · `Claim status` · `Supplier Response`.
 `Late delivery` remains readable for historical records only; passing time never creates a new Claim.
 Missing source/evidence is retained in detail and Work, not presented as proof from a PO ID alone.
 
+**Supplier claim pack words — APPROVED (Jess, 2026-09-18) · NOT BUILT.** Words only; the Supplier
+Claims page proposal that uses them is still under owner review and is not approved by this entry.
+
+| Where | Exact wording | Meaning |
+|---|---|---|
+| Claim object, action that opens the 50/50 pack | `Prepare supplier claim` | Prepare the claim content and its document. Preparing, copying or opening WhatsApp is not sending |
+| Claim pack, confirmation after staff actually sent it | `Claim sent to supplier` | Staff confirm a real send. It records the pack version, channel, recipient, actor and time. It never claims the supplier received, read or accepted it |
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.
