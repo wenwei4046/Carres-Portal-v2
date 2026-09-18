@@ -930,7 +930,7 @@ before marking; the Portal cannot observe WhatsApp sending without an API.
 
 **PURCHASE ORDERS REGISTER — APPROVED / NOT BUILT (Jess, 2026-09-18).**
 
-Columns, exactly: `PO Date · PO No · SO No / Manual Purchase / CO No · Supplier · Items ·
+Columns, exactly: `PO Date · PO No · SO No / MPR No / CO No · Supplier · Items ·
 Supplier Deliver To · PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version`.
 
 | Fact | Exact copy |
@@ -1196,7 +1196,7 @@ connector line.
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — owner ruling 2026-09-18, NOT BUILT | `Proceed Date` · `PO No` · `Approval Status` · `Purpose` · `Requested By` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO Default Delivery Date`. PO No is the actual resulting PO reference, blank before issue; never a separate Manual Purchase number or duplicate PO column. Items opens the request; PO references open their POs. Preserve all POs when several exist. Customer facts are never invented. |
+| The register columns — owner ruling 2026-09-18, NOT BUILT | `Proceed Date` · `MPR No` · `Approval Status` · `Purpose` · `Requested By` · `PO Safety Days` · `Customer Requested Delivery Date` · `Customer Delivery Location` · `Customer` · `Items` · `Supplier` · `Supplier Deliver To` · `PO No` · `PO Default Delivery Date`. `MPR No` opens the request; `PO No` lists every resulting PO, blank before any. Customer columns stay blank for purposes with no customer; never invented. |
 | Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Do not add the SO fixed 14-day reserve; the shared `PO Safety Days` margin display still applies. |
 | Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
 | The Approval Status facts | `Need approval` · `Approved` · `Refused` · `Withdrawn` · `Sent back for changes` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A `To buy` row's own selectability explanation may still appear, computed from the same facts the tick reads: `Approved at 0. Nothing to order.` · `Remaining quantity not checked` (title: `The quantity still to buy could not be read, so it is not offered for buying. Reopen the page to check again.`). A `Sent back for changes` row carries the real requester's initials avatar, title `{name} · Edit and send again`, or `Staff identity not recorded`. `No approval needed` is RETIRED (R1). |
@@ -1732,7 +1732,7 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
 | `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
 | `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
-| `SO No / CO No / RO No` · `PO No` | GRN Register columns (owner ruling 2026-09-18; overwrites the single `PO/CO No` column) | The first shows the receipt's actual linked document numbers — the SO No, the CO No or the RO No (repair returns come back through Receiving) — blank when none. A Manual Purchase has no number; its receipt is identified by `PO No`. `PO No` is its own column, blank for a CO or RO receipt with no PO. The one Receiving engine serves all of them. |
+| `SO No / MPR No / CO No / RO No` · `PO No` | GRN Register columns (owner ruling 2026-09-18; overwrites the single `PO/CO No` column) | The first shows the receipt's actual linked document numbers — the SO No, the MPR No, the CO No or the RO No (repair returns come back through Receiving) — blank when none. `PO No` is its own column, blank for a CO or RO receipt with no PO. The one Receiving engine serves all of them. |
 | `Supplier Confirmed Delivery Date` | GRN Register column | The SAME governed word as the Purchase Orders register (the evidenced supplier answer — see the Purchasing date dictionary). `Not confirmed` while no evidenced reply exists. |
 | `Items` | GRN Register column (owner ruling 2026-09-18; was `Product`) | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
 | `Showing {from}–{to} of {total}` | GRN Register footer | Server-side pagination speaks for the WHOLE filtered result set (owner correction 2026-09-06, second ruling) — never `{n} loaded` over an unknown remainder. |
@@ -1846,9 +1846,9 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `{n} receipt dates` | Multiple physical receipts on a PO; each GRN/date/time/quantity remains accessible. Never show one latest date as if all goods arrived then. |
 | `Goods arrived at` | Actual receiving location, including warehouse, showroom or other actual site. |
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
-| `SO No / Manual Purchase / CO No` | PO combined-reference header; actual linked references only, not invented mandatory relationships. |
-| `SO No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
-| Manual Purchase document reference | `PO No` only: the actual resulting PO, blank before issue; multiple POs remain individually accessible. `Manual Purchase No.`, MPR and invented public request numbers are not used. Items opens the internal request. |
+| `SO No / MPR No / CO No` | PO combined-reference header; actual linked references only, not invented mandatory relationships. |
+| `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
+| `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): every purchase not from a Sales Order. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 
 Retired labels for these same facts: `PO Delivery Date`, `Supplier Delivery Date`, `Goods received on`.
@@ -3532,7 +3532,7 @@ Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver 
 ### Date-first listing contract — APPROVED (Jess, 2026-09-17) · BUILT on Sales Orders, SO Batch, Manual Purchase and Purchase Orders 2026-09-17
 
 Exact leading columns: Sales Orders `SO Date · SO No`; SO Batch `Proceed Date · SO No`;
-Manual Purchase `Proceed Date · PO No` (approved target; PO No blank before issue, Items opens the request; Purchasing §9.2); Purchase Orders `PO Date · PO No`;
+Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`;
 Receiving `GRN Date · GRN No`; Supplier Claims `Reported · Supplier Claim No.`; Delivery Orders `DO Date · DO No`;
 Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity alone below768px.
 Date-first adoption: Sales Orders small patch → Manual Purchase Round 2 → Purchase Orders.
