@@ -1879,6 +1879,8 @@ missing governed Catalog/supplier relationship, refused/withdrawn request.
 
 ### 9.3 Purchase Orders
 
+**Owner acceptance — 2026-09-18: APPROVED / NOT BUILT.** Jess confirmed the reviewed PO Register and goods expansion. The final expansion order is `Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items`; PO No and its line-bound Unit IDs share one cell. Acceptance covers this listing composition, the full supplier-date facet labels, removal of the rail Clear filters control, and the shared UI MASTER geometry. It does not approve a new PO detail/issue workflow or claim production implementation.
+
 **APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Purchase Orders pilots personal saved
 layouts; the shared DataGrid capability is enabled here only. Follow UI MASTER §4.1/§6.7:
 owner-private, per-account, up to 10 layouts per listing, saving order/widths/visibility/sort but
