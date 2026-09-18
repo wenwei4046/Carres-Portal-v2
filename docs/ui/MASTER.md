@@ -1562,6 +1562,26 @@ rail groups, fixed groups, sort, expansion content, footer noun, empty sentences
 | Sales Orders | Already uses the grid settings; apply the 2026-09-18 column order |
 | Purchase Returns · Repair Orders | Built on the template from the start |
 
+**Side-by-side measurement — dev previews at 1440px, origin/main, 2026-09-18 (FACT):**
+
+| Check | SO Batch (reference) | Manual Purchase | Purchase Orders | Receiving | Supplier Claims |
+|---|---|---|---|---|---|
+| Grid classes | reference · slate · responsive search | same | same | reference only | reference only |
+| Header row | 36px · 11/600 slate-11 on slate-3 | same | same | 11/400, no fill | same as reference |
+| Body row | 38px, long text wraps (53px rows) | 38px | 38px, long text cut with "…" (PO No, Supplier) | 36px | 38px |
+| Pinned | checkbox · expand · Proceed Date · SO No | same pattern | expand · PO Date · PO No | GRN No only | none |
+| Checkbox / expand | yes / yes | yes / yes | no / yes | no / no | yes / yes |
+| Groups | To buy · No purchase needed | Need approval · To buy · No purchase needed | 4 groups | none | none |
+| Status cells | plain text | coloured pills (Need approval, Approved…) | plain text | plain text | plain text |
+| Identity link | blue mono, no underline | blue text | blue mono, cut | mono, not a link | blue mono, underlined |
+| Footer | `27 Sales Orders` | `18 Manual Purchases` | `26 purchase orders` (lower case) | `Showing 1–2 of 2` + Previous/Next | `3 claims · 4 units` |
+
+Additional template rules from this measurement: one text-overflow rule for every listing (wrap
+within the cell, never cut an identity or a name); one status style (plain text, or the shared
+StatusPill everywhere — not pills on one page only); identity links look the same everywhere
+(blue mono, no underline). The Receiving and Supplier Claims dev previews also print the wrong page
+title ("SO Batch Purchase") — a preview-harness defect to fix with the conversion.
+
 **Kit fixes that come with it:** `Clear filters` and sort arrows leave the retired flame colour for
 blue-11; `GoodsMiniTable` content-width, capped Item column, two-line minimum row height, 11px
 second line; the PO detail page's local blue-grey stylesheet is retired (detail pages use `Panel`).
