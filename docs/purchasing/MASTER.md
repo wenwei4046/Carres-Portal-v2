@@ -3380,7 +3380,8 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Owner-confirmed UI — 2026-09-18. BUILT 2026-09-19; AUTHENTICATED PRODUCTION WALK OWED.**
+**Owner-confirmed UI — 2026-09-18. BUILT + DEPLOYED 2026-09-19; MIGRATION 0548 NOT APPLIED;
+AUTHENTICATED PRODUCTION WALK OWED.**
 The approval covered layout, labels and inspection interactions; sample parties, dates,
 quantities and document references are illustrative, not verified business data. It approved
 no new custody engine and no claim production verification, and the build added neither.
@@ -3398,6 +3399,15 @@ evidence refused, supplier receipt without a pickup refused, a collector without
 refused, the same Unit twice refused, and **zero `ops_stock_items` rows touched by issuing a
 return**. Walked in Chromium at 1440 / 1180 / 820 / 390 and at 200% zoom: the confirmed column
 order at every width, no page-level horizontal scroll, no clipped cell.
+
+**DEPLOYED 2026-09-19.** Merged to `main` as **`7e9e7c37ebb50e034044b9a3d2aa80ceb436609c`**
+(#1478) and deployed by `deploy-production.yml` run 35445362214. That run's `pnpm ci:smoke`
+printed `Production converged to 7e9e7c37…` for all five canonical surfaces:
+`carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` ·
+`pos.carresofficial.com` · `api.carresofficial.com/health`. **The runner's fetch is the
+evidence; the build session could not repeat it** — its egress proxy answers
+`connect_rejected` to those hosts, so no independent re-fetch backs this row. It is a SHA
+convergence proof and nothing more, exactly as §9.2's row states for the same reason.
 
 **⛔ MIGRATION 0548 IS NOT APPLIED. What the operator sees in that window, and it is
 not a bug:** the rail door opens, the page loads, and the register says
