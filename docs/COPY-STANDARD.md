@@ -900,6 +900,13 @@ Jess alone approves; no substitute approver or Buddy is implied. Do not add a co
 other purchase-document approval rules are unchanged. Exact remaining UI layout is not approved
 by this price ruling.
 
+**RO owner consent — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+For non-Carres-owned Units, absent owner consent is an outstanding follow-up, not an Issue
+blocker. The detail and existing Work projection must communicate that consent is still to be
+obtained; never label it obtained or approved because the RO was issued. Do not show a mandatory
+owner-consent-before-Issue refusal. Exact English action copy remains part of UI review; this
+rule approves the meaning and non-blocking behaviour, not a new status column or task engine.
+
 ### Purchase Returns register — owner-confirmed UI, 2026-09-18
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·

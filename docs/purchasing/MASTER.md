@@ -3433,7 +3433,7 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18; price/approval ruling 2026-09-19. APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval and owner-consent rulings 2026-09-19. APPROVED TARGET / NOT BUILT.**
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
 ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
 The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
@@ -3464,9 +3464,13 @@ Stock Location. If an original PO is absent, retain the genuine source and missi
 never fabricate a PO. The selected repair Supplier does not rewrite the original purchase source.
 
 Carres-owned stock follows normal stock and operational authority; the price/approval boundary below
-does not add a financial gate to placing an RO. Consignment or other
-non-Carres-owned goods require the owner's authority and explicit cost responsibility before
-commitment. Do not silently treat supplier-owned Display goods as Carres assets. Sold/reserved,
+does not add a financial gate to placing an RO. For consignment or other non-Carres-owned goods,
+record the actual owner, consent evidence when obtained, and cost responsibility without presuming
+agreement. **Owner ruling B — 2026-09-19: missing owner consent does not block RO Issue.** Staff
+may issue first; retain an outstanding owner-consent follow-up on the RO, projected into the one
+Workspace Work engine. Issuing does not mark consent obtained, transfer ownership, accept charges
+or complete that follow-up. Do not silently treat supplier-owned Display goods as Carres assets.
+Sold/reserved,
 held, already-out, or already-in-repair Units require the owning workflow's eligibility checks;
 selection must not bypass commitments, controls, permissions or create duplicate active repair.
 A photo or free-text item is not a substitute for a real Unit. Untracked/count-managed repair is
@@ -3517,9 +3521,11 @@ its evidenced agreement. If the supplier rejects liability and proposes paid rep
 reply and original Claim history; neither the Claim nor the RO automatically accepts the charge.
 Outstanding Claim matters remain governed by §9.5.
 
-This financial separation does not waive exact-Unit identity, owner authority for non-Carres goods,
+This financial separation does not waive exact-Unit identity, ownership recording,
 reservation/hold/duplicate-repair checks, authorised Claim repair scope or operational permissions.
-Those source and stock protections still apply before the relevant operational act.
+Missing owner consent is handled by the non-blocking Issue follow-up above, not an Issue refusal.
+This ruling changes document Issue; it does not itself authorise physical handover, waive the
+existing Outbound/Stock controls or establish a new transport policy.
 
 Issue uses the shared formal-document flow: staff actually send the document and record version,
 recipient, channel, actor and time. Generating/downloading PDF proves neither sending nor supplier
@@ -3579,6 +3585,14 @@ Potential Work obligations include issuing the RO, following up a recorded retur
 completing receiving/inspection in the owning module. An optional missing price is not Work.
 Any required financial decision belongs to its owning flow and Jess alone; it does not block RO
 placement or Issue.
+**Owner-consent follow-up — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+For non-Carres-owned Units issued without recorded consent, keep one source-owned outstanding
+follow-up, with the affected Units/owner and a direct RO link. Resolve the actual operational
+assignee through the existing RO follow-up Duty/cover admission; do not invent a new approver or
+deadline. Reissuing the same unresolved scope must not duplicate the task. Recording attributable
+owner-consent evidence completes only the covered scope; a partial reply or refusal leaves its
+unresolved scope visible for follow-up. Issue, download, return or an ordinary task tick cannot
+stand in for consent evidence. Do not create a second repair task store.
 A register filter is not itself a Work obligation. Reuse existing stock/receiving tasks rather than
 create duplicate RO tasks for the same physical act. Tests must prove permission/cover behaviour,
 partial completion, stale-state handling and disappearance of exactly the completed occurrence.
@@ -3591,8 +3605,8 @@ RO implementation. Stock/Receiving must accept an authorised direct-stock RO as 
 without fake Claims/Cases, while preserving permissions, ownership, exact-Unit identity and receipt
 checks. Do not weaken constraints globally or implement independent custody writers.
 
-Build must verify both sources, warehouse/showroom/dealer Display selection, owner authority for
-consignment, Supplier different from original PO supplier, optional/missing price without an Issue
+Build must verify both sources, warehouse/showroom/dealer Display selection, non-Carres owner-consent
+pending at Issue without a block, durable/deduplicated consent follow-up and partial/refused consent, Supplier different from original PO supplier, optional/missing price without an Issue
 block, price recorded without automatic expense approval, Jess-only approval with no substitute,
 pending financial decision without a placement gate, duplicate active repair, partial return,
 failed inspection, replacement identity and receipt-source compatibility.
