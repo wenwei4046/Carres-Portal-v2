@@ -1,7 +1,8 @@
 # PURCHASING — CARD 12 · RECEIVING REGISTER UI
 
 **Module:** Purchasing / Receiving · **Sequence:** 12
-**Status:** DEPLOYED 2026-09-19 (`896a7b12`) — owner approved 2026-09-18 · **PRODUCTION VERIFICATION OWED**
+**Status:** DEPLOYED 2026-09-19 (`896a7b12`) · RENDERED WALK 2026-09-19 found and fixed a pinning
+defect — owner approved 2026-09-18 · **PRODUCTION DATA VERIFICATION OWED**
 **Lane:** BUILD / DELIVERY (owner explicitly requested this Card)
 **Scope:** Receiving Register and read-only goods expansion
 **Dependencies:** coordinate shared Register/DataGrid ownership with ongoing SO Batch, Manual
@@ -222,3 +223,51 @@ UNGROUPED, so it keeps its single sticky header and its tests pass unchanged aga
   they cannot be run from the build environment at all — Chromium does not start there and the
   network policy refuses the production hosts. Purchasing §9.4 lists exactly what that walk owes.
   DEPLOYED is not PRODUCTION-VERIFIED.
+
+
+## Rendered walk — 2026-09-19
+
+The walk the Card asked for ("alignment, pinning, expansion, long references, keyboard access and
+200% zoom at the specified widths") was run in real Chromium against `receiving-preview.html`,
+inside an emulated copy of `OperationApp`'s own container chain, at 1440 · 1180 · 820 · 767 · 390
+and at 200% zoom.
+
+**🔴 It found a defect that 55 passing unit tests went straight through.** `GRN Date` and `GRN No`
+did not pin. Scrolling right drove `GRN Date` to `left: −1022`, off the screen; Purchase Orders
+held `PO Date` at 280 under the identical harness. `leadingColumns` was correct and the widths
+were correct — the fault was one missing class. The register column beside the rail is a flex
+child; a flex item defaults to `min-width:auto`; without `min-w-0` it refused to shrink below the
+sixteen columns' 2234px, so the grid's own scroller never engaged and the sticky offsets were
+computed against a viewport that never moved. The same miss disabled the ≥768px canvas rule,
+because the grid measured 2234px even on a 390px phone. Every sibling rail+grid register
+(Purchase Orders, SO Batch, Supplier Claims, Manual Purchase) already carried `min-w-0`.
+
+**Fixed** in `OperationReceiving.tsx`, with the reason recorded beside it and a regression test
+that asserts the class contract (jsdom has no layout, so the pixels cannot be asserted there).
+
+| Checked on the render | Result |
+|---|---|
+| Sixteen columns, approved order, registry widths | 120 · 170 · 176 · 170 · 140 · 150 · 150 · 180 · 140 · 150 · 208 · 112 · 112 · 112 · 112 — match |
+| Pinning ≥768px canvas | 1176 · 916 → `GRN Date` + `GRN No` pinned |
+| Pinning <768px canvas | 556 · 503 · 126 → `GRN No` alone |
+| Pin survives full horizontal scroll | `GRN Date` holds at 288 (was −1022) |
+| 200% zoom | canvas shrinks correctly; identity pins alone |
+| Long references / clipping | no clipped cell at any width |
+| Rail | six groups; no permanent `Clear filters` |
+| Week arrow | `aria-expanded` toggles, row count unchanged — opens without filtering |
+| Cancelled GRN | `Cancelled` under its number; no status word elsewhere |
+| Expansion order | `Category · Supplier · Supplier Deliver To · PO No / Ref No · Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty` |
+| Expansion content | source number above its Unit ID; item configuration under Items |
+| Expansion controls | 0 checkboxes, no `Ready Stock`, no reservation control |
+| Keyboard | roving tabindex present on the row |
+
+**Correction to the previous entry.** This Card and §9.4 both said no walk could be run from the
+build environment because "Chromium does not start there". That was wrong and is withdrawn: the
+full `chromium` binary hangs, but `headless_shell` starts normally. The real limit is narrower —
+the network policy refuses `erp.carresofficial.com` and `api.carresofficial.com` at the proxy
+(403 on CONNECT), so no authenticated session against real data is possible from here.
+
+**Still owed:** the same surface against REAL GRN rows — real counts against the footer total, a
+real cancelled GRN, a real receipt carrying both an exact-unit and a counted line, a real receipt
+with genuine SO and MPR references beside one with none, and the widths re-measured signed in
+where JetBrains Mono runs wider than the fixture font.
