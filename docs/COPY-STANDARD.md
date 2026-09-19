@@ -1974,10 +1974,12 @@ end in the word.
 **Write the sentence so the word is not at a full stop.** A line that would end
 `… beneath its GRN No.` is rewritten (`… beneath its GRN No — …`) rather than given back its stop.
 
-**Code lags this ruling and the lag is named, not hidden.** Measured 2026-09-18 in `apps/web/src`:
-`Supplier DO No.` (×2), `Supplier Claim No.` and `GRN No.` still carry the stop; `SO No`, `PO No`,
-`GRN No`, `DO No`, `Receipt No`, `Invoice No`, `Voucher No`, `Entry No`, `Move No` and `Bill No`
-are already correct. Each wrong label is corrected by the page that owns it, in its own build
+**Code lags this ruling and the lag is named, not hidden.** Re-measured 2026-09-19 in
+`apps/web/src`, after the Receiving and Manual Purchase rounds: `Supplier DO No.` (×5),
+`Supplier Claim No.`, `GRN No.` and `Issue No.` still carry the stop; `SO No`, `PO No`, `GRN No`,
+`DO No`, `Receipt No`, `Invoice No`, `Voucher No`, `Entry No`, `Move No` and `Bill No` are already
+correct. The count rose because newer rounds copied the old spelling — which is exactly why the
+rule is written down here rather than left to each page to remember. Each wrong label is corrected by the page that owns it, in its own build
 round — never by a repository-wide string sweep, which is how the `Recovery` mistake is made.
 Historical build cards in `docs/cards/` keep their original text: they are a record of what was
 built, not authority over what to build.
@@ -3720,8 +3722,8 @@ No page-local copies of its appearance rules; this does not authorize new busine
 
 `Category · Supplier · Supplier Deliver To · PO No / Ref No` (Unit ID beneath) `· Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty`.
 This is the read-only expansion of a saved GRN, not a purchasing selector. Normal GRNs have no
-Status column; cancelled ones show `Cancelled` beneath GRN No. Rail date and exception counts
-are counts of GRN records, never uncompleted tasks or product quantities.
+Status column; cancelled ones show `Cancelled` beneath GRN No — and the rail's date and exception
+counts are counts of GRN records, never uncompleted tasks or product quantities.
 
 **The Unit cell inside it answers with the words this file already governs**, never a new one:
 a quantity-managed line reads `Counted stock` (0453 — the technical `QTY-` key is not a Unit ID),
