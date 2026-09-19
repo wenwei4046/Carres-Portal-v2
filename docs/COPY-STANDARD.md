@@ -3712,3 +3712,16 @@ No page-local copies of its appearance rules; this does not authorize new busine
 This is the read-only expansion of a saved GRN, not a purchasing selector. Normal GRNs have no
 Status column; cancelled ones show `Cancelled` beneath GRN No. Rail date and exception counts
 are counts of GRN records, never uncompleted tasks or product quantities.
+
+**The Unit cell inside it answers with the words this file already governs**, never a new one:
+a quantity-managed line reads `Counted stock` (0453 — the technical `QTY-` key is not a Unit ID),
+a read that FAILED reads `Could not be loaded`, and extra goods read `—`, because goods that were
+never on the order never became a Unit. The source cell reads `Extra goods` on those rows rather
+than borrowing the purchase order they did not arrive on.
+
+**`Clear filters` — RECONCILED, owner confirmation 2026-09-18.** An earlier planning round read
+the removal of the rail's `Clear filters` button as a Purchase Orders correction that applied
+there only. The later owner confirmation removes the permanent bottom-of-rail button on
+Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
+itself and clears itself, and pressing a chosen rail row again still clears that one group.
+

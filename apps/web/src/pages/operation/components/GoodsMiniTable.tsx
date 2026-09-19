@@ -51,6 +51,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { Fragment, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -220,6 +221,49 @@ const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 const PO_UNIT_COLUMN = { key: "poUnit", label: "PO No / Unit ID", width: 230 } as const;
 
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
+/**
+ * ⭐ THE RECEIVING COMPOSITION — approved 2026-09-18 (Purchasing §9.4, CARD 12).
+ *
+ * ```
+ * Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID ·
+ * Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+ * ```
+ *
+ * A saved GRN is READ, never bought from: this layout carries no checkbox, no
+ * `Ready Stock` and no purchasing tick, because none of them means anything on
+ * a receipt. It is the same BOX every other caller draws — one implementation,
+ * per law ① above — asked for different columns, and every page that passes
+ * nothing renders byte-identically to what it rendered before.
+ *
+ * Widths come from the ONE shared registry (UI MASTER §6.8), never from a
+ * number typed here.
+ */
+const SOURCE_UNIT_COLUMN = {
+  key: "sourceUnit",
+  label: "PO No / Ref No",
+  width: REGISTER_FIELD_WIDTH.sourceAndUnitId,
+} as const;
+const RECEIVED_QTY_COLUMN = {
+  key: "receivedQty",
+  label: "Received Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const DAMAGED_QTY_COLUMN = {
+  key: "damagedQty",
+  label: "Damaged Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const WRONG_QTY_COLUMN = {
+  key: "wrongItemQty",
+  label: "Wrong Item Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const EXTRA_QTY_COLUMN = {
+  key: "extraQty",
+  label: "Extra Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+
 const SELECT_WIDTH = 36;
 
 /**
@@ -312,6 +356,22 @@ export interface GoodsMiniLine {
   /** The configuration facts that identify the exact goods, already joined. */
   itemDetail?: string;
   /**
+   * ⭐ RECEIVING (§9.4) — read only when the table is asked for that layout.
+   *
+   * `sourceNo` is the document this received line belongs to and it prints on
+   * the cell's FIRST line, with `unitIds` beneath it: the number the operator
+   * is looking for leads, and the exact Units it landed as follow. A counted
+   * (quantity-managed) line has no Unit IDs at all and says so — its register
+   * row carries a technical key, which is not an identity.
+   */
+  sourceNo?: string;
+  sourceNoAbsence?: string;
+  /** The receipt's own five quantity words, per line. */
+  receivedQty?: number | null;
+  damagedQty?: number | null;
+  wrongItemQty?: number | null;
+  extraQty?: number | null;
+  /**
    * FALSE = nothing can be bought for this line (a Service). It prints `—` in
    * the ☑ cell and select-all skips it. Ignored when the page passes no
    * `selection` at all.
@@ -340,6 +400,33 @@ function Absence({ children }: { children: ReactNode }) {
       {children}
     </span>
   );
+}
+
+/**
+ * A receipt quantity, per line. A quantity a line does not carry is an
+ * ABSENCE, not a zero: an extra-goods row never "received 0", it simply has
+ * no received quantity, and an ordered line has no extra quantity. The colours
+ * are the register's own — damage and wrong items read red, extra goods amber
+ * — and they never change the arithmetic (damaged/wrong/extra never reduce
+ * `Pending Delivery Qty`).
+ */
+function ReceiptQty({
+  value,
+  tone,
+}: {
+  value: number | null | undefined;
+  tone?: "issue" | "extra";
+}) {
+  if (value == null) return <Absence>—</Absence>;
+  const ink =
+    value > 0 && tone === "issue"
+      ? "text-kit-red-11"
+      : value > 0 && tone === "extra"
+        ? "text-kit-amber-11"
+        : value > 0
+          ? "text-base-900"
+          : "text-kit-slate-11";
+  return <span className={`tabular-nums ${ink}`}>{value}</span>;
 }
 
 /**
@@ -416,6 +503,7 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   showCategory = true,
+  receivingLayout = false,
   purchaseOrderLayout = false,
   itemHeading,
   onPoClick,
@@ -536,6 +624,18 @@ export default function GoodsMiniTable({
    */
   showCategory?: boolean;
   /**
+   * ⭐ RECEIVING'S READ-ONLY GOODS EXPANSION — approved 2026-09-18 (§9.4).
+   *
+   * The saved GRN's own per-line truth, in the owner's order, with the source
+   * number above its line-bound Unit IDs. It carries no checkbox, no
+   * `Ready Stock` and no reservation control: nothing on a receipt is bought.
+   *
+   * Its source cell is `PO No / Ref No`, NOT Purchase Orders' `PO No / Unit ID`
+   * below: a receipt can arrive with no purchase order at all, and the two
+   * governed words are two facts, so they stay two columns in one registry.
+   */
+  receivingLayout?: boolean;
+  /**
    * ⭐ THE ORDERED-GOODS READING ORDER — Purchase Orders (Purchasing §9.3,
    * Jess 2026-09-18):
    *
@@ -599,6 +699,11 @@ export default function GoodsMiniTable({
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
     status: { key: "status", label: "Status", width: 112 },
+    sourceUnit: { ...SOURCE_UNIT_COLUMN },
+    receivedQty: { ...RECEIVED_QTY_COLUMN },
+    damagedQty: { ...DAMAGED_QTY_COLUMN },
+    wrongItemQty: { ...WRONG_QTY_COLUMN },
+    extraQty: { ...EXTRA_QTY_COLUMN },
   };
   /**
    * ⭐ THE SO BATCH GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.1:
@@ -635,6 +740,19 @@ export default function GoodsMiniTable({
        second line inside its cell; it is never clipped. */
     REGISTRY.item = { key: "item", label: itemHeading ?? "Item", width: 240 };
   }
+  /**
+   * ⭐ THE RECEIVING GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.4.
+   * The destination takes the SAME one word the sibling pages use: the
+   * dictionary retired the bare `Deliver To` for this fact on these four
+   * pages, and the label has one home rather than a prop each page passes its
+   * own spelling to.
+   */
+  if (receivingLayout) {
+    /* Only the WORD changes. The widths stay the goods table's own — the
+       registry's second scope (§6.8): `Deliver To` holds a destination list
+       here, not the parent's single name, so the child's 200 stands. */
+    REGISTRY.deliverTo = { ...CHILD_COLUMNS[2], label: SUPPLIER_DELIVER_TO_LABEL };
+  }
   /* Purchase Orders reads a PO's goods from the DOCUMENT outwards and names
      the destination with the SAME shared word SO Batch uses — one label, one
      home (Purchasing §9.3, ui MASTER §6.8). Its `Supplier` takes the reviewed
@@ -643,7 +761,19 @@ export default function GoodsMiniTable({
     REGISTRY.deliverTo = { ...REGISTRY.deliverTo!, label: SUPPLIER_DELIVER_TO_LABEL };
     REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
   }
-  const order = purchaseOrderLayout
+  const order = receivingLayout
+    ? [
+        "category",
+        "supplier",
+        "deliverTo",
+        "sourceUnit",
+        "item",
+        "receivedQty",
+        "damagedQty",
+        "wrongItemQty",
+        "extraQty",
+      ]
+    : purchaseOrderLayout
     ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
     /* ⭐ MANUAL PURCHASE IS SO BATCH'S ORDER PLUS THE TWO PO FACTS (Purchasing
        §9.2). It is written as its own line rather than as a flag on SO Batch's,
@@ -663,7 +793,15 @@ export default function GoodsMiniTable({
     poUnit: purchaseOrderLayout,
     unit: showUnitId,
     category: showCategory,
-    supplier: showSupplier,
+    // The receipt columns exist only in the Receiving layout; the shared
+    // `supplier` flag is not re-used for it, because a receipt always names
+    // its supplier and the buying page's flag means something else.
+    sourceUnit: receivingLayout,
+    receivedQty: receivingLayout,
+    damagedQty: receivingLayout,
+    wrongItemQty: receivingLayout,
+    extraQty: receivingLayout,
+    supplier: showSupplier || receivingLayout,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
     fromStock: showFromStock,
@@ -935,6 +1073,39 @@ export default function GoodsMiniTable({
                   ) : (
                     <Absence>{line.poNoAbsence ?? "—"}</Absence>
                   );
+                case "sourceUnit":
+                  /* THE SOURCE NUMBER LEADS, the exact Units follow beneath
+                     it (owner correction 2026-09-18). A counted line has no
+                     Unit IDs to name and says so instead of printing a
+                     technical register key as if it were an identity. */
+                  return (
+                    <>
+                      {line.sourceNo ? (
+                        <div className="font-medium">{line.sourceNo}</div>
+                      ) : (
+                        <Absence>{line.sourceNoAbsence ?? "—"}</Absence>
+                      )}
+                      {line.unitIds.length ? (
+                        line.unitIds.map((id) => (
+                          <div key={id} className="text-meta text-kit-slate-11">
+                            {id}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-meta">
+                          <Absence>{line.unitAbsence}</Absence>
+                        </div>
+                      )}
+                    </>
+                  );
+                case "receivedQty":
+                  return <ReceiptQty value={line.receivedQty} />;
+                case "damagedQty":
+                  return <ReceiptQty value={line.damagedQty} tone="issue" />;
+                case "wrongItemQty":
+                  return <ReceiptQty value={line.wrongItemQty} tone="issue" />;
+                case "extraQty":
+                  return <ReceiptQty value={line.extraQty} tone="extra" />;
                 case "poDeliveryDate":
                   return line.poDeliveryDate ? (
                     line.poDeliveryDate
