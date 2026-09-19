@@ -16,9 +16,16 @@ import {
   type PurchaseReturnListRow,
   type PurchaseReturnUnitRow,
 } from "@carres/shared";
-import OperationPurchaseReturns from "./OperationPurchaseReturns";
+import OperationPurchaseReturns, {
+  PurchaseReturnsRegister,
+} from "./OperationPurchaseReturns";
 
 vi.mock("./PurchasingTabs", () => ({ default: () => <header>Purchase Returns</header> }));
+
+const returnsQuery = vi.fn();
+vi.mock("@/lib/queries", () => ({
+  useOperationPurchaseReturns: (...args: unknown[]) => returnsQuery(...args),
+}));
 
 const unit = (over: Partial<PurchaseReturnUnitRow> = {}): PurchaseReturnUnitRow => ({
   unit_id: "U-20260904-0142",
@@ -52,7 +59,7 @@ const doc = (over: Partial<PurchaseReturnListRow> = {}): PurchaseReturnListRow =
 function show(returns: PurchaseReturnListRow[]) {
   return render(
     <MemoryRouter initialEntries={["/operation?tab=purchase-returns"]}>
-      <OperationPurchaseReturns returns={returns} />
+      <PurchaseReturnsRegister returns={returns} />
     </MemoryRouter>,
   );
 }
@@ -364,5 +371,65 @@ describe("the register acts on nothing", () => {
     show([doc()]);
     expect(screen.queryByRole("button", { name: /^\+ ?New/i })).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});
+
+/**
+ * The container — the half that talks to the server.
+ *
+ * §6.7 rule 7: *"Loading, failure, genuinely empty and filtered-empty states
+ * are distinct."* They are asserted here rather than in the layout tests above,
+ * because that is where they can actually differ: the presentational half is
+ * handed a state, the container is what DECIDES one.
+ */
+describe("the page binds the register to its own read", () => {
+  const idle = {
+    data: { returns: [doc()] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  };
+
+  function page(over: Record<string, unknown> = {}, path = "/operation?tab=purchase-returns") {
+    returnsQuery.mockReturnValue({ ...idle, ...over });
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <OperationPurchaseReturns />
+      </MemoryRouter>,
+    );
+  }
+
+  it("shows the rows the read returned", () => {
+    page();
+    expect(screen.getByText("PR-20260915-1042")).toBeTruthy();
+  });
+
+  it("narrows to one Supplier Claim when the address names it", () => {
+    page({}, "/operation?tab=purchase-returns&claim=SC-1038");
+    expect(returnsQuery).toHaveBeenCalledWith("SC-1038");
+  });
+
+  it("asks for every return when no claim is named", () => {
+    page();
+    expect(returnsQuery).toHaveBeenCalledWith(null);
+  });
+
+  it("says a read FAILED rather than showing an empty register", () => {
+    page({ data: undefined, isError: true, error: { message: "boom" } });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByText("Purchase Returns could not be loaded.")).toBeTruthy();
+    // A failure is not "no purchase returns" — that would read as finished work.
+    expect(screen.queryByText("No purchase returns.")).toBeNull();
+  });
+
+  it("names a refusal as a refusal, not as a breakage", () => {
+    page({ data: undefined, isError: true, error: { status: 403, message: "nope" } });
+    expect(screen.getByText("You do not have access to Purchase Returns.")).toBeTruthy();
+  });
+
+  it("distinguishes genuinely empty from loading", () => {
+    page({ data: { returns: [] }, isLoading: false });
+    expect(screen.getByText("No purchase returns.")).toBeTruthy();
   });
 });

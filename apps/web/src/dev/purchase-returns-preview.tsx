@@ -185,6 +185,14 @@ window.fetch = async (input, init) => {
         { status: 405, headers: { "Content-Type": "application/json" } },
       );
     }
+    /* The register's own read, answered locally. The preview therefore
+       exercises the CONTAINER — hook, query key, states and all — not just the
+       presentational half, so a walk measures the page the portal serves. */
+    if (url.includes("/api/operation/purchase-returns")) {
+      return new Response(JSON.stringify({ returns }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response("{}", { headers: { "Content-Type": "application/json" } });
   }
   return realFetch(input, init);
@@ -199,7 +207,7 @@ createRoot(document.getElementById("root")!).render(
       would render this page under another page's name. */}
   <MemoryRouter initialEntries={["/operation?tab=purchase-returns"]}>
     <PreviewFrame label="Purchase Returns (§9.6, illustrative data)">
-      <OperationPurchaseReturns returns={returns} />
+      <OperationPurchaseReturns />
     </PreviewFrame>
   </MemoryRouter>
   </QueryClientProvider>,

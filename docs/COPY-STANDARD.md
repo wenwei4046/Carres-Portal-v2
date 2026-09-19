@@ -907,7 +907,7 @@ obtained; never label it obtained or approved because the RO was issued. Do not 
 owner-consent-before-Issue refusal. Exact English action copy remains part of UI review; this
 rule approves the meaning and non-blocking behaviour, not a new status column or task engine.
 
-### Purchase Returns register — owner-confirmed UI, 2026-09-18
+### Purchase Returns register — owner-confirmed UI, 2026-09-18 · BUILT 2026-09-19
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·
 `Qty` · `Pickup Location` · `Return To` · `Confirmed Pickup Date` · `Collected By` ·

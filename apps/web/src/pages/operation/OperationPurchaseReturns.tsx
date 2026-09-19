@@ -23,18 +23,22 @@
  *               selects nothing has nothing to act on (§6.7 rule 5).
  *   PURCHASING'S OWN — no Finance, no Credit Consequence, no Work column.
  *
- * ── AND WHERE ITS ROWS COME FROM ────────────────────────────────────────────
- * The page takes its rows as PROPS rather than calling a query hook, and that
- * is deliberate rather than unfinished. §9.6 is `APPROVED TARGET / NOT BUILT`:
- * the LAYOUT is confirmed, the storage and the Claim→return creation rule are
- * not. A hook pointed at an endpoint nobody has written would claim a data
- * path this repository does not have. So the approved composition ships now,
- * exercised by `dev/purchase-returns-preview` against fixtures, and the
- * container that supplies live rows arrives with the document slice — at which
- * point this file does not change.
+ * ── WHERE ITS ROWS COME FROM ────────────────────────────────────────────────
+ * `useOperationPurchaseReturns` → `/api/operation/purchase-returns` → the
+ * `purchase_returns` / `purchase_return_units` tables (migration 0548). The
+ * default export is the container; `PurchaseReturnsRegister` is the same screen
+ * taking rows directly, which is what the tests and the fixture preview mount
+ * so a layout assertion never depends on a network shape.
+ *
+ * ── WHAT IS STILL NOT BUILT, AND SAYS SO ────────────────────────────────────
+ * Nothing here CREATES a return. §7.4 rules who may (an approved claim
+ * outcome) and 0548 carries that door in SQL, but §9.6 confirmed the REGISTER
+ * — not a creation screen — so the screen that calls it is a later scope with
+ * its own owner decision. The evidence viewer is likewise not wired: the
+ * entries carry the door and say why they are inactive.
  */
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   PURCHASE_RETURN_ABSENT,
   PURCHASE_RETURN_COLUMN_LABEL,
@@ -59,6 +63,7 @@ import {
   type PurchaseReturnCondition,
   type PurchaseReturnListRow,
 } from "@carres/shared";
+import { useOperationPurchaseReturns } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
@@ -121,7 +126,7 @@ const SECTION_ICON: Record<(typeof PURCHASE_RETURN_RAIL_SECTIONS)[number]["key"]
  * `carres.filterRail.<rail>.<group>` (UI MASTER §6.7, SLICE 1).
  */
 
-export interface OperationPurchaseReturnsProps {
+export interface PurchaseReturnsRegisterProps {
   returns: readonly PurchaseReturnListRow[];
   isLoading?: boolean;
   isError?: boolean;
@@ -130,14 +135,14 @@ export interface OperationPurchaseReturnsProps {
   onRetry?: () => void;
 }
 
-export default function OperationPurchaseReturns({
+export function PurchaseReturnsRegister({
   returns,
   isLoading = false,
   isError = false,
   errorTitle = "Purchase Returns could not be loaded.",
   errorDetail,
   onRetry,
-}: OperationPurchaseReturnsProps) {
+}: PurchaseReturnsRegisterProps) {
   const [supplier, setSupplier] = useState<string | null>(null);
   const [condition, setCondition] = useState<PurchaseReturnCondition | null>(null);
   const [railOpen, setRailVisible] = useState(true);
@@ -537,5 +542,39 @@ export default function OperationPurchaseReturns({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * ⭐ THE PAGE — the register bound to its own read.
+ *
+ * Thin on purpose. Everything that decides what the screen SAYS lives either
+ * in `PurchaseReturnsRegister` above or in `@carres/shared`'s purchase-return
+ * module; this function's whole job is to hand over rows and the three states
+ * §6.7 rule 7 keeps distinct — loading, failure, and genuinely empty.
+ *
+ * `?claim=` narrows the register to one Supplier Claim's paperwork, so the
+ * claim can link straight into the returns it authorised without the operator
+ * searching for them.
+ */
+export default function OperationPurchaseReturns() {
+  const [params] = useSearchParams();
+  const claim = params.get("claim");
+  const query = useOperationPurchaseReturns(claim);
+  const status = (query.error as { status?: number } | null)?.status;
+
+  return (
+    <PurchaseReturnsRegister
+      returns={query.data?.returns ?? []}
+      isLoading={query.isLoading}
+      isError={query.isError}
+      errorTitle={
+        status === 403
+          ? "You do not have access to Purchase Returns."
+          : "Purchase Returns could not be loaded."
+      }
+      errorDetail={query.error?.message}
+      onRetry={() => void query.refetch()}
+    />
   );
 }
