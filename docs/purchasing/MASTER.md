@@ -3428,7 +3428,7 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18. APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval ruling 2026-09-19. APPROVED TARGET / NOT BUILT.**
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
 ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
 The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
@@ -3458,7 +3458,8 @@ stock. Bring in Category, Items/configuration, original PO/source, Unit ID and c
 Stock Location. If an original PO is absent, retain the genuine source and missing-reference fact;
 never fabricate a PO. The selected repair Supplier does not rewrite the original purchase source.
 
-Carres-owned stock follows the normal authority and cost-approval rules. Consignment or other
+Carres-owned stock follows normal stock and operational authority; the price/approval boundary below
+does not add a financial gate to placing an RO. Consignment or other
 non-Carres-owned goods require the owner's authority and explicit cost responsibility before
 commitment. Do not silently treat supplier-owned Display goods as Carres assets. Sold/reserved,
 held, already-out, or already-in-repair Units require the owning workflow's eligibility checks;
@@ -3479,8 +3480,9 @@ not admitted by this exact-Unit blueprint; resolve identity in the owning invent
 | Supplier Pickup Location | Recorded place from which these goods are to be collected for repair; default from the Unit's actual Stock Location |
 | Supplier Return Location | Intended place to receive the goods after repair; can differ from pickup location; not evidence of receipt |
 | Expected Return Date | Recorded expected return with its provider/evidence; do not imply supplier confirmation where none exists |
-| Repair Quotation / Cost Responsibility | Supplier's quoted scope and charges, and who will bear them; an unknown cost is not zero |
-| Approval | Actual authorised actor, time and scope, according to existing approval policy |
+| Price / Repair Quotation | Optional price or supplier quotation recorded during creation or in RO detail; unknown is not RM0. Recording a price is neither expense approval nor payment |
+| Cost Responsibility | Recorded responsibility and supporting agreement; a Claim link never proves the supplier will pay |
+| Approval | If a decision requires approval, Jess alone approves; retain the actual decision, scope and time. No substitute approver or Buddy may approve for her. Financial approval is not a placement/Issue gate |
 
 Supplier Pickup Location and Supplier Return Location apply equally to Warehouse, Showroom and
 Dealer sites. Record actual collector/carrier separately; these labels do not require the supplier
@@ -3488,23 +3490,36 @@ to transport personally. Changing a planned location never moves a Unit or overw
 current-location fact. A pickup-location mismatch must be resolved against actual custody.
 Do not add `Repair Location`: this register does not track where the supplier performs the repair.
 
-#### Quotation, approval and issue
+#### Price recording, approval and issue
 
-Save an incomplete quotation as a draft. If Carres pays, obtain the supplier quotation and the
-required approval before committing or issuing the order. If Supplier pays, retain its evidenced
-agreement; never infer free repair from a Claim link. Use existing approval roles/limits, not a new
-threshold invented by this page. Missing applicable authority prevents commitment and explains
-what is needed. Any charge or repair-scope increase needs the applicable approval; keep the old
-quote, new proposal and decision rather than overwriting them.
+**Owner ruling — 2026-09-19, APPROVED TARGET / NOT BUILT.** Staff may write down the price
+when placing a Repair Order. `Price` is optional in RO creation/detail; an absent price remains
+unknown, never RM0. Retain its supplier quotation/source when available and preserve changes.
+The register gains no price, quotation-amount or financial column.
 
-If a supplier rejects warranty liability and proposes paid repair, keep its reply and the original
-Claim history. Carres must expressly approve the paid commission; do not auto-convert the Claim
-or accept the quotation. Decide outstanding Claim matters under §9.5 independently.
+Purchasing places and follows the repair commission; Finance owns financial processing and
+payment. Missing price, an incomplete quotation, unpaid charges or pending financial approval
+must not stop placing or issuing the RO. Recording a price, placing the RO or sending its document
+is not automatic acceptance of supplier charges, expense approval or payment. If an approval is
+needed, **Jess alone approves**, through her governed personal identity; no other Purchasing
+Approver or Buddy may substitute. This is the RO-specific ruling, not a change to Manual Purchase
+or PO approval policy. Do not invent amount thresholds or a compulsory approval for every RO.
+Record any required financial decision separately without making it a Purchasing placement gate.
 
-Issue uses the shared formal-document flow: staff actually send the approved document and record
-version, recipient, channel, actor and time. Generating/downloading PDF proves neither sending
-nor supplier acceptance. Preserve sent revisions and corrections. Quote/approval is a purchasing
-commitment fact; payment, balance and credit processing remain in Finance, outside the register.
+A changed price or supplier request for payment remains a recorded proposal until the required
+Jess decision exists; preserve the old price, new proposal and decision. If Supplier pays, retain
+its evidenced agreement. If the supplier rejects liability and proposes paid repair, retain its
+reply and original Claim history; neither the Claim nor the RO automatically accepts the charge.
+Outstanding Claim matters remain governed by §9.5.
+
+This financial separation does not waive exact-Unit identity, owner authority for non-Carres goods,
+reservation/hold/duplicate-repair checks, authorised Claim repair scope or operational permissions.
+Those source and stock protections still apply before the relevant operational act.
+
+Issue uses the shared formal-document flow: staff actually send the document and record version,
+recipient, channel, actor and time. Generating/downloading PDF proves neither sending nor supplier
+acceptance. Preserve sent revisions and corrections. Price recording is not a second financial
+ledger; payment, balance and credit processing remain in Finance, outside the register.
 
 #### Physical execution and completion
 
@@ -3545,8 +3560,8 @@ Do not invent a new approval holder or deadline; unresolved ownership remains ex
 
 | Portal owner | Repair connection |
 |---|---|
-| Purchasing / RO | Requirements, chosen Supplier, quote/cost responsibility, authorised scope, Issue and supplier follow-up |
-| Workspace / Staff & Duties | Resolve who must approve, issue or follow up; My Work/Team Work shows the same source-owned outstanding act and removes it only after proved completion |
+| Purchasing / RO | Requirements, chosen Supplier, optional recorded price/quotation and cost-responsibility evidence, authorised operational scope, Issue and supplier follow-up; no financial placement gate |
+| Workspace / Staff & Duties | Resolve operational Issue/follow-up owners; any required RO approval belongs to Jess alone, with no substitute approver. My Work/Team Work reads the same source-owned act and its proved completion |
 | Inventory / Stock | Select existing Units and actual locations, verify ownership/holds/reservations, retain identity and custody history |
 | Outbound / transport | Actual Unit dispatch, collector/recipient and proof; existing delivery/transport records when applicable, no second logistics engine |
 | Receiving / inspection | Authorised RO-linked receipt, original identity, partial quantities, actual receiving site and inspection result |
@@ -3555,8 +3570,10 @@ Do not invent a new approval holder or deadline; unresolved ownership remains ex
 | Linked customer order / Service Case | Preserve any actual reservation/customer relationship and outstanding service obligations; RO completion cannot silently complete a different record |
 | Portal history / documents | Trace source, Unit, quote, approval, sent revision, physical movements and actual actors across the linked records |
 
-Potential Work obligations include completing a required quote/approval, issuing the approved RO,
-following up a recorded return date, and completing receiving/inspection in the owning module.
+Potential Work obligations include issuing the RO, following up a recorded return date, and
+completing receiving/inspection in the owning module. An optional missing price is not Work.
+Any required financial decision belongs to its owning flow and Jess alone; it does not block RO
+placement or Issue.
 A register filter is not itself a Work obligation. Reuse existing stock/receiving tasks rather than
 create duplicate RO tasks for the same physical act. Tests must prove permission/cover behaviour,
 partial completion, stale-state handling and disappearance of exactly the completed occurrence.
@@ -3570,8 +3587,10 @@ without fake Claims/Cases, while preserving permissions, ownership, exact-Unit i
 checks. Do not weaken constraints globally or implement independent custody writers.
 
 Build must verify both sources, warehouse/showroom/dealer Display selection, owner authority for
-consignment, Supplier different from original PO supplier, missing quote, denied approval, duplicate
-active repair, partial return, failed inspection, replacement identity and receipt-source compatibility.
+consignment, Supplier different from original PO supplier, optional/missing price without an Issue
+block, price recorded without automatic expense approval, Jess-only approval with no substitute,
+pending financial decision without a placement gate, duplicate active repair, partial return,
+failed inspection, replacement identity and receipt-source compatibility.
 This document authorises the target, not a migration, build-card creation or production rollout.
 
 ### 9.8 Display Requests
