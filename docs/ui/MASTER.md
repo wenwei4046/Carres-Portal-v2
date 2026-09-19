@@ -2093,3 +2093,9 @@ passed 4px, with the second group's header taking the top at 40px. No `<thead>` 
 **Falsifier:** a browser in which a sticky `<thead>` is not constrained by its own table, or a
 grouped listing whose groups drift out of column alignment, overturns the structure — not the
 ruling, which is about what the operator reads.
+
+**Repair Orders price placement — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, quotation-amount,
+Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
+is not a placement/Issue blocker. This scoped placement ruling does not approve the remaining RO
+column sequence, rail wording, prototype or full UI, and changes no other register's composition.
