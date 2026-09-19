@@ -1,7 +1,7 @@
 # PURCHASING — CARD 12 · RECEIVING REGISTER UI
 
 **Module:** Purchasing / Receiving · **Sequence:** 12
-**Status:** BUILT 2026-09-18 — owner approved 2026-09-18 · **PRODUCTION VERIFICATION OWED**
+**Status:** DEPLOYED 2026-09-19 (`896a7b12`) — owner approved 2026-09-18 · **PRODUCTION VERIFICATION OWED**
 **Lane:** BUILD / DELIVERY (owner explicitly requested this Card)
 **Scope:** Receiving Register and read-only goods expansion
 **Dependencies:** coordinate shared Register/DataGrid ownership with ongoing SO Batch, Manual
@@ -83,11 +83,19 @@ BUILT is not PRODUCTION-VERIFIED. Do not mark this Card complete after only deli
 
 ---
 
-# BUILD RECORD — 2026-09-18
+# BUILD RECORD — 2026-09-18, DEPLOYED 2026-09-19
 
-**State: BUILT, NOT PRODUCTION-VERIFIED.** The implementation below is committed and covered by
-tests. It has not yet been merged, deployed, or walked signed-in against production data, so
+**State: DEPLOYED, NOT PRODUCTION-VERIFIED.** The implementation below is merged, deployed and
+converged on every canonical surface. It has NOT been walked signed-in against production data, so
 nothing here may be read as production proof.
+
+| Status | Evidence |
+|---|---|
+| **MERGED** | [#1467](https://github.com/wenwei4046/Carres-Portal-v2/pull/1467) squashed onto `main` as `896a7b128b77dbb3dc0074005aaf81f9aa52cf1f`, 2026-09-19 02:29 UTC. CI `verify` green on the merged head. |
+| **DEPLOYED** | `deploy-production.yml` [run 35415796625](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/35415796625) — it re-ran `ci:migrations` · `lint` · `typecheck` · `test` · `build` on that exact SHA (02:29:52 → 02:49:30), deployed both Pages projects and the production Worker, then `pnpm ci:smoke` printed `Production converged to 896a7b12…` at 02:50:09 for `carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` · `pos.carresofficial.com` · `api.carresofficial.com/health`. |
+| **PRODUCTION-VERIFIED** | **NOT YET** — see the owed walk in Purchasing §9.4. A shipped bundle is not a drawn register. |
+
+**No migration.** This card added none, so there is no apply debt and no deploy-order hazard.
 
 ## Where the earlier rounds disagreed, and what was applied
 
@@ -209,5 +217,8 @@ UNGROUPED, so it keeps its single sticky header and its tests pass unchanged aga
   contract has its tests, this page asserts that `GRN Date` and `GRN No` lead, that a long
   four-way reference keeps every number, and that the week arrow is a real keyboard-operable
   button that filters nothing. The pixel pass stays OWED with production verification.
-- 🔴 **Production verification is OWED**: deployed SHA, an authenticated walk, and the
-  1440/1180/820/390 · keyboard · 200% zoom pass against real data.
+- 🔴 **Production verification is OWED.** The deployed SHA is now proven (above); the
+  **authenticated walk and the 1440/1180/820/390 · keyboard · 200% zoom pass are not**, and
+  they cannot be run from the build environment at all — Chromium does not start there and the
+  network policy refuses the production hosts. Purchasing §9.4 lists exactly what that walk owes.
+  DEPLOYED is not PRODUCTION-VERIFIED.

@@ -2200,16 +2200,21 @@ extra-goods distinctions. Receiving remains ungrouped with a sticky header. Use 
 icons and dimensions; no permanent bottom-rail Clear filters control. Full date and pagination
 behaviour below remains authoritative; abbreviated sample data is not a new rule.
 
-**BUILT 2026-09-18 — what is implemented, and what is still owed.** The register now draws the
-approved sixteen-column, date-first listing with `GRN Date` and `GRN No` pinned at a canvas
-≥768px (`leadingColumns`), the six rail groups, and the read-only goods expansion through the
-shared `GoodsMiniTable`. The five retired words measured on this page — `Supplier Delivery Date`,
-`Goods received on`, `Deliver To`, `Product` and the `Status` column — are gone, and the merged
+**BUILT 2026-09-18 — what is implemented.** The register draws the approved sixteen-column,
+date-first listing with `GRN Date` and `GRN No` pinned at a canvas ≥768px (`leadingColumns`), the
+six rail groups, and the read-only goods expansion through the shared `GoodsMiniTable`. The five
+retired words measured on this page — `Supplier Delivery Date`, `Goods received on`, `Deliver To`,
+`Product` and the `Status` column — are gone, `Supplier DO No` lost its full stop, and the merged
 `PO/CO No` column is replaced by the four-way source reference plus `PO No`. Shared widths come
 from ONE registry in code (`apps/web/src/components/register/register-field-widths.ts`), which
-carries UI MASTER §6.8's approved values plus the four Receiving fields it could not answer.
-**Production verification is OWED** — deployed SHA, an authenticated walk and the
-1440/1180/820/390 · keyboard · 200% zoom pass. BUILT is not PRODUCTION-VERIFIED.
+carries UI MASTER §6.8's parent-scope numbers plus the four Receiving fields it could not answer.
+
+| Status | Evidence |
+|---|---|
+| **APPROVED** | Jess, 2026-09-18 — the Register composition and its read-only goods expansion. Not a replacement of the formal GRN object or the receiving engine. |
+| **BUILT 2026-09-18** | [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md), merged as [#1467](https://github.com/wenwei4046/Carres-Portal-v2/pull/1467). CI `verify` green on the merged head; the same gate locally on the merged tree — 12,047 tests, typecheck, lint with no new design-standard violations, 541 migration filenames, build. |
+| **DEPLOYED 2026-09-19** | Merged to `main` as **`896a7b128b77dbb3dc0074005aaf81f9aa52cf1f`** and deployed by `deploy-production.yml` run 35415796625, which re-ran the whole gate on that exact SHA before shipping it. `pnpm ci:smoke` printed `Production converged to 896a7b12…` for all five canonical surfaces: `carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` · `pos.carresofficial.com` · `api.carresofficial.com/health`. **That is a SHA convergence proof, and nothing more.** No migration was involved; this listing added none. |
+| **PRODUCTION-VERIFIED** | **NOT YET.** A converged SHA proves the bundle shipped; it proves nothing about what the register DRAWS. No authenticated production walk of this build exists, and none could be run from the build environment — Chromium does not start there and the network policy refuses the production hosts. Until that walk is done, no line here may be quoted as production truth. **The walk owes, specifically:** the sixteen columns in order against real GRN rows · `GRN Date` and `GRN No` pinned at ≥768px and the number alone below it · the rail's six groups with counts that match the footer total · a week's arrow opening its days WITHOUT narrowing the register · a real cancelled GRN showing `Cancelled` under its number and no status word anywhere else · the expansion on a receipt with both an exact-unit line and a counted line, the second reading `Counted stock` · a receipt with genuine SO and MPR references beside one with none · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. |
 
 **🟡 `CO No` HAS NO DOCUMENT TO NAME TODAY — measured 2026-09-18.** A consignment order is a FLAG
 on the purchase order (`purchase_orders.is_consignment`), not a separately numbered document, and
