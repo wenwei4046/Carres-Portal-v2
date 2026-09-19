@@ -11,6 +11,7 @@ import {
   readyStockConditionWord,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
+import SecondLine from "./register-cell";
 
 /**
  * ⭐ READY STOCK — ONE TABLE, BOTH PURCHASING SURFACES (owner ruling
@@ -276,11 +277,11 @@ export default function ReadyStockTable({
                     <div className="break-words">
                       {u.poNo ?? <Absence>{W.stockNotRecorded}</Absence>}
                     </div>
-                    <div className="mt-0.5 break-words text-meta text-kit-slate-11">
+                    <SecondLine>
                       {/* 0453: a counted row's key is not a Unit ID and never
                           prints as one — what the goods ARE takes its place. */}
                       {u.identityScope === "unit" && u.unitCode ? u.unitCode : (blocked ?? "—")}
-                    </div>
+                    </SecondLine>
                     {/* ⭐ AND A ROW THAT LOST ITS CHECKBOX SAYS WHY. The approved
                         six columns hold no `why` column, and a Unit that cannot
                         be chosen with nothing beside it reads as a broken

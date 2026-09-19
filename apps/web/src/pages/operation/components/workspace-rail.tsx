@@ -149,6 +149,41 @@ function useReportChosen(label: string | null) {
   }, [group, id, label]);
 }
 
+/**
+ * ⭐ THE RESTORE CONTROL — the rail's own button, extracted 2026-09-18.
+ *
+ * `FilterRail` draws its `Hide filters` control; the button that brings the
+ * rail BACK lives in the register's toolbar, so four pages had each drawn it
+ * inline with the same 145-character class string (UI-KIT §6.6, and §6.1's
+ * "the second occurrence is a full stop" — Purchase Returns would have been
+ * the sixth copy). Hide and restore are two halves of one interaction and now
+ * live in one file, so neither half can drift alone.
+ *
+ * Each page keeps its OWN `testId`: the tests that assert this control are
+ * page tests, and renaming their hooks would be a behaviour change dressed as
+ * a refactor.
+ */
+export function ShowFiltersButton({
+  onShow,
+  testId,
+}: {
+  onShow: () => void;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Show filters"
+      title="Show filters"
+      data-testid={testId}
+      onClick={onShow}
+      className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+    >
+      <Icon name="panelToggle" />
+    </button>
+  );
+}
+
 export function FilterRail({
   children,
   testId,

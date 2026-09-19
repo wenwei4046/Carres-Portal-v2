@@ -52,6 +52,7 @@ import {
   FilterRailRow,
   FilterRailSelect,
   useFilterRailOpen,
+  ShowFiltersButton,
 } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
@@ -1298,16 +1299,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               onClearConditions={() => setFilter(SO_BATCH_RAIL_CLEAR)}
               toolbarStart={
                 !filterRailOpen ? (
-                  <button
-                    type="button"
-                    aria-label="Show filters"
-                    title="Show filters"
-                    data-testid="so-batch-show-filters"
-                    onClick={() => setFilterRailVisible(true)}
-                    className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-                  >
-                    <Icon name="panelToggle" />
-                  </button>
+                  <ShowFiltersButton
+                    onShow={() => setFilterRailVisible(true)}
+                    testId="so-batch-show-filters"
+                  />
                 ) : null
               }
               isLoading={isLoading}

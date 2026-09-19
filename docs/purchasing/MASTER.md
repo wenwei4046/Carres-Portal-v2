@@ -3380,10 +3380,43 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Owner-confirmed UI target — 2026-09-18. APPROVED TARGET / NOT BUILT.** Approval covers
-layout, labels and inspection interactions; sample parties, dates, quantities and document
-references are illustrative, not verified business data. This does not approve a new custody
-engine or claim production verification.
+**Owner-confirmed UI — 2026-09-18. BUILT 2026-09-19; AUTHENTICATED PRODUCTION WALK OWED.**
+The approval covered layout, labels and inspection interactions; sample parties, dates,
+quantities and document references are illustrative, not verified business data. It approved
+no new custody engine and no claim production verification, and the build added neither.
+
+**Build record (2026-09-19).** Storage: migration `0548` — `purchase_returns` +
+`purchase_return_units`, RLS read-only to internal roles, no write policy on either table.
+Read: `GET /api/operation/purchase-returns` (`?claim=` narrows to one Supplier Claim). Screen:
+`OperationPurchaseReturns` on the shared DataGrid + 240px FilterRail; the door is live in the
+Purchasing rail under PROBLEMS at `/operation?tab=purchase-returns`. Words, confirmed column
+order and rail predicates live once in `packages/shared/src/purchase-return.ts`, so the screen
+and the dictionary cannot drift. Verified: the whole migration chain replayed on a local
+PostgreSQL 16 (the five known baseline failures only) and the guards proven in rolled-back
+transactions — a claim without an agreed `Return to Supplier` outcome refused, `problem`
+evidence refused, supplier receipt without a pickup refused, a collector without a pickup
+refused, the same Unit twice refused, and **zero `ops_stock_items` rows touched by issuing a
+return**. Walked in Chromium at 1440 / 1180 / 820 / 390 and at 200% zoom: the confirmed column
+order at every width, no page-level horizontal scroll, no clipped cell.
+
+**⛔ MIGRATION 0548 IS NOT APPLIED. What the operator sees in that window, and it is
+not a bug:** the rail door opens, the page loads, and the register says
+`Purchase Returns could not be loaded.` with `Try again`. PostgREST answers `42P01` for a
+table that is not there and the API maps it to a 404, so the screen reports the feature as
+ABSENT rather than printing `No purchase returns.` — which would tell an operator that Carres
+has sent nothing back to any supplier, a confident false statement about the business made by
+a screen that never reached the data. This is the same posture §9.2 ruled for Manual Purchase's
+Ready Stock cell in its own unapplied window, and it is pinned by a test. **Applying 0548 is the
+governed owner path (`apply_migration`, exact file, after the production assertions and the
+negative control in a rolled-back transaction) and it is what turns this row green.** Nothing
+else is owed for it: the page, the read and the door are already deployed.
+
+**Still NOT built, and deliberately so.** No screen CREATES a return. §7.4 rules who may — an
+approved claim outcome — and `0548` carries that door in SQL
+(`purchasing_issue_purchase_return`, `operation`/`principal` only), but the confirmed UI was
+the REGISTER, not a creation screen, so the screen that calls it is a later scope with its own
+owner decision. The evidence viewer is not wired either: the entries carry the door and say
+why they are inactive. The authenticated production walk is owed, as it is for §9.1.
 
 **Purpose / source:** return Carres-owned purchased goods only after an approved claim/outcome.
 No blank `+ New`. Keep the existing Claim → Purchasing authorisation → Stock physical pickup
