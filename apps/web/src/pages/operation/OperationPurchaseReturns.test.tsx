@@ -428,6 +428,24 @@ describe("the page binds the register to its own read", () => {
     expect(screen.getByText("You do not have access to Purchase Returns.")).toBeTruthy();
   });
 
+  it("reads an ABSENT feature as absent, never as an empty register", () => {
+    /* The window between this code deploying and migration 0548 being applied
+       through the governed owner path. PostgREST answers `42P01` for a table
+       that is not there and `mapPgError` turns that into a 404, so the page
+       says the register could not be loaded.
+
+       §9.2 ruled this exact posture for Manual Purchase's Ready Stock cell in
+       its own unapplied window: *"the feature is absent, not empty, and no
+       line is told it has `0 available` when nobody looked."* Printing
+       `No purchase returns.` here would tell an operator that Carres has sent
+       nothing back to any supplier — a confident, false statement about the
+       business, made by a screen that never reached the data. */
+    page({ data: undefined, isError: true, error: { status: 404, message: "not found" } });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByText("Purchase Returns could not be loaded.")).toBeTruthy();
+    expect(screen.queryByText("No purchase returns.")).toBeNull();
+  });
+
   it("distinguishes genuinely empty from loading", () => {
     page({ data: { returns: [] }, isLoading: false });
     expect(screen.getByText("No purchase returns.")).toBeTruthy();

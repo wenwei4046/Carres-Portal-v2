@@ -3399,6 +3399,18 @@ refused, the same Unit twice refused, and **zero `ops_stock_items` rows touched 
 return**. Walked in Chromium at 1440 / 1180 / 820 / 390 and at 200% zoom: the confirmed column
 order at every width, no page-level horizontal scroll, no clipped cell.
 
+**⛔ MIGRATION 0548 IS NOT APPLIED. What the operator sees in that window, and it is
+not a bug:** the rail door opens, the page loads, and the register says
+`Purchase Returns could not be loaded.` with `Try again`. PostgREST answers `42P01` for a
+table that is not there and the API maps it to a 404, so the screen reports the feature as
+ABSENT rather than printing `No purchase returns.` — which would tell an operator that Carres
+has sent nothing back to any supplier, a confident false statement about the business made by
+a screen that never reached the data. This is the same posture §9.2 ruled for Manual Purchase's
+Ready Stock cell in its own unapplied window, and it is pinned by a test. **Applying 0548 is the
+governed owner path (`apply_migration`, exact file, after the production assertions and the
+negative control in a rolled-back transaction) and it is what turns this row green.** Nothing
+else is owed for it: the page, the read and the door are already deployed.
+
 **Still NOT built, and deliberately so.** No screen CREATES a return. §7.4 rules who may — an
 approved claim outcome — and `0548` carries that door in SQL
 (`purchasing_issue_purchase_return`, `operation`/`principal` only), but the confirmed UI was
