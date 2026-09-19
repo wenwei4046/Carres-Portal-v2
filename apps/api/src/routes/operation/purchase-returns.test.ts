@@ -68,12 +68,15 @@ const UNIT = {
 
 /** Chainable thenable, the same shape the claims route's tests use. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function listBuilder(rows: unknown[]): any {
+function listBuilder(rows: unknown[], inCalls: string[][] = []): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
     select: vi.fn(() => b),
     order: vi.fn(() => b),
-    in: vi.fn(() => b),
+    in: vi.fn((_col: string, ids: string[]) => {
+      inCalls.push(ids);
+      return b;
+    }),
     eq: vi.fn(() => b),
     range: vi.fn((from: number, to: number) =>
       Promise.resolve({ data: rows.slice(from, to + 1), error: null }),
@@ -84,7 +87,10 @@ function listBuilder(rows: unknown[]): any {
   return b;
 }
 
-function client(over: { returns?: unknown[]; units?: unknown[] } = {}) {
+function client(
+  over: { returns?: unknown[]; units?: unknown[] } = {},
+  inCalls: Record<string, string[][]> = {},
+) {
   const tables: Record<string, unknown[]> = {
     purchase_returns: over.returns ?? [RETURN],
     purchase_return_units: over.units ?? [UNIT],
@@ -101,7 +107,8 @@ function client(over: { returns?: unknown[]; units?: unknown[] } = {}) {
     ),
     from: vi.fn((t: string) => {
       if (!(t in tables)) throw new Error(`unmocked table ${t}`);
-      return listBuilder(tables[t]);
+      inCalls[t] ??= [];
+      return listBuilder(tables[t], inCalls[t]);
     }),
   };
 }
@@ -248,6 +255,29 @@ describe("GET /api/operation/purchase-returns", () => {
       expect(res.status, role).toBe(403);
     }
     expect((await get(client(), "principal")).status).toBe(200);
+  });
+
+  it("chunks the id lists — an `in (…)` list lives in the URL", async () => {
+    /* PostgREST puts the whole id list in the query string. One `.in()` with
+       every return id works at four documents and fails at several hundred —
+       on the day the register finally has data in it. `supplier-claims.ts`
+       already chunks for this reason; this route reuses its `chunk` rather
+       than growing a second answer, and this test is what keeps it. */
+    const many = Array.from({ length: 250 }, (_, i) => ({
+      ...RETURN,
+      id: `r${i}`,
+      pr_no: `PR-2026-${i}`,
+    }));
+    const inCalls: Record<string, string[][]> = {};
+    const res = await get(client({ returns: many, units: [] }, inCalls));
+    expect(res.status).toBe(200);
+
+    const unitCalls = inCalls.purchase_return_units ?? [];
+    expect(unitCalls.length).toBeGreaterThan(1);
+    // No single batch may carry all 250 ids.
+    for (const batch of unitCalls) expect(batch.length).toBeLessThan(250);
+    // And every id is still asked for — chunking may not silently drop rows.
+    expect(new Set(unitCalls.flat()).size).toBe(250);
   });
 
   it("offers no door that writes a return", async () => {

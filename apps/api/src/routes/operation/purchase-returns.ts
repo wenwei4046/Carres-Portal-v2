@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { mapPgError } from "../../lib/route-helpers";
+import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
@@ -59,6 +60,34 @@ async function readAll(
   return { rows, error: null };
 }
 
+/**
+ * ⭐ AN `in (…)` LIST IS NOT UNBOUNDED, AND THIS ROUTE LEARNED IT FROM THE
+ * CLAIMS ROUTE RATHER THAN FROM PRODUCTION.
+ *
+ * PostgREST puts the whole id list in the URL. Passing every return id in one
+ * `.in(...)` works while there are four documents and fails once there are
+ * several hundred — a failure that arrives late, looks like an outage and
+ * lands on the day the register finally has data in it. `supplier-claims.ts`
+ * already chunks for exactly this reason (`readEveryClaimRelation`), so this
+ * reuses its `chunk` rather than growing a second answer.
+ *
+ * Each chunk is still fully paginated: a chunk of 100 documents can carry far
+ * more than `DEFAULT_LIMIT` Units between them.
+ */
+async function readAllIn(
+  ids: readonly string[],
+  page: (batch: string[], from: number, to: number) =>
+    PromiseLike<{ data: Row[] | null; error: unknown }>,
+): Promise<{ rows: Row[]; error: unknown }> {
+  const rows: Row[] = [];
+  for (const batch of chunk([...new Set(ids)])) {
+    const result = await readAll((from, to) => page(batch, from, to));
+    if (result.error) return { rows: [], error: result.error };
+    rows.push(...result.rows);
+  }
+  return { rows, error: null };
+}
+
 // ----- GET / -----
 //
 // `?claim=<claim_no|uuid>` narrows to one Supplier Claim's returns, so the
@@ -88,13 +117,13 @@ purchaseReturnsRouter.get("/", async (c) => {
   const returnIds = documents.rows.map((row) => row.id as string);
   if (returnIds.length === 0) return c.json({ returns: [] });
 
-  const units = await readAll((from, to) =>
+  const units = await readAllIn(returnIds, (batch, from, to) =>
     sb
       .from("purchase_return_units")
       .select(
         "purchase_return_id, stock_item_id, unit_code, po_id, category, item, item_spec, pickup_location, return_to, collected_by, collected_by_name, actual_pickup_date, supplier_received_date, evidence",
       )
-      .in("purchase_return_id", returnIds)
+      .in("purchase_return_id", batch)
       .order("unit_code", { ascending: true })
       .range(from, to),
   );
@@ -121,15 +150,15 @@ purchaseReturnsRouter.get("/", async (c) => {
   ];
 
   const [supplierRes, claimRes, receiptRes, collectorNames] = await Promise.all([
-    supplierIds.length
-      ? sb.from("suppliers").select("id, name").in("id", supplierIds)
-      : Promise.resolve({ data: [], error: null }),
-    claimIds.length
-      ? sb.from("supplier_claims").select("id, claim_no").in("id", claimIds)
-      : Promise.resolve({ data: [], error: null }),
-    receiptIds.length
-      ? sb.from("warehouse_receipts").select("id, grn_no").in("id", receiptIds)
-      : Promise.resolve({ data: [], error: null }),
+    readAllIn(supplierIds, (batch, from, to) =>
+      sb.from("suppliers").select("id, name").in("id", batch).range(from, to),
+    ),
+    readAllIn(claimIds, (batch, from, to) =>
+      sb.from("supplier_claims").select("id, claim_no").in("id", batch).range(from, to),
+    ),
+    readAllIn(receiptIds, (batch, from, to) =>
+      sb.from("warehouse_receipts").select("id, grn_no").in("id", batch).range(from, to),
+    ),
     resolveActorNames(
       admin,
       units.rows.map((row) => row.collected_by as string | null),
@@ -143,15 +172,15 @@ purchaseReturnsRouter.get("/", async (c) => {
   }
 
   const supplierName = new Map<string, string>();
-  for (const row of (supplierRes.data ?? []) as Row[]) {
+  for (const row of supplierRes.rows) {
     supplierName.set(row.id as string, (row.name as string) ?? "");
   }
   const claimNo = new Map<string, string>();
-  for (const row of (claimRes.data ?? []) as Row[]) {
+  for (const row of claimRes.rows) {
     claimNo.set(row.id as string, (row.claim_no as string) ?? "");
   }
   const grnNo = new Map<string, string>();
-  for (const row of (receiptRes.data ?? []) as Row[]) {
+  for (const row of receiptRes.rows) {
     grnNo.set(row.id as string, (row.grn_no as string) ?? "");
   }
 
