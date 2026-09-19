@@ -1643,3 +1643,32 @@ describe("Receiving speaks the corrected location/date words — source scan", (
     });
   }
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   THE PINNED PAIR ONLY PINS IF THE GRID CAN SHRINK — measured 2026-09-19.
+
+   `leadingColumns` was correct and the widths were correct, yet on the live
+   page GRN Date and GRN No did not pin at all: scrolling right drove GRN Date
+   to left −1022, clean off the screen. The cause was not in the engine. The
+   register column is a flex child beside the rail, and a flex item defaults to
+   `min-width:auto`, so without `min-w-0` it refused to shrink below the
+   sixteen columns' 2234px. The grid's own scroller therefore never engaged,
+   an ancestor scrolled instead, and sticky offsets computed against a
+   viewport that never moved. The same miss also disabled the ≥768px canvas
+   rule, because the grid measured 2234px even on a 390px phone.
+
+   Every sibling rail+grid register (Purchase Orders, SO Batch, Supplier
+   Claims, Manual Purchase) already carries it. jsdom has no layout, so this
+   asserts the class contract rather than the pixels the walk measured.
+   ───────────────────────────────────────────────────────────────────────── */
+describe("the register column can shrink below its content", () => {
+  it("carries min-w-0 beside the rail, or nothing pins", () => {
+    renderPage();
+    const column = screen.getByTestId("receiving-register-column");
+    expect(
+      column.className,
+      "without min-w-0 the grid cannot shrink, its scroller never engages, " +
+        "and the pinned pair scrolls away with everything else",
+    ).toContain("min-w-0");
+  });
+});

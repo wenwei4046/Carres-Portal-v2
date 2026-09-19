@@ -1018,7 +1018,19 @@ export default function OperationReceiving() {
           </div>
         </FilterRail>
 
-        <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="receiving-register-column">
+        {/* ⭐ `min-w-0` IS LOAD-BEARING — measured on the 2026-09-19 walk.
+            This column is a flex child beside the rail, and a flex item
+            defaults to `min-width:auto`: without this it refuses to shrink
+            below the sixteen columns' 2234px, so the grid's own scroller
+            never engages. The page then scrolled on an ANCESTOR, which meant
+            `GRN Date`/`GRN No` did not pin at all (measured: scrolling right
+            drove GRN Date to left −1022, off screen) and the ≥768px canvas
+            rule never fired, because the grid measured 2234px on a phone.
+            Every sibling rail+grid register already carries it. */}
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col pl-2"
+          data-testid="receiving-register-column"
+        >
           {registerQ.isError ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */
