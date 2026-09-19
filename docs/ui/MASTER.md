@@ -2015,6 +2015,10 @@ resizing remains available.
 | Unit ID standalone | 140 | prototype | |
 | Condition | 120 | prototype | |
 | PO Version with send evidence | 265 | **MEASURED** | PO, 2026-09-18, correcting the prototype 238: `PO sent to supplier · WhatsApp · Wed, 28 Sep` needs 247px of content at the 11px second line and 238 clipped it |
+| SO No / MPR No / CO No / RO No | 176 | prototype | Receiving, 2026-09-18. The FOUR-way header wraps inside the shared two-line header height, so the header does not set the width; the CONTENT does, and it is the same 17-character document number as the two-way entry above. Several references stack as lines in the cell and never widen it. **Owed:** the rendered-portal measurement |
+| Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
+| Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
+| Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
 
 **THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
 different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
@@ -2027,6 +2031,14 @@ and it is always last.
 **Owed convergence is a page's own round, not another page's card.** A card that is building one
 page corrects the registry with what it measured and names the divergence here; it does not reach
 into a page it was not asked to build.
+
+**AND THE REGISTRY IS CODE — BUILT 2026-09-18 (Receiving, PURCHASING CARD 12).** A table nobody
+imports is a table the pages drift from, so the parent-scope numbers above live in one module the
+registers read: `apps/web/src/components/register/register-field-widths.ts`. A page passes
+`REGISTER_FIELD_WIDTH.poNo`, never `168`, which is what makes the next divergence a one-line
+change instead of an audit. The goods table's second scope stays in `GoodsMiniTable`'s
+`CHILD_COLUMNS`, unchanged. Receiving is the first page wired to it; the owed convergence of
+SO Batch, Manual Purchase and Purchase Orders remains each page's own round.
 
 PO rail section titles use the shared 16px Icon, Lucide stroke 2, inherited neutral colour and an 8px text gap: Supplier reply → message; Receiving → goods; Supplier → supplier; Supplier Deliver To → warehouse (the current Site destination filter). Keep the full visible label; icons are supplementary and aria-hidden when text already names the section. Do not add decorative icons to every filter row.
 
@@ -2081,3 +2093,9 @@ passed 4px, with the second group's header taking the top at 40px. No `<thead>` 
 **Falsifier:** a browser in which a sticky `<thead>` is not constrained by its own table, or a
 grouped listing whose groups drift out of column alignment, overturns the structure — not the
 ruling, which is about what the operator reads.
+
+**Repair Orders price placement — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, quotation-amount,
+Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
+is not a placement/Issue blocker. This scoped placement ruling does not approve the remaining RO
+column sequence, rail wording, prototype or full UI, and changes no other register's composition.

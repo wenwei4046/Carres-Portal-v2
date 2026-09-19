@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  expectedArrivalCounts,
+  grnDateMonths,
+  grnDateWeeks,
   receivingDisplayNo,
   receivingExtraQty,
   RECEIVING_CATEGORY_ROWS,
-  warehouseReceiptStatusLabel,
   warehouseReceiptTotals,
+  type GrnReceivedWith,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import {
@@ -19,14 +20,19 @@ import {
   type SupplierRow,
   type WarehouseReceiptQueueRow,
 } from "@/lib/queries";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import MonthCalendar from "@/components/kit/MonthCalendar";
+import { DateField } from "@/components/register/DateField";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   FilterRail,
+  FilterRailExpandableRow,
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import GoodsMiniTable, {
+  type GoodsMiniLine,
+} from "./components/GoodsMiniTable";
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
@@ -38,7 +44,8 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 
 /**
  * OperationReceiving — the ONE Receiving destination
- * (owner corrections 2026-09-06; purchasing/MASTER.md §9.4; UI MASTER §6.7).
+ * (owner corrections 2026-09-06; owner rulings 2026-09-17 / 2026-09-18;
+ * purchasing/MASTER.md §9.4; UI MASTER §6.7–§6.9; PURCHASING CARD 12).
  *
  * ```
  * My Work / Team Work   =  what staff must receive or review
@@ -46,34 +53,34 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
  * ```
  *
  * ONE PAGE. No Receiving Monitor, no `Calendar View / GRN Register View`
- * switch, no permanent tabs, no second Receiving destination — the earlier
- * two-view proposal is superseded. The left 240px rail holds the full month
- * Calendar FIXED on top and the business filters scrolling beneath it; the
- * right side is always the complete GRN Register.
+ * switch, no permanent tabs, no second Receiving destination.
  *
  * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
- * GRN — the Register lists `Valid` and `Cancelled` GRNs, nothing else. A
- * Warehouse count awaiting Carres action lives in My Work / Team Work and
- * deep-links (`?session=`) to its Receiving review; it never becomes a
- * Register row.
+ * GRN. A Warehouse count awaiting Carres action lives in My Work / Team Work
+ * and deep-links (`?session=`) to its Receiving review; it never becomes a
+ * Register row. Partial or completed RECEIPT PROGRESS belongs to the purchase
+ * order, not to a GRN: a GRN is a document, and a document is not half saved.
  *
- * THE RAIL CALENDAR (owner correction 2026-09-06):
- *   · one month at a time, ‹ › exactly one month; Sunday visible but muted —
- *     Receiving follows the Warehouse working calendar, Monday–Saturday,
- *   · a date with expected supplier arrivals prints a COUNT (never colour
- *     alone), from the linked POs' governed `Supplier Delivery Date`
- *     (`expectedArrivalCounts` — the ONE reply arithmetic; our own estimate
- *     never marks a day),
- *   · picking a date filters the SAME register by that Supplier Delivery
- *     Date; picking it again — or `Clear filters` — restores the whole list,
- *   · the right side never becomes a weekly calendar and never shows work
- *     cards — daily Receiving actions stay in My Work / Team Work.
+ * ⭐ NO DATE HAS TO BE CHOSEN TO SEE RECORDS (owner ruling 2026-09-18). The
+ * page opens on every GRN the operator may see, newest first, server-paged.
+ * The rail's `GRN date` group is an OPTIONAL narrowing, and its counts are
+ * counts of GRN RECORDS — never outstanding work and never pieces of goods.
  *
- * The filters below it: CATEGORY (only governed rows present in the result
- * set) · SUPPLIER · GOODS ARRIVED AT · Clear filters. No `Any`, no `All …`;
- * re-clicking the active row clears its section. Detailed received-date
- * filtering is the TABLE's `Goods received on` column — the rail carries no
- * second received-date filter.
+ * THE RAIL — six groups, in the owner's order (§9.4, 2026-09-17). The month
+ * Calendar is RETIRED; the expected-arrival view lives in Warehouse Arrival
+ * Schedule.
+ *
+ *   GRN date          weeks · their days (the arrow opens, it never filters)
+ *                     · months · `Choose dates…`
+ *   Received with     `Damaged goods` · `Wrong items` · `Extra goods` — a
+ *                     record of what was FOUND, and three OVERLAPPING counts
+ *                     that are never added into a total
+ *   Category · Goods arrived at · Supplier      the facts present in the set
+ *   Cancelled GRNs    the last row
+ *
+ * One choice per group; pressing the chosen row again clears it. There is no
+ * `Clear filters` button at the foot of the rail (owner correction
+ * 2026-09-18) — the toolbar's active-condition chips clear what is on.
  *
  * THE REGISTER PAGINATES ON THE SERVER: `Showing 1–50 of {total}` with
  * Previous/Next — the browser never renders the whole history, and every
@@ -106,12 +113,22 @@ function poStillOwes(po: operationPoListRow): boolean {
   return lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
 }
 
-/** Today in the business timezone — the Calendar opens on the month the
- *  operator is standing in, wherever the machine thinks it is. */
-function todayMYT(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-  }).format(new Date());
+/** The three `Received with` rows, in the owner's order and words. */
+const RECEIVED_WITH_ROWS: ReadonlyArray<{ key: GrnReceivedWith; label: string }> = [
+  { key: "damaged", label: "Damaged goods" },
+  { key: "wrong_item", label: "Wrong items" },
+  { key: "extra", label: "Extra goods" },
+];
+
+/** `14 – 20 Sep` — the owner's own spelling, through the ONE date formatter;
+ *  a week that crosses a month or a year prints both ends in full. */
+function weekLabel(from: string, to: string): string {
+  const left = fmtDateShort(from);
+  const right = fmtDateShort(to);
+  const sameTail = left.slice(left.indexOf(" ")) === right.slice(right.indexOf(" "));
+  return sameTail
+    ? `${left.slice(0, left.indexOf(" "))} – ${right}`
+    : `${left} – ${right}`;
 }
 
 export default function OperationReceiving() {
@@ -129,18 +146,35 @@ export default function OperationReceiving() {
   const categorySel = params.get("category");
   const supplierSel = params.get("supplier");
   const siteSel = params.get("site");
-  /** The rail Calendar's picked `Supplier Delivery Date`. */
-  const expectedSel = params.get("expected");
+  /** The `Received with` row that is on — a record of what was found. */
+  const receivedRaw = params.get("received");
+  const receivedSel: GrnReceivedWith | null = RECEIVED_WITH_ROWS.some(
+    (r) => r.key === receivedRaw,
+  )
+    ? (receivedRaw as GrnReceivedWith)
+    : null;
+  /** The `GRN date` pick — a day, a week, a month and `Choose dates…` all
+   *  arrive as the same inclusive pair, so the register has one date rule. */
+  const fromSel = params.get("from");
+  const toSel = params.get("to");
+  const cancelledSel = params.get("cancelled") === "1";
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
-  /** The visible Calendar month — opens on the picked date's month, else
-   *  today's (MYT). The ‹ › arrows move exactly one month. */
-  const [month, setMonth] = useState(() =>
-    (expectedSel ?? todayMYT()).slice(0, 7),
-  );
+  /** `Choose dates…` opens its two fields in the rail; it is not a filter of
+   *  its own until both ends are typed. */
+  const [choosing, setChoosing] = useState(false);
 
   // A changed filter or search term starts the result set over — page 1.
-  const filterKey = [categorySel, supplierSel, siteSel, expectedSel, search].join("|");
+  const filterKey = [
+    categorySel,
+    supplierSel,
+    siteSel,
+    receivedSel,
+    fromSel,
+    toSel,
+    cancelledSel ? "1" : "",
+    search,
+  ].join("|");
   useEffect(() => {
     setOffset(0);
   }, [filterKey]);
@@ -150,7 +184,10 @@ export default function OperationReceiving() {
     category: categorySel,
     supplier: supplierSel,
     site: siteSel,
-    expected: expectedSel,
+    receivedWith: receivedSel,
+    from: fromSel,
+    to: toSel,
+    cancelled: cancelledSel,
     q: search,
   });
 
@@ -163,7 +200,13 @@ export default function OperationReceiving() {
     category: {},
     supplier: {},
     site: {},
+    grnDate: {},
+    receivedWith: { damaged: 0, wrong_item: 0, extra: 0 },
+    cancelled: 0,
   };
+  /** The GRN document's own item words and governed categories, resolved by
+   *  the server for this page — the SAME two facts the official GRN prints. */
+  const lineInfo = registerQ.data?.line_info ?? {};
 
   const suppliers = useMemo(
     () => suppliersQ.data?.suppliers ?? [],
@@ -179,17 +222,40 @@ export default function OperationReceiving() {
     [suppliers],
   );
 
-  /** The Calendar's markers — expected supplier arrivals per governed
-   *  `Supplier Delivery Date`, the ONE shared arithmetic over the same PO
-   *  list Find PO already reads. */
-  const markers = useMemo(() => expectedArrivalCounts(pos), [pos]);
-
   function setFacet(key: string, value: string | null) {
     const next = new URLSearchParams(params);
     if (value === null || next.get(key) === value) next.delete(key);
     else next.set(key, value);
     setParams(next, { replace: true });
   }
+
+  /** One `GRN date` choice, whatever shape it was pressed in. Pressing the
+   *  same range again clears it — the rail's own rule, every group. */
+  function setGrnDate(from: string | null, to: string | null) {
+    const next = new URLSearchParams(params);
+    const same = params.get("from") === from && params.get("to") === to;
+    next.delete("from");
+    next.delete("to");
+    if (!same && from && to) {
+      next.set("from", from);
+      next.set("to", to);
+    }
+    setParams(next, { replace: true });
+  }
+
+  const RAIL_KEYS = ["category", "supplier", "site", "received", "from", "to", "cancelled"];
+  function clearRail() {
+    const next = new URLSearchParams(params);
+    for (const key of RAIL_KEYS) next.delete(key);
+    setParams(next, { replace: true });
+    setChoosing(false);
+  }
+
+  /** The rail's date ladder, folded from the SERVER's complete day counts —
+   *  so a week's number is the truth about the whole filtered set. */
+  const weeks = useMemo(() => grnDateWeeks(facets.grnDate), [facets.grnDate]);
+  const months = useMemo(() => grnDateMonths(facets.grnDate), [facets.grnDate]);
+  const dateChosen = Boolean(fromSel && toSel);
 
   /** Only the governed rows PRESENT in the result set appear (owner
    *  correction 2026-09-06) — plus the active pick, so a row narrowed to
@@ -212,32 +278,180 @@ export default function OperationReceiving() {
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [facets.site, siteSel]);
 
+  /**
+   * ⭐ THE APPROVED REGISTER COLUMNS — owner ruling 2026-09-18, in this order
+   * and no other (`purchasing/MASTER.md` §9.4):
+   *
+   * ```
+   * GRN Date · GRN No · SO No / MPR No / CO No / RO No · PO No · Supplier ·
+   * Supplier Deliver To · Goods arrived at · Supplier Confirmed Delivery Date ·
+   * Goods Received Date · Supplier DO No · Items · Received Qty ·
+   * Damaged Qty · Wrong Item Qty · Extra Qty
+   * ```
+   *
+   * THERE IS NO `Status` COLUMN. A normal GRN shows no status label at all;
+   * a cancelled one says `Cancelled` under its own number, which is where a
+   * person reading the number is already looking. `Valid` is retired, and
+   * `Posted`/`Voided` are database words that never reach this screen.
+   *
+   * Every width comes from the ONE shared registry (UI MASTER §6.8) — the
+   * same field is the same width on SO Batch, Manual Purchase, Purchase
+   * Orders and here, and a width that fails validation is fixed there rather
+   * than nudged on the page that noticed.
+   */
   const columns: DataGridColumn<WarehouseReceiptQueueRow>[] = useMemo(
     () => [
       {
+        key: "grnDate",
+        label: "GRN Date",
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        /* CREATION — when `Save Receiving` made this document. Never inferred
+           from the physical arrival date, and never the other way round. */
+        searchValue: (r) => r.grn_date ?? "",
+        exportValue: (r) => (r.grn_date ? fmtDate(r.grn_date) : ""),
+        filterType: "date",
+        dateValue: (r) => r.grn_date ?? null,
+        sortFn: (a, b) => (a.grn_date ?? "").localeCompare(b.grn_date ?? ""),
+        accessor: (r) =>
+          r.grn_date ? (
+            <span className="tabular-nums text-body text-base-900">
+              {fmtDate(r.grn_date)}
+            </span>
+          ) : (
+            <span className="text-body text-kit-slate-11">Not recorded</span>
+          ),
+      },
+      {
         key: "grn",
         label: "GRN No",
-        width: 168,
+        width: REGISTER_FIELD_WIDTH.documentNo,
         sortable: true,
         /* Every Register row IS a GRN (the boundary above) — the formal
            number exists by construction (purchasing/MASTER.md §7.3). */
         searchValue: (r) => receivingDisplayNo(r),
-        exportValue: (r) => receivingDisplayNo(r),
+        exportValue: (r) =>
+          r.status === "voided"
+            ? `${receivingDisplayNo(r)} · Cancelled`
+            : receivingDisplayNo(r),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
-            {receivingDisplayNo(r)}
+          <span className="flex flex-col">
+            <span className="font-mono text-meta text-base-900">
+              {receivingDisplayNo(r)}
+            </span>
+            {r.status === "voided" && (
+              /* The ONE place a GRN's document status is said — under its own
+                 number, and only when it is cancelled (owner ruling
+                 2026-09-17). */
+              <span
+                className="text-label text-kit-red-11"
+                data-testid={`grn-cancelled-${r.id}`}
+              >
+                Cancelled
+              </span>
+            )}
           </span>
         ),
       },
       {
-        key: "supplierDeliveryDate",
-        label: "Supplier Delivery Date",
-        width: 166,
+        key: "source",
+        label: "SO No / MPR No / CO No / RO No",
+        headerLines: ["SO No / MPR No", "CO No / RO No"],
+        width: REGISTER_FIELD_WIDTH.mixedReferenceFourWay,
+        sortable: true,
+        /* The receipt's ACTUAL linked documents — every one it has, blank when
+           it has none. No word stands in for a missing number, and no PO is
+           invented for a receipt that came back through an arrival source. */
+        searchValue: (r) => (r.source_refs ?? []).join(" "),
+        exportValue: (r) => (r.source_refs ?? []).join(" · "),
+        sortFn: (a, b) =>
+          (a.source_refs?.[0] ?? "").localeCompare(b.source_refs?.[0] ?? ""),
+        accessor: (r) => (
+          <span className="flex flex-col">
+            {(r.source_refs ?? []).map((ref) => (
+              <span key={ref} className="font-mono text-meta text-base-900">
+                {ref}
+              </span>
+            ))}
+          </span>
+        ),
+      },
+      {
+        key: "po",
+        label: "PO No",
+        width: REGISTER_FIELD_WIDTH.documentNo,
+        sortable: true,
+        /* Its own column, and blank for a CO or RO receipt that has no
+           purchase order — an absence, never a borrowed number. */
+        searchValue: (r) => r.po_id ?? "",
+        exportValue: (r) => r.po_id ?? "",
+        accessor: (r) => (
+          <span className="font-mono text-meta text-base-900">{r.po_id ?? ""}</span>
+        ),
+      },
+      {
+        key: "supplier",
+        label: "Supplier",
+        width: REGISTER_FIELD_WIDTH.supplier,
+        sortable: true,
+        searchValue: (r) => r.supplier_name ?? "",
+        exportValue: (r) => r.supplier_name ?? "",
+        overflowText: (r) => r.supplier_name ?? "",
+        accessor: (r) => (
+          <span className="truncate text-body text-base-900">
+            {r.supplier_name ?? ""}
+          </span>
+        ),
+      },
+      {
+        key: "deliverTo",
+        label: "Supplier Deliver To",
+        headerLines: ["Supplier", "Deliver To"],
+        width: REGISTER_FIELD_WIDTH.supplierDeliverTo,
+        sortable: true,
+        /* Where the PO INSTRUCTED the supplier to deliver. It is never
+           overwritten by where the goods actually landed. */
+        searchValue: (r) => r.warehouse_name ?? "",
+        exportValue: (r) => r.warehouse_name ?? "",
+        overflowText: (r) => r.warehouse_name ?? "",
+        accessor: (r) => (
+          <span className="truncate text-body text-base-900">
+            {r.warehouse_name ?? ""}
+          </span>
+        ),
+      },
+      {
+        key: "actualSite",
+        label: "Goods arrived at",
+        headerLines: ["Goods", "arrived at"],
+        width: REGISTER_FIELD_WIDTH.goodsArrivedAt,
+        sortable: true,
+        searchValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
+        exportValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
+        accessor: (r) =>
+          r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
+            /* The physical truth, preserved BESIDE the instruction — never
+               overwriting `Supplier Deliver To` (owner correction 2026-09-06).
+               Amber only when the goods landed somewhere other than
+               instructed. */
+            <span className="truncate text-body text-kit-amber-11">
+              {r.actual_site_name}
+            </span>
+          ) : (
+            <span className="truncate text-body text-base-900">
+              {r.actual_site_name ?? r.warehouse_name ?? ""}
+            </span>
+          ),
+      },
+      {
+        key: "supplierConfirmedDeliveryDate",
+        label: "Supplier Confirmed Delivery Date",
+        headerLines: ["Supplier Confirmed", "Delivery Date"],
+        width: REGISTER_FIELD_WIDTH.supplierConfirmedDeliveryDate,
         sortable: true,
         /* The linked PO's governed supplier answer (`poSupplierDeliveryDateOf`,
-           server-resolved) — the SAME date the rail Calendar filters by, so
-           the picked day and this cell can never disagree. `Not confirmed`
-           while the supplier has not evidenced one. */
+           server-resolved) — the SAME word the Purchase Orders register uses.
+           `Not confirmed` while the supplier has not evidenced one. */
         searchValue: (r) => r.supplier_delivery_date ?? "Not confirmed",
         exportValue: (r) =>
           r.supplier_delivery_date
@@ -260,14 +474,16 @@ export default function OperationReceiving() {
       },
       {
         key: "receivedAt",
-        label: "Goods received on",
-        width: 150,
+        label: "Goods Received Date",
+        headerLines: ["Goods Received", "Date"],
+        width: REGISTER_FIELD_WIDTH.goodsReceivedDate,
         sortable: true,
         searchValue: (r) => r.goods_received_at ?? "",
         exportValue: (r) =>
           r.goods_received_at ? fmtDate(r.goods_received_at) : "",
         /* The table's date column OWNS detailed date filtering (owner
-           correction 2026-09-06) — the rail carries no second one. */
+           correction 2026-09-06) — the rail's date group is the GRN's
+           creation date, which is a different fact. */
         filterType: "date",
         dateValue: (r) => r.goods_received_at,
         sortFn: (a, b) =>
@@ -279,37 +495,29 @@ export default function OperationReceiving() {
         ),
       },
       {
-        key: "po",
-        label: "PO/CO No",
-        width: 150,
+        key: "doNo",
+        /* `No` takes NO full stop — owner ruling 2026-09-18. §9.4's column
+           list already carries the corrected word; this screen was the lag. */
+        label: "Supplier DO No",
+        headerLines: ["Supplier", "DO No"],
+        width: REGISTER_FIELD_WIDTH.supplierDoNo,
         sortable: true,
-        /* An arrival-source receipt has no PO — the cell stays honest-empty. */
-        searchValue: (r) => r.po_id ?? "",
-        exportValue: (r) => r.po_id ?? "",
+        searchValue: (r) => r.do_number ?? "",
+        exportValue: (r) => r.do_number ?? "",
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.po_id}</span>
-        ),
-      },
-      {
-        key: "supplier",
-        label: "Supplier",
-        minWidth: 140,
-        sortable: true,
-        searchValue: (r) => r.supplier_name ?? "",
-        exportValue: (r) => r.supplier_name ?? "",
-        accessor: (r) => (
-          <span className="truncate text-body text-base-900">
-            {r.supplier_name ?? ""}
+          <span className="font-mono text-meta text-base-900">
+            {r.do_number}
           </span>
         ),
       },
       {
-        key: "product",
-        label: "Product",
-        minWidth: 160,
+        key: "items",
+        label: "Items",
+        width: REGISTER_FIELD_WIDTH.items,
         sortable: true,
         /* The GRN PAPER's own line words (`product_skus.variant`, else the
-           SKU — server-resolved), first label plus a truthful `+n`. */
+           SKU — server-resolved), first label plus a truthful `+n`. The exact
+           item-by-item truth is one disclosure away, in the expansion. */
         searchValue: (r) => (r.product_labels ?? []).join(" "),
         exportValue: (r) => (r.product_labels ?? []).join(" · "),
         accessor: (r) => {
@@ -331,43 +539,10 @@ export default function OperationReceiving() {
         },
       },
       {
-        key: "deliverTo",
-        label: "Deliver To",
-        width: 150,
-        sortable: true,
-        searchValue: (r) => r.warehouse_name ?? "",
-        exportValue: (r) => r.warehouse_name ?? "",
-        accessor: (r) => (
-          <span className="truncate text-body text-base-900">
-            {r.warehouse_name ?? ""}
-          </span>
-        ),
-      },
-      {
-        key: "actualSite",
-        label: "Goods arrived at",
-        width: 150,
-        sortable: true,
-        searchValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
-        exportValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
-        accessor: (r) =>
-          r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
-            /* The physical truth, preserved BESIDE the instruction — never
-               overwriting `Deliver To` (owner correction 2026-09-06). Amber
-               only when the goods landed somewhere other than instructed. */
-            <span className="truncate text-body text-kit-amber-11">
-              {r.actual_site_name}
-            </span>
-          ) : (
-            <span className="truncate text-body text-base-900">
-              {r.actual_site_name ?? r.warehouse_name ?? ""}
-            </span>
-          ),
-      },
-      {
         key: "receivedQty",
         label: "Received Qty",
-        width: 110,
+        headerLines: ["Received", "Qty"],
+        width: REGISTER_FIELD_WIDTH.receiptQty,
         align: "right",
         sortable: true,
         searchValue: () => "",
@@ -382,43 +557,10 @@ export default function OperationReceiving() {
         ),
       },
       {
-        key: "status",
-        label: "Status",
-        width: 110,
-        sortable: true,
-        /* Document status words — `Valid` / `Cancelled` (owner correction
-           2026-09-06). `Posted`/`Voided` stay internal database statuses. */
-        searchValue: (r) => warehouseReceiptStatusLabel(r.status),
-        exportValue: (r) => warehouseReceiptStatusLabel(r.status),
-        accessor: (r) => (
-          <span
-            className={
-              r.status === "voided"
-                ? "text-body text-base-500 line-through"
-                : "text-body text-base-900"
-            }
-          >
-            {warehouseReceiptStatusLabel(r.status)}
-          </span>
-        ),
-      },
-      {
-        key: "doNo",
-        label: "Supplier DO No.",
-        width: 140,
-        sortable: true,
-        searchValue: (r) => r.do_number ?? "",
-        exportValue: (r) => r.do_number ?? "",
-        accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
-            {r.do_number}
-          </span>
-        ),
-      },
-      {
         key: "damagedQty",
         label: "Damaged Qty",
-        width: 110,
+        headerLines: ["Damaged", "Qty"],
+        width: REGISTER_FIELD_WIDTH.receiptQty,
         align: "right",
         sortable: true,
         searchValue: () => "",
@@ -446,7 +588,8 @@ export default function OperationReceiving() {
       {
         key: "wrongQty",
         label: "Wrong Item Qty",
-        width: 120,
+        headerLines: ["Wrong Item", "Qty"],
+        width: REGISTER_FIELD_WIDTH.receiptQty,
         align: "right",
         sortable: true,
         searchValue: () => "",
@@ -474,7 +617,8 @@ export default function OperationReceiving() {
       {
         key: "extraQty",
         label: "Extra Qty",
-        width: 100,
+        headerLines: ["Extra", "Qty"],
+        width: REGISTER_FIELD_WIDTH.receiptQty,
         align: "right",
         sortable: true,
         searchValue: () => "",
@@ -502,7 +646,156 @@ export default function OperationReceiving() {
     categorySel !== null ||
     supplierSel !== null ||
     siteSel !== null ||
-    expectedSel !== null;
+    receivedSel !== null ||
+    dateChosen ||
+    cancelledSel;
+
+  /**
+   * ⭐ THE ACTIVE CONDITIONS LIVE IN THE TOOLBAR — owner correction 2026-09-18.
+   *
+   * The rail lost its permanent `Clear filters` button: a control that is
+   * dead most of the time still costs a row at the foot of every group, and
+   * the chips above the table already say WHAT is on as well as clearing it.
+   * Pressing a chosen rail row again still clears that one group.
+   */
+  const activeConditions = [
+    ...(dateChosen
+      ? [
+          {
+            key: "grnDate",
+            label: `GRN date: ${
+              fromSel === toSel
+                ? fmtDateShort(fromSel)
+                : weekLabel(fromSel!, toSel!)
+            }`,
+            onClear: () => setGrnDate(null, null),
+          },
+        ]
+      : []),
+    ...(receivedSel
+      ? [
+          {
+            key: "received",
+            label: `Received with: ${
+              RECEIVED_WITH_ROWS.find((r) => r.key === receivedSel)!.label
+            }`,
+            onClear: () => setFacet("received", null),
+          },
+        ]
+      : []),
+    ...(categorySel
+      ? [
+          {
+            key: "category",
+            label: `Category: ${categorySel}`,
+            onClear: () => setFacet("category", null),
+          },
+        ]
+      : []),
+    ...(siteSel
+      ? [
+          {
+            key: "site",
+            label: `Goods arrived at: ${siteSel}`,
+            onClear: () => setFacet("site", null),
+          },
+        ]
+      : []),
+    ...(supplierSel
+      ? [
+          {
+            key: "supplier",
+            label: `Supplier: ${supplierSel}`,
+            onClear: () => setFacet("supplier", null),
+          },
+        ]
+      : []),
+    ...(cancelledSel
+      ? [
+          {
+            key: "cancelled",
+            label: "Cancelled GRNs",
+            onClear: () => setFacet("cancelled", null),
+          },
+        ]
+      : []),
+  ];
+
+  /**
+   * ⭐ THE READ-ONLY GOODS EXPANSION — approved 2026-09-18 (§9.4, CARD 12).
+   *
+   * One row per received line, in the owner's order, built from the SAME
+   * receipt facts the official GRN document prints: the governed category,
+   * the paper's own item word, the line's bound Unit IDs and the five
+   * quantity words. Extra goods keep their own rows — they were never on the
+   * order, they never enter Inventory, and they are not quietly folded into a
+   * received line.
+   *
+   * It BUYS NOTHING. No checkbox, no `Ready Stock`, no reservation control.
+   */
+  function expansionLines(r: WarehouseReceiptQueueRow): GoodsMiniLine[] {
+    const sourceNo = r.po_id ?? r.source_refs?.[0] ?? null;
+    const unitsByLine = r.unit_ids_by_line;
+    const wordsFor = (sku: string) => lineInfo[sku];
+    const received = (r.lines ?? []).map((line): GoodsMiniLine => {
+      const words = wordsFor(line.sku);
+      const units = unitsByLine ? (unitsByLine[line.id] ?? []) : [];
+      return {
+        key: line.id,
+        category: words?.category ?? "",
+        unitIds: units,
+        /* FIVE answers, never one (COPY-STANDARD): a failed read says so, and
+           a line whose stock is counted rather than individually tracked says
+           `Counted stock` — the technical register key is never a Unit ID. */
+        unitAbsence: unitsByLine == null ? "Could not be loaded" : "Counted stock",
+        deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
+        deliverToAbsence: "Not recorded",
+        supplier: r.supplier_name ?? undefined,
+        supplierAbsence: "No supplier yet",
+        sourceNo: sourceNo ?? undefined,
+        sku: line.sku,
+        qty: line.received_now,
+        item: words?.description ?? line.sku,
+        itemDetail: words?.description ? line.sku : undefined,
+        receivedQty: line.received_now,
+        damagedQty: line.damaged_qty,
+        wrongItemQty: line.wrong_item_qty,
+        /* An ordered line has no extra quantity — an absence, not a zero. */
+        extraQty: null,
+        selectable: false,
+        testId: `grn-line-${line.id}`,
+      };
+    });
+    const extra = (r.extra_lines ?? []).map((x, i): GoodsMiniLine => {
+      const words = wordsFor(x.sku);
+      return {
+        key: `extra-${i}-${x.sku}`,
+        category: words?.category ?? "",
+        unitIds: [],
+        /* Extra goods never enter Inventory, so they never become a Unit. */
+        unitAbsence: "—",
+        deliverTo: r.warehouse_name ? [r.warehouse_name] : [],
+        deliverToAbsence: "Not recorded",
+        supplier: r.supplier_name ?? undefined,
+        supplierAbsence: "No supplier yet",
+        sourceNo: undefined,
+        /* Extra goods were on no order — the source cell says so rather than
+           borrowing the purchase order they did not come on. */
+        sourceNoAbsence: "Extra goods",
+        sku: x.sku,
+        qty: x.qty,
+        item: words?.description ?? x.sku,
+        itemDetail: words?.description ? x.sku : undefined,
+        receivedQty: null,
+        damagedQty: null,
+        wrongItemQty: null,
+        extraQty: x.qty,
+        selectable: false,
+        testId: `grn-extra-${i}`,
+      };
+    });
+    return [...received, ...extra];
+  }
 
   const openObject = arrivalId ?? sessionId ?? poId ?? (finding ? "find" : null);
 
@@ -571,24 +864,100 @@ export default function OperationReceiving() {
         ].join(" ")}
         data-testid="receiving-register"
       >
-        <FilterRail
-          testId="receiving-rail"
-          header={
-            /* The full month Calendar, FIXED at the top of the rail while the
-               business filters scroll beneath it (owner correction
-               2026-09-06). Picking a date filters the SAME register by that
-               Supplier Delivery Date; picking it again clears. */
-            <MonthCalendar
-              testId="receiving-calendar"
-              month={month}
-              onMonthChange={setMonth}
-              selected={expectedSel}
-              onSelect={(iso) => setFacet("expected", iso)}
-              markers={markers}
-              markerWord="expected supplier arrival"
+        <FilterRail testId="receiving-rail">
+          {/* ── GRN date — weeks, their days, months, and Choose dates… ─────
+              The date is the GRN's CREATION date. Nothing has to be chosen to
+              see records: this group NARROWS a listing that is already
+              complete. The arrow beside a week only opens it; pressing a
+              week, a month or a day is what filters. Only periods that HAVE
+              GRNs are listed — Sunday included, because a GRN can be created
+              on one. Every count is a count of GRN RECORDS. */}
+          <FilterRailGroup title="GRN date" icon="date">
+            {weeks.map((w) => (
+              <FilterRailExpandableRow
+                key={w.from}
+                label={weekLabel(w.from, w.to)}
+                count={w.count}
+                active={fromSel === w.from && toSel === w.to}
+                onClick={() => setGrnDate(w.from, w.to)}
+                expandLabel={`Show the days in ${weekLabel(w.from, w.to)}`}
+                testId={`rail-grn-week-${w.from}`}
+              >
+                {w.days.map((d) => (
+                  <FilterRailRow
+                    key={d.iso}
+                    label={fmtDateShort(d.iso)}
+                    count={d.count}
+                    active={fromSel === d.iso && toSel === d.iso}
+                    onClick={() => setGrnDate(d.iso, d.iso)}
+                    testId={`rail-grn-day-${d.iso}`}
+                  />
+                ))}
+              </FilterRailExpandableRow>
+            ))}
+            {months.map((m) => (
+              <FilterRailRow
+                key={m.period}
+                label={fmtMonth(m.period)}
+                count={m.count}
+                active={fromSel === m.from && toSel === m.to}
+                onClick={() => setGrnDate(m.from, m.to)}
+                testId={`rail-grn-month-${m.period}`}
+              />
+            ))}
+            <FilterRailRow
+              label="Choose dates…"
+              active={false}
+              onClick={() => setChoosing((v) => !v)}
+              testId="rail-grn-choose"
             />
-          }
-        >
+            {choosing && (
+              /* Two real fields, both labelled: a range is not a filter until
+                 both ends exist, so nothing narrows while one is being
+                 typed. */
+              <div
+                className="flex flex-col gap-1 px-2 pb-1"
+                data-testid="rail-grn-range"
+              >
+                <span className="text-label text-kit-slate-11">From</span>
+                <DateField
+                  aria-label="GRN date from"
+                  value={fromSel ?? ""}
+                  fullWidth
+                  onChange={(iso) =>
+                    setGrnDate(iso || null, toSel ?? (iso || null))
+                  }
+                />
+                <span className="text-label text-kit-slate-11">To</span>
+                <DateField
+                  aria-label="GRN date to"
+                  value={toSel ?? ""}
+                  fullWidth
+                  onChange={(iso) =>
+                    setGrnDate(fromSel ?? (iso || null), iso || null)
+                  }
+                />
+              </div>
+            )}
+          </FilterRailGroup>
+
+          {/* ── Received with — a RECORD of what was found at receiving, not
+              a to-do list. Counted by GRN, and a GRN that carries two of them
+              appears in two rows: these three numbers OVERLAP and may never
+              be added into a total. */}
+          <FilterRailGroup title="Received with" icon="goods">
+            {RECEIVED_WITH_ROWS.map((row) => (
+              <FilterRailRow
+                key={row.key}
+                label={row.label}
+                count={facets.receivedWith[row.key] ?? 0}
+                active={receivedSel === row.key}
+                onClick={() => setFacet("received", row.key)}
+                testId={`rail-received-${row.key}`}
+              />
+            ))}
+          </FilterRailGroup>
+
           {/* Only the governed category rows PRESENT in the result set, in
               the shared ladder's order — no `Any`, no `All …`, no invented
               category. Counts speak for the COMPLETE filtered result set;
@@ -602,20 +971,6 @@ export default function OperationReceiving() {
                 active={categorySel === word}
                 onClick={() => setFacet("category", word)}
                 testId={`rail-category-${word}`}
-              />
-            ))}
-          </FilterRailGroup>
-
-          {/* The suppliers actually present in Receiving records. */}
-          <FilterRailGroup title="Supplier" icon="supplier">
-            {supplierNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.supplier[name] ?? 0}
-                active={supplierSel === name}
-                onClick={() => setFacet("supplier", name)}
-                testId={`rail-supplier-${name}`}
               />
             ))}
           </FilterRailGroup>
@@ -635,22 +990,32 @@ export default function OperationReceiving() {
             ))}
           </FilterRailGroup>
 
-          <button
-            type="button"
-            disabled={!narrowed}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.delete("category");
-              next.delete("supplier");
-              next.delete("site");
-              next.delete("expected");
-              setParams(next, { replace: true });
-            }}
-            data-testid="rail-clear-filters"
-            className="self-start rounded-control px-2 py-1.5 text-left text-body text-kit-blue-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2"
-          >
-            Clear filters
-          </button>
+          {/* The suppliers actually present in Receiving records. */}
+          <FilterRailGroup title="Supplier" icon="supplier">
+            {supplierNames.map((name) => (
+              <FilterRailRow
+                key={name}
+                label={name}
+                count={facets.supplier[name] ?? 0}
+                active={supplierSel === name}
+                onClick={() => setFacet("supplier", name)}
+                testId={`rail-supplier-${name}`}
+              />
+            ))}
+          </FilterRailGroup>
+
+          {/* The last ROW, not a group of one: a cancelled GRN keeps its row
+              and its number in the register forever, and this narrows to
+              them. There is no `Clear filters` button beneath it. */}
+          <div className="border-t border-kit-slate-5 py-2">
+            <FilterRailRow
+              label="Cancelled GRNs"
+              count={facets.cancelled}
+              active={cancelledSel}
+              onClick={() => setFacet("cancelled", cancelledSel ? null : "1")}
+              testId="rail-cancelled"
+            />
+          </div>
         </FilterRail>
 
         <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="receiving-register-column">
@@ -674,14 +1039,41 @@ export default function OperationReceiving() {
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.receiving.register.v1"
+              /* v2 — the approved sixteen-column, date-first register
+                 replaces v1's eleven, so a saved v1 layout cannot pin a
+                 column that no longer exists. */
+              storageKey="carres.receiving.register.v2"
               rowKey={(r) => r.id}
               exportName="Receiving"
               searchPlaceholder="GRN, PO, supplier or DO number…"
               isLoading={registerQ.isLoading}
               onSearchChange={setSearch}
-              stickyIdentity
+              /* GRN Date and GRN No lead and pin at a canvas ≥768px; below it
+                 the number pins alone. No column is hidden by width. */
+              leadingColumns={{ date: "grnDate", identity: "grn" }}
+              activeConditions={activeConditions}
+              onClearConditions={clearRail}
               groupBanner={false}
+              /* Receiving is UNGROUPED — one sticky header, no business
+                 groups. The group-local header pattern applies to registers
+                 that HAVE groups; inventing GRN groups to use it would be a
+                 regression. */
+              expandTitle="Show goods"
+              expandable={{
+                flush: true,
+                alignToColumn: "grnDate",
+                testId: (r) => `grn-expand-${r.id}`,
+                renderExpansion: (r) => (
+                  <div className="px-2 py-3" data-testid={`grn-goods-${r.id}`}>
+                    <GoodsMiniTable
+                      label={`Goods on ${receivingDisplayNo(r)}`}
+                      lines={expansionLines(r)}
+                      receivingLayout
+                      itemHeading="Items"
+                    />
+                  </div>
+                ),
+              }}
               onRowClick={(r) => openSession(r.id)}
               toolbarStart={
                 <button

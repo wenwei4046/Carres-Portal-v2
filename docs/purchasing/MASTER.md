@@ -2187,8 +2187,9 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
-**Listing UI acceptance — Jess, 2026-09-18 · APPROVED / NOT BUILT.** The Receiving Register
-proposal is accepted for implementation in [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
+**Listing UI acceptance — Jess, 2026-09-18 · APPROVED · BUILT 2026-09-18, PRODUCTION VERIFICATION
+OWED.** The Receiving Register proposal is accepted and implemented in
+[PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
 This approval concerns the Register and its read-only goods expansion, not replacement of the
 formal GRN object/receiving engine. Default entry shows all permitted GRNs with server pagination;
 date filtering is optional. Date and exception counts count GRNs, not units or unfinished work.
@@ -2198,6 +2199,31 @@ Use actual line-linked identity with source number above Unit IDs; preserve quan
 extra-goods distinctions. Receiving remains ungrouped with a sticky header. Use shared heading
 icons and dimensions; no permanent bottom-rail Clear filters control. Full date and pagination
 behaviour below remains authoritative; abbreviated sample data is not a new rule.
+
+**BUILT 2026-09-18 — what is implemented.** The register draws the approved sixteen-column,
+date-first listing with `GRN Date` and `GRN No` pinned at a canvas ≥768px (`leadingColumns`), the
+six rail groups, and the read-only goods expansion through the shared `GoodsMiniTable`. The five
+retired words measured on this page — `Supplier Delivery Date`, `Goods received on`, `Deliver To`,
+`Product` and the `Status` column — are gone, `Supplier DO No` lost its full stop, and the merged
+`PO/CO No` column is replaced by the four-way source reference plus `PO No`. Shared widths come
+from ONE registry in code (`apps/web/src/components/register/register-field-widths.ts`), which
+carries UI MASTER §6.8's parent-scope numbers plus the four Receiving fields it could not answer.
+
+| Status | Evidence |
+|---|---|
+| **APPROVED** | Jess, 2026-09-18 — the Register composition and its read-only goods expansion. Not a replacement of the formal GRN object or the receiving engine. |
+| **BUILT 2026-09-18** | [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md), merged as [#1467](https://github.com/wenwei4046/Carres-Portal-v2/pull/1467). CI `verify` green on the merged head; the same gate locally on the merged tree — 12,047 tests, typecheck, lint with no new design-standard violations, 541 migration filenames, build. |
+| **DEPLOYED 2026-09-19** | Merged to `main` as **`896a7b128b77dbb3dc0074005aaf81f9aa52cf1f`** and deployed by `deploy-production.yml` run 35415796625, which re-ran the whole gate on that exact SHA before shipping it. `pnpm ci:smoke` printed `Production converged to 896a7b12…` for all five canonical surfaces: `carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` · `pos.carresofficial.com` · `api.carresofficial.com/health`. **That is a SHA convergence proof, and nothing more.** No migration was involved; this listing added none. |
+| **PRODUCTION-VERIFIED** | **NOT YET.** A converged SHA proves the bundle shipped; it proves nothing about what the register DRAWS. No authenticated production walk of this build exists, and none could be run from the build environment — Chromium does not start there and the network policy refuses the production hosts. Until that walk is done, no line here may be quoted as production truth. **The walk owes, specifically:** the sixteen columns in order against real GRN rows · `GRN Date` and `GRN No` pinned at ≥768px and the number alone below it · the rail's six groups with counts that match the footer total · a week's arrow opening its days WITHOUT narrowing the register · a real cancelled GRN showing `Cancelled` under its number and no status word anywhere else · the expansion on a receipt with both an exact-unit line and a counted line, the second reading `Counted stock` · a receipt with genuine SO and MPR references beside one with none · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. |
+
+**🟡 `CO No` HAS NO DOCUMENT TO NAME TODAY — measured 2026-09-18.** A consignment order is a FLAG
+on the purchase order (`purchase_orders.is_consignment`), not a separately numbered document, and
+§9.9 Consignment Orders is not built. The source column therefore prints the SO and MPR references
+a receipt genuinely carries, an arrival source's own number (`RO-…` for a repair return) where
+there is one, and stays blank where a CO number does not exist. **No word and no other document
+stands in for it.** When §9.9 mints CO numbers they join the same server-side reference list and
+this listing needs no change. **Falsifier:** a consignment receipt in production that already
+carries a distinct CO number this reader does not print.
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
@@ -2255,9 +2281,12 @@ Warehouse submits count                (or Operation enters goods directly)
   - `Goods arrived at` — the receiving locations present.
   - `Supplier` — the suppliers present.
   - last row `Cancelled GRNs`.
-  One choice per group; no `Any` or `All …` rows. Rail counts, table rows and the footer
-  (`Showing 1–{n} of {total}`) come from the same complete server-side filtered set, never the
-  loaded page. `Clear filters` restores the complete listing.
+  One choice per group; no `Any` or `All …` rows; pressing the chosen row again clears it. Rail
+  counts, table rows and the footer (`Showing 1–{n} of {total}`) come from the same complete
+  server-side filtered set, never the loaded page. **There is NO permanent `Clear filters` button
+  at the foot of the rail (owner correction 2026-09-18)** — the toolbar's active-condition chips
+  name what is on and clear it, one condition at a time or all of them. The earlier reading that
+  this removal was a Purchase Orders correction only is superseded.
 - **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
   renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
   Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
@@ -3404,7 +3433,7 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 
 ### 9.7 Repair Orders
 
-**Owner-confirmed business blueprint — 2026-09-18. APPROVED TARGET / NOT BUILT.**
+**Owner-confirmed business blueprint — 2026-09-18; price/approval ruling 2026-09-19. APPROVED TARGET / NOT BUILT.**
 This replaces the restriction that every RO must originate in a Supplier Claim and the blanket
 ban on creating an RO. It approves a stock-linked repair commission, not a source-free document.
 The draft HTML is illustrative; unreviewed rail wording and layout additions are not approved
@@ -3434,7 +3463,8 @@ stock. Bring in Category, Items/configuration, original PO/source, Unit ID and c
 Stock Location. If an original PO is absent, retain the genuine source and missing-reference fact;
 never fabricate a PO. The selected repair Supplier does not rewrite the original purchase source.
 
-Carres-owned stock follows the normal authority and cost-approval rules. Consignment or other
+Carres-owned stock follows normal stock and operational authority; the price/approval boundary below
+does not add a financial gate to placing an RO. Consignment or other
 non-Carres-owned goods require the owner's authority and explicit cost responsibility before
 commitment. Do not silently treat supplier-owned Display goods as Carres assets. Sold/reserved,
 held, already-out, or already-in-repair Units require the owning workflow's eligibility checks;
@@ -3455,8 +3485,9 @@ not admitted by this exact-Unit blueprint; resolve identity in the owning invent
 | Supplier Pickup Location | Recorded place from which these goods are to be collected for repair; default from the Unit's actual Stock Location |
 | Supplier Return Location | Intended place to receive the goods after repair; can differ from pickup location; not evidence of receipt |
 | Expected Return Date | Recorded expected return with its provider/evidence; do not imply supplier confirmation where none exists |
-| Repair Quotation / Cost Responsibility | Supplier's quoted scope and charges, and who will bear them; an unknown cost is not zero |
-| Approval | Actual authorised actor, time and scope, according to existing approval policy |
+| Price / Repair Quotation | Optional price or supplier quotation recorded during creation or in RO detail; unknown is not RM0. Recording a price is neither expense approval nor payment |
+| Cost Responsibility | Recorded responsibility and supporting agreement; a Claim link never proves the supplier will pay |
+| Approval | If a decision requires approval, Jess alone approves; retain the actual decision, scope and time. No substitute approver or Buddy may approve for her. Financial approval is not a placement/Issue gate |
 
 Supplier Pickup Location and Supplier Return Location apply equally to Warehouse, Showroom and
 Dealer sites. Record actual collector/carrier separately; these labels do not require the supplier
@@ -3464,23 +3495,36 @@ to transport personally. Changing a planned location never moves a Unit or overw
 current-location fact. A pickup-location mismatch must be resolved against actual custody.
 Do not add `Repair Location`: this register does not track where the supplier performs the repair.
 
-#### Quotation, approval and issue
+#### Price recording, approval and issue
 
-Save an incomplete quotation as a draft. If Carres pays, obtain the supplier quotation and the
-required approval before committing or issuing the order. If Supplier pays, retain its evidenced
-agreement; never infer free repair from a Claim link. Use existing approval roles/limits, not a new
-threshold invented by this page. Missing applicable authority prevents commitment and explains
-what is needed. Any charge or repair-scope increase needs the applicable approval; keep the old
-quote, new proposal and decision rather than overwriting them.
+**Owner ruling — 2026-09-19, APPROVED TARGET / NOT BUILT.** Staff may write down the price
+when placing a Repair Order. `Price` is optional in RO creation/detail; an absent price remains
+unknown, never RM0. Retain its supplier quotation/source when available and preserve changes.
+The register gains no price, quotation-amount or financial column.
 
-If a supplier rejects warranty liability and proposes paid repair, keep its reply and the original
-Claim history. Carres must expressly approve the paid commission; do not auto-convert the Claim
-or accept the quotation. Decide outstanding Claim matters under §9.5 independently.
+Purchasing places and follows the repair commission; Finance owns financial processing and
+payment. Missing price, an incomplete quotation, unpaid charges or pending financial approval
+must not stop placing or issuing the RO. Recording a price, placing the RO or sending its document
+is not automatic acceptance of supplier charges, expense approval or payment. If an approval is
+needed, **Jess alone approves**, through her governed personal identity; no other Purchasing
+Approver or Buddy may substitute. This is the RO-specific ruling, not a change to Manual Purchase
+or PO approval policy. Do not invent amount thresholds or a compulsory approval for every RO.
+Record any required financial decision separately without making it a Purchasing placement gate.
 
-Issue uses the shared formal-document flow: staff actually send the approved document and record
-version, recipient, channel, actor and time. Generating/downloading PDF proves neither sending
-nor supplier acceptance. Preserve sent revisions and corrections. Quote/approval is a purchasing
-commitment fact; payment, balance and credit processing remain in Finance, outside the register.
+A changed price or supplier request for payment remains a recorded proposal until the required
+Jess decision exists; preserve the old price, new proposal and decision. If Supplier pays, retain
+its evidenced agreement. If the supplier rejects liability and proposes paid repair, retain its
+reply and original Claim history; neither the Claim nor the RO automatically accepts the charge.
+Outstanding Claim matters remain governed by §9.5.
+
+This financial separation does not waive exact-Unit identity, owner authority for non-Carres goods,
+reservation/hold/duplicate-repair checks, authorised Claim repair scope or operational permissions.
+Those source and stock protections still apply before the relevant operational act.
+
+Issue uses the shared formal-document flow: staff actually send the document and record version,
+recipient, channel, actor and time. Generating/downloading PDF proves neither sending nor supplier
+acceptance. Preserve sent revisions and corrections. Price recording is not a second financial
+ledger; payment, balance and credit processing remain in Finance, outside the register.
 
 #### Physical execution and completion
 
@@ -3521,8 +3565,8 @@ Do not invent a new approval holder or deadline; unresolved ownership remains ex
 
 | Portal owner | Repair connection |
 |---|---|
-| Purchasing / RO | Requirements, chosen Supplier, quote/cost responsibility, authorised scope, Issue and supplier follow-up |
-| Workspace / Staff & Duties | Resolve who must approve, issue or follow up; My Work/Team Work shows the same source-owned outstanding act and removes it only after proved completion |
+| Purchasing / RO | Requirements, chosen Supplier, optional recorded price/quotation and cost-responsibility evidence, authorised operational scope, Issue and supplier follow-up; no financial placement gate |
+| Workspace / Staff & Duties | Resolve operational Issue/follow-up owners; any required RO approval belongs to Jess alone, with no substitute approver. My Work/Team Work reads the same source-owned act and its proved completion |
 | Inventory / Stock | Select existing Units and actual locations, verify ownership/holds/reservations, retain identity and custody history |
 | Outbound / transport | Actual Unit dispatch, collector/recipient and proof; existing delivery/transport records when applicable, no second logistics engine |
 | Receiving / inspection | Authorised RO-linked receipt, original identity, partial quantities, actual receiving site and inspection result |
@@ -3531,8 +3575,10 @@ Do not invent a new approval holder or deadline; unresolved ownership remains ex
 | Linked customer order / Service Case | Preserve any actual reservation/customer relationship and outstanding service obligations; RO completion cannot silently complete a different record |
 | Portal history / documents | Trace source, Unit, quote, approval, sent revision, physical movements and actual actors across the linked records |
 
-Potential Work obligations include completing a required quote/approval, issuing the approved RO,
-following up a recorded return date, and completing receiving/inspection in the owning module.
+Potential Work obligations include issuing the RO, following up a recorded return date, and
+completing receiving/inspection in the owning module. An optional missing price is not Work.
+Any required financial decision belongs to its owning flow and Jess alone; it does not block RO
+placement or Issue.
 A register filter is not itself a Work obligation. Reuse existing stock/receiving tasks rather than
 create duplicate RO tasks for the same physical act. Tests must prove permission/cover behaviour,
 partial completion, stale-state handling and disappearance of exactly the completed occurrence.
@@ -3546,8 +3592,10 @@ without fake Claims/Cases, while preserving permissions, ownership, exact-Unit i
 checks. Do not weaken constraints globally or implement independent custody writers.
 
 Build must verify both sources, warehouse/showroom/dealer Display selection, owner authority for
-consignment, Supplier different from original PO supplier, missing quote, denied approval, duplicate
-active repair, partial return, failed inspection, replacement identity and receipt-source compatibility.
+consignment, Supplier different from original PO supplier, optional/missing price without an Issue
+block, price recorded without automatic expense approval, Jess-only approval with no substitute,
+pending financial decision without a placement gate, duplicate active repair, partial return,
+failed inspection, replacement identity and receipt-source compatibility.
 This document authorises the target, not a migration, build-card creation or production rollout.
 
 ### 9.8 Display Requests
