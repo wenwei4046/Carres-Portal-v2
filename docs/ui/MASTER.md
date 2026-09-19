@@ -2117,3 +2117,9 @@ Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, 
 Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
 is not a placement/Issue blocker. This scoped placement ruling does not approve the remaining RO
 column sequence, rail wording, prototype or full UI, and changes no other register's composition.
+
+**Repair Orders owner-consent placement — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits Issue while non-Carres owner consent is outstanding. Show the unresolved
+fact and evidence in RO detail and its follow-up in the existing Workspace projection; do not
+disable Issue solely for missing consent or add a second repair task list. This ruling adds no
+financial/Work register column and does not approve the remaining RO prototype layout.

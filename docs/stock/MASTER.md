@@ -1396,7 +1396,10 @@ Finance consumes physical movement without maintaining freight allocation in Tra
 **Direct inventory repair source — owner-approved target, 2026-09-18; NOT BUILT.**
 Purchasing MASTER §9.7 admits an authorised RO from existing Warehouse, Showroom or Dealer Units,
 including Display, without a Supplier Claim. Location does not establish ownership: supplier-owned
-consignment/display requires owner authority and agreed cost responsibility. Preserve existing
+consignment/display retains the actual owner, consent evidence and cost-responsibility facts.
+Owner ruling B (2026-09-19), Purchasing §9.7: missing owner consent does not block document Issue;
+keep its outstanding follow-up in the existing Work engine. Issue is not proof of consent or a
+stock movement. This document-Issue exception does not waive physical handover controls. Preserve existing
 holds, reservations, custody, eligibility and duplicate-repair guards. Planned pickup defaults from
 actual Stock Location; editing it does not move stock. Outbound proves dispatch; Receiving accepts
 the original Unit against the authorised RO and requires inspection before availability. The 0490
