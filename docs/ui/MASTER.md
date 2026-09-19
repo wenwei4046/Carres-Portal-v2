@@ -1651,10 +1651,15 @@ words: at 1440 every one is a single line in a 51px row (50 + the rule), unchang
 them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
 component, so all 28 destination pages carry it.
 
-🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
-— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
-takes four lines and a 137px row. It is correct and readable now where it used to blow the page
-open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+**THE SAME MEASUREMENT EXPOSED ONE IDENTITY, AND IT IS FIXED — BUILT 2026-09-19.** The wrap rule
+made `Warehouse Unit detail` readable instead of page-breaking, but it also showed WHY that page
+wrapped worst: its word was `{unitCode} · {sku}` — two facts in the one slot this section rules is
+"one short identity, the word alone". A Unit page's destination word is the Unit. The word is now
+`{unitCode}` alone, and the SKU keeps the place it already had, printed under **Product** in
+Connected records beside the product name — nothing is lost from the screen, only moved out of the
+identity slot. Measured in the shared header box at a 390px canvas: the old word took two lines in
+a 73px row, the new one takes one line in the exact 51px row, still 0px of page overflow. This was
+not a presentation preference handed to the owner — §6.7 already ruled it, and the page disagreed.
 
 **ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
