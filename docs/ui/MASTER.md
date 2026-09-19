@@ -1657,9 +1657,22 @@ wrapped worst: its word was `{unitCode} · {sku}` — two facts in the one slot 
 "one short identity, the word alone". A Unit page's destination word is the Unit. The word is now
 `{unitCode}` alone, and the SKU keeps the place it already had, printed under **Product** in
 Connected records beside the product name — nothing is lost from the screen, only moved out of the
-identity slot. Measured in the shared header box at a 390px canvas: the old word took two lines in
-a 73px row, the new one takes one line in the exact 51px row, still 0px of page overflow. This was
-not a presentation preference handed to the owner — §6.7 already ruled it, and the page disagreed.
+identity slot.
+
+**MEASURED ON THE REAL PAGE, not on a mock of its header** — the lesson #1475 paid for. An isolated
+header box said the old word cost two lines at 390. The actual page, rendered with a real SKU in the
+real font, was far worse, and the defect reached three desktop widths, not just the phone:
+
+| canvas | old word | new word |
+|---|---|---|
+| 1440 | 1 line · 51px | 1 line · 51px |
+| 1180 | **2 lines · 73px** | 1 line · 51px |
+| 820 | **3 lines · 105px** | 1 line · 51px |
+| 390 | **5 lines · 169px** | 1 line · 51px |
+
+Page overflow is 0px throughout — the floor fix already guaranteed that; the identity is what puts
+the row back on its exact 50px. This was not a presentation preference handed to the owner: §6.7
+already ruled it, and the page disagreed.
 
 **ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
