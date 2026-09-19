@@ -890,6 +890,16 @@ name intended pickup and return sites; neither asserts a physical movement or su
 must never be labelled as proof that sending or movement did not happen. Existing Issue recording
 and shared evidence-viewer words continue to apply. Scope is approved target, not a built feature.
 
+**RO price and approval — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
+`Price` is an optional field in Repair Order creation/detail, not a register column. Missing price
+is unknown, never RM0. `Repair Quotation` records the supplier's proposal; neither it nor a recorded
+price means approved expense or payment. Purchasing does not process payment and missing price,
+quotation, payment or financial approval must not block placement/Issue. If approval is needed,
+Jess alone approves; no substitute approver or Buddy is implied. Do not add a compulsory
+`Awaiting payment` or financial-approval gate to the RO. Purchasing MASTER §9.7 owns this scope;
+other purchase-document approval rules are unchanged. Exact remaining UI layout is not approved
+by this price ruling.
+
 ### Purchase Returns register — owner-confirmed UI, 2026-09-18
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·

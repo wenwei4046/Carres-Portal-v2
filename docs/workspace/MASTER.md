@@ -784,12 +784,18 @@ Work is ready for owner acceptance only when all are demonstrable:
 
 **Repair Orders integration — owner-approved target, 2026-09-18; NOT BUILT.** Purchasing MASTER
 §9.7 admits direct inventory repairs as well as Claim-linked repairs, including Warehouse,
-Showroom and Dealer Display Units. RO quote/approval/Issue/follow-up obligations and the existing
+Showroom and Dealer Display Units. RO Issue/follow-up obligations and the existing
 Outbound/Receiving inspection obligations share this Work engine. No separate repair task list,
 status writer or custody ledger. Every new projection must pass the admission contract below;
 reuse existing physical-work occurrences to avoid duplicate tasks. Duties, cover, permissions,
 source actions and actual completion facts stay with their existing owners. The RO business
 blueprint does not itself admit a production Work rule or define new financial approval limits.
+**RO owner correction, 2026-09-19:** optional price/quotation recording is not an approval or
+payment act. Missing price or a pending financial decision never blocks placing/issuing RO and
+does not create a mandatory quote task. If an RO-related approval is required, Jess alone acts
+through her governed personal identity; no other Duty holder or Buddy may substitute. Preserve
+normal operational cover for Issue/follow-up and physical work. This exception does not alter
+Manual Purchase/PO approval policy. Purchasing §9.7 owns the rule.
 
 
 A page displaying an action sentence is not enough. A module joins Work only with:
