@@ -3523,7 +3523,7 @@ not admitted by this exact-Unit blueprint; resolve identity in the owning invent
 
 | Field / fact | Meaning and source |
 |---|---|
-| RO Doc Date / RO No | Repair document date and governed RO identity; not the pickup date. Follow the existing number-allocation policy; do not invent a sequence in the UI |
+| RO Doc Date / RO No | RO Doc Date is system-set to the current Malaysia business date on document creation, read-only to staff; backdating is forbidden (owner correction 2026-09-20). Preserve the actual date of an existing record; viewing it later never restamps it. Governed RO identity; not the pickup date. Follow the existing number-allocation policy; do not invent a sequence in the UI |
 | Supplier | Supplier accepting this repair commission; selected independently of the original seller |
 | Supplier Claim No | Optional related Claim; prefilled for Claim-origin repairs, empty for direct inventory repairs |
 | Category / PO No + Unit ID / Items / Qty | Existing goods facts; PO on line one and Unit ID beneath in one cell; model then configuration; one tracked Unit per detail row, Qty 1 |
@@ -3531,7 +3531,7 @@ not admitted by this exact-Unit blueprint; resolve identity in the owning invent
 | Evidence | Per-Unit photos/videos with their source and purpose; retain existing Claim evidence links |
 | Supplier Pickup Location | Recorded place from which these goods are to be collected for repair; default from the Unit's actual Stock Location |
 | Supplier Return Location | Intended place to receive the goods after repair; can differ from pickup location; not evidence of receipt |
-| Expected Return Date | Recorded expected return with its provider/evidence; do not imply supplier confirmation where none exists |
+| Expected Return Date | Supplier-reported return date with provider/evidence, distinct from the Carres return target below; never guessed and never an automatic extension |
 | Price / Repair Quotation | Optional price or supplier quotation recorded during creation or in RO detail; unknown is not RM0. Recording a price is neither expense approval nor payment |
 | Cost Responsibility | Recorded responsibility and supporting agreement; a Claim link never proves the supplier will pay |
 | Approval | If a decision requires approval, Jess alone approves; retain the actual decision, scope and time. No substitute approver or Buddy may approve for her. Financial approval is not a placement/Issue gate |
@@ -3541,6 +3541,30 @@ Dealer sites. Record actual collector/carrier separately; these labels do not re
 to transport personally. Changing a planned location never moves a Unit or overwrites Stock's
 current-location fact. A pickup-location mismatch must be resolved against actual custody.
 Do not add `Repair Location`: this register does not track where the supplier performs the repair.
+
+#### Return target and Supplier replies — owner correction 2026-09-20
+
+**APPROVED TARGET / NOT BUILT.** Carres sets a default of **14 working days from the
+Supplier receiving the Repair Order document**. This is not receipt of the goods, RO creation,
+Issue/send time, pickup time or a Service Case deadline. The governed setting supplies the period;
+staff do not type the target on every order. Record evidenced Supplier receipt of the specific RO
+version, the received date/time, source and actual recording actor. Sending/downloading alone
+cannot prove receipt. Until receipt is recorded, show `Awaiting Supplier receipt of RO`; do not
+invent an anchor or a due date. Calculate the target automatically using the admitted working-day
+calendar and preserve the source, setting/calendar version and computed target. No calendar
+configuration has been verified for this standalone RO flow: choosing the governing calendar and
+counting convention remains explicit build-admission work, not a claim that a live setting exists.
+
+Keep the original Carres target separately from `Supplier Expected Return Date`. The Supplier
+may report one month or longer, including fabric/material shortages. Staff record its date, reason,
+reply evidence and actor/time; retain previous replies and affected Units. A Supplier reply does not
+silently extend the Carres target, erase overdue work or change a related Case deadline. If no
+concrete date is provided, retain `Supplier date not reported` and the follow-up; do not invent one.
+Guide staff through `Record Supplier reply`, selecting a reason and entering the reply reference,
+rather than exposing an unexplained date box. The exact form layout remains a review proposal.
+An authorised extension process is not established by this ruling; do not invent its approver.
+Workspace consumes the same RO-owned receipt/target/reply facts through its existing Duty and
+calendar admission, without creating a second repair task system or financial gate.
 
 #### Price recording, approval and issue
 
@@ -3626,12 +3650,14 @@ the Supplier Claims exception.
   and still opens on its permanent internal identity.
 - `Supplier Claim No` is empty for a direct inventory repair. An absent link prints the governed
   absence, never a word implying a relationship that does not exist.
-- `PO No / Unit ID` is one cell, two lines: PO number in full on line one, and on line two the
-  goods identity that PO names — one Unit ID, `{n} Units` as the in-cell disclosure into THIS row's
-  expansion, `Counted stock`, or the honest absence/failure word. A missing original purchase source
-  reads `Not recorded` on line one with the real Unit ID beneath. Never fabricate a PO or a Unit ID,
-  and never put a second document in the cell (UI MASTER §6.8).
-- `Items` is model on line one, configuration on line two; several models read `{first item} + {n} more`.
+- `PO No / Unit ID` shows the full PO first and **every actual Unit ID beneath it**.
+  Owner correction 2026-09-20 supersedes the earlier `{n} Units` summary: two Units show both
+  identifiers directly, without requiring expansion. Keep each ID associated with its genuine PO;
+  a missing original purchase source reads `Not recorded`. Never fabricate identities. Allow
+  enough row height to show the IDs; the two-line default is not a clipping rule.
+- `Items` is model then configuration, with a discoverable item-detail action showing the actual
+  affected Unit facts. It does not replace `RO No` as the entry to the full repair record. Exact
+  item-detail presentation remains a preview proposal; do not invent specifications.
 - `Qty` is the commissioned repair quantity, not a Unit count. No footer quantity total.
 - `Repair Requirement` is what the supplier must do; several requirements read `{first} + {n} more`.
 - **`Cost Responsibility` is a RESPONSIBILITY WORD, NOT MONEY** — `Carres pays` · `Supplier pays` ·

@@ -782,6 +782,14 @@ Work is ready for owner acceptance only when all are demonstrable:
 
 ## 6 · Module admission gate
 
+**RO return timing — owner correction 2026-09-20; target, not built.** Purchasing §9.7 owns
+Carres’s default 14-working-day target starting from evidenced Supplier receipt of the RO document,
+not goods pickup or document sending. My Work/Team Work reads those same source facts; a later
+Supplier-reported return date does not reset the Carres target or complete overdue follow-up.
+Preserve setting/calendar versions and previous dates. A missing receipt cannot produce an
+invented due date. Calendar and occurrence admission still require the §6 contract; no new task
+engine, arbitrary follow-up deadline or extension approver is authorised here.
+
 **Repair Orders integration — owner-approved target, 2026-09-18; NOT BUILT.** Purchasing MASTER
 §9.7 admits direct inventory repairs as well as Claim-linked repairs, including Warehouse,
 Showroom and Dealer Display Units. RO Issue/follow-up obligations and the existing

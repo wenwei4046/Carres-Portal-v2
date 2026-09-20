@@ -907,6 +907,15 @@ obtained; never label it obtained or approved because the RO was issued. Do not 
 owner-consent-before-Issue refusal. Exact English action copy remains part of UI review; this
 rule approves the meaning and non-blocking behaviour, not a new status column or task engine.
 
+**Repair dates — owner correction 2026-09-20; APPROVED TARGET / NOT BUILT.**
+`RO Doc Date` is automatic and cannot be backdated. `Carres return target` uses the configured
+14 working days from evidenced Supplier receipt of the RO document; before that show
+`Awaiting Supplier receipt of RO`. This is not the pickup date or the send date.
+`Supplier Expected Return Date` / `Supplier date not reported` describe the Supplier’s separate
+reply. `Record Supplier reply` asks for its date, reason and reply reference; it does not extend
+Carres’s target. Never ask staff to guess a date. Goods selection guidance: `Click Add Units`,
+`Choose where the goods are now`, `Tick the Unit ID on each item to send for repair`.
+
 **Repair Orders register — owner-confirmed UI, 2026-09-20; APPROVED TARGET / NOT BUILT.**
 Column headings, exactly in this order: `RO Doc Date` · `RO No` · `Supplier` ·
 `Supplier Claim No` · `Category` · `PO No` with `Unit ID` below · `Items` · `Qty` ·
