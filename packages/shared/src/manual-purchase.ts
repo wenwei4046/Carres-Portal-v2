@@ -36,6 +36,29 @@ export const MANUAL_PURCHASE_WORDS = {
   sendNeedsServiceCase: "Send — pick the Service Case",
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
+  /**
+   * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0549) — and the reason it is a
+   * QUESTION rather than a derivation.
+   *
+   * The owner ruling of 2026-09-18 requires the intent to be STORED and
+   * forbids inferring it from the SKU, the shelf count or the purpose. 0546
+   * built the column, the door and every guard that reads it — and nothing
+   * ever wrote it, so every request stored NULL and not one Unit could be
+   * allocated. This is the question that feeds them.
+   *
+   * ⛔ NO DEFAULT. A pre-selected answer is a guess wearing the operator's
+   * name, which is the exact thing the ruling bans; the field starts empty and
+   * `Send` names the gap like every other missing header fact.
+   *
+   * The words reuse the vocabulary the read-only reasons already carry —
+   * `This purchase buys extra stock` and `whether stock can answer it` — so
+   * the question and its later consequence read as one sentence rather than
+   * two dialects.
+   */
+  canStockAnswer: "Can stock answer this?",
+  canStockAnswerYes: "Yes — existing stock can answer this",
+  canStockAnswerNo: "No — this buys extra stock",
+  sendNeedsStockAnswer: "Send — say whether stock can answer this",
   cancel: "Cancel",
   /** The Deliver To door on an existing request (0421): the text button that
    *  opens the choice, and the act that closes it. */
@@ -115,8 +138,15 @@ export const MANUAL_PURCHASE_WORDS = {
    * arithmetic: `manualPurchaseGroupOf`.
    */
   groupNeedApproval: "Need approval",
-  groupToBuy: "To buy",
-  groupNoPurchaseNeeded: "No purchase needed",
+  /**
+   * ⭐ `To buy` AND `No purchase needed` ARE RETIRED ON THIS PAGE (owner
+   * ruling 2026-09-18). The heading now says the same thing the row's own
+   * `Status` cell says, in the same two words, so a group and the rows inside
+   * it cannot read as two different answers. SO Batch Purchase keeps its own
+   * register groups — this renames Manual Purchase only.
+   */
+  groupNeedPo: "Need PO",
+  groupNoPoNeeded: "No PO needed",
   groupNeedApprovalEmpty: "Nothing waiting for approval",
   noMatch: "No Manual Purchases match these filters",
   footerOne: "1 Manual Purchase",
@@ -143,8 +173,49 @@ export const MANUAL_PURCHASE_WORDS = {
   colPurpose: "Purpose",
   colItems: "Items",
   colSupplier: "Supplier",
+  /** The OBJECT still reads `Deliver To`; the four reviewed LISTINGS read
+   *  `Supplier Deliver To` (Purchasing UI dictionary, 2026-09-18) — the
+   *  destination instructed to the supplier, which is not the customer's
+   *  address and not the site the goods actually reach. */
   colDeliverTo: "Deliver To",
+  colSupplierDeliverTo: "Supplier Deliver To",
   colDeliveryDate: "Delivery Date",
+  /**
+   * ── THE COLUMNS THE 2026-09-18 RULING ADDED ──────────────────────────────
+   *
+   * `Status` is the purchase NEED and is independent of `Approval Status`:
+   * `Need PO` may stand beside `Need approval`, because the goods are needed
+   * and the decision is separate. Never print one in the other's column.
+   */
+  colStatus: "Status",
+  colMprNo: "MPR No",
+  /** A request minted between 0424 and 0546 stored no number. The absence is
+   *  a FACT and is never an invented `MPR-…`; the row still opens. */
+  mprNotRecorded: "Not recorded",
+  colPoSafetyDays: "PO Safety Days",
+  colCustomerRequestedDeliveryDate: "Customer Requested Delivery Date",
+  colCustomerDeliveryLocation: "Customer Delivery Location",
+  colCustomer: "Customer",
+  colPoDefaultDeliveryDate: "PO Default Delivery Date",
+  colCategory: "Category",
+  colQty: "Qty",
+  colItem: "Item",
+  colReadyStock: "Ready Stock",
+  /**
+   * THE STOCK SELECTION JOURNEY (owner ruling 2026-09-18). Four controls and
+   * no fifth: there is no per-Unit Undo, because a Unit is not a document and
+   * an act that releases one of five choices is the same act that saves them.
+   */
+  chooseReadyUnit: "Choose Ready Unit",
+  changeSelection: "Change selection",
+  saveChanges: "Save changes",
+  cancelChanges: "Cancel",
+  stockNotSaved: "Not saved",
+  stockSaved: "Stock selection saved.",
+  stockSaveOrCancelFirst: "Save or cancel your stock selection before issuing a PO.",
+  stockReadFailed: "Ready Stock could not be read.",
+  stockReading: "Reading the stock register…",
+  stockNoneMatches: "No stock on the shelf matches this item.",
   /** The OBJECT's structured `For` fact — never a Register column again. */
   colFor: "For",
   /** The PO lineage absence — the arithmetic ran and found no PO. The

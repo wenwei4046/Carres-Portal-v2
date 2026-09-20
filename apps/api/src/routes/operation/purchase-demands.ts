@@ -4,6 +4,8 @@ import {
   purchaseDemandBlockerOf,
   purchaseDemandQuantities,
   purchaseDemandTimingOf,
+  purchaseDemandSafetyDaysLeft,
+  isPurchaseDemandTimingState,
   soBatchAction,
   soBatchOrderLineOutstandingQty,
   soBatchOrderStatusOf,
@@ -539,6 +541,23 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           (supplierKinds.get(proposal.supplierId) ?? "own_logistics") ===
             "factory_pickup" &&
           !collectionBySupplier.get(proposal.supplierId)?.procurementPartnerId;
+        /* ONE INPUT BUNDLE, TWO ANSWERS — the timing state and the
+           `PO Safety Days` margin it is classified from. Built once so the
+           column and the rail row can never be measured against two different
+           sets of dates (ERP Architecture Law D). `null` when the engine gave
+           this build no completion date: an unmeasured margin is UNKNOWN, and
+           the column says so instead of printing a `0` nobody counted. */
+        const timing =
+          row.delivery != null && build.readyIfOrderedToday != null
+            ? {
+                today,
+                orderBy: build.orderBy ?? null,
+                readyIfOrderedToday: build.readyIfOrderedToday,
+                customerDelivery: row.delivery,
+                safetyDays: settings.orderByBufferDays,
+                holidays,
+              }
+            : null;
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
@@ -546,20 +565,20 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
               ? "no_cost"
             : pickupPartnerMissing
               ? "no_pickup_partner"
-            : build.readyIfOrderedToday != null
-              ? purchaseDemandTimingOf({
-                  today,
-                  orderBy: build.orderBy ?? null,
-                  readyIfOrderedToday: build.readyIfOrderedToday,
-                  customerDelivery: row.delivery,
-                  safetyDays: settings.orderByBufferDays,
-                  holidays,
-                })
+            : timing != null
+              ? purchaseDemandTimingOf(timing)
               : /* The engine planned this build but gave it no dates — a pair
                    whose production facts went missing mid-read. Fail safely at
                    the Purchasing-owned boundary: `SETUP TO FIX` names it, and
                    nothing silently defaults an order timing. */
                 "no_production_days";
+        /* The margin belongs to a demand that can actually be timed. A blocked
+           row has no margin to state, and stating one would describe a plan
+           that does not exist. */
+        const safetyDaysLeft =
+          timing != null && isPurchaseDemandTimingState(state)
+            ? purchaseDemandSafetyDaysLeft(timing)
+            : null;
         const fact = orderFact(row.orderId);
         rows.push({
           id: `build::${row.orderId}::${build.key}`,
@@ -570,6 +589,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           customer: row.customer,
           customerDelivery: row.delivery,
           orderBy: build.orderBy ?? null,
+          safetyDaysLeft,
           item: build.model,
           // A modular sofa is a matched SET, not one variant — the engine gives
           // it no size, and its module codes are the SKUs below.

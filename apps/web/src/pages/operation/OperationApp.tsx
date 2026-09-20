@@ -57,6 +57,7 @@ import OperationDeliveryReport from "./OperationDeliveryReport";
 import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPurchaseReturns from "./OperationPurchaseReturns";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
 import OperationPurchasingReport from "./OperationPurchasingReport";
@@ -365,6 +366,19 @@ export default function OperationApp() {
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
+             It draws PurchasingTabs, which is a ModuleHeader and embeds
+             TopBarIcons, so the slim bar put a second Jump to, a second bell,
+             a second Help and a second gear on one screen. Found on the
+             production walk, like every one before it; the test below now
+             catches the whole CLASS instead of waiting for the next walk. */
+          tab !== "purchase-returns" &&
+          /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
+             live rail destination that draws its own ModuleHeader and has been
+             showing two top rows. The class test above found it the minute it
+             existed, which is the whole reason that test is a rule and not a
+             list of six names. */
+          tab !== "supplier-items" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" &&
           /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
@@ -526,6 +540,10 @@ export default function OperationApp() {
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
             {tab === "claims" && <OperationSupplierClaims />}
+            {/* §9.6 — Purchase Returns: the goods an approved claim outcome
+                sends back. Read-only; issuing a return is §7.4's own door and
+                moving the goods is Stock's. */}
+            {tab === "purchase-returns" && <OperationPurchaseReturns />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}

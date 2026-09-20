@@ -176,8 +176,19 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
     }
     // UI MASTER's current rail grammar supersedes the old FacetRow import.
+    // The law is WHICH MODULE the rail comes from and that all three parts
+    // come from it — not the punctuation of one import line. A page that also
+    // imports another shared control from `workspace-rail` (`ShowFiltersButton`,
+    // extracted 2026-09-18) still obeys it, and pinning the exact named set
+    // made a compliant extraction look like a violation.
     const claims = read("pages/operation/OperationSupplierClaims.tsx");
-    expect(claims).toMatch(/import \{ FilterRail, FilterRailGroup, FilterRailRow \} from "\.\/components\/workspace-rail"/);
+    const railImport = claims.match(
+      /import \{([^}]*)\} from "\.\/components\/workspace-rail"/,
+    );
+    expect(railImport, "Supplier Claims imports the shared rail").toBeTruthy();
+    for (const part of ["FilterRail", "FilterRailGroup", "FilterRailRow"]) {
+      expect(railImport?.[1]).toContain(part);
+    }
     expect(claims).not.toMatch(/from "@\/components\/FacetRow"/);
     // Receiving left this list on 2026-08-03 (Slice B): it is no longer a
     // facet-rail list page, it is the Purchasing module's WORKSPACE template —
