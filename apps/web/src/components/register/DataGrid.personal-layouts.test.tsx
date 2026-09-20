@@ -46,7 +46,13 @@ function mount(personal?: Partial<DataGridPersonalLayouts>, key = "test.personal
   );
   return { ...utils, props };
 }
-const heads = (c: HTMLElement) => [...c.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+/* Group-local headers (Jess, 2026-09-18): a governed grouped listing has no
+   `<thead>`. Every open group draws the SAME header, so reading the first one
+   reads the layout — which is the point of one `<colgroup>` and one layout. */
+const headerCells = (c: HTMLElement) => [
+  ...(c.querySelector<HTMLElement>('tr[data-testid^="grid-header-"]')?.querySelectorAll<HTMLElement>("th") ?? []),
+];
+const heads = (c: HTMLElement) => headerCells(c).map((th) => th.title).filter(Boolean);
 const openColumns = () => fireEvent.click(screen.getByRole("button", { name: "Columns" }));
 
 afterEach(() => window.localStorage.clear());
@@ -100,7 +106,7 @@ describe("DataGrid · personalLayouts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load layout" }));
     fireEvent.click(screen.getByRole("button", { name: "Receiving view" }));
     expect(heads(container)).toEqual(["PO Date", "PO No", "GRN No"]);
-    const grn = [...container.querySelectorAll<HTMLElement>("thead th")].find((th) => th.title === "GRN No")!;
+    const grn = headerCells(container).find((th) => th.title === "GRN No")!;
     expect(grn.style.width).toBe("200px");
   });
 
@@ -150,7 +156,7 @@ describe("DataGrid · personalLayouts", () => {
     const { container } = mount({});
     openColumns();
     fireEvent.click(screen.getByRole("button", { name: "Best fit" }));
-    const supplier = [...container.querySelectorAll<HTMLElement>("thead th")].find((th) => th.title === "Supplier")!;
+    const supplier = headerCells(container).find((th) => th.title === "Supplier")!;
     // `Hooka Furniture Manufacturing` = 29 characters → 29 × 7 + 17 = 220.
     expect(supplier.style.width).toBe("220px");
   });

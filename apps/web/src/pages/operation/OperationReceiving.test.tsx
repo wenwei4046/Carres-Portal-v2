@@ -57,6 +57,8 @@ const h = vi.hoisted(() => ({
   receiptsError: false,
   /** The paged register's page size — small in the pagination test. */
   pageLimit: 50,
+  /** The GRN document's own item words and governed categories, per SKU. */
+  lineInfo: {} as Record<string, { description: string | null; category: string }>,
   /** Every ask the page sent the paged register hook — filters + offset. */
   registerAsks: [] as Array<Record<string, unknown>>,
   pos: [] as unknown[],
@@ -92,7 +94,10 @@ vi.mock("@/lib/queries", async () => {
       category: string | null;
       supplier: string | null;
       site: string | null;
-      expected: string | null;
+      receivedWith: "damaged" | "wrong_item" | "extra" | null;
+      from: string | null;
+      to: string | null;
+      cancelled: boolean;
       q: string;
     }) => {
       h.registerAsks.push({ ...filters });
@@ -116,13 +121,22 @@ vi.mock("@/lib/queries", async () => {
             (r.actual_site_name as string | null) ??
             (r.warehouse_name as string | null) ??
             null,
-          supplierDeliveryDateIso:
-            (r.supplier_delivery_date as string | null) ?? null,
+          /* `GRN date` is the CREATION stamp — the posting — read here
+             exactly as the Worker reads it. */
+          grnDateIso: ((r.posted_at as string | null) ?? "").slice(0, 10) || null,
+          damaged: (r.lines as Array<{ damaged_qty: number }>).some(
+            (l) => l.damaged_qty > 0,
+          ),
+          wrongItem: (r.lines as Array<{ wrong_item_qty: number }>).some(
+            (l) => l.wrong_item_qty > 0,
+          ),
+          extra: ((r.extra_lines as unknown[] | undefined) ?? []).length > 0,
+          cancelled: r.status === "voided",
           searchText: [r.grn_no, r.po_id, r.do_number, r.supplier_name]
             .filter(Boolean)
             .join(" "),
         })),
-        filters,
+        { ...filters, cancelled: filters.cancelled ? true : null },
         filters.offset,
         h.pageLimit,
       );
@@ -136,6 +150,7 @@ vi.mock("@/lib/queries", async () => {
             total: view.total,
           },
           facets: view.facets,
+          line_info: h.lineInfo,
           counts: { waiting: h.waiting },
         },
         isLoading: false,
@@ -339,7 +354,24 @@ function receipt(over: Record<string, unknown>) {
 }
 
 const REGISTER_ROWS = [
-  receipt({ id: "r-posted" }),
+  /* Created Tue 1 Sep (Kuala Lumpur). It carries BOTH a damaged unit and
+     extra goods, which is how the rail's overlapping counts are proved. */
+  receipt({
+    id: "r-posted",
+    lines: [
+      {
+        id: "lr1",
+        sku: "MS01",
+        received_now: 2,
+        damaged_qty: 1,
+        wrong_item_qty: 0,
+        wrong_item_claim_type: null,
+      },
+    ],
+    extra_lines: [{ sku: "MS02", qty: 2 }],
+    source_refs: ["SO-1303", "MPR-20260904-8935"],
+    unit_ids_by_line: { lr1: ["id-abc000001", "id-abc000002"] },
+  }),
   /* A submitted count is WORK, not a GRN — the boundary says it never
      becomes a Register row. It stays in the fixture to prove exclusion. */
   receipt({
@@ -358,6 +390,9 @@ const REGISTER_ROWS = [
     id: "r-voided",
     status: "voided",
     grn_no: "GRN-20260830-7777",
+    /* Created on a SUNDAY, in the week and the month before the other one —
+       a GRN can be created on a Sunday and the rail must list that day. */
+    posted_at: "2026-08-30T03:00:00Z",
     void_at: "2026-09-02T00:00:00Z",
     void_by_name: "Jess",
     void_reason: "Duplicate entry",
@@ -365,8 +400,19 @@ const REGISTER_ROWS = [
     categories: ["Sofa"],
     supplier_delivery_date: "2026-09-12",
     product_labels: ["Cloud Sofa 3-seater"],
+    extra_lines: [],
+    /* A consignment return: no purchase order at all, and no number is
+       invented to fill the column. */
+    source_refs: [],
+    unit_ids_by_line: {},
   }),
 ];
+
+/** The GRN paper's own item words and governed categories, server-resolved. */
+const LINE_INFO = {
+  MS01: { description: "Dream Queen", category: "Mattress" },
+  MS02: { description: "Dream King", category: "Mattress" },
+};
 
 const FIND_POS = [
   po({
@@ -503,6 +549,7 @@ beforeEach(() => {
   h.receiptsError = false;
   h.pageLimit = 50;
   h.registerAsks.length = 0;
+  h.lineInfo = { ...LINE_INFO };
   h.pos = [...FIND_POS];
   h.poReceiving = { sessions: [], events: [], expected_units: [] };
   h.sessionDetail = null;
@@ -524,21 +571,32 @@ afterEach(() => {
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("draws the 240px rail — Calendar fixed on top, CATEGORY · SUPPLIER · GOODS ARRIVED AT · Clear filters beneath", () => {
+  it("draws the 240px rail — the six approved groups, no month Calendar, no Clear filters button", () => {
     renderPage();
     const rail = screen.getByTestId("receiving-rail");
     expect(rail.className).toContain("w-[240px]");
     const inRail = within(rail);
-    // The Calendar lives in the FIXED block; the business filters live in
-    // their own independently scrolling block (owner correction 2026-09-06).
-    const fixed = inRail.getByTestId("receiving-rail-fixed");
+    // The six groups the owner ruled, in order (§9.4, 2026-09-17).
+    for (const heading of [
+      "GRN date",
+      "Received with",
+      "Category",
+      "Goods arrived at",
+      "Supplier",
+      "Cancelled GRNs",
+    ]) {
+      expect(inRail.getByText(heading)).toBeInTheDocument();
+    }
+    // The month Calendar is RETIRED — the expected-arrival view lives in
+    // Warehouse Arrival Schedule.
+    expect(inRail.queryByTestId("receiving-calendar")).not.toBeInTheDocument();
+    // And the rail has NO permanent Clear filters button (owner correction
+    // 2026-09-18); the toolbar's active conditions clear what is on.
+    expect(inRail.queryByTestId("rail-clear-filters")).not.toBeInTheDocument();
+    expect(inRail.queryByText("Clear filters")).not.toBeInTheDocument();
+
     expect(
-      within(fixed).getByTestId("receiving-calendar"),
-    ).toBeInTheDocument();
-    const scroll = inRail.getByTestId("receiving-rail-scroll");
-    expect(scroll.className).toContain("overflow-y-auto");
-    expect(
-      within(scroll).getByTestId("rail-category-Mattress"),
+      inRail.getByTestId("rail-category-Mattress"),
     ).toBeInTheDocument();
     // Only the governed categories PRESENT in the result set render — the
     // fixtures hold Mattress and Sofa GRNs, so Bedframe/Pillow/Mattress
@@ -556,13 +614,7 @@ describe("OperationReceiving — the formal GRN Register", () => {
       ).not.toBeInTheDocument();
       expect(inRail.queryByText(banned)).not.toBeInTheDocument();
     }
-    expect(inRail.getByText("Goods arrived at")).toBeInTheDocument();
-    expect(inRail.getByTestId("rail-clear-filters")).toHaveTextContent(
-      "Clear filters",
-    );
-    // The old Receiving state rail is retired — no `All …`, no state rows,
-    // and no second received-date filter (the table's `Goods received on`
-    // column owns detailed date filtering).
+    // The old Receiving state rail is retired — no `All …`, no state rows.
     for (const gone of [
       "All receiving",
       "All suppliers",
@@ -576,6 +628,18 @@ describe("OperationReceiving — the formal GRN Register", () => {
     }
   });
 
+  it("opens on every permitted GRN — no date has to be chosen to see records", () => {
+    renderPage();
+    // The listing is complete before any rail choice (owner ruling
+    // 2026-09-18): the page never opens on an empty date-picker.
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+      "Showing 1–2 of 2",
+    );
+    const first = h.registerAsks[0]!;
+    expect(first.from).toBeNull();
+    expect(first.to).toBeNull();
+  });
+
   it("lists ONLY GRNs — a submitted count is Work, never a Register row", () => {
     renderPage();
     // Valid GRN: the formal stored number, never re-derived.
@@ -587,24 +651,80 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(screen.queryByText("PO-2002")).not.toBeInTheDocument();
   });
 
-  it("speaks document status words — Valid / Cancelled, never Posted / Voided", () => {
+  it("gives a normal GRN no status word, and says Cancelled under the cancelled one's number", () => {
     renderPage();
-    expect(screen.getAllByText("Valid").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
+    // There is no Status COLUMN at all, and no `Valid` anywhere.
+    expect(
+      within(screen.getByTestId("grid-header")).queryByText("Status"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Valid")).not.toBeInTheDocument();
+    // `Cancelled` appears exactly where the person reading the number is
+    // already looking — under the GRN No of the cancelled record.
+    const mark = screen.getByTestId("grn-cancelled-r-voided");
+    expect(mark).toHaveTextContent("Cancelled");
+    // Database words never reach this screen.
     expect(screen.queryByText("Posted")).not.toBeInTheDocument();
     expect(screen.queryByText("Voided")).not.toBeInTheDocument();
+    // Partial/completed receipt progress belongs to the purchase order — a
+    // GRN is a document, and a document is not half saved.
+    for (const banned of ["Partial", "Partly received", "Completed"]) {
+      expect(screen.queryByText(banned)).not.toBeInTheDocument();
+    }
   });
 
-  it("speaks the corrected location/date words in the table", () => {
+  it("speaks the approved column words, and none of the retired ones", () => {
     renderPage();
-    expect(screen.getByText("Goods received on")).toBeInTheDocument();
-    expect(within(screen.getByTestId("grid-header")).getByText("Goods arrived at")).toBeInTheDocument();
-    expect(screen.getByText("Deliver To")).toBeInTheDocument();
-    expect(screen.queryByText("Actual Site")).not.toBeInTheDocument();
-    expect(screen.queryByText("Goods Received At")).not.toBeInTheDocument();
+    const headerEl = screen.getByTestId("grid-header");
+    const header = within(headerEl);
+    /* A two-line header is one label broken by a `<br>`, so the words are
+       read off the header's own text rather than as separate elements. */
+    const headerText = (headerEl.textContent ?? "").replace(/\s+/g, " ");
+    for (const word of [
+      "GRN Date",
+      "GRN No",
+      // The four-way source reference, on its two approved lines.
+      "SO No / MPR No",
+      "CO No / RO No",
+      "PO No",
+      "Supplier",
+      "Supplier Deliver To",
+      "Goods arrived at",
+      "Supplier Confirmed Delivery Date",
+      "Goods Received Date",
+      // `No` takes NO full stop (owner ruling 2026-09-18).
+      "Supplier DO No",
+      "Items",
+      "Received Qty",
+      "Damaged Qty",
+      "Wrong Item Qty",
+      "Extra Qty",
+    ]) {
+      expect(headerText).toContain(word);
+    }
+    // Every retired word this register printed until today.
+    for (const retired of [
+      "Supplier Delivery Date",
+      "Goods received on",
+      "Product",
+      "PO/CO No",
+      "Actual Site",
+      "Goods Received At",
+      "Delivery Location",
+    ]) {
+      expect(header.queryByText(retired)).not.toBeInTheDocument();
+    }
   });
 
-  it("a category pick narrows the listing; picking it again clears; Clear filters clears the rail", async () => {
+  it("prints the genuine linked documents, and invents none for a receipt without them", () => {
+    renderPage();
+    expect(screen.getByText("SO-1303")).toBeInTheDocument();
+    expect(screen.getByText("MPR-20260904-8935")).toBeInTheDocument();
+    // The cancelled GRN has no linked source and no purchase order of its
+    // own in the fixture — the cells stay empty rather than borrowing one.
+    expect(screen.queryByText("SO-0000")).not.toBeInTheDocument();
+  });
+
+  it("a category pick narrows the listing; picking it again clears; the toolbar chip clears the rest", async () => {
     renderPage();
     fireEvent.click(screen.getByTestId("rail-category-Sofa"));
     await waitFor(() =>
@@ -618,16 +738,172 @@ describe("OperationReceiving — the formal GRN Register", () => {
       expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0),
     );
 
-    // Clear filters clears the complete rail.
+    // The rail lost its Clear filters button; the toolbar's active
+    // conditions name what is on and clear it (owner correction 2026-09-18).
     fireEvent.click(screen.getByTestId("rail-category-Mattress"));
     fireEvent.click(screen.getByTestId("rail-supplier-Nice Future"));
     await waitFor(() =>
       expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByTestId("rail-clear-filters"));
+    expect(screen.getByText("Category: Mattress")).toBeInTheDocument();
+    expect(screen.getByText("Supplier: Nice Future")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /clear filters/i }));
     await waitFor(() =>
       expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
     );
+  });
+
+  it("the GRN date group lists weeks, months and Choose dates — and a week's arrow only OPENS it", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    // Two weeks, each counting the GRNs CREATED in it — 31 Aug – 6 Sep holds
+    // the Tuesday record, 24 – 30 Aug holds the SUNDAY one.
+    const week = rail.getByTestId("rail-grn-week-2026-08-31");
+    expect(week).toHaveTextContent("31 Aug – 6 Sep");
+    expect(week).toHaveTextContent("1");
+    expect(rail.getByTestId("rail-grn-week-2026-08-24")).toHaveTextContent(
+      "24 – 30 Aug",
+    );
+    // Months and Choose dates… are the coarser and the free choice.
+    expect(rail.getByTestId("rail-grn-month-2026-09")).toHaveTextContent("Sep 2026");
+    expect(rail.getByTestId("rail-grn-month-2026-08")).toHaveTextContent("Aug 2026");
+    expect(rail.getByTestId("rail-grn-choose")).toHaveTextContent("Choose dates…");
+
+    // THE ARROW FILTERS NOTHING — it only reveals the week's days, Sunday
+    // included, and days with no GRN are never listed.
+    expect(rail.queryByTestId("rail-grn-day-2026-08-30")).not.toBeVisible();
+    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24-expand"));
+    await waitFor(() =>
+      expect(rail.getByTestId("rail-grn-day-2026-08-30")).toBeVisible(),
+    );
+    expect(rail.getByTestId("rail-grn-day-2026-08-30")).toHaveTextContent("30 Aug");
+    expect(rail.queryByTestId("rail-grn-day-2026-08-29")).not.toBeInTheDocument();
+    // Opening it changed no filter.
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent("of 2");
+
+    // Pressing the WEEK is what filters, as one inclusive range.
+    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+    );
+    const ask = h.registerAsks[h.registerAsks.length - 1]!;
+    expect(ask.from).toBe("2026-08-24");
+    expect(ask.to).toBe("2026-08-30");
+    // Pressing it again clears the choice.
+    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-24"));
+    await waitFor(() =>
+      expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0),
+    );
+  });
+
+  it("a day inside a week filters that one day", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    fireEvent.click(rail.getByTestId("rail-grn-week-2026-08-31-expand"));
+    fireEvent.click(await rail.findByTestId("rail-grn-day-2026-09-01"));
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+    );
+    const ask = h.registerAsks[h.registerAsks.length - 1]!;
+    expect(ask.from).toBe("2026-09-01");
+    expect(ask.to).toBe("2026-09-01");
+  });
+
+  it("Choose dates… opens two labelled fields and asks the server for that range", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    fireEvent.click(rail.getByTestId("rail-grn-choose"));
+    await rail.findByTestId("rail-grn-range");
+    /* The shared `DateField` — day-first whatever the machine's locale, so
+       the rail cannot show one spelling of a date and the table another. */
+    const from = rail.getByLabelText("GRN date from");
+    fireEvent.change(from, { target: { value: "01/08/2026" } });
+    fireEvent.change(rail.getByLabelText("GRN date to"), {
+      target: { value: "31/08/2026" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+    );
+    const ask = h.registerAsks[h.registerAsks.length - 1]!;
+    expect(ask.from).toBe("2026-08-01");
+    expect(ask.to).toBe("2026-08-31");
+  });
+
+  it("`Received with` counts GRN RECORDS, overlapping — never a total", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    // ONE GRN carries both a damaged unit and extra goods, so it is counted
+    // in two rows. 1 + 0 + 1 describes one record, which is exactly why the
+    // three numbers are never added together.
+    expect(rail.getByTestId("rail-received-damaged")).toHaveTextContent("1");
+    expect(rail.getByTestId("rail-received-wrong_item")).toHaveTextContent("0");
+    expect(rail.getByTestId("rail-received-extra")).toHaveTextContent("1");
+    expect(rail.getByText("Damaged goods")).toBeInTheDocument();
+    expect(rail.getByText("Wrong items")).toBeInTheDocument();
+    expect(rail.getByText("Extra goods")).toBeInTheDocument();
+
+    fireEvent.click(rail.getByTestId("rail-received-damaged"));
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("Received with: Damaged goods")).toBeInTheDocument();
+    // Selected facets toggle off.
+    fireEvent.click(rail.getByTestId("rail-received-damaged"));
+    await waitFor(() =>
+      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
+    );
+  });
+
+  it("Cancelled GRNs is the last ROW, and the default listing holds valid and cancelled alike", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    expect(rail.getByTestId("rail-cancelled")).toHaveTextContent("1");
+    // Both are listed before anything is chosen.
+    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+    fireEvent.click(rail.getByTestId("rail-cancelled"));
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument(),
+    );
+    // The rail row AND the toolbar's active condition both say it.
+    expect(screen.getAllByText("Cancelled GRNs").length).toBe(2);
+  });
+
+  it("the read-only goods expansion carries the receipt's own line facts — and buys nothing", async () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId("grn-expand-r-posted"));
+    const goods = within(await screen.findByTestId("grn-goods-r-posted"));
+    // The approved order: Category · Supplier · Supplier Deliver To ·
+    // PO No / Ref No (+ Unit ID) · Items · the four quantity words.
+    const headers = goods
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers).toEqual([
+      "Category",
+      "Supplier",
+      "Supplier Deliver To",
+      "PO No / Ref No",
+      "Items",
+      "Received Qty",
+      "Damaged Qty",
+      "Wrong Item Qty",
+      "Extra Qty",
+    ]);
+    // The source number leads; its line-bound Unit IDs follow beneath it.
+    expect(goods.getByText("PO-2001")).toBeInTheDocument();
+    expect(goods.getByText("id-abc000001")).toBeInTheDocument();
+    expect(goods.getByText("id-abc000002")).toBeInTheDocument();
+    // The GRN paper's own item word, with the SKU on its second line.
+    expect(goods.getByText("Dream Queen")).toBeInTheDocument();
+    expect(goods.getAllByText("MS01").length).toBeGreaterThan(0);
+    // Extra goods keep their OWN row — never folded into a received line.
+    expect(goods.getByText("Dream King")).toBeInTheDocument();
+    expect(goods.getByText("Extra goods")).toBeInTheDocument();
+    // It selects nothing and buys nothing.
+    expect(goods.queryAllByRole("checkbox")).toHaveLength(0);
+    for (const banned of ["Ready Stock", "To buy", "Ordered Qty"]) {
+      expect(goods.queryByText(banned)).not.toBeInTheDocument();
+    }
   });
 
   it("shows real counts from the COMPLETE GRN result set", () => {
@@ -710,26 +986,94 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(screen.queryByText(/Nothing received/i)).not.toBeInTheDocument();
   });
 
-  it("carries the corrected register columns — Supplier Delivery Date · PO/CO No · Product", () => {
+  it("leads with GRN Date then GRN No — the pinned pair the engine guarantees", () => {
     renderPage();
-    expect(screen.getByText("Supplier Delivery Date")).toBeInTheDocument();
-    expect(screen.getByText("PO/CO No")).toBeInTheDocument();
-    expect(screen.getByText("Product")).toBeInTheDocument();
-    // The cells speak the server-resolved facts: the governed supplier date
-    // and the GRN paper's own product words.
+    const headerCells = within(screen.getByTestId("grid-header"))
+      .getAllByRole("columnheader")
+      .map((th) => (th.textContent ?? "").replace(/\s+/g, " ").trim());
+    /* The engine owns the pin (`leadingColumns`): the two lead in this order
+       whatever a saved layout says, neither can be hidden, and below a 768px
+       canvas the identity pins alone. The disclosure gutter comes first. */
+    const named = headerCells.filter((t) => t.length > 0);
+    expect(named[0]).toContain("GRN Date");
+    expect(named[1]).toContain("GRN No");
+  });
+
+  it("keeps a long four-way reference whole — every number, none dropped", () => {
+    h.receipts = [
+      receipt({
+        id: "r-long",
+        source_refs: [
+          "SO-1303",
+          "SO-1477",
+          "MPR-20260904-8935",
+          "RO-20260916-0042",
+        ],
+        po_id: "PO-20260901-4827",
+        supplier_name: "Dorsettloft Manufacturing Sdn Bhd",
+        warehouse_name: "AL Sungai Buloh Distribution Centre",
+      }),
+    ];
+    renderPage();
+    // A reference list is not truncated to the first one, and not summarised
+    // into `+3 more`: each document the receipt genuinely carries is readable.
+    for (const ref of [
+      "SO-1303",
+      "SO-1477",
+      "MPR-20260904-8935",
+      "RO-20260916-0042",
+      "PO-20260901-4827",
+    ]) {
+      expect(screen.getByText(ref)).toBeInTheDocument();
+    }
+    // The long supplier name reads in the row and in the rail alike.
+    expect(
+      screen.getAllByText("Dorsettloft Manufacturing Sdn Bhd").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("is reachable by keyboard — the arrow opens a week with Enter and still filters nothing", async () => {
+    renderPage();
+    const rail = within(screen.getByTestId("receiving-rail"));
+    const arrow = rail.getByTestId("rail-grn-week-2026-08-24-expand");
+    // A real button with a stated expanded state, and an accessible name that
+    // says what it does — not a decorative caret.
+    expect(arrow.tagName).toBe("BUTTON");
+    expect(arrow).toHaveAttribute("aria-expanded", "false");
+    expect(arrow).toHaveAccessibleName("Show the days in 24 – 30 Aug");
+    arrow.focus();
+    expect(document.activeElement).toBe(arrow);
+    fireEvent.keyDown(arrow, { key: "Enter" });
+    fireEvent.click(arrow);
+    await waitFor(() => expect(arrow).toHaveAttribute("aria-expanded", "true"));
+    // Opening it narrowed nothing — both GRNs are still listed.
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+      "Showing 1–2 of 2",
+    );
+    const ask = h.registerAsks[h.registerAsks.length - 1]!;
+    expect(ask.from).toBeNull();
+    expect(ask.to).toBeNull();
+  });
+
+  it("the cells speak the server-resolved facts, in the governed words", () => {
+    renderPage();
+    // The GRN paper's own item words, and the governed supplier answer.
     expect(screen.getAllByText("Dream Queen").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Cloud Sofa 3-seater").length).toBeGreaterThan(0);
+    // Both fixtures carry an evidenced supplier answer, so nothing reads
+    // `Not confirmed` — the absence word is never printed over a real date.
+    expect(screen.queryAllByText("Not confirmed")).toHaveLength(0);
   });
 });
 
-/* ═══ THE RAIL CALENDAR · ONE DESTINATION · SERVER PAGINATION ═════════════ */
+/* ═══ ONE DESTINATION · SERVER PAGINATION ════════════════════════════════ */
 
-describe("OperationReceiving — the rail Calendar and the paged register", () => {
+describe("OperationReceiving — one destination and the paged register", () => {
   it("is ONE destination — no Calendar/Register view switch, no Receiving Monitor", async () => {
     renderPage();
-    // The month Calendar and the complete GRN Register render TOGETHER —
-    // there is nothing to switch.
-    expect(screen.getByTestId("receiving-calendar")).toBeInTheDocument();
+    // The rail and the complete GRN Register render TOGETHER — there is
+    // nothing to switch, and the month Calendar is retired from this page.
+    expect(screen.queryByTestId("receiving-calendar")).not.toBeInTheDocument();
     expect(screen.getByTestId("receiving-register")).toBeInTheDocument();
     for (const banned of [
       "Calendar View",
@@ -744,84 +1088,6 @@ describe("OperationReceiving — the rail Calendar and the paged register", () =
       i.label.toLowerCase().includes("receiving"),
     );
     expect(receivingRows.map((i) => i.label)).toEqual(["Receiving"]);
-  });
-
-  it("opens on the operator's month, spelled out, with Sunday visible but muted", () => {
-    renderPage();
-    const cal = screen.getByTestId("receiving-calendar");
-    expect(within(cal).getByText("SEPTEMBER 2026")).toBeInTheDocument();
-    expect(within(cal).getAllByText(/^Su/i).length).toBeGreaterThan(0);
-    // 2026-09-06 is a Sunday — a non-working day wears the muted state; the
-    // working calendar is Monday–Saturday.
-    const sunday = within(cal).getByTestId("month-day-2026-09-06");
-    expect(sunday.closest("td")?.className ?? "").toContain("kit-slate-9");
-    const monday = within(cal).getByTestId("month-day-2026-09-07");
-    expect(monday.closest("td")?.className ?? "").not.toContain("kit-slate-9");
-  });
-
-  it("the month arrows move exactly one month", async () => {
-    renderPage();
-    const cal = screen.getByTestId("receiving-calendar");
-    fireEvent.click(
-      within(cal).getByRole("button", { name: /next month/i }),
-    );
-    await within(cal).findByText("OCTOBER 2026");
-    fireEvent.click(
-      within(cal).getByRole("button", { name: /previous month/i }),
-    );
-    await within(cal).findByText("SEPTEMBER 2026");
-  });
-
-  it("marks expected supplier arrivals with an accessible COUNT — never colour alone", () => {
-    renderPage();
-    const cal = screen.getByTestId("receiving-calendar");
-    // Two open, still-owing POs answered 8 Sep — the marker is the number 2
-    // and the day button says it in words.
-    const day = within(cal).getByTestId("month-day-2026-09-08");
-    expect(day).toHaveAccessibleName(
-      "2026-09-08 — 2 expected supplier arrivals",
-    );
-    expect(day.textContent).toContain("2");
-    // The fully received PO-2003 stops being expected — 15 Sep is unmarked.
-    const done = within(cal).getByTestId("month-day-2026-09-15");
-    expect(done).toHaveAccessibleName("2026-09-15");
-  });
-
-  it("picking a date filters the SAME register by Supplier Delivery Date; picking again restores", async () => {
-    renderPage();
-    const cal = screen.getByTestId("receiving-calendar");
-    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
-    // Only the GRN whose PO answered 8 Sep remains; the 12 Sep one is gone.
-    await waitFor(() =>
-      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
-    );
-    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
-    expect(
-      h.registerAsks.some((a) => a.expected === "2026-09-08"),
-    ).toBe(true);
-    // The right side stays the Register — never a weekly calendar, never
-    // work cards.
-    expect(screen.getByTestId("receiving-register-column")).toBeInTheDocument();
-
-    // The same date again restores the complete listing.
-    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
-    await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
-    );
-  });
-
-  it("Clear filters clears the Calendar pick too", async () => {
-    renderPage();
-    const cal = screen.getByTestId("receiving-calendar");
-    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
-    await waitFor(() =>
-      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
-    );
-    fireEvent.click(screen.getByTestId("rail-clear-filters"));
-    await waitFor(() =>
-      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
-    );
-    expect(h.registerAsks[h.registerAsks.length - 1]?.expected).toBeNull();
   });
 
   it("paginates on the SERVER — Showing 1–1 of 2, Next asks for the next offset", async () => {
@@ -1376,4 +1642,33 @@ describe("Receiving speaks the corrected location/date words — source scan", (
       }
     });
   }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   THE PINNED PAIR ONLY PINS IF THE GRID CAN SHRINK — measured 2026-09-19.
+
+   `leadingColumns` was correct and the widths were correct, yet on the live
+   page GRN Date and GRN No did not pin at all: scrolling right drove GRN Date
+   to left −1022, clean off the screen. The cause was not in the engine. The
+   register column is a flex child beside the rail, and a flex item defaults to
+   `min-width:auto`, so without `min-w-0` it refused to shrink below the
+   sixteen columns' 2234px. The grid's own scroller therefore never engaged,
+   an ancestor scrolled instead, and sticky offsets computed against a
+   viewport that never moved. The same miss also disabled the ≥768px canvas
+   rule, because the grid measured 2234px even on a 390px phone.
+
+   Every sibling rail+grid register (Purchase Orders, SO Batch, Supplier
+   Claims, Manual Purchase) already carries it. jsdom has no layout, so this
+   asserts the class contract rather than the pixels the walk measured.
+   ───────────────────────────────────────────────────────────────────────── */
+describe("the register column can shrink below its content", () => {
+  it("carries min-w-0 beside the rail, or nothing pins", () => {
+    renderPage();
+    const column = screen.getByTestId("receiving-register-column");
+    expect(
+      column.className,
+      "without min-w-0 the grid cannot shrink, its scroller never engages, " +
+        "and the pinned pair scrolls away with everything else",
+    ).toContain("min-w-0");
+  });
 });
