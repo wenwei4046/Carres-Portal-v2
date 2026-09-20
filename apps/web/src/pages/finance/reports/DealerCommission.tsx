@@ -1,8 +1,3 @@
-// design-standard: not-a-list-page — a month report you read, with the rate
-// settings that produced it underneath. There is no row to open, no bulk act
-// and no facet: picking a month rebuilds every figure. Same shape as
-// HrCommissionTab. ListPageShell frames a register you scan and act on, and it
-// has no slot for the settings cards below the grid (docs/UI-KIT.md §A9).
 /**
  * Reports → Dealer commission (migration 0544). Read-only: nothing here is
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
@@ -11,9 +6,15 @@
  * `dealerCommissionReport` (Law D). Below the report, Finance keeps the rates:
  * the default commission rate, products with their own rate, and each dealer's
  * renovation quota.
+ *
+ * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
+ * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
+ * Journal, Money moves). The month/dealer/showroom scope sits in the Register's
+ * own toolbar and the note in its 32px status footer, so nothing page-owned is
+ * drawn above the table (UI MASTER §6.7). Export is the engine's — the columns
+ * carry `exportValue` so the money leaves as numbers.
  */
 import { useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dealerCommissionReport, type DcReportRow, type DcSource } from "@carres/shared/dealer-commission";
 import Button from "@/components/kit/Button";
@@ -21,6 +22,7 @@ import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import { FieldError } from "@/components/kit/FieldFrame";
+import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
@@ -61,42 +63,33 @@ export default function DealerCommission() {
 
   const columns = useMemo<DataGridColumn<DcReportRow>[]>(() => [
     { key: "dealer", label: "Dealer", width: 240, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
-    { key: "earned", label: "Commission on collected", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned },
-    { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect },
-    { key: "rebate", label: "Rebate this month", width: 170, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : rm(r.rebate)), numberValue: (r) => r.rebate ?? 0 },
-    { key: "left", label: "Quota left", width: 160, align: "right", accessor: (r) => (r.quotaLeft === null ? "No quota" : rm(r.quotaLeft)), numberValue: (r) => r.quotaLeft ?? 0 },
+    { key: "earned", label: "Commission on collected", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned },
+    { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect },
+    { key: "rebate", label: "Rebate this month", width: 170, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : rm(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
+    { key: "left", label: "Quota left", width: 160, align: "right", accessor: (r) => (r.quotaLeft === null ? "No quota" : rm(r.quotaLeft)), numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "" },
   ], []);
-
-  const exportExcel = () => {
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map((r) => ({
-      Dealer: r.dealer, "Commission on collected": r.earned, "Commission still to collect": r.stillToCollect,
-      "Rebate this month": r.rebate ?? "", "Quota left": r.quotaLeft ?? "",
-    }))), "Dealer commission");
-    XLSX.writeFile(wb, `Dealer commission ${month}.xlsx`);
-  };
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission — Carres" />
     {q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
-    <div className="min-h-0 flex-1 overflow-auto p-6 flex flex-col gap-6">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
-          options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
-        <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
-          onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
-          options={[{ value: ALL, label: "All" }, ...(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))]} /></div>
-        <div className="w-[220px]"><Select id="dc-outlet" label="Showroom" value={outletId} onValueChange={setOutletId}
-          options={[{ value: ALL, label: "All" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]} /></div>
-        <Button variant="neutral" onClick={exportExcel} disabled={!src}>Export Excel</Button>
-      </div>
-      <p className="text-label text-base-500">Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.</p>
-      <div className="h-[420px]">
-        <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
-          appearance="reference" groupBanner={false} stickyIdentity isLoading={!q.isSuccess} />
-      </div>
-      {src && <Rates src={src} />}
-    </div>}
+    <ListPageShell register>
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
+        appearance="reference" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
+        isLoading={!q.isSuccess} wrapToolbar
+        toolbarStart={<div className="flex flex-wrap items-end gap-2">
+          <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
+            options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
+          <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
+            onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
+            options={[{ value: ALL, label: "All" }, ...(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))]} /></div>
+          <div className="w-[220px]"><Select id="dc-outlet" label="Showroom" value={outletId} onValueChange={setOutletId}
+            options={[{ value: ALL, label: "All" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]} /></div>
+        </div>}
+        statusSummary={(visible) => <span data-testid="dealer-commission-summary">
+          {visible.length} of {rows.length} rows · Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.
+        </span>} />
+      {src && <div className="mt-6 min-h-0 overflow-y-auto flex flex-col gap-6"><Rates src={src} /></div>}
+    </ListPageShell>}
   </div>;
 }
 
