@@ -2128,6 +2128,15 @@ passed 4px, with the second group's header taking the top at 40px. No `<thead>` 
 grouped listing whose groups drift out of column alignment, overturns the structure — not the
 ruling, which is about what the operator reads.
 
+**Repair Orders date and identity presentation — owner correction 2026-09-20; target, not built.**
+Purchasing §9.7 owns date semantics: read-only automatic RO Doc Date, no backdating; an automatic
+Carres target of 14 working days from evidenced Supplier receipt of the RO; a separate attributed
+Supplier return-date reply. Do not add an editable blank target date. Use existing form controls
+and history patterns; sending is not Supplier receipt. The governed calendar is not yet verified.
+For RO `PO No / Unit ID`, show all actual Unit IDs beneath their PO directly, not `{n} Units`.
+Allow the row to grow to fit these identities rather than clipping to the default two-line height.
+Items exposes a discoverable detail action; its exact review surface is not yet approved.
+
 **Repair Orders price placement — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
 Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, quotation-amount,
 Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
