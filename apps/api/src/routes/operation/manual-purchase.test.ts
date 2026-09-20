@@ -1822,6 +1822,49 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
+  it("⭐ 0549 · THE RECORDED INTENT RIDES THE CREATE, BY NAME", async () => {
+    /* ⛔ THE BUG THIS PINS. 0546 built the binding column, the guards, the
+       arithmetic, the atomic save and the issue ceiling — every one of them
+       reads `fulfilment_intent` — and NOTHING wrote it. The create route sent
+       seven names, PostgREST resolved to the pre-intent overload, the column
+       stored NULL, and every goods line read `This purchase did not record
+       whether stock can answer it`. The name is the fix; asserting the VALUE
+       alone would pass on a call that still lost it. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "concrete_need", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", "concrete_need");
+  });
+
+  it("⛔ 0549 · AN UNANSWERED CREATE SENDS NULL — never a guessed answer", async () => {
+    /* A caller that records no intent gets the honest absence. The screen is
+       what refuses an unanswered form; the wire never invents one, so a
+       pre-0549 row and a skipped question read the same and both say so. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", null);
+  });
+
+  it("⛔ 0549 · AND A THIRD INTENT NEVER REACHES THE DOOR", async () => {
+    const rpc = vi.fn();
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "maybe", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses a request with no lines before it reaches the database", async () => {
     /* An empty Manual Purchase is the orphan `0410` exists to delete. The
        route refuses it on the schema, so no transaction is even opened; the
@@ -1990,25 +2033,53 @@ describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purc
 });
 
 /* ════════════════════════════════════════════════════════════════════════
- * GET /:id/ready-stock — MANUAL PURCHASE · READY STOCK
+ * MANUAL PURCHASE · READY STOCK ALLOCATION (owner ruling 2026-09-18)
  *
- * The settled design's read: *is the product this internal purchase asks for
- * already on our shelf, and exactly which Units are they?* It writes nothing,
- * it nets nothing, and it has no reservation twin.
+ * GET  /:id/stock-allocation  what is on the shelf for each line, what the
+ *                             line already holds, and whether it may choose
+ * POST /:id/stock-allocation  the one save — the COMPLETE desired set
+ *
+ * ⭐ THESE TESTS REPLACE THE READ-ONLY `ready-stock` SUITE, WHICH ASSERTED A
+ * RULE THE OWNER HAS SINCE OVERWRITTEN. It proved the section could never
+ * write. It can now — for a CONCRETE NEED on an APPROVED request, and for
+ * nothing else. What the old suite protected that still stands (the ask is
+ * never netted, a counted row shows and is not a Unit, a dead line asks for
+ * nothing) is protected here, in the new shape.
  * ════════════════════════════════════════════════════════════════════════ */
-describe("GET /purchasing/requests/:id/ready-stock", () => {
+describe("GET /purchasing/requests/:id/stock-allocation", () => {
   const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
+  const LINE = "bbbbbbbb-0000-0000-0000-0000000000b1";
   const UNIT = "ffffffff-0000-0000-0000-000000000001";
   const BULK = "ffffffff-0000-0000-0000-000000000002";
+  const HELD = "ffffffff-0000-0000-0000-000000000003";
 
-  function readySb(lines: Array<Record<string, unknown>>) {
+  type ReqRow = Record<string, unknown>;
+  const approvedRequest = (over: ReqRow = {}): ReqRow => ({
+    id: REQ,
+    req_no: "MPR-20260918-4103",
+    fulfilment_intent: "concrete_need",
+    approved_at: "2026-09-18T02:00:00Z",
+    refused_at: null,
+    withdrawn_at: null,
+    sent_back_at: null,
+    ...over,
+  });
+
+  function allocSb(
+    request: ReqRow | null,
+    lines: Array<Record<string, unknown>>,
+    held: Array<Record<string, unknown>> = [],
+    rpc: ReturnType<typeof vi.fn> = vi.fn(),
+  ) {
     return {
       from: vi.fn((table: string) => {
         switch (table) {
           case "purchase_requests":
-            return tableStub({ id: REQ });
+            return tableStub(request);
           case "purchase_demands":
             return tableStub(lines);
+          case "stock_unit_register_v":
+            return tableStub(held);
           case "product_skus":
             return tableStub([
               {
@@ -2022,22 +2093,42 @@ describe("GET /purchasing/requests/:id/ready-stock", () => {
             return tableStub([]);
         }
       }),
-      rpc: vi.fn(),
+      rpc,
     } as unknown as ReturnType<typeof userClient>;
   }
 
-  async function readyStock(lines: Array<Record<string, unknown>>) {
-    vi.mocked(userClient).mockReturnValue(readySb(lines));
+  async function read(
+    request: ReqRow | null,
+    lines: Array<Record<string, unknown>>,
+    held: Array<Record<string, unknown>> = [],
+  ) {
+    vi.mocked(userClient).mockReturnValue(allocSb(request, lines, held));
     const jwt = await makeJwt("operation");
     return app.fetch(
       new Request(
-        `https://api.test/api/operation/purchasing/requests/${REQ}/ready-stock`,
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
         { headers: { Authorization: `Bearer ${jwt}` } },
       ),
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
     );
   }
+
+  type Body = {
+    reference: string | null;
+    intent: string | null;
+    approved: boolean;
+    lines: Array<{
+      demandId: string;
+      item: string;
+      requestedQty: number;
+      availableQty: number;
+      reservedQty: number;
+      remainingQty: number;
+      stockBlock: string | null;
+      units: Array<Record<string, unknown>>;
+    }>;
+  };
 
   beforeEach(() => {
     vi.mocked(readFreeStock).mockResolvedValue({
@@ -2057,9 +2148,10 @@ describe("GET /purchasing/requests/:id/ready-stock", () => {
               siteName: "Carres Klang",
               holderName: null,
               ownership: "carres_owned",
-              supplier: null,
+              supplier: "Ohana",
               identityScope: "unit",
-              dateIn: "2026-08-01",
+              dateIn: "2026-08-01T09:30:00Z",
+              poNo: "PO-20260801-1121",
             },
             {
               id: BULK,
@@ -2073,6 +2165,7 @@ describe("GET /purchasing/requests/:id/ready-stock", () => {
               supplier: null,
               identityScope: "quantity",
               dateIn: null,
+              poNo: null,
             },
           ],
         ],
@@ -2080,83 +2173,405 @@ describe("GET /purchasing/requests/:id/ready-stock", () => {
     });
   });
 
-  it("groups by matching product/configuration and prints BOTH numbers, netting neither", async () => {
-    const res = await readyStock([
-      { id: "l1", sku: "5539-2NA", qty: 4, cancelled_at: null },
-      /* A SECOND LINE OF THE SAME GOODS IS ONE SHELF QUESTION — the group is
-         the product, never the request line. 4 + 2 = 6 asked. */
-      { id: "l2", sku: "5539-2NA", qty: 2, cancelled_at: null },
+  it("prints the ask, the shelf and the remainder as THREE numbers and nets none of them into the ask", async () => {
+    const res = await read(approvedRequest(), [
+      {
+        id: LINE,
+        sku: "5539-2NA",
+        qty: 4,
+        approved_qty: null,
+        issued_qty: 0,
+        cancelled_at: null,
+      },
     ]);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      groups: Array<{
-        item: string;
-        skus: string[];
-        requestedQty: number;
-        freeQty: number;
-        units: Array<Record<string, unknown>>;
-      }>;
-    };
-    expect(body.groups).toHaveLength(1);
-    const [group] = body.groups;
-    expect(group.item).toBe("Ohana 2 Seater");
-    expect(group.skus).toEqual(["5539-2NA"]);
-    /* ⛔ THE ASK IS NOT REDUCED BY THE SHELF. 6 asked and 13 free stand side
-       by side; an additional replenishment quantity is never automatically
-       netted against existing inventory. */
-    expect(group.requestedQty).toBe(6);
-    expect(group.freeQty).toBe(13);
-    /* A COUNTED ROW IS SHOWN (0453 · 0368) — hiding the 12 would make a full
-       shelf read as an empty one — and it is not a Unit. */
-    expect(group.units.map((u) => u.identityScope)).toEqual(["unit", "quantity"]);
-    /* CONDITION IS A GRADE, carried raw for the ONE shared vocabulary to
-       spell; availability was already decided by the register view. */
-    expect(group.units[0].condition).toBe("exhibition");
-    expect(group.units[0].siteName).toBe("Carres Klang");
+    const body = (await res.json()) as Body;
+    const [line] = body.lines;
+    expect(line.item).toBe("Ohana 2 Seater");
+    /* ⛔ THE ORIGINAL ASK SURVIVES. 4 asked, 13 on the shelf, 4 still to buy
+       because nothing has been SAVED yet — seeing stock is not taking it. */
+    expect(line.requestedQty).toBe(4);
+    expect(line.availableQty).toBe(13);
+    expect(line.reservedQty).toBe(0);
+    expect(line.remainingQty).toBe(4);
+    expect(line.stockBlock).toBeNull();
   });
 
-  it("VIEWING WRITES NOTHING — the response carries no act, and no RPC runs", async () => {
-    const sb = readySb([{ id: "l1", sku: "5539-2NA", qty: 1, cancelled_at: null }]);
+  it("a counted row SHOWS and cannot be ticked (0453 · 0368)", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    const units = body.lines[0]!.units;
+    /* Hiding the 12 would make a full shelf read as an empty one. */
+    expect(units.map((u) => u.itemId)).toEqual([UNIT, BULK]);
+    expect(units[1]!.blocked).toBe("counted_stock");
+    /* A counted key is not a Unit ID and never pretends to be one. */
+    expect(units[1]!.identityScope).toBe("quantity");
+  });
+
+  it("the picker's six facts come from the STOCK record, and the receipt date is a DATE", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const unit = ((await res.json()) as Body).lines[0]!.units[0]!;
+    /* Date only on this picker; the stored timestamp is not rewritten. */
+    expect(unit.goodsReceivedDate).toBe("2026-08-01");
+    expect(unit.stockLocation).toBe("Carres Klang");
+    expect(unit.supplier).toBe("Ohana");
+    /* The Unit's OWN source document — never the Manual Purchase reading it. */
+    expect(unit.sourceRef).toBe("PO-20260801-1121");
+    expect(unit.unitCode).toBe("U1-000-014");
+    expect(unit.condition).toBe("exhibition");
+  });
+
+  it("a Unit already saved against this line is reserved, is listed first, and reduces the remainder", async () => {
+    const res = await read(
+      approvedRequest(),
+      [
+        {
+          id: LINE,
+          sku: "5539-2NA",
+          qty: 2,
+          approved_qty: null,
+          issued_qty: 0,
+          cancelled_at: null,
+        },
+      ],
+      [
+        {
+          id: HELD,
+          unit_code: "U1-000-099",
+          sku: "5539-2NA",
+          qty: 1,
+          date_in: "2026-07-02",
+          condition: "new",
+          site_name: "Carres Klang",
+          supplier: "Ohana",
+          po_no: null,
+          ownership: "carres_owned",
+          identity_scope: "unit",
+          reserved_ref: "MPR-20260918-4103",
+          reserved_purchase_demand_id: LINE,
+        },
+      ],
+    );
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.reservedQty).toBe(1);
+    /* SAVED UNITS COME FIRST and are never hidden — the journey that takes a
+       choice back has to stay reachable. */
+    expect(line.units[0]!.itemId).toBe(HELD);
+    expect(line.units[0]!.reservedForThisLine).toBe(true);
+    /* 2 asked − 0 issued − 1 saved = 1 still to buy. */
+    expect(line.remainingQty).toBe(1);
+  });
+
+  it("an unapproved request may not choose stock, and says so instead of hiding the shelf", async () => {
+    const res = await read(approvedRequest({ approved_at: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.approved).toBe(false);
+    expect(body.lines[0]!.stockBlock).toBe("not_approved");
+    /* The goods still SHOW: the operator can see what is there while they
+       wait, they simply cannot commit it. */
+    expect(body.lines[0]!.units.length).toBeGreaterThan(0);
+  });
+
+  it("ADDITIONAL REPLENISHMENT is read-only, and existing stock never reduces its ask", async () => {
+    const res = await read(approvedRequest({ fulfilment_intent: "additional_stock" }), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.stockBlock).toBe("additional_stock");
+    /* 13 free on the shelf and the ask is still 4 to buy. */
+    expect(line.availableQty).toBe(13);
+    expect(line.remainingQty).toBe(4);
+  });
+
+  it("AN UNRECORDED INTENT IS ITS OWN STATE — never guessed into either answer", async () => {
+    const res = await read(approvedRequest({ fulfilment_intent: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.intent).toBeNull();
+    expect(body.lines[0]!.stockBlock).toBe("intent_not_recorded");
+  });
+
+  it("a request minted before the number came back cannot save stock against nothing", async () => {
+    const res = await read(approvedRequest({ req_no: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.reference).toBeNull();
+    expect(body.lines[0]!.stockBlock).toBe("request_has_no_number");
+  });
+
+  it("the approver's cut REPLACES the ask, and an issued quantity has already left it", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 5, approved_qty: 3, issued_qty: 1, cancelled_at: null },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    /* The ORIGINAL ask still prints; the remainder is 3 − 1 = 2. */
+    expect(line.requestedQty).toBe(5);
+    expect(line.remainingQty).toBe(2);
+  });
+
+  it("a line nobody is going ahead with asks for nothing and cannot be chosen against", async () => {
+    const res = await read(approvedRequest(), [
+      {
+        id: LINE,
+        sku: "5539-2NA",
+        qty: 4,
+        approved_qty: null,
+        issued_qty: 0,
+        cancelled_at: "2026-09-01T00:00:00Z",
+      },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.remainingQty).toBe(0);
+    expect(line.stockBlock).toBe("line_not_going_ahead");
+  });
+
+  it("READING WRITES NOTHING — no RPC runs", async () => {
+    const sb = allocSb(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
     vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request(
-        `https://api.test/api/operation/purchasing/requests/${REQ}/ready-stock`,
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
         { headers: { Authorization: `Bearer ${jwt}` } },
       ),
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
     );
     expect(res.status).toBe(200);
-    /* No reservation twin exists for this route, and reading it must never
-       reach one: an internal replenishment is owed by no Unit on the shelf. */
     expect((sb as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc).not.toHaveBeenCalled();
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body).not.toHaveProperty("picks");
-    expect(JSON.stringify(body)).not.toContain("blocked");
-  });
-
-  it("a line nobody is going ahead with asks for nothing", async () => {
-    const res = await readyStock([
-      { id: "l1", sku: "5539-2NA", qty: 4, cancelled_at: "2026-09-01T00:00:00Z" },
-    ]);
-    const body = (await res.json()) as { groups: unknown[] };
-    /* Offering shelf stock against a dead line would be an answer to a
-       question nobody is asking any more. */
-    expect(body.groups).toEqual([]);
   });
 
   it("refuses an id that is not a request id before it reads anything", async () => {
-    vi.mocked(userClient).mockReturnValue(readySb([]));
+    vi.mocked(userClient).mockReturnValue(allocSb(approvedRequest(), []));
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
-      new Request("https://api.test/api/operation/purchasing/requests/not-a-uuid/ready-stock", {
+      new Request(
+        "https://api.test/api/operation/purchasing/requests/not-a-uuid/stock-allocation",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE DEPLOY WINDOW — code on `main` before 0546 is applied
+ *
+ * ⭐ `main` deploys the code; the migration lands through its own governed
+ * path. Between them the allocation column does not exist, and the Register
+ * must keep working — but it must NOT start guessing.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("the Register before 0546 is applied", () => {
+  const LINES = [
+    {
+      id: "dddddddd-0000-0000-0000-0000000000a1",
+      request_id: REQUESTS[0]!.id,
+      sku: "5539-2NA",
+      supplier_id: SUP,
+      qty: 3,
+      approved_qty: null,
+      issued_qty: 0,
+      remaining_qty: 3,
+      required_by: null,
+      remark: null,
+      po_id: null,
+      cancelled_at: null,
+      cancel_reason: null,
+    },
+  ];
+
+  /** The whole register read, with the saved-stock read failing its own way. */
+  function registerSb(stockError: { code?: string; message: string }) {
+    const base = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(LINES, { filterInBy: "request_id" });
+          case "ops_stock_items":
+            /* `.select().in().in()` — the shape the saved-stock read uses. */
+            return {
+              select: () => ({
+                in: () => ({ in: () => Promise.resolve({ data: null, error: stockError }) }),
+              }),
+            };
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    };
+    return base as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(stockError: { code?: string; message: string }) {
+    vi.mocked(userClient).mockReturnValue(registerSb(stockError));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env as never,
       { waitUntil() {}, passThroughException() {} } as never,
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      linesUnavailable?: boolean;
+      lines: Array<{ stock_reserved_qty?: number }>;
+    };
+  }
+
+  it("⭐ a MISSING COLUMN is not unknown — nothing can be allocated where there is nowhere to store it", async () => {
+    const body = await register({
+      code: "42703",
+      message: "column ops_stock_items.reserved_purchase_demand_id does not exist",
+    });
+    /* Unknown here would be a portal-wide P1: every remainder unreadable, so
+       every Manual Purchase row would read `Remaining quantity not checked`
+       and NOTHING could be ticked until the migration landed. Zero is the TRUE
+       answer before the column exists, not a guess — which is the only reason
+       this one code is tolerated. */
+    expect(body.linesUnavailable).toBeFalsy();
+    expect(body.lines.length).toBeGreaterThan(0);
+    for (const l of body.lines) expect(l.stock_reserved_qty).toBe(0);
+  });
+
+  it("⛔ EVERY OTHER FAILURE STAYS UNKNOWN and still refuses the tick", async () => {
+    const body = await register({ code: "57014", message: "canceling statement due to timeout" });
+    expect(body.linesUnavailable).toBe(true);
+  });
+});
+
+describe("POST /purchasing/requests/:id/stock-allocation — the one save", () => {
+  const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
+  const OTHER_REQ = "aaaaaaaa-0000-0000-0000-0000000000bb";
+  const LINE = "bbbbbbbb-0000-0000-0000-0000000000b1";
+  const UNIT = "ffffffff-0000-0000-0000-000000000001";
+
+  function saveSb(line: Record<string, unknown> | null, rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) =>
+        table === "purchase_demands" ? tableStub(line) : tableStub([]),
+      ),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function save(
+    line: Record<string, unknown> | null,
+    rpc: ReturnType<typeof vi.fn>,
+    body: Record<string, unknown>,
+  ) {
+    vi.mocked(userClient).mockReturnValue(saveSb(line, rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("sends the COMPLETE desired set to the ONE allocation door — never an SO reservation route", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { demandId: LINE, reserved: 1, added: 1, removed: 0, remainingQty: 0 },
+      error: null,
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+      expectedItemIds: [],
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_allocate_ready_units", {
+      p_demand_id: LINE,
+      p_item_ids: [UNIT],
+      p_expected_item_ids: [],
+    });
+    /* ⛔ AN MPR ID NEVER REACHES THE SALES-ORDER DOOR. */
+    expect(rpc.mock.calls.map((c) => c[0])).not.toContain("so_batch_reserve_ready_units");
+  });
+
+  it("AN EMPTY SET IS A REAL SAVE — removing every Unit needs no second door", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { demandId: LINE, reserved: 0, added: 0, removed: 2, remainingQty: 2 },
+      error: null,
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [],
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_allocate_ready_units", {
+      p_demand_id: LINE,
+      p_item_ids: [],
+      p_expected_item_ids: null,
+    });
+  });
+
+  it("refuses a line that belongs to a DIFFERENT Manual Purchase", async () => {
+    const rpc = vi.fn();
+    const res = await save({ id: LINE, request_id: OTHER_REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(404);
+    /* The route owns the relationship between its own two identities: without
+       this, naming somebody else's line would bind Units to it. */
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("passes the door's own refusal code and the Unit that stopped it", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "40001",
+        message: "unit_no_longer_free",
+        details: `someone else took that Unit · unit_id=${UNIT}`,
+      },
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; itemId?: string };
+    expect(body.code).toBe("unit_no_longer_free");
+    expect(body.itemId).toBe(UNIT);
+  });
+
+  it("names the intent refusal rather than a generic one", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "request_not_a_concrete_need", details: "" },
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("request_not_a_concrete_need");
   });
 });
 

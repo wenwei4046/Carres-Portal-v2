@@ -7,7 +7,7 @@
 // BOUNDARY).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { carresExecutionLabel, customerResolutionLabel, supplierClaimRequestLabel, supplierClaimResponseLabel, supplierClaimTypeLabel } from "@carres/shared";
 import { useOperationSupplierClaims, type SupplierClaimListRow } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -18,7 +18,7 @@ import StatusPill from "@/components/kit/StatusPill";
 import { fmtDate } from "@/lib/fmt-date";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
+import { FilterRail, FilterRailGroup, FilterRailRow, ShowFiltersButton } from "./components/workspace-rail";
 import SupplierClaimPanel, { SupplierClaimInspector } from "./components/SupplierClaimPanel";
 
 const absent = "Not recorded";
@@ -129,11 +129,7 @@ export default function OperationSupplierClaims() {
             <DataGrid rows={rows} columns={columns} rowKey={(row) => row.id} storageKey="carres.supplier-claims.register.v2"
               appearance="reference" exportName="Supplier Claims" groupBanner={false}
               isLoading={query.isLoading} emptyMessage="No matching claims." searchPlaceholder="Search claims…"
-              toolbarStart={<>{!railOpen ? <button type="button" aria-label="Show filters" title="Show filters" data-testid="claims-show-filters"
-                onClick={() => setRailVisible(true)}
-                className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12">
-                <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-              </button> : null}</>}
+              toolbarStart={<>{!railOpen ? <ShowFiltersButton onShow={() => setRailVisible(true)} testId="claims-show-filters" /> : null}</>}
               onFilteredRowsChange={setVisibleRows} onRowDoubleClick={open}
               expandable={{ renderExpansion: (row) => <SupplierClaimInspector claim={row} onOpen={() => open(row)} />, testId: (row) => `claim-inspect-${row.claim_no}` }}
               selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((previous) => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; }), onToggleAll: (keys, all) => setSelectedKeys((previous) => { const next = new Set(previous); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next; }) }}
