@@ -1541,6 +1541,19 @@ facts, permissions, complete-record populations or task ownership.
    live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
    writes no page-local version of it.
 
+🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
+2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what
+another facet happens to have selected"; Purchase Returns §9.6 says counts "respect the other
+active dimensions"; Supplier Claims §9.5 says they cover "the complete permitted searched/filtered
+set". A register cannot obey all three, and an operator who learns one page learns the wrong thing
+about the next. **The standard facet semantics are the answer, and they belong to this shared
+contract, not to a page:** a count reflects every OTHER active filter and the search, and NOT the
+selections inside its own group — the only reading under which a count never promises rows it
+cannot deliver and never hides a row the operator could still reach. Purchasing §9.7 Repair Orders
+is written to it. **Owed:** converging the three built/confirmed pages, each in its own round; no
+page reaches into another's. *Falsifier: a measured operator journey in which whole-register counts
+read truer than filtered ones — then this contract changes once, here, and every page follows.*
+
 9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
@@ -2037,6 +2050,9 @@ resizing remains available.
 | Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
 | Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
 | Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
+| RO No | 170 | prototype | Repair Orders, 2026-09-20. Same 16-character `PREFIX-YYYYMMDD-RRRR` shape as `PO No` / `GRN No`, which the mono face measured at 170; it shares that number rather than inventing one. **Owed:** the rendered-portal measurement |
+| Supplier Claim No | 150 | prototype | Repair Orders, 2026-09-20, reading §9.5's measurement of `SC-20260916-0007` at 122.8px of text plus header chrome. **Owed:** the rendered-portal measurement on a page that actually ships the column |
+| Cost Responsibility | 144 | prototype | Repair Orders, 2026-09-20. Holds `Supplier pays` and the governed absence `Not decided`. It is a responsibility WORD, never an amount — no money field joins this registry through it |
 
 **THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
 different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
