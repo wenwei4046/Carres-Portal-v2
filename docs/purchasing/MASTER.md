@@ -3380,8 +3380,8 @@ does not close any related customer Service Case.
 
 ### 9.6 Purchase Returns
 
-**Owner-confirmed UI — 2026-09-18. BUILT + DEPLOYED 2026-09-19; MIGRATION 0548 NOT APPLIED;
-AUTHENTICATED PRODUCTION WALK OWED.**
+**Owner-confirmed UI — 2026-09-18. BUILT + DEPLOYED 2026-09-19; MIGRATION 0548 APPLIED
+2026-09-20; AUTHENTICATED PRODUCTION WALK OWED.**
 The approval covered layout, labels and inspection interactions; sample parties, dates,
 quantities and document references are illustrative, not verified business data. It approved
 no new custody engine and no claim production verification, and the build added neither.
@@ -3409,17 +3409,40 @@ evidence; the build session could not repeat it** — its egress proxy answers
 `connect_rejected` to those hosts, so no independent re-fetch backs this row. It is a SHA
 convergence proof and nothing more, exactly as §9.2's row states for the same reason.
 
-**⛔ MIGRATION 0548 IS NOT APPLIED. What the operator sees in that window, and it is
-not a bug:** the rail door opens, the page loads, and the register says
-`Purchase Returns could not be loaded.` with `Try again`. PostgREST answers `42P01` for a
-table that is not there and the API maps it to a 404, so the screen reports the feature as
-ABSENT rather than printing `No purchase returns.` — which would tell an operator that Carres
-has sent nothing back to any supplier, a confident false statement about the business made by
-a screen that never reached the data. This is the same posture §9.2 ruled for Manual Purchase's
-Ready Stock cell in its own unapplied window, and it is pinned by a test. **Applying 0548 is the
-governed owner path (`apply_migration`, exact file, after the production assertions and the
-negative control in a rolled-back transaction) and it is what turns this row green.** Nothing
-else is owed for it: the page, the read and the door are already deployed.
+**MIGRATION 0548 APPLIED 2026-09-20**, through the governed `apply_migration` path, tracker
+row `20260920084605`. Verified on production after the apply: both tables exist, RLS is ON with
+**one SELECT policy each and no write policy**, `purchase_return_units` has no quantity column,
+the evidence guard trigger is armed, `anon` cannot execute the issue door and `authenticated`
+can, and **zero rows were created** (red line 8: the file asserts no row count and wrote none).
+
+**The negative controls were run on production as a real active `operation` user inside a
+rolled-back transaction**, exactly as §5 of ENGINEERING requires. All three fired: a claim with
+no agreed `Return to Supplier` outcome was refused (`outcome_not_return_to_supplier`), `problem`
+evidence was refused (`problem_evidence_belongs_to_the_supplier_claim`), and a supplier receipt
+with no pickup was refused. The happy path issued exactly one Unit row, pickup proof was
+accepted, and **`ops_stock_items` was not touched** — §7.4's rule proven on production, not
+assumed. A fourth control fell out for free: the MCP's own roleless connection was refused
+`not_purchasing`, which is 0500's law holding. Afterwards: 0 return rows, 0 Unit rows, 0 probe
+purchase orders, 0 probe claims, 0 probe tracker rows, sequence still at 1001.
+
+**⚠️ THE APPLIED TEXT IS NOT BYTE-IDENTICAL TO THE COMMITTED FILE, AND THAT IS A KNOWN DEBT.**
+`apply_migration` takes inline text, not the file's bytes, so the applied statement is a
+transcription with the non-ASCII comment art (`⭐ § ─ ⛔`) normalised and the long explanatory
+comment blocks condensed. **Every statement, identifier, constraint, guard, grant and assertion
+is unchanged** — the file's own sanity block ran as part of the apply and would have aborted it
+otherwise, and the catalog was then read directly. The numbers, so a later chat reconciling can
+tell this apart from a rogue apply rather than opening a P0:
+
+```
+committed file   22,730 bytes   md5 4f9432d77f728e236cd7c901becea219
+applied text     11,684 bytes   md5 6407e93f78687c2439d47856e8d77203
+```
+
+`md5(prosrc)` of `purchasing_issue_purchase_return` and
+`purchase_return_evidence_purposes_allowed` will likewise differ from the file, for the same
+reason and only inside comments. Re-applying the exact file is safe whenever a path that can
+stream bytes exists — every statement in 0548 is idempotent (`create … if not exists`,
+`create or replace`, `drop policy/trigger if exists` then create).
 
 **Still NOT built, and deliberately so.** No screen CREATES a return. §7.4 rules who may — an
 approved claim outcome — and `0548` carries that door in SQL
