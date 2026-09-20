@@ -1,3 +1,8 @@
+// design-standard: not-a-list-page — a month report you read, with the rate
+// settings that produced it underneath. There is no row to open, no bulk act
+// and no facet: picking a month rebuilds every figure. Same shape as
+// HrCommissionTab. ListPageShell frames a register you scan and act on, and it
+// has no slot for the settings cards below the grid (docs/UI-KIT.md §A9).
 /**
  * Reports → Dealer commission (migration 0544). Read-only: nothing here is
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
