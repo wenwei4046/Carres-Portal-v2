@@ -26,7 +26,8 @@ number, the party and the date already worked out, and one obvious button.
 §6.7–6.10, the owning module's listing section, and its `docs/COPY-STANDARD.md` entries.
 Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
 2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
-Manual Purchase also owes migrations 0546 + 0547); preserve their distinct approval and allocation rules.
+Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
+is owed); preserve their distinct approval and allocation rules.
 Manual Purchase INHERITS the four §6.8 engine capabilities and §6.10's group-local header engine;
 neither page grows a second set and no page writes a local copy of either.
 Use the current main versions; open PRs and mockups are not a second authority. Resolve older PR

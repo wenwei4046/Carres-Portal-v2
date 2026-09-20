@@ -1839,7 +1839,7 @@ but does not say where it is recorded; `purchasing_create_request` therefore tak
 Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
 column is dropped and the derivation replaces it.
 
-✅ **CLOSED BY 0549 (owner ruling 2026-09-20): the create form asks the question.**
+✅ **CLOSED BY 0549 — APPLIED TO PRODUCTION 2026-09-20 (owner ruling 2026-09-20): the create form asks the question.**
 `Can stock answer this?` sits beside `Need for`, two answers, **no default**, and `Send` refuses an
 unanswered form with `Send — say whether stock can answer this`. The route sends
 `p_fulfilment_intent` BY NAME — that is the whole fix, because PostgREST resolves an RPC by the
@@ -1847,6 +1847,8 @@ argument names it carries — and `purchasing_create_request_with_lines` gained 
 names it in turn when it calls the header door. NULL stays legal and stays its own state: a request
 raised before the question existed recorded no answer, is never guessed into one, and must answer
 before it is sent again. The words are composed under ui MASTER §1.1 and reviewed asynchronously.
+
+**APPLIED AND RECONCILED 2026-09-20**, through the governed `apply_migration` path, on merge `98203b4b` (#1484) after `deploy-production.yml` run 35503591683. The new door's CR-normalised `md5(prosrc)` equals the committed file's, the tracker row is written, and the thing that was actually broken is verified rather than assumed: `to_regprocedure` on the nine argument names the API now sends resolves to the nine-argument door, and that door's body names `p_fulfilment_intent` when it calls the header. The column is present and still nullable. **Numbered 0549, not 0548** — the Purchase Returns lane took 0548 first and is already applied; red line 7 wants the MAX of the tracker tail, the repository tail and every branch, and CI's migration gate caught that this lane had not re-taken it.
 
 🔴 **THE DEFECT IT CLOSED, MEASURED 2026-09-20 MINUTES AFTER 0546 AND 0547 WERE APPLIED — AND THE
 LESSON IS BIGGER THAN THE BUG.** `fulfilment_intent` is read in two places and written in none. The route that
