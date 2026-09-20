@@ -16,6 +16,8 @@ import {
   soBatchCellSummary,
   soBatchOrderSelection,
   soBatchOrderPlanning,
+  soBatchOrderSafetyDays,
+  soBatchOrderStatusWord,
   soBatchOrderByAbsenceWord,
   soBatchOrderRemainingQty,
   compareSoBatchPlanning,
@@ -160,32 +162,54 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     expect(W.search).toBe("Search Sales Order, customer, SKU or supplier…");
     expect(W.empty).toBe("No proceeded Sales Orders.");
     expect(W.footerUnit).toBe("Sales Orders");
-    expect(W.deliverTo).toBe("Deliver To");
+    /* The shared Purchasing dictionary's own head for the destination
+       INSTRUCTED TO THE SUPPLIER (owner ruling 2026-09-18). */
+    expect(W.deliverTo).toBe("Supplier Deliver To");
     expect(W.multiple).toBe("Multiple");
   });
 
-  it("the nine business column heads, in the approved reading order exactly", () => {
+  it("the twelve business column heads, in the approved reading order exactly", () => {
     expect([
-      W.colSoNo,
-      W.colCustomer,
+      "Status",
       W.colProceedDate,
+      W.colSoNo,
+      W.colPoSafetyDays,
       W.colRequestedDelivery,
       W.colDeliveryLocation,
+      W.colCustomer,
+      W.colItems,
       W.colSupplier,
       W.deliverTo,
       W.colPoNo,
       W.colPoDeliveryDate,
     ]).toEqual([
-      "SO No",
-      "Customer",
+      "Status",
       "Proceed Date",
-      "Requested Delivery Date",
-      "Delivery Location",
+      "SO No",
+      "PO Safety Days",
+      "Customer Requested Delivery Date",
+      "Customer Delivery Location",
+      "Customer",
+      "Items",
       "Supplier",
-      "Deliver To",
+      "Supplier Deliver To",
       "PO No",
-      "PO Delivery Date",
+      "PO Default Delivery Date",
     ]);
+  });
+
+  /**
+   * ⭐ STATUS IS THE NEW-PO NEED, NOT PERMISSION (owner ruling 2026-09-18), and
+   * it reads the SAME group the table heading above the row reads — there is no
+   * second arithmetic and no stored status.
+   */
+  it("says `Need PO` / `No PO needed`, from the groups' own reading", () => {
+    expect(soBatchOrderStatusWord("to-buy")).toBe("Need PO");
+    expect(soBatchOrderStatusWord("no-purchase-needed")).toBe("No PO needed");
+    /* And the group headings themselves are untouched — the word on the row
+       does not rename them. */
+    expect(W.groupToBuy).toBe("To buy");
+    expect(W.groupNoPurchaseNeeded).toBe("No purchase needed");
   });
 
   it("the retired column heads left the dictionary and never come back", () => {
@@ -198,6 +222,13 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "Goods Must Arrive",
     ]) {
       expect(words, gone).not.toContain(gone);
+    }
+    /* ⭐ RETIRED FOR THESE FACTS ON ALL FOUR REVIEWED PAGES, 2026-09-18. The
+       check is on the WHOLE head, not on a substring: the replacements say the
+       same fact with the owner in front of it, so `Customer Delivery Location`
+       legitimately contains the retired spelling. */
+    for (const gone of ["PO Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
+      expect(Object.values(W), gone).not.toContain(gone);
     }
     expect(W).not.toHaveProperty("buy");
     expect(W).not.toHaveProperty("colWork");
@@ -1220,5 +1251,76 @@ describe("soBatchOrderPlanning — groups by remaining demand, never by raw stat
       { so: 13, plan: { group: "to-buy" as const, date: null, notPlanned: true, absence: "not_planned" as const, rank: 1 as const } },
     ];
     expect([...items].sort(compareSoBatchPlanning).map((i) => i.so)).toEqual([12, 11, 13, 10]);
+  });
+});
+
+/**
+ * ⭐ `PO Safety Days` — THE PARENT CELL, owner ruling 2026-09-18.
+ *
+ * One answer per Sales Order, over exactly the leaves the parent checkbox would
+ * tick: the TIGHTEST margin. The number is the ENGINE's; this only picks a
+ * minimum. Nothing to buy prints nothing; a margin nobody measured is stated as
+ * an absence and is NEVER a `0`.
+ */
+describe("soBatchOrderSafetyDays — the tightest measured margin, or a stated absence", () => {
+  it("nothing left to buy states no margin at all", () => {
+    const o = railOrder({
+      orderId: "rs",
+      status: "blank",
+      lines: [line({ orderLineId: "x", qty: 2, stockTaken: 2 })],
+    });
+    expect(soBatchOrderSafetyDays(o, [])).toEqual({ kind: "none" });
+  });
+
+  it("takes the TIGHTEST of the leaves the parent checkbox would tick", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 3 })] });
+    const cell = soBatchOrderSafetyDays(o, [
+      row({ orderId: "p", safetyDaysLeft: 9 }),
+      row({ id: "b2", orderId: "p", safetyDaysLeft: 2 }),
+    ]);
+    expect(cell).toEqual({ kind: "days", days: 2 });
+  });
+
+  it("keeps a negative margin negative — an overrun is not a margin of zero", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 1 })] });
+    expect(soBatchOrderSafetyDays(o, [row({ orderId: "p", safetyDaysLeft: -2 })])).toEqual({
+      kind: "days",
+      days: -2,
+    });
+  });
+
+  /**
+   * ⛔ ONE UNMEASURED LEAF MAKES THE TIGHTEST MARGIN UNKNOWABLE. A minimum over
+   * the rest would claim a floor nobody counted, and the lowest number on the
+   * page is exactly the one an operator acts on.
+   */
+  it("states an absence, never a number, when one eligible leaf was not measured", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 2 })] });
+    const cell = soBatchOrderSafetyDays(o, [
+      row({ orderId: "p", safetyDaysLeft: 9 }),
+      row({ id: "b2", orderId: "p", safetyDaysLeft: null }),
+    ]);
+    expect(cell.kind).toBe("absent");
+  });
+
+  it("names WHY a To-buy order has no margin, in the page's governed words", () => {
+    const covered = railOrder({ orderId: "c", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const cell = soBatchOrderSafetyDays(covered, [row({ orderId: "c", fullyOnPo: true })]);
+    expect(cell).toEqual({ kind: "absent", absence: "already_on_po" });
+    expect(soBatchOrderByAbsenceWord("already_on_po")).toBe("Already on a PO");
+
+    const blocked = railOrder({ orderId: "u" });
+    const unverified = soBatchOrderSafetyDays(blocked, [
+      row({ orderId: "u", state: "no_production_days", toBuy: null, issueRef: null }),
+    ]);
+    expect(unverified).toEqual({ kind: "absent", absence: "not_planned" });
+  });
+
+  it("agrees with the group beside it — no second arithmetic", () => {
+    const o = railOrder({ orderId: "p", lines: [line({ orderLineId: "x", qty: 1 })] });
+    const leaves = [row({ orderId: "p", safetyDaysLeft: 4 })];
+    expect(soBatchOrderPlanning(o, leaves).group).toBe("to-buy");
+    expect(soBatchOrderStatusWord(soBatchOrderPlanning(o, leaves).group)).toBe("Need PO");
+    expect(soBatchOrderSafetyDays(o, leaves).kind).toBe("days");
   });
 });

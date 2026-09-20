@@ -139,21 +139,28 @@ describe("the empty query", () => {
 
 describe("what typing searches", () => {
   it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
-    // The PAGES are the destinations, never the module row. `Purchase Returns`
-    // is `Coming soon` and a door the rail refuses to open may not be offered
-    // here — grouping the rail changed no destination and added no door,
-    // because a drawer is presentation and Jump To lists pages.
+    // The PAGES are the destinations, never the module row. A door the rail
+    // refuses to open may not be offered here — grouping the rail changed no
+    // destination and added no door, because a drawer is presentation and Jump
+    // To lists pages.
     //
-    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, five of
-    // them live. `Purchase Demands` and `Report` LEFT the rail, so Jump To may
-    // not offer them either — a demand is a hidden record, not a destination.
+    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, SIX of
+    // them live since §9.6's Purchase Returns shipped on 2026-09-19 — which is
+    // why it is offered here and `Repair Orders`, still `Coming soon`, is not.
+    // `Purchase Demands` and `Report` LEFT the rail, so Jump To may not offer
+    // them either — a demand is a hidden record, not a destination.
     //
     // Starts-with ranks first — `Purchase Orders` — then contains, in NAV
     // order, which is the BUY drawer's own order: `SO Batch Purchase` then
     // `Manual Purchase`.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
+    ).toEqual([
+      "Purchase Orders",
+      "Purchase Returns",
+      "SO Batch Purchase",
+      "Manual Purchase",
+    ]);
   });
 
   it("every retired Purchasing row is unreachable from Jump To", () => {

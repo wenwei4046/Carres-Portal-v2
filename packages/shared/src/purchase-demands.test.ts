@@ -15,6 +15,7 @@ import {
   purchaseDemandStateCounts,
   purchaseDemandStateWords,
   purchaseDemandTimingOf,
+  purchaseDemandSafetyDaysLeft,
   purchaseDemandsResponseSchema,
   soBatchAction,
   type PurchaseDemandRow,
@@ -720,5 +721,101 @@ describe("the SO Batch response carries destinations, duty and permission", () =
     expect(parsed.mayIssue).toBe(false);
     expect(parsed.currentPoDuty).toBeNull();
     expect(parsed.actingPoDuty).toBeNull();
+  });
+});
+
+/**
+ * ⭐ `PO Safety Days` — THE NUMBER THE CLASSIFICATION IS ALREADY MADE OF
+ * (owner ruling 2026-09-18; COPY-STANDARD — Purchasing UI dictionary).
+ *
+ * ONE ARITHMETIC (ERP Architecture Law D): the margin and the timing state must
+ * be two readings of the same count, never two counts that currently agree.
+ */
+describe("purchaseDemandSafetyDaysLeft — the margin the timing state is made of", () => {
+  const none: ReadonlySet<string> = new Set();
+  const base = {
+    today: "2026-09-02",
+    orderBy: "2026-09-01",
+    safetyDays: 14,
+    holidays: none,
+  };
+
+  it("counts OFFICE working days from completion to the customer's date", () => {
+    /* 2026-09-01 (Tue) → 2026-09-18 (Fri) is 13 Mon–Fri working days. */
+    expect(
+      purchaseDemandSafetyDaysLeft({
+        ...base,
+        readyIfOrderedToday: "2026-09-01",
+        customerDelivery: "2026-09-18",
+      }),
+    ).toBe(13);
+  });
+
+  it("a weekend between completion and delivery buys no margin", () => {
+    expect(
+      purchaseDemandSafetyDaysLeft({
+        ...base,
+        readyIfOrderedToday: "2026-09-18",
+        customerDelivery: "2026-09-20",
+      }),
+    ).toBe(0);
+  });
+
+  it("counts a public holiday out of the margin, on the same calendar", () => {
+    const withHoliday = purchaseDemandSafetyDaysLeft({
+      ...base,
+      holidays: new Set(["2026-09-16"]),
+      readyIfOrderedToday: "2026-09-14",
+      customerDelivery: "2026-09-18",
+    });
+    const without = purchaseDemandSafetyDaysLeft({
+      ...base,
+      readyIfOrderedToday: "2026-09-14",
+      customerDelivery: "2026-09-18",
+    });
+    expect(withHoliday).toBe(without - 1);
+  });
+
+  /**
+   * ⛔ NOT CLAMPED. An overrun is a NEGATIVE margin and stays one here, so a
+   * caller can tell it apart from a margin that lands exactly on the day. The
+   * screen turns it into the governed `Not enough production days`.
+   */
+  it("answers a negative margin when production overruns the customer's date", () => {
+    expect(
+      purchaseDemandSafetyDaysLeft({
+        ...base,
+        readyIfOrderedToday: "2026-09-25",
+        customerDelivery: "2026-09-21",
+      }),
+    ).toBe(-4);
+    expect(
+      purchaseDemandTimingOf({
+        ...base,
+        readyIfOrderedToday: "2026-09-25",
+        customerDelivery: "2026-09-21",
+      }),
+    ).toBe("not_enough_production_time");
+  });
+
+  it("zero margin is the same fact the state calls `No safety days left`", () => {
+    const f = { ...base, readyIfOrderedToday: "2026-09-21", customerDelivery: "2026-09-21" };
+    expect(purchaseDemandSafetyDaysLeft(f)).toBe(0);
+    expect(purchaseDemandTimingOf(f)).toBe("safety_days_none");
+  });
+
+  /** The two readings of one count, over a spread of real dates. */
+  it("never disagrees with the band the same inputs classify into", () => {
+    const dates = ["2026-09-03", "2026-09-11", "2026-09-18", "2026-09-21", "2026-10-30"];
+    for (const customerDelivery of dates) {
+      const f = { ...base, readyIfOrderedToday: "2026-09-01", customerDelivery };
+      const left = purchaseDemandSafetyDaysLeft(f);
+      const state = purchaseDemandTimingOf(f);
+      if (state === "safety_days_none") expect(left).toBe(0);
+      if (state === "safety_days_low") expect(left).toBeGreaterThan(0);
+      if (state === "safety_days_low") expect(left).toBeLessThan(base.safetyDays);
+      if (state === "safety_days_full") expect(left).toBe(base.safetyDays);
+      if (state === "can_order_early") expect(left).toBeGreaterThan(base.safetyDays);
+    }
   });
 });
