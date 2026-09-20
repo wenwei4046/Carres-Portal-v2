@@ -366,6 +366,23 @@ describe("evidence is per Unit and per purpose", () => {
   });
 });
 
+describe("an empty register is not a hole", () => {
+  it("draws no rail when there is nothing to filter", () => {
+    /* Measured on the production walk, signed in, register genuinely empty:
+       every rail group returns null, so the rail was a blank 240px column
+       between the sidebar and the table. */
+    show([]);
+    expect(screen.queryByTestId("purchase-returns-rail")).toBeNull();
+    expect(screen.queryByTestId("purchase-returns-show-filters")).toBeNull();
+    expect(screen.getByText("No purchase returns.")).toBeTruthy();
+  });
+
+  it("draws the rail again as soon as one document exists", () => {
+    show([doc()]);
+    expect(screen.getByTestId("purchase-returns-rail")).toBeTruthy();
+  });
+});
+
 describe("the register acts on nothing", () => {
   it("offers no blank + New and no batch actions", () => {
     show([doc()]);

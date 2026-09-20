@@ -366,6 +366,19 @@ export default function OperationApp() {
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
+             It draws PurchasingTabs, which is a ModuleHeader and embeds
+             TopBarIcons, so the slim bar put a second Jump to, a second bell,
+             a second Help and a second gear on one screen. Found on the
+             production walk, like every one before it; the test below now
+             catches the whole CLASS instead of waiting for the next walk. */
+          tab !== "purchase-returns" &&
+          /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
+             live rail destination that draws its own ModuleHeader and has been
+             showing two top rows. The class test above found it the minute it
+             existed, which is the whole reason that test is a rule and not a
+             list of six names. */
+          tab !== "supplier-items" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" &&
           /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw

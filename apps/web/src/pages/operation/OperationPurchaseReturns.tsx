@@ -179,6 +179,21 @@ export function PurchaseReturnsRegister({
   );
 
   const anyFilter = supplier != null || condition != null;
+
+  /**
+   * ⭐ AN EMPTY RAIL IS NOT A RAIL, IT IS A HOLE.
+   *
+   * Every group draws only when some document makes its condition true, so on
+   * a register with nothing in it EVERY group returns null and the rail became
+   * a blank 240px column between the sidebar and the table — measured on the
+   * production walk, signed in, with the register genuinely empty.
+   *
+   * So the rail appears when there is something to filter, and the table takes
+   * the full width when there is not. The restore button in the toolbar
+   * follows the same rule: a `Show filters` control that reveals an empty
+   * column is a control that teaches the operator the page is broken.
+   */
+  const hasFilters = supplierRows.length > 0 || conditionRows.length > 0;
   const clearFilters = () => {
     setSupplier(null);
     setCondition(null);
@@ -425,7 +440,7 @@ export function PurchaseReturnsRegister({
     <div className="flex h-full min-h-0 flex-col" data-testid="operation-purchase-returns">
       <PurchasingTabs />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {railOpen && (
+        {railOpen && hasFilters && (
           <FilterRail testId="purchase-returns-rail" onHide={() => setRailVisible(false)}>
             {PURCHASE_RETURN_RAIL_SECTIONS.map((section) => {
               /* ⭐ SUPPLIER IS A LIST, NOT A DROPDOWN — §9.6 says so in its own
@@ -513,7 +528,7 @@ export function PurchaseReturnsRegister({
             searchPlaceholder="Search purchase returns…"
             exportName="Purchase Returns"
             toolbarStart={
-              !railOpen ? (
+              !railOpen && hasFilters ? (
                 <ShowFiltersButton
                   onShow={() => setRailVisible(true)}
                   testId="purchase-returns-show-filters"
