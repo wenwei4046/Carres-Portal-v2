@@ -3591,17 +3591,147 @@ availability. A supplier saying the work is finished is not receipt or inspectio
 
 #### Register, detail and shared UI
 
+**OWNER-CONFIRMED REGISTER UI — Jess, 2026-09-20. APPROVED TARGET / NOT BUILT.** This closes the
+"remaining exact filter copy and layout require a fresh preview" gap left on 2026-09-18 and
+supersedes the old §9.7 field/rail list completely. Approval covers the column order, the per-Unit
+expansion, the rail and the evidence presentation reviewed in the 2026-09-20 preview. Sample
+suppliers, dates, numbers and quantities in that preview are illustrative, not business data. It
+approves no application build, no migration and no production claim. The page is `Coming soon` in
+the shipped sidebar (`apps/web/src/pages/portal/portal-nav.ts`, measured 2026-09-20).
+
 Keep Repair Orders as a separate register for both creation sources. Supplier Claim opens its
 related RO directly. Register expansion is read-only per-Unit inspection; RO No opens the one formal
 record. Ordinary detail is full-width; only document issue/revision uses governed 50/50 preview.
-Use shared grid/rail geometry and width registry, Supplier-name/count filters, Category immediately
-before PO No / Unit ID, Items/configuration and Qty. Counts distinguish RO documents from Units.
-Problem and Evidence are separate columns. Evidence actions are compact icon/text controls;
-expand by Unit and distinguish original fault, dispatch and receipt/inspection evidence. Use the
-shared viewer contract for photo zoom/pan/reset/navigation and video playback/fullscreen.
-No Work, Finance, Credit or Payment column. No invented editable lifecycle, supplier progress or
-ambiguous dash-joined status. The old §9.7 field/rail list is superseded; remaining exact filter copy
-and layout require a fresh preview against this business scope, not reuse of the rejected HTML.
+
+**ONE LEADING CONTROL, AND IT IS THE DISCLOSURE.** `▸` only — this register has no batch write
+action, so it takes no selection checkbox. Export covers the filtered set. This follows §9.6
+Purchase Returns, not §9.5 Supplier Claims, whose `☐` exists for its own Export selection.
+
+**Columns — exactly in this order:**
+
+```text
+▸ · RO Doc Date · RO No · Supplier · Supplier Claim No · Category · PO No / Unit ID ·
+Items · Qty · Repair Requirement · Cost Responsibility · Supplier Pickup Location ·
+Actual Pickup Date · Supplier Return Location · Expected Return Date · Returned Qty ·
+Goods Received Date · GRN No
+```
+
+The order reads the record then the physical story: document identity → counterparty and source
+record → goods → what was commissioned and who bears it → OUT → BACK. Do not rearrange it with a
+general heuristic. `RO Doc Date · RO No` lead and pin per UI MASTER §6.7 rule 2; this page is not
+the Supplier Claims exception.
+
+- `RO Doc Date` is the document date, never the pickup date. `RO No` is the only door into the
+  object; an unissued RO keeps its place, reads `Not issued` with `Sending not confirmed` beneath,
+  and still opens on its permanent internal identity.
+- `Supplier Claim No` is empty for a direct inventory repair. An absent link prints the governed
+  absence, never a word implying a relationship that does not exist.
+- `PO No / Unit ID` is one cell, two lines: PO number in full on line one, and on line two the
+  goods identity that PO names — one Unit ID, `{n} Units` as the in-cell disclosure into THIS row's
+  expansion, `Counted stock`, or the honest absence/failure word. A missing original purchase source
+  reads `Not recorded` on line one with the real Unit ID beneath. Never fabricate a PO or a Unit ID,
+  and never put a second document in the cell (UI MASTER §6.8).
+- `Items` is model on line one, configuration on line two; several models read `{first item} + {n} more`.
+- `Qty` is the commissioned repair quantity, not a Unit count. No footer quantity total.
+- `Repair Requirement` is what the supplier must do; several requirements read `{first} + {n} more`.
+- **`Cost Responsibility` is a RESPONSIBILITY WORD, NOT MONEY** — `Carres pays` · `Supplier pays` ·
+  `Not decided`. It is admitted because it decides whether goods may leave, and it is the one
+  commercial fact on the row. **It is not the price, quotation amount or financial column the
+  2026-09-19 ruling excludes**, and it creates no approval or payment gate. `Price` and
+  `Repair Quotation` stay in create/detail and never become columns.
+- `Supplier Pickup Location` defaults from the Unit's actual Stock Location; a Display Unit prints
+  its site with `Display` on the second line. Editing it moves nothing.
+- `Actual Pickup Date`, `Expected Return Date`, `Returned Qty` and `Goods Received Date` are four
+  separate facts. Fully picked up is not returned; returned is not inspected. `Goods Received Date`
+  carries the arrival date and time under the shared dictionary; every record today prints
+  `Time not recorded`, because the database holds no arrival clock (§9.3's stated Receiving gap).
+- `GRN No` links the return receipt; several read `{n} GRNs`; none reads blank, never zero.
+
+**Optional Columns, default off:** `Collected By` (the actual collector/carrier, also on every
+expanded Unit row) and `SKU`. No `Approval`, `Price`, `Repair Quotation`, `Work`, `Finance`,
+`Credit` or `Payment` column, and no owner avatar. An approval actor is object history, not a
+register column (UI MASTER §6.7).
+
+**Shape and geometry.** Flat register, newest `RO Doc Date` first, one ungrouped list with one
+sticky opaque header; invent no status groups, so §6.10's group-local header does not apply here.
+Shared 54px two-line listing row, 36px two-line header, 8px cell padding, 1px dividers, 45px
+toolbar, 32px footer (UI MASTER §6.8 shared Purchasing geometry). Pin `RO Doc Date` and `RO No` at
+canvas ≥768px, `RO No` alone below. **No column is hidden by width**; the approved defaults always
+show and the grid scrolls horizontally inside its own container — 17 columns is the deliberate
+answer to a document with an out leg and a back leg, and hiding half of it behind Columns would
+cost more clicks than the scroll (planner decision, 2026-09-20; owner-reviewed and accepted).
+Widths come from the ONE registry (`register-field-widths.ts`), never from this section.
+**Footer:** `{n} Repair Orders` · `1 Repair Order` · `{n} of {m} Repair Orders`; documents, never Units.
+
+**Row expansion — the read-only per-Unit inspector, exactly in this order:**
+
+```text
+Category · PO No / Unit ID · Items · Qty · Problem · Evidence ·
+Supplier Pickup Location · Collected By · Actual Pickup Date ·
+Supplier Return Location · Goods Received Date
+```
+
+`Problem` and `Evidence` are SEPARATE columns here; this page does not adopt §9.5's merged
+`Problem & Evidence` cell. Each individually tracked Unit is one row at `Qty 1` with its own
+problem, its own evidence and its own physical dates; quantity-managed goods keep their genuine
+quantity on one row reading `Counted stock`. A Unit not yet back leaves `Goods Received Date`
+unrecorded — partial return stays visible and is never rounded up to complete. The parent's facts
+are not repeated inside its own expansion. The expansion is read-only: no editor, no uploader, no
+delete, no status change. It uses §6.9's connected expansion and its 1px connector.
+
+**Left rail — five groups, in this order:**
+
+| Group | Rows |
+|---|---|
+| `Supplier` | Supplier names with right-aligned matching RO counts, reusing the §9.5/§9.6 list pattern; never a dropdown |
+| `Repair order` | `Sending not confirmed` |
+| `Pickup` | `Not picked up` · `Partly picked up` · `Fully picked up` |
+| `Return` | `Not returned` · `Partly returned` · `Fully returned` |
+| `Evidence` | `Pickup proof missing` · `Return proof missing` |
+
+**There is deliberately NO quotation or approval rail group.** A facet reading
+`Quotation not recorded` or `Approval not recorded` would present an OPTIONAL fact as a deficiency
+and rebuild the financial gate the 2026-09-19 owner ruling removed; missing price is explicitly not
+Work. A proposal for one was drafted on 2026-09-20 and withdrawn against that ruling.
+
+**`Sending not confirmed` is the PO family's own word** (COPY, 2026-09-16/17), reused unchanged.
+This register never says a document was not sent: absent evidence means the Portal has no record,
+not that nobody sent it on WhatsApp. `Repair order not sent` and `PDF not sent` are refused here.
+🟡 **§9.6's `Return document not sent` contradicts that same principle and §9.7's own COPY rule.**
+It is named here and belongs to Purchase Returns' own round to correct; this section does not
+edit another page's confirmed text.
+
+Rail rows are factual predicates with truthful counts, not queues and not stored states. Click to
+filter, click again to clear; there is no Clear filters control in the rail (§9.3 owner correction)
+— the toolbar's active-condition strip owns that, and it appears only while something narrows the
+list. Counts count RO documents, not Units; one RO may match several rows in a group.
+🟡 **Facet-count semantics are stated three different ways across §9.3, §9.5 and §9.6.** This page
+uses standard facet semantics: a count reflects every OTHER active filter and the search, but not
+the selections inside its own group. Converging the three pages on one algorithm belongs to the
+shared listing contract in UI MASTER §6.7, not to this section.
+
+Search covers RO No, Supplier, Supplier Claim No, PO No, Unit ID, Items and GRN No.
+
+**Evidence — three kinds, never interchanged:** `Problem evidence` (the original fault; a
+Claim-origin RO links the Claim's existing files by reference and never re-uploads them),
+`Pickup proof` (what actually left, and to whom) and `Return proof` (what actually came back).
+Controls are compact icon + text `Photos {n}` / `Video {n}` — no button, pill, border or permanent
+fill, 12px helper size, hover/focus tint only, visible focus ring, `aria-expanded`. Clicking opens
+that Unit's evidence directly beneath it; opening one never closes a sibling and never reflows the
+rows above. A count is never printed when it is unknown: an unread list reads
+`Evidence could not be loaded` + `Try again`, never `Photos 0`, and a kind with genuinely zero
+files prints no control. Photos and video open the ONE shared read-only viewer
+(UI MASTER §6.8 kit request — it still does not exist and must join the kit before this page is built).
+
+**States, all distinct:** loading · `No Repair Orders yet.` · `No Repair Orders match these filters`
+· `Repair Orders could not be loaded` + `Try again` inside the grid with the toolbar intact · no
+access · the two evidence failure states above. A failed read is never drawn as zero, and an
+unrecorded fact is never drawn as `0`.
+
+**Open and return:** `RO No` opens the full-width object, kept in the URL; returning restores
+search, filters, scroll, the open expansion and focus on that `RO No`. Cross-links: `PO No` opens
+Purchase Orders, `Supplier Claim No` opens the Claim, `GRN No` opens the Receiving record, a Unit
+ID opens Stock.
 
 #### Whole-Portal ownership and Workspace integration
 
@@ -3654,6 +3784,27 @@ block, price recorded without automatic expense approval, Jess-only approval wit
 pending financial decision without a placement gate, duplicate active repair, partial return,
 failed inspection, replacement identity and receipt-source compatibility.
 This document authorises the target, not a migration, build-card creation or production rollout.
+
+**🔴 TWO MEASURED STRUCTURAL CONFLICTS — found 2026-09-20 on `61ccf39`, named before any build.**
+
+| Conflict | Measured evidence | Consequence for build |
+|---|---|---|
+| **`RO No` is minted today by the RETURN LEG, not by the repair commission.** `arrival_sources` allocates it for a `repair-return` — a table that carries no supplier, price, cost responsibility, approval or sent version, and that requires a Claim or Case | `supabase/migrations/0490_…sql:136` (`allocate_formal_document_code('RO', v_id::text)`), with the source constraint at `:31` | One `RO-…` cannot name both the commission and its inbound leg — ownership Law A, and Law C's "a door, never a duplicate". The commission must mint `RO No` and the arrival source must REFERENCE it. Extend 0490's `repair-return` source check from "Claim or Case" to "an authorised RO", in a NEW migration; keep its physical checks at `:148` (Units at the recorded origin Site, status `free`/`reserved`/`on_hold`) — those are physical truth, not a source restriction. Never edit an applied migration, fabricate a Claim, or relax the checks globally |
+| **There is no shared formal-document Issue engine; the only one is PO-specific.** §9.7 says Issue "uses the shared formal-document flow" — that flow does not exist | `supabase/migrations/0377_…sql`: `po_sends` keys every send on `po_id` + `po_version`, with the `confirmed_sent` unique index on that pair | Version/recipient/channel/actor/time evidence must be lifted into a document-agnostic component that RO, PRTN, CO and CRTN share, before RO Issue is built. Do not draw a second set of send controls on this page (§8.2, ONE COMMUNICATION AREA PER DOCUMENT) |
+
+**Also measured 2026-09-20, and not defects — recorded so the next chat does not re-derive them:**
+the outbound leg has no owning record (`apps/web/src/pages/operation/warehouse-schedule-view.ts:69`
+states `repair-pickup` and `supplier-return` render nothing today); `Repair Orders` is
+`soon: true` in `portal-nav.ts:373`; `OperationOpsRepair.tsx` is the legacy Stock `needs_repair`
+queue and is NOT this register; `ops_stock_items.ownership` admits only `carres_owned` and
+`supplier_consignment` (`0366_…sql:117`), so the screen has exactly two ownership words and
+`Dealer` is a LOCATION; and `warehouse_kind` is only `own` / `logistics_partner` (`0027`), so
+Showroom and Dealer are not governed Stock Sites yet — Stock §12.9 holds that as an approved
+target. **Consequence, planner decision 2026-09-20:** the UI is drawn for all three locations now,
+and selection opens Warehouse first, with Showroom and Dealer following Stock's Site work. This
+neither narrows the 2026-09-18 approved scope nor pretends a Dealer Site exists today.
+*Falsifier: a governed Showroom/Dealer Site row in `warehouses`, which would open selection at once.*
+
 
 ### 9.8 Display Requests
 
