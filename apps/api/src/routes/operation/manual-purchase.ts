@@ -1877,7 +1877,7 @@ const headerBody = z
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
-    /* ⭐ THE RECORDED INTENT (0546 · 0548). Optional on the wire and NULLABLE
+    /* ⭐ THE RECORDED INTENT (0546 · 0549). Optional on the wire and NULLABLE
        in the column, because a request that recorded none is its own state and
        is never guessed into an answer. The form asks it and refuses Send
        without it; a caller that sends nothing gets the honest NULL and the
@@ -1986,7 +1986,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     p_for_service_case_id: serviceCaseId ?? null,
     p_for_staff_user_id: staffUserId ?? null,
     p_for_subsidiary_name: (subsidiaryName ?? "").trim() || null,
-    /* ⭐ SENT BY NAME, AND THAT IS THE WHOLE FIX (0548). PostgREST resolves an
+    /* ⭐ SENT BY NAME, AND THAT IS THE WHOLE FIX (0549). PostgREST resolves an
        RPC by the argument NAMES the request carries, so omitting this one
        bound the call to the pre-intent overload and stored NULL — which left
        every Ready Stock line reading `This purchase did not record whether

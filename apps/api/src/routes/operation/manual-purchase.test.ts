@@ -1822,7 +1822,7 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("⭐ 0548 · THE RECORDED INTENT RIDES THE CREATE, BY NAME", async () => {
+  it("⭐ 0549 · THE RECORDED INTENT RIDES THE CREATE, BY NAME", async () => {
     /* ⛔ THE BUG THIS PINS. 0546 built the binding column, the guards, the
        arithmetic, the atomic save and the issue ceiling — every one of them
        reads `fulfilment_intent` — and NOTHING wrote it. The create route sent
@@ -1842,10 +1842,10 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(args).toHaveProperty("p_fulfilment_intent", "concrete_need");
   });
 
-  it("⛔ 0548 · AN UNANSWERED CREATE SENDS NULL — never a guessed answer", async () => {
+  it("⛔ 0549 · AN UNANSWERED CREATE SENDS NULL — never a guessed answer", async () => {
     /* A caller that records no intent gets the honest absence. The screen is
        what refuses an unanswered form; the wire never invents one, so a
-       pre-0548 row and a skipped question read the same and both say so. */
+       pre-0549 row and a skipped question read the same and both say so. */
     const rpc = vi
       .fn()
       .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
@@ -1855,7 +1855,7 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(args).toHaveProperty("p_fulfilment_intent", null);
   });
 
-  it("⛔ 0548 · AND A THIRD INTENT NEVER REACHES THE DOOR", async () => {
+  it("⛔ 0549 · AND A THIRD INTENT NEVER REACHES THE DOOR", async () => {
     const rpc = vi.fn();
     const { res } = await post(
       { ...HEADER, fulfilmentIntent: "maybe", lines: [{ sku: "5539-2NA", qty: 1 }] },

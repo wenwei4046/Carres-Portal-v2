@@ -5047,7 +5047,7 @@ export function useCreatePurchaseRequest() {
       serviceCaseId?: string | null;
       staffUserId?: string | null;
       subsidiaryName?: string | null;
-      /** ⭐ THE RECORDED INTENT (0546 · 0548) — whether Units already on the
+      /** ⭐ THE RECORDED INTENT (0546 · 0549) — whether Units already on the
        *  shelf may answer this request, or it buys EXTRA on top of them. The
        *  form refuses `Send` without it; the wire keeps it optional because a
        *  request that recorded none is its own state and is never guessed. */

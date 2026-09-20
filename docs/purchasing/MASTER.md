@@ -1839,7 +1839,7 @@ but does not say where it is recorded; `purchasing_create_request` therefore tak
 Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
 column is dropped and the derivation replaces it.
 
-✅ **CLOSED BY 0548 (owner ruling 2026-09-20): the create form asks the question.**
+✅ **CLOSED BY 0549 (owner ruling 2026-09-20): the create form asks the question.**
 `Can stock answer this?` sits beside `Need for`, two answers, **no default**, and `Send` refuses an
 unanswered form with `Send — say whether stock can answer this`. The route sends
 `p_fulfilment_intent` BY NAME — that is the whole fix, because PostgREST resolves an RPC by the

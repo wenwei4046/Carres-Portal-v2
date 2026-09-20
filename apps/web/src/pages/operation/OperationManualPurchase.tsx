@@ -2226,7 +2226,7 @@ function CreateRequestWorkspace({
   const [purpose, setPurpose] = useState<DemandPurpose>(DEMAND_PURPOSE_DEFAULT);
   /**
    * ⭐ THE RECORDED INTENT (owner rulings 2026-09-18 / 2026-09-20; 0546 ·
-   * 0548). Whether Units already on the shelf may answer this request, or it
+   * 0549). Whether Units already on the shelf may answer this request, or it
    * is buying EXTRA on top of them.
    *
    * ⛔ IT STARTS EMPTY AND HAS NO DEFAULT. The ruling forbids inferring the
@@ -2581,7 +2581,7 @@ function CreateRequestWorkspace({
           purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
         subsidiaryName:
           purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
-        /* The recorded intent (0546 · 0548) — `Send` already refused an
+        /* The recorded intent (0546 · 0549) — `Send` already refused an
            unanswered form, so this is always a real answer here. */
         fulfilmentIntent: stockAnswer,
         lines: payload.map((l) => ({
@@ -2665,7 +2665,7 @@ function CreateRequestWorkspace({
         {/* ⭐ CAN STOCK ANSWER THIS? — beside `Need for`, because it is the
             same breath: the operator says what the purchase is for, then
             whether goods already on the shelf can answer it. It is the ONE
-            fact the whole Ready Stock allocation reads (0546), and 0548 is
+            fact the whole Ready Stock allocation reads (0546), and 0549 is
             the file that finally writes it.
 
             No default option and no pre-selection: the ruling of 2026-09-18

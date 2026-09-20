@@ -1,4 +1,4 @@
--- 0548 · THE CREATE DOOR ASKS WHETHER STOCK CAN ANSWER THE PURCHASE
+-- 0549 · THE CREATE DOOR ASKS WHETHER STOCK CAN ANSWER THE PURCHASE
 --
 -- ⛔ THE DEFECT THIS CLOSES, MEASURED ON PRODUCTION 2026-09-20, MINUTES AFTER
 --    0546 AND 0547 WERE APPLIED.
@@ -92,7 +92,7 @@ begin
 
   -- THE HEADER, through its own door. Every purpose rule, the `why` rule and
   -- the three structured-For rules run inside `purchasing_create_request`.
-  -- 0548: the arguments are NAMED, so this binds to the eight-argument form
+  -- 0549: the arguments are NAMED, so this binds to the eight-argument form
   -- 0546 created and the intent actually reaches the row. Called positionally
   -- it would bind to 0522's seven-argument twin and silently store NULL —
   -- which is the defect this file exists to close.
@@ -146,7 +146,7 @@ grant execute on function
 
 comment on function
   public.purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text) is
-  '0548 — 0410''s whole-request door plus the RECORDED INTENT (owner rulings 2026-09-18 / 2026-09-20). It calls purchasing_create_request with NAMED arguments so the call binds to 0546''s eight-argument form and the intent reaches the row; called positionally it bound to 0522''s seven-argument twin and stored NULL, which left every Ready Stock line reading `This purchase did not record whether stock can answer it`. Still one transaction, still every inner gate in its own body, still refuses a request with no lines. NULL intent stays legal and stays its own state — it is never guessed.';
+  '0549 — 0410''s whole-request door plus the RECORDED INTENT (owner rulings 2026-09-18 / 2026-09-20). It calls purchasing_create_request with NAMED arguments so the call binds to 0546''s eight-argument form and the intent reaches the row; called positionally it bound to 0522''s seven-argument twin and stored NULL, which left every Ready Stock line reading `This purchase did not record whether stock can answer it`. Still one transaction, still every inner gate in its own body, still refuses a request with no lines. NULL intent stays legal and stays its own state — it is never guessed.';
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- SANITY — the SHAPE, and the thing that was actually broken
@@ -159,7 +159,7 @@ begin
   if to_regprocedure(
        'public.purchasing_create_request_with_lines(text, uuid, text, date, uuid, uuid, text, jsonb, text)'
      ) is null then
-    raise exception '0548 sanity: the intent-carrying create door is missing';
+    raise exception '0549 sanity: the intent-carrying create door is missing';
   end if;
 
   -- The header door it names must be the EIGHT-argument one, or the named
@@ -167,7 +167,7 @@ begin
   if to_regprocedure(
        'public.purchasing_create_request(text, uuid, text, date, uuid, uuid, text, text)'
      ) is null then
-    raise exception '0548 sanity: the intent-carrying header door is missing';
+    raise exception '0549 sanity: the intent-carrying header door is missing';
   end if;
 
   -- ⭐ THE DEFECT ITSELF: the new body must name its arguments. A positional
@@ -178,7 +178,7 @@ begin
      and p.proname = 'purchasing_create_request_with_lines'
      and p.prosrc like '%p_fulfilment_intent   => p_fulfilment_intent%';
   if v_n <> 1 then
-    raise exception '0548 sanity: exactly one create door must pass the intent by name, found %', v_n;
+    raise exception '0549 sanity: exactly one create door must pass the intent by name, found %', v_n;
   end if;
 
   -- The column the whole chain reads is still there and still nullable: a row
@@ -188,7 +188,7 @@ begin
    where table_schema = 'public' and table_name = 'purchase_requests'
      and column_name = 'fulfilment_intent' and is_nullable = 'YES';
   if v_n <> 1 then
-    raise exception '0548 sanity: fulfilment_intent must exist and stay nullable';
+    raise exception '0549 sanity: fulfilment_intent must exist and stay nullable';
   end if;
 end
 $sanity$;

@@ -402,7 +402,7 @@ async function openWorkspace(options: { answerStockQuestion?: boolean } = {}) {
   await waitFor(() =>
     expect(screen.getByText("5539-2NA", { selector: ".font-mono" })).toBeTruthy(),
   );
-  /* ⭐ 0548 — the form asks whether stock can answer the purchase and `Send`
+  /* ⭐ 0549 — the form asks whether stock can answer the purchase and `Send`
      refuses until it does, so filling the form in includes answering it, the
      way an operator must. The gate itself is asserted by the one test that
      passes `false`. */
@@ -410,7 +410,7 @@ async function openWorkspace(options: { answerStockQuestion?: boolean } = {}) {
 }
 
 /**
- * ⭐ THE FORM ASKS WHETHER STOCK CAN ANSWER THE PURCHASE (0548), and `Send`
+ * ⭐ THE FORM ASKS WHETHER STOCK CAN ANSWER THE PURCHASE (0549), and `Send`
  * refuses until it is answered — so every test that reaches `Send` answers it,
  * exactly as an operator must. The gate itself is asserted separately below;
  * here it is just part of filling the form in.
@@ -3408,7 +3408,7 @@ describe("Round 2 · the object's rounds", () => {
     });
   });
 
-  it("⭐ 0548 · THE FORM ASKS WHETHER STOCK CAN ANSWER, AND SEND NAMES THE GAP", async () => {
+  it("⭐ 0549 · THE FORM ASKS WHETHER STOCK CAN ANSWER, AND SEND NAMES THE GAP", async () => {
     /* 0546 built the binding, the guards, the arithmetic and the atomic save —
        and NOTHING wrote the one fact they all read, so every request stored
        NULL and not a single Unit could ever be allocated. This is the question
@@ -3424,7 +3424,7 @@ describe("Round 2 · the object's rounds", () => {
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
   });
 
-  it("⛔ 0548 · NO DEFAULT ANSWER — a pre-picked option would be the guess the ruling bans", async () => {
+  it("⛔ 0549 · NO DEFAULT ANSWER — a pre-picked option would be the guess the ruling bans", async () => {
     await openWorkspace({ answerStockQuestion: false });
     /* Both answers must be reachable and NEITHER chosen. The ruling of
        2026-09-18 forbids inferring the intent from the SKU, the shelf count or
@@ -3440,7 +3440,7 @@ describe("Round 2 · the object's rounds", () => {
     ).toEqual([MW.canStockAnswerYes, MW.canStockAnswerNo]);
   });
 
-  it("⭐ 0548 · THE ANSWER REACHES THE WIRE — both ways, and never invented", async () => {
+  it("⭐ 0549 · THE ANSWER REACHES THE WIRE — both ways, and never invented", async () => {
     await openWorkspace({ answerStockQuestion: false });
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
@@ -3477,7 +3477,7 @@ describe("Round 2 · the object's rounds", () => {
     // The SAME request opens in the form, prefilled, its purpose locked.
     await screen.findByTestId("manual-purchase-create");
     expect(screen.getByText("Edit and send again", { selector: "h2" })).toBeInTheDocument();
-    /* ⭐ 0548 — this request was raised before the intent was ever asked, so it
+    /* ⭐ 0549 — this request was raised before the intent was ever asked, so it
        stores NULL and the reopened form asks for it before it may go back. The
        absence is never guessed into an answer, not even on a re-send. */
     await waitFor(() =>

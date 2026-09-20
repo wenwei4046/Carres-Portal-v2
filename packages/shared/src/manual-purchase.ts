@@ -37,7 +37,7 @@ export const MANUAL_PURCHASE_WORDS = {
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
   /**
-   * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0548) — and the reason it is a
+   * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0549) — and the reason it is a
    * QUESTION rather than a derivation.
    *
    * The owner ruling of 2026-09-18 requires the intent to be STORED and
