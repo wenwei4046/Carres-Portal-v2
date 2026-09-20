@@ -248,10 +248,10 @@ describe("the optional Ordered Qty column", () => {
 /**
  * ⭐ CARD 02-B — the exact-mapping columns, optional like everything else.
  * A sibling register that asks for nothing renders byte-identically; the
- * buying Register asks and gets `Supplier` and `PO Delivery Date` as fixed
+ * buying Register asks and gets `Supplier` and `PO Default Delivery Date` as fixed
  * columns BEFORE `Item`, which stays last (law ①).
  */
-describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
+describe("Card 02-B · optional Supplier and PO Default Delivery Date", () => {
   it("absent by default — Sales Orders and Delivery keep their ruled layout", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
@@ -288,7 +288,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
       "Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty",
-      "Supplier", "PO Delivery Date", "Item",
+      "Supplier", "PO Default Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();
     expect(screen.getByText("Fri, 18 Sep")).toBeInTheDocument();
@@ -337,5 +337,118 @@ describe("the Purchase Orders reading", () => {
   it("every other caller keeps Category", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
     expect(within(screen.getByRole("table", { name: "Goods on SO-1303" })).getAllByRole("columnheader").map((h) => h.textContent)).toContain("Category");
+  });
+});
+
+/**
+ * ⭐ SO BATCH'S APPROVED ACTIONABLE EXPANSION — owner ruling 2026-09-18
+ * (Purchasing §9.1 · UI §6.8–6.9). Opt-in: every other caller above renders
+ * byte-identically, which is what the tests before this one hold.
+ */
+describe("the SO Batch buying reading", () => {
+  const soBatchLine = (over: Partial<GoodsMiniLine> = {}): GoodsMiniLine =>
+    goodsLine({
+      status: "Need PO",
+      itemDetail: "King · Fabric 3",
+      supplier: "Nice Furniture Sdn Bhd",
+      fromStockNode: <span data-testid="stock-cell">3 available</span>,
+      ...over,
+    });
+
+  function drawSoBatch(over: Partial<GoodsMiniLine> = {}, detail?: React.ReactNode) {
+    return render(
+      <GoodsMiniTable
+        label="Goods on SO-1318"
+        lines={[soBatchLine(over)]}
+        soBatchGoodsLayout
+        showStatus
+        showSku={false}
+        showFromStock
+        showSupplier
+        showUnitId={false}
+        detailRow={detail === undefined ? undefined : () => detail}
+        selection={{ selectedKeys: new Set(), onToggle: vi.fn() }}
+      />,
+    );
+  }
+
+  it("draws the seven approved columns, in the owner's order", () => {
+    drawSoBatch();
+    const table = screen.getByRole("table", { name: "Goods on SO-1318" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => (h.textContent ?? "").trim())
+        .filter(Boolean),
+    ).toEqual([
+      "Status", "Category", "Qty", "Item", "Ready Stock", "Supplier", "Supplier Deliver To",
+    ]);
+  });
+
+  it("removed the five columns and kept the customer's own quantity", () => {
+    drawSoBatch();
+    const table = screen.getByRole("table", { name: "Goods on SO-1318" });
+    const heads = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    for (const gone of ["SKU", "Ordered Qty", "To buy", "Order By", "Unit ID"]) {
+      expect(heads, gone).not.toContain(gone);
+    }
+    expect(table).not.toHaveTextContent("B1201S-K");
+    expect(table).toHaveTextContent("2");
+    /* And the configuration, which is what tells two lines of one model apart. */
+    expect(table).toHaveTextContent("King · Fabric 3");
+  });
+
+  it("lets the page draw the Ready Stock cell", () => {
+    drawSoBatch();
+    expect(screen.getByTestId("stock-cell")).toHaveTextContent("3 available");
+  });
+
+  it("takes its CONTENT width and does not stretch to fill a canvas", () => {
+    drawSoBatch();
+    const table = screen.getByRole("table", { name: "Goods on SO-1318" });
+    /* 36 + 112 + 132 + 64 + 240 + 136 + 136 + 200 */
+    expect(table).toHaveStyle({ width: "1056px" });
+    expect(table.className).not.toContain("w-full");
+  });
+
+  it("marks the ACTIVE goods context with a blue boundary", () => {
+    drawSoBatch();
+    expect(screen.getByTestId("goods-mini-table").className).toContain("border-kit-blue-6");
+  });
+
+  it("every other caller keeps the neutral frame", () => {
+    render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
+    expect(screen.getByTestId("goods-mini-table").className).toContain("border-base-200");
+  });
+
+  /**
+   * ⭐ §6.9 — the connector belongs to the table, because only the table knows
+   * where the `Ready Stock` column is. It exists ONLY while a picker is open,
+   * so it can never run on into the next item.
+   */
+  it("draws the connector in the Ready Stock cell, only while a picker is open", () => {
+    const { unmount } = drawSoBatch();
+    expect(screen.queryByTestId("goods-connector-line-1")).toBeNull();
+    unmount();
+    drawSoBatch({}, <div data-testid="picker">the stock picker</div>);
+    const line = screen.getByTestId("goods-connector-line-1");
+    /* In the `Ready Stock` cell, so horizontal scrolling moves it with the
+       arrow rather than leaving it behind. */
+    expect(line.closest("td")).toBe(screen.getByTestId("stock-cell").closest("td"));
+    expect(line.closest("td")).toHaveStyle({ position: "relative" });
+    /* And it reaches PAST this cell, across the row divider and the gap, onto
+       the frame's top border. */
+    expect(line).toHaveStyle({ top: "28px", right: "15px", bottom: "-13px" });
+  });
+
+  it("opens the picker in its own row, under the item it is about", () => {
+    drawSoBatch({}, <div data-testid="picker">the stock picker</div>);
+    const rows = [
+      ...screen
+        .getByRole("table", { name: "Goods on SO-1318" })
+        .querySelectorAll<HTMLTableRowElement>("tbody tr"),
+    ];
+    expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(["demand", "detail"]);
+    expect(within(rows[1]!).getByTestId("picker")).toBeInTheDocument();
   });
 });

@@ -2,30 +2,38 @@ import { describe, it, expect } from "vitest";
 import {
   buildGrnRegisterView,
   expectedArrivalCounts,
+  grnDateMonths,
+  grnDateWeeks,
+  grnWeekStart,
   type GrnRegisterFactRow,
 } from "./receiving-register";
 import type { PoDatePromise } from "./po-workspace";
 
 /**
- * The Receiving page's ONE register arithmetic (owner correction 2026-09-06):
+ * The Receiving page's ONE register arithmetic (owner correction 2026-09-06;
+ * rail overwritten by the owner ruling 2026-09-17 and PURCHASING CARD 12):
  * server-side pagination and rail counts over the WHOLE filtered result set,
- * and Calendar markers from the governed `Supplier Delivery Date` — never a
- * self-computed estimate.
+ * the six rail groups, and the Arrival Schedule's expected-arrival markers
+ * from the governed supplier reply — never a self-computed estimate.
  */
 
 const row = (over: Partial<GrnRegisterFactRow> & { id: string }): GrnRegisterFactRow => ({
   categories: ["Mattress"],
   supplierName: "Nice Future",
   siteName: "Carres Klang",
-  supplierDeliveryDateIso: "2026-09-08",
+  grnDateIso: "2026-09-16",
+  damaged: false,
+  wrongItem: false,
+  extra: false,
+  cancelled: false,
   searchText: `${over.id} PO-2001 DO-5512 Nice Future`,
   ...over,
 });
 
 const ROWS: GrnRegisterFactRow[] = [
   row({ id: "g1" }),
-  row({ id: "g2", categories: ["Sofa"], supplierName: "Ohana", siteName: "Carres Setia", supplierDeliveryDateIso: "2026-09-09", searchText: "g2 PO-2002 DO-7000 Ohana" }),
-  row({ id: "g3", categories: ["Mattress", "Bedframe"], supplierDeliveryDateIso: null }),
+  row({ id: "g2", categories: ["Sofa"], supplierName: "Ohana", siteName: "Carres Setia", grnDateIso: "2026-09-17", searchText: "g2 PO-2002 DO-7000 Ohana" }),
+  row({ id: "g3", categories: ["Mattress", "Bedframe"], grnDateIso: null }),
 ];
 
 describe("buildGrnRegisterView — filters, facets, the page slice", () => {
@@ -53,13 +61,31 @@ describe("buildGrnRegisterView — filters, facets, the page slice", () => {
     expect(v.facets.supplier).toEqual({ Ohana: 1 });
   });
 
-  it("the Calendar's Supplier Delivery Date narrows EVERY section and the total", () => {
-    const v = buildGrnRegisterView(ROWS, { expected: "2026-09-08" }, 0, 50);
+  it("a GRN date pick narrows EVERY section and the total", () => {
+    const v = buildGrnRegisterView(
+      ROWS,
+      { from: "2026-09-16", to: "2026-09-16" },
+      0,
+      50,
+    );
     expect(v.total).toBe(1);
     expect(v.pageIds).toEqual(["g1"]);
-    // g3 has no supplier date — it never matches a picked date.
+    // g3 has no recorded creation date — it is never given one to match.
     expect(v.facets.category).toEqual({ Mattress: 1 });
     expect(v.facets.supplier).toEqual({ "Nice Future": 1 });
+    // The GRN-date facet itself keeps every day countable.
+    expect(v.facets.grnDate).toEqual({ "2026-09-16": 1, "2026-09-17": 1 });
+  });
+
+  it("a week is one inclusive range, not seven picks", () => {
+    const v = buildGrnRegisterView(
+      ROWS,
+      { from: "2026-09-14", to: "2026-09-20" },
+      0,
+      50,
+    );
+    expect(v.total).toBe(2);
+    expect(v.pageIds).toEqual(["g1", "g2"]);
   });
 
   it("search matches the governed text case-insensitively and narrows facets", () => {
@@ -70,7 +96,75 @@ describe("buildGrnRegisterView — filters, facets, the page slice", () => {
   });
 });
 
-describe("expectedArrivalCounts — the Calendar's markers", () => {
+describe("the rail's `Received with` rows — a record, never a to-do list", () => {
+  const FOUND: GrnRegisterFactRow[] = [
+    // One GRN carries TWO exceptions — which is exactly why the three counts
+    // may never be added into a total.
+    row({ id: "f1", damaged: true, wrongItem: true }),
+    row({ id: "f2", extra: true, supplierName: "Ohana" }),
+    row({ id: "f3" }),
+    row({ id: "f4", cancelled: true, damaged: true }),
+  ];
+
+  it("counts GRNs, overlapping, and the sum exceeds the matching records", () => {
+    const v = buildGrnRegisterView(FOUND, {}, 0, 50);
+    expect(v.facets.receivedWith).toEqual({ damaged: 2, wrong_item: 1, extra: 1 });
+    // 2 + 1 + 1 = 4 while only three GRNs carry an exception: NEVER a total.
+    const records = FOUND.filter((r) => r.damaged || r.wrongItem || r.extra);
+    expect(records).toHaveLength(3);
+  });
+
+  it("picking Damaged goods narrows the rows and the other groups", () => {
+    const v = buildGrnRegisterView(FOUND, { receivedWith: "damaged" }, 0, 50);
+    expect(v.pageIds).toEqual(["f1", "f4"]);
+    expect(v.facets.supplier).toEqual({ "Nice Future": 2 });
+    // Its own group stays fully countable — clicking Extra goods shows 1.
+    expect(v.facets.receivedWith).toEqual({ damaged: 2, wrong_item: 1, extra: 1 });
+  });
+
+  it("Cancelled GRNs is a row of its own, and the default listing holds both", () => {
+    expect(buildGrnRegisterView(FOUND, {}, 0, 50).total).toBe(4);
+    expect(buildGrnRegisterView(FOUND, {}, 0, 50).facets.cancelled).toBe(1);
+    const only = buildGrnRegisterView(FOUND, { cancelled: true }, 0, 50);
+    expect(only.pageIds).toEqual(["f4"]);
+  });
+});
+
+describe("the GRN date ladder — weeks Monday to Sunday, only days that exist", () => {
+  const COUNTS = {
+    "2026-09-14": 2, // Monday
+    "2026-09-20": 1, // Sunday of the same week
+    "2026-09-21": 3, // the next Monday
+    "2026-08-31": 1, // the month before
+  };
+
+  it("a week runs Monday to Sunday", () => {
+    expect(grnWeekStart("2026-09-20")).toBe("2026-09-14");
+    expect(grnWeekStart("2026-09-14")).toBe("2026-09-14");
+    expect(grnWeekStart("2026-09-21")).toBe("2026-09-21");
+  });
+
+  it("weeks carry their own days, newest first, and never invent an empty day", () => {
+    const weeks = grnDateWeeks(COUNTS);
+    expect(weeks.map((w) => w.from)).toEqual(["2026-09-21", "2026-09-14", "2026-08-31"]);
+    const middle = weeks[1]!;
+    expect(middle.to).toBe("2026-09-20");
+    expect(middle.count).toBe(3);
+    // Sunday is listed; the five days with no GRN are not.
+    expect(middle.days.map((d) => d.iso)).toEqual(["2026-09-20", "2026-09-14"]);
+  });
+
+  it("months fold the same day counts and carry their own inclusive range", () => {
+    const months = grnDateMonths(COUNTS);
+    expect(months.map((m) => [m.period, m.count])).toEqual([
+      ["2026-09", 6],
+      ["2026-08", 1],
+    ]);
+    expect(months[1]).toMatchObject({ from: "2026-08-01", to: "2026-08-31" });
+  });
+});
+
+describe("expectedArrivalCounts — the Arrival Schedule's markers", () => {
   const promise = (date: string): PoDatePromise =>
     ({
       kind: "tomorrow_delivery",
