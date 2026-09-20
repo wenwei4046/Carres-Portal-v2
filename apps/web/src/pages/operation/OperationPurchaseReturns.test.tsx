@@ -366,20 +366,31 @@ describe("evidence is per Unit and per purpose", () => {
   });
 });
 
-describe("an empty register is not a hole", () => {
-  it("draws no rail when there is nothing to filter", () => {
-    /* Measured on the production walk, signed in, register genuinely empty:
-       every rail group returns null, so the rail was a blank 240px column
-       between the sidebar and the table. */
+describe("the confirmed rail does not disappear", () => {
+  it("still draws all four §9.6 sections on an empty register", () => {
+    /* An earlier change in this file hid the whole rail when the register was
+       empty. §9.6 confirms these four sections; tidying a blank column is not
+       a licence to delete approved UI. The HEADINGS draw always — only their
+       rows depend on the data. */
     show([]);
-    expect(screen.queryByTestId("purchase-returns-rail")).toBeNull();
-    expect(screen.queryByTestId("purchase-returns-show-filters")).toBeNull();
+    const rail = screen.getByTestId("purchase-returns-rail");
+    for (const title of ["Supplier", "Return document", "Pickup", "Evidence"]) {
+      expect(rail.textContent, title).toContain(title);
+    }
+  });
+
+  it("offers no filter rows when no document makes one true", () => {
+    show([]);
+    expect(
+      screen.queryByTestId("purchase-returns-rail-condition-Not picked up"),
+    ).toBeNull();
     expect(screen.getByText("No purchase returns.")).toBeTruthy();
   });
 
-  it("draws the rail again as soon as one document exists", () => {
+  it("fills the same sections once a document exists", () => {
     show([doc()]);
-    expect(screen.getByTestId("purchase-returns-rail")).toBeTruthy();
+    expect(screen.getByTestId("purchase-returns-rail-supplier-Hookka")).toBeTruthy();
+    expect(screen.getByTestId("purchase-returns-rail-condition-Not picked up")).toBeTruthy();
   });
 });
 

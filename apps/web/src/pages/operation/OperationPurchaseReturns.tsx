@@ -181,19 +181,20 @@ export function PurchaseReturnsRegister({
   const anyFilter = supplier != null || condition != null;
 
   /**
-   * ⭐ AN EMPTY RAIL IS NOT A RAIL, IT IS A HOLE.
+   * ⭐ THE RAIL IS CONFIRMED UI. IT DOES NOT DISAPPEAR.
    *
-   * Every group draws only when some document makes its condition true, so on
-   * a register with nothing in it EVERY group returns null and the rail became
-   * a blank 240px column between the sidebar and the table — measured on the
-   * production walk, signed in, with the register genuinely empty.
+   * §9.6 confirms four sections — Supplier · Return document · Pickup ·
+   * Evidence. An earlier change in this file hid the whole rail whenever the
+   * register was empty, because every section drew only when some document
+   * made its condition true and the column came out blank. That deleted part
+   * of an approved design to tidy up a blank space, which was not a decision
+   * this file was entitled to make.
    *
-   * So the rail appears when there is something to filter, and the table takes
-   * the full width when there is not. The restore button in the toolbar
-   * follows the same rule: a `Show filters` control that reveals an empty
-   * column is a control that teaches the operator the page is broken.
+   * The blank column was real, but the cause was the SECTIONS, not the rail: a
+   * heading is what tells the operator this page filters by supplier and by
+   * pickup state at all. So every confirmed section now draws its heading
+   * always, and only its ROWS depend on the data.
    */
-  const hasFilters = supplierRows.length > 0 || conditionRows.length > 0;
   const clearFilters = () => {
     setSupplier(null);
     setCondition(null);
@@ -440,14 +441,13 @@ export function PurchaseReturnsRegister({
     <div className="flex h-full min-h-0 flex-col" data-testid="operation-purchase-returns">
       <PurchasingTabs />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {railOpen && hasFilters && (
+        {railOpen && (
           <FilterRail testId="purchase-returns-rail" onHide={() => setRailVisible(false)}>
             {PURCHASE_RETURN_RAIL_SECTIONS.map((section) => {
               /* ⭐ SUPPLIER IS A LIST, NOT A DROPDOWN — §9.6 says so in its own
                  sentence, because a dropdown hides the counts and the counts
                  are the reason to look. */
               if (section.key === "supplier") {
-                if (supplierRows.length === 0) return null;
                 return (
                   <FilterRailGroup
                     key={section.key}
@@ -468,14 +468,14 @@ export function PurchaseReturnsRegister({
                   </FilterRailGroup>
                 );
               }
-              /* The three condition sections. A section with nothing true of
-                 any document is not drawn — an empty heading is a promise of
-                 rows that do not exist. */
+              /* The three condition sections. The heading draws ALWAYS — it is
+                 confirmed in §9.6 and it is what tells the operator this page
+                 filters by pickup state at all. Only the rows underneath
+                 depend on what the documents actually say. */
               const inSection = conditionRows.filter(
                 ({ condition: value }) =>
                   PURCHASE_RETURN_CONDITION_SECTION[value] === section.key,
               );
-              if (inSection.length === 0) return null;
               return (
                 <FilterRailGroup
                   key={section.key}
@@ -528,7 +528,7 @@ export function PurchaseReturnsRegister({
             searchPlaceholder="Search purchase returns…"
             exportName="Purchase Returns"
             toolbarStart={
-              !railOpen && hasFilters ? (
+              !railOpen ? (
                 <ShowFiltersButton
                   onShow={() => setRailVisible(true)}
                   testId="purchase-returns-show-filters"
