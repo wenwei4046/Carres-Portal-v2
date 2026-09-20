@@ -61,7 +61,9 @@ export default function ModuleHeader({
   /** The Destination Header's rendered 50px includes the bottom rule — owner
       ruling 2026-08-15, grown from 44 so a 24px identity keeps 8.5px of air
       above and below. Existing tab-strip module headers keep their 44px content
-      row + rule and their 13px word. */
+      row + rule and their 13px word.
+
+      ⭐ 50px IS A MINIMUM ON A NARROW CANVAS (2026-09-18). See the row below. */
   destinationHeader?: boolean;
 }) {
   useEffect(() => {
@@ -72,16 +74,40 @@ export default function ModuleHeader({
   }, [docTitle]);
 
   return (
+    /**
+     * ⭐ THE DESTINATION ROW'S 50px IS A FLOOR, NOT A CEILING — 2026-09-18.
+     *
+     * MEASURED DEFECT: at a 390px canvas this row pushed the page 30px wider
+     * than the viewport, so EVERY destination page scrolled sideways — which
+     * §6.7 rule 8 forbids by name. The cause was in this file: the identity
+     * span was `shrink-0` at the governed 24px, so on a phone
+     * `SO Batch Purchase` demanded 260px beside a 144px utility cluster inside
+     * 366px of usable width. `Jump to…` already collapses its label under `sm`
+     * (`JumpTo.tsx`); the WORD had no narrow-canvas rule at all.
+     *
+     * ⛔ TRUNCATING IT WAS NEVER AN OPTION — a governed label is never cut and
+     * never hidden behind a tooltip (§6.7 · §6.8), and `Warehouse Inventory`
+     * clipped to `Warehouse Inv…` is the exact defect the Showroom ruling
+     * removed from a column. Shrinking it to a phone type step would invent a
+     * typography value §2 has not ruled.
+     *
+     * So the word may WRAP, and the row grows only when it is forced to: 50px
+     * stays exact at every width where the identity fits on one line, which is
+     * every desktop canvas and most page names even on a phone. Nothing is
+     * hidden, nothing is cut, no new token is invented, and the page stops
+     * scrolling sideways. The tab-strip header is untouched — it keeps its
+     * fixed 44px row, its 13px word and its `shrink-0`.
+     */
     <div
       className={`shrink-0 bg-white border-b border-base-200 ${
-        destinationHeader ? "px-3 sm:px-6 box-border h-[50px]" : "px-6"
+        destinationHeader ? "px-3 sm:px-6 box-border min-h-[50px]" : "px-6"
       }`}
       data-testid={testId}
     >
-      <div className={`flex items-center ${destinationHeader ? "gap-1 sm:gap-4 h-full" : "gap-4 h-11"}`}>
+      <div className={`flex items-center ${destinationHeader ? "gap-1 sm:gap-4 min-h-[50px] py-1" : "gap-4 h-11"}`}>
         <span
-          className={`shrink-0 flex items-center gap-1.5 font-semibold text-base-900 select-none cursor-default ${
-            destinationHeader ? "text-page" : "text-body"
+          className={`flex items-center gap-1.5 font-semibold text-base-900 select-none cursor-default ${
+            destinationHeader ? "min-w-0 break-words text-page" : "shrink-0 text-body"
           }`}
           data-testid={`${testId}-module-word`}
         >

@@ -218,6 +218,15 @@ export interface PurchaseDemandRow {
   customerDelivery: IsoDate | null;
   /** Server planning fact; optional for older Workers, never calculated in React. */
   orderBy?: IsoDate | null;
+  /**
+   * `PO Safety Days` for this demand — the working-day margin that would remain
+   * if it were ordered today (`purchaseDemandSafetyDaysLeft`, the expression
+   * the timing state is classified from). Server planning fact; optional for
+   * older Workers, never calculated in React. `null` on a blocked or undated
+   * row: an unmeasured margin is UNKNOWN, and a `0` would claim it was counted.
+   * Negative means production overruns the customer's date.
+   */
+  safetyDaysLeft?: number | null;
   /** `product_models.name` — or the raw SKU when Catalog has no such SKU. */
   item: string;
   /** `product_skus.variant` — the size or the module code. */
@@ -501,14 +510,38 @@ export function purchaseDemandTimingOf(
   if (f.orderBy != null && f.today < f.orderBy) return "can_order_early";
   if (f.orderBy != null && f.today === f.orderBy) return "safety_days_full";
   if (f.readyIfOrderedToday > f.customerDelivery) return "not_enough_production_time";
-  const left = countWorkingDays(f.readyIfOrderedToday, f.customerDelivery, {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
-    holidays: f.holidays,
-  });
+  const left = purchaseDemandSafetyDaysLeft(f);
   if (left === 0) return "safety_days_none";
   if (left > f.safetyDays) return "can_order_early";
   if (left === f.safetyDays) return "safety_days_full";
   return "safety_days_low";
+}
+
+/**
+ * ⭐ `PO Safety Days` — THE NUMBER THE CLASSIFICATION IS ALREADY MADE OF
+ * (owner ruling 2026-09-18; `docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+ *
+ * The working-day margin that would REMAIN if this demand were ordered today:
+ * the office-calendar distance from the engine's expected production
+ * completion to the customer's required date. It is the SAME expression
+ * `purchaseDemandTimingOf` classifies from — extracted, not re-derived, so one
+ * derived fact keeps one arithmetic (ERP Architecture Law D) and the column can
+ * never disagree with the rail row beside it.
+ *
+ * ⛔ IT IS NOT CLAMPED. A demand whose production overruns the customer's date
+ * answers a NEGATIVE margin, and the caller decides what to print — this page
+ * prints its governed `Not enough production days`, which is the same fact the
+ * timing state already carries. Clamping it to 0 here would make an overrun
+ * indistinguishable from a margin that lands exactly on the day.
+ */
+export function purchaseDemandSafetyDaysLeft(f: PurchaseDemandTimingInput): number {
+  const forward = f.readyIfOrderedToday <= f.customerDelivery;
+  const days = countWorkingDays(
+    forward ? f.readyIfOrderedToday : f.customerDelivery,
+    forward ? f.customerDelivery : f.readyIfOrderedToday,
+    { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
+  );
+  return forward ? days : -days;
 }
 
 /**
@@ -825,6 +858,13 @@ export const purchaseDemandRowSchema = z.object({
   customer: z.string().nullable(),
   customerDelivery: z.string().nullable(),
   orderBy: z.string().nullable().optional(),
+  /**
+   * `PO Safety Days` for THIS demand — the server planning engine's own
+   * margin (`purchaseDemandSafetyDaysLeft`). Optional on the wire: an older
+   * Worker sends none and the column says so rather than printing a `0` it did
+   * not measure. Negative means production overruns the customer's date.
+   */
+  safetyDaysLeft: z.number().int().nullable().optional(),
   item: z.string(),
   variant: z.string().nullable(),
   /* The catalog's own enum, so the wire type and the domain type are ONE type

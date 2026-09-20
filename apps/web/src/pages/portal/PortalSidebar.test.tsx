@@ -802,7 +802,9 @@ describe("PortalSidebar — the Purchasing map", () => {
     fireEvent.click(group_("purchasing-problems"));
     fireEvent.click(group_("purchasing-showroom"));
     for (const key of [
-      "purchase-returns",
+      /* `purchase-returns` LEFT this list on 2026-09-19 — §9.6's register, its
+         read and its storage shipped, so it is a destination now and is
+         asserted as one in the test below. */
       "repair-orders",
       "display-requests",
       "consignment-orders",
@@ -819,6 +821,18 @@ describe("PortalSidebar — the Purchasing map", () => {
       // The name owns its line; the reason stacks under it.
       expect(row.className).toContain("flex-col");
     }
+  });
+
+  it("Purchase Returns is a real door now — §9.6 shipped 2026-09-19", () => {
+    renderAt("/operation?tab=purchase");
+    fireEvent.click(group_("purchasing-problems"));
+    const row = child("purchase-returns");
+    // The opposite of every assertion in the test above: it is a link, it is
+    // focusable, and it no longer explains itself away.
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=purchase-returns");
+    expect(row.getAttribute("aria-disabled")).not.toBe("true");
+    expect(row.textContent).not.toContain("Coming soon");
   });
 
   it("no unbuilt row renders a count, and none renders a `0`", () => {

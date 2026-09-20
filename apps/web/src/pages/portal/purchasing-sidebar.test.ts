@@ -136,7 +136,7 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("five live pages, at the five unchanged addresses", () => {
+  it("six live pages, at their unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
@@ -147,6 +147,11 @@ describe("the live destinations keep their exact current addresses", () => {
       ["Purchase Orders", "/operation/procurement"],
       ["Receiving", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
+      /* §9.6 — Purchase Returns opened 2026-09-19 with its register, its read
+         and its storage (migration 0548). It is the first of the six planned
+         PROBLEMS/SHOWROOM rows to become a destination; no other address
+         moved. */
+      ["Purchase Returns", "/operation?tab=purchase-returns"],
     ]);
   });
 
@@ -169,10 +174,9 @@ describe("the live destinations keep their exact current addresses", () => {
     expect(navItemHref(operation, item as PortalNavItem)).toBe("/operation?tab=purchase");
   });
 
-  it("the six planned pages are non-controls — no route may be invented for them", () => {
+  it("the five still-planned pages are non-controls — no route may be invented for them", () => {
     const soon = purchasing.filter((i) => i.soon);
     expect(soon.map(label)).toEqual([
-      "Purchase Returns",
       "Repair Orders",
       "Display Requests",
       "Consignment Orders",
