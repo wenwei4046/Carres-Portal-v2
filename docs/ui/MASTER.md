@@ -1541,6 +1541,19 @@ facts, permissions, complete-record populations or task ownership.
    live in **§6.10** — one truth, not a second copy here. A listing round reads it there and
    writes no page-local version of it.
 
+🟡 **FACET COUNTS ARE SPELT THREE WAYS, AND THAT IS ONE FACT WITH THREE ANSWERS — found
+2026-09-20.** Purchase Orders §9.3 says a facet's number "describes the whole register, never what
+another facet happens to have selected"; Purchase Returns §9.6 says counts "respect the other
+active dimensions"; Supplier Claims §9.5 says they cover "the complete permitted searched/filtered
+set". A register cannot obey all three, and an operator who learns one page learns the wrong thing
+about the next. **The standard facet semantics are the answer, and they belong to this shared
+contract, not to a page:** a count reflects every OTHER active filter and the search, and NOT the
+selections inside its own group — the only reading under which a count never promises rows it
+cannot deliver and never hides a row the operator could still reach. Purchasing §9.7 Repair Orders
+is written to it. **Owed:** converging the three built/confirmed pages, each in its own round; no
+page reaches into another's. *Falsifier: a measured operator journey in which whole-register counts
+read truer than filtered ones — then this contract changes once, here, and every page follows.*
+
 9. **Narrow canvas.** Filters use an overlay when they would consume usable content space.
    Tables may scroll inside their container. Inputs, Back/Cancel and submit remain usable;
    overlap or off-screen submission is not an accepted mobile fallback. Card lists are deferred.
@@ -1651,10 +1664,28 @@ words: at 1440 every one is a single line in a 51px row (50 + the rule), unchang
 them take two lines in a 73px row and no page overflows by a single pixel. One fix in the shared
 component, so all 28 destination pages carry it.
 
-🟡 **`Warehouse Unit detail` is the one identity this exposes.** Its word is `{unitCode} · {sku}`
-— two facts in a slot this section rules is "one short identity, the word alone" — and at 390 it
-takes four lines and a 137px row. It is correct and readable now where it used to blow the page
-open, but the identity itself wants the owner's eye: a Unit page's destination word is the Unit.
+**THE SAME MEASUREMENT EXPOSED ONE IDENTITY, AND IT IS FIXED — BUILT 2026-09-19.** The wrap rule
+made `Warehouse Unit detail` readable instead of page-breaking, but it also showed WHY that page
+wrapped worst: its word was `{unitCode} · {sku}` — two facts in the one slot this section rules is
+"one short identity, the word alone". A Unit page's destination word is the Unit. The word is now
+`{unitCode}` alone, and the SKU keeps the place it already had, printed under **Product** in
+Connected records beside the product name — nothing is lost from the screen, only moved out of the
+identity slot.
+
+**MEASURED ON THE REAL PAGE, not on a mock of its header** — the lesson #1475 paid for. An isolated
+header box said the old word cost two lines at 390. The actual page, rendered with a real SKU in the
+real font, was far worse, and the defect reached three desktop widths, not just the phone:
+
+| canvas | old word | new word |
+|---|---|---|
+| 1440 | 1 line · 51px | 1 line · 51px |
+| 1180 | **2 lines · 73px** | 1 line · 51px |
+| 820 | **3 lines · 105px** | 1 line · 51px |
+| 390 | **5 lines · 169px** | 1 line · 51px |
+
+Page overflow is 0px throughout — the floor fix already guaranteed that; the identity is what puts
+the row back on its exact 50px. This was not a presentation preference handed to the owner: §6.7
+already ruled it, and the page disagreed.
 
 **ROW 1 · DESTINATION HEADER, 50px minimum.** Left = one short identity, **the word alone** — owner ruling
 2026-08-15: the icon is dropped and the word rises to the governed `text-page` (24px / 32px / 600),
@@ -2019,6 +2050,9 @@ resizing remains available.
 | Goods arrived at | 150 | prototype | Receiving, 2026-09-18. A receiving SITE name — deliberately NOT `Stock Location` (160), which names a stock position; §9.4 keeps the two facts apart. Same class of value as `Supplier Deliver To`, so the same number. **Owed:** the rendered-portal measurement against the longest live site name |
 | Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty | 112 | prototype | Receiving, 2026-09-18. Four adjacent quantity columns read as ONE family and share one width. The `Qty` role's 64 cannot hold them: their headers are two lines and the widest first line, `Wrong Item`, is about 63px at 11px/600 before the sort and filter affordances the engine draws beside it. **Owed:** the rendered-portal measurement |
 | Supplier DO No | 150 | prototype | Receiving, 2026-09-18. The SUPPLIER's own reference, which obeys no Carres format and has no upper bound the registry can prove; a longer one wraps rather than truncating. **Owed:** the rendered-portal measurement against the longest live DO number |
+| RO No | 170 | prototype | Repair Orders, 2026-09-20. Same 16-character `PREFIX-YYYYMMDD-RRRR` shape as `PO No` / `GRN No`, which the mono face measured at 170; it shares that number rather than inventing one. **Owed:** the rendered-portal measurement |
+| Supplier Claim No | 150 | prototype | Repair Orders, 2026-09-20, reading §9.5's measurement of `SC-20260916-0007` at 122.8px of text plus header chrome. **Owed:** the rendered-portal measurement on a page that actually ships the column |
+| Cost Responsibility | 144 | prototype | Repair Orders, 2026-09-20. Holds `Supplier pays` and the governed absence `Not decided`. It is a responsibility WORD, never an amount — no money field joins this registry through it |
 
 **THE GOODS TABLE IS THE SECOND SCOPE OF THE SAME REGISTRY**, because the same fact carries
 different content there: a parent `Supplier Deliver To` cell holds one destination name, while the
@@ -2094,8 +2128,23 @@ passed 4px, with the second group's header taking the top at 40px. No `<thead>` 
 grouped listing whose groups drift out of column alignment, overturns the structure — not the
 ruling, which is about what the operator reads.
 
+**Repair Orders date and identity presentation — owner correction 2026-09-20; target, not built.**
+Purchasing §9.7 owns date semantics: read-only automatic RO Doc Date, no backdating; an automatic
+Carres target of 14 working days from evidenced Supplier receipt of the RO; a separate attributed
+Supplier return-date reply. Do not add an editable blank target date. Use existing form controls
+and history patterns; sending is not Supplier receipt. The governed calendar is not yet verified.
+For RO `PO No / Unit ID`, show all actual Unit IDs beneath their PO directly, not `{n} Units`.
+Allow the row to grow to fit these identities rather than clipping to the default two-line height.
+Items exposes a discoverable detail action; its exact review surface is not yet approved.
+
 **Repair Orders price placement — owner-confirmed 2026-09-19; APPROVED TARGET / NOT BUILT.**
 Purchasing §9.7 permits optional `Price` in RO creation/detail only. No price, quotation-amount,
 Finance, Credit, Payment or Work column is added to its register. Missing price/financial approval
 is not a placement/Issue blocker. This scoped placement ruling does not approve the remaining RO
 column sequence, rail wording, prototype or full UI, and changes no other register's composition.
+
+**Repair Orders owner-consent placement — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+Purchasing §9.7 permits Issue while non-Carres owner consent is outstanding. Show the unresolved
+fact and evidence in RO detail and its follow-up in the existing Workspace projection; do not
+disable Issue solely for missing consent or add a second repair task list. This ruling adds no
+financial/Work register column and does not approve the remaining RO prototype layout.

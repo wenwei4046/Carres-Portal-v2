@@ -782,6 +782,14 @@ Work is ready for owner acceptance only when all are demonstrable:
 
 ## 6 · Module admission gate
 
+**RO return timing — owner correction 2026-09-20; target, not built.** Purchasing §9.7 owns
+Carres’s default 14-working-day target starting from evidenced Supplier receipt of the RO document,
+not goods pickup or document sending. My Work/Team Work reads those same source facts; a later
+Supplier-reported return date does not reset the Carres target or complete overdue follow-up.
+Preserve setting/calendar versions and previous dates. A missing receipt cannot produce an
+invented due date. Calendar and occurrence admission still require the §6 contract; no new task
+engine, arbitrary follow-up deadline or extension approver is authorised here.
+
 **Repair Orders integration — owner-approved target, 2026-09-18; NOT BUILT.** Purchasing MASTER
 §9.7 admits direct inventory repairs as well as Claim-linked repairs, including Warehouse,
 Showroom and Dealer Display Units. RO Issue/follow-up obligations and the existing
@@ -796,6 +804,13 @@ does not create a mandatory quote task. If an RO-related approval is required, J
 through her governed personal identity; no other Duty holder or Buddy may substitute. Preserve
 normal operational cover for Issue/follow-up and physical work. This exception does not alter
 Manual Purchase/PO approval policy. Purchasing §9.7 owns the rule.
+**RO owner-consent correction B, 2026-09-19; APPROVED TARGET / NOT BUILT:** issuing an RO for
+non-Carres-owned Units without recorded owner consent is allowed and retains an outstanding
+owner-consent follow-up. Project the RO-owned obligation here with its affected scope, resolved
+operational assignee/cover and evidence-based completion under this admission contract. Reissue
+must not duplicate unresolved work; partial consent completes only its covered scope and refusal
+remains unresolved. Do not create a second task store, infer consent from Issue or invent a due
+date. Purchasing §9.7 owns the trigger/completion rule; existing Stock/Outbound controls remain.
 
 
 A page displaying an action sentence is not enough. A module joins Work only with:

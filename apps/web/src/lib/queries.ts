@@ -314,6 +314,7 @@ import {
   type ProofRules,
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
+  type PurchaseReturnListRow,
 } from "@carres/shared";
 import { operationWorkResponseSchema } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
@@ -522,6 +523,11 @@ export const qk = {
      *  receive is the thing that opens claims. */
     supplierClaims: (status: string) =>
       ["operation", "supplier-claims", status] as const,
+    /** §9.6 — the Purchase Returns register. Keyed by the claim it is narrowed
+     *  to, so the claim object's own view and the full register never share a
+     *  cache entry and show each other's rows. */
+    purchaseReturns: (claim: string | null) =>
+      ["operation", "purchase-returns", claim ?? "all-claims"] as const,
     /** R6 — what the warehouse filed and is waiting on. Invalidated by a
      *  check-in, because a check-in IS a receive: the PO row, the claim queue
      *  and this queue all move together. */
@@ -3829,6 +3835,32 @@ export interface SupplierClaimListRow {
 export interface SupplierClaimsResponse {
   claims: SupplierClaimListRow[];
   counts: { open: number; closed: number; all: number };
+}
+
+/**
+ * The Purchase Returns register's read (`docs/purchasing/MASTER.md` §9.6).
+ *
+ * The row shape is `PurchaseReturnListRow` from `@carres/shared` — the same
+ * type the columns, the rail predicates and the derived Qty all read, so the
+ * server and the screen cannot hold two ideas of what a purchase return is.
+ */
+export interface PurchaseReturnsResponse {
+  returns: PurchaseReturnListRow[];
+}
+
+export function useOperationPurchaseReturns(
+  claimNo?: string | null,
+  opts?: Partial<UseQueryOptions<PurchaseReturnsResponse>>,
+) {
+  const claim = claimNo?.trim() || null;
+  return useQuery({
+    queryKey: qk.operation.purchaseReturns(claim),
+    queryFn: () =>
+      apiFetch<PurchaseReturnsResponse>(
+        `/api/operation/purchase-returns${claim ? `?claim=${encodeURIComponent(claim)}` : ""}`,
+      ),
+    ...opts,
+  });
 }
 
 export function useOperationSupplierClaims(

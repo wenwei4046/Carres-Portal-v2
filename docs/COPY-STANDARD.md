@@ -900,7 +900,54 @@ Jess alone approves; no substitute approver or Buddy is implied. Do not add a co
 other purchase-document approval rules are unchanged. Exact remaining UI layout is not approved
 by this price ruling.
 
-### Purchase Returns register — owner-confirmed UI, 2026-09-18
+**RO owner consent — owner ruling B, 2026-09-19; APPROVED TARGET / NOT BUILT.**
+For non-Carres-owned Units, absent owner consent is an outstanding follow-up, not an Issue
+blocker. The detail and existing Work projection must communicate that consent is still to be
+obtained; never label it obtained or approved because the RO was issued. Do not show a mandatory
+owner-consent-before-Issue refusal. Exact English action copy remains part of UI review; this
+rule approves the meaning and non-blocking behaviour, not a new status column or task engine.
+
+**Repair dates — owner correction 2026-09-20; APPROVED TARGET / NOT BUILT.**
+`RO Doc Date` is automatic and cannot be backdated. `Carres return target` uses the configured
+14 working days from evidenced Supplier receipt of the RO document; before that show
+`Awaiting Supplier receipt of RO`. This is not the pickup date or the send date.
+`Supplier Expected Return Date` / `Supplier date not reported` describe the Supplier’s separate
+reply. `Record Supplier reply` asks for its date, reason and reply reference; it does not extend
+Carres’s target. Never ask staff to guess a date. Goods selection guidance: `Click Add Units`,
+`Choose where the goods are now`, `Tick the Unit ID on each item to send for repair`.
+
+**Repair Orders register — owner-confirmed UI, 2026-09-20; APPROVED TARGET / NOT BUILT.**
+Column headings, exactly in this order: `RO Doc Date` · `RO No` · `Supplier` ·
+`Supplier Claim No` · `Category` · `PO No` with `Unit ID` below · `Items` · `Qty` ·
+`Repair Requirement` · `Cost Responsibility` · `Supplier Pickup Location` ·
+`Actual Pickup Date` · `Supplier Return Location` · `Expected Return Date` · `Returned Qty` ·
+`Goods Received Date` · `GRN No`. Optional columns, default off: `Collected By` · `SKU`.
+Expansion headings: `Category` · `PO No / Unit ID` · `Items` · `Qty` · `Problem` · `Evidence` ·
+`Supplier Pickup Location` · `Collected By` · `Actual Pickup Date` · `Supplier Return Location` ·
+`Goods Received Date`. `Problem` and `Evidence` stay two columns; this page does not use Supplier
+Claims' merged `Problem & Evidence` cell.
+`Cost Responsibility` prints `Carres pays` · `Supplier pays` · `Not decided` — a responsibility
+word, never an amount. `Price` and `Repair Quotation` stay in create/detail and never become
+columns, which keeps the 2026-09-19 price ruling intact.
+Rail headings: `Supplier` → `Repair order` → `Pickup` → `Return` → `Evidence`. Rail rows:
+`Sending not confirmed` · `Not picked up` · `Partly picked up` · `Fully picked up` ·
+`Not returned` · `Partly returned` · `Fully returned` · `Pickup proof missing` ·
+`Return proof missing`. Supplier rows show the supplier name and its matching RO count, using the
+Supplier Claims list pattern, not a dropdown. Counts count RO documents, never Units.
+**There is no quotation or approval rail group:** price is optional and its absence is not Work
+(owner ruling 2026-09-19), so no facet may present it as a deficiency. A draft rail carrying
+`Quotation not recorded` / `Approval not recorded` was withdrawn on 2026-09-20 for that reason.
+`Sending not confirmed` is the PO family's word, reused unchanged — this register never prints
+`Repair order not sent`, `PDF not sent`, `Not sent` or any wording that turns a missing record into
+proof that nobody sent the document. Evidence labels: `Problem evidence` · `Pickup proof` ·
+`Return proof`, offered as compact `Photos {n}` / `Video {n}` actions.
+An unissued RO reads `Not issued` in the `RO No` cell. Unknown facts read `Not recorded`; a failed
+read reads `Evidence could not be loaded` with `Try again` — never `0`, and never a `Photos 0`
+that actually means "we did not look". Footer counts documents: `{n} Repair Orders`.
+Exact column order and rail composition are owned once by Purchasing MASTER §9.7.
+Approval of these words is not a built feature; the page is still `Coming soon`.
+
+### Purchase Returns register — owner-confirmed UI, 2026-09-18 · BUILT 2026-09-19
 
 Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` below · `Items` ·
 `Qty` · `Pickup Location` · `Return To` · `Confirmed Pickup Date` · `Collected By` ·
@@ -908,6 +955,15 @@ Exact labels: `PR Doc Date` · `PR No` · `Category` · `PO No` with `Unit ID` b
 Visible purchase-return prefix: `PR-`, not `PRTN-`. PR Doc Date is the document date only.
 Rail headings: `Supplier` → `Return document` → `Pickup` → `Evidence`. Supplier rows show
 the supplier name and matching PR count, using the Supplier Claims list pattern, not a dropdown.
+Rail rows, written down here 2026-09-20 because Purchasing MASTER §9.6 held them alone and a word
+that is not in this file may not appear on screen: `Return document not sent` ·
+`Pickup date not confirmed` · `Not picked up` · `Partly picked up` · `Fully picked up` ·
+`Pickup proof missing`.
+🟡 `Return document not sent` contradicts the PO ruling that retired `PDF not sent` / `Not sent`
+for exactly this reason — a missing send record is not proof nobody sent it — and contradicts the
+Repair Orders rule above, which reuses `Sending not confirmed`. Recorded as found rather than
+silently rewritten: this page is BUILT, so changing a shipped word belongs to Purchase Returns'
+own round and its owner, not to a repository-wide sweep.
 Evidence labels: `Problem evidence` · `Pickup proof` · `Supplier receipt proof`; compact
 `Photos {n}` / `Video {n}` actions. Rail labels and exact column order are owned once by
 Purchasing MASTER §9.6. `Handover`, `Handover proof`, `Units / Qty`, `Return Doc Date` and

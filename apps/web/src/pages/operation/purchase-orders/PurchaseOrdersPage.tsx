@@ -6,8 +6,8 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, useFilterRailOpen } from "../components/workspace-rail";
-import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
+import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import { ArrowLeft, Download, FileCheck2, RotateCcw, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
@@ -980,16 +980,10 @@ export default function PurchaseOrdersPage() {
                 renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
               }}
               toolbarStart={!railOpen && (
-                <button
-                  type="button"
-                  aria-label="Show filters"
-                  title="Show filters"
-                  data-testid="purchase-orders-show-filters"
-                  className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
-                  onClick={() => setRailVisible(true)}
-                >
-                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-                </button>
+                <ShowFiltersButton
+                  onShow={() => setRailVisible(true)}
+                  testId="purchase-orders-show-filters"
+                />
               )}
               /* One total, including collapsed groups; no quantity totals. */
               statusSummary={(filtered) => (
