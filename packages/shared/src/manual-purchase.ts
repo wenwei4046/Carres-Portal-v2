@@ -36,6 +36,29 @@ export const MANUAL_PURCHASE_WORDS = {
   sendNeedsServiceCase: "Send — pick the Service Case",
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
+  /**
+   * ⭐ THE RECORDED INTENT, ASKED AT CREATION (0549) — and the reason it is a
+   * QUESTION rather than a derivation.
+   *
+   * The owner ruling of 2026-09-18 requires the intent to be STORED and
+   * forbids inferring it from the SKU, the shelf count or the purpose. 0546
+   * built the column, the door and every guard that reads it — and nothing
+   * ever wrote it, so every request stored NULL and not one Unit could be
+   * allocated. This is the question that feeds them.
+   *
+   * ⛔ NO DEFAULT. A pre-selected answer is a guess wearing the operator's
+   * name, which is the exact thing the ruling bans; the field starts empty and
+   * `Send` names the gap like every other missing header fact.
+   *
+   * The words reuse the vocabulary the read-only reasons already carry —
+   * `This purchase buys extra stock` and `whether stock can answer it` — so
+   * the question and its later consequence read as one sentence rather than
+   * two dialects.
+   */
+  canStockAnswer: "Can stock answer this?",
+  canStockAnswerYes: "Yes — existing stock can answer this",
+  canStockAnswerNo: "No — this buys extra stock",
+  sendNeedsStockAnswer: "Send — say whether stock can answer this",
   cancel: "Cancel",
   /** The Deliver To door on an existing request (0421): the text button that
    *  opens the choice, and the act that closes it. */

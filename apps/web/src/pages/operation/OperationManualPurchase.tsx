@@ -55,6 +55,7 @@ import {
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
+  type ManualPurchaseIntent,
   type ManualPurchaseApprovalKind,
   type ManualPurchaseGroup,
   type ManualPurchaseRailFilter,
@@ -2223,6 +2224,17 @@ function CreateRequestWorkspace({
   const items = pick.data?.items ?? [];
 
   const [purpose, setPurpose] = useState<DemandPurpose>(DEMAND_PURPOSE_DEFAULT);
+  /**
+   * ⭐ THE RECORDED INTENT (owner rulings 2026-09-18 / 2026-09-20; 0546 ·
+   * 0549). Whether Units already on the shelf may answer this request, or it
+   * is buying EXTRA on top of them.
+   *
+   * ⛔ IT STARTS EMPTY AND HAS NO DEFAULT. The ruling forbids inferring the
+   * intent from the SKU, the shelf count or the purpose, and a pre-selected
+   * option is that inference wearing the operator's name. `Send` names the
+   * gap instead, exactly as it does for every other missing header fact.
+   */
+  const [stockAnswer, setStockAnswer] = useState<ManualPurchaseIntent | null>(null);
   const [dest, setDest] = useState<string | undefined>(undefined);
   /** Card 06 §3.2 — `Delivery Date`: when supplier goods must reach the
    *  selected Deliver To. The SERVER proposes it from the slowest selected
@@ -2258,6 +2270,9 @@ function CreateRequestWorkspace({
     if (!editing || seeded || !existing.data) return;
     const r = existing.data.request;
     setPurpose(r.purpose as DemandPurpose);
+    /* R4 — an edit reopens the request exactly as it was sent back, including
+       an intent it never recorded: NULL stays NULL and Send asks for it. */
+    setStockAnswer((r.fulfilment_intent as ManualPurchaseIntent | null) ?? null);
     setDest(r.destination_id);
     if (r.required_by) {
       setDeliveryDate(r.required_by);
@@ -2432,6 +2447,7 @@ function CreateRequestWorkspace({
     caseOk &&
     staffOk &&
     subsidiaryOk &&
+    stockAnswer != null &&
     dateOk &&
     !dateTooEarly &&
     chosenDest != null &&
@@ -2462,6 +2478,8 @@ function CreateRequestWorkspace({
               ? MW.sendNeedsSubsidiary
               : !whyOk
                 ? MW.sendNeedsWhy
+                : stockAnswer == null
+                  ? MW.sendNeedsStockAnswer
                 : editing
                   ? MW.sendAgain
                   : MW.send;
@@ -2563,6 +2581,9 @@ function CreateRequestWorkspace({
           purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
         subsidiaryName:
           purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
+        /* The recorded intent (0546 · 0549) — `Send` already refused an
+           unanswered form, so this is always a real answer here. */
+        fulfilmentIntent: stockAnswer,
         lines: payload.map((l) => ({
           sku: l.sku,
           qty: Number(l.qty),
@@ -2639,6 +2660,29 @@ function CreateRequestWorkspace({
             disabled={editing}
             onValueChange={(v) => setPurpose(v as DemandPurpose)}
             options={DEMAND_PURPOSES.map((p) => ({ value: p.value, label: p.label }))}
+          />
+        </div>
+        {/* ⭐ CAN STOCK ANSWER THIS? — beside `Need for`, because it is the
+            same breath: the operator says what the purchase is for, then
+            whether goods already on the shelf can answer it. It is the ONE
+            fact the whole Ready Stock allocation reads (0546), and 0549 is
+            the file that finally writes it.
+
+            No default option and no pre-selection: the ruling of 2026-09-18
+            forbids inferring the intent, and a pre-picked answer is that
+            inference with the operator's name on it. `Send` names the gap. */}
+        <div>
+          <label htmlFor="mp-stock-answer" className="text-meta text-kit-slate-11">
+            {MW.canStockAnswer}
+          </label>
+          <Select
+            id="mp-stock-answer"
+            value={stockAnswer ?? undefined}
+            onValueChange={(v) => setStockAnswer(v as ManualPurchaseIntent)}
+            options={[
+              { value: "concrete_need", label: MW.canStockAnswerYes },
+              { value: "additional_stock", label: MW.canStockAnswerNo },
+            ]}
           />
         </div>
         <div>

@@ -1822,6 +1822,49 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
+  it("⭐ 0549 · THE RECORDED INTENT RIDES THE CREATE, BY NAME", async () => {
+    /* ⛔ THE BUG THIS PINS. 0546 built the binding column, the guards, the
+       arithmetic, the atomic save and the issue ceiling — every one of them
+       reads `fulfilment_intent` — and NOTHING wrote it. The create route sent
+       seven names, PostgREST resolved to the pre-intent overload, the column
+       stored NULL, and every goods line read `This purchase did not record
+       whether stock can answer it`. The name is the fix; asserting the VALUE
+       alone would pass on a call that still lost it. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "concrete_need", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", "concrete_need");
+  });
+
+  it("⛔ 0549 · AN UNANSWERED CREATE SENDS NULL — never a guessed answer", async () => {
+    /* A caller that records no intent gets the honest absence. The screen is
+       what refuses an unanswered form; the wire never invents one, so a
+       pre-0549 row and a skipped question read the same and both say so. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", null);
+  });
+
+  it("⛔ 0549 · AND A THIRD INTENT NEVER REACHES THE DOOR", async () => {
+    const rpc = vi.fn();
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "maybe", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses a request with no lines before it reaches the database", async () => {
     /* An empty Manual Purchase is the orphan `0410` exists to delete. The
        route refuses it on the schema, so no transaction is even opened; the

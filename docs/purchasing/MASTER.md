@@ -1738,7 +1738,7 @@ because each proves something different and only the last one is production trut
 |---|---|
 | **APPROVED / LOCKED** | The listing, its fifteen columns, its three groups, the goods expansion, the Ready Stock cell and picker, the draft/save/cancel selection flow and the allocation rules below. Owner ruling 2026-09-18. |
 | **BUILT 2026-09-18** | All of the above is implemented and covered by tests — including a PGlite suite that runs migrations 0546/0547's committed SQL rather than a mock of it — and measured in Chromium at 1440 and 1024 on the rendered register. |
-| **DEPLOYED 2026-09-18** | Code merged to `main` as **`55ee52e7d07ef57fd4b6d2e5681ec1dffc832ef7`** (#1464) and deployed by `deploy-production.yml` run 35359618573. That run's `pnpm ci:smoke` printed `Production converged to 55ee52e7…` for all five canonical surfaces: `carres-portal.pages.dev` · `carres-pos.pages.dev` · `erp.carresofficial.com` · `pos.carresofficial.com` · `api.carresofficial.com/health`. **The runner's fetch is the evidence; the build session could not repeat it** — its egress proxy answers 403 to those hosts, so no independent re-fetch backs this row. It is a SHA convergence proof and nothing more. Migrations **0546 + 0547 are NOT APPLIED**, and 0547 must never be applied without 0546. **What the operator sees in that window, and it is not a bug:** the Register, its groups, its columns and `Issue PO` all work — the held-stock read is tolerated and counts as zero, which is true by construction before the column exists — and every line's Ready Stock cell reads `Could not be loaded`, because the allocation read asks for `fulfilment_intent` and the column is not there yet. That is the honest answer: the feature is absent, not empty, and no line is told it has `0 available` when nobody looked. Applying both migrations is the governed owner path, and it is what turns this row green. |
+| **DEPLOYED 2026-09-18 · MIGRATIONS APPLIED 2026-09-20** | Code merged to `main` as **`55ee52e7d07ef57fd4b6d2e5681ec1dffc832ef7`** (#1464), deployed by `deploy-production.yml` run 35359618573 (`ci:smoke`: `Production converged to 55ee52e7…` on all five canonical surfaces — the runner's fetch, which the build session could not repeat because its egress proxy 403s those hosts). **Migrations 0545, 0546 and 0547 were applied to production on 2026-09-20** through the governed `apply_migration` path, in number order, after the owner confirmed 0546's four `drop constraint` / `drop function` statements in conversation (red line 1). **Reconciled, not assumed:** every function body's CR-normalised `md5(prosrc)` equals the committed file's — `so_batch_save_ready_units`, `ops_stock_pool_draw` (now 9-arg), `ops_stock_release`, `purchasing_allocate_ready_units` (0547's body), `purchasing_mpr_line_remaining_requirement`, `purchasing_demand_record_issue`, `purchasing_create_request` — and the binding column, its partial index, both CHECK constraints, the register view's column and `req_no`'s `allocate_formal_document_code('MPR')` default are all present, with three tracker rows written. |
 | **PRODUCTION-VERIFIED** | **NOT YET**, and a converged SHA would not be it: that proves the bundle shipped, not what the register draws. **The walk owes, specifically:** the fifteen columns in order against real rows · `Status` standing beside an independent `Approval Status` · a real concrete-need request choosing, changing and releasing real Units, with the counters and the remaining quantity coming back from the server · an additional-replenishment request showing the shelf and taking none of it · the `Issue PO` draft gate · and the widths re-measured signed in, where JetBrains Mono renders document numbers wider than the fixture font. |
 
 The parent has checkbox and a separate goods-disclosure button before Status. Approval Status
@@ -1838,6 +1838,35 @@ but does not say where it is recorded; `purchasing_create_request` therefore tak
 `p_fulfilment_intent`, and every request raised before 0546 keeps NULL and states the gap.
 Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
 column is dropped and the derivation replaces it.
+
+✅ **CLOSED BY 0549 (owner ruling 2026-09-20): the create form asks the question.**
+`Can stock answer this?` sits beside `Need for`, two answers, **no default**, and `Send` refuses an
+unanswered form with `Send — say whether stock can answer this`. The route sends
+`p_fulfilment_intent` BY NAME — that is the whole fix, because PostgREST resolves an RPC by the
+argument names it carries — and `purchasing_create_request_with_lines` gained the parameter and
+names it in turn when it calls the header door. NULL stays legal and stays its own state: a request
+raised before the question existed recorded no answer, is never guessed into one, and must answer
+before it is sent again. The words are composed under ui MASTER §1.1 and reviewed asynchronously.
+
+🔴 **THE DEFECT IT CLOSED, MEASURED 2026-09-20 MINUTES AFTER 0546 AND 0547 WERE APPLIED — AND THE
+LESSON IS BIGGER THAN THE BUG.** `fulfilment_intent` is read in two places and written in none. The route that
+actually raises a Manual Purchase is `purchasing_create_request_with_lines` (0410), which 0546 never
+touched; the header the API sends it carries seven facts and no intent, and no create form asks the
+question. `purchasing_create_request` did gain `p_fulfilment_intent`, but adding a parameter created a
+SECOND overload beside 0522's seven-argument one, and PostgREST resolves by the argument names a
+request sends — so the seven-name caller still binds to the old door. **Consequence: every request
+raised today stores NULL, every line reads `This purchase did not record whether stock can answer it,
+so stock cannot be chosen.`, and not one Unit can ever be allocated.** The door, the guards, the
+constraint and the arithmetic are all live and correct; the question that feeds them is never asked.
+
+⚠️ **THE LESSON, WRITTEN DOWN BECAUSE IT WILL HAPPEN AGAIN.** Every gate this build has — 12,000
+unit tests, a 542-migration replay, a green CI, a SHA-converged deploy, and a 30-case PGlite suite
+that runs the committed SQL rather than a mock of it — passed while the feature could not be used
+even once. None of them asks *is this reachable from the screen a person actually touches?* The
+PGlite suite wrote its own `fulfilment_intent` in a fixture, so it proved the door and never noticed
+that nothing in the app turns the handle. **A read with no writer is invisible to every test that
+supplies the value itself.** The check that would have caught it is the one the authenticated
+production walk still owes: raise a real request, then look at what the row stored.
 
 The formal Issue PO workspace follows §8.2; the HTML quantity dialog is not its replacement.
 Replenishment advice based on history is deferred. No new automatic ordering or Finance scope.

@@ -4664,6 +4664,13 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** ⭐ THE RECORDED INTENT (0546) — `concrete_need` means Units already on
+   *  the shelf may answer this request and a saved allocation reduces what is
+   *  left to buy; `additional_stock` means it buys EXTRA and the shelf is
+   *  reference only. NULL is its own state and is never guessed into either:
+   *  the request recorded no answer, and the Ready Stock section says so.
+   *  Optional so an older API reads as not recorded. */
+  fulfilment_intent?: "concrete_need" | "additional_stock" | null;
   /** 0522 · R3 — the requester withdrew it before a decision. Optional so an
    *  older API reads as not withdrawn. */
   withdrawn_at?: string | null;
@@ -5040,6 +5047,11 @@ export function useCreatePurchaseRequest() {
       serviceCaseId?: string | null;
       staffUserId?: string | null;
       subsidiaryName?: string | null;
+      /** ⭐ THE RECORDED INTENT (0546 · 0549) — whether Units already on the
+       *  shelf may answer this request, or it buys EXTRA on top of them. The
+       *  form refuses `Send` without it; the wire keeps it optional because a
+       *  request that recorded none is its own state and is never guessed. */
+      fulfilmentIntent?: "concrete_need" | "additional_stock" | null;
       /** ⭐ THE WHOLE REQUEST IN ONE CALL (0410). Sending the lines here makes
        *  the header and every line ONE database transaction, so a bad line can
        *  no longer leave a committed header behind. Optional because `0410` is
