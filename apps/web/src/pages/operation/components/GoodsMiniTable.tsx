@@ -48,9 +48,10 @@ import { fmtDate } from "@/lib/fmt-date";
 // a page. It has no destination, no toolbar and no header of its own; the
 // register above it owns all three, and wrapping a disclosure in ListPageShell
 // would draw a second page chrome inside one table cell.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -138,6 +139,33 @@ const ORDERED_QTY_COLUMN = { key: "orderedQty", label: "Ordered Qty", width: 116
 const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 148 } as const;
 
 /**
+ * ⭐ `Supplier Deliver To`, NOT `Deliver To` — owner ruling 2026-09-18
+ * (`docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+ *
+ * On a page where a customer's address and a supplier instruction sit in one
+ * expansion, `Deliver To` said WHOSE destination only by where it happened to
+ * be. The head now says it. SO Batch asks for the new word; every other caller
+ * keeps the column it has until its own round.
+ */
+const SUPPLIER_DELIVER_TO_LABEL = "Supplier Deliver To";
+
+/** Air between an item row and the picker its disclosure opened — the last
+ *  stretch the connector crosses before it lands (§6.9). */
+const DETAIL_GAP = 12;
+/** The disclosure caret's centre, measured in from the right of its cell:
+ *  8px cell padding + the button's own 4px + half the caret. Walked at 1440 in
+ *  the rendered portal: the line's centre lands on the caret's centre. */
+const CONNECTOR_INSET = 15;
+/** Where the line starts: the cell's 8px of top padding plus the caret's own
+ *  height, so it leaves from directly BENEATH the arrow and not from the top of
+ *  the cell. Stated, never measured — a line that re-measures is a line that
+ *  moves when a table loads. */
+const CONNECTOR_TOP = 28;
+/** And where it ENDS: past this cell's bottom edge, across the 1px row divider
+ *  and the gap below, exactly on the TOP BORDER of the picker's frame. */
+const CONNECTOR_BOTTOM = -(DETAIL_GAP + 1);
+
+/**
  * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
  * (owner ruling 2026-08-27). Optional, exactly like `Covered by` and for the
  * same reason: when one Sales Order spans two purchase orders, the parent row
@@ -147,7 +175,21 @@ const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 148 } as const;
  * and Delivery pass neither and render byte-identically.
  */
 const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
-const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
+/**
+ * ⭐ `PO Default Delivery Date`, NOT `PO Delivery Date` — Purchasing UI
+ * dictionary, owner ruling 2026-09-18, which RETIRES the older label.
+ *
+ * It is the ORIGINAL planned date the purchase order was issued with, and it
+ * survives the supplier moving it; the supplier's own answer is a different
+ * column with a different name. One word for two facts is how a screen comes
+ * to show a promise nobody made. 176px holds the two-line heading and a
+ * cross-year date.
+ */
+const PO_DATE_COLUMN = {
+  key: "poDeliveryDate",
+  label: "PO Default Delivery Date",
+  width: 176,
+} as const;
 
 /**
  * ⭐ `PO No` — MANUAL PURCHASE'S OWN COLUMN (settled design, owner ruling
@@ -163,7 +205,65 @@ const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width
  */
 const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 
+/**
+ * ⭐ `PO No / Unit ID` — ONE CELL, TWO LINES (Purchasing §9.3, Jess
+ * 2026-09-18; the same shape UI MASTER §6.8 already approved for the SO Batch
+ * stock table's `PO No / Ref No` + Unit ID cell).
+ *
+ * The document is on the first line and the pieces it bought are underneath
+ * it, because on an ordered-goods table they are ONE identity read together:
+ * "these units, on this PO". Splitting them into two columns puts a document
+ * number in one place and the units it minted 200px away, and a reader
+ * comparing two expansions has to carry the number across the gap.
+ *
+ * 230px is the shared registry's width for this combined role.
+ */
+const PO_UNIT_COLUMN = { key: "poUnit", label: "PO No / Unit ID", width: 230 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
+/**
+ * ⭐ THE RECEIVING COMPOSITION — approved 2026-09-18 (Purchasing §9.4, CARD 12).
+ *
+ * ```
+ * Category · Supplier · Supplier Deliver To · PO No / Ref No + Unit ID ·
+ * Items · Received Qty · Damaged Qty · Wrong Item Qty · Extra Qty
+ * ```
+ *
+ * A saved GRN is READ, never bought from: this layout carries no checkbox, no
+ * `Ready Stock` and no purchasing tick, because none of them means anything on
+ * a receipt. It is the same BOX every other caller draws — one implementation,
+ * per law ① above — asked for different columns, and every page that passes
+ * nothing renders byte-identically to what it rendered before.
+ *
+ * Widths come from the ONE shared registry (UI MASTER §6.8), never from a
+ * number typed here.
+ */
+const SOURCE_UNIT_COLUMN = {
+  key: "sourceUnit",
+  label: "PO No / Ref No",
+  width: REGISTER_FIELD_WIDTH.sourceAndUnitId,
+} as const;
+const RECEIVED_QTY_COLUMN = {
+  key: "receivedQty",
+  label: "Received Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const DAMAGED_QTY_COLUMN = {
+  key: "damagedQty",
+  label: "Damaged Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const WRONG_QTY_COLUMN = {
+  key: "wrongItemQty",
+  label: "Wrong Item Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+const EXTRA_QTY_COLUMN = {
+  key: "extraQty",
+  label: "Extra Qty",
+  width: REGISTER_FIELD_WIDTH.receiptQty,
+} as const;
+
 const SELECT_WIDTH = 36;
 
 /**
@@ -196,6 +296,20 @@ export interface GoodsMiniLine {
   deliverToNode?: ReactNode;
   /** Units of this line already answered off the shelf. Read with `showFromStock`. */
   fromStock?: number | null;
+  /**
+   * ⭐ THE READY STOCK CELL, DRAWN BY THE PAGE — owner ruling 2026-09-18.
+   *
+   * SO Batch's `Ready Stock` is no longer a number: it is two counts and a
+   * disclosure that opens the stock picker under this very row. Both the counts
+   * and the act belong to the page that can read and write stock, so the box
+   * only gives it the cell. Absent = the plain figure renders exactly as before.
+   */
+  fromStockNode?: ReactNode;
+  /**
+   * ⭐ `Need PO` / `No PO needed` — the need for a NEW purchase order, never a
+   * progress badge and never permission to buy. Read with `showStatus`.
+   */
+  status?: string;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
   orderBy?: string | null;
@@ -242,6 +356,22 @@ export interface GoodsMiniLine {
   /** The configuration facts that identify the exact goods, already joined. */
   itemDetail?: string;
   /**
+   * ⭐ RECEIVING (§9.4) — read only when the table is asked for that layout.
+   *
+   * `sourceNo` is the document this received line belongs to and it prints on
+   * the cell's FIRST line, with `unitIds` beneath it: the number the operator
+   * is looking for leads, and the exact Units it landed as follow. A counted
+   * (quantity-managed) line has no Unit IDs at all and says so — its register
+   * row carries a technical key, which is not an identity.
+   */
+  sourceNo?: string;
+  sourceNoAbsence?: string;
+  /** The receipt's own five quantity words, per line. */
+  receivedQty?: number | null;
+  damagedQty?: number | null;
+  wrongItemQty?: number | null;
+  extraQty?: number | null;
+  /**
    * FALSE = nothing can be bought for this line (a Service). It prints `—` in
    * the ☑ cell and select-all skips it. Ignored when the page passes no
    * `selection` at all.
@@ -270,6 +400,33 @@ function Absence({ children }: { children: ReactNode }) {
       {children}
     </span>
   );
+}
+
+/**
+ * A receipt quantity, per line. A quantity a line does not carry is an
+ * ABSENCE, not a zero: an extra-goods row never "received 0", it simply has
+ * no received quantity, and an ordered line has no extra quantity. The colours
+ * are the register's own — damage and wrong items read red, extra goods amber
+ * — and they never change the arithmetic (damaged/wrong/extra never reduce
+ * `Pending Delivery Qty`).
+ */
+function ReceiptQty({
+  value,
+  tone,
+}: {
+  value: number | null | undefined;
+  tone?: "issue" | "extra";
+}) {
+  if (value == null) return <Absence>—</Absence>;
+  const ink =
+    value > 0 && tone === "issue"
+      ? "text-kit-red-11"
+      : value > 0 && tone === "extra"
+        ? "text-kit-amber-11"
+        : value > 0
+          ? "text-base-900"
+          : "text-kit-slate-11";
+  return <span className={`tabular-nums ${ink}`}>{value}</span>;
 }
 
 /**
@@ -330,6 +487,11 @@ export default function GoodsMiniTable({
   label,
   lines,
   selection,
+  soBatchGoodsLayout = false,
+  manualPurchaseGoodsLayout = false,
+  showStatus = false,
+  detailRow,
+  showSku = true,
   showFromStock = false,
   showOrderedQty = false,
   showToBuy = false,
@@ -341,6 +503,8 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   showCategory = true,
+  receivingLayout = false,
+  purchaseOrderLayout = false,
   itemHeading,
   onPoClick,
   onOpenPoDetails,
@@ -350,6 +514,43 @@ export default function GoodsMiniTable({
   lines: GoodsMiniLine[];
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
+  /**
+   * ⭐ SO BATCH'S APPROVED ACTIONABLE EXPANSION (Jess 2026-09-18, §9.1):
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To`. Opt-in; Sales Orders, Delivery, Manual Purchase and
+   * Purchase Orders pass nothing and render byte-identically.
+   */
+  soBatchGoodsLayout?: boolean;
+  /**
+   * ⭐ MANUAL PURCHASE'S APPROVED EXPANSION (Jess 2026-09-18, §9.2):
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To · PO No · PO Default Delivery Date`.
+   *
+   * It is the SO Batch order plus the two DOCUMENT columns, because a Manual
+   * Purchase row carries its own purchase orders where an SO Batch row does
+   * not. Everything else — the cells, the widths, the `Ready Stock` node, the
+   * detail row and its connector — is the sibling's, unchanged. A second
+   * near-identical layout constant is exactly the drift law ① exists to stop,
+   * so this adds two keys to one list rather than a second list.
+   */
+  manualPurchaseGoodsLayout?: boolean;
+  /** `Need PO` / `No PO needed` — the need for a new document, not permission. */
+  showStatus?: boolean;
+  /**
+   * ⭐ THE ROW THAT OPENS UNDER AN ITEM — owner ruling 2026-09-18.
+   *
+   * The stock picker opens *directly beneath this item*, inside this table, so
+   * it scrolls with the columns it is aligned to and the connector drawn from
+   * the disclosure above it cannot drift. `null` = nothing is open on that line
+   * and no row is rendered at all.
+   */
+  detailRow?: (line: GoodsMiniLine) => ReactNode;
+  /**
+   * SO Batch's approved expansion has no `SKU` column: the item and its
+   * configuration identify the goods, and the code took the width the item
+   * needs. Every other caller keeps it.
+   */
+  showSku?: boolean;
   /**
    * A page that BUYS asks for `Ordered Qty` and `To buy`; a truth register does
    * not. Together they state what `Covered by` used to hide: what the customer
@@ -422,6 +623,34 @@ export default function GoodsMiniTable({
    * and names the item column for what it shows. Every other caller keeps both.
    */
   showCategory?: boolean;
+  /**
+   * ⭐ RECEIVING'S READ-ONLY GOODS EXPANSION — approved 2026-09-18 (§9.4).
+   *
+   * The saved GRN's own per-line truth, in the owner's order, with the source
+   * number above its line-bound Unit IDs. It carries no checkbox, no
+   * `Ready Stock` and no reservation control: nothing on a receipt is bought.
+   *
+   * Its source cell is `PO No / Ref No`, NOT Purchase Orders' `PO No / Unit ID`
+   * below: a receipt can arrive with no purchase order at all, and the two
+   * governed words are two facts, so they stay two columns in one registry.
+   */
+  receivingLayout?: boolean;
+  /**
+   * ⭐ THE ORDERED-GOODS READING ORDER — Purchase Orders (Purchasing §9.3,
+   * Jess 2026-09-18):
+   *
+   * ```
+   * Category · Supplier · Supplier Deliver To · PO No / Unit ID · Qty · Items
+   * ```
+   *
+   * A third reading order, not a third table: the same registry, the same
+   * geometry, the same one flexible column last. It exists because this page
+   * reads a PO's goods from the DOCUMENT outwards — what kind of thing, who
+   * makes it, where they were told to send it, which units it bought — where
+   * the buying page reads from the goods outwards. Sales Orders, Delivery, SO
+   * Batch and Manual Purchase pass nothing and render byte-identically.
+   */
+  purchaseOrderLayout?: boolean;
   itemHeading?: string;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
@@ -442,6 +671,17 @@ export default function GoodsMiniTable({
    * computed offsets, which is how `Supplier` and `PO No` ended up depending
    * on whether `PO Delivery Date` happened to be asked for.
    */
+  /**
+   * ⭐ ONE PURCHASING GEOMETRY, TWO APPROVED ORDERS.
+   *
+   * SO Batch and Manual Purchase share every measured width, the blue context
+   * boundary, the 40px header, the content-width table and the connector; they
+   * differ only in that Manual Purchase carries two more DOCUMENT columns. So
+   * the geometry keys off this one flag and only the `order` list branches —
+   * two near-identical geometry branches is the drift law ① exists to stop.
+   */
+  const purchasingGoodsLayout = soBatchGoodsLayout || manualPurchaseGoodsLayout;
+
   type Column = { key: string; label: string; width: number | null };
   const REGISTRY: Record<string, Column> = {
     category: { ...CHILD_COLUMNS[0] },
@@ -450,6 +690,7 @@ export default function GoodsMiniTable({
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
     item: { ...CHILD_COLUMNS[5], ...(itemHeading ? { label: itemHeading } : {}) },
+    poUnit: { ...PO_UNIT_COLUMN },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -457,22 +698,118 @@ export default function GoodsMiniTable({
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
     orderBy: { key: "orderBy", label: "Order By", width: 104 },
+    status: { key: "status", label: "Status", width: 112 },
+    sourceUnit: { ...SOURCE_UNIT_COLUMN },
+    receivedQty: { ...RECEIVED_QTY_COLUMN },
+    damagedQty: { ...DAMAGED_QTY_COLUMN },
+    wrongItemQty: { ...WRONG_QTY_COLUMN },
+    extraQty: { ...EXTRA_QTY_COLUMN },
   };
-  const order = salesOrderLayout
+  /**
+   * ⭐ THE SO BATCH GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.1:
+   * `☐ · Status · Category · Qty · Item · Ready Stock · Supplier ·
+   * Supplier Deliver To`, exactly.
+   *
+   * FIVE COLUMNS LEFT, and none of the facts did.
+   *   · `SKU` — the item and its configuration already identify the goods, and
+   *     a code nobody types on this page took the width the item needs.
+   *   · `Ordered Qty` and `PO Safety Days` — `Purchase order details` below is
+   *     the table that is ABOUT documents, and the parent carries the margin.
+   *   · `To buy` — the remaining purchasing quantity belongs where the act is:
+   *     the selection bar and the issue review, on the AUTHORITATIVE
+   *     recomputation. Removing the column removed no coverage arithmetic and
+   *     no duplicate-order safeguard: `isSelectableForBuying`,
+   *     `soBatchOrderLineOutstandingQty`, `fullyOnPo` and the issue door's own
+   *     refusal are all untouched.
+   *   · `Order By` — an engine/detail fact again, never a goods column.
+   * `Ready Stock` widens because it stopped being a figure and became the door
+   * to the stock picker; `Supplier` takes the reviewed 136 it has on the parent.
+   */
+  if (purchasingGoodsLayout) {
+    REGISTRY.fromStock = { key: "fromStock", label: "Ready Stock", width: 136 };
+    REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
+    REGISTRY.deliverTo = { key: "deliverTo", label: SUPPLIER_DELIVER_TO_LABEL, width: 200 };
+    REGISTRY.qty = { key: "qty", label: "Qty", width: 64 };
+    /* ⭐ `Item` TAKES A MEASURED WIDTH HERE, and law ① is kept a different way.
+       The owner's order puts `Item` FOURTH of seven, so it cannot be the
+       flexible last column any more — and a flexible column in the middle
+       would move every column after it, which is the one thing law ① exists to
+       stop. So every column is fixed and the TABLE takes the sum: two
+       expansions opened together still line up column for column, and nothing
+       stretches to fill a 1440px canvas (§6.8). A long model name wraps to a
+       second line inside its cell; it is never clipped. */
+    REGISTRY.item = { key: "item", label: itemHeading ?? "Item", width: 240 };
+  }
+  /**
+   * ⭐ THE RECEIVING GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.4.
+   * The destination takes the SAME one word the sibling pages use: the
+   * dictionary retired the bare `Deliver To` for this fact on these four
+   * pages, and the label has one home rather than a prop each page passes its
+   * own spelling to.
+   */
+  if (receivingLayout) {
+    /* Only the WORD changes. The widths stay the goods table's own — the
+       registry's second scope (§6.8): `Deliver To` holds a destination list
+       here, not the parent's single name, so the child's 200 stands. */
+    REGISTRY.deliverTo = { ...CHILD_COLUMNS[2], label: SUPPLIER_DELIVER_TO_LABEL };
+  }
+  /* Purchase Orders reads a PO's goods from the DOCUMENT outwards and names
+     the destination with the SAME shared word SO Batch uses — one label, one
+     home (Purchasing §9.3, ui MASTER §6.8). Its `Supplier` takes the reviewed
+     136 the parent and SO Batch both carry. */
+  if (purchaseOrderLayout) {
+    REGISTRY.deliverTo = { ...REGISTRY.deliverTo!, label: SUPPLIER_DELIVER_TO_LABEL };
+    REGISTRY.supplier = { key: "supplier", label: "Supplier", width: 136 };
+  }
+  const order = receivingLayout
+    ? [
+        "category",
+        "supplier",
+        "deliverTo",
+        "sourceUnit",
+        "item",
+        "receivedQty",
+        "damagedQty",
+        "wrongItemQty",
+        "extraQty",
+      ]
+    : purchaseOrderLayout
+    ? ["category", "supplier", "deliverTo", "poUnit", "qty", "item"]
+    /* ⭐ MANUAL PURCHASE IS SO BATCH'S ORDER PLUS THE TWO PO FACTS (Purchasing
+       §9.2). It is written as its own line rather than as a flag on SO Batch's,
+       because the two lists are owned by two rulings and a shared list would
+       make either round silently reorder the other's columns. The GEOMETRY
+       stays shared — see `purchasingGoodsLayout`. */
+    : manualPurchaseGoodsLayout
+    ? ["status", "category", "qty", "item", "fromStock", "supplier", "deliverTo", "poNo", "poDeliveryDate"]
+    : soBatchGoodsLayout
+    ? ["status", "category", "qty", "item", "fromStock", "supplier", "deliverTo"]
+    : salesOrderLayout
     ? ["category", "unit", "deliverTo", "sku", "qty", "item"]
     : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "orderBy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "orderBy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
+    poUnit: purchaseOrderLayout,
     unit: showUnitId,
     category: showCategory,
-    supplier: showSupplier,
+    // The receipt columns exist only in the Receiving layout; the shared
+    // `supplier` flag is not re-used for it, because a receipt always names
+    // its supplier and the buying page's flag means something else.
+    sourceUnit: receivingLayout,
+    receivedQty: receivingLayout,
+    damagedQty: receivingLayout,
+    wrongItemQty: receivingLayout,
+    extraQty: receivingLayout,
+    supplier: showSupplier || receivingLayout,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
     fromStock: showFromStock,
     orderedQty: showOrderedQty,
     toBuy: showToBuy,
     orderBy: showOrderBy,
+    status: showStatus,
+    sku: showSku,
   };
   const columns: Column[] = order
     .filter((key) => asked[key] ?? true)
@@ -497,6 +834,12 @@ export default function GoodsMiniTable({
   /* Below this the box scrolls sideways rather than crushing a column. */
   const minWidth =
     columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
+  /* Content decides the width on the SO Batch layout; every other caller keeps
+     `w-full` and its one flexible column. */
+  const tableStyle = purchasingGoodsLayout ? { width: minWidth } : { minWidth };
+  const tableClass = purchasingGoodsLayout
+    ? "table-fixed text-left"
+    : "w-full table-fixed text-left";
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -508,12 +851,25 @@ export default function GoodsMiniTable({
        LEFT and RIGHT edges are untouched: the frame is drawn on the `SO No`
        column's left edge and the parent table's right edge. */
     <div
-      className="overflow-x-auto rounded-control border border-base-200 bg-white"
+      /**
+       * ⭐ THE ACTIVE GOODS CONTEXT HAS A BLUE BOUNDARY (§6.9, Jess
+       * 2026-09-18). An expansion is a context the operator OPENED, and the
+       * boundary is what says where it begins and ends when two are open at
+       * once.
+       *
+       * ⛔ IT IS NOT EVIDENCE OF A SAVED RESERVATION, and nothing about it
+       * changes when one is saved: the stock picker inside keeps its own
+       * neutral white frame, and what a line actually holds is the `{n}
+       * reserved` count and the Unit IDs in the picker — never a colour.
+       */
+      className={`overflow-x-auto rounded-control bg-white ${
+        purchasingGoodsLayout ? "border border-kit-blue-6" : "border border-base-200"
+      }`}
       data-testid="goods-mini-table"
     >
       <table
-        className="w-full table-fixed text-left"
-        style={{ minWidth }}
+        className={tableClass}
+        style={tableStyle}
         aria-label={label}
       >
         <colgroup>
@@ -546,7 +902,15 @@ export default function GoodsMiniTable({
                    `01-design-tokens.md` has locked. Size, colour and case carry
                    the match — and the weight is 600, because §2.2 deleted 700
                    into 600 and the CSS module's own 700 predates that ruling. */
-                className="px-2 py-1.5 text-label font-semibold text-kit-slate-11"
+                className={`px-2 py-1.5 text-label font-semibold text-kit-slate-11${
+                  purchasingGoodsLayout ? " align-bottom" : ""
+                }`}
+                /* ⭐ ONE HEADER HEIGHT FOR EVERY TABLE IN THE EXPANSION (§6.8).
+                   `Supplier Deliver To` wraps to two lines and `Qty` does not;
+                   without a reserved height the goods table and the stock
+                   picker beneath it sat at two different header heights and
+                   read as two near-miss listings. */
+                style={purchasingGoodsLayout ? { height: 40 } : undefined}
               >
                 {c.label}
               </th>
@@ -589,7 +953,16 @@ export default function GoodsMiniTable({
                   );
                 case "qty":
                   return <span className="tabular-nums">{line.qty}</span>;
+                case "status":
+                  return line.status ? (
+                    <span data-testid={`goods-status-${line.key}`}>{line.status}</span>
+                  ) : (
+                    <Absence>—</Absence>
+                  );
                 case "fromStock":
+                  /* THE PAGE DRAWS THIS CELL WHEN IT CAN ACT ON IT. Absent =
+                     the plain figure, exactly as every other caller has it. */
+                  if (line.fromStockNode != null) return line.fromStockNode;
                   return !line.fromStock ? (
                     <Absence>—</Absence>
                   ) : (
@@ -669,12 +1042,70 @@ export default function GoodsMiniTable({
                   ) : (
                     <Absence>{line.supplierAbsence ?? "—"}</Absence>
                   );
+                case "poUnit":
+                  /* ⭐ ONE IDENTITY, TWO LINES. The document first, at the
+                     box's 13px; the pieces it minted underneath at the
+                     governed 11px second-line treatment (ui MASTER §6.8).
+                     Whatever the owning page put in `unitNode` — a governed
+                     absence, an integrity refusal, a read failure — is printed
+                     as it stands: this box never decides what a missing Unit
+                     ID MEANS, because only the line's own identity mode and
+                     the state of the read can say. */
+                  return (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-mono">
+                        {line.poNos?.length
+                          ? line.poNos.map((po) => <span key={po} className="block">{poLink(po)}</span>)
+                          : <Absence>{line.poNoAbsence ?? "—"}</Absence>}
+                      </span>
+                      <span className="font-mono text-meta text-kit-slate-11">
+                        {line.unitNode != null ? line.unitNode : line.unitIds.length ? (
+                          line.unitIds.map((id) => <span key={id} className="block">{id}</span>)
+                        ) : (
+                          <Absence>{line.unitAbsence}</Absence>
+                        )}
+                      </span>
+                    </span>
+                  );
                 case "poNo":
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
                   ) : (
                     <Absence>{line.poNoAbsence ?? "—"}</Absence>
                   );
+                case "sourceUnit":
+                  /* THE SOURCE NUMBER LEADS, the exact Units follow beneath
+                     it (owner correction 2026-09-18). A counted line has no
+                     Unit IDs to name and says so instead of printing a
+                     technical register key as if it were an identity. */
+                  return (
+                    <>
+                      {line.sourceNo ? (
+                        <div className="font-medium">{line.sourceNo}</div>
+                      ) : (
+                        <Absence>{line.sourceNoAbsence ?? "—"}</Absence>
+                      )}
+                      {line.unitIds.length ? (
+                        line.unitIds.map((id) => (
+                          <div key={id} className="text-meta text-kit-slate-11">
+                            {id}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-meta">
+                          <Absence>{line.unitAbsence}</Absence>
+                        </div>
+                      )}
+                    </>
+                  );
+                case "receivedQty":
+                  return <ReceiptQty value={line.receivedQty} />;
+                case "damagedQty":
+                  return <ReceiptQty value={line.damagedQty} tone="issue" />;
+                case "wrongItemQty":
+                  return <ReceiptQty value={line.wrongItemQty} tone="issue" />;
+                case "extraQty":
+                  return <ReceiptQty value={line.extraQty} tone="extra" />;
                 case "poDeliveryDate":
                   return line.poDeliveryDate ? (
                     line.poDeliveryDate
@@ -685,9 +1116,10 @@ export default function GoodsMiniTable({
                   return null;
               }
             };
+            const detail = detailRow?.(line) ?? null;
             return (
+              <Fragment key={line.key}>
               <tr
-                key={line.key}
                 data-testid={line.testId}
                 data-row="demand"
                 /* A ticked demand reads as selected, in the register's own
@@ -698,7 +1130,12 @@ export default function GoodsMiniTable({
                 }`}
               >
                 {selection ? (
-                  <td className={salesOrderLayout ? "py-1 px-2 align-middle leading-tight text-center" : "px-2 py-2 text-center"}>
+                  /* ⭐ THE TICK IS VERTICALLY CENTRED (§6.8). A two-line item
+                     description made a top-aligned checkbox sit beside the
+                     model name and above the configuration, so the control
+                     looked like it belonged to the first line of the cell
+                     rather than to the row. */
+                  <td className={salesOrderLayout ? "py-1 px-2 align-middle leading-tight text-center" : purchasingGoodsLayout ? "px-2 py-2 align-middle text-center" : "px-2 py-2 text-center"}>
                     {line.selectable ? (
                       <input
                         type="checkbox"
@@ -711,21 +1148,78 @@ export default function GoodsMiniTable({
                     )}
                   </td>
                 ) : null}
-                {columns.map((c) => (
+                {columns.map((c) => {
+                  /**
+                   * ⭐ THE CONNECTOR IS THE TABLE'S, NOT THE PAGE'S (§6.9).
+                   *
+                   * Only this box knows where the `Ready Stock` column is, so
+                   * only this box can draw a line that leaves from beneath that
+                   * column's own arrow. It is drawn INSIDE the cell, in normal
+                   * flow, so horizontal scrolling and resizing move it with the
+                   * arrow by construction — a line placed from a measured pixel
+                   * offset is the floating elbow one resize later.
+                   *
+                   * ONE UNBROKEN LINE: it starts under the caret, crosses
+                   * whatever height the item row happens to have, and reaches
+                   * `-DETAIL_GAP` — past this cell's own bottom edge, through
+                   * the gap below, onto the TOP BORDER of the picker's frame.
+                   * It exists only while that picker is open, so it can never
+                   * run on into the next item.
+                   */
+                  const connects =
+                    purchasingGoodsLayout && detail != null && c.key === "fromStock";
+                  return (
                   <td
                     key={c.key}
+                    style={connects ? { position: "relative" } : undefined}
                     className={
                       salesOrderLayout
                         ? `px-2 py-2 whitespace-normal break-words${c.key === "unit" || c.key === "qty" ? " tabular-nums" : ""}`
-                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
+                        : purchasingGoodsLayout
+                        ? /* One row geometry for every line: the values sit at
+                             the top of their cell so two-line items line up,
+                             and `Qty` is centred with its tick because a lone
+                             digit beside a two-line description reads as
+                             belonging to the first line otherwise. Long names
+                             wrap; nothing is clipped behind a hover title. */
+                          `px-2 py-2 whitespace-normal break-words${
+                            c.key === "qty" ? " align-middle text-center tabular-nums" : " align-top"
+                          }`
+                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo" || c.key === "poUnit"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }
                   >
+                    {connects ? (
+                      <span
+                        aria-hidden
+                        data-testid={`goods-connector-${line.key}`}
+                        className="absolute w-px bg-kit-slate-6"
+                        style={{ right: CONNECTOR_INSET, top: CONNECTOR_TOP, bottom: CONNECTOR_BOTTOM }}
+                      />
+                    ) : null}
                     {cell(c.key)}
                   </td>
-                ))}
+                  );
+                })}
               </tr>
+              {/* ⭐ THE PICKER OPENS INSIDE THE TABLE, under the item it is
+                  about (owner ruling 2026-09-18). A sibling box outside the
+                  table would scroll separately from the columns the connector
+                  is aligned to, which is exactly the floating elbow §6.9
+                  forbids. `data-row="detail"` so a test can tell the two row
+                  kinds apart without reading their contents. */}
+              {detail ? (
+                <tr data-row="detail" data-testid={`goods-detail-${line.key}`}>
+                  <td
+                    colSpan={columns.length + (selection ? 1 : 0)}
+                    className="p-0"
+                  >
+                    <div style={{ paddingTop: DETAIL_GAP }}>{detail}</div>
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
             );
           })}
         </tbody>

@@ -16,8 +16,11 @@ import ModuleHeader from "./components/ModuleHeader";
  * THE UNIT — one exact physical thing Carres controls.
  * CARD-2026-08-20-stock-register §2 · Object Detail Template (UI MASTER §4.1).
  *
- * Titled by the Unit ID and the product, because that is what is printed on the
- * supplier's label and what the operator has in their hand.
+ * Titled by the Unit ID ALONE. It used to read `{unitCode} · {sku}`, which put two
+ * facts in the one slot UI MASTER §6.7 rules is "one short identity, the word
+ * alone" — and on a 390px canvas that identity took four lines and a 137px row.
+ * The SKU is not lost: it is printed under Product in Connected records below,
+ * beside the product name, which is where the rest of the object's facts live.
  *
  * ── ONLY FACT-PERMITTED ACTIONS APPEAR, AND TODAY THAT IS NONE ──────────────
  * There is no generic Edit, no status selector and no Delete (Card §2, Stock
@@ -76,7 +79,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack }: 
     <div className="flex min-h-0 flex-1 flex-col">
       <ModuleHeader
         testId="stock-unit-destination-header"
-        word={unit ? `${unit.unitCode} · ${unit.sku}` : "Unit"}
+        word={unit?.unitCode ?? "Unit"}
         docTitle={unit ? `${unit.unitCode} · Warehouse — Carres` : "Unit · Warehouse — Carres"}
         destinationHeader
       />

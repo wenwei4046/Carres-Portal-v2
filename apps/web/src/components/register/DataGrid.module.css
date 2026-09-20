@@ -1084,6 +1084,26 @@ div:first-child > .columnsMenuGroup {
   outline: 2px solid theme("colors.kit.blue.9");
   outline-offset: 1px;
 }
+/* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN — owner ruling 2026-09-18, UI §6.8.
+   "Headers reserve a common two-line height, 11px/600, normal casing; main
+   header pale blue in this SO Batch reference, child headers neutral slate.
+   This is not a new global blue-header ruling."
+
+   So the PARENT listing's header band takes blue-2 — the palest step the kit
+   has — and every child table inside an expansion keeps slate-3. Two stacked
+   headers eight pixels apart otherwise read as one table that lost its place.
+   Only `headerTone="paleBlue"` draws it; every other Register is untouched,
+   and no page may copy this rule into its own stylesheet.
+
+   THE INK DOES NOT MOVE: slate-11 on blue-2 is the same 11px/600 normal-cased
+   label, and the separator stays the slate rule — this changes a FILL, not a
+   type or contrast decision. */
+.rootHeaderPaleBlue .thead,
+.rootHeaderPaleBlue .th,
+.rootHeaderPaleBlue .thead .stickyCell {
+  background: theme("colors.kit.blue.2");
+}
+
 /* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
    row is in the batch — blue-3 across the WHOLE row, pinned cells included,
    and it outranks hover. An expanded row that is not ticked stays white. */
@@ -1317,4 +1337,38 @@ div:first-child > .columnsMenuGroup {
 .columnsMenuWithLayouts .columnsMenuBody {
   flex: 1 1 auto;
   min-height: 96px;
+}
+
+/* ── Group-local headers — owner ruling, Jess 2026-09-18 ──────────────────
+   Supersedes the single header above all groups. Each governed group is its
+   own `<tbody>`, and a sticky cell is held by its table SECTION: that is what
+   makes the group's heading and its column header travel with the operator
+   through the group's own records and then STOP at the boundary, instead of
+   standing over the next group's rows.
+
+   Two stacked stops, in the order they are read:
+     0   the group heading (38px, the governed band)
+     38  that group's column header
+
+   Widths, visibility, sorting and resizing are not repeated here — one
+   `<colgroup>` and one `layout` serve every section, so there is nothing for
+   four headers to disagree about. */
+/* One table per group: `table-layout: fixed` so a long value in one group can
+   never widen a column in that group alone, and the width is the columns' own
+   sum so every group lines up with every other and with the scrollbar. */
+.tableGrouped {
+  table-layout: fixed;
+  min-width: 100%;
+}
+/* The group's heading rides in its own `<thead>` beside the column header, so
+   the two travel together and stop together. The band stays white against the
+   header's slate fill. */
+.tableGrouped .fixedGroupRow .groupRowCell {
+  background: theme("colors.white");
+}
+/* The header cell is already sticky through `.thead`; `.thInGroup` marks it
+   for the pinned-identity fill so a scrolled group header is opaque where the
+   columns slide under it. */
+.tableGrouped .thInGroup.stickyCell {
+  z-index: 3;
 }

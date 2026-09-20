@@ -147,3 +147,39 @@ it("returns a directly opened Unit to the real Inventory destination", () => {
   fireEvent.click(screen.getByRole("button", { name: "← Inventory" }));
   expect(screen.getByText("Inventory destination")).toBeInTheDocument();
 });
+
+
+/**
+ * UI MASTER §6.7 — ROW 1 is "one short identity, the WORD ALONE". The Unit page
+ * used to title itself `{unitCode} · {sku}`, which is two facts in that one slot,
+ * and on a 390px canvas it wrapped to four lines and a 137px row. The SKU keeps
+ * its place in the object's own facts; it does not belong in the destination.
+ */
+describe("the destination word is the Unit, and only the Unit", () => {
+  function titledUnit() {
+    vi.mocked(useStockUnit).mockReturnValue({ data: { unit: {
+      id: "u1", unitCode: "U1-000-082", sku: "ALL-AASNDA-K", productName: "Allison King Bed",
+      availability: "available", ownership: "carres_owned", condition: "new", qty: 1,
+      lifecycleOutcome: "active",
+    }, events: [] }, isLoading: false, isError: false, error: null } as never);
+  }
+
+  it("prints the Unit ID alone in the destination header", () => {
+    titledUnit();
+    renderAt("U1-000-082");
+    expect(screen.getByTestId("stock-unit-destination-header-module-word")).toHaveTextContent(/^U1-000-082$/);
+  });
+
+  it("still gives the operator the SKU, under Product where the facts live", () => {
+    titledUnit();
+    renderAt("U1-000-082");
+    expect(screen.getByText("Allison King Bed")).toBeInTheDocument();
+    expect(screen.getByText("ALL-AASNDA-K")).toBeInTheDocument();
+  });
+
+  it("names the destination before the Unit has loaded", () => {
+    vi.mocked(useStockUnit).mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null } as never);
+    renderAt("U1-000-082");
+    expect(screen.getByTestId("stock-unit-destination-header-module-word")).toHaveTextContent(/^Unit$/);
+  });
+});

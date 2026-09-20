@@ -546,3 +546,163 @@ describe("0500 alternate live bodies and the forward binding repair", () => {
     await db.exec(bindingRepairDraft()); // idempotent, preserves the corrected body
   });
 });
+
+/* ─── THE REPLACEMENT DOOR — `Save changes`, 0545 ───────────────────────── */
+
+/**
+ * ⭐ ONE ACT, WHATEVER IT CHANGES — owner ruling 2026-09-18.
+ *
+ * `Save changes` sends the COMPLETE intended set for one item line. The door
+ * works out the difference from the locked rows and applies releases and draws
+ * in ONE transaction: all or none. These are database behaviours — that a swap
+ * on a one-piece line is not refused as already covered, that a refused half
+ * leaves the other half unapplied, that a sold Unit is never taken back — so
+ * the committed 0545 body is what runs.
+ */
+describe("saving a replacement set", () => {
+  const A = "33333333-0000-0000-0000-00000000000a";
+  const B = "33333333-0000-0000-0000-00000000000b";
+
+  async function save(lineId: string, itemIds: string[], ref = "SO-1251", orderId = ORDER) {
+    const res = await rows<{ so_batch_save_ready_units: Record<string, unknown> }>(
+      `select public.so_batch_save_ready_units(
+          p_ref => '${ref}',
+          p_reason => 'used_instead_of_ordering',
+          p_note => 'test',
+          p_order_id => '${orderId}',
+          p_line => '${lineId}',
+          p_item_ids => '${JSON.stringify(itemIds)}'::jsonb) as so_batch_save_ready_units`,
+    );
+    return res[0]!.so_batch_save_ready_units;
+  }
+
+  async function boundTo(lineId: string) {
+    return rows<{ unit_code: string }>(
+      `select unit_code from public.ops_stock_items
+        where reserved_order_line_id = '${lineId}' order by unit_code`,
+    );
+  }
+
+  it("saves a first choice with no purchase order in sight", async () => {
+    const out = await save(LINE_A, [A]);
+    expect(out).toMatchObject({ reserved: 1, added: 1, released: 0 });
+    expect(await boundTo(LINE_A)).toEqual([{ unit_code: "U1-000-001" }]);
+  });
+
+  /**
+   * ⭐ RELEASES RUN FIRST, AND THAT IS LOAD-BEARING. Drawing B before releasing
+   * A meets `line_already_covered` — A is still answering the line — so the
+   * whole act would be refused for doing exactly what was asked.
+   */
+  it("swaps one Unit for another on a one-piece line, in one act", async () => {
+    await save(LINE_A, [A]);
+    const out = await save(LINE_A, [B]);
+    expect(out).toMatchObject({ reserved: 1, added: 1, released: 1 });
+    expect(await boundTo(LINE_A)).toEqual([{ unit_code: "U1-000-002" }]);
+    const freed = await rows<{ status: string; reserved_order_line_id: string | null }>(
+      `select status, reserved_order_line_id from public.ops_stock_items where id = '${A}'`,
+    );
+    expect(freed[0]).toEqual({ status: "free", reserved_order_line_id: null });
+  });
+
+  it("removes every choice when the set is empty, and gives the requirement back", async () => {
+    await save(LINE_A, [A]);
+    const out = await save(LINE_A, []);
+    expect(out).toMatchObject({ reserved: 0, added: 0, released: 1 });
+    expect(await boundTo(LINE_A)).toEqual([]);
+    /* The customer still owes the goods, so the line needs a Unit again. */
+    const need = await rows<{ n: number }>(
+      `select public.so_line_remaining_requirement('${LINE_A}', null) as n`,
+    );
+    expect(Number(need[0]!.n)).toBe(1);
+  });
+
+  it("leaves a Unit it already holds alone rather than re-drawing it", async () => {
+    await save(LINE_A, [A]);
+    const out = await save(LINE_A, [A]);
+    expect(out).toMatchObject({ reserved: 1, added: 0, released: 0 });
+    expect(await boundTo(LINE_A)).toEqual([{ unit_code: "U1-000-001" }]);
+  });
+
+  /**
+   * ⛔ ALL OR NONE. The release half succeeded in the same transaction as the
+   * add that was refused, so the Unit that was to be given back must still be
+   * reserved when the dust settles.
+   */
+  it("applies NOTHING when the add half is refused", async () => {
+    await save(LINE_A, [A]);
+    /* A Unit of different goods: the draw door refuses it by name. */
+    const err = await refusal(() => save(LINE_A, ["33333333-0000-0000-0000-00000000000c"]));
+    expect(err).toContain("unit_does_not_match_line");
+    expect(await boundTo(LINE_A)).toEqual([{ unit_code: "U1-000-001" }]);
+    const still = await rows<{ status: string }>(
+      `select status from public.ops_stock_items where id = '${A}'`,
+    );
+    expect(still[0]!.status).toBe("reserved");
+  });
+
+  it("names the Unit that stopped the act", async () => {
+    await save(LINE_A, [A]);
+    const detail = await refusalDetail(() =>
+      save(LINE_A, ["33333333-0000-0000-0000-00000000000c"]),
+    );
+    expect(detail).toContain("unit_id=33333333-0000-0000-0000-00000000000c");
+  });
+
+  /** A delivered Unit has left the shelf; a picker does not un-choose it. */
+  it("refuses to give back a Unit that is already sold, and changes nothing", async () => {
+    await save(LINE_A, [A]);
+    await db.exec(`update public.ops_stock_items set status = 'sold' where id = '${A}'`);
+    const err = await refusal(() => save(LINE_A, []));
+    expect(err).toContain("unit_cannot_be_released");
+    const after = await rows<{ status: string; reserved_order_line_id: string | null }>(
+      `select status, reserved_order_line_id from public.ops_stock_items where id = '${A}'`,
+    );
+    expect(after[0]).toEqual({ status: "sold", reserved_order_line_id: LINE_A });
+  });
+
+  it("refuses a line that is not on this Sales Order, before anything moves", async () => {
+    const err = await refusal(() => save(OTHER_LINE, [A]));
+    expect(err).toContain("order_line_not_in_order");
+    expect(await boundTo(OTHER_LINE)).toEqual([]);
+  });
+
+  /** A colleague took the Unit between the read and the save. */
+  it("refuses a Unit somebody else took, and releases nothing in the same act", async () => {
+    await save(LINE_A, [A]);
+    /* The second item line of the same order claims the other Queen first. */
+    await draw({ ref: "SO-1251", itemId: B, lineId: LINE_B });
+    const err = await refusal(() => save(LINE_A, [B]));
+    expect(err).toContain("unit_no_longer_free");
+    /* ⛔ AND THE RELEASE HALF DID NOT SURVIVE THE REFUSAL. */
+    expect(await boundTo(LINE_A)).toEqual([{ unit_code: "U1-000-001" }]);
+    expect(await boundTo(LINE_B)).toEqual([{ unit_code: "U1-000-002" }]);
+  });
+
+  it("refuses counted stock, exactly as the draw door does", async () => {
+    const err = await refusal(() => save(LINE_A, ["33333333-0000-0000-0000-00000000000e"]));
+    expect(err).toContain("quantity_row_not_bindable");
+    expect(await boundTo(LINE_A)).toEqual([]);
+  });
+
+  it("refuses a caller who is not Operation", async () => {
+    await actingAs(db, "sales");
+    const err = await refusal(() => save(LINE_A, [A]));
+    expect(err).toContain("forbidden");
+    await actingAs(db, "operation", OP);
+    expect(await boundTo(LINE_A)).toEqual([]);
+  });
+
+  /**
+   * The ledger counts the DECISION and is append-only by law (0292): a later
+   * release does not unmake the decision, so a swap leaves BOTH draws recorded.
+   */
+  it("never rewinds the append-only pool ledger", async () => {
+    await save(LINE_A, [A]);
+    await save(LINE_A, [B]);
+    const ledger = await rows<{ n: string }>(
+      `select count(*)::text as n from public.ops_stock_pool_usage`,
+    );
+    expect(Number(ledger[0]!.n)).toBe(2);
+  });
+});
