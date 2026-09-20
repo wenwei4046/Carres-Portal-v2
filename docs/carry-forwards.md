@@ -727,3 +727,36 @@ moved onto `actor_display_names` in the same PR; other surfaces that read `app_u
 signed-in walk of a Manual Purchase Jess approved shows her name in History.
 
 - `payment-records-print-n-receipts-is-sequential-not-one-package` — **opened 2026-09-13, non-blocking.** `Payment Records → select → Print {n} receipts` prints each selected receipt through the governed `GET /api/finance/payments/:id/receipt-document` door, one tab per receipt. A single merged PDF package for a selection is an improvement, not a defect: the numbers, snapshots and VOIDED marks are already correct per document. Do it in its own card when a real batch-printing need is measured; do not expand a Payment closure for it.
+
+## `authenticated-production-walk-owed` — BUILT AND DEPLOYED, NEVER WALKED SIGNED IN, opened 2026-09-19
+
+**🔴 Several shipped builds carry `PRODUCTION-VERIFIED — NOT YET`, and the reason is the same one
+every time: no build environment can sign in to production.** A converged SHA is proof that the
+bundle shipped. It is not proof of what the page draws, and this file is where that debt is
+counted so it stops being re-discovered by whoever ships next.
+
+**Verified, both independently, on 2026-09-18:** no signed-in browser session artefact exists
+anywhere in the container, and the agent proxy answers `connect_rejected` for both production
+hosts. So the walk is not "not done yet" — it **cannot** be done from here. It needs a signed-in
+human, or a production-reachable environment with a real session.
+
+**What is owed, and by which MASTER:**
+
+- `docs/purchasing/MASTER.md` §9.1 — the SO Batch approved listing and stock-selection UI
+  (BUILT 2026-09-18): the twelve parent columns in the owner's order against real rows · the goods
+  table's seven columns · a real Ready Stock cell's two counts and its Unit table · save, change,
+  remove-all and cancel against the governed doors · and the widths re-measured signed in, where
+  JetBrains Mono renders document numbers wider than the fixture font.
+- `docs/purchasing/MASTER.md` §9.3, §9.4 — the PO Register and the Receiving Register, each with
+  its own owed list already written there.
+- `docs/ui/MASTER.md` §6.7 — the destination header's 50px floor (BUILT 2026-09-18) and the
+  Warehouse Unit identity (BUILT 2026-09-19), at a real 390px device rather than an emulated
+  viewport, since a phone's own font metrics are what the wrap rule is measured against.
+- `docs/ui/MASTER.md` §1.x — the portal-wide listing readability slice (BUILT 2026-09-17).
+
+**Closes when** a signed-in walk of each surface above is recorded in its owning MASTER, which is
+also what turns that MASTER's `BUILT` into `PRODUCTION-VERIFIED`. Closing it in parts is correct;
+strike each line as its walk lands.
+
+**Falsifier:** a signed-in production walk finds any of these surfaces drawing what its MASTER
+already claims — then the claim was never owed, and the line goes.

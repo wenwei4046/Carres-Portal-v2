@@ -113,3 +113,101 @@ describe("DataGrid · leadingColumns", () => {
     expect(headerLefts(container).every((l) => l === "")).toBe(true);
   });
 });
+
+/**
+ * ⭐ `before` — A COLUMN THE OWNER PUT AHEAD OF THE PAIR (Jess 2026-09-18).
+ *
+ * §6.7 rule 2 fixes the ORDER of the record date and the identity; it does not
+ * make them the first two columns of every page. SO Batch Purchase's approved
+ * order opens with `Status`, and an exact owner-approved page order may not be
+ * rearranged by a general ordering heuristic.
+ */
+describe("DataGrid · leadingColumns.before", () => {
+  const WITH_STATUS: DataGridColumn<Row>[] = [
+    ...COLUMNS,
+    { key: "status", label: "Status", width: 110, accessor: () => "Need PO" },
+  ];
+
+  function mountWithStatus(storageKey: string) {
+    return render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={WITH_STATUS}
+        storageKey={storageKey}
+        rowKey={(r) => r.id}
+        leadingColumns={{ date: "date", identity: "so", before: ["status"] }}
+        selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
+        expandable={{ renderExpansion: () => <div>goods</div> }}
+      />,
+    );
+  }
+
+  it("leads the named column, then the date, then the identity", () => {
+    stubCanvas(1140);
+    const { container } = mountWithStatus("test.before.order");
+    expect(headerLabels(container)).toEqual(["Status", "SO Date", "SO No", "Customer"]);
+  });
+
+  /** ⛔ THE PINNING RULE DOES NOT MOVE: only the PAIR pins. */
+  it("pins the date and the identity, and not the column ahead of them", () => {
+    stubCanvas(1140);
+    const { container } = mountWithStatus("test.before.pins");
+    const lefts = headerLefts(container);
+    /* [☐, ▸, Status, SO Date, SO No, Customer] */
+    expect(lefts[2]).toBe("");
+    expect(lefts[3]).not.toBe("");
+    expect(lefts[4]).not.toBe("");
+    expect(lefts[5]).toBe("");
+  });
+
+  it("protects it from the Columns chooser exactly as it protects the pair", () => {
+    stubCanvas(1140);
+    const { container } = mountWithStatus("test.before.hide");
+    window.localStorage.setItem(
+      "test.before.hide",
+      JSON.stringify({ order: ["customer", "so", "date", "status"], hidden: ["status", "date"], widths: {} }),
+    );
+    const again = mountWithStatus("test.before.hide");
+    expect(headerLabels(again.container)).toEqual(["Status", "SO Date", "SO No", "Customer"]);
+    expect(container).toBeTruthy();
+  });
+
+  it("changes nothing for a listing that names none", () => {
+    stubCanvas(1140);
+    const { container } = mount("test.before.absent");
+    expect(headerLabels(container)).toEqual(["SO Date", "SO No", "Customer"]);
+  });
+});
+
+/**
+ * ⭐ THE MAIN HEADER'S FILL — UI §6.8 (Jess 2026-09-18). Opt-in, and
+ * explicitly not a new global blue-header ruling.
+ */
+describe("DataGrid · headerTone", () => {
+  it("marks the root so the main header band can read pale blue", () => {
+    stubCanvas(1140);
+    const { container } = render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={COLUMNS}
+        storageKey="test.tone.on"
+        rowKey={(r) => r.id}
+        headerTone="paleBlue"
+      />,
+    );
+    expect(container.querySelector('[class*="rootHeaderPaleBlue"]')).not.toBeNull();
+  });
+
+  it("leaves every other Register's header exactly as it was", () => {
+    stubCanvas(1140);
+    const { container } = render(
+      <DataGrid<Row>
+        rows={ROWS}
+        columns={COLUMNS}
+        storageKey="test.tone.off"
+        rowKey={(r) => r.id}
+      />,
+    );
+    expect(container.querySelector('[class*="rootHeaderPaleBlue"]')).toBeNull();
+  });
+});
