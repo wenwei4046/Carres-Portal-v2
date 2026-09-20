@@ -394,7 +394,7 @@ function optionText(testId: string, value: string): string {
   return option.textContent ?? "";
 }
 
-async function openWorkspace() {
+async function openWorkspace(options: { answerStockQuestion?: boolean } = {}) {
   await loaded();
   fireEvent.click(screen.getByTestId("manual-purchase-new-request"));
   await screen.findByTestId("manual-purchase-create");
@@ -402,6 +402,30 @@ async function openWorkspace() {
   await waitFor(() =>
     expect(screen.getByText("5539-2NA", { selector: ".font-mono" })).toBeTruthy(),
   );
+  /* ⭐ 0548 — the form asks whether stock can answer the purchase and `Send`
+     refuses until it does, so filling the form in includes answering it, the
+     way an operator must. The gate itself is asserted by the one test that
+     passes `false`. */
+  if (options.answerStockQuestion !== false) await answerStockQuestion();
+}
+
+/**
+ * ⭐ THE FORM ASKS WHETHER STOCK CAN ANSWER THE PURCHASE (0548), and `Send`
+ * refuses until it is answered — so every test that reaches `Send` answers it,
+ * exactly as an operator must. The gate itself is asserted separately below;
+ * here it is just part of filling the form in.
+ */
+async function answerStockQuestion(answer: "yes" | "no" = "yes") {
+  /* The kit `Select` is a Radix trigger, not a native `<select>`, so it is
+     driven the way an operator drives it: focus, open with the keyboard, click
+     the option. Measured in jsdom — `fireEvent.change` does nothing here. */
+  const trigger = document.getElementById("mp-stock-answer")!;
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  const option = await screen.findByRole("option", {
+    name: answer === "yes" ? MW.canStockAnswerYes : MW.canStockAnswerNo,
+  });
+  fireEvent.click(option);
 }
 
 const pickRow = (sku: string) =>
@@ -3384,6 +3408,61 @@ describe("Round 2 · the object's rounds", () => {
     });
   });
 
+  it("⭐ 0548 · THE FORM ASKS WHETHER STOCK CAN ANSWER, AND SEND NAMES THE GAP", async () => {
+    /* 0546 built the binding, the guards, the arithmetic and the atomic save —
+       and NOTHING wrote the one fact they all read, so every request stored
+       NULL and not a single Unit could ever be allocated. This is the question
+       that feeds them, and the reason the whole feature is reachable. */
+    await openWorkspace({ answerStockQuestion: false });
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsStockAnswer),
+    );
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    await answerStockQuestion();
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+  });
+
+  it("⛔ 0548 · NO DEFAULT ANSWER — a pre-picked option would be the guess the ruling bans", async () => {
+    await openWorkspace({ answerStockQuestion: false });
+    /* Both answers must be reachable and NEITHER chosen. The ruling of
+       2026-09-18 forbids inferring the intent from the SKU, the shelf count or
+       the purpose; a pre-selected option is that inference with the operator's
+       name on it. */
+    const trigger = document.getElementById("mp-stock-answer")!;
+    expect(trigger.textContent).not.toContain(MW.canStockAnswerYes);
+    expect(trigger.textContent).not.toContain(MW.canStockAnswerNo);
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(
+      (await screen.findAllByRole("option")).map((o) => o.textContent),
+    ).toEqual([MW.canStockAnswerYes, MW.canStockAnswerNo]);
+  });
+
+  it("⭐ 0548 · THE ANSWER REACHES THE WIRE — both ways, and never invented", async () => {
+    await openWorkspace({ answerStockQuestion: false });
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await answerStockQuestion("no");
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("mp-send"));
+    const requestPosts = () =>
+      apiFetch.mock.calls.filter(
+        (c) =>
+          (c[1] as RequestInit | undefined)?.method === "POST" &&
+          String(c[0]).endsWith("/purchasing/requests"),
+      );
+    await waitFor(() => expect(requestPosts().length).toBeGreaterThan(0));
+    const sent = JSON.parse(
+      String((requestPosts().at(-1)![1] as RequestInit).body),
+    ) as { fulfilmentIntent?: string };
+    /* `No — this buys extra stock` is `additional_stock`, and the mapping is
+       asserted rather than assumed: send the wrong one and the shelf would be
+       netted against a purchase that was meant to add to it. */
+    expect(sent.fulfilmentIntent).toBe("additional_stock");
+  });
+
   it("R4 · a sent-back request shows the reason and, for its requester, `Edit and send again`", async () => {
     await openObject(false, {
       request: { ...REGISTER.requests[0], sent_back_at: "2026-08-21T01:00:00Z", sent_back_reason: "Wrong size" },
@@ -3398,6 +3477,13 @@ describe("Round 2 · the object's rounds", () => {
     // The SAME request opens in the form, prefilled, its purpose locked.
     await screen.findByTestId("manual-purchase-create");
     expect(screen.getByText("Edit and send again", { selector: "h2" })).toBeInTheDocument();
+    /* ⭐ 0548 — this request was raised before the intent was ever asked, so it
+       stores NULL and the reopened form asks for it before it may go back. The
+       absence is never guessed into an answer, not even on a re-send. */
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsStockAnswer),
+    );
+    await answerStockQuestion();
     await waitFor(() => expect(screen.getByTestId("mp-send")).toHaveTextContent("Send again for approval"));
   });
 
@@ -3408,6 +3494,7 @@ describe("Round 2 · the object's rounds", () => {
     });
     fireEvent.click(screen.getByTestId("mp-edit-and-send-again"));
     await screen.findByTestId("manual-purchase-create");
+    await answerStockQuestion();
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));

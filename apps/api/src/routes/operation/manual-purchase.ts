@@ -16,6 +16,7 @@ import {
   railItemLabel,
   stockMatchKey,
   transitDaysFor,
+  manualPurchaseIntentSchema,
   manualPurchaseLineStockRemaining,
   manualPurchaseStockBlockOf,
   manualPurchaseStockSaveInputSchema,
@@ -1876,6 +1877,12 @@ const headerBody = z
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
+    /* ⭐ THE RECORDED INTENT (0546 · 0548). Optional on the wire and NULLABLE
+       in the column, because a request that recorded none is its own state and
+       is never guessed into an answer. The form asks it and refuses Send
+       without it; a caller that sends nothing gets the honest NULL and the
+       Ready Stock section that says so. */
+    fulfilmentIntent: manualPurchaseIntentSchema.nullish(),
     /* ⭐ THE WHOLE REQUEST ARRIVES AT ONCE (0410, YH 2026-09-01). The form
        used to POST the header, read back its id, then POST one line per line
        in a loop — six transactions for one act. A failure on line 3 left a
@@ -1940,6 +1947,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   }
   const {
     purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName, lines,
+    fulfilmentIntent,
   } = parsed.data;
 
   /* ⭐ 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
@@ -1978,6 +1986,12 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     p_for_service_case_id: serviceCaseId ?? null,
     p_for_staff_user_id: staffUserId ?? null,
     p_for_subsidiary_name: (subsidiaryName ?? "").trim() || null,
+    /* ⭐ SENT BY NAME, AND THAT IS THE WHOLE FIX (0548). PostgREST resolves an
+       RPC by the argument NAMES the request carries, so omitting this one
+       bound the call to the pre-intent overload and stored NULL — which left
+       every Ready Stock line reading `This purchase did not record whether
+       stock can answer it` and made the entire allocation unreachable. */
+    p_fulfilment_intent: fulfilmentIntent ?? null,
   };
 
   /* ⭐ ONE TRANSACTION FOR ONE ACT (0410). When the caller sends its lines,

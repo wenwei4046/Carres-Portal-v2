@@ -1839,8 +1839,17 @@ but does not say where it is recorded; `purchasing_create_request` therefore tak
 Falsifier: the owner rules that intent is derived from the purpose vocabulary instead — then the
 column is dropped and the derivation replaces it.
 
-🔴 **AND MEASURED 2026-09-20, AFTER THE MIGRATIONS WERE APPLIED: NOTHING WRITES THE INTENT, SO READY
-STOCK IS INERT.** `fulfilment_intent` is read in two places and written in none. The route that
+✅ **CLOSED BY 0548 (owner ruling 2026-09-20): the create form asks the question.**
+`Can stock answer this?` sits beside `Need for`, two answers, **no default**, and `Send` refuses an
+unanswered form with `Send — say whether stock can answer this`. The route sends
+`p_fulfilment_intent` BY NAME — that is the whole fix, because PostgREST resolves an RPC by the
+argument names it carries — and `purchasing_create_request_with_lines` gained the parameter and
+names it in turn when it calls the header door. NULL stays legal and stays its own state: a request
+raised before the question existed recorded no answer, is never guessed into one, and must answer
+before it is sent again. The words are composed under ui MASTER §1.1 and reviewed asynchronously.
+
+🔴 **THE DEFECT IT CLOSED, MEASURED 2026-09-20 MINUTES AFTER 0546 AND 0547 WERE APPLIED — AND THE
+LESSON IS BIGGER THAN THE BUG.** `fulfilment_intent` is read in two places and written in none. The route that
 actually raises a Manual Purchase is `purchasing_create_request_with_lines` (0410), which 0546 never
 touched; the header the API sends it carries seven facts and no intent, and no create form asks the
 question. `purchasing_create_request` did gain `p_fulfilment_intent`, but adding a parameter created a
@@ -1850,12 +1859,14 @@ raised today stores NULL, every line reads `This purchase did not record whether
 so stock cannot be chosen.`, and not one Unit can ever be allocated.** The door, the guards, the
 constraint and the arithmetic are all live and correct; the question that feeds them is never asked.
 
-**This is an OWNER decision, and the MASTER already names both options.** No wording for the question
-exists in `docs/COPY-STANDARD.md`, and CLAUDE.md §2 forbids putting an unapproved word on screen, so
-the build cannot choose it. Either the create form asks a new recorded question (the proposal above,
-which needs its approved words), or intent is derived from the purpose vocabulary (the falsifier
-above, which needs the owner to say which purposes mean which) — and until one is ruled, Ready Stock
-stays correct, verified and unreachable.
+⚠️ **THE LESSON, WRITTEN DOWN BECAUSE IT WILL HAPPEN AGAIN.** Every gate this build has — 12,000
+unit tests, a 542-migration replay, a green CI, a SHA-converged deploy, and a 30-case PGlite suite
+that runs the committed SQL rather than a mock of it — passed while the feature could not be used
+even once. None of them asks *is this reachable from the screen a person actually touches?* The
+PGlite suite wrote its own `fulfilment_intent` in a fixture, so it proved the door and never noticed
+that nothing in the app turns the handle. **A read with no writer is invisible to every test that
+supplies the value itself.** The check that would have caught it is the one the authenticated
+production walk still owes: raise a real request, then look at what the row stored.
 
 The formal Issue PO workspace follows §8.2; the HTML quantity dialog is not its replacement.
 Replenishment advice based on history is deferred. No new automatic ordering or Finance scope.
