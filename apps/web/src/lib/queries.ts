@@ -13,6 +13,7 @@ import {
   type AttachDoInput,
   type AwaitingStockShortageResponse,
   type DeliveryHandoverKind,
+  type GrnReceivedWith,
   type HandoverGoodsLine,
   type RecordHandoverInput,
   type DeliveryProofReviewRow,
@@ -313,6 +314,7 @@ import {
   type ProofRules,
   type DeliveryTemplateRow,
   type DeliverySettingChangeRow,
+  type PurchaseReturnListRow,
 } from "@carres/shared";
 import { operationWorkResponseSchema } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
@@ -521,6 +523,11 @@ export const qk = {
      *  receive is the thing that opens claims. */
     supplierClaims: (status: string) =>
       ["operation", "supplier-claims", status] as const,
+    /** §9.6 — the Purchase Returns register. Keyed by the claim it is narrowed
+     *  to, so the claim object's own view and the full register never share a
+     *  cache entry and show each other's rows. */
+    purchaseReturns: (claim: string | null) =>
+      ["operation", "purchase-returns", claim ?? "all-claims"] as const,
     /** R6 — what the warehouse filed and is waiting on. Invalidated by a
      *  check-in, because a check-in IS a receive: the PO row, the claim queue
      *  and this queue all move together. */
@@ -3457,16 +3464,32 @@ export interface operationPoListRow {
    *  the label matches), and bring the business facts that tell them apart. */
   sources?: Array<{
     kind: "sales_order" | "manual_purchase";
+    /** The visible document number: `SO-1319`, or the request's own
+     *  `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18, which overwrites the
+     *  2026-09-04 MPR retirement). A request with no stored number keeps the
+     *  governed label `Manual Purchase` — never a UUID, never an invention. */
     reference: string;
     /** A sales_order source's order id, so one SO number opens its order. */
     order_id?: string | null;
+    /** Manual Purchase only — the stored MPR number, null where there is none. */
+    req_no?: string | null;
     request_id?: string | null;
     purpose?: string | null;
     proceed_date?: string | null;
   }>;
   /** Posted receipts of this PO (`warehouse_receipts` with a GRN number),
-   *  oldest first. Absent on an older Worker — treat as unknown, not none. */
-  grns?: Array<{ id: string; grn_no: string }>;
+   *  oldest first. Absent on an older Worker — treat as unknown, not none.
+   *  `goods_received_at` is the PHYSICAL arrival day (0314), never the day the
+   *  record was filed and never a substitute for either delivery-date column;
+   *  `received_qty` is the shared `warehouseReceiptTotals` count of GOOD units
+   *  on that receipt. Both OPTIONAL so a browser on this build against an
+   *  older Worker prints the governed absence instead of crashing. */
+  grns?: Array<{
+    id: string;
+    grn_no: string;
+    goods_received_at?: string | null;
+    received_qty?: number | null;
+  }>;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
@@ -3814,6 +3837,32 @@ export interface SupplierClaimsResponse {
   counts: { open: number; closed: number; all: number };
 }
 
+/**
+ * The Purchase Returns register's read (`docs/purchasing/MASTER.md` §9.6).
+ *
+ * The row shape is `PurchaseReturnListRow` from `@carres/shared` — the same
+ * type the columns, the rail predicates and the derived Qty all read, so the
+ * server and the screen cannot hold two ideas of what a purchase return is.
+ */
+export interface PurchaseReturnsResponse {
+  returns: PurchaseReturnListRow[];
+}
+
+export function useOperationPurchaseReturns(
+  claimNo?: string | null,
+  opts?: Partial<UseQueryOptions<PurchaseReturnsResponse>>,
+) {
+  const claim = claimNo?.trim() || null;
+  return useQuery({
+    queryKey: qk.operation.purchaseReturns(claim),
+    queryFn: () =>
+      apiFetch<PurchaseReturnsResponse>(
+        `/api/operation/purchase-returns${claim ? `?claim=${encodeURIComponent(claim)}` : ""}`,
+      ),
+    ...opts,
+  });
+}
+
 export function useOperationSupplierClaims(
   status: "open" | "closed" | "all",
   poIdOrOpts?: string | Partial<UseQueryOptions<SupplierClaimsResponse>>,
@@ -3981,9 +4030,21 @@ export interface WarehouseReceiptQueueRow {
   /** The linked PO's governed `Supplier Delivery Date` (ISO) — the ONE reply
    *  arithmetic (`poSupplierDeliveryDateOf`), resolved server-side. */
   supplier_delivery_date?: string | null;
-  /** The Product cell's words — the GRN paper's own line description
+  /** The `Items` cell's words — the GRN paper's own line description
    *  (`product_skus.variant`, else the SKU), distinct, server-resolved. */
   product_labels?: string[];
+  /** `GRN Date` — when `Save Receiving` CREATED this document. It is never
+   *  inferred from `Goods Received Date`, which is the physical arrival. */
+  grn_date?: string | null;
+  /** The receipt's ACTUAL linked documents — `SO No / MPR No / CO No / RO No`
+   *  (owner ruling 2026-09-18). Empty when it genuinely has none; no word and
+   *  no other document ever stands in for a missing number. */
+  source_refs?: string[];
+  /** `po_line_id` → the Unit IDs THIS receiving answered for that line. A
+   *  quantity-managed line has no entry (its register row carries a technical
+   *  key, which is not an identity); `null` means the read FAILED and the
+   *  cell must say so rather than claim counted stock. */
+  unit_ids_by_line?: Record<string, string[]> | null;
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4281,8 +4342,14 @@ export interface GrnRegisterFilters {
   category: string | null;
   supplier: string | null;
   site: string | null;
-  /** The rail Calendar's picked `Supplier Delivery Date` (ISO). */
-  expected: string | null;
+  /** The rail's `Received with` row (owner ruling 2026-09-17). */
+  receivedWith: GrnReceivedWith | null;
+  /** The `GRN date` pick as one INCLUSIVE range — a day, a week, a month and
+   *  `Choose dates…` all arrive here as the same two facts. */
+  from: string | null;
+  to: string | null;
+  /** `Cancelled GRNs` — the rail's last row. */
+  cancelled: boolean;
   q: string;
 }
 export interface GrnRegisterResponse {
@@ -4292,7 +4359,16 @@ export interface GrnRegisterResponse {
     category: Record<string, number>;
     supplier: Record<string, number>;
     site: Record<string, number>;
+    /** GRN creation days, ISO → count; the rail folds them into weeks and
+     *  months, so a week's number is the whole filtered set's truth. */
+    grnDate: Record<string, number>;
+    /** OVERLAPPING by construction — never added into a total. */
+    receivedWith: Record<GrnReceivedWith, number>;
+    cancelled: number;
   };
+  /** The expansion's item words and governed categories, per SKU on this
+   *  page — the same two facts the official GRN document prints. */
+  line_info?: Record<string, { description: string | null; category: string }>;
   counts: { waiting: number };
 }
 
@@ -4312,10 +4388,16 @@ export function useOperationGrnRegister(
   if (filters.category) params.set("category", filters.category);
   if (filters.supplier) params.set("supplier", filters.supplier);
   if (filters.site) params.set("site", filters.site);
-  if (filters.expected) params.set("expected", filters.expected);
+  if (filters.receivedWith) params.set("receivedWith", filters.receivedWith);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (filters.cancelled) params.set("cancelled", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return useQuery({
-    queryKey: qk.operation.grnRegister({ ...filters }),
+    queryKey: qk.operation.grnRegister({
+      ...filters,
+      cancelled: filters.cancelled ? "1" : null,
+    }),
     queryFn: () =>
       apiFetch<GrnRegisterResponse>(
         `/api/operation/warehouse-receipts?${params.toString()}`,
@@ -4582,6 +4664,13 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** ⭐ THE RECORDED INTENT (0546) — `concrete_need` means Units already on
+   *  the shelf may answer this request and a saved allocation reduces what is
+   *  left to buy; `additional_stock` means it buys EXTRA and the shelf is
+   *  reference only. NULL is its own state and is never guessed into either:
+   *  the request recorded no answer, and the Ready Stock section says so.
+   *  Optional so an older API reads as not recorded. */
+  fulfilment_intent?: "concrete_need" | "additional_stock" | null;
   /** 0522 · R3 — the requester withdrew it before a decision. Optional so an
    *  older API reads as not withdrawn. */
   withdrawn_at?: string | null;
@@ -4615,6 +4704,14 @@ export interface PurchaseRequestLineRow {
   approved_qty: number | null;
   issued_qty: number;
   remaining_qty: number;
+  /**
+   * ⭐ Units of READY STOCK saved against this exact line (owner ruling
+   * 2026-09-18). It reduces what is still to BUY and never touches `qty`,
+   * which stays the original ask, or `approved_qty`, which stays the
+   * approver's number. Absent on a payload from a Worker before this ruling —
+   * treated as 0, which is what it was.
+   */
+  stock_reserved_qty?: number;
   required_by: string | null;
   remark: string | null;
   po_id: string | null;
@@ -4679,8 +4776,23 @@ export interface ManualPurchaseRegisterPayload {
     official_delivery_date?: string | null;
     supplier_id?: string | null;
   }>;
-  /** The linked Service Cases behind `for_service_case_id`. */
-  serviceCases: Array<{ id: string; case_no: string }>;
+  /**
+   * The linked Service Cases behind `for_service_case_id`, with the CUSTOMER
+   * facts the approved register columns print (owner ruling 2026-09-18).
+   *
+   * ⛔ THIS IS THE ONLY SOURCE OF A CUSTOMER ON THIS PAGE. Every other purpose
+   * has no customer, and those rows print the columns blank — never the
+   * requester, never the destination, never the supplier's town.
+   */
+  serviceCases: Array<{
+    id: string;
+    case_no: string;
+    customer_name?: string | null;
+    /** The linked Sales Order's own promised day; TBD is null, never a date. */
+    requested_delivery_date?: string | null;
+    delivery_city?: string | null;
+    delivery_state?: string | null;
+  }>;
   destinations: Array<{ id: string; name: string }>;
   /** The governed standing Deliver To (MASTER §5.4) — null means none is set. */
   defaultDestinationId?: string | null;
@@ -4935,6 +5047,11 @@ export function useCreatePurchaseRequest() {
       serviceCaseId?: string | null;
       staffUserId?: string | null;
       subsidiaryName?: string | null;
+      /** ⭐ THE RECORDED INTENT (0546 · 0549) — whether Units already on the
+       *  shelf may answer this request, or it buys EXTRA on top of them. The
+       *  form refuses `Send` without it; the wire keeps it optional because a
+       *  request that recorded none is its own state and is never guessed. */
+      fulfilmentIntent?: "concrete_need" | "additional_stock" | null;
       /** ⭐ THE WHOLE REQUEST IN ONE CALL (0410). Sending the lines here makes
        *  the header and every line ONE database transaction, so a bad line can
        *  no longer leave a committed header behind. Optional because `0410` is

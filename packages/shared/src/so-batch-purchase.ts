@@ -74,8 +74,34 @@ export const SO_BATCH_PURCHASE_WORDS = {
   colProceedDate: "Proceed Date",
   colPoNo: "PO No",
   colSoNo: "SO No",
-  /** Owner rulings R1/R2, 2026-09-16 — the engine's date to issue by. */
+  /** Owner rulings R1/R2, 2026-09-16 — the engine's date to issue by. It is an
+   *  ENGINE/DETAIL fact again (Jess 2026-09-18): the parent column is
+   *  `PO Safety Days`, and `Order By` is not a goods-table column either. */
   colOrderBy: "Order By",
+  /**
+   * ⭐ THE PARENT PLANNING COLUMN — owner ruling 2026-09-18, the shared
+   * Purchasing dictionary's `PO Safety Days`.
+   *
+   * The working-day margin that would REMAIN if the outstanding demand were
+   * ordered today, after supplier production and transit, against the
+   * applicable required date. It is NOT the Order By date, NOT always 14 and
+   * NOT days since creation: the one server planning engine counts it
+   * (`purchaseDemandSafetyDaysLeft`, the same expression the timing states are
+   * classified from — Law D), the browser only prints it.
+   *
+   * The parent shows the TIGHTEST outstanding line. Nothing left to buy prints
+   * nothing. Unknown setup or unverified coverage NEVER prints `0`; it prints
+   * the same governed absence word this page already uses for an unstatable
+   * plan (`Not planned` · `Coverage not checked` · `Already on a PO`).
+   */
+  colPoSafetyDays: "PO Safety Days",
+  /**
+   * A margin that has already been spent: ordering today lands the goods after
+   * the customer's date. It is the page's own governed timing word, not a
+   * negative number — `−2` in a days column reads as a defect rather than as
+   * the one sentence that says what is wrong.
+   */
+  safetyDaysOverrun: "Not enough production days",
   /** The Order By of remaining demand that cannot be stated yet (blocked or unverified). */
   notPlanned: "Not planned",
   /** The two governed table group headings — never stored statuses or rail rows. */
@@ -85,11 +111,46 @@ export const SO_BATCH_PURCHASE_WORDS = {
   footerUnitOne: "Sales Order",
   issueNeedsPoDuty: "Only PO Duty can issue this PO",
   colCustomer: "Customer",
-  colDeliveryLocation: "Delivery Location",
-  colRequestedDelivery: "Requested Delivery Date",
+  /**
+   * ⭐ THE SHARED PURCHASING DICTIONARY'S OWN HEADS — owner ruling 2026-09-18
+   * (`docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+   *
+   * `Delivery Location` and `Requested Delivery Date` said WHOSE date and
+   * WHOSE address only by where they happened to sit. On four pages that read
+   * the same facts — SO Batch, Manual Purchase, Purchase Orders, Receiving —
+   * the customer's date sits beside a supplier's, and a warehouse destination
+   * sits beside a customer address. The customer's facts now say so in their
+   * own heads, and `Deliver To` becomes `Supplier Deliver To` for the
+   * destination INSTRUCTED TO THE SUPPLIER.
+   */
+  colDeliveryLocation: "Customer Delivery Location",
+  colRequestedDelivery: "Customer Requested Delivery Date",
   colSupplier: "Supplier",
-  deliverTo: "Deliver To",
-  colPoDeliveryDate: "PO Delivery Date",
+  /** The goods summary: `{first item} + {n} more`, every item in expansion. */
+  colItems: "Items",
+  deliverTo: "Supplier Deliver To",
+  /**
+   * The ORIGINAL supplier-facing date stamped at the document's birth (§5.7).
+   * `PO Delivery Date` is retired for this fact on all four reviewed pages.
+   */
+  colPoDeliveryDate: "PO Default Delivery Date",
+
+  /**
+   * ⭐ STATUS IS THE NEW-PO NEED, NOT A PROGRESS BADGE — owner ruling
+   * 2026-09-18.
+   *
+   * `Partial` / `Ordered` described a generic progress the row already showed
+   * under `PO No`, and an operator could act on neither. What a buying page
+   * has to answer is one question: does this still need a purchase order?
+   *
+   * It is derived from the SAME remaining-demand reading that decides the two
+   * governed groups (`soBatchOrderPlanning().group`) — there is no second
+   * arithmetic and no stored status. And it is a NEED, never a permission:
+   * unknown coverage and every other blocker still refuse the tick and state
+   * their own reason, whatever this word says.
+   */
+  statusNeedPo: "Need PO",
+  statusNoPoNeeded: "No PO needed",
 
   /**
    * The deterministic compact summaries a parent cell prints when one Sales
@@ -194,6 +255,67 @@ export const SO_BATCH_PURCHASE_WORDS = {
   /** The destination editor. */
   split: "Split",
   splitTotal: "Total",
+
+  /**
+   * ── READY STOCK ON THE ITEM ROW — owner ruling 2026-09-18 ─────────────────
+   *
+   * The cell states two counts and nothing else: what is FREE for this goods,
+   * and what is already SAVED against THIS item line. Two numbers because they
+   * answer two questions, and folding them into one made a line with a saved
+   * reservation and an empty shelf read as a line with nothing at all.
+   *
+   * ⛔ `0` IS AN ANSWER, NOT A PLACEHOLDER. It prints only for a SUCCESSFUL
+   * read that found no free stock AND no saved reservation, and that row gets
+   * no disclosure because there is nothing under it. Loading, failed and
+   * unverified reads print their own words — never a zero.
+   */
+  readyStockAvailable: (n: number) => `${n} available`,
+  readyStockReserved: (n: number) => `${n} reserved`,
+  readyStockNone: "0",
+  readyStockLoading: "Loading…",
+  readyStockFailed: "Could not be read",
+  readyStockRetry: "Try again",
+  readyStockOpen: "Show Ready Stock",
+  readyStockClose: "Hide Ready Stock",
+  readyStockEmpty: "No stock on the shelf matches this item line.",
+
+  /**
+   * ── THE ONE SAVED SET, AND THE FOUR CONTROLS THAT EDIT IT ────────────────
+   *
+   * Ticking is a DRAFT and writes nothing. `Choose Ready Unit` saves the first
+   * reservation — on its own, with no purchase order involved, which is what
+   * an all-stock Sales Order needs. After that the same set is reopened by
+   * `Change selection`, and the replacement is committed by `Save changes` or
+   * abandoned by `Cancel`.
+   *
+   * ⛔ THERE IS NO PER-UNIT UNDO. A release is part of the replacement and is
+   * validated with it, so one act is one transaction — a row of little Undo
+   * buttons would be N acts, each its own race.
+   */
+  readyStockChoose: "Choose Ready Unit",
+  readyStockChange: "Change selection",
+  readyStockSave: "Save changes",
+  readyStockCancel: "Cancel",
+  readyStockChosen: (n: number) => `${n} chosen`,
+  readyStockNoneChosen: "No Unit chosen",
+  /**
+   * A purchase cannot be issued on top of a stock decision nobody committed:
+   * the quantity the purchase would be raised against is exactly what the
+   * pending edit is changing.
+   */
+  readyStockPendingBlocksIssue:
+    "Save or cancel the Ready Stock changes before issuing a PO.",
+
+  /** The stock picker's own six heads (Purchasing MASTER §9.1). */
+  stockColReceived: "Goods Received Date",
+  stockColLocation: "Stock Location",
+  stockColSupplier: "Supplier",
+  /** ONE cell, two lines: the document reference, then the Unit ID under it. */
+  stockColReference: "PO No / Ref No",
+  stockColCondition: "Condition",
+  stockUnitIdLabel: "Unit ID",
+  /** An absent fact is a stated fact — never a blank and never an invention. */
+  stockNotRecorded: "Not recorded",
 
   /** The issue journey. */
   issuePo: "Issue PO",
@@ -1432,6 +1554,59 @@ export function soBatchOrderByAbsenceWord(absence: SoBatchOrderByAbsence): strin
     case "coverage_not_checked":
       return SO_BATCH_PURCHASE_WORDS.toBuyNotChecked[0]!;
   }
+}
+
+/**
+ * ⭐ THE PARENT `PO Safety Days` CELL — owner ruling 2026-09-18.
+ *
+ * ONE answer per Sales Order, over exactly the leaves the parent checkbox
+ * would tick: the TIGHTEST margin, because a row is as late as its latest
+ * line. Nothing left to buy prints nothing at all; a margin that cannot be
+ * stated prints the page's own governed absence word, never `0`.
+ *
+ * The engine owns the number. This picks the minimum of numbers it was given
+ * and performs no calendar arithmetic (Card 02-A: "no client calendar
+ * arithmetic is admitted").
+ */
+export type SoBatchSafetyDaysCell =
+  /** Nothing outstanding to buy — the cell is blank. */
+  | { kind: "none" }
+  /** The engine's margin. Negative = production overruns the customer date. */
+  | { kind: "days"; days: number }
+  /** Outstanding demand whose margin cannot be stated. NEVER printed as `0`. */
+  | { kind: "absent"; absence: SoBatchOrderByAbsence };
+
+export function soBatchOrderSafetyDays(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+): SoBatchSafetyDaysCell {
+  const plan = soBatchOrderPlanning(order, leaves);
+  if (plan.group === "no-purchase-needed") return { kind: "none" };
+  const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
+  const measured = eligible
+    .map((r) => r.safetyDaysLeft)
+    .filter((n): n is number => typeof n === "number");
+  /* An eligible leaf whose margin the engine did not send is UNKNOWN, and one
+     unknown leaf makes the tightest margin unknowable — a minimum over the
+     rest would claim a floor nobody measured. */
+  if (measured.length > 0 && measured.length === eligible.length) {
+    return { kind: "days", days: Math.min(...measured) };
+  }
+  return { kind: "absent", absence: plan.absence ?? "not_planned" };
+}
+
+/**
+ * ⭐ `Need PO` / `No PO needed` — owner ruling 2026-09-18.
+ *
+ * The SAME remaining-demand reading that decides the two governed groups, so
+ * the word on the row and the heading above it can never disagree. It states
+ * the NEED for a new purchase order; it is not permission to raise one, and it
+ * renames no group and no rail row.
+ */
+export function soBatchOrderStatusWord(group: SoBatchRegisterGroup): string {
+  return group === "to-buy"
+    ? SO_BATCH_PURCHASE_WORDS.statusNeedPo
+    : SO_BATCH_PURCHASE_WORDS.statusNoPoNeeded;
 }
 
 /** Default order inside a group: rank → Order By ascending → SO No descending. */

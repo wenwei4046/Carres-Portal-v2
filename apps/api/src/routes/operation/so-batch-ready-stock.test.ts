@@ -55,8 +55,8 @@ function fixture(over: Record<string, { data: unknown; error: unknown }> = {}) {
         {
           id: "unit-queen-1", unit_code: "U1-000-001", sku: QUEEN, qty: 1,
           date_in: "2026-08-01", condition: "exhibition", site_name: "Carres Klang Warehouse",
-          holder_name: null, ownership: "carres_owned", supplier: null,
-          identity_scope: "unit", warehouse_id: "wh-1",
+          holder_name: null, ownership: "carres_owned", supplier: "Nice Furniture",
+          identity_scope: "unit", warehouse_id: "wh-1", po_no: "PO-20260820-4827",
         },
         {
           id: "unit-bulk", unit_code: "QTY-000000001", sku: QUEEN, qty: 893,
@@ -66,9 +66,9 @@ function fixture(over: Record<string, { data: unknown; error: unknown }> = {}) {
         },
         {
           id: "unit-consign", unit_code: "U1-000-065", sku: QUEEN, qty: 1,
-          date_in: "2026-08-06", condition: "new", site_name: "Ohana",
+          date_in: null, condition: "new", site_name: "Ohana",
           holder_name: null, ownership: "supplier_consignment", supplier: "Dorsettloft",
-          identity_scope: "unit", warehouse_id: "wh-2",
+          identity_scope: "unit", warehouse_id: "wh-2", po_no: null,
         },
       ],
       error: null,
@@ -317,6 +317,199 @@ describe("POST …/ready-stock/reserve", () => {
       fixture({ orders: { data: [{ id: ORDER, so: null }], error: null } }),
     );
     expect(res.status).toBe(422);
+    expect(c.rpcCalls).toHaveLength(0);
+  });
+});
+
+/**
+ * ⭐ THE PICKER'S OWN FACTS — owner ruling 2026-09-18, Purchasing §9.1.
+ *
+ * The approved stock table prints the physical receipt date, the actual current
+ * location, the recorded provenance and the document the goods came in on.
+ * Every one of them is the register's own value; none is invented, and a Unit
+ * with no document says so rather than borrowing the Sales Order's supplier.
+ */
+describe("GET …/ready-stock — the picker's provenance and the saved set", () => {
+  it("carries the recorded document reference, and NULL where there is none", async () => {
+    const { body } = await read();
+    expect(body.units.find((u) => u.itemId === "unit-queen-1")!.poNo).toBe(
+      "PO-20260820-4827",
+    );
+    /* Missing provenance is not a reason to invent a PO. */
+    expect(body.units.find((u) => u.itemId === "unit-consign")!.poNo).toBeNull();
+  });
+
+  it("carries the receipt date as it is stored, and null where it is absent", async () => {
+    const { body } = await read();
+    expect(body.units.find((u) => u.itemId === "unit-queen-1")!.dateIn).toBe("2026-08-01");
+    expect(body.units.find((u) => u.itemId === "unit-consign")!.dateIn).toBeNull();
+  });
+
+  /**
+   * ⭐ `lineIds` IS A DIFFERENT QUESTION FROM `matchingLineIds`. The second
+   * empties the moment a line is covered; a covered line whose shelf is full
+   * must not read as an empty shelf, so the per-item cell asks the first.
+   */
+  it("names every line the goods match, need or no need", async () => {
+    const { body } = await read(
+      fixture({
+        ops_stock_items: {
+          data: [
+            { unit_code: "U1-000-009", qty: 1, reserved_order_line_id: LINE_A },
+            { unit_code: "U1-000-010", qty: 1, reserved_order_line_id: LINE_B },
+          ],
+          error: null,
+        },
+      }),
+    );
+    const queen = body.units.find((u) => u.itemId === "unit-queen-1")!;
+    expect(queen.matchingLineIds).toEqual([]);
+    expect(queen.lineIds).toEqual([LINE_A, LINE_B]);
+    expect(queen.blocked).toBe("no_line_needs_it");
+  });
+
+  /**
+   * A committed Unit is not `available`, so the offer cannot see it — and
+   * `Change selection` would open on a table with the saved set nowhere on it.
+   * It is read back by the binding this order's own lines carry (0471).
+   */
+  it("carries a saved reservation back, marked with the line it answers", async () => {
+    const { body } = await read(
+      fixture({
+        stock_unit_register_v: {
+          data: [
+            {
+              id: "unit-saved", unit_code: "U1-000-077", sku: QUEEN, qty: 1,
+              date_in: "2026-08-02", condition: "new", site_name: "Carres Klang Warehouse",
+              holder_name: null, ownership: "carres_owned", supplier: "Nice Furniture",
+              identity_scope: "unit", warehouse_id: "wh-1", po_no: "PO-20260820-4827",
+              reserved_order_line_id: LINE_A,
+            },
+          ],
+          error: null,
+        },
+      }),
+    );
+    const saved = body.units.filter((u) => u.reservedForLineId === LINE_A);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]!.unitCode).toBe("U1-000-077");
+    expect(saved[0]!.lineIds).toEqual([LINE_A]);
+    /* And it is named ONCE — not again as a free offer. */
+    expect(body.units.filter((u) => u.itemId === "unit-saved")).toHaveLength(1);
+  });
+});
+
+/**
+ * ⭐ THE SAVE — ONE ITEM LINE'S WHOLE CHOSEN SET (owner ruling 2026-09-18).
+ *
+ * The browser sends what the line SHOULD stand at. The door (0545) works out
+ * the difference from the locked rows and applies releases and draws in one
+ * transaction. Nothing here subtracts one set from another.
+ */
+describe("POST …/ready-stock/save", () => {
+  async function save(body: unknown, tables = fixture()) {
+    const c = client(tables);
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/save", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt("operation")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    return { res, c };
+  }
+
+  const UNIT = "11111111-1111-4111-8111-111111111111";
+
+  it("hands the door the COMPLETE intended set, the order and the line", async () => {
+    const { res, c } = await save({ orderId: ORDER, orderLineId: LINE_A, itemIds: [UNIT] });
+    expect(res.status).toBe(200);
+    expect(c.rpcCalls).toHaveLength(1);
+    expect(c.rpcCalls[0]!.fn).toBe("so_batch_save_ready_units");
+    expect(c.rpcCalls[0]!.args).toMatchObject({
+      p_ref: "SO-1251",
+      p_order_id: ORDER,
+      p_line: LINE_A,
+      p_item_ids: [UNIT],
+    });
+  });
+
+  /** An empty set is a real instruction: remove every saved choice. */
+  it("accepts an empty set and still reaches the door", async () => {
+    const { res, c } = await save({ orderId: ORDER, orderLineId: LINE_A, itemIds: [] });
+    expect(res.status).toBe(200);
+    expect(c.rpcCalls[0]!.args.p_item_ids).toEqual([]);
+  });
+
+  it("makes ONE call, never a release followed by a reserve", async () => {
+    const { c } = await save({ orderId: ORDER, orderLineId: LINE_A, itemIds: [UNIT] });
+    expect(c.rpcCalls.map((r) => r.fn)).toEqual(["so_batch_save_ready_units"]);
+  });
+
+  it("refuses an order with no customer number rather than reaching the door", async () => {
+    const { res, c } = await save(
+      { orderId: ORDER, orderLineId: LINE_A, itemIds: [UNIT] },
+      fixture({ orders: { data: [{ id: ORDER, so: null }], error: null } }),
+    );
+    expect(res.status).toBe(422);
+    expect(c.rpcCalls).toHaveLength(0);
+  });
+
+  it("refuses a body that names no item line", async () => {
+    const { res, c } = await save({ orderId: ORDER, itemIds: [UNIT] });
+    expect(res.status).toBe(400);
+    expect(c.rpcCalls).toHaveLength(0);
+  });
+
+  it("passes the release refusal's own word and the Unit it is about", async () => {
+    const c = client(fixture());
+    c.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: "22023",
+        message: "unit_cannot_be_released",
+        details: `that Unit has already left the shelf · unit_id=${UNIT}`,
+      },
+    } as never);
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/save", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt("operation")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ orderId: ORDER, orderLineId: LINE_A, itemIds: [] }),
+      }),
+      env,
+    );
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(res.status).toBe(422);
+    expect(body.code).toBe("unit_cannot_be_released");
+    expect(body.itemId).toBe(UNIT);
+  });
+
+  it("refuses a caller who is not Operation", async () => {
+    const c = client(fixture());
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/save", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt("sales")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ orderId: ORDER, orderLineId: LINE_A, itemIds: [] }),
+      }),
+      env,
+    );
+    /* The guard refuses before the route, and nothing reaches the door. */
+    expect(res.status).toBe(401);
     expect(c.rpcCalls).toHaveLength(0);
   });
 });
