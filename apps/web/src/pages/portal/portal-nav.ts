@@ -370,7 +370,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },
-      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
+      { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, section: "Purchasing", pageGroup: "purchasing-problems" },
       { key: "repair-orders", label: "Repair Orders", icon: ArrowUpRight, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
 
       /* SHOWROOM — the goods standing on a Carres floor. Some Carres bought
