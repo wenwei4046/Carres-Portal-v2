@@ -3794,3 +3794,25 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
+### PROPOSAL — PENDING APPROVAL (chart-tab)
+
+Finance Settings gains a second tab, the chart of accounts (migration 0539). Words already in
+this file keep their meaning: `Account` · `Name` · `Kind` and the kind words · `Status` ·
+`Active` · `Not active` · `Save` · `Cancel` · `Type the account name.` ·
+`Keep the name to 60 characters.` · `The chart of accounts could not be loaded. Try again.`
+
+| Group | Word | Meaning |
+|---|---|---|
+| Tabs | **`Money accounts`** · **`Chart of accounts`** | The two tabs of Finance Settings. The second is `?tab=chart`. |
+| Chart | `{code} {name}` | One account, indented under its parent. A heading account (one that other accounts sit under) is bold; nothing is ever posted to it. |
+| Form | `Account` · `{code} · {kind}` | The rename form's heading, and the line under it. Only the name changes; the code never does. |
+| Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
+| Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
+
+Finance words that never appear on screen. A finance person says the word on the left; the screen
+always says the word on the right. One fact, one word (rule 2).
+
+| Said in finance | On screen |
+|---|---|
+| Sundry debtor | `Other debtor` |
+| Sundry creditor | `Other creditor` |
