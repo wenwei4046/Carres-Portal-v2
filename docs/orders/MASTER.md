@@ -1529,6 +1529,12 @@ exactly and in this order: `SO No` · `SO Doc Date` · `Proceed Date` (printed o
 and lift print on the Delivery Order. The stair-carry charge note stays. The customer signature stays exactly
 as the Sales Portal captures it: the customer signs on the Sales Portal's signature pad (step 3, required),
 and that image prints in the dashed box `Customer Signature · {name}`; there is no company signature box.
+**Table framing — OWNER RULING (Jess, 2026-09-21), from the Houzs reference.** The items table and the payment
+table are fully framed (every cell ruled, horizontal and vertical); the category row (`MATTRESS` · `BEDFRAME` …)
+sits inside the frame across the full width. The items columns are unchanged. The payment table is
+`# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
+document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
+and `No payments recorded.` instead of an empty table.
 `Bill To` keeps Name · Address · Tel · Email · Emergency; `Deliver To` still prints only when it differs.
 
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
