@@ -430,6 +430,11 @@ export type SalesOrderTemplateData = {
    *  a figure arrives. */
   expected_deposit?: number | null;
 
+  /** Footer audit cell — the `audit_log` actor who CREATED the order, the
+   *  same source the PO reads (0383). NOT the salesperson: that row answers
+   *  "who does the customer call". Absent → the footer prints `Not recorded`. */
+  issued_by?: string | null;
+
   signed: boolean;
   /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at
    *  checkout. The template renders this inline as the customer signature.
