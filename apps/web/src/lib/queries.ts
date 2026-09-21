@@ -2023,6 +2023,8 @@ export interface PrincipalDealerRow {
   channel: StoreChannel;
   /** How many outlets hang off this account (a dealer's branches). */
   outletCount: number;
+  /** 0543 — dealer code (JB1, JB2); null until Finance sets one. */
+  code: string | null;
 }
 export interface PrincipalDealersListResponse {
   dealers: PrincipalDealerRow[];
@@ -2055,6 +2057,9 @@ export interface PrincipalDealerDetailDealer {
   /** Same second SELECT — tells the drawer whether this is one of Carres' own
    *  showrooms (no SSM / PIC) or an external dealer. */
   channel: StoreChannel;
+  /** 0543 — dealer code and optional state. */
+  code: string | null;
+  state: string | null;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -2294,6 +2299,8 @@ export function useUpdateDealer(
         ssmCode?: string;
         contactName?: string;
         contactPhone?: string;
+        code?: string;
+        state?: string;
       }
     >
   >,

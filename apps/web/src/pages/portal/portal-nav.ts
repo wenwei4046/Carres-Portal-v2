@@ -609,6 +609,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
       // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      // 0543 — Finance keeps the dealer master (code, state, address, contact)
+      // on the same list the principal uses; inviting stays principal-only.
+      { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
       // The Finance Ledger — three rows, not one row with tabs: the Journal,
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs

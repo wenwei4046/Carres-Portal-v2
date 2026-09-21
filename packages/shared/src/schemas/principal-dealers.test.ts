@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inviteDealerInput, setDealerStatusInput } from './principal-dealers';
+import { inviteDealerInput, setDealerStatusInput, updateDealerInput } from './principal-dealers';
 
 describe('inviteDealerInput', () => {
   it('accepts valid', () => {
@@ -28,3 +28,15 @@ describe('setDealerStatusInput', () => {
   });
 });
 
+
+describe('updateDealerInput code', () => {
+  it('uppercases a JB1-style code and lets an empty one clear it', () => {
+    expect(updateDealerInput.parse({ code: ' jb1 ' }).code).toBe('JB1');
+    expect(updateDealerInput.parse({ code: '' }).code).toBe('');
+  });
+  it('rejects spaces, dashes and codes over 12 characters', () => {
+    expect(updateDealerInput.safeParse({ code: 'JB 1' }).success).toBe(false);
+    expect(updateDealerInput.safeParse({ code: 'JB-1' }).success).toBe(false);
+    expect(updateDealerInput.safeParse({ code: 'A'.repeat(13) }).success).toBe(false);
+  });
+});

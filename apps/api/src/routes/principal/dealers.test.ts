@@ -570,3 +570,46 @@ describe("POST /api/principal/dealers/:id/status", () => {
   });
 });
 
+
+describe("0543 — finance keeps the dealer master", () => {
+  it("finance PATCH goes through dealer_save_master with code and state", async () => {
+    const { sb, rpcCalls } = buildSb({
+      rpcResults: { dealer_save_master: { data: { id: DEALER_ID, code: "JB1" } } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "jb1", state: "Johor" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpcCalls[0]).toEqual({
+      name: "dealer_save_master",
+      args: { p_dealer_id: DEALER_ID, p_patch: { code: "JB1", state: "Johor" } },
+    });
+  });
+
+  it("finance cannot invite a dealer or change its status", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("finance");
+    for (const path of ["invite", `${DEALER_ID}/status`]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/principal/dealers/${path}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "suspended", name: "X Y", region: "R", contact: "c" }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(403);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
