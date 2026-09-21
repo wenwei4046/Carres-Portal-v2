@@ -26,11 +26,15 @@
  * / outlet prints in ORDER DETAILS and the seller block.
  */
 
+import type { ReactNode } from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { displayCustomerName } from "@/lib/customer-name";
 import { lineConfigBits } from "../../pages/dealer/new-order/special-addons-picker";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
+// main moved the money formatters into the shared letterhead (#1337) — the
+// document family keeps ONE date and money format. Take theirs, keep ours.
 import { CARRES_COMPANY, formatMoney, moneyDigits } from "./letterhead";
+import { ORDER_TERMS } from "../order-terms";
 import type { SalesOrderTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -46,7 +50,8 @@ const mm = (v: number) => v * 2.83465;
  * NOT feed a charge sentence the customer signs. Until the nullable-columns
  * migration + POS form land, the stair-carry sentence and its T&C clause
  * stay OFF. Flip this to true in the migration's PR, nowhere else. */
-const LIFT_THREE_STATE_READY = false;
+/* The §8 lift gate moved to DO-PDF-STANDARD with the Access row (owner,
+   2026-09-21). Nothing on the Sales Order reads floor or lift any more. */
 
 const MARGIN = mm(12);
 const HEADER_H = mm(20);
@@ -77,6 +82,24 @@ function niceDate(iso: string | null | undefined, withDow = false): string | nul
   return withDow ? pretty : pretty.replace(/^[A-Za-z]{3}, /, "");
 }
 
+/** Square mark, left of the legal name — the Houzs stamp shape (owner,
+ *  2026-09-21, OVERRIDES round 13's "no logo image on the SO"). 13mm fits
+ *  inside the header's existing 15.7mm text block: zero added height. */
+const CARRES_LOGO_SRC =
+  (globalThis as { __CARRES_LOGO_SRC__?: string }).__CARRES_LOGO_SRC__ ?? "/carres-logo.png";
+
+/** Column-rule offsets, mm from the row's LEFT EDGE. The row carries no
+ *  horizontal padding — the 2mm lives inside `bNo` and `bAmount` — so these
+ *  numbers and the column widths are one coordinate system.
+ *  Content 186mm; fixed columns 9+27+10+25+24+27 = 122; DESCRIPTION flexes
+ *  to 64. CHANGE A WIDTH, CHANGE THIS LINE IN THE SAME COMMIT. */
+const RULE_X = [9, 36, 100, 110, 135, 159];
+
+/** PAYMENTS columns: date 26 (incl. 2mm rail pad) · method flex 75 · approval
+ *  30 · collected by 30 · amount 25 (incl. 2mm rail pad) = 186mm. Same law as
+ *  RULE_X: these numbers ARE the widths. */
+const PAY_RULE_X = [26, 101, 131, 161];
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: NOTO_SANS_SC_FAMILY,
@@ -102,74 +125,118 @@ const styles = StyleSheet.create({
   //    (2026-08-09) found the all-grey voice hard to read; international
   //    references (Stripe / Shopify invoices) bold the section titles small
   //    and keep grey for genuinely secondary text only. ──
-  cards: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), minHeight: mm(36) },
+  /* ONE left rail for the whole page: BILL TO, the tables, the signature
+     and the terms all start at the same x (owner, 2026-09-21). */
+  cards: { flexDirection: "row", marginTop: mm(3.5), minHeight: mm(36) },
   blockLabel: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
   partyName: { fontSize: 9.5, fontWeight: 600, marginTop: mm(1) },
   partyLine: { fontSize: 9, marginTop: mm(1) },
   pairRow: { flexDirection: "row" },
+  /* SALES ORDER INFO only. A two-line LABEL needs its colon and value on the
+     SECOND line, which is what bottom-alignment gives. BILL TO must NOT use
+     it: there the two-line thing is the VALUE (a wrapped address), and
+     bottom-aligning floated the address above its own label (measured). */
+  pairRowBase: { flexDirection: "row", alignItems: "flex-end" },
   pairLabel: { fontSize: 8, color: GREY, width: mm(20), lineHeight: 1.42 },
   pairValue: { fontSize: 8, flex: 1, lineHeight: 1.42 },
-  deliverBlock: { marginTop: mm(2), paddingHorizontal: mm(4) },
-  accessNote: { fontSize: 7.5, color: GREY, marginTop: mm(0.8) },
+  deliverBlock: { marginTop: mm(2) },
 
   // ── items table: zero grid lines, hairline rhythm, category bands ──
   tableHead: {
+    position: "relative",
     backgroundColor: BAR_BG,
     flexDirection: "row",
+    alignItems: "stretch",
     paddingVertical: mm(1.8),
-    paddingHorizontal: mm(2),
     marginTop: mm(2.5),
   },
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(27) },
-  colQty: { width: mm(10), textAlign: "right" },
-  colPrice: { width: mm(25), textAlign: "right" },
-  colDisc: { width: mm(24), textAlign: "right" },
-  colAmount: { width: mm(25), textAlign: "right" },
+  colQty: { textAlign: "right" },
+  colPrice: { textAlign: "right" },
+  colDisc: { textAlign: "right" },
+  colAmount: { textAlign: "right" },
+  headerLogo: { width: mm(13), height: mm(13), objectFit: "contain", marginRight: mm(4) },
+  /* No fill (owner, 2026-09-21 — Houzs' way). Once every goods row is boxed,
+     the boxes do the grouping and a grey band on top of them is one texture
+     too many. The label now reads as a heading ABOVE its group, which is what
+     it is. Air above it does the separating. */
   bandRow: {
     flexDirection: "row",
-    backgroundColor: BAND_BG,
-    paddingVertical: mm(1.2),
+    paddingTop: mm(2.6),
+    paddingBottom: mm(1.2),
     paddingHorizontal: mm(2),
-    marginTop: mm(1),
   },
   bandText: { fontSize: 7.5, fontWeight: 700, color: INK, letterSpacing: 0.3 },
-  row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
+  // Every goods row is BOXED. Bands and the payments table stay open — the
+  // box is what says "these are the goods" (Houzs does the same).
+  row: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: mm(9),
+    paddingVertical: mm(2),
+    borderLeftWidth: 0.3,
+    borderRightWidth: 0.3,
+    borderTopWidth: 0.3,
+    borderLeftColor: HAIR,
+    borderRightColor: HAIR,
+    borderTopColor: HAIR,
+  },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
-  cellNo: { fontSize: 7, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
-  cellCode: { fontSize: 7.5, width: mm(27), paddingRight: mm(2), lineHeight: 1 },
-  desc: { flex: 1, paddingRight: mm(3) },
+
+  vline: { position: "absolute", top: 0, bottom: 0, width: 0.4, backgroundColor: HAIR },
+  gridV: { justifyContent: "center" },
+  bNo: { width: mm(9), paddingLeft: mm(2), paddingRight: mm(1.5), justifyContent: "center" },
+  bCode: { width: mm(27), paddingLeft: mm(1.5), paddingRight: mm(2), justifyContent: "center" },
+  bQty: { width: mm(10), paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bPrice: { width: mm(25), paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bDisc: { width: mm(24), paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bAmount: { width: mm(27), paddingLeft: mm(1.5), paddingRight: mm(2), justifyContent: "center" },
+  cellNo: { fontSize: 7, color: GREY, textAlign: "right", lineHeight: 1 },
+  cellCode: { fontSize: 7.5, lineHeight: 1 },
+  desc: { flex: 1, paddingLeft: mm(1.5), paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
-  cellQty: { fontSize: 7, width: mm(10), textAlign: "right", lineHeight: 1 },
+  cellQty: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   cellMoney: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   // The line's own amount anchors the row (international convention: the
   // rightmost figure is the one the reader scans down).
   cellAmount: { fontSize: 7, fontWeight: 700, textAlign: "right", lineHeight: 1 },
 
-  voucherBlock: { marginTop: mm(1), paddingHorizontal: mm(4) },
+  voucherBlock: { marginTop: mm(1) },
   voucherLine: { fontSize: 8, color: GREY, marginTop: mm(0.5) },
 
   // ── payments received ──
+  payEmptyTitle: { fontSize: 8.5, fontWeight: 700, color: INK, letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1 },
+  payEmpty: { fontSize: 8, color: GREY, marginTop: mm(1.5) },
   payHead: {
+    position: "relative",
     backgroundColor: BAR_BG,
     flexDirection: "row",
+    alignItems: "stretch",
     paddingVertical: mm(1.8),
-    paddingHorizontal: mm(2),
     marginTop: mm(1.2),
   },
-  payColDate: { width: mm(24) },
-  payColCode: { width: mm(30) },
-  payColBy: { width: mm(30) },
-  payColAmount: { width: mm(23), textAlign: "right" },
+  payColAmount: { textAlign: "right" },
+  bDate: { width: mm(26), paddingLeft: mm(2), paddingRight: mm(1.5), justifyContent: "center" },
+  bMethod: { flex: 1, paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bApproval: { width: mm(30), paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bBy: { width: mm(30), paddingHorizontal: mm(1.5), justifyContent: "center" },
+  bPayAmt: { width: mm(25), paddingLeft: mm(1.5), paddingRight: mm(2), justifyContent: "center" },
   payCell: { fontSize: 8, lineHeight: 1 },
 
   // ── amount in words · totals ──
-  totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(2.5), paddingHorizontal: mm(4), alignItems: "stretch" },
-  wordsRow: { marginTop: mm(5), paddingHorizontal: mm(4) },
+  /* No side padding: the signature box's LEFT edge and the totals card's
+     RIGHT edge must land on the same rails as the tables above, or the page
+     reads as two documents (owner, 2026-09-21). */
+  totalsZone: { flexDirection: "row", justifyContent: "space-between", marginTop: mm(4), alignItems: "stretch" },
+  wordsRow: { marginTop: mm(5) },
   depositLine: { fontSize: 8.5, color: GREY, marginTop: mm(2) },
-  totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR },
+  /* 110 + 6 gap + 70 = 186mm: the pair spans the content width exactly,
+     so both outer edges land on the table rails. */
+  totalsBlock: { width: mm(70), borderWidth: 0.6, borderColor: HAIR, alignSelf: "stretch" },
   totalsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -194,16 +261,22 @@ const styles = StyleSheet.create({
   // ── customer signature · legal sentence ──
   signZone: { flexDirection: "row", marginTop: mm(3.5), paddingHorizontal: mm(4), alignItems: "flex-start" },
   signBlock: { width: mm(90) },
+  /* The box was 110 × 40mm — a room, not a signature. A person signs a line
+     ~70mm wide; anything larger just prints emptiness (owner, 2026-09-21).
+     The column still spans 110mm so the LEFT rail stays with the tables; the
+     box sits at its BOTTOM so it lines up with the totals card's last row. */
+  signCol: { width: mm(110), alignSelf: "stretch", justifyContent: "flex-end" },
   signBox: {
     borderWidth: 0.6,
     borderColor: "#787878",
     borderStyle: "dashed",
-    width: mm(80),
-    paddingBottom: mm(1.2),
+    width: mm(72),
+    height: mm(20),
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "center",
   },
   signCaption: { fontSize: 6.5, color: GREY, lineHeight: 1 },
+  contLine: { fontSize: 6.5, color: GREY, paddingTop: mm(1.2), paddingLeft: mm(2) },
   signImage: { width: mm(55), height: mm(14), objectFit: "contain" },
   signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1) },
   signName: { fontSize: 8.5, marginTop: mm(0.6) },
@@ -212,7 +285,7 @@ const styles = StyleSheet.create({
   legalSentence: { fontSize: 7.5, color: GREY, lineHeight: 1.5 },
 
   // ── terms ──
-  terms: { paddingTop: mm(4), paddingHorizontal: mm(4) },
+  terms: { paddingTop: mm(4) },
   termsLine: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(0.8) },
 
   // ── footer (fixed, every page) ──
@@ -297,6 +370,21 @@ function bandedLines(lines: SoLine[]): Array<{ band: string | null; rows: Array<
   return groups;
 }
 
+/** The box table (owner, 2026-09-21 — Houzs' structure, Carres' hairline).
+ *  Full-height rules, drawn as ABSOLUTE lines pinned to the row's top and
+ *  bottom. A border on the cell itself stops at the cell's CONTENT height and
+ *  renders as ragged stubs beside a two-line description; `alignSelf:
+ *  "stretch"` does not fix it in react-pdf. Measured, not assumed. */
+function ColumnRules({ xs = RULE_X }: { xs?: readonly number[] }) {
+  return (
+    <>
+      {xs.map((x) => (
+        <View key={x} style={[styles.vline, { left: mm(x) }]} />
+      ))}
+    </>
+  );
+}
+
 export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const {
     so_number,
@@ -333,14 +421,11 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     delivery.address && delivery.address.trim().length > 0 && delivery.address.trim() !== customer.address.trim()
       ? delivery.address.trim()
       : null;
-  const floorText = delivery.floor == null ? "Floor not recorded" : `Floor ${delivery.floor}`;
-  const liftText =
-    delivery.has_lift == null ? "Lift not recorded" : delivery.has_lift ? "Lift available" : "No lift";
-  const accessKnown = delivery.floor != null && delivery.has_lift != null;
-  // The charge sentence prints only on a RECORDED walk-up; an unknown access
-  // prints the to-be-checked sentence instead. Never a charge on a default.
-  const stairCarry =
-    LIFT_THREE_STATE_READY && accessKnown && delivery.floor! > 1 && delivery.has_lift === false;
+  // ACCESS (floor · lift) is NOT a Sales Order fact — owner, 2026-09-21:
+  // "Access remove due to DO only show". Floor/lift, the stair-carry sentence
+  // and its T&C clause now live ONLY on the Delivery Order, which is the
+  // document the crew carries. This also retires the §8 lift gate here: with
+  // no access row on the paper, no charge basis can rest on a default.
 
   // Vouchers print under the FIRST table line matching their trigger sku;
   // the rest fall to a block below the table (defensive).
@@ -356,6 +441,10 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   const orphanVouchers = vouchers.filter((v) => !v.trigger_sku || !printedLineSkus.has(v.trigger_sku));
 
   const groups = bandedLines(lines);
+  /* What the printed payment rows add up to. It should equal `paid` — if a
+     future payload ever disagrees, the paper shows the rows' own arithmetic,
+     never a figure the reader cannot check. */
+  const paymentsSum = payments.reduce((n, pm) => n + Number(pm.amount), 0);
   const hasAddons = addons.length > 0;
 
   const dash = "—";
@@ -369,17 +458,150 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     lines.reduce((n, l) => n + Number(l.line_total), 0) +
     addons.reduce((n, a) => n + Number(a.line_total), 0);
 
+
+  // ── PAGE CHUNKING ───────────────────────────────────────────────────
+  // Heights in mm, deliberately generous: a page that breaks one row early
+  // is invisible; a row that overflows its page is not.
+  const EST_ROW = 9;    // the row minimum
+  const EST_SUB = 3.6;  // each description sub-line
+  const EST_BAND = 9;   // a category heading with its air
+  // A4 297 − top (12 margin + 20 header + 2) − bottom (12 + 8 footer + 4) =
+  // 239mm of body. Page 1 also carries the parties block (~42) and the bar
+  // (~8). Both caps keep a safety margin: if a chunk ever overflowed, react-
+  // pdf would break it mid-chunk and the continuation would lose its bar —
+  // the one failure this whole mechanism exists to prevent.
+  const CAP_FIRST = 170;
+  const CAP_REST = 225;
+  const blocks: Array<{ h: number; node: ReactNode }> = [];
+
+  for (const [gi, group] of groups.entries()) {
+    if (group.band) {
+      blocks.push({
+        h: EST_BAND,
+        node: (
+          <View key={`band-${gi}`} style={styles.bandRow} minPresenceAhead={30}>
+            <Text style={styles.bandText}>
+              {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
+            </Text>
+          </View>
+        ),
+      });
+    }
+    for (const { line, index } of group.rows) {
+      const sofaSub = sofaSpecLine(line.attrs);
+      const configSub = configLine(line.attrs);
+      const pwpSub = pwpMarkerLine(line.attrs);
+      const freeSub = freeMarkerLine(line.attrs);
+      let issuedSubs: Voucher[] = [];
+      if (!attachedTriggerSkus.has(line.sku) && vouchersByTrigger.has(line.sku)) {
+        attachedTriggerSkus.add(line.sku);
+        issuedSubs = vouchersByTrigger.get(line.sku) ?? [];
+      }
+      const subs = [sofaSub, configSub, pwpSub, freeSub].filter(Boolean).length + issuedSubs.length;
+      blocks.push({
+        h: EST_ROW + subs * EST_SUB,
+        node: (
+          <View key={`${line.sku}-${index}`} wrap={false} style={[styles.row, styles.rowHair]}>
+            <ColumnRules />
+            <View style={styles.bNo}><Text style={styles.cellNo}>{index + 1}</Text></View>
+            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{line.sku}</Text></View>
+            <View style={[styles.desc, styles.gridV]}>
+              <Text style={styles.descMain}>{line.description}</Text>
+              {sofaSub ? <Text style={styles.descSub}>{sofaSub}</Text> : null}
+              {configSub ? <Text style={styles.descSub}>{configSub}</Text> : null}
+              {pwpSub ? <Text style={styles.descSubAccent}>{pwpSub}</Text> : null}
+              {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}
+              {issuedSubs.map((v) => (
+                <Text key={v.code} style={styles.descSub}>{voucherIssuedLine(v)}</Text>
+              ))}
+            </View>
+            <View style={[styles.bQty, styles.gridV]}>
+              <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{line.qty}</Text>
+            </View>
+            <View style={[styles.bPrice, styles.gridV]}>
+              <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
+            </View>
+            <View style={[styles.bDisc, styles.gridV]}>
+              <Text style={[styles.cellMoney, styles.colDisc]}>
+                {line.discount && line.discount > 0 ? moneyDigits(line.discount) : dash}
+              </Text>
+            </View>
+            <View style={[styles.bAmount, styles.gridV]}>
+              <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(line.line_total)}</Text>
+            </View>
+          </View>
+        ),
+      });
+    }
+  }
+  if (hasAddons) {
+    blocks.push({
+      h: EST_BAND,
+      node: (
+        <View key="addon-band" style={styles.bandRow} minPresenceAhead={30}>
+          <Text style={styles.bandText}>
+            SERVICE · {addons.length} {addons.length > 1 ? "items" : "item"}
+          </Text>
+        </View>
+      ),
+    });
+    addons.forEach((a, idx) => {
+      const addonSub = addonAttrsDescription(a.attrs);
+      blocks.push({
+        h: EST_ROW + (addonSub ? EST_SUB : 0),
+        node: (
+          <View key={`addon-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
+            <ColumnRules />
+            <View style={styles.bNo}><Text style={styles.cellNo}>{lines.length + idx + 1}</Text></View>
+            <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text></View>
+            <View style={[styles.desc, styles.gridV]}>
+              <Text style={styles.descMain}>{a.label}</Text>
+              {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
+            </View>
+            <View style={[styles.bQty, styles.gridV]}>
+              <Text style={a.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{a.qty}</Text>
+            </View>
+            <View style={[styles.bPrice, styles.gridV]}>
+              <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>
+            </View>
+            <View style={[styles.bDisc, styles.gridV]}><Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text></View>
+            <View style={[styles.bAmount, styles.gridV]}>
+              <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(a.line_total)}</Text>
+            </View>
+          </View>
+        ),
+      });
+    });
+  }
+
+  const itemPages: Array<Array<{ h: number; node: ReactNode }>> = [[]];
+  let used = 0;
+  let cap = CAP_FIRST;
+  for (const b of blocks) {
+    if (used + b.h > cap && itemPages[itemPages.length - 1].length > 0) {
+      itemPages.push([]);
+      used = 0;
+      cap = CAP_REST;
+    }
+    itemPages[itemPages.length - 1].push(b);
+    used += b.h;
+  }
+
   // Row order + words fixed by the owner (round 23): Doc No · Ordered ·
   // Sales Location (2990's word; was Showroom) · Proceed date · Delivery
   // date · Salesperson · Access.
   const orderDetailRows: Array<[string, string | null]> = [
     ["SO No", so_number],
-    ["Ordered", niceDate(issue_date, true)],
-    ["Sales Location", outletName],
-    ["Proceed date", proceed_date ? niceDate(proceed_date, true) : null],
-    ["Delivery date", niceDate(delivery.date, true) ?? delivery.date],
+    ["SO Doc Date", niceDate(issue_date, true)],
+    ["Proceed Date", proceed_date ? niceDate(proceed_date, true) : null],
+    /* TWO deliberate lines (owner, 2026-09-21) — the colon and value sit on
+       the label's SECOND line; SALES ORDER INFO rows bottom-align for it. */
+    ["Customer Requested\nDelivery Date", niceDate(delivery.date, true) ?? delivery.date],
+    /* One row, always filled: the outlet when the order sold from a showroom,
+       else the dealer (0144 fallback). `Sold by` retired as a second row. */
+    ["Sales Location", outletName ?? sellerName],
+    ["Salesperson", dealer.salesperson_name],
   ];
-  const accessText = `${floorText} · ${liftText}`;
 
   return (
     <Document>
@@ -402,7 +624,9 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                   {/* Carres amendment of 2990's drawHeader (owner round 15):
                       name 14/700 with the SSM inline at 8pt grey, address in
                       TWO 8.5pt lines. */}
-                  <View style={{ flex: 1, paddingRight: mm(10) }}>
+                  <View style={{ flex: 1, paddingRight: mm(4), flexDirection: "row", alignItems: "center" }}>
+                    <Image src={CARRES_LOGO_SRC} style={styles.headerLogo} />
+                    <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
                       <Text style={styles.companyName}>{CARRES_COMPANY.legalName}</Text>
                       <Text style={styles.ssmInline}>SSM {CARRES_COMPANY.regNo}</Text>
@@ -413,6 +637,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                     <Text style={styles.legalLine}>
                       {CARRES_COMPANY.addressLines[1]} {CARRES_COMPANY.addressLines[2]}
                     </Text>
+                    </View>
                   </View>
                   {/* Owner round 16: the number IS the identity — 18/700
                       hero, no "Doc No:" label, no Date (ORDER DETAILS'
@@ -465,29 +690,16 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.blockLabel}>Order Details</Text>
+            <Text style={styles.blockLabel}>Sales Order Info</Text>
             <View style={{ marginTop: mm(1.5) }}>
-              {[
-                ...orderDetailRows,
-                /* Showroom already names the outlet — this row carries only
-                   what is NEW: the salesperson, or the dealer when no outlet. */
-                ["Salesperson", dealer.salesperson_name] as [string, string | null],
-                ["Sold by", outletName ? null : sellerName] as [string, string | null],
-                ["Access", accessText] as [string, string | null],
-              ].map(([label, value]) =>
+              {orderDetailRows.map(([label, value]) =>
                 value ? (
-                  <View key={label} style={styles.pairRow}>
-                    <Text style={[styles.pairLabel, { width: mm(26) }]}>{label}</Text>
+                  <View key={label} style={styles.pairRowBase}>
+                    <Text style={[styles.pairLabel, { width: mm(32) }]}>{label}</Text>
                     <Text style={styles.pairValue}>:  {value}</Text>
                   </View>
                 ) : null,
               )}
-              {stairCarry ? (
-                <Text style={styles.accessNote}>Stair-carry charge applies — see Terms & Conditions.</Text>
-              ) : null}
-              {!accessKnown ? (
-                <Text style={styles.accessNote}>Access not confirmed — to be checked before delivery.</Text>
-              ) : null}
             </View>
           </View>
         </View>
@@ -508,107 +720,51 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             biggest order is 4 lines today, and @react-pdf's `fixed` would
             also stamp the bar on a money-zone-only last page. Do it with
             the 50-line stress test, not blind. ── */}
-        <View style={styles.tableHead} minPresenceAhead={40}>
-          <Text style={[styles.th, styles.colNo]}>#</Text>
-          <Text style={[styles.th, styles.colCode]}>Item Code</Text>
-          <Text style={[styles.th, { flex: 1 }]}>Description</Text>
-          <Text style={[styles.th, styles.colQty]}>Qty</Text>
-          <Text style={[styles.th, styles.colPrice]}>Unit (RM)</Text>
-          <Text style={[styles.th, styles.colDisc]}>Discount (RM)</Text>
-          <Text style={[styles.th, styles.colAmount]}>Amount (RM)</Text>
-        </View>
-        {groups.map((group, gi) => (
-          <View key={`band-${gi}`}>
-            {group.band ? (
-              <View style={styles.bandRow} minPresenceAhead={30}>
-                <Text style={styles.bandText}>
-                  {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
-                </Text>
-              </View>
+        {/* ── THE GOODS TABLE, PAGINATED BY US ──────────────────────────
+            Every page that carries goods carries the column bar. react-pdf's
+            `fixed` cannot do this: it repeats on EVERY page of the Page, so a
+            long order whose money zone lands on a page of its own would print
+            an items header over nothing (measured, 40-line stress pass —
+            3 pages, page 3 money-only). So the rows are chunked HERE against
+            an estimated height and each chunk opens with its own bar.
+            The estimate is deliberately conservative: a page that breaks one
+            row early is invisible; a row that overflows is not. ── */}
+        {itemPages.map((blocks, pi) => (
+          <View key={`page-${pi}`} break={pi > 0}>
+            <View style={styles.tableHead} minPresenceAhead={40}>
+              <ColumnRules />
+              <View style={styles.bNo}><Text style={styles.th}>#</Text></View>
+              <View style={[styles.bCode, styles.gridV]}><Text style={styles.th}>Item Code</Text></View>
+              <View style={[styles.desc, styles.gridV]}><Text style={styles.th}>Description</Text></View>
+              <View style={[styles.bQty, styles.gridV]}><Text style={[styles.th, styles.colQty]}>Qty</Text></View>
+              <View style={[styles.bPrice, styles.gridV]}><Text style={[styles.th, styles.colPrice]}>Unit (RM)</Text></View>
+              <View style={[styles.bDisc, styles.gridV]}><Text style={[styles.th, styles.colDisc]}>Disc (RM)</Text></View>
+              <View style={[styles.bAmount, styles.gridV]}><Text style={[styles.th, styles.colAmount]}>Amount (RM)</Text></View>
+            </View>
+            {pi > 0 ? (
+              <Text style={styles.contLine}>Continued from page {pi}</Text>
             ) : null}
-            {group.rows.map(({ line, index }) => {
-              const sofaSub = sofaSpecLine(line.attrs);
-              const configSub = configLine(line.attrs);
-              const pwpSub = pwpMarkerLine(line.attrs);
-              const freeSub = freeMarkerLine(line.attrs);
-              let issuedSubs: Voucher[] = [];
-              if (!attachedTriggerSkus.has(line.sku) && vouchersByTrigger.has(line.sku)) {
-                attachedTriggerSkus.add(line.sku);
-                issuedSubs = vouchersByTrigger.get(line.sku) ?? [];
-              }
-              return (
-                <View
-                  key={`${line.sku}-${index}`}
-                  wrap={false}
-                  style={[styles.row, styles.rowHair]}
-                >
-                  <Text style={styles.cellNo}>{index + 1}</Text>
-                  <Text style={styles.cellCode}>{line.sku}</Text>
-                  <View style={styles.desc}>
-                    <Text style={styles.descMain}>{line.description}</Text>
-                    {sofaSub ? <Text style={styles.descSub}>{sofaSub}</Text> : null}
-                    {configSub ? <Text style={styles.descSub}>{configSub}</Text> : null}
-                    {pwpSub ? <Text style={styles.descSub}>{pwpSub}</Text> : null}
-                    {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}
-                    {issuedSubs.map((v) => (
-                      <Text key={v.code} style={styles.descSub}>
-                        {voucherIssuedLine(v)}
-                      </Text>
-                    ))}
-                  </View>
-                  <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
-                    {line.qty}
-                  </Text>
-                  <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
-                  <Text style={[styles.cellMoney, styles.colDisc]}>
-                    {line.discount && line.discount > 0 ? moneyDigits(line.discount) : dash}
-                  </Text>
-                  <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(line.line_total)}</Text>
-                </View>
-              );
-            })}
+            {blocks.map((b) => b.node)}
           </View>
         ))}
-        {hasAddons ? (
-          <View style={styles.bandRow} minPresenceAhead={30}>
-            <Text style={styles.bandText}>
-              SERVICE · {addons.length} {addons.length > 1 ? "items" : "item"}
-            </Text>
-          </View>
-        ) : null}
-        {addons.map((a, idx) => {
-          const addonSub = addonAttrsDescription(a.attrs);
-          return (
-            <View key={`addon-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
-              <Text style={styles.cellNo}>{lines.length + idx + 1}</Text>
-              <Text style={styles.cellCode}>{a.sku ?? "ADD-ON"}</Text>
-              <View style={styles.desc}>
-                <Text style={styles.descMain}>{a.label}</Text>
-                {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
-              </View>
-              <Text style={a.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{a.qty}</Text>
-              <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>
-              <Text style={[styles.cellMoney, styles.colDisc]}>{dash}</Text>
-              <Text style={[styles.cellAmount, styles.colAmount]}>{moneyDigits(a.line_total)}</Text>
-            </View>
-          );
-        })}
-        {/* TOTAL row closes the table: qty · discount · amount sums (round 24) */}
         <View
           wrap={false}
           style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}
         >
-          <Text style={styles.cellNo}> </Text>
-          <Text style={styles.cellCode}> </Text>
-          <View style={styles.desc}>
-            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>SUBTOTAL</Text>
+          <ColumnRules />
+          <View style={styles.bNo}><Text style={styles.cellNo}> </Text></View>
+          <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}> </Text></View>
+          <View style={[styles.desc, styles.gridV]}>
+            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>GOODS TOTAL</Text>
           </View>
-          <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
-          <Text style={[styles.cellMoney, styles.colPrice]}> </Text>
-          <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
-            {totalDiscount > 0 ? money(totalDiscount) : dash}
-          </Text>
-          <Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text>
+          <View style={[styles.bQty, styles.gridV]}><Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text></View>
+          <View style={[styles.bPrice, styles.gridV]}><Text style={[styles.cellMoney, styles.colPrice]}> </Text></View>
+          <View style={[styles.bDisc, styles.gridV]}>
+            <Text style={[styles.cellMoney, styles.colDisc, totalDiscount > 0 ? { fontWeight: 700 } : {}]}>
+              {totalDiscount > 0 ? money(totalDiscount) : dash}
+            </Text>
+          </View>
+          <View style={[styles.bAmount, styles.gridV]}><Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text></View>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
 
@@ -628,29 +784,70 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             unit: the items table is the only flexible zone, so BALANCE DUE
             and the signature sit at the same spot on every printed order
             (pre-printed-form geometry). ── */}
-        <View wrap={false} style={{ marginTop: "auto" }}>
+        {/* Content FLOWS, top to bottom — Houzs' way (owner, 2026-09-21).
+            The money zone used to pin to the page bottom (`marginTop: auto`)
+            so BALANCE DUE landed on the same spot on every order; the price
+            was a hole the size of half a page on a short order, and short
+            orders are most orders. Predictable geometry lost to the thing the
+            customer actually sees. */}
+        <View wrap={false} style={{ marginTop: mm(4) }}>
         {payments.length > 0 ? (
-          /* frozen at four rows' height — 1 payment or 4, the geometry
-             never moves (owner round 28) */
-          <View style={{ marginTop: mm(5), minHeight: mm(40) }}>
+          /* Height follows the rows now: the frozen four-row block was part
+             of the same pinned-geometry idea and left its own gap. */
+          <View style={{ marginTop: mm(5) }}>
             <View style={styles.payHead}>
-              <Text style={[styles.th, styles.payColDate]}>Date</Text>
-              <Text style={[styles.th, { flex: 1 }]}>Payment Received</Text>
-              <Text style={[styles.th, styles.payColCode]}>Approval Code</Text>
-              <Text style={[styles.th, styles.payColBy]}>Collected By</Text>
-              <Text style={[styles.th, styles.payColAmount]}>Amount (RM)</Text>
+              <ColumnRules xs={PAY_RULE_X} />
+              <View style={styles.bDate}><Text style={styles.th}>Date</Text></View>
+              <View style={[styles.bMethod, styles.gridV]}><Text style={styles.th}>Payment Received</Text></View>
+              <View style={[styles.bApproval, styles.gridV]}><Text style={styles.th}>Approval Code</Text></View>
+              <View style={[styles.bBy, styles.gridV]}><Text style={styles.th}>Collected By</Text></View>
+              <View style={[styles.bPayAmt, styles.gridV]}><Text style={[styles.th, styles.payColAmount]}>Amount (RM)</Text></View>
             </View>
+            {/* Same box as the goods table: one table style on the document.
+                EVERY row carries the bottom hairline, including the last —
+                a table that stops without a closing line looks like the last
+                row is taller than the rest. */}
             {payments.map((p, i) => (
-              <View key={i} style={i === payments.length - 1 ? styles.row : [styles.row, styles.rowHair]}>
-                <Text style={[styles.payCell, styles.payColDate]}>{p.date ? (niceDate(p.date) ?? p.date) : dash}</Text>
-                <Text style={[styles.payCell, { flex: 1 }]}>{p.label}</Text>
-                <Text style={[styles.payCell, styles.payColCode]}>{p.approval_code ?? p.reference ?? dash}</Text>
-                <Text style={[styles.payCell, styles.payColBy]}>{p.collected_by ?? dash}</Text>
-                <Text style={[styles.payCell, styles.payColAmount, { textAlign: "right", fontWeight: 600 }]}>{moneyDigits(p.amount)}</Text>
+              <View key={i} style={[styles.row, styles.rowHair]}>
+                <ColumnRules xs={PAY_RULE_X} />
+                <View style={styles.bDate}><Text style={styles.payCell}>{p.date ? (niceDate(p.date) ?? p.date) : dash}</Text></View>
+                <View style={[styles.bMethod, styles.gridV]}><Text style={styles.payCell}>{p.label}</Text></View>
+                <View style={[styles.bApproval, styles.gridV]}><Text style={styles.payCell}>{p.approval_code ?? p.reference ?? dash}</Text></View>
+                <View style={[styles.bBy, styles.gridV]}><Text style={styles.payCell}>{p.collected_by ?? dash}</Text></View>
+                <View style={[styles.bPayAmt, styles.gridV]}><Text style={[styles.payCell, styles.payColAmount, { fontWeight: 600 }]}>{moneyDigits(p.amount)}</Text></View>
               </View>
             ))}
+            {/* The table sums the rows it printed — the same law as the goods
+                SUBTOTAL. A customer must never be asked to add 3,240 + 500
+                themselves to learn what they have paid. */}
+            <View wrap={false} style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}>
+              <ColumnRules xs={PAY_RULE_X} />
+              <View style={styles.bDate}><Text style={styles.payCell}> </Text></View>
+              <View style={[styles.bMethod, styles.gridV]}>
+                <Text style={[styles.payCell, { fontWeight: 700, textAlign: "right" }]}>TOTAL RECEIVED</Text>
+              </View>
+              <View style={[styles.bApproval, styles.gridV]}><Text style={styles.payCell}> </Text></View>
+              <View style={[styles.bBy, styles.gridV]}><Text style={styles.payCell}> </Text></View>
+              <View style={[styles.bPayAmt, styles.gridV]}>
+                <Text style={[styles.payCell, styles.payColAmount, { fontWeight: 700 }]}>{money(paymentsSum)}</Text>
+              </View>
+            </View>
+            <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
           </View>
-        ) : null}
+        ) : (
+          /* An empty payments zone that simply VANISHES reads as a printing
+             fault (owner, 2026-09-21, after the Houzs compare). The geometry
+             holds and absence speaks — COPY-STANDARD's absence law. */
+          <View style={{ marginTop: mm(5) }}>
+            {/* No column headers over zero rows (owner, 2026-09-21). A bar
+                reading DATE · APPROVAL CODE · COLLECTED BY above nothing asks
+                the reader a question the document cannot answer. With the
+                money zone no longer pinned, the bar bought no geometry
+                either. Houzs prints a title and a sentence; so do we. */}
+            <Text style={styles.payEmptyTitle}>Payments Received</Text>
+            <Text style={styles.payEmpty}>No payments recorded.</Text>
+          </View>
+        )}
 
         {/* amount in words + customer signature (left) · totals (right) */}
         {/* Amount-in-words REMOVED (owner, 2026-08-09): a computer-generated
@@ -665,13 +862,25 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
         {/* the two boxes share TOP and BOTTOM lines: the row stretches the
             dashed signature box to the totals card's exact height (round 27) */}
         <View style={styles.totalsZone} wrap={false}>
-          <View style={styles.signBox}>
-            {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-            <Text style={styles.signCaption}>Customer Signature · {displayCustomerName(customer.name)}</Text>
+          <View style={styles.signCol}>
+            <View style={styles.signBox}>
+              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+            </View>
+            <Text style={[styles.signCaption, { marginTop: mm(1.4) }]}>
+              Customer Signature · {displayCustomerName(customer.name)}
+            </Text>
           </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Subtotal</Text>
+              <Text style={styles.totalsLabel}>Goods total</Text>
+              <Text style={styles.totalsValue}>{money(total)}</Text>
+            </View>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Tax</Text>
+              <Text style={styles.totalsValue}>{dash}</Text>
+            </View>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Total payable</Text>
               <Text style={styles.totalsValue}>{money(total)}</Text>
             </View>
             <View style={styles.totalsRow}>
@@ -690,21 +899,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             signed charge basis may not rest on an unasked default. ── */}
         <View style={styles.terms} wrap={false}>
           <Text style={{ fontSize: 7.5, fontWeight: 700, lineHeight: 1 }}>Terms & Conditions</Text>
-          {[
-            /* T&C #1 — the OWNER-CORRECTED wording (2026-08-09, BUILD-QUEUE
-               "GOLDEN BASELINE": the ONLY outstanding copy correction). A
-               Sales Order never claims to convert into the finance document — SO / DO /
-               Sales Invoice are SEPARATE lifecycle documents, and "the SO
-               does not talk tax" is this file's own header rule. The exact
-               sentence is LAW in docs/pdf/SO-PDF-STANDARD.md §T&C. */
-            "This sales order records your purchase agreement with Carres. The sales invoice is a separate document issued upon delivery.",
-            "Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.",
-            "Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.",
-            ...(LIFT_THREE_STATE_READY
-              ? ["Stair-carry surcharges (if any) follow the floor and lift access recorded above and are billed on this sales order, not on the delivery order."]
-              : []),
-            "Once the delivery date has been confirmed, any subsequent request to change or extend the date will incur a rescheduling surcharge.",
-          ].map((t, i) => (
+          {ORDER_TERMS.map((t, i) => (
             <Text key={i} style={styles.termsLine}>
               {i + 1}. {t}
             </Text>
@@ -717,7 +912,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             "carres address make it compact"). ── */}
         <View style={styles.footer} fixed>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={styles.footerCell}>{order_code}</Text>
+            {/* `Issued by` is the audit_log actor for the CREATION — never
+                salespersons.name, which answers a different question (who the
+                customer calls). The PO shipped this cell hard-coded null and
+                named nobody on every purchase order Carres ever sent, so an
+                unknown actor prints WORDS, not a blank. */}
+            <Text style={styles.footerCell}>
+              {order_code} · Issued by {data.issued_by ?? "Not recorded"}
+            </Text>
             <Text style={styles.footerCenter}>Computer-generated document · No company signature required.</Text>
             <Text
               style={styles.footerPage}

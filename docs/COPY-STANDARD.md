@@ -3189,6 +3189,42 @@ after the canonical Proceed transition, not after a second Sales click, and uses
 
 ---
 
+## The Sales Order DOCUMENT words (owner ruling 2026-09-21)
+
+The words ON the printed Sales Order. Layout is
+[`docs/pdf/SO-PDF-STANDARD.md`](pdf/SO-PDF-STANDARD.md); this table is the
+vocabulary, and the two files may not disagree.
+
+| Block / cell | The word | Not |
+|---|---|---|
+| The facts block | **`SALES ORDER INFO`** | `ORDER DETAILS` · `Order Info` |
+| The number | **`SO No`** | `Doc No` — a label says WHICH number |
+| The document's own date | **`SO Doc Date`** | `Date` · `Ordered` |
+| The date the order was released | **`Proceed Date`** | `Processing Date` |
+| The date the customer asked for | **`Customer Requested Delivery Date`** | `Delivery Date` — it is a REQUEST, and T&C #3 says so |
+| Where it was sold | **`Sales Location`** | `Showroom` · `Venue` · `Outlet` · `Branding` |
+| Who the customer calls | **`Salesperson`** | `Agent` — Houzs prints both for one person |
+| Who made the document | **`Issued by {name}`** (footer) | `Printed by` — a reprint would name a different person |
+| No payments on file | **`No payments recorded.`** | a vanished block |
+| Tax we do not charge | **`Tax`** + the absence dash | silence |
+| Sum of the goods rows | **`Goods total`** (table: `GOODS TOTAL`) | `Subtotal` — "sub-" promises a step that never comes |
+| What the customer owes in all | **`Total payable`** | `Total` alone · `Grand total` |
+
+**`Salesperson` and `Issued by` may never read the same field.** `Salesperson`
+is `salespersons.name`; `Issued by` is the `audit_log` actor for the creation
+(the PO's cell, 0383). Two questions — "who do I call" and "who made this" —
+so two sources. One field feeding both is the Houzs `Agent: Luis Teo /
+Salesperson: Luis Teo` defect.
+
+**`Tax —` is the one place a dash is LAW, not laziness.** It is a money row in a
+money card: the customer must read that the tax line exists and is nil. Verified
+2026-09-21: the POS computes no tax, `order-money.ts` carries no tax term, and
+migrations 0098/0229 insert `tax_amount = 0`. If Carres ever registers for SST,
+this row stops being a dash and the SENTENCE in the standard changes first.
+
+**Floor and lift are DELIVERY ORDER words, not Sales Order words** (owner,
+2026-09-21). A document states a charge only where it prints the fact behind it.
+
 ## ⭐ AN ABSENT VALUE READS AS WORDS — owner ruling 2026-08-15
 
 **A `—` on either side of a change arrow is a dash pretending to be a value.** The reader
