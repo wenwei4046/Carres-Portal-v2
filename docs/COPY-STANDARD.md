@@ -3794,21 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (departments)
-
-NOT LAW. Words the 0540 departments slice puts on screen. Falsifier: Jess or Finance
-reads "Department" as the HR department (org_departments) on a Finance page.
-
-| Word / sentence | Where | Meaning |
-|---|---|---|
-| Department | Finance line pickers, Journal, Trial Balance, P&L, Balance Sheet, Finance lists | Which part of the business an income or expense line belongs to |
-| Showroom | Department type | One outlet of a showroom-channel dealer |
-| Dealer | Department type | One dealer that is not a showroom |
-| Subscription | Department type | Rental / subscription business, one department |
-| Office | Department type | Head office costs, one department; expenses only |
-| Choose the department. | Line refusal | A new line was saved without a department |
-| That department is not on the list. | Line refusal | The chosen outlet or dealer is not a department |
-| Office has expenses only. Choose another department for income. | Line refusal | Office was picked on an income account |
-| All | Department filter | Every department; the filter is off |
-| All Showroom · All Dealer | Department filter | Every outlet (or every dealer) of that type |
-| Department… · Choose the department | Line picker placeholder | No department picked yet on this line |
