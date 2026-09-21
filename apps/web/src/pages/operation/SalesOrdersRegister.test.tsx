@@ -790,7 +790,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "grid-expansion-gutter-__select__",
       "grid-expansion-gutter-__expand__",
     ]);
-    for (const gutter of gutters) expect(gutter).toBeEmptyDOMElement();
+    /* §6.9 (UI #1492): the line starts under the caret — the drop in the caret
+       cell, the curve in the caret column's gutter — and the checkbox gutter
+       stays empty. */
+    expect(gutters[0]).toBeEmptyDOMElement();
+    expect(within(gutters[1]!).getByTestId("expansion-connector-elbow")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
     const cell = screen.getByTestId("grid-expansion-cell");
     expect(cell).toHaveAttribute("colspan", "11");
     expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
@@ -798,7 +803,8 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* The Purchasing reference: flush under the row, and the section stack
        draws the line from the caret to the goods frame and ends there. */
     expect(cell).toHaveStyle({ paddingTop: "0px", paddingBottom: "0px" });
-    expect(within(cell).getByTestId("section-elbow-goods")).toBeInTheDocument();
+    expect(within(cell).getByTestId("section-run-goods")).toBeInTheDocument();
+    expect(within(cell).queryByTestId("section-elbow-goods")).toBeNull();
     expect(within(cell).queryByTestId("section-trunk-goods")).toBeNull();
     expect(within(cell).getByTestId("goods-mini-table").className).toContain("border");
   });
