@@ -195,7 +195,7 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, PR_LINK) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
+**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
 (`SO Date · SO No`), and the 2026-09-18 default order.
 
 ```
