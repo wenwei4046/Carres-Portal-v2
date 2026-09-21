@@ -3794,16 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (bank-movement)
-
-Finance → Dashboard, per-account panel (RPT-3). Movement only: the ledger holds no opening balances, so the panel never says "balance".
-- Panel heading: `Cash and bank · Movement since go-live`
-- Note under it: `Money in and out of each account since {date}, when the ledger started. Money held before then is not counted.`
-- Table label (screen readers): `Movement since go-live`
-- Columns: `Account` · `Inflow` · `Outflow` · `Net` (Inflow and Outflow are the Cashflow chart's own words on the same page)
-
-Finance → Reports, twelve-month trend (RPT-6), read from gl_profit_and_loss one month at a time:
-- Panel heading: `Profit and Loss · Last 12 months`
-- Legend: `Income` · `Expense`; each month shows its net result under the bars
-- Screen-reader line per month: `Income {amount} · Expense {amount}`
-- Read failed: reuses `The profit and loss could not be loaded. Try again.`
