@@ -1480,6 +1480,10 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             Loading · Could not be loaded + Try again · empty — never mixed
 4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
 5  ROW      A one-line listing row is 40px (aligned with SO Batch Purchase)
+            Text 13px / 18px line (text-body) · 11px top and bottom
+            8px left and right in every cell · 1px lines between cells
+            Header 36px, 11px/600 (text-label) · footer 32px · 8px gaps
+            Second fact in a cell (where approved): 11px grey (slate-11)
             One line per cell. A long value ends in … and shows whole on
             hover and focus; the column can be widened. Dates and numbers
             never cut. The row never grows
