@@ -1520,7 +1520,7 @@ facts, permissions, complete-record populations or task ownership.
 2. **Date and identity — APPROVED / NOT BUILT (Jess, 2026-09-17).** Every listing begins
    with its own record date, then its document number/business identity. Canvas ≥768px pins
    both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
-   layout changes. Identity opens the object. Mappings: Sales Orders `Proceed Date · SO Doc Date · SO No` (owner ruling 2026-09-21, orders MASTER; NOT BUILT);
+   layout changes. Identity opens the object. Mappings: Sales Orders `Proceed Date · SO Doc Date · SO No` (owner ruling 2026-09-21, orders MASTER; BUILT Card 12 — `Proceed Date` rides `leadingColumns.before`, `SO Doc Date · SO No` pin at ≥768px, and below 768px the page passes `SO No` alone so it leads on first paint);
    SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
    **Supplier Claims is the one owner-approved exception (Jess, 2026-09-18):** its confirmed order
@@ -2068,7 +2068,7 @@ resizing remains available.
 | Checkbox / disclosure (each) | 40 | prototype | |
 | Date (short date) | 120 | **MEASURED** | SO Batch: cross-year date 99px → 120. PO built 118 → widened to 120 (2026-09-18). **Owed:** Manual Purchase built 112 |
 | PO No / MPR No / GRN No | 170 | **MEASURED** | PO: `PO-20260903-4316` renders 125px in production's JetBrains Mono, and 142 cut 34 live rows. **Owed:** SO Batch and Manual Purchase built 144 off a 127px Inter measurement — the mono face is the wider one |
-| SO No | 90 | prototype | |
+| SO No | 90 | **MEASURED** | Sales Orders, 2026-09-21: `SO-1334` 54.6px + 16; the header and its controls set the floor |
 | SO No / MPR No mixed reference | 176 | **MEASURED** | PO, built 2026-09-18 |
 | Status | 144 | prototype | |
 | Approval Status | 188 | **MEASURED** | Manual Purchase: `Sent back for changes` pill 134px + requester avatar |
@@ -2079,7 +2079,10 @@ resizing remains available.
 | Item / Items | 208 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 180 |
 | Supplier / Ready Stock | 140 | **MEASURED** | Manual Purchase: longest live supplier 17 characters. PO built 136 → widened to 140 (2026-09-18) |
 | Supplier Deliver To | 150 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 132 |
-| Customer | 150 | prototype | |
+| Customer | 150 | prototype | Sales Orders shows it one line; a longer name ends in `…` and opens whole |
+| Showroom | 118 | **MEASURED** | Sales Orders, 2026-09-21: `Kota Damansara` (longest live outlet, house name dropped) 100.5px + 16 |
+| Salesperson | 120 | **MEASURED** | Sales Orders, 2026-09-21: `Khoo Aik Yean` (longest live) fits; the header word plus sort and filter is the floor |
+| Sales Orders optional catalog: amount 116 · party name 150 · reference 150 · phone 132 · email 200 · address 240 · place word 140 · short fact 96 · small count 120 | — | prototype | Sales Orders, 2026-09-21: the hidden-by-default catalog columns take a registry role instead of a typed number. **Owed:** measurement when a page shows one by default |
 | Customer Delivery Location | 176 | prototype | |
 | Customer Requested Delivery Date | 180 | prototype | **Owed:** SO Batch built 144 off `No delivery date yet` 124px; re-measure against the longest governed absence |
 | PO Default Delivery Date | 150 | **MEASURED** | PO, built 2026-09-18 |

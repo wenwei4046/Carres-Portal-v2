@@ -103,7 +103,7 @@ describe("GET /api/operation/orders", () => {
           calls.push({ head, method: "select", args: [_cols, o] });
           return chain;
         });
-        for (const m of ["in", "eq", "ilike", "or", "not", "is", "order", "limit", "range"])
+        for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
           chain[m] = vi.fn((...args: unknown[]) => { calls.push({ head, method: m, args }); return chain; });
         chain.then = (resolve: (v: unknown) => unknown) =>
           resolve(head ? { count: opts.count, error: opts.countError ?? null, data: null } : { data: opts.rows, error: null });
@@ -145,6 +145,21 @@ describe("GET /api/operation/orders", () => {
       const countCalls = calls.filter((c) => c.head);
       expect(countCalls).toContainEqual({ head: true, method: "eq", args: ["status", "place"] });
       expect(countCalls).toContainEqual({ head: true, method: "not", args: ["outlet_id", "is", null] });
+    });
+
+    /* ⭐ THE SALES ORDERS REGISTER POPULATION — owner ruling 2026-09-21: only
+       orders Sales has handed to Operation. The rows and the total are both
+       narrowed off `place`, and each row carries the actual handoff moment. */
+    it("stage=proceeded drops Placed orders from the rows AND the total, and serves proceeded_at", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
+      const body = await get("?stage=proceeded");
+      expect(body.salesOrderTotal).toBe(29);
+      expect(calls).toContainEqual({ head: false, method: "neq", args: ["status", "place"] });
+      expect(calls).toContainEqual({ head: true, method: "neq", args: ["status", "place"] });
+      const listSelect = calls.find((c) => !c.head && c.method === "select");
+      expect(String(listSelect?.args[0])).toContain("proceeded_at");
+      /* Never the planned production-start field in its place. */
+      expect(calls.some((c) => c.method === "eq" && c.args[0] === "operation_stage")).toBe(false);
     });
 
     it("says UNKNOWN (null), never a guess, when the count cannot be read", async () => {

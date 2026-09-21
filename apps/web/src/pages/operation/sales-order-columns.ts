@@ -12,9 +12,19 @@
  * stay off this page; a chooser is exactly the back door they would walk in
  * through.
  *
- * THE DEFAULT ROW — re-ruled to EIGHT by the owner, 2026-08-15:
- *   ☐ ▸ SO Date · SO No · Requested Delivery Date · Customer · Delivery Location ·
- *   Showroom · PO No · DO No
+ * THE DEFAULT ROW — owner ruling 2026-09-21 (orders MASTER, THE REGISTER
+ * COMPOSITION), exactly and in this order:
+ *   ☐ ▸ Proceed Date · SO Doc Date · SO No · Showroom · Salesperson ·
+ *   Customer Requested Delivery Date · Customer Delivery Location · Customer ·
+ *   Items · PO No · DO No
+ *
+ * REQUIRED FACTS PRINT NO ABSENCE WORD. The first nine are required when Sales
+ * submits the order, so an empty one is a system error fixed at its source —
+ * never dressed as `Not recorded` / `To be confirmed` / `No delivery date`.
+ * Only a document that does not exist yet has a word: `No PO yet` · `No DO yet`.
+ *
+ * EVERY WIDTH IS THE REGISTRY'S (`REGISTER_FIELD_WIDTH`, UI MASTER §6.8). This
+ * file types no pixel number.
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
  * box matches, what a sort compares and what Export writes — one string, four
@@ -31,6 +41,7 @@
  */
 import { parseEmergencyContact } from "@carres/shared";
 
+import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -43,7 +54,7 @@ import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 export type RegisterDeliveryOrder = Pick<DeliveryOrderRow, "do_number">;
 import {
   digits,
-  itemsSummary,
+  lineName,
   moneyOfOrder,
   outstandingState,
   searchHaystack,
@@ -61,6 +72,32 @@ export { NOT_RECORDED, conciseLocality } from "@/lib/locality";
 import { NOT_RECORDED, conciseLocality } from "@/lib/locality";
 import { DATE_TO_BE_CONFIRMED_CELL } from "./sales-order-guidance";
 export const NO_DATE_YET = "No delivery date";
+
+/**
+ * ⭐ THE TWO DOCUMENT ABSENCES — owner ruling 2026-09-21 (COPY-STANDARD).
+ * A Purchase Order or a Delivery Order that genuinely does not exist yet is
+ * the only empty cell on the Register's default row that earns a word. Muted,
+ * one line. `Not recorded` would say Carres failed to write a number down.
+ */
+export const NO_PO_YET = "No PO yet";
+export const NO_DO_YET = "No DO yet";
+
+/**
+ * `{first item} + {n} more` — the Register's `Items` (COPY-STANDARD, goods
+ * summary). The name is the product's, never its SKU, whenever the catalog
+ * knows it; the SKU is the honest fallback for a code the catalog does not.
+ * Goods lines only: a service sells nothing on its own (Sales Portal gate).
+ */
+export function registerItemsSummary(
+  o: operationOrderListRow,
+  nameOf: (sku: string) => string | undefined = () => undefined,
+): string {
+  const lines = o.order_lines ?? [];
+  if (lines.length === 0) return "";
+  const first = lines[0]!;
+  const name = nameOf(first.sku) ?? lineName(first);
+  return lines.length > 1 ? `${name} + ${lines.length - 1} more` : name;
+}
 
 /**
  * ⭐ ONE ARITHMETIC FOR `Requested Delivery Date` (Architecture Law D).
@@ -130,7 +167,7 @@ export function showroomShort(name: string | null | undefined): string {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED]);
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
@@ -140,6 +177,8 @@ export interface RegisterRow {
   customer: string;
   phone: string;
   items: string;
+  /** `Proceed Date` — `orders.proceeded_at`, the actual Sales → Operation handoff. */
+  proceeded: string | null;
   ordered: string;
   customerDelivery: string | null;
   deliveryLocation: string;
@@ -164,6 +203,7 @@ export interface RegisterRow {
 export function buildRegisterRow(
   o: operationOrderListRow,
   deliveryOrders: RegisterDeliveryOrder[] = [],
+  itemNameOf?: (sku: string) => string | undefined,
 ): RegisterRow {
   const money = moneyOfOrder(o);
   const phone = o.customer_phone ?? "";
@@ -177,10 +217,16 @@ export function buildRegisterRow(
        only: `o.customer_name` is untouched and nothing is written back. */
     customer: displayCustomerName(o.customer_name),
     phone,
-    items: itemsSummary(o),
+    items: registerItemsSummary(o, itemNameOf),
+    proceeded: o.proceeded_at ?? null,
     ordered: o.placed_at,
     customerDelivery: requestedDeliveryOf(o).iso,
-    deliveryLocation: conciseLocality(o.customer_address_city, o.customer_address_state),
+    /* A required fact (2026-09-21): an empty locality prints nothing, never
+       the locality helper's `Not recorded`. */
+    deliveryLocation:
+      o.customer_address_city?.trim() || o.customer_address_state?.trim()
+        ? conciseLocality(o.customer_address_city, o.customer_address_state)
+        : "",
     poNumbers: o.po_numbers ?? [],
     deliveryOrders,
     total: valueState(money),
@@ -216,8 +262,8 @@ export interface RegisterField {
   key: string;
   /** The header word. COPY-STANDARD / BUILD-QUEUE own it; this file carries it. */
   label: string;
-  /** Measured ink + 16 for the kit's `px-2`; +2 more where the column may clip. */
-  width: string;
+  /** Always a `REGISTER_FIELD_WIDTH` entry (UI MASTER §6.8) — never a number typed here. */
+  width: number;
   align?: "right";
   numeric?: boolean;
   group: FieldGroup;
@@ -242,57 +288,65 @@ const date = (v: string | null | undefined, absent: string) => (v ? fmtDate(v) :
 const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
 
 /**
- * DEFAULT WIDTHS — Listing Standard 2026-09-16, measured on the rendered page:
- * each fixed fact column is its widest governed value + 16px padding, and the
- * header's sort + filter controls are the floor. Re-measured 2026-09-17 for the
- * date-first order, in the rendered portal shell at 1440 (Inter): SO Date
- * `Wed, 28 May 25` (another year) 100.2px → 118; Requested Delivery Date's
- * amber `No delivery date` 103px → 120; Showroom `Kota Damansara` (longest live
- * outlet) 100.7px → 118; PO No `2 Purchase Orders` 149 → 152; DO No
- * `No delivery order yet` 129.2px → 144. Customer (170) and Delivery Location
- * (160, holds `Sungai Buloh, Selangor`) are the flexible text columns: a cut
- * value opens whole (engine `overflowText`). The eight defaults plus the gutter
- * render 1125px — the grid's client width at 1440 once a long list draws its
- * vertical scrollbar — so DO No is fully visible and nothing scrolls sideways.
+ * THE CATALOG — the eleven owner-ruled defaults in their order (2026-09-21),
+ * everything else hidden and openable from Columns.
  *
- * THE CATALOG — the eight owner-ruled defaults in their order, everything else
- * hidden. Hidden columns are sized to their own longest live value plus the
- * kit's `px-2`, and every one of them is off by default, so none of them can
- * widen the sheet an operator did not ask to widen.
+ * WIDTHS COME ONLY FROM THE SHARED REGISTRY (UI MASTER §6.8), and the default
+ * row was re-measured for this order in the rendered portal shell (orders
+ * MASTER records the numbers). One line per cell at the 38px row: a value
+ * longer than its column ends in `…` and opens whole on hover and keyboard
+ * focus (engine `overflowText`), and the column can be widened. Dates and the
+ * three document numbers are sized so they never cut.
+ *
+ * THE KEYS STAY WHAT THEY WERE (`ordered`, `customer_delivery`, …): a label is
+ * presentation, an identifier is a contract. The saved-layout key moved
+ * instead (v6), which is what retires the old order.
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
-  /* The eight owner-ruled defaults, in their governed order — date first, then
-     identity (ui MASTER §6.7 rule 2, Jess 2026-09-17). */
-  { key: "ordered", label: "SO Date", width: "118px", group: "Dates", on: true,
+  /* ── THE DEFAULT ROW — owner ruling 2026-09-21, exactly this order ──────── */
+  /* `Proceed Date` leads: the ACTUAL handoff (`orders.proceeded_at`, the same
+     fact and word as SO Batch Purchase) — never the planned `proceed_date`. */
+  { key: "proceeded", label: "Proceed Date", width: W.date, group: "Dates", on: true,
+    text: (r) => (r.proceeded ? fmtDate(r.proceeded) : ""), sortBy: (r) => r.proceeded ?? "",
+    kind: "date", iso: (r) => r.proceeded },
+  /* `SO Doc Date` replaces the retired word `SO Date` for the Sales Order
+     document date (`orders.placed_at`) — one meaning, one word. */
+  { key: "ordered", label: "SO Doc Date", width: W.date, group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
+  { key: "so", label: "SO No", width: W.soNo, group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "customer_delivery", label: "Requested Delivery Date", width: "120px", group: "Dates", on: true,
-    text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
+  /* `Showroom` is read with the identity: which branch sold it. */
+  { key: "showroom", label: "Showroom", width: W.showroom, group: "Sales ownership", on: true,
+    text: (r) => showroomShort(r.o.outlets?.name) },
+  /* `Salesperson` names who SOLD the order — never an action owner. */
+  { key: "salesperson", label: "Salesperson", width: W.salesperson, group: "Sales ownership", on: true,
+    text: (r) => r.o.salespersons?.name ?? "" },
+  /* A required fact: a date, never `To be confirmed` / `No delivery date`. */
+  { key: "customer_delivery", label: "Customer Requested Delivery Date", width: W.customerRequestedDeliveryDate,
+    group: "Dates", on: true,
+    text: (r) => (r.customerDelivery ? fmtDate(r.customerDelivery) : ""),
+    sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "170px", group: "Customer", on: true,
-    text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "delivery_location", label: "Delivery Location", width: "160px", group: "Customer", on: true,
+  { key: "delivery_location", label: "Customer Delivery Location", width: W.customerDeliveryLocation,
+    group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
-  /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
-     Sales-ownership fact the order already carries (`outlets.name`) — it is
-     the same declaration that has always been in this catalog, promoted to a
-     default. No new writer, no new query, no new fact. */
-  { key: "showroom", label: "Showroom", width: "118px", group: "Sales ownership", on: true,
-    text: (r) => showroomShort(r.o.outlets?.name) || NOT_RECORDED },
-  { key: "po_number", label: "PO No", width: "152px", group: "Document", on: true,
-    text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
-  { key: "do_number", label: "DO No", width: "144px", group: "Document", on: true,
+  { key: "customer", label: "Customer", width: W.customer, group: "Customer", on: true,
+    text: (r) => r.customer, sortBy: (r) => r.customer },
+  { key: "items", label: "Items", width: W.items, group: "Items", on: true,
+    text: (r) => r.items },
+  { key: "po_number", label: "PO No", width: W.documentNo, group: "Document", on: true,
+    text: (r) => r.poNumbers.join(" · ") || NO_PO_YET },
+  { key: "do_number", label: "DO No", width: W.documentNo, group: "Document", on: true,
     text: (r) =>
       r.deliveryOrders.length === 0
-        ? "No delivery order yet"
+        ? NO_DO_YET
         : r.deliveryOrders.length === 1
           ? r.deliveryOrders[0]!.do_number
           : `${r.deliveryOrders.length} Delivery Orders` },
-  { key: "items", label: "Items", width: "300px", group: "Items",
-    text: (r) => r.items },
-  { key: "total", label: "Total", width: "109px", align: "right", numeric: true,
+
+  /* ── OPTIONAL — hidden by default, openable from Columns ────────────────── */
+  { key: "total", label: "Total", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.total),
     sortBy: (r) => (r.total.kind === "amount" ? r.total.value : -1),
     kind: "number", num: (r) => (r.total.kind === "amount" ? r.total.value : null),
@@ -302,7 +356,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      label is presentation, an identifier is a contract, and renaming it would
      silently reset every saved column layout (01-design-tokens §0). `balance`
      remains the ruled GOODS word for short-delivery quantity elsewhere. */
-  { key: "balance", label: "Outstanding", width: "125px", align: "right", numeric: true,
+  { key: "balance", label: "Outstanding", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.balance),
     sortBy: (r) => (r.balance.kind === "amount" ? r.balance.value : -1),
     kind: "number",
@@ -318,34 +372,34 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      the same fact as `Requested Delivery Date` (`orders.delivery_date` under the
      same tbd guard), so opening it printed one date twice under two labels —
      ONE customer date column is the law. */
-  { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",
+  { key: "dealer", label: "Dealer", width: W.partyName, group: "Sales ownership",
     text: (r) => r.o.dealers?.name || NOT_RECORDED },
 
   /* ── DOCUMENT — the papers this order produced, and its references ──────── */
-  { key: "source_ref", label: "Customer reference", width: "160px", group: "Document",
+  { key: "source_ref", label: "Customer reference", width: W.reference, group: "Document",
     text: (r) => (r.o.source_ref ?? []).filter(Boolean).join(" · ") || NOT_RECORDED },
-  { key: "invoice_no", label: "Invoice No", width: "130px", group: "Document",
+  { key: "invoice_no", label: "Invoice No", width: W.reference, group: "Document",
     text: (r) => r.o.invoice_no || NOT_RECORDED },
 
   /* ── CUSTOMER — the customer's own facts (BUILD-QUEUE "STRUCTURED ADDRESS":
      raw fallback + the five structured parts + Building Type) ─────────────── */
-  { key: "phone", label: "Phone", width: "103px", group: "Customer",
+  { key: "phone", label: "Phone", width: W.phone, group: "Customer",
     text: (r) => r.phone || NOT_RECORDED },
-  { key: "email", label: "Email", width: "200px", group: "Customer",
+  { key: "email", label: "Email", width: W.email, group: "Customer",
     text: (r) => r.o.customer_email || NOT_RECORDED },
-  { key: "address", label: "Address", width: "280px", group: "Customer",
+  { key: "address", label: "Address", width: W.address, group: "Customer",
     text: (r) => r.o.customer_address || NOT_RECORDED },
-  { key: "address_line1", label: "Address line 1", width: "200px", group: "Customer",
+  { key: "address_line1", label: "Address line 1", width: W.address, group: "Customer",
     text: (r) => r.o.customer_address_line1 || NOT_RECORDED },
-  { key: "address_line2", label: "Address line 2", width: "200px", group: "Customer",
+  { key: "address_line2", label: "Address line 2", width: W.address, group: "Customer",
     text: (r) => r.o.customer_address_line2 || NOT_RECORDED },
-  { key: "city", label: "City", width: "140px", group: "Customer",
+  { key: "city", label: "City", width: W.placeWord, group: "Customer",
     text: (r) => r.o.customer_address_city || NOT_RECORDED },
-  { key: "state", label: "State", width: "140px", group: "Customer",
+  { key: "state", label: "State", width: W.placeWord, group: "Customer",
     text: (r) => r.o.customer_address_state || NOT_RECORDED },
-  { key: "postcode", label: "Postcode", width: "96px", group: "Customer",
+  { key: "postcode", label: "Postcode", width: W.shortFact, group: "Customer",
     text: (r) => r.o.customer_address_postcode || NOT_RECORDED },
-  { key: "building_type", label: "Building type", width: "130px", group: "Customer",
+  { key: "building_type", label: "Building type", width: W.placeWord, group: "Customer",
     text: (r) => r.o.building_type || NOT_RECORDED },
   /* THREE FACTS, THREE COLUMNS. `RegisterField.text` is "the ONE string:
      printed, filtered, sorted and exported", so a cell cannot carry a second
@@ -354,11 +408,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      A legacy/imported string that `composeEmergencyContact` never wrote lands
      wholly in `name` (see `parseEmergencyContact`), so nothing is lost and the
      other two read `Not given`. */
-  { key: "emergency", label: "Emergency contact", width: "150px", group: "Customer",
+  { key: "emergency", label: "Emergency contact", width: W.customer, group: "Customer",
     text: (r) => r.emergency.name || NOT_RECORDED },
-  { key: "emergency_phone", label: "Emergency phone", width: "150px", group: "Customer",
+  { key: "emergency_phone", label: "Emergency phone", width: W.phone, group: "Customer",
     text: (r) => r.emergency.phone || NOT_RECORDED },
-  { key: "emergency_relationship", label: "Emergency relationship", width: "180px", group: "Customer",
+  { key: "emergency_relationship", label: "Emergency relationship", width: W.placeWord, group: "Customer",
     text: (r) => r.emergency.relationship || NOT_RECORDED },
   /* "SAME AS DELIVERY" IS AN ANSWER, NOT A BLANK.
      `customer_billing` is empty BY DESIGN whenever the customer ticked
@@ -377,7 +431,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      An order with the flag set and no delivery address either (the governed
      `Address not given yet` case) still reads `Not recorded`, because then
      nothing IS recorded. */
-  { key: "billing", label: "Billing address", width: "220px", group: "Customer",
+  { key: "billing", label: "Billing address", width: W.address, group: "Customer",
     text: (r) =>
       (r.o.customer_billing_same ? r.o.customer_address : r.o.customer_billing) ||
       NOT_RECORDED },
@@ -388,62 +442,60 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
      for could not be read back by the office that has to act on it. Added as
      ordinary optional columns: off by default, in the chooser like every other,
      so the owner-ruled default view is untouched. */
-  { key: "race", label: "Race", width: "110px", group: "Customer",
+  { key: "race", label: "Race", width: W.shortFact, group: "Customer",
     text: (r) => r.o.customer_race || NOT_RECORDED },
-  { key: "gender", label: "Gender", width: "100px", group: "Customer",
+  { key: "gender", label: "Gender", width: W.shortFact, group: "Customer",
     text: (r) => r.o.customer_gender || NOT_RECORDED },
-  { key: "birthday", label: "Birthday", width: "120px", group: "Customer",
+  { key: "birthday", label: "Birthday", width: W.date, group: "Customer",
     text: (r) => r.o.customer_birthday || NOT_RECORDED },
   /* Stair carry is a DELIVERY fact, not a customer one — it sits with Floor and
      Lift, which is where the operator planning the trip looks. */
-  { key: "stair_items", label: "Stair carry items", width: "140px", align: "right", numeric: true,
+  { key: "stair_items", label: "Stair carry items", width: W.smallCount, align: "right", numeric: true,
     group: "Delivery",
     text: (r) =>
       r.o.delivery_stair_items == null ? NOT_RECORDED : String(r.o.delivery_stair_items) },
 
   /* ── SOURCE — who sold it, through which door ───────────────────────────── */
-  { key: "salesperson", label: "Salesperson", width: "167px", group: "Sales ownership",
-    text: (r) => r.o.salespersons?.name || NOT_RECORDED },
-  { key: "channel", label: "Channel", width: "112px", group: "Sales ownership",
+  { key: "channel", label: "Channel", width: W.partyName, group: "Sales ownership",
     text: (r) => r.o.channel || NOT_RECORDED },
-  { key: "source", label: "Order origin", width: "112px", group: "Sales ownership",
+  { key: "source", label: "Order origin", width: W.partyName, group: "Sales ownership",
     text: (r) => r.o.source_system || NOT_RECORDED },
 
   /* ── MONEY — the rest ───────────────────────────────────────────────────── */
-  { key: "paid", label: "Paid", width: "109px", align: "right", numeric: true,
+  { key: "paid", label: "Paid", width: W.amount, align: "right", numeric: true,
     group: "Money", text: (r) => moneyText(r.paid),
     sortBy: (r) => (r.paid.kind === "amount" ? r.paid.value : 0),
     kind: "number", num: (r) => (r.paid.kind === "amount" ? r.paid.value : 0),
     footerSum: (r) => amountOf(r.paid) },
-  { key: "payment_method", label: "Payment method", width: "150px", group: "Money",
+  { key: "payment_method", label: "Payment method", width: W.reference, group: "Money",
     text: (r) => r.o.payment_method || NOT_RECORDED },
-  { key: "installments", label: "Instalment months", width: "140px", align: "right",
+  { key: "installments", label: "Instalment months", width: W.smallCount, align: "right",
     numeric: true, group: "Money",
     text: (r) => (r.o.installment_months == null ? NOT_RECORDED : String(r.o.installment_months)),
     sortBy: (r) => r.o.installment_months ?? -1,
     kind: "number", num: (r) => r.o.installment_months ?? null },
 
   /* ── DATES — every stamp, whatever act produced it ──────────────────────── */
-  { key: "proceed_date", label: "Proceed date", width: "113px", group: "Dates",
+  { key: "proceed_date", label: "Proceed date", width: W.date, group: "Dates",
     text: (r) => date(r.o.proceed_date, NOT_RECORDED), sortBy: (r) => r.o.proceed_date ?? "",
     kind: "date", iso: (r) => r.o.proceed_date ?? null },
-  { key: "dispatched", label: "Dispatched", width: "113px", group: "Dates",
+  { key: "dispatched", label: "Dispatched", width: W.date, group: "Dates",
     text: (r) => date(r.o.dispatched_at, NOT_RECORDED), sortBy: (r) => r.o.dispatched_at ?? "",
     kind: "date", iso: (r) => r.o.dispatched_at ?? null },
-  { key: "delivered", label: "Delivered", width: "113px", group: "Dates",
+  { key: "delivered", label: "Delivered", width: W.date, group: "Dates",
     text: (r) => date(r.o.delivered_at, NOT_RECORDED), sortBy: (r) => r.o.delivered_at ?? "",
     kind: "date", iso: (r) => r.o.delivered_at ?? null },
-  { key: "invoiced", label: "Invoiced", width: "113px", group: "Dates",
+  { key: "invoiced", label: "Invoiced", width: W.date, group: "Dates",
     text: (r) => date(r.o.invoiced_at, NOT_RECORDED), sortBy: (r) => r.o.invoiced_at ?? "",
     kind: "date", iso: (r) => r.o.invoiced_at ?? null },
 
   /* ── DELIVERY — what the trip has to cope with (facts the ORDER carries) ── */
-  { key: "floor", label: "Floor", width: "80px", align: "right", numeric: true,
+  { key: "floor", label: "Floor", width: W.shortFact, align: "right", numeric: true,
     group: "Delivery",
     text: (r) => (r.o.delivery_floor == null ? NOT_RECORDED : String(r.o.delivery_floor)),
     sortBy: (r) => r.o.delivery_floor ?? -1,
     kind: "number", num: (r) => r.o.delivery_floor ?? null },
-  { key: "lift", label: "Lift", width: "80px", group: "Delivery",
+  { key: "lift", label: "Lift", width: W.shortFact, group: "Delivery",
     text: (r) => (r.o.delivery_has_lift == null ? NOT_RECORDED : r.o.delivery_has_lift ? "Yes" : "No") },
 
   /* ── OPERATION — currently empty on purpose. `Current` moved to DOCUMENT

@@ -2699,6 +2699,9 @@ export interface operationOrderListRow {
    *  the suggested default carrier in the control table (apps/web/src/lib/region.ts). */
   customer_address?: string | null;
   placed_at: string;
+  /** 0396 — the actual Sales → Operation handoff moment. The Sales Orders
+   *  Register's `Proceed Date` (never the planned `proceed_date` below). */
+  proceeded_at?: string | null;
   delivery_date: string | null;
   delivery_date_tbd?: boolean | null;
   /** Phase 11.1 (migration 0165) — salesperson-entered planned production-start
