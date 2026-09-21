@@ -227,10 +227,14 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
 - Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
   retired with it and are re-measured in the build round.
 
-**Document absence words — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** When the order has no
-Purchase Order yet, `PO No` reads `No PO yet`; when it has no Delivery Order yet, `DO No` reads `No DO yet`.
-Both are muted and one line. `Not recorded` is wrong here: nothing was forgotten, the document does not exist
-yet. The words are governed in `COPY-STANDARD.md`.
+**Document absence words and expansion — OWNER RULING (Jess, 2026-09-21): follow the Purchasing design ·
+APPROVED / NOT BUILT.** `PO No` with no Purchase Order reads `Not ordered yet` — the same word SO Batch
+Purchase prints for the same fact (one fact, one word across listings); `DO No` with no Delivery Order
+reads `No DO yet`. Both muted, one line. `Not recorded` is never used here. The goods expansion uses the
+Purchasing reference geometry (UI MASTER §6.8–§6.9): the §6.9 1px connector from the SO row's caret to a
+bordered child frame, 11px/600 child headers, and `Item` as the product name with its configuration on
+line two (`Cody` / `Super King`) instead of repeating the SKU. Its columns stay
+`Category | Unit ID | Deliver To | SKU | Qty | Item`; `Deliver To` with no PO line reads `Not ordered yet`.
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
