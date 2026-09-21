@@ -644,7 +644,10 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  * route turns it into `status='place'` rather than a stage match.
  */
 export const ListOperationOrdersQuery = z.object({
-  stage: z.enum(['all', 'placed', 'confirmed', 'in_production', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered']).default('all'),
+  // `proceeded` (Sales Orders Register, owner ruling 2026-09-21): only orders
+  // Sales has handed to Operation — every status except `place`. A Placed
+  // order is not on that Register. Every other caller keeps its stage.
+  stage: z.enum(['all', 'placed', 'proceeded', 'confirmed', 'in_production', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();

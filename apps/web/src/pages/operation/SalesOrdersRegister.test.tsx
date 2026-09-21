@@ -44,6 +44,9 @@ let expansionHookState: {
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
 const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
+/* The product catalog — the NAME behind a SKU (orders MASTER 2026-09-21). */
+let catalogHookState: { data: unknown };
+const useCatalogSpy = vi.fn((..._args: unknown[]) => catalogHookState);
 /* D4 · a tripwire, not a fixture. The register must NOT consult this hook:
  * its read is capped at the newest 500 Delivery Orders, so order 501 and
  * older printed "No delivery order yet" while holding a DO. It answers with
@@ -63,6 +66,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
+    useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
   };
 });
@@ -131,6 +135,7 @@ beforeEach(() => {
     refetch: vi.fn(),
   };
   expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
+  catalogHookState = { data: undefined };
 });
 
 describe("FIX 1 · the register asks the SERVER", () => {
@@ -167,11 +172,13 @@ describe("FIX 1 · the register asks the SERVER", () => {
     expect(screen.getByText("ID-13")).toBeInTheDocument();
   });
 
-  it("mounts asking for the unfiltered population (no search key)", () => {
+  /* ⭐ POPULATION — owner ruling 2026-09-21: only proceeded orders. A Placed
+     order is never asked for, so it can never appear. */
+  it("mounts asking for the proceeded population only (no search key)", () => {
     mount();
     expect(useOperationOrdersSpy).toHaveBeenCalled();
     const first = useOperationOrdersSpy.mock.calls[0]![0] as Record<string, unknown>;
-    expect(first).toEqual({});
+    expect(first).toEqual({ stage: "proceeded" });
   });
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
@@ -186,7 +193,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
       const calls = useOperationOrdersSpy.mock.calls.map(
         (c) => c[0] as Record<string, unknown>,
       );
-      expect(calls.some((f) => f && f.search === "Umi")).toBe(true);
+      expect(calls.some((f) => f && f.search === "Umi" && f.stage === "proceeded")).toBe(true);
     });
   });
 
@@ -203,8 +210,11 @@ describe("FIX 1 · the register asks the SERVER", () => {
     });
     fireEvent.change(box, { target: { value: "" } });
     await waitFor(() => {
-      const last = useOperationOrdersSpy.mock.calls.at(-1)![0] as Record<string, unknown>;
-      expect(last).toEqual({});
+      /* The top bar reads its own list; only the Register asks for `proceeded`. */
+      const mine = useOperationOrdersSpy.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .filter((f) => f?.stage === "proceeded");
+      expect(mine.at(-1)).toEqual({ stage: "proceeded" });
     });
   });
 });
@@ -295,77 +305,21 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByRole("button", { name: /Export Excel \(1\)/ })).toBeInTheDocument();
   });
 
-  it("a customer who already answered is not work to do — the 8 read differently from the 3", () => {
-    listHookState.data = { orders: [order({
-      delivery_date: null,
-      delivery_date_tbd: true,
-      customer_name: "Kimmy",
-      salespersons: { name: "Shasha" },
-    })] };
+  /* ⭐ A REQUIRED FACT PRINTS NO ABSENCE WORD — owner ruling 2026-09-21. The
+     Requested Delivery Date is mandatory at order entry, so an empty one is a
+     system error fixed at its source: no `To be confirmed`, no amber
+     `No delivery date`, no action sentence and no hover guidance. */
+  it("prints no absence word, warning or guidance for a missing Customer Requested Delivery Date", () => {
+    listHookState.data = { orders: [
+      order({ id: "a", so: 1, delivery_date: null, delivery_date_tbd: true, salespersons: { name: "Shasha" } }),
+      order({ id: "b", so: 2, delivery_date: null, delivery_date_tbd: false, salespersons: { name: "Shasha" }, outlets: null }),
+    ] };
     mount();
-    /* The customer WAS asked. No warning, and no instruction to ask again —
-     * printing `Confirm delivery date` here is the wrong attribution this
-     * ruling corrects (docs/orders/MASTER.md · THE THREE DELIVERY DATES). */
-    expect(screen.getByText("To be confirmed")).toBeInTheDocument();
-    expect(screen.queryByText("No delivery date")).not.toBeInTheDocument();
-    expect(screen.queryByText("Confirm delivery date")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("attention-warning")).not.toBeInTheDocument();
-    /* The full governed sentence, the party and the phone stay reachable. */
-    const hover = screen.getByTitle(/Delivery date to be confirmed/);
-    expect(hover).toHaveAttribute("title", expect.stringContaining("Kimmy"));
-    expect(hover).toHaveAttribute("title", expect.stringContaining("Shasha"));
-  });
-
-  it("shows a governed missing Requested Delivery Date exception instead of a passive empty value", () => {
-    listHookState.data = { orders: [order({
-      delivery_date: null,
-      delivery_date_tbd: false,
-      customer_name: "Kimmy",
-      salespersons: { name: "Shasha" },
-    })] };
-    mount();
-    const exception = screen.getByText("No delivery date");
-    expect(exception).toHaveAttribute("data-attention", "warning");
-    /* ⭐ THE FACT ALONE — owner ruling 2026-08-18: a register lists documents;
-       actions live in My Work / Team Work / the Order Route. The instruction
-       clause left the cell; who must act, whose phone and what to record
-       still ride the hover. */
-    expect(screen.queryByText("Confirm delivery date")).toBeNull();
-    const cell = exception.closest("span[title]");
-    expect(cell).toHaveAttribute(
-      "title",
-      [
-        "Shasha · Kimmy · 019-3478913",
-        "Ask which delivery date the customer agrees to.",
-        "Record the agreed Requested Delivery Date.",
-      ].join("\n"),
-    );
-    expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
-  });
-
-  /* ⭐ THE CELL IS THE FACT ALONE — owner ruling 2026-08-18 (supersedes the
-     in-cell 13/11 action pair of 2026-08-15). The fact keeps the governed
-     body rank and the warning ink; NO action clause renders in any register
-     cell. The two-line grammar lives on where actions live — My Work / Team
-     Work / the Order Route. */
-  it("the guidance cell is the FACT alone — no action sentence in a register cell", () => {
-    listHookState.data = { orders: [order({
-      delivery_date: null,
-      delivery_date_tbd: false,
-      customer_name: "Kimmy",
-      salespersons: { name: "Shasha" },
-    })] };
-    mount();
-
-    // The FACT. Governed body 13 (inherited from the row) at semibold, in
-    // the warning ink reserved for it.
-    const problem = screen.getByText("No delivery date");
-    expect(problem.className).toContain("font-semibold");
-    expect(problem.className).not.toContain("text-meta");
-    expect(problem.className).not.toContain("text-label");
-
-    // The ACTION clause is GONE from the cell — named, so a revert is caught.
-    expect(screen.queryByText("Confirm delivery date")).toBeNull();
+    for (const word of ["To be confirmed", "No delivery date", "Not recorded", "Confirm delivery date"]) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    expect(document.querySelector("[data-attention]")).toBeNull();
+    expect(screen.queryByTitle(/Delivery date to be confirmed/)).toBeNull();
   });
 
   /* ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY, owner ruling 2026-08-15. */
@@ -616,31 +570,63 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByText("PO-2041").closest("[data-absence]")).toBeNull();
   });
 
-  /* The re-ruled EIGHTH default column, read-only, no new writer. */
-  it("shows Showroom as a default column between Delivery Location and PO No", () => {
-    listHookState.data = { orders: [order({ outlets: { name: "Carres Kelana Jaya" } })] };
+  /* ⭐ THE REGISTER COMPOSITION — owner ruling 2026-09-21, exactly this order. */
+  it("prints the owner's eleven columns in order: Proceed Date · SO Doc Date · SO No first", () => {
+    listHookState.data = { orders: [order({ outlets: { name: "Carres Kelana Jaya" }, salespersons: { name: "Khoo Aik Yean" } })] };
     mount();
     const headers = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) =>
       (th.textContent ?? "").trim(),
     );
     const business = headers.filter(Boolean);
-    expect(business.map((h) => h.replace(/[AV]$/, "").trim())).toEqual([
-      "SO Date",
+    expect(business.map((h) => h.replace(/[AV]$/, "").replace(/\s+/g, " ").trim())).toEqual([
+      "Proceed Date",
+      "SO Doc Date",
       "SO No",
-      "Requested Delivery Date",
-      "Customer",
-      "Delivery Location",
       "Showroom",
+      "Salesperson",
+      "Customer Requested Delivery Date",
+      "Customer Delivery Location",
+      "Customer",
+      "Items",
       "PO No",
       "DO No",
     ]);
     expect(screen.getByText("Kelana Jaya")).toBeInTheDocument();
+    expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
+    /* The retired word never prints (COPY-STANDARD, SO Doc Date). */
+    expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
+    /* Flat: no status groups, no Service Case column. */
+    expect(document.querySelector("[data-testid^='grid-group-']")).toBeNull();
+    expect(screen.queryByText(/Service Case/)).not.toBeInTheDocument();
   });
 
-  it("says plainly when the Sales Order has produced no Delivery Order", () => {
-    listHookState.data = { orders: [order({ do_number: null })] };
+  it("says No PO yet · No DO yet, muted, when neither document exists", () => {
+    listHookState.data = { orders: [order({ do_number: null, po_numbers: [] })] };
     mount();
-    expect(screen.getByText("No delivery order yet")).toBeInTheDocument();
+    expect(screen.getByText("No DO yet")).toHaveAttribute("data-absence", "true");
+    expect(screen.getByText("No PO yet")).toHaveAttribute("data-absence", "true");
+    expect(screen.queryByText("No delivery order yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not recorded")).not.toBeInTheDocument();
+  });
+
+  it("names the goods by the catalog: Items {first item} + {n} more, Item = product with its variant beneath", () => {
+    catalogHookState = { data: {
+      models: [{ id: "m-1", name: "Cody" }],
+      skus: [{ id: "s-1", modelId: "m-1", sku: "B1201S-K", variant: "Super King" }],
+      addons: [],
+    } };
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, attrs: {} },
+      { id: "line-2", sku: "PILLOW-9", qty: 2, unit_price: 99, attrs: {} },
+    ] })] };
+    mount();
+    expect(within(screen.getByTestId("grid-parent-row")).getByText("Cody + 1 more")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    const itemCell = within(row).getByText("Cody").closest("td")!;
+    expect(itemCell).toHaveTextContent("CodySuper King");
+    /* The SKU keeps its own column and is not repeated as the item. */
+    expect(itemCell).not.toHaveTextContent("B1201S-K");
   });
 
   it("reads the Delivery Orders off the order row, not a second capped read", () => {
@@ -788,7 +774,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  it("starts under SO Date, the first column, with a separate bordered child and 12px vertical gaps", () => {
+  it("hangs flush under its row with the shared 1px connector to a bordered goods frame (§6.8–§6.9)", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
@@ -798,16 +784,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     ]);
     for (const gutter of gutters) expect(gutter).toBeEmptyDOMElement();
     const cell = screen.getByTestId("grid-expansion-cell");
-    expect(cell).toHaveAttribute("colspan", "8");
+    expect(cell).toHaveAttribute("colspan", "11");
     expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
     expect(within(cell).getByRole("table")).toHaveStyle({ minWidth: "908px" });
-    /* The child owns its border; only vertical padding separates it. */
-    expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
-      paddingTop: "12px",
-      paddingBottom: "12px",
-      paddingLeft: "0px",
-      paddingRight: "0px",
-    });
+    /* The Purchasing reference: flush under the row, and the section stack
+       draws the line from the caret to the goods frame and ends there. */
+    expect(cell).toHaveStyle({ paddingTop: "0px", paddingBottom: "0px" });
+    expect(within(cell).getByTestId("section-elbow-goods")).toBeInTheDocument();
+    expect(within(cell).queryByTestId("section-trunk-goods")).toBeNull();
+    expect(within(cell).getByTestId("goods-mini-table").className).toContain("border");
   });
 
   /** The child of a record is its own object, and the frame is what says so. */
@@ -870,7 +855,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(within(goods).getByText("Not allocated")).toHaveAttribute("data-absence", "true");
-    expect(within(goods).getByText("Not recorded")).toHaveAttribute("data-absence", "true");
+    /* Before any PO line there is no supplier destination (owner ruling 2026-09-21). */
+    expect(within(goods).getByText("No PO yet")).toHaveAttribute("data-absence", "true");
+    expect(within(goods).queryByText("Not recorded")).toBeNull();
   });
 
   it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
@@ -972,32 +959,36 @@ describe("Cancel SO", () => {
 describe("Sales Orders table correction", () => {
   it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    const sort = screen.getByRole("button", { name: "Requested Delivery Date" });
+    const sort = screen.getByRole("button", { name: "Customer Requested Delivery Date" });
     expect(sort.querySelector("br")).not.toBeNull();
     fireEvent.click(sort);
-    expect(screen.getByRole("button", { name: "Requested Delivery Date" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Filter Requested Delivery Date" }));
+    expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
     expect(screen.getByText("Today")).toBeInTheDocument();
   });
 
-  it("preserves saved widths and optional columns, but a saved order cannot move SO Date · SO No off the front", () => {
+  it("preserves saved widths and optional columns, but a saved order cannot move Proceed Date · SO Doc Date · SO No off the front", () => {
+    /* A v5 layout is retired: the key moved so it cannot resurrect the old order. */
+    localStorage.setItem("carres.salesOrders.register.v5.anon", JSON.stringify({
+      order: ["customer", "so", "ordered"], widths: {}, hidden: ["proceeded"], groupBy: [], sort: null,
+    }));
     const saved = {
-      order: ["customer", "so", "ordered", "customer_delivery", "delivery_location", "showroom", "po_number", "do_number", "phone"],
+      order: ["customer", "so", "ordered", "proceeded", "customer_delivery", "delivery_location", "showroom", "po_number", "do_number", "phone"],
       widths: { customer: 288, customer_delivery: 240 },
       hidden: [], groupBy: [], sort: null,
     };
-    localStorage.setItem("carres.salesOrders.register.v5.anon", JSON.stringify(saved));
+    localStorage.setItem("carres.salesOrders.register.v6.anon", JSON.stringify(saved));
     mount();
     const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
-    expect(business.slice(0, 3)).toEqual(["SO Date", "SO No", "Customer"]);
+    expect(business.slice(0, 4)).toEqual(["Proceed Date", "SO Doc Date", "SO No", "Customer"]);
     expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
-    expect(screen.getByRole("button", { name: "Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(screen.getByRole("button", { name: "Customer Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
       "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__",
     ]);
-    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v5.anon")!).widths).toEqual(saved.widths);
+    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v6.anon")!).widths).toEqual(saved.widths);
   });
 });
 
