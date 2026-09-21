@@ -3794,9 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-### PROPOSAL — PENDING APPROVAL (dealer-maintenance)
-
-Finance sidebar entry `Dealers` (opens the same dealer list as Admin > Dealers; Finance has no
-`+ Invite dealer` button and no Suspend / Reactivate). Dealer drawer fields: `Dealer code` with
-placeholder `e.g. JB1`, and `State` with the first option `Not set`. A dealer's code, when set,
-shows before its name in the list and replaces the id at the top of the drawer.
