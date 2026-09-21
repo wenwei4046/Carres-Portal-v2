@@ -20,6 +20,8 @@ export const PAYMENT_METHODS_QUERY_KEY = ["finance", "payment-methods"] as const
 export interface PaymentMethodsPayload {
   methods: PaymentMethodRegistryRow[];
   money_accounts: PaymentMoneyAccount[];
+  /** 0541 — the POS card and Online payment rows, which have no method row. */
+  system_rows?: { method: string; source_channel: string; account_code: string }[];
 }
 
 export function usePaymentMethodRegistry() {

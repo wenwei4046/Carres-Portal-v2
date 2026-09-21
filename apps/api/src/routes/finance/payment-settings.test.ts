@@ -97,10 +97,13 @@ describe("the payment method registry (0476)", () => {
     const rpc = vi.fn().mockImplementation(async (name: string) => ({
       data: name === "payment_method_registry" ? REGISTRY : ACCOUNTS, error: null,
     }));
-    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const SYSTEM = [{ method: "card", source_channel: "*", account_code: "1130" }];
+    const chain = { select: vi.fn(), in: vi.fn(), order: vi.fn(), then: (r: (v: unknown) => void) => r({ data: SYSTEM, error: null }) };
+    chain.select.mockReturnValue(chain); chain.in.mockReturnValue(chain); chain.order.mockReturnValue(chain);
+    vi.mocked(userClient).mockReturnValue({ rpc, from: vi.fn().mockReturnValue(chain) } as never);
     const res = await get(role);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ methods: REGISTRY, money_accounts: ACCOUNTS });
+    expect(await res.json()).toEqual({ methods: REGISTRY, money_accounts: ACCOUNTS, system_rows: SYSTEM });
     expect(rpc).toHaveBeenCalledWith("payment_method_registry");
     expect(rpc).toHaveBeenCalledWith("payment_method_money_accounts");
   });
@@ -112,6 +115,19 @@ describe("the payment method registry (0476)", () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "down" } });
     vi.mocked(userClient).mockReturnValue({ rpc } as never);
     expect((await get("finance")).status).toBe(500);
+  });
+  it("moving POS card sends the row and the account to the 0541 door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { method: "card" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/system-method", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ method: "card", sourceChannel: "*", accountCode: "1131" }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("payment_system_account_save", {
+      p_method: "card", p_source_channel: "*", p_account_code: "1131",
+    });
   });
   it("adding a method sends a null key, the name and the money account", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: { method: "grab_pay", label: "Grab Pay" }, error: null });

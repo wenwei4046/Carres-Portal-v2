@@ -20,7 +20,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  CARD_CHANNELS,
+  CARD_CHANNEL_WORD,
   MONEY_ACCOUNT_KIND_WORD,
+  type CardChannel,
+  type CardRouteRow,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
@@ -32,8 +36,8 @@ import Tabs from "@/components/kit/Tabs";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import { LoadFailed } from "../other-money-in/parts";
-import { useMoneyAccounts, useSaveMoneyAccount } from "./api";
+import { accountLabel, LoadFailed } from "../other-money-in/parts";
+import { useCardRoutes, useMoneyAccounts, useSaveCardRoute, useSaveMoneyAccount } from "./api";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
 
@@ -99,6 +103,7 @@ function MoneyAccounts() {
       {editing !== undefined && (
         <MoneyAccountModal key={editing?.code ?? "new"} account={editing} onClose={() => setEditing(undefined)} />
       )}
+      {query.isSuccess && <CardRoutes accounts={query.data} />}
     </ListPageShell>
   );
 }
@@ -159,6 +164,96 @@ function MoneyAccountModal({ account, onClose }: { account: MoneyAccountRow | nu
             {refusal}
           </FieldError>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+const CHANNEL_OPTIONS = CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }));
+
+/**
+ * 0541 — Card payout banks: which bank each card holding account pays out to,
+ * for machines at a showroom and at a dealer. The card payout form on Money
+ * moves defaults its bank from here; the database checks the accounts again.
+ */
+function CardRoutes({ accounts }: { accounts: MoneyAccountRow[] }) {
+  const routes = useCardRoutes();
+  /* `undefined` = closed; `null` = a new route; a row = that route. */
+  const [editing, setEditing] = useState<CardRouteRow | null | undefined>(undefined);
+  const name = (code: string) => {
+    const a = accounts.find((x) => x.code === code);
+    return a ? accountLabel(a) : code;
+  };
+  return (
+    <section className="border-t border-kit-slate-5 p-5" data-testid="card-routes">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-section">Card payout banks</h2>
+        <Button variant="neutral" size="sm" onClick={() => setEditing(null)}>
+          Add a card payout bank
+        </Button>
+      </div>
+      {routes.isError && <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />}
+      <div className="mt-3 space-y-2">
+        {(routes.data ?? []).map((r) => (
+          <button
+            key={`${r.holding_code}:${r.channel}`}
+            type="button"
+            className="block w-full text-left text-body"
+            data-testid={`card-route-${r.holding_code}-${r.channel}`}
+            onClick={() => setEditing(r)}
+          >
+            {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
+          </button>
+        ))}
+      </div>
+      {editing !== undefined && (
+        <CardRouteModal route={editing} accounts={accounts} onClose={() => setEditing(undefined)} />
+      )}
+    </section>
+  );
+}
+
+function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | null; accounts: MoneyAccountRow[]; onClose: () => void }) {
+  const save = useSaveCardRoute();
+  const [holding, setHolding] = useState(route?.holding_code);
+  const [channel, setChannel] = useState<CardChannel | undefined>(route?.channel);
+  const [bank, setBank] = useState(route?.bank_code);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const opts = (kind: MoneyAccountRow["money_kind"]) =>
+    accounts.filter((a) => a.is_active && a.money_kind === kind).map((a) => ({ value: a.code, label: accountLabel(a) }));
+  const submit = () => {
+    setRefusal(null);
+    save.mutate(
+      { holding_code: holding ?? "", channel: channel as CardChannel, bank_code: bank ?? "" },
+      { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
+    );
+  };
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title="Card payout bank"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" loading={save.isPending} disabled={!holding || !channel || !bank} onClick={submit}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3" data-testid="card-route-form">
+        <Select id="card-route-holding" label="Card account" required value={holding} onValueChange={setHolding}
+          options={opts("HOLDING")} disabled={route !== null} placeholder="Choose an account" />
+        <Select id="card-route-channel" label="Machine at" required value={channel}
+          onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} disabled={route !== null} />
+        <Select id="card-route-bank" label="Pays out to" required value={bank} onValueChange={setBank}
+          options={opts("BANK")} placeholder="Choose an account" />
+        {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>
   );

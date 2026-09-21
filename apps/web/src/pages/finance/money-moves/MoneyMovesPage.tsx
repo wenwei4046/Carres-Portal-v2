@@ -24,6 +24,7 @@ import {
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
 import { parseTypedAmount } from "@carres/shared/other-money-in";
+import { CARD_CHANNELS, CARD_CHANNEL_WORD, settlementBank, type CardChannel } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -37,7 +38,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
-import { useMoneyAccounts } from "../settings/api";
+import { useCardRoutes, useMoneyAccounts } from "../settings/api";
 import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/parts";
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
 
@@ -244,6 +245,13 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
+  /* 0541 — a card payout's bank defaults from Finance Settings' route; still changeable. */
+  const routes = useCardRoutes();
+  const [channel, setChannel] = useState<CardChannel | undefined>();
+  const routeBank = (holding: string | undefined, ch: CardChannel | undefined) => {
+    const bank = settlementBank(routes.data ?? [], holding, ch);
+    if (bank && moveAccounts("CARD_PAYOUT", "to", accounts.data ?? []).some((a) => a.code === bank)) setToCode(bank);
+  };
 
   const options = (side: "from" | "to") =>
     moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
@@ -317,9 +325,24 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             label="Paid from"
             required
             value={fromCode}
-            onValueChange={setFromCode}
+            onValueChange={(v) => {
+              setFromCode(v);
+              if (kind === "CARD_PAYOUT") routeBank(v, channel);
+            }}
             options={options("from")}
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
+          />
+        )}
+        {kind === "CARD_PAYOUT" && (
+          <Select
+            id="move-channel"
+            label="Machine at"
+            value={channel}
+            onValueChange={(v) => {
+              setChannel(v as CardChannel);
+              routeBank(fromCode, v as CardChannel);
+            }}
+            options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
           />
         )}
         {!fixedTo && (

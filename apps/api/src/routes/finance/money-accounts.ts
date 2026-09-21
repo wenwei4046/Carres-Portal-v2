@@ -1,7 +1,9 @@
 import { Hono, type Context } from "hono";
 import {
+  cardRouteInput,
   moneyAccountAddInput,
   moneyAccountUpdateInput,
+  type CardRouteRow,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
 import { requireFinance } from "../../lib/auth-guards";
@@ -19,6 +21,8 @@ import type { AppEnv } from "../../types";
  *   GET    /          the list: code, name, kind, in use
  *   POST   /          add a bank or holding account → 201 { code }
  *   PATCH  /:code     rename, or take in or out of use → { code }
+ *   GET    /card-routes   which bank each card holding account pays out to (0541)
+ *   POST   /card-routes   set one route → the route
  *
  * Finance and principal, twice: `requireFinance` here, and each function's own
  * NULL-safe role check (42501). `userClient` forwards the caller's JWT, so
@@ -46,6 +50,26 @@ financeMoneyAccountsRouter.post("/", requireFinance, async (c) => {
   const { data, error } = await sb.rpc("gl_money_account_add", { p_name: body.data.name, p_kind: body.data.kind });
   if (error) return fail(c, error);
   return c.json({ code: data as string }, 201);
+});
+
+financeMoneyAccountsRouter.get("/card-routes", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("card_settlement_routes").select("holding_code,channel,bank_code").order("holding_code");
+  if (error) return fail(c, error);
+  return c.json((data ?? []) as CardRouteRow[]);
+});
+
+financeMoneyAccountsRouter.post("/card-routes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, cardRouteInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("card_settlement_route_set", {
+    p_holding: body.data.holding_code,
+    p_channel: body.data.channel,
+    p_bank: body.data.bank_code,
+  });
+  if (error) return fail(c, error);
+  return c.json(data as CardRouteRow);
 });
 
 financeMoneyAccountsRouter.patch("/:code", requireFinance, async (c) => {
