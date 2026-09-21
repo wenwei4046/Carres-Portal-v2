@@ -60,6 +60,12 @@ vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
 }));
 
+/** The frozen clock every test in this file runs on: Tuesday 15 Sep 2026 in
+ *  Kuala Lumpur. It is frozen in the file-level `beforeEach` BEFORE any fixture
+ *  is built, because `iso()` and `workday()` read the clock: a fixture built on
+ *  the real clock and asserted against a frozen one rots as the calendar moves. */
+const TUESDAY = new Date("2026-09-15T02:00:00Z");
+
 function iso(daysFromToday: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromToday);
@@ -134,6 +140,9 @@ function order(id: string, so: number, over: {
 }
 
 beforeEach(() => {
+  // First, before a single fixture date is computed.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(TUESDAY);
   state.invoices.data = [
     // Goods not ready, no arrival, delivery in two weeks — Wait.
     row({ id: "i1", order_id: "o1", so: 1300, paid: 400, control: { confirmed_date: iso(14) } }),
@@ -161,6 +170,8 @@ beforeEach(() => {
   // collapsed — the desktop tests want it open, as a wide window would.
   Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
 });
+
+afterEach(() => { vi.useRealTimers(); });
 
 function show(at = "/finance/monitor?day=all") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -429,16 +440,8 @@ function workItem(objectId: string, actionOn: string, over: {
   };
 }
 
-/** The frozen clock for the week plan: Tuesday 15 Sep 2026 in Kuala Lumpur. */
-const TUESDAY = new Date("2026-09-15T02:00:00Z");
-
 describe("Payment Monitor — the rail is the Monday–Friday follow-up plan (owner ruling 2026-09-16)", () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(TUESDAY);
-  });
-  afterEach(() => { vi.useRealTimers(); });
-
+  // The clock is already frozen on TUESDAY by the file-level `beforeEach`.
   const days = () => screen.getAllByTestId(/^payment-monitor-day-\d/).map((b) => b.getAttribute("data-testid")!.slice(-10));
   const listed = () => screen.queryAllByRole("button", { name: /^SO-13/ }).map((b) => b.textContent);
 
