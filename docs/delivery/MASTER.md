@@ -463,7 +463,7 @@ each day, and which record do I open?* Its only main surface is the existing `Wo
 register (§8.3), with the existing fixed 72px parent rows and shared `MonitorTwoLines`.
 The local `Delivery schedule` view and the left rail's two month calendars retire only after
 the replacement acceptance gate below passes. Current deployed calendars are transition
-implementation, not the target layout. This documentation approval claims no implementation,
+implementation, not the target layout. Owner reconfirmed persistence on 2026-09-21. This documentation approval claims no implementation,
 rendered acceptance or production verification.
 
 **DIRECTION APPROVED; DETAIL PROPOSAL / NOT LAW.** The owner confirmed daily work in the left
@@ -628,7 +628,7 @@ reference, never stacked as a third line, and never hidden: the WHOLE journey �
 place, every recorded result — is one right-click away on `Open Order Route`, the same door the
 Delivery Orders register offers from the same menu.
 
-**ACTOR, ACT AND COUNTERPARTY — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-18.**
+**ACTOR, ACT AND COUNTERPARTY — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-21 (reconfirming the 2026-09-18 direction).**
 Operational messages must answer who does what, to whom. Shortening may not remove the actor
 or make an agreement look unilateral. Line 1 names the responsible operating party, the act and
 its counterparty; line 2 supplies the purpose or evidenced result. For example:
@@ -662,9 +662,10 @@ deadline and result into a third line of a 72px cell. Full messages are accessib
 keyboard. Exact placement is still a design draft; this ruling approves meaning and sentence
 structure, not a new column layout or a new Work engine.
 
-**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS, so
-the two contact rungs — which now print one sentence — are ONE option, and the pick narrows by
-the label rather than by the internal key.
+**One option per printed word.** The `DELIVERY STATUS` dropdown, Search and exports read the
+same actor-aware message as the row. Carres customer contact and partner customer contact may
+not collapse into a label that hides who acts. This changes displayed wording, not the source
+status keys, contact policy or Work ownership.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
@@ -996,7 +997,8 @@ line sits beside it and says otherwise.
 ```
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
-  Confirmed             Transfer confirmed       Stock risk
+  {partner} and         Transfer confirmed       Stock risk
+    customer agreed
   Collected by {p}      Collected for transfer   Payment blocked
   On the way to         In transit to {stop}     Logistics details incomplete
     customer                                     DO not released
@@ -1157,7 +1159,7 @@ Malaysian public holidays refused) · `Confirmed time` (governed windows) · `In
 from` (`{partner}` · `Customer` · `Operation on behalf of {partner}`) · `WhatsApp proof` (required
 when the new date is later than `Requested Delivery Date`) · `Save confirmed delivery`. The Save
 button names its gap while disabled: `Save confirmed delivery — upload the WhatsApp reply`.
-Cancel restores the read state. A day saved without a window keeps the row in `Call customer`
+Cancel restores the read state. A day saved without a window keeps the row in the actor-qualified time-agreement step
 with `No time agreed`.
 
 **A later date is never a silent edit.** When the new date is later than the customer's

@@ -722,8 +722,10 @@ directory only and said so.*
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind
   every panel that renders an event, not only this one.
-- **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
-  promised date, or two surfaces put one order on two days.
+- **Calendar reads each event’s owning date projection.** Delivery arrangements/legs, Warehouse
+  arrival and handover projections, and dated follow-up Work retain their separate dates. A
+  legacy booking or purchasing fallback must not contradict the owner. Delivery MASTER §8.2
+  governs the approved-target replacement gate; Calendar creates no dates or work.
 - **The calendar names actual days, never `Today` / `Tomorrow`** (owner ruling 2026-08-15). Both
   single-day chips and every day heading print the real weekday + date; `This week` survives
   because it is a SPAN. The full ruling, its one history-group exception and the structural
@@ -737,7 +739,7 @@ directory only and said so.*
 
 ### WORK OWNER + TWO-LINE ACTION GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-14
 
-- **Actor + act + counterparty — owner correction 2026-09-18, APPROVED TARGET / NOT BUILT.**
+- **Actor + act + counterparty — owner reconfirmation 2026-09-21, APPROVED TARGET / NOT BUILT.**
   Operational UI must make clear who does what, to whom. The responsible party is part of the
   message when omitting it makes ownership ambiguous (`Carres to call customer`,
   `{partner} to call customer`). An agreement names both parties and its evidenced result.
@@ -780,7 +782,7 @@ directory only and said so.*
   No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
   the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, journey rungs re-ruled
   2026-09-14, `../delivery/MASTER.md` §8.4):** its status word names the actor and the fact in
-  primary-school English (`Operation must call the customer` · `Waiting for {partner} pickup` ·
+  primary-school English (`Carres to call customer` · `{partner} to call customer` · `Waiting for {partner} pickup` ·
   `Collected by {partner}` · `On the way to customer`), one arithmetic, no owner avatar and no
   second action. It is a status word, not an action sentence.
   **DELIVERY PROGRESS AND READINESS REMAIN DISTINCT FACTS.** Journey progress and a readiness
@@ -788,7 +790,7 @@ directory only and said so.*
   intermediate transfer remain different event kinds and counts. Delivery's local calendar-card
   layout retires under the approved-target replacement gate in `../delivery/MASTER.md` §8.2;
   it is not a shared Warehouse layout. Reusing kit primitives never transfers business meanings.
-- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner correction 2026-09-18.**
+- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner reconfirmation 2026-09-21.**
   Line 1 identifies the responsible party, act and counterparty; line 2 gives the purpose or
   recorded result. Delivery MASTER §8.3 owns the exact evidence and deadline rules. The resolved
   individual, source and work date remain identifiable without inventing another owner.
