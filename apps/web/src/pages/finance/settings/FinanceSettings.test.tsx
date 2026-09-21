@@ -14,6 +14,7 @@ vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string, init?: RequestInit) => {
     const key = `${init?.method ?? "GET"} ${path.replace("/api/finance/ledger/money-accounts", "") || "/"}`;
     net.calls.push({ key, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (key === "GET /api/finance/ledger/accounts") return { go_live_on: "2026-09-10", accounts: CHART };
     if (key === "GET /") {
       if (net.failList) throw new Error("boom");
       return net.rows;
@@ -31,6 +32,15 @@ const ROWS = [
   { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
 ];
 
+const acc = (code: string, name: string, parent_code: string | null, is_header = false) => ({
+  code, name, kind: "LIABILITY", parent_code, is_control: false, control_for: null, is_active: true, is_header,
+});
+const CHART = [
+  acc("2130", "Accrued expenses", "2100"),
+  acc("2000", "Liabilities", null, true),
+  acc("2100", "Payables", "2000", true),
+];
+
 beforeEach(() => {
   net.rows = ROWS;
   net.failList = false;
@@ -39,11 +49,11 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function show() {
+function show(path = "/finance/settings") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <FinanceSettings />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -104,5 +114,20 @@ describe("Finance Settings — the money accounts", () => {
     net.failList = true;
     show();
     expect(await screen.findByText("The accounts could not be loaded. Try again.")).toBeInTheDocument();
+  });
+});
+
+describe("Finance Settings — the chart of accounts", () => {
+  it("lists the chart as a tree, headings in bold, and renames an account by its code", async () => {
+    show("/finance/settings?tab=chart");
+    const accrued = await screen.findByText("2130 Accrued expenses");
+    expect(screen.getByText("2000 Liabilities")).toHaveClass("font-semibold");
+    expect(accrued).not.toHaveClass("font-semibold");
+    fireEvent.click(accrued);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: " Accruals " } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({ key: "PATCH /api/finance/ledger/accounts/2130", body: { name: "Accruals" } });
   });
 });
