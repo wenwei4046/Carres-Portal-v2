@@ -84,6 +84,9 @@ import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseWorkspace from "./WarehouseWorkspace";
 import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
+import { isOperationTab } from "./operation-tabs";
+import EmptyState from "@/components/kit/EmptyState";
+import Button from "@/components/kit/Button";
 import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
@@ -649,6 +652,25 @@ export default function OperationApp() {
             {tab === "service-notes" && <OperationServiceCases />}
             {/* 0261-0263 — the guarantee claim / track-back desk */}
             {tab === "guarantees" && <OperationGuarantees />}
+            {/* An address no page answers says so, with one way out — it used
+                to render an empty pane (2026-09-21). */}
+            {!isOperationTab(tab) && (
+              <div data-testid="operation-tab-not-found">
+                <EmptyState
+                  title="Page not found."
+                  detail="This address does not open a page."
+                  action={
+                    <Button
+                      variant="neutral"
+                      size="md"
+                      onClick={() => navigate("/operation?tab=dashboard")}
+                    >
+                      Go to Dashboard
+                    </Button>
+                  }
+                />
+              </div>
+            )}
           </>
         )}
         </div>

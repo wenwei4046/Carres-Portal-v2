@@ -806,6 +806,12 @@ export default function OperationManualPurchase() {
     [filtered, selected, selectable],
   );
   const selectionUnits = selectedRows.reduce((n, r) => n + r.remainingQty, 0);
+  /* One issue wall per live item line; only a line with something left to buy
+     is part of the issue. */
+  const selectionItemLines = selectedRows.reduce(
+    (n, r) => n + r.issueWalls.filter((w) => w.remainingQty > 0).length,
+    0,
+  );
   const selectionPos = manualPurchaseIssueGroupCount(
     selectedRows.flatMap((r) => r.issueWalls),
   );
@@ -1747,10 +1753,19 @@ export default function OperationManualPurchase() {
                   return next;
                 }),
               isSelectable: (r: RequestRegisterRow) => selectable(r),
+              /* The refused tick names the fact its row already prints: the
+                 dead-row sentence, else the approval badge. */
+              unselectableReason: (r: RequestRegisterRow) =>
+                deadReason(r) ?? (r.approval.kind === "approved" ? null : r.approval.label),
               testId: (r: RequestRegisterRow) => `mp-select-${r.id}`,
             }}
             selectionSummary={() =>
-              manualPurchaseIssueSentence(selectedRows.length, selectionUnits, selectionPos)
+              manualPurchaseIssueSentence(
+                selectedRows.length,
+                selectionItemLines,
+                selectionUnits,
+                selectionPos,
+              )
             }
             selectionPrimary={
               selectedRows.length > 0 && q.data ? (

@@ -558,7 +558,7 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
 
     /* The selection actually happened - the bar is the page's own proof. */
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item line · Qty 2 · Issue 1 PO")).toBeVisible();
   });
 
   it("opens on the first ACTIVE destination and says which, without blocking", () => {
@@ -568,6 +568,25 @@ describe("a missing DEFAULT destination does not stop the buying", () => {
     expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
     const note = screen.getByTestId("so-batch-no-default-destination");
     expect(note).toHaveTextContent("ticks open on Carres Klang");
+  });
+
+  it("says nothing about destinations while the list is still loading", () => {
+    /* The host renders an empty placeholder until the read lands; its empty
+       destination list is not a fact about Settings (production, 634ms). */
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+          <SoBatchRegister
+            data={data({ rows: [], registerRows: [], destinations: [], defaultDestinationId: null })}
+            isLoading
+            onIssue={onIssue}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-no-default-destination")).not.toBeInTheDocument();
   });
 
   it("an EMPTY list still blocks, and still names the setting", () => {
@@ -611,7 +630,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
 
     const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+    expect(within(bar).getByText("1 Sales Order · 1 item line · Qty 2 · Issue 1 PO")).toBeVisible();
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveTextContent("YJ");
     expect(within(bar).getByTestId("so-batch-duty-chip")).toHaveAttribute(
       "title",
@@ -645,7 +664,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item line · Qty 2 · Issue 1 PO",
     );
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
@@ -704,7 +723,7 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     fireEvent.click(screen.getByTestId("so-batch-select-o3"));
     /* The leaf's own remainder — 1 unit, never the 2 already on the PO. */
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 1 unit · Issue 1 PO",
+      "1 Sales Order · 1 item line · Qty 1 · Issue 1 PO",
     );
   });
 
@@ -793,6 +812,60 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
     expect(panel.textContent).toBeTruthy();
     expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
+  /* ⭐ 2026-09-21 — the refused checkbox itself names the fact, and a missing
+     SKU's fix line is a door into Catalog's SKU Master. */
+  function renderBlocked(state: PurchaseDemandRow["state"]) {
+    const blocked = leaf({
+      id: `build::ob::${state}`,
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      lineIds: ["lb1"],
+      skus: ["B1201S-K"],
+      state,
+    });
+    const order = orderRow({
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lb1", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "Booqit", variant: "King", category: "mattress", pos: [] },
+      ],
+    });
+    renderRegister({ rows: [blocked], registerRows: [order] });
+  }
+
+  it("a refused checkbox is described by the row's own blocker words", () => {
+    renderBlocked("no_sku");
+    const box = screen.getByTestId("so-batch-select-ob");
+    expect(box).toBeDisabled();
+    expect(box).toHaveAccessibleDescription("SKU not found");
+  });
+
+  it("an offered checkbox carries no refusal", () => {
+    renderRegister();
+    expect(screen.getByTestId("so-batch-select-o1")).not.toBeDisabled();
+    expect(screen.getByTestId("so-batch-select-o1")).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("a missing SKU's fix line opens Catalog's SKU Master", () => {
+    renderBlocked("no_sku");
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+    const link = screen.getByTestId("so-batch-blocker-link-build::ob::no_sku");
+    expect(link).toHaveTextContent("Add this item to the SKU catalog");
+    expect(link).toHaveAttribute("href", "/operation?tab=op-catalog");
+  });
+
+  it("other blockers keep their fix line as text — their doors are not built here", () => {
+    renderBlocked("no_supplier");
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+    expect(
+      screen.queryByTestId("so-batch-blocker-link-build::ob::no_supplier"),
+    ).not.toBeInTheDocument();
   });
 
   it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
@@ -1517,7 +1590,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     fireEvent.change(within(box).getByTestId("so-batch-deliver-to-select-build::o8::a"), {
       target: { value: BULOH },
     });
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 1 unit");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item line · Qty 1");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
@@ -1537,7 +1610,7 @@ describe("the arrangement is the demand's, never the summary's", () => {
     });
     fireEvent.click(within(box).getByTestId("so-batch-split-apply-build::o1::b1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 2 POs",
+      "1 Sales Order · 1 item line · Qty 2 · Issue 2 POs",
     );
   });
 });
@@ -1683,7 +1756,7 @@ describe("a demand with several Unit records", () => {
     const table = within(box).getByTestId("goods-mini-table");
     fireEvent.click(within(table).getByRole("checkbox"));
     /* What the toolbar says and what the screen shows are the same number. */
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 1 unit");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item line · Qty 1");
     expect(
       within(table).getAllByRole("checkbox").filter((c) => (c as HTMLInputElement).checked),
     ).toHaveLength(1);
@@ -1999,7 +2072,7 @@ describe("a demand that covers several item lines", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-oset"));
     const box = await screen.findByTestId("so-batch-inspector-oset");
     fireEvent.click(within(within(box).getByTestId("goods-mini-table")).getByRole("checkbox"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 2 item lines · Qty 2");
     fireEvent.click(screen.getByTestId("so-batch-issue"));
     expect(onIssue).toHaveBeenCalledWith([
       { demandId: "build::oset::s", allocations: [{ destinationId: KLANG, qty: 2 }] },
@@ -2067,7 +2140,7 @@ describe("a tick whose To buy has changed", () => {
   it("is dropped when the recomputed remainder is smaller", () => {
     const { rerender } = renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 Sales Order · 1 item line · Qty 2");
     /* Two Units of the two were answered off the shelf. */
     rerender(
       again({

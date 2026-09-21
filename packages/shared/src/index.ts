@@ -2436,6 +2436,8 @@ export {
   composeDocumentLines,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
+  purchaseSelectionSentence,
+  soBatchOrderUnselectableReason,
   destinationAllocationSchema,
   soBatchSelectionSchema,
   purchasingDestinationSchema,

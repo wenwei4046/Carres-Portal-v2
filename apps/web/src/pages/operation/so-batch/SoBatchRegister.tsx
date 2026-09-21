@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import {
@@ -26,6 +26,7 @@ import {
   soBatchRailModel,
   soBatchToBuyState,
   soBatchSelectionSummary,
+  soBatchOrderUnselectableReason,
   type DestinationAllocation,
   type PurchaseDemandRow,
   type PurchaseDemandTimingState,
@@ -122,6 +123,8 @@ const STORAGE_KEY = "carres.soBatchPurchase.register.v7";
    header plus its controls (text + 46px of padding, sort mark and filter). Long
    names never ellipsise: those columns take an inline second line. */
 const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
+/** Operation Catalog opens on SKU Master, where `+ New SKU` lives. */
+const CATALOG_SKU_MASTER_HREF = "/operation?tab=op-catalog";
 
 /**
  * ⭐ ONE PO IS A DOOR; SEVERAL ARE A COUNT — owner correction 2026-09-11.
@@ -1243,8 +1246,14 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
               per row as they always could — which is exactly what the Deliver
               To dropdown and Split's Apply were already doing without ever
               reading the default. The warning that remains is the one that is
-              still true. */}
-          {data.destinations.length === 0 ? (
+              still true.
+              ⭐ AND ONLY ONCE IT IS KNOWN (2026-09-21). While the list loads,
+              the page renders the host's empty placeholder, whose destination
+              list is empty because nothing has been read yet — measured on
+              production at 634ms, beside the loading skeleton, before the real
+              list replaced it. An unread list is not an empty one, so neither
+              band draws until loading ends. */}
+          {isLoading ? null : data.destinations.length === 0 ? (
             <p
               className="mb-2 rounded-control bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
               data-testid="so-batch-no-destination"
@@ -1343,6 +1352,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
                 },
                 isSelectable: (o: SoBatchOrderRow) =>
                   (eligibleByOrder.get(o.orderId) ?? []).length > 0,
+                unselectableReason: (o: SoBatchOrderRow) =>
+                  soBatchOrderUnselectableReason(
+                    o,
+                    leafsByOrder.get(o.orderId) ?? [],
+                    stateWords,
+                  ),
                 isIndeterminate: (o: SoBatchOrderRow) =>
                   orderSelection(o.orderId).indeterminate,
                 testId: (o: SoBatchOrderRow) => `so-batch-select-${o.orderId}`,
@@ -1890,7 +1905,26 @@ function SoBatchOrderExpansion({
               <div className="text-body font-medium text-kit-slate-12">
                 <Icon name="late" /> {stateWords[leaf.state]}
               </div>
-              <div className="text-meta text-kit-slate-11">{leaf.action!.action}</div>
+              {/* ⭐ A MISSING SKU HAS A DOOR (2026-09-21). The fix line used to
+                  be plain text, so the operator read `Add this item to the SKU
+                  catalog` and had nowhere to press. The owner rule is
+                  `Catalog/Master Data through Current PO Duty`, and Operation
+                  Catalog's SKU Master already carries the governed `+ New SKU`
+                  the API lets Operation use (`gateSkuCreatePriceCost`) — so
+                  the same sentence now opens it. Nothing is created here. */}
+              {leaf.state === "no_sku" ? (
+                <Link
+                  to={CATALOG_SKU_MASTER_HREF}
+                  /* slate-12 + underline, the §9.1 R5 treatment for a link on a
+                     tinted band: blue-11 on amber-3 measured 4.39:1. */
+                  className="text-meta text-kit-slate-12 underline underline-offset-2"
+                  data-testid={`so-batch-blocker-link-${leaf.id}`}
+                >
+                  {leaf.action!.action}
+                </Link>
+              ) : (
+                <div className="text-meta text-kit-slate-11">{leaf.action!.action}</div>
+              )}
             </div>
           ))}
         </div>

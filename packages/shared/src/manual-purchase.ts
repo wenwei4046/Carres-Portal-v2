@@ -11,7 +11,11 @@
 import type { ProductCategory } from "./db-types";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { DEMAND_PURPOSES, type DemandPurpose } from "./to-order";
-import { SO_BATCH_RAIL, type SoBatchProductCategory } from "./so-batch-purchase";
+import {
+  SO_BATCH_RAIL,
+  purchaseSelectionSentence,
+  type SoBatchProductCategory,
+} from "./so-batch-purchase";
 import type { WorkItem } from "./work-engine";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 import { countWorkingDays, type WorkingDayOptions } from "./working-days";
@@ -1219,13 +1223,21 @@ export function manualPurchaseIssueGroupCount(
   return walls.size;
 }
 
-/** `1 selected · 1 unit · Issue 1 PO` — pluralised from facts, never guessed. */
+/** `1 Manual Purchase · 2 item lines · Qty 3 · Issue 1 PO` — pluralised from
+ *  facts, never guessed; the same sentence SO Batch prints. */
 export function manualPurchaseIssueSentence(
   requests: number,
-  units: number,
+  itemLines: number,
+  qty: number,
   pos: number,
 ): string {
-  return `${requests} selected · ${units} unit${units === 1 ? "" : "s"} · Issue ${pos} PO${pos === 1 ? "" : "s"}`;
+  return purchaseSelectionSentence({
+    records: requests,
+    recordWord: ["Manual Purchase", "Manual Purchases"],
+    itemLines,
+    qty,
+    pos,
+  });
 }
 
 // ─── The two Work Engine action contracts — PURCHASING CARD 06 §7,

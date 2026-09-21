@@ -2786,7 +2786,7 @@ describe("Card 04 · selection and PO Duty", () => {
     /* Selection REPLACES the toolbar in place (UI MASTER §6.7) — the truthful
        sentence, pluralised from facts, and no bar below the table. */
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 3 units · Issue 1 PO",
+      "1 Manual Purchase · 1 item line · Qty 3 · Issue 1 PO",
     );
     expect(screen.getByTestId("selection-bar").contains(bar)).toBe(true);
     // The resolved person, once, beside the one issue action (SO Batch's chip).

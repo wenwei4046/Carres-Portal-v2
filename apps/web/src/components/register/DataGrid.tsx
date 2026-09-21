@@ -56,6 +56,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
+import Tooltip from "@/components/kit/Tooltip";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
@@ -475,6 +476,16 @@ export type DataGridProps<T> = {
      * every row is selectable, exactly as before.
      */
     isSelectable?: (row: never) => boolean;
+    /**
+     * WHY a row the tick refuses is refused (2026-09-21). A disabled checkbox
+     * that says nothing reads as broken: the operator cannot tell a finished
+     * row from a blocked one. The page states the fact it already prints on
+     * the row or in its expansion; the grid attaches it to the refused
+     * checkbox as its accessible description and a hover/focus tooltip.
+     * Consulted only for rows `isSelectable` refuses. Omitted, or `null` for
+     * a row = the checkbox is disabled exactly as before.
+     */
+    unselectableReason?: (row: never) => string | null;
     /**
      * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
      * child records renders indeterminate when only part of that set is
@@ -2276,6 +2287,41 @@ function DataGridInner<T>({
           {visibleColumns.map((col) => {
             const w = layout.widths[col.key] ?? col.width ?? 140;
             if (col.key === "__select__" && selectable) {
+              const canSelect = selectable.isSelectable?.(row as never) ?? true;
+              const refusal = canSelect
+                ? null
+                : (selectable.unselectableReason?.(row as never) ?? null);
+              const refusalId = refusal
+                ? `dg-refusal-${key.replace(/[^\w-]/g, "_")}`
+                : undefined;
+              const checkLabel = (
+                <label
+                  className={`${narrowCanvas ? styles.checkHitNarrow : styles.checkHit}${
+                    refusal ? ` ${styles.checkRefused}` : ""
+                  }`}
+                  data-testid={refusal ? "row-select-refusal" : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Select row"
+                    aria-describedby={refusalId}
+                    data-testid={selectable.testId?.(row as never)}
+                    checked={selectable.selectedKeys.has(key)}
+                    disabled={!canSelect}
+                    /* A parent-of-children checkbox's third state — set via the
+                       ref exactly as the header checkbox sets its own. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
+                    }}
+                    onChange={() => selectable.onToggle(key)}
+                  />
+                  {refusal ? (
+                    <span id={refusalId} className="sr-only">
+                      {refusal}
+                    </span>
+                  ) : null}
+                </label>
+              );
               return (
                 <td
                   key={col.key}
@@ -2290,21 +2336,7 @@ function DataGridInner<T>({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <label className={narrowCanvas ? styles.checkHitNarrow : styles.checkHit}>
-                  <input
-                    type="checkbox"
-                    aria-label="Select row"
-                    data-testid={selectable.testId?.(row as never)}
-                    checked={selectable.selectedKeys.has(key)}
-                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
-                    /* A parent-of-children checkbox's third state — set via the
-                       ref exactly as the header checkbox sets its own. */
-                    ref={(el) => {
-                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
-                    }}
-                    onChange={() => selectable.onToggle(key)}
-                  />
-                  </label>
+                  {refusal ? <Tooltip content={refusal} side="right">{checkLabel}</Tooltip> : checkLabel}
                 </td>
               );
             }

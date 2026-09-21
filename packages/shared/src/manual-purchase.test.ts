@@ -775,8 +775,12 @@ describe("Card 06 · selection and the issue sentence", () => {
   });
 
   it("pluralises from facts", () => {
-    expect(manualPurchaseIssueSentence(1, 1, 1)).toBe("1 selected · 1 unit · Issue 1 PO");
-    expect(manualPurchaseIssueSentence(2, 5, 3)).toBe("2 selected · 5 units · Issue 3 POs");
+    expect(manualPurchaseIssueSentence(1, 1, 1, 1)).toBe(
+      "1 Manual Purchase · 1 item line · Qty 1 · Issue 1 PO",
+    );
+    expect(manualPurchaseIssueSentence(2, 4, 5, 3)).toBe(
+      "2 Manual Purchases · 4 item lines · Qty 5 · Issue 3 POs",
+    );
   });
 });
 
