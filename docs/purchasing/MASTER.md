@@ -329,18 +329,65 @@ from Warehouse authority. An external destination does not create Carres Stock m
 can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
 exist, a new destination may not silently invent who receives or what Stock consequence follows.
 
-- Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase.
-- Numbered PDF prepared but not sent: update the same issue surface; History records it.
-- Supplier already received a PDF: `Change Deliver To` creates a new version/change record and
-  concrete work to send the new PDF.
+**ONE PO = ONE DELIVER TO — owner ruling (Jess, 2026-09-22; overwrites Owner B of 2026-08-28).**
+A PO carries exactly one governed Deliver To. A sofa PO is always one location. Mattress and
+bedframe goods may go to several locations, but each location is its **own PO**: split before
+issue in SO Batch Purchase / Manual Purchase, or later with `Change Deliver To` below. A closed
+destination remains visible on old records but cannot be selected for new work. The PO's
+Deliver To is Purchasing-owned truth read by Sales Order and receiving/logistics.
 
-**Owner B, 2026-08-28:** one PO may carry several governed Deliver To destinations. The PO-level
-destination is the default; a goods line may name another active Purchasing destination. The formal
-PDF prints every line's effective destination and, when several are used, every exact address in its
-DELIVER TO block. A closed destination remains visible on old records but cannot be selected for new
-work. The final destination of each goods line is Purchasing-owned truth read by Sales Order and
-receiving/logistics. Changing it after the supplier received the PDF mints a new PO version and send
-work; it never silently changes the paper already sent.
+- Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase; each
+  destination issues as its own PO.
+- Numbered PDF prepared but not sent: update the same issue surface; History records it.
+- Supplier already received a PDF: use `Change Deliver To` (below). It never silently changes the
+  paper already sent.
+
+#### `Change Deliver To` — move part of a sent PO to another location
+
+**APPROVED TARGET / NOT BUILT (Jess, 2026-09-22).** The existing PO Edit does not yet do this. The
+staff member picks, inside the original PO, the goods to send elsewhere; the system splits the PO.
+Nothing is typed twice and no second PO is opened by hand.
+
+Place: PO detail → `Edit` → `Deliver To`.
+
+```text
+Change Deliver To
+
+Item              Forte Mattress · King
+Current location  Carres Klang Warehouse
+Qty on this PO    6
+Qty you can move  6
+
+Qty to move       [ 2 ]
+New Deliver To    [ AL Sungai Buloh ▾ ]
+Reason            [ ... ]
+
+                         [Review changes]
+```
+
+`Review changes` shows the result before anything is saved:
+
+| Result | Deliver To | Qty |
+|---|---|---:|
+| Original PO, new version | Carres Klang Warehouse | 4 |
+| New PO, linked to the original | AL Sungai Buloh | 2 |
+| **Total bought — unchanged** | | **6** |
+
+On confirm, one transaction saves the original PO's new version, the new linked PO and the change
+record (who, when, reason). Every earlier version stays readable in Revisions and History.
+
+- **Nothing is marked as sent.** Both documents then go through the normal send-and-confirm work
+  (§5.6): send the revised original and the new PO, record the actual sending, follow up the
+  supplier's confirmation. The message to the supplier says it is **still 6 pieces — 2 now go to
+  AL; this is not an extra order.**
+- **Only undelivered quantity can move.** Quantity already received or in delivery cannot be
+  selected; the screen says why and leads to redelivery / transfer instead.
+- **Exact-unit goods move by Unit.** The staff member picks the exact Units, never just "2". The
+  moved Units keep their Unit IDs and bind to the new PO's line — a destination change never voids
+  or mints a Unit (§6.2). The original line's reduction here is a MOVE, not the §6.2 reduction that
+  retires surplus Units.
+- The new PO is a new object with its own PO No (§6.1 numbering); the relationship is a link, never
+  matching digits.
 
 ### 5.5 Supplier and SKU resolution
 

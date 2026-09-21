@@ -66,18 +66,15 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   names both parties completely. Detail rows read in time order:
   `PO No · Issued · Deliver by (bold, last)`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
-  deliver-to-at-section-2). **One PO may carry one or several governed
-  destinations** (Owner B, 2026-08-28). **Scope (Jess, 2026-09-22): a SOFA PO
-  always has ONE location; a MATTRESS or BEDFRAME PO may have one, or split its
-  lines across several selected locations.** For one destination, DELIVER TO prints
-  that exact name and address. For several, it prints `Multiple destinations`
-  and every exact name/address used by the goods lines. Nice Future prints its
-  fixed collection sentence via `delivery_instructions`.
-- **Items table**: `# · SO NO · UNIT ID · DESCRIPTION · DELIVER TO · QTY`.
-  - Every goods line prints its effective governed destination name and address.
-    `purchase_order_lines.destination_id` overrides the PO default; a null line
-    destination follows `purchase_orders.destination_id`. This is document
-    truth, not display inference.
+  deliver-to-at-section-2). **ONE PO = ONE DELIVER TO** (Jess, 2026-09-22 —
+  overwrites Owner B of 2026-08-28; `docs/purchasing/MASTER.md` §5.4). A sofa PO
+  is always one location; mattress/bedframe goods for another location are
+  another PO (split before issue, or `Change Deliver To` after sending). DELIVER
+  TO prints that one exact name and address. Nice Future prints its fixed
+  collection sentence via `delivery_instructions`.
+- **Items table**: `# · SO NO · UNIT ID · DESCRIPTION · QTY` — the same five
+  columns on every PO. There is no DELIVER TO column and no per-location group:
+  the address prints once, in section 2.
   - **UNIT ID — the only approved word; `ITEM ID` is retired (owner ruling
     2026-09-07).** The column prints `ops_stock_items.unit_code` for the
     Units THIS LINE was born with: an exact-unit line (Catalog
@@ -179,4 +176,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-07 | **UNIT ID BORN WITH THE OFFICIAL PO.** Column heading `ITEM ID` → `UNIT ID` (the only approved word). IDs are born in the PO's own transaction for exact-unit lines only, bound to the line (0442 · 0443); a quantity line prints `—` by law; the document reads each line's own Units (`purchasing_po_document`, 0443) and therefore shows exactly what the PO object shows. Supplier instruction stays `CARRES UNIT ID: U1-000-001` on the supplier's own label. | Owner (Purchasing CARD 10) |
 | 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
 | 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
-| 2026-09-22 | Owner B re-affirmed and scoped: sofa PO = one location; mattress/bedframe PO = one or several selected locations. | Jess |
+| 2026-09-22 | **ONE PO = ONE DELIVER TO** — Owner B (2026-08-28) overwritten. Mattress/bedframe goods for another location become their own PO (`Change Deliver To` splits a sent PO; purchasing MASTER §5.4). The per-line DELIVER TO column and `Multiple destinations` are deleted; every PO prints the same five columns. (Corrects the same-day entry that misread "split" as several locations on one PO.) | Jess |
