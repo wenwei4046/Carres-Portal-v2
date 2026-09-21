@@ -509,7 +509,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               <Text style={styles.descMain}>{line.description}</Text>
               {sofaSub ? <Text style={styles.descSub}>{sofaSub}</Text> : null}
               {configSub ? <Text style={styles.descSub}>{configSub}</Text> : null}
-              {pwpSub ? <Text style={styles.descSubAccent}>{pwpSub}</Text> : null}
+              {pwpSub ? <Text style={styles.descSub}>{pwpSub}</Text> : null}
               {freeSub ? <Text style={styles.descSub}>{freeSub}</Text> : null}
               {issuedSubs.map((v) => (
                 <Text key={v.code} style={styles.descSub}>{voucherIssuedLine(v)}</Text>
