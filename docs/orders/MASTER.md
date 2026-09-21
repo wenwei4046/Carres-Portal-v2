@@ -427,7 +427,9 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-ITEMS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
+ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): category rows
+                        `SOFA · 2 items` · # · Item Code · Description (name, configuration beneath) · Qty ·
+                        Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF
 PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
@@ -1488,9 +1490,11 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
   EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN — see
   § THE CURRENT COMPOSITION (2026-09-11), which is the only current card list.** What survives
-  from this ruling is the rest of the sentence — **`GOODS` is not a form.** Its six ruled columns
-  `Category | Unit ID | SKU | Qty | Item | Deliver To` are Stock's and Purchasing's facts, read
-  only; removing them would lose governed truth the card does not name.
+  from this ruling is the rest of the sentence — **`ITEMS` is not a form.** **OWNER RULING (Jess, 2026-09-21):**
+  the object page's Items table is the Sales Order document's own table (see the card list above); `Unit ID`
+  and `Deliver To` leave it (international practice: a unit and its destination belong to fulfilment, and
+  neither exists when the order is taken). Those Stock and Purchasing facts stay readable on Order Route and in
+  the Sales Orders Register's goods expansion, so no governed truth is lost.
 
   **THE OBJECT PAGE'S GOODS TABLE ALSO STATES THE MONEY — APPROVED + IMPLEMENTED 2026-09-11.**
   `Unit price` and `Line total` share a two-line money column to the right of those six;
