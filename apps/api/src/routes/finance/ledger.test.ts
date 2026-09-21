@@ -380,6 +380,30 @@ describe("GET /accounts", () => {
   });
 });
 
+describe("PATCH /accounts/:code", () => {
+  const patch = async (path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("renames through gl_account_rename with the name trimmed, and never the code", async () => {
+    const { sb } = fakeClient(() => ok("2130"));
+    const res = await patch("/accounts/2130", { name: " Accruals " });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_rename", { p_code: "2130", p_name: "Accruals" });
+  });
+
+  it("refuses operation, a bad code and a blank name before the database", async () => {
+    expect((await patch("/accounts/2130", { name: "X" }, "operation")).status).toBe(403);
+    fakeClient(() => ok("x"));
+    expect((await patch("/accounts/abc", { name: "X" })).status).toBe(404);
+    expect((await patch("/accounts/2130", { name: "  " })).status).toBe(422);
+    expect((await patch("/accounts/2130", { name: "X", code: "9999" })).status).toBe(422);
+  });
+});
+
 describe("GET /trial-balance", () => {
   const tbRow = (o: AnyJson) => ({ report_status: "OK", go_live_on: "2026-09-01", as_of: "2026-09-10", ...o });
 

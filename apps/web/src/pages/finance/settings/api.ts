@@ -56,3 +56,14 @@ export function useSaveCardRoute() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "card-routes"] }),
   });
 }
+
+/** Rename one chart account (0539). The chart read is `useLedgerChart`; the
+ *  ["finance"] refresh re-reads it with everything else. */
+export function useRenameAccount() {
+  const qc = useQueryClient();
+  return useMutation<{ code: string }, Error, { code: string; name: string }>({
+    mutationFn: (v) =>
+      apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
