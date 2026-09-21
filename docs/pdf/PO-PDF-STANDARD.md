@@ -53,7 +53,10 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   fact; imperative, the reader IS the supplier — lineage: "Required
   Delivery" rejected 2026-08-01, "Supplier Delivery By" frozen, "Supplier"
   dropped on paper 2026-08-09) · Issued`. **No SO No row** — a bulk PO can
-  carry dozens; the table's SO NO column is the one home. Screens speak the
+  carry dozens; the table's SO NO column is the one home. **ONE layout for
+  every PO (Jess, 2026-09-22):** a one-SO purchase order (every sofa PO) keeps
+  the SO NO column too — lifting its single SO into PO DETAILS was proposed
+  and REFUSED, because two layouts for one document is two standards. Screens speak the
   Business Date Dictionary (`Goods Arrival`); this paper speaks to the
   supplier.
 - **Section 2 is THREE columns** — `SUPPLIER (flex) · DELIVER TO (flex) ·
@@ -173,3 +176,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-08-28 | **Owner B**: one PO may carry several governed Deliver To destinations. The header names every exact destination and the items table prints each line's effective destination. A post-send destination change still mints a new version and must be sent again. | Owner |
 | 2026-09-07 | **UNIT ID BORN WITH THE OFFICIAL PO.** Column heading `ITEM ID` → `UNIT ID` (the only approved word). IDs are born in the PO's own transaction for exact-unit lines only, bound to the line (0442 · 0443); a quantity line prints `—` by law; the document reads each line's own Units (`purchasing_po_document`, 0443) and therefore shows exactly what the PO object shows. Supplier instruction stays `CARRES UNIT ID: U1-000-001` on the supplier's own label. | Owner (Purchasing CARD 10) |
 | 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
+| 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
