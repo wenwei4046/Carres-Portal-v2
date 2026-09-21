@@ -1513,6 +1513,14 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 
 ### The preview IS the document
 
+**ONE SALES ORDER DOCUMENT — OWNER RULING (Jess, 2026-09-21).** The owner's reference layout (the
+`HC-SO-2609-123` sample: logo + legal name + address left; `SALES ORDER` + number + date right; a two-block
+information band; the category-grouped bordered items table; payment, amount in words, totals, signature
+boxes, terms) is THE Sales Order document. The Sales Portal (new-order step 3) and this page already render
+through the one `sales-order-template.tsx`; both keep doing so — never a second layout. Its word changes are
+listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, Customer Requested Delivery
+Date, Showroom); its layout is not redesigned.
+
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
   `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same
   blob. There is no second lookalike renderer, and there is no toolbar on or above the paper —
