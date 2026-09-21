@@ -65,3 +65,30 @@ export const moneyAccountUpdateInput = z.object({
   is_active: z.boolean(),
 });
 export type MoneyAccountUpdateInput = z.infer<typeof moneyAccountUpdateInput>;
+
+/** 0541 — where a card machine sits: the place its money is routed by. */
+export const CARD_CHANNELS = ["showroom", "dealer"] as const;
+export type CardChannel = (typeof CARD_CHANNELS)[number];
+export const CARD_CHANNEL_WORD: Record<CardChannel, string> = { showroom: "Showroom", dealer: "Dealer" };
+
+/** One row of `card_settlement_routes`: a holding account pays out to a bank. */
+export interface CardRouteRow {
+  holding_code: string;
+  channel: CardChannel;
+  bank_code: string;
+}
+
+export const cardRouteInput = z.object({
+  holding_code: z.string().regex(/^\d{4}$/, "Choose the card account."),
+  channel: z.enum(CARD_CHANNELS, { errorMap: () => ({ message: "Choose showroom or dealer." }) }),
+  bank_code: z.string().regex(/^\d{4}$/, "Choose the bank."),
+});
+export type CardRouteInput = z.infer<typeof cardRouteInput>;
+
+/** The bank a card payout defaults to. With the place chosen, that route;
+ *  without it, the one bank every route of this holding agrees on. */
+export function settlementBank(routes: CardRouteRow[], holding: string | undefined, channel?: CardChannel): string | undefined {
+  const mine = routes.filter((r) => r.holding_code === holding && (!channel || r.channel === channel));
+  const banks = new Set(mine.map((r) => r.bank_code));
+  return banks.size === 1 ? mine[0]!.bank_code : undefined;
+}

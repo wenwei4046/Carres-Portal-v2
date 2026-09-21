@@ -9,6 +9,8 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  CardRouteInput,
+  CardRouteRow,
   MoneyAccountAddInput,
   MoneyAccountRow,
   MoneyAccountUpdateInput,
@@ -35,6 +37,23 @@ export function useSaveMoneyAccount() {
         ? apiFetch(BASE, { method: "POST", body: JSON.stringify(v.input) })
         : apiFetch(`${BASE}/${v.code}`, { method: "PATCH", body: JSON.stringify(v.input) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0541 — which bank each card holding account pays out to. */
+export function useCardRoutes() {
+  return useQuery({
+    queryKey: ["finance", "card-routes"] as const,
+    queryFn: () => apiFetch<CardRouteRow[]>(`${BASE}/card-routes`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useSaveCardRoute() {
+  const qc = useQueryClient();
+  return useMutation<CardRouteRow, Error, CardRouteInput>({
+    mutationFn: (v) => apiFetch(`${BASE}/card-routes`, { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "card-routes"] }),
   });
 }
 

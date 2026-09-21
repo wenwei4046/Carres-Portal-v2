@@ -38,6 +38,7 @@ import {
   SlidersHorizontal,
   Receipt,
   Banknote,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -599,6 +600,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: UserCheck,
         financePath: "/finance/rental-approver",
       },
+      // 0538 — due, collected and unpaid subscription months across every agreement.
+      { key: "subscriptions", label: "Subscriptions", icon: CalendarClock, financePath: "/finance/subscriptions" },
       // 0478 — money in that is not a sale. A party that is not a customer
       // (a sister company, a lender) is billed on Other debtors; a loan in,
       // other income or money against those invoices is an Other receipt.
@@ -606,6 +609,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
       // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      // 0543 — Finance keeps the dealer master (code, state, address, contact)
+      // on the same list the principal uses; inviting stays principal-only.
+      { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
       // The Finance Ledger — three rows, not one row with tabs: the Journal,
       // the Trial Balance and the Self-check are three different objects
       // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs

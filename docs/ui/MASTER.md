@@ -1475,7 +1475,7 @@ facts, permissions, complete-record populations or task ownership.
 2. **Date and identity — APPROVED / NOT BUILT (Jess, 2026-09-17).** Every listing begins
    with its own record date, then its document number/business identity. Canvas ≥768px pins
    both; narrower canvas pins only identity. Neither may be hidden or reordered away by personal
-   layout changes. Identity opens the object. Mappings: Sales Orders `SO Date · SO No`;
+   layout changes. Identity opens the object. Mappings: Sales Orders `Proceed Date · SO Doc Date · SO No` (owner ruling 2026-09-21, orders MASTER; NOT BUILT);
    SO Batch `Proceed Date · SO No`; Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`; Receiving `GRN Date · GRN No`;
    Delivery Orders `DO Date · DO No`; Payment Records `Paid date · Receipt No`.
    **Supplier Claims is the one owner-approved exception (Jess, 2026-09-18):** its confirmed order

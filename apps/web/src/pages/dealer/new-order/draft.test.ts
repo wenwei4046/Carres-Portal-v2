@@ -641,6 +641,9 @@ describe("step3Valid — Submit gate", () => {
     d.payment.approvalCode = "AB";
     expect(step3Valid(d)).toBe(false);
     d.payment.approvalCode = "ABC123";
+    // KL Gateway 2026-09-18: a card sale also names its bank.
+    expect(step3Valid(d)).toBe(false);
+    d.payment.followUps = { bank: "Maybank" };
     expect(step3Valid(d)).toBe(true);
   });
 

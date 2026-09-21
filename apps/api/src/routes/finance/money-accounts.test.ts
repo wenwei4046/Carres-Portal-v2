@@ -53,6 +53,7 @@ describe("who may use /api/finance/ledger/money-accounts", () => {
     ["GET", "", undefined],
     ["POST", "", { name: "CIMB", kind: "BANK" }],
     ["PATCH", "/1121", { name: "Public Bank", is_active: false }],
+    ["POST", "/card-routes", { holding_code: "1131", channel: "dealer", bank_code: "1124" }],
   ])("%s refuses operation with 403 and never reaches the database", async (method, path, body) => {
     const sb = stubRpc({ data: [], error: null });
     const res = await call(method, path, body, "operation");
@@ -179,5 +180,14 @@ describe("rename and take out of use", () => {
   it("an unknown code is 404", async () => {
     stubRpc({ data: null, error: { code: "P0002", message: "That money account is not on the list." } });
     expect((await call("PATCH", "/1199", { name: "X", is_active: true })).status).toBe(404);
+  });
+});
+
+describe("POST /card-routes (0541)", () => {
+  it("sends the holding, the place and the bank to the one door", async () => {
+    const sb = stubRpc({ data: { holding_code: "1131", channel: "dealer", bank_code: "1124" }, error: null });
+    const res = await call("POST", "/card-routes", { holding_code: "1131", channel: "dealer", bank_code: "1124" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("card_settlement_route_set", { p_holding: "1131", p_channel: "dealer", p_bank: "1124" });
   });
 });

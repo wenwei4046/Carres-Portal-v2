@@ -25,6 +25,8 @@ import {
   // 0300 — the ONE interest implementation. The SQL mirror in the migration
   // asserts the same worked examples, so the two cannot drift apart silently.
   rentalLateInterest,
+  rentalMonthView,
+  type RentalMonthBilling,
   RENTAL_AGREEMENT_DOC_KEY,
   CUSTOMERS,
   SERVICE_PACKAGES,
@@ -1054,6 +1056,9 @@ const decideRentalAgreementSchema = z
   .object({
     approve: z.boolean(),
     note: z.string().trim().max(500).optional(),
+    // 0538 — which check Finance ran and its reference, typed by hand.
+    creditCheck: z.string().trim().max(100).optional(),
+    creditReference: z.string().trim().max(200).optional(),
   })
   .refine((v) => v.approve || (v.note != null && v.note.length > 0), {
     message: "A rejection needs a reason",
@@ -1069,6 +1074,26 @@ rentalRouter.get("/approvals", async (c) => {
   const { data, error } = await sb.rpc("rental_pending_approvals");
   if (error) return fail(c, error);
   return c.json({ approvals: (data ?? []) as unknown[] });
+});
+
+// GET /month?month=YYYY-MM — 0538. One calendar month of billing months across
+// every agreement: due, collected, outstanding, and the unpaid ones with the
+// salesperson on the order (Finance hands the chase to them). Read only.
+rentalRouter.get("/month", async (c) => {
+  approverOnly(c);
+  const month = c.req.query("month") ?? todayIsoMYT().slice(0, 7);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return c.json({ error: "bad_month", code: "bad_month", message: "month must be YYYY-MM" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_billings_for_month", { p_month: `${month}-01` });
+  if (error) return fail(c, error);
+  const rows = ((data ?? []) as RentalMonthBilling[]).map((r) => ({
+    ...r,
+    amountDue: Number(r.amountDue),
+    paidAmount: r.paidAmount == null ? null : Number(r.paidAmount),
+  }));
+  return c.json({ month, ...rentalMonthView(rows, todayIsoMYT()) });
 });
 
 // GET /agreements/:id/collections — 0281. What has actually been collected.
@@ -1427,12 +1452,17 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJsonBody(c, decideRentalAgreementSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const { approve, note } = parsed.data;
+  const { approve, note, creditCheck, creditReference } = parsed.data;
+  // Sent only when typed, so a decision without a check calls the same way it always did.
+  const credit = {
+    ...(creditCheck ? { p_credit_check: creditCheck } : {}),
+    ...(creditReference ? { p_credit_reference: creditReference } : {}),
+  };
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = approve
-    ? await sb.rpc("rental_approve_agreement", { p_agreement_id: id, p_note: note ?? null })
-    : await sb.rpc("rental_reject_agreement", { p_agreement_id: id, p_reason: note ?? "" });
+    ? await sb.rpc("rental_approve_agreement", { p_agreement_id: id, p_note: note ?? null, ...credit })
+    : await sb.rpc("rental_reject_agreement", { p_agreement_id: id, p_reason: note ?? "", ...credit });
 
   if (error) {
     const detail = (error as { details?: string | null }).details ?? "";

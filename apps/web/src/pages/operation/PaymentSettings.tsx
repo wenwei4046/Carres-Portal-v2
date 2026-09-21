@@ -381,7 +381,7 @@ const CHANGE_WORD: Record<string, string> = {
 
 function changeWord(what: string): string {
   if (CHANGE_WORD[what]) return CHANGE_WORD[what]!;
-  if (what.startsWith("method")) return "Payment methods";
+  if (what.startsWith("method") || what.startsWith("system_method")) return "Payment methods";
   if (what.startsWith("template")) return "WhatsApp templates";
   return what;
 }
@@ -389,7 +389,7 @@ function changeWord(what: string): string {
 function valueSummary(v: Record<string, unknown> | null): string {
   if (!v) return "none";
   const keep = ["ask_days_before", "deadline_days_before", "free_days", "charge_amount", "cycle_days",
-    "operation_limit_day", "waiver_limit_day", "extra_free_allowed", "inspection_days", "account_no", "active", "label"];
+    "operation_limit_day", "waiver_limit_day", "extra_free_allowed", "inspection_days", "account_no", "active", "label", "account_code"];
   const parts = keep.filter((k) => k in v && v[k] != null).map((k) => `${k.replaceAll("_", " ")} ${String(v[k])}`);
   return parts.length ? parts.join(" · ") : "recorded";
 }
@@ -418,6 +418,12 @@ function ChangeLog({ changes }: { changes: PaymentSettingsPayload["setting_chang
   </Section>;
 }
 
+/** 0541 — the screen word of a row that has no method row (0525's words). */
+function systemMethodWord(method: string, sourceChannel: string): string {
+  if (method === "card") return "POS card";
+  return sourceChannel === "stripe_checkout" ? "Online payment · Stripe checkout" : "Online payment";
+}
+
 /** The draft behind the Edit / Add form. `method` null = a new method. */
 interface MethodDraft {
   method: string | null;
@@ -439,6 +445,9 @@ function PaymentMethodsCard() {
   const rows = registry.data?.methods ?? [];
   const accounts = registry.data?.money_accounts ?? [];
   const [draft, setDraft] = useState<MethodDraft | null>(null);
+  const systemRows = registry.data?.system_rows ?? [];
+  /* 0541 — the POS card or Online payment row being moved. */
+  const [moving, setMoving] = useState<{ method: string; sourceChannel: string; accountCode: string } | null>(null);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
@@ -463,6 +472,17 @@ function PaymentMethodsCard() {
     onSuccess: () => {
       toast.success("Payment method saved");
       setDraft(null);
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const move = useMutation({
+    mutationFn: (m: NonNullable<typeof moving>) =>
+      apiFetch("/api/finance/payment-settings/system-method", { method: "POST", body: JSON.stringify(m) }),
+    onSuccess: () => {
+      toast.success("Payment method saved");
+      setMoving(null);
       refresh();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -528,6 +548,29 @@ function PaymentMethodsCard() {
             })}>Edit</Button>}
           </div>
           {draft?.method === m.method && form}
+        </div>;
+      })}
+    </div>
+    <div className="mt-3 space-y-2" data-testid="system-method-rows">
+      {systemRows.map((r) => {
+        const key = `${r.method}:${r.source_channel}`;
+        const name = accounts.find((a) => a.code === r.account_code)?.name ?? "";
+        const isMoving = moving?.method === r.method && moving.sourceChannel === r.source_channel;
+        return <div key={key} className="text-body" data-testid={`system-row-${key}`}>
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              <span className="font-semibold">{systemMethodWord(r.method, r.source_channel)}</span>
+              <span className="block text-label font-normal">Money account: {r.account_code} · {name}</span>
+            </span>
+            {!isMoving && <Button variant="neutral" onClick={() =>
+              setMoving({ method: r.method, sourceChannel: r.source_channel, accountCode: r.account_code })}>Edit</Button>}
+          </div>
+          {isMoving && <div className="mt-2 flex items-end gap-2 rounded-card border border-kit-slate-5 p-4">
+            <Select id={`system-account-${key}`} label="Money account" value={moving.accountCode}
+              options={accountOptions} onValueChange={(v) => setMoving({ ...moving, accountCode: v })} />
+            <Button variant="primary" loading={move.isPending} onClick={() => move.mutate(moving)}>Save</Button>
+            <Button variant="neutral" onClick={() => setMoving(null)}>Cancel</Button>
+          </div>}
         </div>;
       })}
     </div>

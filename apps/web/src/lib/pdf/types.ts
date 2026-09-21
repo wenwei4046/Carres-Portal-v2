@@ -78,6 +78,8 @@ export type ReceiptTemplateData = {
   reference: string | null;
   note: string | null;
   currency: string;
+  /** §4 — the invoice number(s) this payment settles (live allocations). */
+  invoice_nos?: string[];
   /** §4: "Voided Payment keeps a visible VOIDED receipt." The receipt is not
    *  withdrawn when a payment is voided — it is reprinted saying so. */
   voided?: boolean;
@@ -172,6 +174,9 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   total: number;
   currency: string;
+  /** Goods money (deposit + payments) received before this invoice was
+   *  issued. Above 0, the totals card adds that line and the balance due. */
+  received_before?: number;
   /** Audit name for the footer's left cell (owner 2026-08-09) — who at
    *  Carres issued this invoice. Falls back to the invoice number. */
   issued_by?: string | null;

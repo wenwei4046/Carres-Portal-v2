@@ -69,6 +69,8 @@ describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
         id, email, `IT ${role} ${id.slice(-4)}`, role, position,
       ]);
     }
+    // 0533: a principal approves only as a person, not as a shared login.
+    await q("update app_users set is_person = true where id = $1", [U.principal]);
   }, 30000);
 
   afterAll(async () => {
@@ -152,6 +154,31 @@ describe.skipIf(!URL)("money moves (real PostgreSQL, 0529)", () => {
     );
     expect(after.rows[0]).toEqual({ status: "reversed", holding: 0 });
     expect(await attempt("select public.gl_money_move_reverse($1, 'again')", [id])).toEqual({ ok: false, detail: "money_move_ended" });
+  });
+
+  it("a bank charge posts Dr 6500, Cr bank; a bank credit Dr bank, Cr 4900 (0537)", async () => {
+    await actAs(U.preparer);
+    expect(await create("BANK_CHARGE", "1131", "6500", 1)).toEqual({ ok: false, detail: "from_account_refused" });
+    expect(await create("BANK_CHARGE", "1121", "6100", 1)).toEqual({ ok: false, detail: "to_account_refused" });
+    expect(await create("BANK_CHARGE", "1121", "6500", 1, 0.5)).toEqual({ ok: false, detail: "fee_on_transfer" });
+    expect(await create("BANK_CREDIT", "4000", "1121", 1)).toEqual({ ok: false, detail: "from_account_refused" });
+    expect(await create("BANK_CREDIT", "4900", "1110", 1)).toEqual({ ok: false, detail: "to_account_refused" });
+    const charge = ((await create("BANK_CHARGE", "1121", "6500", 0.5)) as { value: string }).value;
+    const credit = ((await create("BANK_CREDIT", "4900", "1123", 3.21)) as { value: string }).value;
+    await actAs(U.principal);
+    const entry = (await attempt("select public.gl_money_move_approve($1)", [charge])) as { ok: true; value: string };
+    expect(entry.ok).toBe(true);
+    expect((await attempt("select public.gl_money_move_approve($1)", [credit])).ok).toBe(true);
+    expect(await linesOf(charge)).toEqual([
+      { account_code: "1121", debit: 0, credit: 0.5 },
+      { account_code: "6500", debit: 0.5, credit: 0 },
+    ]);
+    expect(await linesOf(credit)).toEqual([
+      { account_code: "1123", debit: 3.21, credit: 0 },
+      { account_code: "4900", debit: 0, credit: 3.21 },
+    ]);
+    expect((await q("select source_type from gl_entries where id = $1", [entry.value])).rows[0].source_type).toBe("BANK_CHARGE");
+    expect((await attempt("select public.gl_money_move_reverse($1, 'bank refunded it')", [charge])).ok).toBe(true);
   });
 
   it("a prepared move is cancelled by Finance with nothing posted, and is never deleted or edited", async () => {

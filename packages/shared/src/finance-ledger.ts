@@ -253,6 +253,8 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   SUPPLIER_MONEY_BACK: "Supplier money back",
   MONEY_TRANSFER: "Bank transfer",
   CARD_PAYOUT: "Card payout",
+  BANK_CHARGE: "Bank charge",
+  BANK_CREDIT: "Bank credit",
   MANUAL: "Manual journal",
 };
 

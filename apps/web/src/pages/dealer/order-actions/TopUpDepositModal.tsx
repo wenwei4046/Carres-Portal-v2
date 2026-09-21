@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { resolvePaymentMethods } from "@carres/shared";
+import { requiredPaymentReference, resolvePaymentMethods } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useCatalog, useTopUpOrder } from "@/lib/queries";
@@ -75,6 +75,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     }
   }, [payMethods, method]);
   const [reference, setReference] = useState("");
+  const refWord = requiredPaymentReference(method); // §16 (0535)
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => appTodayIso());
   const [photos, setPhotos] = useState<PhotoSlot[]>([]);
@@ -135,6 +136,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
     amount > 0 &&
     amount <= balanceToFull &&
     photos.length > 0 &&
+    (!refWord || reference.trim() !== "") &&
     !uploading &&
     !topUpMut.isPending &&
     !!dealerId;
@@ -301,7 +303,7 @@ export default function TopUpDepositModal({ order, total, onClose }: Props) {
               />
             </label>
             <label className="block">
-              <span className="label block mb-1.5">Reference #</span>
+              <span className="label block mb-1.5">{refWord ? `${refWord} *` : "Reference #"}</span>
               <input
                 type="text"
                 value={reference}

@@ -9,6 +9,7 @@ import {
   type PrincipalDealerRecentOrder,
 } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
+import { MY_STATES } from "@/data/malaysia-postcodes";
 import DealerStatusPill from "./DealerStatusPill";
 
 /**
@@ -46,9 +47,11 @@ import DealerStatusPill from "./DealerStatusPill";
 interface Props {
   dealerId: string;
   onClose: () => void;
+  /** 0543 — false under Finance: suspend / reactivate stay principal-only. */
+  canSetStatus?: boolean;
 }
 
-export default function DealerDrawer({ dealerId, onClose }: Props) {
+export default function DealerDrawer({ dealerId, onClose, canSetStatus = true }: Props) {
   const { data, isLoading } = usePrincipalDealer(dealerId);
   const setStatus = useDealerSetStatus(dealerId);
   const update = useUpdateDealer(dealerId);
@@ -62,6 +65,8 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
     ssmCode: "",
     contactName: "",
     contactPhone: "",
+    code: "",
+    state: "",
   });
   const [dirty, setDirty] = useState(false);
   useEffect(() => {
@@ -71,6 +76,8 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
         ssmCode: data.dealer.ssm_code ?? "",
         contactName: data.dealer.contact_name ?? "",
         contactPhone: data.dealer.contact_phone ?? "",
+        code: data.dealer.code ?? "",
+        state: data.dealer.state ?? "",
       });
       setDirty(false);
     }
@@ -126,6 +133,13 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
       draft.contactPhone !== (dealer.contact_phone ?? "")
     ) {
       payload.contactPhone = draft.contactPhone.trim();
+    }
+    // Code and state may be cleared, so an empty value is sent as "".
+    if (draft.code.trim().toUpperCase() !== (dealer.code ?? "")) {
+      payload.code = draft.code.trim().toUpperCase();
+    }
+    if (draft.state !== (dealer.state ?? "")) {
+      payload.state = draft.state;
     }
     if (Object.keys(payload).length === 0) {
       toast.info("No changes to save");
@@ -193,7 +207,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
       >
         <div className="flex justify-between items-start mb-[18px]">
           <div>
-            <div className="kicker">{dealer.id.slice(0, 8)}</div>
+            <div className="kicker">{dealer.code ?? dealer.id.slice(0, 8)}</div>
             <h2 className="font-display text-title leading-tight mt-1 tracking-tight font-semibold">
               {dealer.name}
             </h2>
@@ -288,6 +302,31 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
                 form already drops them), so the drawer hides them too. */}
             {!isShowroom(dealer.channel) && (
               <>
+                <div className="grid grid-cols-2 gap-3">
+                  <ProfileField label="Dealer code">
+                    <input
+                      value={draft.code}
+                      onChange={(e) => setField("code", e.target.value)}
+                      placeholder="e.g. JB1"
+                      maxLength={12}
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary font-mono uppercase"
+                    />
+                  </ProfileField>
+                  <ProfileField label="State">
+                    <select
+                      value={draft.state}
+                      onChange={(e) => setField("state", e.target.value)}
+                      className="w-full px-3 py-2 border border-base-200 rounded text-body outline-none focus:border-primary bg-white"
+                    >
+                      <option value="">Not set</option>
+                      {MY_STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </ProfileField>
+                </div>
                 <ProfileField label="SSM code">
                   <input
                     value={draft.ssmCode}
@@ -338,6 +377,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
           </div>
         </div>
 
+        {canSetStatus && (
         <div className="pt-[18px] border-t border-base-100 flex gap-2">
           {dealer.status === "active" && (
             <button
@@ -371,6 +411,7 @@ export default function DealerDrawer({ dealerId, onClose }: Props) {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

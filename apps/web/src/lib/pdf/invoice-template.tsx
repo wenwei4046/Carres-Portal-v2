@@ -160,7 +160,8 @@ function bandedLines(lines: InvLine[]): Array<{ band: string | null; rows: Array
 }
 
 export function InvoiceTemplate(data: InvoiceTemplateData) {
-  const { doc_title, invoice_no, issue_date, order_code, customer, lines, subtotal, tax_amount, total, currency } = data;
+  const { doc_title, invoice_no, issue_date, order_code, customer, lines, subtotal, tax_amount, total, currency,
+    received_before } = data;
   const guarantees = data.guarantees ?? [];
 
   const title = doc_title ?? "TAX INVOICE";
@@ -373,6 +374,18 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
                 <Text style={styles.grandLabel}>{isTaxInvoice ? "TOTAL" : "TOTAL DUE"}</Text>
                 <Text style={styles.grandValue}>{money(total)}</Text>
               </View>
+              {/* Deposit then final invoice (KL Gateway 2026-09-18): the full
+                  total, the money received before this invoice, what is left. */}
+              {received_before ? (<>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Received before this invoice</Text>
+                  <Text style={styles.totalsValue}>{money(received_before)}</Text>
+                </View>
+                <View style={styles.grandBox}>
+                  <Text style={styles.grandLabel}>BALANCE DUE</Text>
+                  <Text style={styles.grandValue}>{money(Math.max(0, total - received_before))}</Text>
+                </View>
+              </>) : null}
             </View>
           </View>
 

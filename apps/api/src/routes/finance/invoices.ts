@@ -7,7 +7,9 @@ import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
   invoicesListQuery,
+  receivedBeforeInvoice,
 } from "@carres/shared";
+import { ORDER_PAYMENTS } from "@carres/shared/tables";
 import {
   invoicePrepareInput,
   invoiceRegisterQuery,
@@ -793,6 +795,14 @@ financeInvoicesRouter.post("/:id/void", (c) =>
 //   - invoice not voided
 //   - order.status='delivered'
 //   - order.paid >= invoice.amount  (full payment received before tax doc)
+/** The order's payments, for the invoice's "received before this invoice" line. */
+export async function invoicePayments(sb: ReturnType<typeof userClient>, orderId: string) {
+  const { data, error } = await sb.from(ORDER_PAYMENTS)
+    .select("amount, kind, voided_at, created_at").eq("order_id", orderId);
+  if (error) throw new HTTPException(500, { message: error.message });
+  return data ?? [];
+}
+
 financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
@@ -957,6 +967,7 @@ financeInvoicesRouter.get("/:id/pdf-data", requireFinance, async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    received_before: receivedBeforeInvoice(await invoicePayments(sb, inv.order_id), String(inv.issued_at)),
     guarantees: gRows.map((g) => ({
       label: termsBySku[String(g.guarantee_sku)]?.label ?? String(g.guarantee_sku),
       guarantee_id: g.guarantee_id

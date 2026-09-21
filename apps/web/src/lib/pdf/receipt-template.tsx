@@ -85,7 +85,7 @@ const KIND_LABEL: Record<string, string> = {
 
 export function ReceiptTemplate(data: ReceiptTemplateData) {
   const { receipt_no, issue_date, order_code, customer, amount, method, kind, reference, note, currency,
-    voided, void_reason, payer_sign_label } = data;
+    voided, void_reason, payer_sign_label, invoice_nos } = data;
   const kindLabel = KIND_LABEL[kind] ?? kind;
   return (
     <Document>
@@ -113,6 +113,12 @@ export function ReceiptTemplate(data: ReceiptTemplateData) {
             <Text style={styles.detailLabel}>Method</Text>
             <Text style={styles.detailValue}>{method}</Text>
           </View>
+          {invoice_nos?.length ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Invoice</Text>
+              <Text style={styles.detailValue}>{invoice_nos.join(", ")}</Text>
+            </View>
+          ) : null}
           {reference ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Reference</Text>

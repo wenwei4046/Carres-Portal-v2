@@ -2371,7 +2371,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. ⛔ **`Other goods` is COUNTED BUT NO LONGER PRINTED here** (YH, 2026-08-27) — this overwrites the earlier "never dropped from the count". The word reports a CATALOG GAP (a line with no catalog row, or a catalogued `guarantee` item, since this vocabulary covers five of the catalog's six categories), which is not a fact about the customer's goods and is not actionable from a register footer. 🟡 The printed numbers therefore no longer sum to the order's item count; `footerWord` is untouched and still computes the bucket |
 | Copy this order into a new one, from the object page | **`Copy to new Sales Order`** | Duplicate · Clone · New from this |
 | The object MONEY card's door to the collections desk | **`Open this order in Payments`** | View payments · Go to Payments · Collect |
-| The day the Sales Order was taken — register column, Order info, Order Route, field catalog | **`SO Date`** | `Ordered` · `Ordered Qty` · Order date · Placed · Created · Taken on. **REGISTERED 2026-09-01 (YH), five days after the screens started printing it.** `11e11ca2` renamed this fact on five surfaces and never wrote it down here, so the dictionary went on saying `Ordered: {date}` while every screen said `SO Date` — the exact drift Law 1 exists to stop, and it survived because nothing checks a rename against this file. **Why `SO Date` wins the tie:** `Ordered` is Purchasing's word. A Purchase Order is *Ordered* when it goes to the factory, and `Ordered Qty` is a purchasing column on the same operator's screen — one word for two modules' facts is how an operator learns to distrust the header. Sales Orders name their own fact after their own document. The row above under THE ORDER ROUTE WORDS moves with it: the Route node prints `SO Date: {date}`. |
+| The day the Sales Order was taken — register column, Order info, Order Route, field catalog | **`SO Doc Date`** (owner re-ruling Jess 2026-09-21; APPROVED / NOT BUILT) | `SO Date` (retired 2026-09-21) · `Ordered` · `Ordered Qty` · Order date · Placed · Created · Taken on. **REGISTERED 2026-09-01 (YH), five days after the screens started printing it.** `11e11ca2` renamed this fact on five surfaces and never wrote it down here, so the dictionary went on saying `Ordered: {date}` while every screen said `SO Date` — the exact drift Law 1 exists to stop, and it survived because nothing checks a rename against this file. **Why `SO Date` wins the tie:** `Ordered` is Purchasing's word. A Purchase Order is *Ordered* when it goes to the factory, and `Ordered Qty` is a purchasing column on the same operator's screen — one word for two modules' facts is how an operator learns to distrust the header. Sales Orders name their own fact after their own document. The row above under THE ORDER ROUTE WORDS moves with it: the Route node prints `SO Date: {date}`. |
 | Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
 | Order Route, a promise with no trip arranged | **`Customer date {date} · Delivery not arranged`** | `Promised this day, no date yet` — retired 2026-08-15: it named a day and denied it in one line |
 | Order Route, no promise at all | **`No delivery date`** | any second spelling — this is the same governed value the Register prints |
@@ -2468,6 +2468,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | Report a problem, now inside `More actions` | **`Report a problem`** | Raise an issue · Log a complaint · New Service Case |
 | The delivery address the customer has not given yet | **`Address not given yet`** | Unknown · Fill in later · TBC |
 | A cell with no value, anywhere in a register | **`Not recorded`** | `Not given` · Not provided · None · N/A · — · a blank cell. **ONE word, YH 2026-08-29.** The Sales Orders register printed TWO — `Not given` for a fact the customer never told us, `Not recorded` for one Carres never wrote down — 20 cells against 18 on the same table. The distinction is real and invisible: an operator sees two spellings of empty and must work out whether they differ. `Not recorded` survives because it is honest about EVERY column; nobody *gives* us an invoice number or a showroom. Neither word had ever been registered here, while `lib/locality.ts` claimed `Not given` was governed by this file |
+| Sales Orders register `PO No` / `DO No` cell when no PO or DO exists for the order yet — OWNER RULING 2026-09-21 (Jess) · APPROVED / NOT BUILT | **`No PO yet`** · **`No DO yet`**, muted, one line (owner preference 2026-09-21; also the SO goods expansion's `Deliver To` before any PO line). 🟡 SO Batch Purchase prints `Not ordered yet` for the same fact — converging it is Purchasing's own round | `Not recorded` (says Carres failed to write a number down; the document simply does not exist yet) · `No delivery order yet` (too long for the cell, and a second grammar beside `PO No`) · a blank cell |
 | Billing that repeats the delivery address | **`Billing address same as delivery`** | Same as above · Use delivery address |
 | SO goods with order/SKU association but no proven line association (2026-09-11 review) | **`Unit ID link not verified`**; full evidence remains inspectable | Not allocated · silently assigning the same IDs to every matching SKU line |
 | Proven SO line Unit IDs exceed its ordered Qty | **`Unit ID count exceeds order quantity`** | truncating the IDs to fit Qty |
@@ -3730,7 +3731,7 @@ Warehouse operator-flow review, 2026-09-16: **Loading recorded. Awaiting driver 
 
 ### Date-first listing contract — APPROVED (Jess, 2026-09-17) · BUILT on Sales Orders, SO Batch, Manual Purchase and Purchase Orders 2026-09-17
 
-Exact leading columns: Sales Orders `SO Date · SO No`; SO Batch `Proceed Date · SO No`;
+Exact leading columns: Sales Orders `Proceed Date · SO Doc Date · SO No` (2026-09-21); SO Batch `Proceed Date · SO No`;
 Manual Purchase `Proceed Date · MPR No` (Purchasing §9.2); Purchase Orders `PO Date · PO No`;
 Receiving `GRN Date · GRN No`; Delivery Orders `DO Date · DO No`;
 Payment Records `Paid date · Receipt No`. Pin both at canvas ≥768px, identity alone below768px.
@@ -3816,3 +3817,139 @@ always says the word on the right. One fact, one word (rule 2).
 |---|---|
 | Sundry debtor | `Other debtor` |
 | Sundry creditor | `Other creditor` |
+
+## PROPOSAL — PENDING APPROVAL (bank-charge)
+
+Money moves gain two kinds (0537). Nothing below is approved yet.
+
+| Words | Where and meaning |
+|---|---|
+| `Bank charge` · `Bank credit` | The two new kinds (`BANK_CHARGE` · `BANK_CREDIT`), and the Journal's Source for them (with ` reversal`). A bank charge is money the bank took; a bank credit is money the bank added with no document (interest). |
+| `Goes to 6500 Bank and payment charges.` | Hint under the amount on a bank charge. |
+| `Goes to 4900 Other income. Money from a customer is recorded as a payment, not here.` | Hint under the amount on a bank credit. |
+| `Only a card payout has a fee.` · `Only a card payout has a fee. Record a bank charge as its own money move.` | Form refusal · database refusal, replacing `A bank transfer has no fee.` and its database sentence. |
+| `Choose a bank transfer, a card payout, a bank charge or a bank credit.` | Refusal when no kind is chosen, replacing `Choose a bank transfer or a card payout.` |
+| `A bank charge is taken from a bank account in use.` · `A bank charge goes to 6500 Bank and payment charges.` · `A bank credit comes from 4900 Other income.` · `A bank credit goes into a bank account in use.` | Database refusals for the wrong account on each side. |
+
+## PROPOSAL — PENDING APPROVAL (card-routing)
+
+New words on Finance Settings, Money moves and Settings → Payment (migration 0541):
+
+- `Card payout banks` (section heading, Finance Settings) · `Add a card payout bank` (button) · `Card payout bank` (form title)
+- `Card account` · `Machine at` · `Pays out to` (field labels) · `Showroom` · `Dealer` (Machine at choices)
+- `Online payment · Stripe checkout` (the Stripe row on Settings → Payment → Payment methods; `POS card` and `Online payment` are already approved)
+- Refusals: `Choose a card account that is in use.` · `Choose a bank that is in use.` · `Choose showroom or dealer.` · `Choose the card account.` · `Choose the bank.`
+
+## PROPOSAL — PENDING APPROVAL (exception-buttons)
+
+BR-7: Finance holds and clears a delivery from the Payment Record overflow (Finance and principal only).
+
+| Where | Proposed words |
+|---|---|
+| Overflow item, form title and button to open a hold | **`Hold delivery`** |
+| Form sentence | **`The Delivery Order is not issued while Finance holds this delivery.`** |
+| Reason field label | **`Why is Finance holding this delivery`** |
+| Overflow item, form title and button to lift it | **`Clear hold`** |
+| Clear form sentence | reuses **`Finance is holding this delivery: {reason}`** |
+| Evidence field label | **`What shows the money is found`** |
+| Toasts | **`Delivery held`** · **`Hold cleared`** · **`The delivery was not held — {error}`** · **`The hold was not cleared — {error}`** |
+
+### PROPOSAL — PENDING APPROVAL (subscription-views, migration 0538, 18 Sep 2026)
+
+Page: Finance → `Subscriptions` at `/finance/subscriptions` (sidebar word and page header, both
+PROPOSAL). One calendar month across every subscription agreement. Month picker label `Month`.
+Totals: `Due` · `Collected` · `Outstanding`. Columns of the unpaid list: `Customer` · `Phone` ·
+`Sales Order` · `Agreement` · `Amount` · `Due Date` · `Days Late` (a month not yet late reads
+`Not late`) · `Salesperson`. Search hint `Search customer, SO or agreement…`. Footer
+`{n} unpaid · {amount}`. Export name `Unpaid subscriptions`. Empty state
+`Every subscription month due in this month is paid.` Failure
+`The subscription months could not be loaded. Try again.` Nothing on this page says how the
+monthly money arrives; that is not settled.
+
+Rental Approver card, two optional fields kept with approve or reject: `Credit check used`
+(hint `e.g. CTOS`) · `Check reference`.
+
+### PROPOSAL — PENDING APPROVAL (dealer-maintenance)
+
+Finance sidebar entry `Dealers` (opens the same dealer list as Admin > Dealers; Finance has no
+`+ Invite dealer` button and no Suspend / Reactivate). Dealer drawer fields: `Dealer code` with
+placeholder `e.g. JB1`, and `State` with the first option `Not set`. A dealer's code, when set,
+shows before its name in the list and replaces the id at the top of the drawer.
+
+## PROPOSAL — PENDING APPROVAL (receipt-data)
+
+NOT LAW until approved. Words added by the receipt-data slice (0535, 2026-09-18).
+
+| Where | Proposed words | Note |
+|---|---|---|
+| Reference label for a card / cheque payment (order drawer, storage collect, AR drawer, top-up) | `Approval code` · `Cheque number` | Same words `lib/payment-methods` already shows on Invoice → Record payment. |
+| Toast when that reference is empty | `Enter the approval code` · `Enter the cheque number` | |
+| Writer refusals (0535) | `choose how the customer paid` · `a cheque payment needs its cheque number` · `a card payment needs its approval code` | Reach the operator through the API's error message. |
+| Payment receipt PDF, detail row | `Invoice` — the invoice number(s) the payment settles | Payment MASTER §4. |
+| Sales Invoice PDF totals card, when money came before the invoice | `Received before this invoice` · `BALANCE DUE` | Line 2132 lists `Balance due` as a rejected word for the delivery gate refusal; this is a different surface (a printed total), so it needs its own ruling. |
+
+## PROPOSAL — PENDING APPROVAL (bank-movement)
+
+Finance → Dashboard, per-account panel (RPT-3). Movement only: the ledger holds no opening balances, so the panel never says "balance".
+- Panel heading: `Cash and bank · Movement since go-live`
+- Note under it: `Money in and out of each account since {date}, when the ledger started. Money held before then is not counted.`
+- Table label (screen readers): `Movement since go-live`
+- Columns: `Account` · `Inflow` · `Outflow` · `Net` (Inflow and Outflow are the Cashflow chart's own words on the same page)
+
+Finance → Reports, twelve-month trend (RPT-6), read from gl_profit_and_loss one month at a time:
+- Panel heading: `Profit and Loss · Last 12 months`
+- Legend: `Income` · `Expense`; each month shows its net result under the bars
+- Screen-reader line per month: `Income {amount} · Expense {amount}`
+- Read failed: reuses `The profit and loss could not be loaded. Try again.`
+
+## PROPOSAL — PENDING APPROVAL (commission-report)
+
+New on-screen words from Reports → Dealer commission (migration 0544). Not law until approved.
+
+| Where | Proposed words |
+|---|---|
+| Page and report door | `Dealer commission` |
+| Report columns and export | `Commission on collected` · `Commission still to collect` · `Rebate this month` · `Quota left` · `No quota` |
+| Report note | `Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.` |
+| Filters | `All` (as the no-filter choice for Dealer and Showroom) |
+| Rates section | `Commission rates` · `Default rate (%)` · `Product rate` · `Rate (%)` · `Add a product rate` · `Edit` · `Remove` |
+| Quota section | `Renovation quotas` · `Renovation quota` · `Add a renovation quota` · `Quota (RM)` · `Rebate rate (%)` · `Counts from` · `<RM> · <rate>% from <month>` |
+| Quota list, dealer gone | `Dealer not available` |
+| API refusals | `Pick a month.` · `That product is not on the list.` · `That dealer is not on the list.` |
+
+## PROPOSAL — PENDING APPROVAL (departments)
+
+NOT LAW. Words the 0540 departments slice puts on screen. Falsifier: Jess or Finance
+reads "Department" as the HR department (org_departments) on a Finance page.
+
+| Word / sentence | Where | Meaning |
+|---|---|---|
+| Department | Finance line pickers, Journal, Trial Balance, P&L, Balance Sheet, Finance lists | Which part of the business an income or expense line belongs to |
+| Showroom | Department type | One outlet of a showroom-channel dealer |
+| Dealer | Department type | One dealer that is not a showroom |
+| Subscription | Department type | Rental / subscription business, one department |
+| Office | Department type | Head office costs, one department; expenses only |
+| Choose the department. | Line refusal | A new line was saved without a department |
+| That department is not on the list. | Line refusal | The chosen outlet or dealer is not a department |
+| Office has expenses only. Choose another department for income. | Line refusal | Office was picked on an income account |
+| All | Department filter | Every department; the filter is off |
+| All Showroom · All Dealer | Department filter | Every outlet (or every dealer) of that type |
+| Department… · Choose the department | Line picker placeholder | No department picked yet on this line |
+
+### PROPOSAL — PENDING APPROVAL (pv-checks-print)
+
+Payables, 18 Sep 2026. Words new to this standard:
+- Payment voucher form, the bill list: column `Price Check`, with the Bills register's own cells
+  `{n} line differs from PO` · `{n} lines differ from PO` · `Matches PO` · `No PO price`
+  (a flag, never a block).
+- Payment voucher line without a description (0536): `Line {n}: say what this payment is for.`
+  and, before the request is sent, `Say what this payment is for`.
+- Unpaid by Supplier, under a supplier: heading `Advances`; one line per advance with money left
+  `{voucher No} · {date} · RM {x} left of RM {y}`; failure `The advances could not be loaded. Try again.`
+- Payment voucher detail: button `Print`; failure toast `The voucher could not be opened — {error}`.
+- Payment voucher PDF: `PAYMENT VOUCHER` · `PAYMENT VOUCHER · CANCELLED` · `CANCELLED · {reason}` ·
+  `Pay To` · `Voucher Details` · `Payee` · `Supplier` · `Voucher No` · `Date` · `Paid from` ·
+  `Method` · `Reference` · `Description` · `Amount (RM)` · `TOTAL` · `Note: {narration}` ·
+  `{bill No} · Supplier invoice {No}` · `Advance` · signature blocks `Prepared By` (left),
+  `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
+  not yet signed. A draft voucher has no number and no PDF.

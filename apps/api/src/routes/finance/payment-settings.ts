@@ -134,14 +134,17 @@ paymentSettingsRouter.get("/methods", async (c) => {
     throw new HTTPException(403, { message: "You cannot view payment methods." });
   }
   const sb = userClient(c.env, auth.jwt);
-  const [methods, accounts] = await Promise.all([
+  const [methods, accounts, system] = await Promise.all([
     sb.rpc("payment_method_registry"),
     sb.rpc("payment_method_money_accounts"),
+    // 0541 — the POS card and Online payment rows, which have no method row.
+    sb.from("gl_payment_account_map").select("method,source_channel,account_code")
+      .in("method", ["card", "online"]).order("method").order("source_channel"),
   ]);
-  if (methods.error || accounts.error || methods.data == null || accounts.data == null) {
+  if (methods.error || accounts.error || system.error || methods.data == null || accounts.data == null) {
     throw new HTTPException(500, { message: "Payment methods could not be loaded. Try again." });
   }
-  return c.json({ methods: methods.data, money_accounts: accounts.data });
+  return c.json({ methods: methods.data, money_accounts: accounts.data, system_rows: system.data ?? [] });
 });
 
 paymentSettingsRouter.post("/method/save", async (c) => {
@@ -157,6 +160,33 @@ paymentSettingsRouter.post("/method/save", async (c) => {
     p_label: body.data.label,
     p_account_code: body.data.accountCode,
     p_active: body.data.active,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/** 0541 — move POS card or Online payment to another money account. */
+const systemRowInput = z.object({
+  method: z.enum(["card", "online"]),
+  sourceChannel: z.string().trim().min(1).max(40),
+  accountCode: z.string().regex(/^\d{4}$/),
+});
+
+paymentSettingsRouter.post("/system-method", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot change Payment settings." });
+  }
+  const body = await parseJsonBody(c, systemRowInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_system_account_save", {
+    p_method: body.data.method,
+    p_source_channel: body.data.sourceChannel,
+    p_account_code: body.data.accountCode,
   });
   if (error) {
     const m = mapPgError(error);

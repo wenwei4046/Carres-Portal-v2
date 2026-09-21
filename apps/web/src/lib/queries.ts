@@ -363,6 +363,8 @@ export const qk = {
     posPlans: () => ["rental", "pos-plans"] as const,
     // 0268 — the finance approver's credit queue.
     approvals: () => ["rental", "approvals"] as const,
+    // 0538 — one calendar month across every agreement.
+    month: (month: string) => ["rental", "month", month] as const,
     // 0279 — the wording in force, read by the POS before a customer signs.
     agreementTemplate: () => ["rental", "agreement-template"] as const,
     // 0281 — what has actually been collected against one agreement.
@@ -2022,6 +2024,8 @@ export interface PrincipalDealerRow {
   channel: StoreChannel;
   /** How many outlets hang off this account (a dealer's branches). */
   outletCount: number;
+  /** 0543 — dealer code (JB1, JB2); null until Finance sets one. */
+  code: string | null;
 }
 export interface PrincipalDealersListResponse {
   dealers: PrincipalDealerRow[];
@@ -2054,6 +2058,9 @@ export interface PrincipalDealerDetailDealer {
   /** Same second SELECT — tells the drawer whether this is one of Carres' own
    *  showrooms (no SSM / PIC) or an external dealer. */
   channel: StoreChannel;
+  /** 0543 — dealer code and optional state. */
+  code: string | null;
+  state: string | null;
 }
 export interface PrincipalDealerRecentOrder {
   id: string;
@@ -2293,6 +2300,8 @@ export function useUpdateDealer(
         ssmCode?: string;
         contactName?: string;
         contactPhone?: string;
+        code?: string;
+        state?: string;
       }
     >
   >,
@@ -10515,16 +10524,36 @@ export function useRentalApprovals(
   });
 }
 
+/** 0538 — due, collected, outstanding and the unpaid months for one month (YYYY-MM). */
+export function useRentalMonth(month: string) {
+  return useQuery({
+    queryKey: qk.rental.month(month),
+    queryFn: () =>
+      apiFetch<{ month: string } & import("@carres/shared").RentalMonthView>(
+        `/api/rental/month?month=${encodeURIComponent(month)}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
 /** Approve or reject one application. Blasts the whole ["rental"] sub-tree:
  *  an approval mints the schedule + asset + entitlement, so the agreements
  *  list and the unit registry are both stale the moment it lands. */
 export function useDecideRentalAgreement() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: string; approve: boolean; note?: string }) =>
+    mutationFn: (v: {
+      id: string; approve: boolean; note?: string; creditCheck?: string; creditReference?: string;
+    }) =>
       apiFetch<{ agreement: RentalAgreementListItem }>(
         `/api/rental/agreements/${v.id}/decide`,
-        { method: "POST", body: JSON.stringify({ approve: v.approve, note: v.note }) },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            approve: v.approve, note: v.note,
+            creditCheck: v.creditCheck, creditReference: v.creditReference,
+          }),
+        },
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["rental"] });
@@ -11606,5 +11635,60 @@ export function useAddCommissionAdjustment() {
         body: JSON.stringify(input),
       }),
     onSuccess: invalidate,
+  });
+}
+
+/* ─── BR-7 — Finance holds a delivery from the Payment Record ────────────────
+ * The two doors of `/api/finance/exceptions` (0355). The server gates both to
+ * Finance and principal; clearing may issue the Delivery Order, so both
+ * refresh the whole order family.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** Every Finance exception on one order, newest first. */
+export function useFinanceExceptions(orderId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId, "finance-exceptions"] as const,
+    queryFn: () => apiFetch<SalesOrderRouteFinanceException[]>(
+      `/api/finance/exceptions/${encodeURIComponent(orderId)}`),
+    enabled,
+  });
+}
+
+/** Finance opens a hold. `reason` is required by the schema, RPC and table. */
+export function useOpenFinanceException(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { reason: string }>({
+    mutationFn: ({ reason }) => apiFetch("/api/finance/exceptions/open", {
+      method: "POST", body: JSON.stringify({ orderId, reason }),
+    }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Finance lifts one hold, with the evidence that closed it. */
+export function useClearFinanceException(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { id: string; evidence: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { id: string; evidence: string }>({
+    mutationFn: ({ id, evidence }) => apiFetch(
+      `/api/finance/exceptions/${encodeURIComponent(id)}/clear`,
+      { method: "POST", body: JSON.stringify({ evidence }) },
+    ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId] });
+      // Clearing the last hold can issue the Delivery Order.
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }

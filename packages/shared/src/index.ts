@@ -1623,8 +1623,10 @@ export {
   type PaymentMoneyAccount,
   type PaymentMethodSaveInput,
   recordPaymentInputSchema,
+  requiredPaymentReference,
   collectStorageInput,
   summarizePayments,
+  receivedBeforeInvoice,
   // CARD 4 closing slice (0347) — the ONE "is this a valid payment?" predicate.
   // A voided row stays in the history and counts toward nothing.
   isLivePayment,
@@ -2987,6 +2989,10 @@ export {
   // The SQL mirror `rental_late_interest()` asserts the same worked examples.
   rentalLateInterest,
   RENTAL_LATE_INTEREST_PCT_PER_MONTH,
+  // 0538 — Finance's month across all agreements.
+  rentalMonthView,
+  type RentalMonthBilling,
+  type RentalMonthView,
   // 0264 — the offer layer: service SKU codes + the pick → money resolver
   // (shared by the P&M previews, the POS lanes and the signing recompute).
   serviceSkuCode,

@@ -3,7 +3,8 @@
  *
  * Finance moving its own money: a bank transfer between two cash or bank
  * accounts, or a card payout from a card company's holding account into a
- * bank, less the card company's fee. Prepared by Finance; the finance approver
+ * bank, less the card company's fee; a bank charge or a bank credit seen only
+ * on the statement (0537). Prepared by Finance; the finance approver
  * (not the preparer) approves, and only approval enters it in the ledger.
  * A prepared move is cancelled; an approved one is cancelled by reversal.
  *
@@ -13,6 +14,7 @@
 import { useMemo, useState } from "react";
 import {
   MONEY_MOVE_KIND_WORD,
+  MONEY_MOVE_KINDS,
   MONEY_MOVE_STATUS_WORD,
   moneyMoveActions,
   moneyMoveGross,
@@ -22,6 +24,7 @@ import {
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
 import { parseTypedAmount } from "@carres/shared/other-money-in";
+import { CARD_CHANNELS, CARD_CHANNEL_WORD, settlementBank, type CardChannel } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -35,7 +38,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
-import { useMoneyAccounts } from "../settings/api";
+import { useCardRoutes, useMoneyAccounts } from "../settings/api";
 import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/parts";
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
 
@@ -242,11 +245,21 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
+  /* 0541 — a card payout's bank defaults from Finance Settings' route; still changeable. */
+  const routes = useCardRoutes();
+  const [channel, setChannel] = useState<CardChannel | undefined>();
+  const routeBank = (holding: string | undefined, ch: CardChannel | undefined) => {
+    const bank = settlementBank(routes.data ?? [], holding, ch);
+    if (bank && moveAccounts("CARD_PAYOUT", "to", accounts.data ?? []).some((a) => a.code === bank)) setToCode(bank);
+  };
 
   const options = (side: "from" | "to") =>
     moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
   const amountN = parseTypedAmount(amount);
-  const feeN = kind === "TRANSFER" ? 0 : parseTypedAmount(fee) ?? 0;
+  // 0537: a bank credit always comes from 4900, a bank charge always goes to 6500.
+  const fixedFrom = kind === "BANK_CREDIT" ? "4900" : undefined;
+  const fixedTo = kind === "BANK_CHARGE" ? "6500" : undefined;
+  const feeN = kind !== "CARD_PAYOUT" ? 0 : parseTypedAmount(fee) ?? 0;
   const gross = amountN && !Number.isNaN(amountN) && !Number.isNaN(feeN) ? moneyMoveGross(amountN, feeN) : null;
 
   const submit = () => {
@@ -254,8 +267,8 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
     const parsed = moneyMoveInput.safeParse({
       kind,
       move_date: date ?? "",
-      from_account_code: fromCode ?? "",
-      to_account_code: toCode ?? "",
+      from_account_code: fixedFrom ?? fromCode ?? "",
+      to_account_code: fixedTo ?? toCode ?? "",
       amount: amountN === null || Number.isNaN(amountN) ? undefined : amountN,
       fee: Number.isNaN(feeN) ? undefined : feeN,
       reference: reference.trim() || null,
@@ -303,35 +316,58 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             setFromCode(undefined);
             setToCode(undefined);
           }}
-          options={[
-            { value: "TRANSFER", label: MONEY_MOVE_KIND_WORD.TRANSFER },
-            { value: "CARD_PAYOUT", label: MONEY_MOVE_KIND_WORD.CARD_PAYOUT },
-          ]}
+          options={MONEY_MOVE_KINDS.map((k) => ({ value: k, label: MONEY_MOVE_KIND_WORD[k] }))}
         />
         <DatePicker id="move-date" label="Date" required value={date} onChange={setDate} />
-        <Select
-          id="move-from"
-          label="Paid from"
-          required
-          value={fromCode}
-          onValueChange={setFromCode}
-          options={options("from")}
-          placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
-        />
-        <Select
-          id="move-to"
-          label="Paid into"
-          required
-          value={toCode}
-          onValueChange={setToCode}
-          options={options("to")}
-          placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
-        />
+        {!fixedFrom && (
+          <Select
+            id="move-from"
+            label="Paid from"
+            required
+            value={fromCode}
+            onValueChange={(v) => {
+              setFromCode(v);
+              if (kind === "CARD_PAYOUT") routeBank(v, channel);
+            }}
+            options={options("from")}
+            placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
+          />
+        )}
+        {kind === "CARD_PAYOUT" && (
+          <Select
+            id="move-channel"
+            label="Machine at"
+            value={channel}
+            onValueChange={(v) => {
+              setChannel(v as CardChannel);
+              routeBank(fromCode, v as CardChannel);
+            }}
+            options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
+          />
+        )}
+        {!fixedTo && (
+          <Select
+            id="move-to"
+            label="Paid into"
+            required
+            value={toCode}
+            onValueChange={setToCode}
+            options={options("to")}
+            placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
+          />
+        )}
         <Input
           id="move-amount"
-          label={kind === "TRANSFER" ? "Amount (RM)" : "Paid into the bank (RM)"}
+          label={kind === "CARD_PAYOUT" ? "Paid into the bank (RM)" : "Amount (RM)"}
           required
           inputMode="decimal"
+          hint={
+            kind === "BANK_CHARGE"
+              ? "Goes to 6500 Bank and payment charges."
+              : kind === "BANK_CREDIT"
+                ? "Goes to 4900 Other income. Money from a customer is recorded as a payment, not here."
+                : undefined
+          }
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />

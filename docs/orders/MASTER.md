@@ -195,31 +195,51 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**Date-first listing — APPROVED (Jess, 2026-09-17) · BUILT 2026-09-17.** Follow UI MASTER §6.7: date first, identity second; pin both at canvas ≥768px, identity alone below 768px; neither can be hidden or moved (engine `leadingColumns`, layout key `…register.v5`). Personal account layouts remain PO-only until owner acceptance.
-
-The approved default columns — **OWNER RULING (Jess, 2026-09-18): every listing uses the same order and
-words · NOT BUILT** (overwrites the 2026-09-17 order):
+**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
+2026-09-17 date-first pair (`SO Date · SO No`), and the 2026-09-18 default order. The current build still shows the older order until the Sales Orders listing round.
 
 ```
-SO Date | SO No | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | Showroom | PO No | DO No
+Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
 ```
 
-Same reading order and column words as SO Batch Purchase and Manual Purchase (date → number → customer
-facts → goods → linked documents). `Items` becomes a default column (`{first item} + {n} more`).
+- **Population.** Only orders Sales has handed to Operation. A `Placed` order is not on this Register,
+  so every row has a Proceed Date.
+- **`Proceed Date`** leads: the actual day Sales handed the complete order to Operation
+  (`orders.proceeded_at`, the same fact and word as SO Batch Purchase). Never the planned
+  production-start field `orders.proceed_date`.
+- **`SO Doc Date`** follows: the Sales Order document date (`orders.placed_at`). It replaces the word
+  `SO Date` for this fact on every surface — Register, Order info, Order Route, field catalogs (one
+  meaning, one word — COPY-STANDARD). The bare word `Ordered` stays Purchasing's (`Ordered` · `Ordered Qty`).
+- **`SO No`** is the identity and the door to the order. Proceed Date, SO Doc Date and SO No cannot be
+  hidden or moved by personal layouts; SO No pins at every width.
+- **No groups, no status.** The Register is one flat list with no status grouping (owner ruling
+  2026-09-21). After-sales service can happen at any point, so a Service Case is never a group and never
+  a Register column; the order's Service Cases stay on the order and on Order Route `Linked problems`.
+- **No absence word for a required fact.** Proceed Date, SO Doc Date, SO No, Showroom, Salesperson,
+  Customer Requested Delivery Date, Customer Delivery Location, Customer and Items are required when Sales
+  submits the order (Sales Portal entry gate), so every row has them. `Not recorded`, `To be confirmed`
+  and `No delivery date` never print in these columns: an empty one would be a system error, not a state
+  of the order, and is fixed at its source rather than dressed as data. Only a document that genuinely
+  does not exist yet has an absence word (`No PO yet` · `No DO yet`, below).
+- **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
+- **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
+- `Items` is a default column (`{first item} + {n} more`).
+- **One line, 38px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
+  Salesforce, SAP Fiori, AG Grid).** Every row stays the current 38px (`--grid-row-h`) and never grows.
+  Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
+  column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
+  be widened. Dates, `SO No`, `PO No` and `DO No` never cut.
+- Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
+  retired with it and are re-measured in the build round.
 
-**Widths re-measured for the date-first order (rendered shell fixture, 1440, Inter, 2026-09-17):**
-SO Date 118 (another year `Wed, 28 May 25` needs 117 — the 🟡 cross-year cut is closed) · SO No 80 ·
-Requested Delivery Date 120 (amber `No delivery date` needs 119) · Customer 170 · Delivery Location 160
-(`Sungai Buloh, Selangor`; the longest live `Port Dickson, Negeri Sembilan` opens whole) · Showroom 118
-(longest live outlet `Kota Damansara` needs 117; 100 cut it) · PO No 152 · DO No 144. Total with the
-gutter 1125px = the grid's client width at 1440 when the vertical scrollbar is drawn; every default is
-fully visible and nothing scrolls sideways. 1180: both pinned, the rest scrolls under. 820 / 720 (200% of
-1440) / 390: SO No pins alone at 72px, SO Date scrolls under it, no page sideways scroll.
-
-**Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
-Order was created (`orders.placed_at`). It is one read-only fact and uses that exact label in the
-Register, Order info, Order Route and field catalogs. The bare word `Ordered` is not an SO date:
-Purchasing retains it only for an ordered state or quantity (`Ordered` · `Ordered Qty`).
+**Document absence words and expansion — OWNER RULING (Jess, 2026-09-21): follow the Purchasing design ·
+APPROVED / NOT BUILT.** `PO No` with no Purchase Order reads `No PO yet` (owner preference 2026-09-21,
+kept over SO Batch Purchase's `Not ordered yet`); `DO No` with no Delivery Order
+reads `No DO yet`. Both muted, one line. `Not recorded` is never used here. The goods expansion uses the
+Purchasing reference geometry (UI MASTER §6.8–§6.9): the §6.9 1px connector from the SO row's caret to a
+bordered child frame, 11px/600 child headers, and `Item` as the product name with its configuration on
+line two (`Cody` / `Super King`) instead of repeating the SKU. Its columns stay
+`Category | Unit ID | Deliver To | SKU | Qty | Item`; `Deliver To` with no PO line reads `No PO yet`.
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
@@ -228,15 +248,15 @@ a door to its owner: SO → SO, PO → PO, DO → DO.
 ### Listing Standard — owner approved 2026-09-16
 
 The shared ERP Listing Standard applies to this Register without changing what it is (a record
-register: same eight default columns and order, no rail, no work groups, no owners, no action
-sentences, no Priority).
+register: the owner-ruled columns and groups above, no rail, no owners, no action sentences, no
+Priority).
 
 ```
 FILTERS    active search + header filters shown as conditions · one `Clear filters` clears both
            footer `{n} of {m} sales orders` · `1 sales order` · `{m}` = the server's count
            (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
            unknown total → `{n} sales orders`, never a guessed `of`
-IDENTITY   SO Date · SO No lead and pin (SO No alone below 768px); SO No is a door to the order
+IDENTITY   Proceed Date · SO Doc Date · SO No lead (2026-09-21); SO No is a door to the order
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
