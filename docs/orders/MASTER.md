@@ -252,11 +252,11 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
   Requested Delivery Date → **180** (the two-line header sets it) · Customer Delivery Location
   **176** · Customer **150** · Items `Booqit Hybrid + 1 more` 142.9px → **208** · PO No
   `PO-20260910-4004` 126.8px / DO No `DO-20260915-7020` 125.1px → **170** (`documentNo`). Row height
-  38px at ≥768px; no page-level sideways scroll at 1440 / 1180 / 820 / 390 or 200% zoom.
+  40px (`rowHeight={40}`, this page only); no page-level sideways scroll at 1440 / 1180 / 820 / 390 or 200% zoom.
 - 🟡 **Owed to the engine, not this page:** `overflowText` opens a cut value on click / Enter (and
   names it in full to a screen reader), not on hover or focus; the §6.9 SO-row connector starts
   22px below and 26px right of the caret on SO Batch and here alike; below 768px the engine's 40px
-  checkbox touch target makes every row 39px, not 38.
+  checkbox touch target is measured against the 40px row in the walk below.
 
 **Document absence words and expansion — OWNER RULING (Jess, 2026-09-21): follow the Purchasing design ·
 BUILT (Card 12).** `PO No` with no Purchase Order reads `No PO yet` (owner preference 2026-09-21,

@@ -735,6 +735,10 @@ export default function SalesOrdersRegister() {
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
             groupBanner={false}
+            /* ⭐ The one-line listing row is 40px, adopted on this page only
+               (ui MASTER §6.0 rule 5, owner ruling 2026-09-21). Text stays
+               13/18 with 8px padding; the engine default (38px) is untouched. */
+            rowHeight={40}
             /* ⭐ Proceed Date · SO Doc Date · SO No lead and cannot be hidden
                or moved (owner ruling 2026-09-21). At a canvas ≥768px the
                engine pins SO Doc Date · SO No and Proceed Date scrolls under

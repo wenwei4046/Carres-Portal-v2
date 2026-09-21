@@ -386,8 +386,10 @@ export type DataGridProps<T> = {
    * every cell carries one primary fact and one supporting line. Omitted =
    * the Register baseline (38px), byte-identical for every other caller. A
    * page passes the governed number; the engine never invents a third.
+   * 40 = the one-line listing row, adopted PAGE BY PAGE (ui MASTER §6.0 rule
+   * 5, owner ruling 2026-09-21); the 38px default is not changed by it.
    */
-  rowHeight?: 38 | 72;
+  rowHeight?: 38 | 40 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
