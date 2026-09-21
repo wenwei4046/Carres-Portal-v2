@@ -1522,9 +1522,11 @@ listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, C
 Date, Showroom); its layout is not redesigned.
 
 **The PDF header — OWNER RULING (Jess, 2026-09-21).** Left: the Carres logo beside the legal name, the registration
-number, then the address in two lines without `Wilayah Persekutuan KL`. Right, three lines: `SALES ORDER` (the existing
+number, then the address in two lines without `Wilayah Persekutuan KL`. Right, two lines only: `SALES ORDER` (the existing
 Carres small grey document word) · the SO number alone in the existing Carres hero size (18pt bold, no `SO No:`
-label) · `SO Doc Date: {date}`. Carres type sizes are kept
+label). The SO Doc Date prints once, in SALES ORDER INFO. **Every date on the document reads `Fri, 21 Aug 2026`**
+— weekday plus four-digit year (owner, 2026-09-21), through the one shared `fmtDate` with `year: "always"`; the
+template's private `niceDate`/`capsDate` formatter (two-digit year) is retired. Carres type sizes are kept
 throughout; nothing is resized to match the reference.
 
 **The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (in full). Rows,

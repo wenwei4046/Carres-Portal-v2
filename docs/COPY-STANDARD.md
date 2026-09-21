@@ -2798,8 +2798,9 @@ the moment `27` appears, it is carrying the whole meaning, and the operator sees
 the day off the date itself. `12 Aug` does not say whether the truck moves on a working day;
 `Wed, 12 Aug` does. The year is context the reader already has; the weekday is not.
 
-**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year** — `fmtDate(iso, { year:
-"always" })`. A screen is read today, so "this year" is a fact the reader is holding. A service
+**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year, in FOUR digits** — `fmtDate(iso, { year:
+"always" })` prints `Fri, 21 Aug 2026` (owner ruling 2026-09-21: a filed document re-read years later must not
+show `26`). A screen is read today, so "this year" is a fact the reader is holding. A service
 note or a receipt is printed, filed and re-read in a later year by a customer or a technician
 who is holding nothing, and `Request Date: Wed, 12 Aug` has lost a fact the document exists to
 carry. **It is an option ON the one formatter, never a second formatter.**
