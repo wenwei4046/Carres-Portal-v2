@@ -237,6 +237,30 @@ describe("GET /entries", () => {
     expect(ops(c, "range")).toEqual([["range", 500, 599]]);
   });
 
+  it("narrows by department through gl_line_departments, never through an embed", async () => {
+    const { calls } = fakeClient((call) => (call.name === "gl_line_departments"
+      ? ok([{ entry_id: "e1" }, { entry_id: "e1" }, { entry_id: "e2" }], null)
+      : ok([], 0)));
+    const res = await get("/entries?departmentType=SHOWROOM&departmentId=11111111-1111-4111-8111-111111111111");
+    expect(res.status).toBe(200);
+    const dept = calls.find((x) => x.name === "gl_line_departments")!;
+    expect(ops(dept, "eq")).toContainEqual(["eq", "department_type", "SHOWROOM"]);
+    expect(ops(dept, "eq")).toContainEqual(["eq", "department_id", "11111111-1111-4111-8111-111111111111"]);
+    const entries = calls.find((x) => x.name === "gl_entries")!;
+    // One entry with two lines in the department is one entry, not two.
+    expect(ops(entries, "in")).toEqual([["in", "id", ["e1", "e2"]]]);
+    // 0540's view derives the department of an invoice or a payment; embedding
+    // it as a computed relationship is what made this read never return.
+    expect(String(ops(entries, "select")[0]![1])).not.toContain("gl_entry_departments");
+  });
+
+  it("answers a department with no entries as empty, never as an error", async () => {
+    fakeClient((call) => (call.name === "gl_line_departments" ? ok([], null) : ok([], 0)));
+    const res = await get("/entries?departmentType=OFFICE");
+    expect(res.status).toBe(200);
+    expect((await json(res)).total).toBe(0);
+  });
+
   it.each([
     ["?from=2026-09-30&to=2026-09-01", "backwards dates"],
     ["?q=a,b", "a comma in the search"],

@@ -201,18 +201,29 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
 
   // An account narrows to the entries with at least one line on it. `!inner`
   // makes the embedded filter a filter on the entries, and the count follows.
-  // 0540: a department narrows the same way, through gl_entry_departments.
-  const embeds = [
-    account ? "gl_entry_lines!inner(account_code)" : null,
-    departmentType ? "gl_entry_departments!inner(department_type,department_id)" : null,
-  ].filter(Boolean);
+  const embeds = [account ? "gl_entry_lines!inner(account_code)" : null].filter(Boolean);
+
+  // 0540: a sales invoice, a customer payment and a rental collection take
+  // their department at read time from the order, so it lives in
+  // gl_line_departments and not on the line. Read that view ONCE for the
+  // entries it matches. Not as an embedded computed relationship: PostgREST
+  // rebuilds the whole view per parent row and the read never returns.
+  // ponytail: an unbounded id list, held today by the Journal's own page cap;
+  // push the filter into a register function if one department outgrows a URL.
+  let deptEntries: string[] | null = null;
+  if (departmentType) {
+    let d = sb.from("gl_line_departments").select("entry_id").eq("department_type", departmentType);
+    if (departmentId) d = d.eq("department_id", departmentId);
+    const got = await d;
+    if (got.error) return ledgerError(c, got.error, "The journal");
+    deptEntries = [...new Set((got.data ?? []).map((r) => String((r as Json).entry_id)))];
+  }
   let req = sb
     .from("gl_entries")
     .select([ENTRY_COLUMNS, ...embeds].join(","), { count: "exact" })
     .eq("posted", true);
   if (account) req = req.eq("gl_entry_lines.account_code", account);
-  if (departmentType) req = req.eq("gl_entry_departments.department_type", departmentType);
-  if (departmentId) req = req.eq("gl_entry_departments.department_id", departmentId);
+  if (deptEntries) req = req.in("id", deptEntries);
   if (from) req = req.gte("entry_date", from);
   if (to) req = req.lte("entry_date", to);
   if (source) req = req.eq("source_type", source);

@@ -84,6 +84,19 @@ export default function LedgerJournal() {
     onPickAccount={pickAccount} onShowAll={showAll} onNew={mayRecord ? startEntry : undefined} />;
 }
 
+/** The empty line names only what is actually filtered. A department with no
+ *  entries of its own must not read as a failed search on accounts and dates. */
+function emptyWords(scope: JournalScope): string {
+  const bits = [
+    scope.account ? "this account" : null,
+    scope.dept ? "this department" : null,
+    scope.from || scope.to ? "these dates" : null,
+  ].filter(Boolean);
+  return bits.length === 0
+    ? "No entries yet. Invoices, payments and bills add entries here."
+    : `No entry matches ${bits.join(" and ")}.`;
+}
+
 function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onShowAll, onNew }: {
   scope: JournalScope;
   onPickDept: (v: string) => void;
@@ -163,9 +176,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
               <button type="button" className="underline underline-offset-2" onClick={onShowAll}>Show all entries</button>
             </span>}
           </span>}
-          emptyMessage={scoped
-            ? "No entry matches this account and these dates."
-            : "No entries yet. Invoices, payments and bills add entries here."}
+          emptyMessage={emptyWords(scope)}
           expandTitle="Show lines" onRowDoubleClick={(r) => onOpen(r.entry_no)}
           expandable={{ renderExpansion: (r) => <EntryExpansion row={r} onOpen={onOpen} /> }}
           statusSummary={(visible) => <span data-testid="journal-summary">
