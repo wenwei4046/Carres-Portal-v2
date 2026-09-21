@@ -413,7 +413,10 @@ order and the same words on both sides. The PDF's `Order Details` · `Ordered` �
 SO info                 SO Doc Date · Customer Requested Delivery Date · Proceed Date · Customer reference
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 CUSTOMER                name · phone · email · demographics
-  ├ header              New customer / Existing customer — the standing answer, beside the name
+  ├ header              New customer / Existing customer — the standing answer, beside the name.
+  │                     Existing customer carries `· {n} orders ›` (owner ruling 2026-09-21, NOT BUILT):
+  │                     n = this phone's Sales Orders the reader may see; the link opens the Sales Orders
+  │                     Register searched by that phone. No new customer page, no new writer.
   ├ Sales ownership     Dealer · Showroom · Salesperson  (+ the approval lane)
   ├ Emergency contact   name · phone · relationship      (own heading, own divider)
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
