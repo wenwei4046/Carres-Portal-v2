@@ -112,11 +112,11 @@ export const REGISTER_FIELD_WIDTH = {
      optional catalog read every width from here; none is typed on the page. ── */
 
   /**
-   * `Showroom` — the branch that sold the order, printed without the house
-   * name (`Kota Damansara`, the longest live outlet: 100.7px at 13px Inter
-   * + 16 padding). 118 also clears the header and its sort/filter controls.
+   * `Sales Location` — where the order was sold: the outlet, else the dealer,
+   * printed in full as the SO PDF prints it. Longest live value
+   * `Carres Kota Damansara`; see orders MASTER Card 12 for the rendered measurement.
    */
-  showroom: 118,
+  salesLocation: 168,
   /**
    * `Salesperson` — who SOLD the order. Longest live name `Khoo Aik Yean`
    * (≈88px at 13px Inter + 16). The header word plus its sort and filter

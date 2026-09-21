@@ -2080,8 +2080,8 @@ resizing remains available.
 | Supplier / Ready Stock | 140 | **MEASURED** | Manual Purchase: longest live supplier 17 characters. PO built 136 → widened to 140 (2026-09-18) |
 | Supplier Deliver To | 150 | **MEASURED** | PO, built 2026-09-18. **Owed:** Manual Purchase built 132 |
 | Customer | 150 | prototype | Sales Orders shows it one line; a longer name ends in `…` and opens whole |
-| Showroom | 118 | **MEASURED** | Sales Orders, 2026-09-21: `Kota Damansara` (longest live outlet, house name dropped) 100.5px + 16 |
-| Salesperson | 120 | **MEASURED** | Sales Orders, 2026-09-21: `Khoo Aik Yean` (longest live) fits; the header word plus sort and filter is the floor |
+| Sales Location | 168 | **MEASURED** | Sales Orders, 2026-09-22: `Carres Kota Damansara` (longest live, printed in full as on the SO PDF) 145.4px + 16 = 161.4 |
+| Salesperson | 120 | **MEASURED** | Sales Orders, 2026-09-22: `Khoo Aik Yean` (longest live) 89.2px + 16; the header word plus its filter icon (103px) is the floor |
 | Sales Orders optional catalog: amount 116 · party name 150 · reference 150 · phone 132 · email 200 · address 240 · place word 140 · short fact 96 · small count 120 | — | prototype | Sales Orders, 2026-09-21: the hidden-by-default catalog columns take a registry role instead of a typed number. **Owed:** measurement when a page shows one by default |
 | Customer Delivery Location | 176 | prototype | |
 | Customer Requested Delivery Date | 180 | prototype | **Owed:** SO Batch built 144 off `No delivery date yet` 124px; re-measure against the longest governed absence |

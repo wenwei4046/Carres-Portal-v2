@@ -195,8 +195,7 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR
-#1491](https://github.com/wenwei4046/Carres-Portal-v2/pull/1491), not yet merged) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
+**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, PR_LINK) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
 (`SO Date · SO No`), and the 2026-09-18 default order.
 
 ```
@@ -238,25 +237,29 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
 
 - **Population** is the server's: the page asks `GET /api/operation/orders?stage=proceeded`
   (every status except `place`) and the `{m}` total is counted the same way. Production on
-  2026-09-21 (test data): 29 proceeded orders stay, 72 Placed orders leave the Register.
+  2026-09-22 (test data): 27 proceeded orders stay; Placed orders leave the Register.
 - **Leading three.** At a grid canvas ≥768px `Proceed Date` leads (engine `leadingColumns.before`)
   and `SO Doc Date · SO No` pin. Below 768px `SO No` leads and pins alone and the two dates follow
-  it: three locked columns plus the control gutter need ~400px, which put SO No off-screen at 390.
-  Layout key `carres.salesOrders.register.v6.{role}` retires every saved v5 order.
+  it, all three still locked (none can be hidden or moved): three locked columns plus the control
+  gutter need ~400px, which put SO No off-screen at 390. Layout key `carres.salesOrders.register.v6.{role}` retires every saved v5 order.
 - **`Items`** and the expansion's **`Item`** read the product name from the catalog (`Cody + 1
   more`; `Cody` / `Super King`); a SKU the catalog does not know prints as itself.
 - **Measured widths** — rendered portal shell, 13px Inter, 1440 (fixture; the widest governed value
   + 16px padding): Proceed Date / SO Doc Date `Wed, 28 May 25` 101.5px → **120** (`date`) · SO No
-  `SO-1334` 54.6px → **90** (`soNo`) · Showroom `Kota Damansara` 100.5px → **118** (`showroom`, new)
-  · Salesperson `Khoo Aik Yean` (longest live) fits → **120** (`salesperson`, new) · Customer
+  `SO-1334` 54.6px → **90** (`soNo`)
+  · Sales Location `Carres Kota Damansara` (longest live, printed in full as the SO PDF prints it)
+  145.4px → **168** (`salesLocation`, new) · Salesperson `Khoo Aik Yean` (longest live) 89.2px; the
+  header word + filter icon is the floor (103px) → **120** (`salesperson`, new) · Customer
   Requested Delivery Date → **180** (the two-line header sets it) · Customer Delivery Location
   **176** · Customer **150** · Items `Booqit Hybrid + 1 more` 142.9px → **208** · PO No
   `PO-20260910-4004` 126.8px / DO No `DO-20260915-7020` 125.1px → **170** (`documentNo`). Row height
   40px (`rowHeight={40}`, this page only); no page-level sideways scroll at 1440 / 1180 / 820 / 390 or 200% zoom.
-- 🟡 **Owed to the engine, not this page:** `overflowText` opens a cut value on click / Enter (and
-  names it in full to a screen reader), not on hover or focus; the §6.9 SO-row connector starts
-  22px below and 26px right of the caret on SO Batch and here alike; below 768px the engine's 40px
-  checkbox touch target is measured against the 40px row in the walk below.
+- **Sales Location** is `salesLocationOf` — the outlet, else the dealer, trimmed, in full; the same
+  rule as the SO PDF (`sales-order-template.tsx`). Production 2026-09-22: 0 of 27 proceeded orders
+  lack it, 0 lack a Salesperson, 0 lack a Customer Requested Delivery Date.
+- **Engine behaviours it reads, shipped once for every listing by [PR #1492](https://github.com/wenwei4046/Carres-Portal-v2/pull/1492)**
+  (merged before this page): a cut value shows whole on hover and keyboard focus, and click/Enter opens
+  it to read and select; the §6.9 line starts under the SO row's caret and runs to the goods frame.
 
 **Document absence words and expansion — OWNER RULING (Jess, 2026-09-21): follow the Purchasing design ·
 BUILT (Card 12).** `PO No` with no Purchase Order reads `No PO yet` (owner preference 2026-09-21,
@@ -1374,8 +1377,8 @@ query.**
 ### Register
 
 - **The default columns are THE REGISTER COMPOSITION** (owner ruling 2026-09-21, top of this
-  MASTER) — eleven, led by `Proceed Date | SO Doc Date | SO No`. `Showroom` READS the Sales-ownership fact the
-  order already carries (`outlets.name`); it has been a declaration in the register's catalog since
+  MASTER) — eleven, led by `Proceed Date | SO Doc Date | SO No`. `Sales Location` READS the Sales-ownership fact the
+  order already carries (the word is `Sales Location` since 2026-09-21: `outlets.name`, else `dealers.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
   for it.
 - **An absence is quieter than a fact.** `Not recorded` / `Not given` keep their words — a blank

@@ -14,7 +14,7 @@
  *
  * THE DEFAULT ROW — owner ruling 2026-09-21 (orders MASTER, THE REGISTER
  * COMPOSITION), exactly and in this order:
- *   ☐ ▸ Proceed Date · SO Doc Date · SO No · Showroom · Salesperson ·
+ *   ☐ ▸ Proceed Date · SO Doc Date · SO No · Sales Location · Salesperson ·
  *   Customer Requested Delivery Date · Customer Delivery Location · Customer ·
  *   Items · PO No · DO No
  *
@@ -35,7 +35,7 @@
  *
  * THE ABSENCE WORDS ARE THE DICTIONARY'S (`COPY-STANDARD.md`):
  *   Not given      the CUSTOMER did not give it     phone · address · email
- *   Not recorded   WE never captured it             salesperson · outlet
+ *   Not recorded   WE never captured it             optional columns only
  *   No price yet / Paid in full                     the money states
  *   No date yet    a promise with no date on it
  */
@@ -135,23 +135,17 @@ export function requestedDeliveryText(v: { iso: string | null; tbd: boolean }): 
 }
 
 /**
- * `Carres Kelana Jaya` → `Kelana Jaya`, for the SHOWROOM column only.
- *
- * Every showroom is ours — the column is headed `Showroom` and all four rows
- * in production read `Carres …` — so the house name distinguishes nothing here
- * and costs the place name its width: at 126px `Carres Maluri Cheras` clipped
- * to `Carres Maluri C…`, hiding the only part that identifies the branch.
- *
- * DISPLAY ONLY, and deliberately NOT applied to `Deliver To`. There the house
- * name is the whole point: `Carres Klang` sits beside `AL Sungai Buloh`, and
- * dropping it would leave `Klang` unable to say whose warehouse it is. Nothing
- * is written back, and every document keeps the outlet's real registered name.
+ * `Sales Location` — where the order was sold (owner ruling 2026-09-21:
+ * "showroom is sales location"). The OUTLET, else the DEALER, so it is always
+ * filled — the same rule and the same full name the SO PDF prints
+ * (`sales-order-template.tsx`, `outletName ?? dealer.name`). Nothing is
+ * shortened: one fact prints one way on the page and on the paper.
  */
-export function showroomShort(name: string | null | undefined): string {
-  const n = (name ?? "").trim();
-  if (!n) return "";
-  const tail = n.replace(/^carres\s+/i, "").trim();
-  return tail || n;
+export function salesLocationOf(o: {
+  outlets?: { name?: string | null } | null;
+  dealers?: { name?: string | null } | null;
+}): string {
+  return o.outlets?.name?.trim() || o.dealers?.name?.trim() || "";
 }
 
 /**
@@ -293,7 +287,7 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
  *
  * WIDTHS COME ONLY FROM THE SHARED REGISTRY (UI MASTER §6.8), and the default
  * row was re-measured for this order in the rendered portal shell (orders
- * MASTER records the numbers). One line per cell at the 38px row: a value
+ * MASTER records the numbers). One line per cell at the page's 40px row: a value
  * longer than its column ends in `…` and opens whole on hover and keyboard
  * focus (engine `overflowText`), and the column can be widened. Dates and the
  * three document numbers are sized so they never cut.
@@ -316,9 +310,9 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "date", iso: (r) => r.ordered },
   { key: "so", label: "SO No", width: W.soNo, group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  /* `Showroom` is read with the identity: which branch sold it. */
-  { key: "showroom", label: "Showroom", width: W.showroom, group: "Sales ownership", on: true,
-    text: (r) => showroomShort(r.o.outlets?.name) },
+  /* `Sales Location` is read with the identity: where it was sold. */
+  { key: "sales_location", label: "Sales Location", width: W.salesLocation, group: "Sales ownership", on: true,
+    text: (r) => salesLocationOf(r.o) },
   /* `Salesperson` names who SOLD the order — never an action owner. */
   { key: "salesperson", label: "Salesperson", width: W.salesperson, group: "Sales ownership", on: true,
     text: (r) => r.o.salespersons?.name ?? "" },

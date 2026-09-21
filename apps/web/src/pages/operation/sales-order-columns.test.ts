@@ -59,12 +59,12 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
   }) as operationOrderListRow;
 
 describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-21)", () => {
-  it("Proceed Date · SO Doc Date · SO No · Showroom · Salesperson · Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · PO No · DO No", () => {
+  it("Proceed Date · SO Doc Date · SO No · Sales Location · Salesperson · Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "proceeded",
       "ordered",
       "so",
-      "showroom",
+      "sales_location",
       "salesperson",
       "customer_delivery",
       "delivery_location",
@@ -77,7 +77,7 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
       "Proceed Date",
       "SO Doc Date",
       "SO No",
-      "Showroom",
+      "Sales Location",
       "Salesperson",
       "Customer Requested Delivery Date",
       "Customer Delivery Location",
@@ -97,15 +97,21 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
     expect(f.iso!(row)).toBe("2026-08-03T04:00:00Z");
   });
 
-  /* `Showroom` was promoted, not invented — it has been a declaration in this
-     catalog since Stage 1. The register may never grow a writer for it. */
-  it("Showroom READS the Sales-ownership fact the order already carries", () => {
-    const showroom = REGISTER_FIELDS.find((f) => f.key === "showroom")!;
-    expect(showroom.group).toBe("Sales ownership");
-    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
-      "Kelana Jaya",
+  /* `Sales Location` (owner ruling 2026-09-21: "showroom is sales location")
+     READS the Sales-ownership facts the order already carries — the outlet,
+     else the dealer, in full, exactly as the SO PDF prints it. */
+  it("Sales Location is the outlet, else the dealer, printed in full", () => {
+    const f = REGISTER_FIELDS.find((x) => x.key === "sales_location")!;
+    expect(f.group).toBe("Sales ownership");
+    expect(f.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
+      "Carres Kelana Jaya",
     );
-    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Kepong" } })))).toBe("Kepong");
+    expect(
+      f.text(buildRegisterRow(order({ outlets: null, dealers: { name: "Home Living Sdn Bhd" } }))),
+    ).toBe("Home Living Sdn Bhd");
+    expect(
+      f.text(buildRegisterRow(order({ outlets: { name: "  " }, dealers: { name: "Home Living" } }))),
+    ).toBe("Home Living");
   });
 
   /* ⭐ A REQUIRED FACT PRINTS NO ABSENCE WORD (owner ruling 2026-09-21). An
@@ -115,6 +121,7 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
       order({
         proceeded_at: null,
         outlets: null,
+        dealers: null,
         salespersons: null,
         delivery_date: null,
         delivery_date_tbd: true,
@@ -123,7 +130,7 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
       }),
     );
     const banned = [NOT_RECORDED, NO_DATE_YET, "To be confirmed", "Date to be confirmed"];
-    for (const key of ["proceeded", "showroom", "salesperson", "customer_delivery", "delivery_location"]) {
+    for (const key of ["proceeded", "sales_location", "salesperson", "customer_delivery", "delivery_location"]) {
       const text = REGISTER_FIELDS.find((f) => f.key === key)!.text(empty);
       for (const word of banned) expect(text).not.toContain(word);
     }
@@ -162,7 +169,7 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
       expect(typeof f.width).toBe("number");
       expect(registry.has(f.width as never)).toBe(true);
     }
-    expect(REGISTER_FIELDS.find((f) => f.key === "showroom")!.width).toBe(REGISTER_FIELD_WIDTH.showroom);
+    expect(REGISTER_FIELDS.find((f) => f.key === "sales_location")!.width).toBe(REGISTER_FIELD_WIDTH.salesLocation);
     expect(REGISTER_FIELDS.find((f) => f.key === "salesperson")!.width).toBe(REGISTER_FIELD_WIDTH.salesperson);
   });
 });

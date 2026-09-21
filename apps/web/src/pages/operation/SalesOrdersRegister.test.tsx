@@ -244,13 +244,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("min-h-[50px]");
   });
 
-  it("Showroom drops the house name — every showroom is ours (§6.7)", () => {
+  it("Sales Location prints the outlet in full, as the SO PDF does", () => {
     listHookState.data = { orders: [order({
       outlets: { name: "Carres Maluri Cheras" },
     })] };
     mount();
-    expect(screen.getByText("Maluri Cheras")).toBeInTheDocument();
-    expect(screen.queryByText("Carres Maluri Cheras")).not.toBeInTheDocument();
+    expect(screen.getByText("Carres Maluri Cheras")).toBeInTheDocument();
   });
 
   it("keeps one work toolbar with discoverable Search, Export and Columns", () => {
@@ -582,7 +581,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Proceed Date",
       "SO Doc Date",
       "SO No",
-      "Showroom",
+      "Sales Location",
       "Salesperson",
       "Customer Requested Delivery Date",
       "Customer Delivery Location",
@@ -591,7 +590,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "PO No",
       "DO No",
     ]);
-    expect(screen.getByText("Kelana Jaya")).toBeInTheDocument();
+    expect(screen.getByText("Carres Kelana Jaya")).toBeInTheDocument();
     expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
     /* The retired word never prints (COPY-STANDARD, SO Doc Date). */
     expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
@@ -982,7 +981,7 @@ describe("Sales Orders table correction", () => {
       order: ["customer", "so", "ordered"], widths: {}, hidden: ["proceeded"], groupBy: [], sort: null,
     }));
     const saved = {
-      order: ["customer", "so", "ordered", "proceeded", "customer_delivery", "delivery_location", "showroom", "po_number", "do_number", "phone"],
+      order: ["customer", "so", "ordered", "proceeded", "customer_delivery", "delivery_location", "sales_location", "po_number", "do_number", "phone"],
       widths: { customer: 288, customer_delivery: 240 },
       hidden: [], groupBy: [], sort: null,
     };
@@ -1084,6 +1083,26 @@ describe("Listing Standard 2026-09-16 · page-local", () => {
       await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 sales order\b/));
       expect(screen.getByTestId("grid-footer")).not.toHaveTextContent(" of ");
     });
+  });
+
+  /* ⭐ THE 390px DEFECT (Card 12): SO Doc Date led and SO No started past the
+     fold. Below a 768px canvas SO No leads and pins alone on first paint, and
+     the two dates follow it — still locked, never hideable. */
+  it("below a 768px canvas SO No leads and pins alone, and the two dates stay locked", () => {
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    try {
+      mount();
+      const ths = [...screen.getByTestId("grid-header").querySelectorAll("th")].filter((th) => th.getAttribute("title"));
+      expect(ths.slice(0, 3).map((th) => th.getAttribute("title"))).toEqual(["SO No", "Proceed Date", "SO Doc Date"]);
+      expect(ths[0]!.style.left).not.toBe("");
+      expect(ths[1]!.style.left).toBe("");
+      fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+      for (const label of ["SO No", "Proceed Date", "SO Doc Date"]) {
+        expect(screen.getByRole("checkbox", { name: label })).toBeDisabled();
+      }
+    } finally {
+      width.mockRestore();
+    }
   });
 
   it("names a single ticked row in the singular", () => {

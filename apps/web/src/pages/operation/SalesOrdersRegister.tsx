@@ -92,7 +92,7 @@ const HEADER_LINES: Partial<Record<string, readonly [string, string]>> = {
 };
 
 /** The free-text defaults that may be longer than their registry width. */
-const ONE_LINE_TEXT = new Set(["showroom", "salesperson", "delivery_location", "items"]);
+const ONE_LINE_TEXT = new Set(["sales_location", "salesperson", "delivery_location", "items"]);
 
 /**
  * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15 (Chai),
@@ -287,7 +287,7 @@ function toGridColumn(
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
   if (ONE_LINE_TEXT.has(f.key)) {
-    /* ⭐ ONE LINE, 38px — owner ruling 2026-09-21. A value longer than its
+    /* ⭐ ONE LINE, 40px — owner ruling 2026-09-21. A value longer than its
        registry width ends in `…` and opens whole through the engine's
        `overflowText`; the row never grows and the column stays resizable. */
     return { ...base, overflowText: (r) => f.text(r) };
@@ -745,7 +745,9 @@ export default function SalesOrdersRegister() {
                them; below it SO No leads and pins alone, visible on first paint. */
             leadingColumns={
               narrowCanvas
-                ? { date: "so", identity: "so" }
+                ? /* All three stay locked (cannot be hidden or moved); SO No
+                     leads, and the engine pins it alone below 768px. */
+                  { before: ["so", "proceeded"], date: "ordered", identity: "so" }
                 : { before: ["proceeded"], date: "ordered", identity: "so" }
             }
             chooserGroupOrder={[
