@@ -362,6 +362,8 @@ export const qk = {
     posPlans: () => ["rental", "pos-plans"] as const,
     // 0268 — the finance approver's credit queue.
     approvals: () => ["rental", "approvals"] as const,
+    // 0538 — one calendar month across every agreement.
+    month: (month: string) => ["rental", "month", month] as const,
     // 0279 — the wording in force, read by the POS before a customer signs.
     agreementTemplate: () => ["rental", "agreement-template"] as const,
     // 0281 — what has actually been collected against one agreement.
@@ -10513,16 +10515,36 @@ export function useRentalApprovals(
   });
 }
 
+/** 0538 — due, collected, outstanding and the unpaid months for one month (YYYY-MM). */
+export function useRentalMonth(month: string) {
+  return useQuery({
+    queryKey: qk.rental.month(month),
+    queryFn: () =>
+      apiFetch<{ month: string } & import("@carres/shared").RentalMonthView>(
+        `/api/rental/month?month=${encodeURIComponent(month)}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
 /** Approve or reject one application. Blasts the whole ["rental"] sub-tree:
  *  an approval mints the schedule + asset + entitlement, so the agreements
  *  list and the unit registry are both stale the moment it lands. */
 export function useDecideRentalAgreement() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: string; approve: boolean; note?: string }) =>
+    mutationFn: (v: {
+      id: string; approve: boolean; note?: string; creditCheck?: string; creditReference?: string;
+    }) =>
       apiFetch<{ agreement: RentalAgreementListItem }>(
         `/api/rental/agreements/${v.id}/decide`,
-        { method: "POST", body: JSON.stringify({ approve: v.approve, note: v.note }) },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            approve: v.approve, note: v.note,
+            creditCheck: v.creditCheck, creditReference: v.creditReference,
+          }),
+        },
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["rental"] });

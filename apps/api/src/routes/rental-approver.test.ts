@@ -531,3 +531,26 @@ describe("0275 — a rental mints a Sales Order", () => {
     expect(((await res.json()) as { orderCancelled: boolean }).orderCancelled).toBe(true);
   });
 });
+
+describe("0538 — the month across agreements, and the credit check", () => {
+  it("GET /month passes the first of the month and refuses bd", async () => {
+    const sb = makeSb({ data: [], error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get("/api/rental/month?month=2026-09", "finance");
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc[0]).toEqual({ name: "rental_billings_for_month", args: { p_month: "2026-09-01" } });
+    expect((await get("/api/rental/month?month=2026-09", "bd")).status).toBe(403);
+    expect((await get("/api/rental/month?month=2026-13", "finance")).status).toBe(422);
+  });
+
+  it("approve sends the check and its reference when typed", async () => {
+    const sb = makeSb({ data: { agreement: { ...PENDING_ROW, status: "active" } }, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", {
+      approve: true, creditCheck: "CTOS", creditReference: "R-1",
+    });
+    expect(sb.calls.rpc[0].args).toEqual({
+      p_agreement_id: AG_ID, p_note: null, p_credit_check: "CTOS", p_credit_reference: "R-1",
+    });
+  });
+});

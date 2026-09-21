@@ -155,12 +155,19 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
   const decide = useDecideRentalAgreement();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  // 0538 — which check Finance ran and its reference, kept with the decision.
+  const [creditCheck, setCreditCheck] = useState("");
+  const [creditReference, setCreditReference] = useState("");
 
   const busy = decide.isPending;
 
   const run = (approve: boolean, note?: string) => {
     decide.mutate(
-      { id: r.id, approve, note },
+      {
+        id: r.id, approve, note,
+        creditCheck: creditCheck.trim() || undefined,
+        creditReference: creditReference.trim() || undefined,
+      },
       {
         onSuccess: () => {
           toast.success(
@@ -236,11 +243,39 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
       </div>
 
       {/* The CBM check is planned, not built (Loo 2026-07-26) — the page says
-          that plainly instead of showing a button that does nothing. */}
+          that plainly instead of showing a button that does nothing. 0538: the
+          check Finance ran by hand is typed here and kept with the decision. */}
       <div className="px-4 pb-2 text-label text-muted-foreground">
         {r.creditReference
           ? `Credit bureau: ${r.creditReference}`
           : "Credit bureau (CBM) check is not wired yet — assess this one by hand."}
+      </div>
+      <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
+            Credit check used
+          </span>
+          <input
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
+            value={creditCheck}
+            placeholder="e.g. CTOS"
+            maxLength={100}
+            onChange={(e) => setCreditCheck(e.target.value)}
+            data-testid="approver-credit-check"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
+            Check reference
+          </span>
+          <input
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
+            value={creditReference}
+            maxLength={200}
+            onChange={(e) => setCreditReference(e.target.value)}
+            data-testid="approver-credit-reference"
+          />
+        </label>
       </div>
 
       {rejecting ? (
