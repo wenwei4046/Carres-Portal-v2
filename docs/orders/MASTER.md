@@ -1521,12 +1521,14 @@ through the one `sales-order-template.tsx`; both keep doing so — never a secon
 listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, Customer Requested Delivery
 Date, Showroom); its layout is not redesigned.
 
-**The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (written in full on
-the document). **No current fact is deleted:** the rows stay SO No · SO Doc Date (was `Ordered`) · Showroom (was
-`Sales Location`) · Proceed Date (was `Proceed date`; printed only when it exists) · Customer Requested Delivery
-Date (was `Delivery date`) · Salesperson · Sold by (dealer, when there is no showroom). The ONE removal is the
-`Access` row and its `Access not confirmed` note: floor and lift are the Delivery Order's facts and print there,
-not on the Sales Order. The stair-carry charge note stays, because it explains a charge on this order.
+**The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (in full). Rows,
+exactly and in this order: `SO No` · `SO Doc Date` · `Proceed Date` (printed only when it exists) ·
+`Customer Requested Delivery Date` (one line: the label column is widened to hold it, never wrapped) ·
+`Sales Location` (the outlet name; on this document the owner's word, more accurate than Showroom) ·
+`Salesperson`. `Sold by` is removed. The `Access` row and its `Access not confirmed` note are removed: floor
+and lift print on the Delivery Order. The stair-carry charge note stays. The customer signature stays exactly
+as the Sales Portal captures it: the customer signs on the Sales Portal's signature pad (step 3, required),
+and that image prints in the dashed box `Customer Signature · {name}`; there is no company signature box.
 `Bill To` keeps Name · Address · Tel · Email · Emergency; `Deliver To` still prints only when it differs.
 
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
