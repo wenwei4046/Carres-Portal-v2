@@ -432,7 +432,12 @@ DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21)
                         → building type → floor → lift → items needing stair carry + the stair working line
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): category rows
                         `SOFA · 2 items` · # · Item Code · Description (name, configuration beneath) · Qty ·
-                        Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF
+                        Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF's
+                        COLUMNS AND WORDS. **The PDF's LOOK is not copied (owner ruling, Jess 2026-09-21,
+                        answer "A" over a Shopify-style list):** the page keeps the document's table so staff
+                        can check page against paper column by column, but draws it in the portal's web style —
+                        no black ink header bar (owner: "copied the same black header? … not international"),
+                        each item row a soft grey box, the same grey-box treatment as the rest of the page
 PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
