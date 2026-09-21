@@ -1473,6 +1473,9 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   governed amendment path), otherwise `Save`. `View` and `Edit` on the Register's context menu open
   the read-only and the edit state respectively. Leaving edit mode with unsaved changes still refuses
   safely. Who may press `Edit` is the existing permission; this ruling changes no permission.
+  **Amendment notice (owner, 2026-09-21):** while a supplier commitment exists, one lock-icon notice sits
+  under the header in BOTH states: `This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`
+  It is absent when no supplier commitment exists.
 - **Two panes, 50% / 50% — in BOTH states (owner, 2026-09-21: the preview remains).** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
