@@ -4,6 +4,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useInvoiceRegister } from "@/lib/queries";
+import { DepartmentFilter, useDepartmentParam } from "./department";
 import { appTodayIso } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ARDrawer, { type OrderPaymentRow } from "./ARDrawer";
@@ -42,7 +43,8 @@ export function ageScopeWord(scope: AgeScope): string {
  * shows as a removable condition beside the column filters.
  */
 export default function FinanceAR() {
-  const query = useInvoiceRegister();
+  const [dept, setDept] = useDepartmentParam();
+  const query = useInvoiceRegister(dept);
   const invoiceRows = query.data;
   const [params, setParams] = useSearchParams();
   const askedAge = params.get("age");
@@ -118,6 +120,7 @@ export default function FinanceAR() {
             stickyIdentity
             isLoading={!query.isSuccess}
             searchPlaceholder="Search orders…"
+            toolbarStart={<DepartmentFilter value={dept} onChange={setDept} />}
             emptyMessage={ageScope ? "No order owing money is this old." : "No customer owes money."}
             activeConditions={ageScope
               ? [{ key: "age", label: ageScopeWord(ageScope), onClear: clearAge }]

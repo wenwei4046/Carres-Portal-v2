@@ -15,6 +15,8 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
+import type { DepartmentType } from "@carres/shared";
+import { DepartmentFilter, DepartmentName, DepartmentPicker, useDepartmentParam } from "../department";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
@@ -79,7 +81,8 @@ export default function PaymentVouchers() {
 
 function VoucherRegister() {
   const navigate = useNavigate();
-  const query = usePaymentVouchers();
+  const [dept, setDept] = useDepartmentParam();
+  const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
     { key: "voucher", label: "Voucher No", width: 170,
@@ -133,6 +136,7 @@ function VoucherRegister() {
             searchPlaceholder="Search payment vouchers…"
             toolbarStart={
               <span className="flex items-center gap-4">
+                <DepartmentFilter value={dept} onChange={setDept} />
                 <button
                   type="button"
                   data-testid="new-voucher"
@@ -395,6 +399,7 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
         : doc.lines.map((l) => (
           <p key={l.line_no}>
             {l.account_code} {l.account_name ?? ""} · {l.description ?? "No description"} · {money(l.amount)}
+            {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
           </p>
         ))}
     </Facts>
@@ -406,10 +411,10 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
 type Purpose = PaymentVoucherDraftInput["purpose"];
 type Method = PaymentVoucherDraftInput["payMethod"];
 type BillPick = { on: boolean; amount: string };
-type DirectLine = { key: string; accountCode: string; description: string; amount: string };
+type DirectLine = { key: string; accountCode: string; description: string; amount: string; departmentType: DepartmentType | null; departmentId: string | null };
 
 let seq = 0;
-const newLine = (): DirectLine => { seq += 1; return { key: `d${seq}`, accountCode: "", description: "", amount: "" }; };
+const newLine = (): DirectLine => { seq += 1; return { key: `d${seq}`, accountCode: "", description: "", amount: "", departmentType: null, departmentId: null }; };
 
 /** The voucher total is never typed: it is what the ticked bills, the
  *  advance and the direct lines add up to, and the database recomputes it the
@@ -468,7 +473,8 @@ function VoucherForm() {
     setReference(d.voucher.pay_reference ?? "");
     setNarration(d.voucher.narration ?? "");
     setPicks(Object.fromEntries(d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }])));
-    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount) })));
+    setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
+      departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
     setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
     setLoaded(true);
   }, [id, loaded, existing.data]);
@@ -530,6 +536,8 @@ function VoucherForm() {
         accountCode: l.accountCode,
         description: l.description.trim(),
         amount: Number(l.amount),
+        departmentType: l.departmentType,
+        departmentId: l.departmentId,
       })),
       allocations: purpose === "SUPPLIER_BILLS"
         ? Object.entries(picks).filter(([, p]) => p.on).map(([billId, p]) => ({ billId, amount: Number(p.amount) }))
@@ -555,7 +563,8 @@ function VoucherForm() {
     );
   }
 
-  const linesOk = lines.every((l) => l.accountCode !== "" && l.description.trim() !== "" && (num(l.amount) ?? 0) > 0);
+  const linesOk = lines.every((l) => l.accountCode !== "" && l.description.trim() !== ""
+    && (num(l.amount) ?? 0) > 0 && l.departmentType !== null);
   const picksOk = Object.values(picks).filter((p) => p.on).every((p) => (num(p.amount) ?? 0) > 0);
   const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
   const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && advanceOk
@@ -764,6 +773,9 @@ function DirectLineRow({ line, n, accounts, onChange, onRemove }: {
         maxLength={300} placeholder="What it is for" onChange={(e) => onChange({ description: e.target.value })} />
       <input aria-label={`Line ${n} amount`} className={`${fieldCls} w-32`} inputMode="decimal" value={line.amount}
         placeholder="0.00" onChange={(e) => onChange({ amount: e.target.value })} />
+      <DepartmentPicker label={`Line ${n} department`} className={`${fieldCls} w-48`}
+        type={line.departmentType} id={line.departmentId}
+        income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />
       <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
     </div>
   );

@@ -33,6 +33,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
 import { packMonths } from "./month-end-pack";
 import { profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
+import { DepartmentFilter, useDepartmentParam } from "./department";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -106,10 +107,12 @@ const TREND_MONTHS = 12;
 const sectionTotal = (pl: Extract<ProfitAndLoss, { status: "ok" }>, kind: string) =>
   pl.sections.find((s) => s.kind === kind)?.total ?? 0;
 
-/** Income, expense and net result for each of the last twelve months since go-live, oldest first. */
-function ProfitAndLossTrend({ goLive, today }: { goLive: string; today: string }) {
+/** Income, expense and net result for each of the last twelve months since go-live, oldest first.
+ *  The department picked above filters the trend too, so the twelve months and the statement
+ *  on the same page never answer with different money. */
+function ProfitAndLossTrend({ goLive, today, dept }: { goLive: string; today: string; dept: string }) {
   const months = packMonths(today, goLive).slice(0, TREND_MONTHS).reverse();
-  const reads = useQueries({ queries: months.map((ym) => profitAndLossQuery(`${ym}-01`, monthEnd(ym))) });
+  const reads = useQueries({ queries: months.map((ym) => profitAndLossQuery(`${ym}-01`, monthEnd(ym), dept)) });
   if (reads.some((r) => r.isError)) {
     return <ReadFailed testId="pl-trend-failed" sentence="The profit and loss could not be loaded. Try again."
       retrying={reads.some((r) => r.isFetching)}
@@ -152,8 +155,9 @@ export default function FinanceReports() {
   const { from, to } = readPeriod(params, today);
   const asOf = readDay(params.get("asOf")) ?? today;
 
-  const pl = useProfitAndLoss(from, to);
-  const bs = useBalanceSheet(asOf);
+  const [dept, setDept] = useDepartmentParam();
+  const pl = useProfitAndLoss(from, to, dept);
+  const bs = useBalanceSheet(asOf, dept);
   const notStarted = notStartedError(pl.error) || notStartedError(bs.error);
   const goLive = pl.data?.goLiveOn ?? bs.data?.goLiveOn ?? null;
   const plReport = pl.data;
@@ -225,6 +229,7 @@ export default function FinanceReports() {
           {goLive && <p className="text-body text-kit-slate-11" data-testid="reports-go-live">
             Since {fmtDate(goLive)} · No opening balances
           </p>}
+          <DepartmentFilter value={dept} onChange={setDept} />
 
           <div className="grid items-start gap-6 xl:grid-cols-2">
             <Panel title="Profit and Loss">
@@ -283,7 +288,7 @@ export default function FinanceReports() {
           </div>
 
           {goLive && <Panel title="Profit and Loss · Last 12 months">
-            <ProfitAndLossTrend goLive={goLive} today={today} />
+            <ProfitAndLossTrend goLive={goLive} today={today} dept={dept} />
           </Panel>}
         </>}
       </div>

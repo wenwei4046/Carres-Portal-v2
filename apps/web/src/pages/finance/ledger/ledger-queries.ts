@@ -16,6 +16,7 @@ import type {
   TrialBalanceReport,
 } from "@carres/shared/finance-ledger";
 import { apiFetch } from "@/lib/api";
+import { departmentSearch } from "../department";
 
 /** What the Journal is narrowed to on the server. Everything else (source,
  *  date, search) narrows the rows already in hand. */
@@ -23,6 +24,8 @@ export interface JournalScope {
   account: string | null;
   from: string | null;
   to: string | null;
+  /** 0540: "TYPE" or "TYPE:id"; "" or absent = every department. */
+  dept?: string;
 }
 
 export const ledgerKeys = {
@@ -30,7 +33,7 @@ export const ledgerKeys = {
   entries: (scope: JournalScope) => ["finance", "ledger", "entries", scope] as const,
   entry: (ref: string) => ["finance", "ledger", "entry", ref] as const,
   chart: () => ["finance", "ledger", "chart"] as const,
-  trialBalance: (asOf: string) => ["finance", "ledger", "trial-balance", asOf] as const,
+  trialBalance: (asOf: string, dept = "") => ["finance", "ledger", "trial-balance", asOf, dept] as const,
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
 };
 
@@ -59,6 +62,7 @@ export async function readJournal(scope: JournalScope): Promise<JournalRead> {
     if (scope.account) q.set("account", scope.account);
     if (scope.from) q.set("from", scope.from);
     if (scope.to) q.set("to", scope.to);
+    for (const [k, v] of Object.entries(departmentSearch(scope.dept))) q.set(k, v);
     const res = await apiFetch<LedgerEntriesPage>(`/api/finance/ledger/entries?${q.toString()}`);
     if (!Array.isArray(res.rows) || !Number.isInteger(res.total) || res.total < 0) throw new Error(JOURNAL_FAILED);
     if (total !== null && total !== res.total) throw new Error("The Journal changed while it loaded. Try again.");
@@ -101,16 +105,17 @@ export function useLedgerChart() {
 }
 
 /** The Trial Balance read, as options — the page's hook and the Dashboard's month-end pack share it. */
-export function trialBalanceQuery(asOf: string) {
+export function trialBalanceQuery(asOf: string, dept = "") {
+  const q = new URLSearchParams({ asOf, ...departmentSearch(dept) });
   return {
-    queryKey: ledgerKeys.trialBalance(asOf),
-    queryFn: () => apiFetch<TrialBalanceReport>(`/api/finance/ledger/trial-balance?asOf=${encodeURIComponent(asOf)}`),
+    queryKey: ledgerKeys.trialBalance(asOf, dept),
+    queryFn: () => apiFetch<TrialBalanceReport>(`/api/finance/ledger/trial-balance?${q.toString()}`),
     retry: (count: number, error: unknown) => (error as { status?: number }).status !== 409 && count < 2,
   };
 }
 
-export function useTrialBalance(asOf: string) {
-  return useQuery(trialBalanceQuery(asOf));
+export function useTrialBalance(asOf: string, dept = "") {
+  return useQuery(trialBalanceQuery(asOf, dept));
 }
 
 /** How many entries the Dashboard's Activity card lists. */

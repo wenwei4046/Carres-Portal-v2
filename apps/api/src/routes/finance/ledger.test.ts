@@ -416,7 +416,7 @@ describe("GET /trial-balance", () => {
     ])));
     const res = await get("/trial-balance?asOf=2026-09-10");
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: null, p_department_id: null });
     const body = await json(res);
     expect(body.status).toBe("ok");
     expect(body.accounts.map((a: AnyJson) => a.account_code)).toEqual(["1210", "4100"]);
@@ -429,7 +429,7 @@ describe("GET /trial-balance", () => {
     try {
       const { sb } = fakeClient(chartAnswer(ok([tbRow({ row_kind: "TOTAL", total_debit: 0, total_credit: 0, balances: true })])));
       await get("/trial-balance");
-      expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-11" });
+      expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-11", p_department_type: null, p_department_id: null });
     } finally {
       vi.useRealTimers();
     }
@@ -472,7 +472,7 @@ describe("GET /account-ledger", () => {
     const body = await json(res);
     expect(body.rows).toHaveLength(1001);
     expect(calls).toHaveLength(2);
-    expect(calls[0]!.args).toEqual({ p_account_code: "1210", p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(calls[0]!.args).toEqual({ p_account_code: "1210", p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null });
     expect(ops(calls[1], "range")).toEqual([["range", 1000, 1999]]);
   });
 
@@ -658,13 +658,25 @@ describe("statements, passed through", () => {
   it("profit and loss asks for the period", async () => {
     const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL", amount: 0 }]));
     expect((await get("/profit-and-loss?from=2026-09-01&to=2026-09-30")).status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_profit_and_loss", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_profit_and_loss", { p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null });
   });
 
   it("balance sheet asks for the day", async () => {
     const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL" }]));
     expect((await get("/balance-sheet?asOf=2026-09-30")).status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30", p_department_type: null, p_department_id: null });
+  });
+
+  it("balance sheet asks for one department (0540)", async () => {
+    const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL" }]));
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect((await get(`/balance-sheet?asOf=2026-09-30&departmentType=DEALER&departmentId=${id}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30", p_department_type: "DEALER", p_department_id: id });
+  });
+
+  it("refuses a department id without its type", async () => {
+    fakeClient(() => ok([]));
+    expect((await get("/balance-sheet?departmentId=11111111-1111-4111-8111-111111111111")).status).toBe(422);
   });
 
   it("balance sheet rows reach the page whole, with whatever columns the database returns (0506, 0507)", async () => {

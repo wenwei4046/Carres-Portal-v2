@@ -15,6 +15,7 @@ import {
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { departmentQuery, keepByDepartment, withLineDepartments } from "../../lib/line-departments";
 import type { AppEnv } from "../../types";
 
 /**
@@ -91,6 +92,9 @@ function supplierFilter(c: Context<AppEnv>): { ok: true; value: string | null } 
   return UUID_RE.test(raw) ? { ok: true, value: raw } : { ok: false };
 }
 
+const BILL_LINES = { table: "supplier_bill_lines", parent: "bill_id" } as const;
+const VOUCHER_LINES = { table: "payment_voucher_lines", parent: "voucher_id" } as const;
+
 function sb(c: Context<AppEnv>) {
   return userClient(c.env, c.var.auth.jwt);
 }
@@ -105,6 +109,8 @@ function billLinesToJson(lines: SupplierBillDraftInput["lines"]) {
     qty: l.qty ?? null,
     unit_price: l.unitPrice ?? null,
     amount: l.amount ?? null,
+    department_type: l.departmentType ?? null,
+    department_id: l.departmentId ?? null,
   }));
 }
 
@@ -133,6 +139,8 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
       account_code: l.accountCode,
       description: l.description ?? null,
       amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
     })),
     p_allocations: d.allocations.map((a) => ({ bill_id: a.billId, amount: a.amount })),
     p_pay_method: d.payMethod,
@@ -193,9 +201,13 @@ payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
 // ── bills ───────────────────────────────────────────────────────────────────
 
 payablesRouter.get("/bills", requireFinance, async (c) => {
+  const f = departmentQuery(c);
+  if (!f.ok) return f.res;
   const { data, error } = await sb(c).rpc("supplier_bill_register");
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  const kept = await keepByDepartment(sb(c), BILL_LINES, (data ?? []) as Array<{ id: string }>, (r) => r.id, f.value);
+  if ("error" in kept) return pgFail(c, kept.error);
+  return c.json({ rows: kept.rows });
 });
 
 payablesRouter.get("/bills/grn-candidates", requireFinance, async (c) => {
@@ -221,7 +233,16 @@ payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
   if (!UUID_RE.test(receiptId)) return badId(c, "goods received note");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_lines", { p_receipt_id: receiptId });
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  // 0540 (DEPT-6): each GRN line's default department, from its sales orders.
+  const rows = (data ?? []) as Array<{ po_line_id?: string | null }>;
+  const polIds = [...new Set(rows.map((r) => r.po_line_id).filter((x): x is string => !!x))];
+  const dept = new Map<string, Record<string, unknown>>();
+  if (polIds.length) {
+    const d = await sb(c).from("fin_po_line_departments").select("po_line_id, department_type, department_id").in("po_line_id", polIds);
+    if (d.error) return pgFail(c, d.error);
+    for (const r of d.data ?? []) dept.set(r.po_line_id, r);
+  }
+  return c.json({ rows: rows.map((r) => ({ department_type: null, department_id: null, ...r, ...dept.get(r.po_line_id ?? "") })) });
 });
 
 payablesRouter.get("/bills/:id", requireFinance, async (c) => {
@@ -230,7 +251,9 @@ payablesRouter.get("/bills/:id", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("supplier_bill_document", { p_bill_id: id });
   if (error) return pgFail(c, error);
   if (!data) return c.json({ error: "not_found", code: "bill_missing", message: "That bill does not exist." }, 404);
-  return c.json(data);
+  const merged = await withLineDepartments(sb(c), BILL_LINES, id, data);
+  if ("error" in merged) return pgFail(c, merged.error);
+  return c.json(merged.doc);
 });
 
 payablesRouter.post("/bills", requireFinance, async (c) => {
@@ -272,9 +295,13 @@ payablesRouter.post("/bills/:id/cancel", requireFinance, async (c) => {
 // ── payment vouchers ────────────────────────────────────────────────────────
 
 payablesRouter.get("/vouchers", requireFinance, async (c) => {
+  const f = departmentQuery(c);
+  if (!f.ok) return f.res;
   const { data, error } = await sb(c).rpc("payment_voucher_register");
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  const kept = await keepByDepartment(sb(c), VOUCHER_LINES, (data ?? []) as Array<{ id: string }>, (r) => r.id, f.value);
+  if ("error" in kept) return pgFail(c, kept.error);
+  return c.json({ rows: kept.rows });
 });
 
 payablesRouter.get("/vouchers/:id", requireFinance, async (c) => {
@@ -285,7 +312,9 @@ payablesRouter.get("/vouchers/:id", requireFinance, async (c) => {
   if (!data) {
     return c.json({ error: "not_found", code: "voucher_missing", message: "That payment voucher does not exist." }, 404);
   }
-  return c.json(data);
+  const merged = await withLineDepartments(sb(c), VOUCHER_LINES, id, data);
+  if ("error" in merged) return pgFail(c, merged.error);
+  return c.json(merged.doc);
 });
 
 payablesRouter.post("/vouchers", requireFinance, async (c) => {

@@ -20,6 +20,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
+import { DepartmentFilter, useDepartmentParam } from "../department";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -40,7 +41,8 @@ export default function LedgerTrialBalance() {
     if (iso) next.set("asOf", iso); else next.delete("asOf");
     return next;
   });
-  const query = useTrialBalance(asOf);
+  const [dept, setDept] = useDepartmentParam();
+  const query = useTrialBalance(asOf, dept);
   const report = query.data;
   const notStarted = (query.error as { status?: number } | null)?.status === 409;
 
@@ -95,6 +97,7 @@ export default function LedgerTrialBalance() {
           toolbarStart={<span className="flex items-center gap-3 text-body">
             <span>As of</span>
             <span className="w-40"><DateField value={asOf} onChange={setAsOf} aria-label="As of" /></span>
+            <DepartmentFilter value={dept} onChange={setDept} />
             {goLive && <span data-testid="trial-balance-go-live">
               Since {fmtDate(goLive)} · No opening balances
             </span>}

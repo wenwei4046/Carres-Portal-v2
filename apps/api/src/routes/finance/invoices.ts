@@ -23,6 +23,7 @@ import { requireFinance } from "../../lib/auth-guards";
 // renderInvoicePdf removed — see file header note re: Workers WASM limit.
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { departmentQuery } from "../../lib/line-departments";
 import { todayIsoMYT } from "../../lib/today";
 import type { InvoiceTemplateData } from "../../lib/pdf/types";
 import type { AppEnv } from "../../types";
@@ -129,10 +130,20 @@ financeInvoicesRouter.get("/register", async (c) => {
   const parsed = invoiceRegisterQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json({ message: "Choose a valid invoice range." }, 422);
   const { offset, limit } = parsed.data;
+  const dept = departmentQuery(c);
+  if (!dept.ok) return dept.res;
+  const { departmentType, departmentId } = dept.value;
   const sb = userClient(c.env, auth.jwt);
-  const { data, error, count } = await sb
+  // 0540: a department narrows through invoice_department (the order's).
+  let req = sb
     .from("invoices")
-    .select(INVOICE_REGISTER_SELECT, { count: "exact" })
+    .select(
+      departmentType ? `${INVOICE_REGISTER_SELECT},invoice_department!inner(department_type,department_id)` : INVOICE_REGISTER_SELECT,
+      { count: "exact" },
+    );
+  if (departmentType) req = req.eq("invoice_department.department_type", departmentType);
+  if (departmentId) req = req.eq("invoice_department.department_id", departmentId);
+  const { data, error, count } = await req
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .range(offset, offset + limit - 1);

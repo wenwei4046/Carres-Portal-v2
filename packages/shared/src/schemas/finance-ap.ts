@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lineDepartmentFields } from "../department";
 
 /**
  * Supplier bills and payment vouchers — the wire contract (migration 0477).
@@ -59,6 +60,7 @@ export const supplierBillLineInput = z
     qty: money.nullable().optional(),
     unitPrice: money.nullable().optional(),
     amount: money.nullable().optional(),
+    ...lineDepartmentFields,
   })
   .strict();
 export type SupplierBillLineInput = z.infer<typeof supplierBillLineInput>;
@@ -100,6 +102,7 @@ export const paymentVoucherLineInput = z
     // 0536: a voucher line says what it is for.
     description: z.string().trim().min(1, "Say what this payment is for").max(300),
     amount: money,
+    ...lineDepartmentFields,
   })
   .strict();
 
@@ -247,6 +250,8 @@ export interface SupplierBillDocument {
     po_line_id: string | null;
     po_unit_cost: ApMoney | null;
     price_diff: ApMoney | null;
+    /** 0540 */
+    department_type?: string | null; department_id?: string | null;
   }>;
   /** A voucher that pays the bill, or (0485) an advance knocked off it. */
   payments: Array<{
@@ -310,6 +315,8 @@ export interface GrnLineRow {
   open_qty: ApMoney;
   po_unit_cost: ApMoney | null;
   commercial_treatment: string | null;
+  /** 0540 (DEPT-6): the default department, from the PO line's sales orders. */
+  department_type?: string | null; department_id?: string | null;
 }
 
 export interface ApAccountChoice {
@@ -501,7 +508,7 @@ export interface PaymentVoucherDocument {
     entry_no: string | null;
     reversal_entry_no: string | null;
   };
-  lines: Array<{ line_no: number; account_code: string; account_name: string | null; description: string | null; amount: ApMoney }>;
+  lines: Array<{ line_no: number; account_code: string; account_name: string | null; description: string | null; amount: ApMoney; department_type?: string | null; department_id?: string | null }>;
   allocations: Array<{
     bill_id: string;
     bill_no: string | null;

@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OtherDebtorsPage from "./OtherDebtorsPage";
-import { ACCOUNTS, DRAFT_DETAIL, I_DRAFT, I_OPEN, INVOICES, OPEN_DETAIL, P1, PARTIES } from "./fixtures.test-data";
+import { ACCOUNTS, DEPARTMENTS, DRAFT_DETAIL, I_DRAFT, I_OPEN, INVOICES, OPEN_DETAIL, P1, PARTIES } from "./fixtures.test-data";
 
 const net = vi.hoisted(() => ({
   routes: {} as Record<string, unknown>,
@@ -27,6 +27,7 @@ beforeEach(() => {
     "GET /invoices": INVOICES,
     "GET /parties": PARTIES,
     "GET /accounts": ACCOUNTS,
+    "GET /api/finance/ledger/departments": DEPARTMENTS,
     "GET /me": { mayCancel: false },
     [`GET /invoices/${I_DRAFT}`]: DRAFT_DETAIL,
     [`GET /invoices/${I_OPEN}`]: OPEN_DETAIL,
@@ -118,8 +119,8 @@ describe("Other debtors — one invoice", () => {
       invoice_date: "2026-09-20",
       issue: false,
       lines: [
-        { account_code: "6200", description: "Office rent September", amount: 1400 },
-        { account_code: "4900", description: "Service charge", amount: 100 },
+        { account_code: "6200", description: "Office rent September", amount: 1400, department_type: "OFFICE", department_id: null },
+        { account_code: "4900", description: "Service charge", amount: 100, department_type: "SUBSCRIPTION", department_id: null },
       ],
     });
   });

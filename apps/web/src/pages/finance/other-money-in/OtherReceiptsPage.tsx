@@ -65,6 +65,7 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../department";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -127,7 +128,8 @@ export default function OtherReceiptsPage() {
 /* ── the Register ──────────────────────────────────────────────────────────── */
 
 function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
-  const query = useOtherReceipts();
+  const [dept, setDept] = useDepartmentParam();
+  const query = useOtherReceipts(dept);
   const columns = useMemo<DataGridColumn<OtherReceiptRow>[]>(
     () => [
       {
@@ -224,9 +226,12 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         isLoading={!query.isSuccess}
         searchPlaceholder="Search receipts…"
         toolbarStart={
-          <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
-            New receipt
-          </Button>
+          <span className="flex items-center gap-4">
+            <Button variant="primary" size="sm" shape="pill" icon="add" onClick={onNew}>
+              New receipt
+            </Button>
+            <DepartmentFilter value={dept} onChange={setDept} />
+          </span>
         }
         emptyMessage="No other receipt yet. Press New receipt to record a loan in, other income, or money against an invoice."
         expandTitle="Inspect receipt"
@@ -655,6 +660,7 @@ function ReceiptFacts({ detail, onBack }: { detail: OtherReceiptDetail; onBack: 
                 {accountLabel({ code: l.account_code, name: l.account_name })}
                 {" — "}
                 {l.description ?? "No description"}
+                {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>
               <span>{money(l.amount)}</span>
             </p>

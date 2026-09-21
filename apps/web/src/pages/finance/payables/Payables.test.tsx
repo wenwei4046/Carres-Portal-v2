@@ -70,6 +70,18 @@ const moneyAccounts = [
   { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
 ];
 
+// 0540: the department list every line picker reads.
+const OUTLET = "99999999-9999-4999-8999-999999999991";
+const departments = { rows: [
+  { department_type: "SHOWROOM", department_id: OUTLET, name: "Bangsar showroom" },
+  { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+  { department_type: "OFFICE", department_id: null, name: "Office" },
+] };
+async function pickDept(label: string, value: string) {
+  await screen.findAllByRole("option", { name: "Office" });
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+}
+
 function billRow(over: Record<string, unknown>) {
   return {
     id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
@@ -117,6 +129,7 @@ beforeEach(() => {
     [`${B}/suppliers`]: suppliers,
     [`${B}/accounts`]: accounts,
     [MONEY]: moneyAccounts,
+    ["/api/finance/ledger/departments"]: departments,
     [`${B}/bills`]: { rows: [billRow({}), billRow({ id: BILL2, bill_no: null, status: "draft", unpaid: null,
       supplier_invoice_no: "LSW-902", total_amount: "200.00", price_flags: 0, file_count: 0 })] },
     [`${B}/bills/grn-candidates`]: { rows: [{ receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP,
@@ -125,7 +138,7 @@ beforeEach(() => {
     [`${B}/bills/grn-lines/${GRN}`]: { rows: [
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL1, sku: "SOFA-3S", received_qty: "1", billed_qty: "0", open_qty: "1", po_unit_cost: "520.00",
-        commercial_treatment: null },
+        commercial_treatment: null, department_type: "SHOWROOM", department_id: OUTLET },
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL2, sku: "STOOL-1", received_qty: "2", billed_qty: "0", open_qty: "2", po_unit_cost: "250.00",
         commercial_treatment: null },
@@ -226,6 +239,9 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(screen.getByTestId("bill-form-total")).toHaveTextContent("RM 1,025.00");
 
     fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "LSW-901" } });
+    // Line 1 took its department from the PO's sales order (DEPT-6); line 2 is picked.
+    expect(screen.getByLabelText("Line 1 department")).toHaveValue(`SHOWROOM:${OUTLET}`);
+    await pickDept("Line 2 department", "OFFICE");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -235,8 +251,8 @@ describe("Bill form — Convert GRN to bill", () => {
       supplierId: SUP,
       supplierInvoiceNo: "LSW-901",
       lines: [
-        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525 },
-        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250 },
+        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525, departmentType: "SHOWROOM", departmentId: OUTLET },
+        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250, departmentType: "OFFICE", departmentId: null },
       ],
     });
     // The database computes a GRN line's amount; the page never sends one.
@@ -283,6 +299,7 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "3000" } });
     fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "RENT-08" } });
     fireEvent.change(screen.getByLabelText("Bill date"), { target: { value: "2026-08-15" } });
+    await pickDept("Line 1 department", "OFFICE");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]!.body).toMatchObject({
@@ -303,6 +320,7 @@ describe("Payment voucher form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
     fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
     fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "1" } });
+    await pickDept("Line 1 department", "SUBSCRIPTION");
     expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 1,226.00");
 
     // The bill's price check shows where Finance ticks it (P2P-4).
@@ -319,7 +337,7 @@ describe("Payment voucher form", () => {
     expect(w.body).toMatchObject({
       purpose: "SUPPLIER_BILLS", supplierId: SUP, payFromAccountCode: "1120", payMethod: "BANK_TRANSFER",
       allocations: [{ billId: BILL1, amount: 1025 }, { billId: BILL2, amount: 200 }],
-      lines: [{ accountCode: "6500", description: "Transfer fee", amount: 1 }],
+      lines: [{ accountCode: "6500", description: "Transfer fee", amount: 1, departmentType: "SUBSCRIPTION", departmentId: null }],
     });
     expect(w.body).not.toHaveProperty("amount");
     expect(w.body).toMatchObject({ advanceAmount: 0 });
@@ -352,6 +370,7 @@ describe("Payment voucher form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
     fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
     fireEvent.change(screen.getByLabelText("Line 1 amount"), { target: { value: "150" } });
+    await pickDept("Line 1 department", "OFFICE");
     fireEvent.change(screen.getByLabelText("Line 1 description"), { target: { value: "Pipe repair" } });
     fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1110" } });
     fireEvent.change(screen.getByLabelText("Method"), { target: { value: "CASH" } });

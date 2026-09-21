@@ -3250,3 +3250,5 @@ export {
   type PurchaseReturnRailSection,
   type PurchaseReturnCondition,
 } from "./purchase-return";
+
+export * from "./department";

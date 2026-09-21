@@ -13,6 +13,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { departmentSearch } from "../department";
 
 export const PL_SECTIONS = ["INCOME", "EXPENSE"] as const;
 export const BS_SECTIONS = ["ASSET", "LIABILITY", "EQUITY"] as const;
@@ -283,8 +284,8 @@ export function parseBalanceSheet(body: unknown, asOf: string): BalanceSheet {
 export const reportKeys = {
   // Under the ledger's own key, so anything that refreshes the ledger
   // refreshes these too.
-  profitAndLoss: (from: string, to: string) => ["finance", "ledger", "profit-and-loss", from, to] as const,
-  balanceSheet: (asOf: string) => ["finance", "ledger", "balance-sheet", asOf] as const,
+  profitAndLoss: (from: string, to: string, dept = "") => ["finance", "ledger", "profit-and-loss", from, to, dept] as const,
+  balanceSheet: (asOf: string, dept = "") => ["finance", "ledger", "balance-sheet", asOf, dept] as const,
 };
 
 /** One more try for a failed request. None for a ledger with no start date
@@ -298,11 +299,12 @@ function retryOnce(failures: number, error: unknown): boolean {
 }
 
 /** The Profit and Loss read, as options — Reports and the Dashboard's month-end pack share it. */
-export function profitAndLossQuery(from: string, to: string) {
+export function profitAndLossQuery(from: string, to: string, dept = "") {
+  const q = new URLSearchParams({ from, to, ...departmentSearch(dept) });
   return {
-    queryKey: reportKeys.profitAndLoss(from, to),
+    queryKey: reportKeys.profitAndLoss(from, to, dept),
     queryFn: async () => parseProfitAndLoss(
-      await apiFetch<unknown>(`/api/finance/ledger/profit-and-loss?${new URLSearchParams({ from, to }).toString()}`),
+      await apiFetch<unknown>(`/api/finance/ledger/profit-and-loss?${q.toString()}`),
       from,
       to,
     ),
@@ -311,21 +313,22 @@ export function profitAndLossQuery(from: string, to: string) {
 }
 
 /** The Balance Sheet read, as options — Reports and the Dashboard's month-end pack share it. */
-export function balanceSheetQuery(asOf: string) {
+export function balanceSheetQuery(asOf: string, dept = "") {
+  const q = new URLSearchParams({ asOf, ...departmentSearch(dept) });
   return {
-    queryKey: reportKeys.balanceSheet(asOf),
+    queryKey: reportKeys.balanceSheet(asOf, dept),
     queryFn: async () => parseBalanceSheet(
-      await apiFetch<unknown>(`/api/finance/ledger/balance-sheet?${new URLSearchParams({ asOf }).toString()}`),
+      await apiFetch<unknown>(`/api/finance/ledger/balance-sheet?${q.toString()}`),
       asOf,
     ),
     retry: retryOnce,
   };
 }
 
-export function useProfitAndLoss(from: string, to: string) {
-  return useQuery(profitAndLossQuery(from, to));
+export function useProfitAndLoss(from: string, to: string, dept = "") {
+  return useQuery(profitAndLossQuery(from, to, dept));
 }
 
-export function useBalanceSheet(asOf: string) {
-  return useQuery(balanceSheetQuery(asOf));
+export function useBalanceSheet(asOf: string, dept = "") {
+  return useQuery(balanceSheetQuery(asOf, dept));
 }

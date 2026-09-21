@@ -51,6 +51,7 @@ import {
   type LineErrors,
   type TypedLine,
 } from "./parts";
+import { DepartmentName, encodeDepartment } from "../department";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const TONE = { draft: "neutral", issued: "info", cancelled: "neutral" } as const;
@@ -124,6 +125,7 @@ function InvoiceForm({
           account_code: l.account_code,
           description: l.description ?? "",
           amount: Number(l.amount).toFixed(2),
+          department: encodeDepartment(l.department_type, l.department_id),
         }))
       : [blankLine()],
   );
@@ -428,6 +430,7 @@ function InvoiceObject({ detail, onBack }: { detail: OtherDebtorInvoiceDetail; o
                 {l.account_code} · {l.account_name}
                 {" — "}
                 {l.description ?? "No description"}
+                {l.department_type && <> · <DepartmentName type={l.department_type} id={l.department_id} /></>}
               </span>
               <span>{money(l.amount)}</span>
             </p>
