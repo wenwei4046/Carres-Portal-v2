@@ -1534,7 +1534,12 @@ table are fully framed (every cell ruled, horizontal and vertical); the category
 sits inside the frame across the full width. The items columns are unchanged. The payment table is
 `# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
 document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
-and `No payments recorded.` instead of an empty table.
+and `No payments recorded.` instead of an empty table. The section heading is `PAYMENTS RECEIVED` (owner, 2026-09-21,
+following the Houzs reference). **Footer left** prints `Printed by {staff name} · {dd/mm/yyyy hh:mm}` instead of the
+SO number (continuation pages already carry the number in their header line); a print from a shared, role-labelled
+login prints `Printed {dd/mm/yyyy hh:mm}` with no name (staff identity law). Footer centre and `Page {n} of {m}` stay.
+**Proceed Date reads `orders.proceeded_at`** (the actual handoff) — the template's current `proceed_date` feed is
+the planned production-start field and is a defect to fix in the build.
 `Bill To` keeps Name · Address · Tel · Email · Emergency; `Deliver To` still prints only when it differs.
 
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
