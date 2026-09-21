@@ -52,6 +52,8 @@ On a conflict, Business wins.
 - **A feature is wired only if it makes the operator finish faster today.** "The kit has it" is
   not an answer. Three fewer clicks, five fewer documents opened, one fewer exception missed.
 - **A word that is not in `docs/COPY-STANDARD.md` may not appear on screen.** Stop and ask.
+- **Any listing — read first:** [UI MASTER §6.0 Listing Template](docs/ui/MASTER.md) (one page), then the
+  module MASTER's column order. The Sales Orders Register is the reference page.
 - **Purchasing UI cold start:** read [the shared Purchasing UI dictionary](docs/COPY-STANDARD.md#purchasing-ui-dictionary)
   and the exact column order in `docs/purchasing/MASTER.md` §9.1–§9.4 before changing those lists.
   Use the same fact names across pages; do not revive labels from old chats or improvise column order.

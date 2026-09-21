@@ -224,8 +224,8 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
 - **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
 - **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
-- **One line, 38px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
-  Salesforce, SAP Fiori, AG Grid).** Every row stays the current 38px (`--grid-row-h`) and never grows.
+- **One line, 40px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
+  Salesforce, SAP Fiori, AG Grid).** Every row is the shared one-line listing row, 40px (UI MASTER §6.0 rule 5; engine default today 38px), and never grows.
   Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
   column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
   be widened. Dates, `SO No`, `PO No` and `DO No` never cut.

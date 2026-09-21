@@ -1460,6 +1460,46 @@ breathing gap
   remains the master form contract; UI composition may not create a second commercial form or an
   operational action door.
 
+# §6.0 · LISTING TEMPLATE — every Portal listing · OWNER RULINGS 2026-09-21 (Jess)
+
+**Read this first for any listing.** It is the one-page current truth; the sections below it are the
+detailed record and lose to this page wherever they disagree. The reference page is the Sales Orders
+Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is not proof of build.
+
+```
+1  PAGE     Header 50px: page name + Jump to · alerts · help · settings only
+            Toolbar: one blue create button · Search · Export · Columns
+            Table · 32px footer. Nothing above the table (no KPI cards)
+2  COLUMNS  Order = the module MASTER's owner-approved list, never guessed
+            Record date(s) first, then the document number
+            The document number pins left and opens the record
+            Another document's number opens that document
+3  WORDS    Only words in COPY-STANDARD
+            A required fact prints no absence word (empty = system error)
+            A document not made yet: No PO yet · No DO yet
+            Loading · Could not be loaded + Try again · empty — never mixed
+4  WIDTH    Only from REGISTER_FIELD_WIDTH. A missing field is added there
+5  ROW      A one-line listing row is 40px (aligned with SO Batch Purchase)
+            One line per cell. A long value ends in … and shows whole on
+            hover and focus; the column can be widened. Dates and numbers
+            never cut. The row never grows
+            Own approved designs, not this rule: SO Batch Purchase ·
+            Manual Purchase · Payment Monitor · Delivery Monitor
+6  HEADER   11px/600 grey band · the same simple filter icon on every column
+7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
+            Item = product name on line 1, configuration on line 2
+8  GROUPS   Only where the module MASTER approves them. Sales Orders: flat
+9  FILTER   Active conditions shown · one Clear filters · footer {n} of {m}
+10 SELECT   Ticking replaces the toolbar; no buttons inside rows
+11 PHONE    The document number is visible on first screen; the table
+            scrolls itself; the page never scrolls sideways
+12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
+```
+
+**Row height ruling (Jess, 2026-09-21).** The shared one-line row becomes 40px (engine `--grid-row-h`
+default, today 38px — NOT BUILT). Every "38px single-line row" statement below is superseded by it.
+The four pages named in rule 5 keep their own approved row design.
+
 # §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
 
 ### Shared listing standard — APPROVED / NOT BUILT, staged adoption (Jess, 2026-09-16)
