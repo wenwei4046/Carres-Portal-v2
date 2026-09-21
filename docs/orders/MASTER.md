@@ -196,8 +196,7 @@ No deposit · Online order
 ## Sales Orders Register — find truth, never assign work
 
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
-2026-09-17 date-first pair (`SO Date · SO No`), the 2026-09-18 default order and the 2026-09-16 "no
-groups" clause. The current build still shows the older order until the Sales Orders listing round.
+2026-09-17 date-first pair (`SO Date · SO No`), and the 2026-09-18 default order. The current build still shows the older order until the Sales Orders listing round.
 
 ```
 Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
@@ -213,14 +212,17 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
   meaning, one word — COPY-STANDARD). The bare word `Ordered` stays Purchasing's (`Ordered` · `Ordered Qty`).
 - **`SO No`** is the identity and the door to the order. Proceed Date, SO Doc Date and SO No cannot be
   hidden or moved by personal layouts; SO No pins at every width.
-- **Grouped — always.** The Register is grouped (UI MASTER §6.10 group-local headers). Service-after-sales
-  can happen in any group, so a Service Case is never a group and never a Register column; the order's
-  Service Cases stay on the order and on Order Route `Linked problems`.
-  **PROPOSAL / NOT LAW — the group set awaits owner confirmation:** `Delivery in progress` (default open;
-  a partial delivery stays here) · `Delivery completed` · `Cancelled`. *Falsifier: the owner names
-  other groups.*
+- **No groups, no status.** The Register is one flat list with no status grouping (owner ruling
+  2026-09-21). After-sales service can happen at any point, so a Service Case is never a group and never
+  a Register column; the order's Service Cases stay on the order and on Order Route `Linked problems`.
+- **No absence word for a required fact.** Proceed Date, SO Doc Date, SO No, Showroom, Salesperson,
+  Customer Requested Delivery Date, Customer Delivery Location, Customer and Items are required when Sales
+  submits the order (Sales Portal entry gate), so every row has them. `Not recorded`, `To be confirmed`
+  and `No delivery date` never print in these columns: an empty one would be a system error, not a state
+  of the order, and is fixed at its source rather than dressed as data. Only a document that genuinely
+  does not exist yet has an absence word (`No PO yet` · `No DO yet`, below).
 - **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
-- **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`, absence `Not recorded`) promoted to a default. It names who SOLD the order, never an action owner.
+- **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
 - Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
   retired with it and are re-measured in the build round.
