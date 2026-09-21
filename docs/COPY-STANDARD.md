@@ -3794,17 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-### PROPOSAL — PENDING APPROVAL (subscription-views, migration 0538, 18 Sep 2026)
-
-Page: Finance → `Subscriptions` at `/finance/subscriptions` (sidebar word and page header, both
-PROPOSAL). One calendar month across every subscription agreement. Month picker label `Month`.
-Totals: `Due` · `Collected` · `Outstanding`. Columns of the unpaid list: `Customer` · `Phone` ·
-`Sales Order` · `Agreement` · `Amount` · `Due Date` · `Days Late` (a month not yet late reads
-`Not late`) · `Salesperson`. Search hint `Search customer, SO or agreement…`. Footer
-`{n} unpaid · {amount}`. Export name `Unpaid subscriptions`. Empty state
-`Every subscription month due in this month is paid.` Failure
-`The subscription months could not be loaded. Try again.` Nothing on this page says how the
-monthly money arrives; that is not settled.
-
-Rental Approver card, two optional fields kept with approve or reject: `Credit check used`
-(hint `e.g. CTOS`) · `Check reference`.
