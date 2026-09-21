@@ -1543,8 +1543,11 @@ category with the Carres count (`MATTRESS · 1 item`), no fill, no box, with air
 rules), top-aligned; Description is regular weight with the configuration on the following lines in the same ink.
 Columns `# · Item Code · Description · Qty · Unit Price · Discount · Amount (RM)`; Qty reads `1 UNIT`; Unit Price and
 Amount carry the currency (`RM 2,999.00`); an empty Discount reads `—`. No in-table SUBTOTAL row — the totals
-block carries the sums. Carres type sizes are kept. Spacing (owner, 2026-09-21: rows must breathe): every cell 8pt top and bottom, 6pt
-left and right, line height 1.45; the category row 10pt above and 6pt below. The payment table uses the same header
+block carries the sums. Carres type sizes are kept. Spacing follows the Houzs sample and saves space (owner, 2026-09-21): header and cells 4pt
+top and bottom, 5pt left and right, line height 1.25; the category row 5pt above and 3pt below. **Totals follow the
+sample:** no box and no grey band — plain rows (Subtotal · Paid to date), a thin ink rule, then bold .
+The sample's Tax and Total rows are not added: the Sales Order carries no tax (the invoice owns SST), so they would
+only repeat the Subtotal and a dash. The payment table uses the same header
 and cell rules. The payment table is
 `# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
 document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
