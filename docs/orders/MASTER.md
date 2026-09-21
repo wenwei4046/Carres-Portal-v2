@@ -1550,9 +1550,9 @@ The sample's Tax and Total rows are not added: the Sales Order carries no tax (t
 only repeat the Subtotal and a dash. The payment table uses the same header
 and cell rules. The payment table is
 `# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
-document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
-and `No payments recorded.` instead of an empty table. The section heading is `PAYMENTS RECEIVED` (owner, 2026-09-21,
-following the Houzs reference). **Footer left** prints `Printed by {staff name} · {dd/mm/yyyy hh:mm}` instead of the
+document (who collected stays in Payments and on the Receipt). The payment table carries NO separate section title
+(owner, 2026-09-21: its own `Payment Received` column header already names it); with no payment it prints its header
+row and one muted line `No payments recorded.`. **Footer left** prints `Printed by {staff name} · {dd/mm/yyyy hh:mm}` instead of the
 SO number (continuation pages already carry the number in their header line); a print from a shared, role-labelled
 login prints `Printed {dd/mm/yyyy hh:mm}` with no name (staff identity law). Footer centre and `Page {n} of {m}` stay.
 **Proceed Date reads `orders.proceeded_at`** (the actual handoff) — the template's current `proceed_date` feed is
