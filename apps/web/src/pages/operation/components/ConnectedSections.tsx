@@ -114,7 +114,9 @@ export default function ConnectedSections({
                 aria-hidden="true"
                 data-testid={`section-run-${s.key}`}
                 className="pointer-events-none absolute border-kit-slate-6"
-                style={{ left: -SECTION_PAD_L, width: SECTION_PAD_L - 4, top: s.connectAt, borderTopWidth: 1, zIndex: 1 }}
+                /* It ends ON the box's border — §6.9: the line visibly touches its
+                   destination (a 4px shortfall left it floating, Card 12 walk). */
+                style={{ left: -SECTION_PAD_L, width: SECTION_PAD_L, top: s.connectAt, borderTopWidth: 1, zIndex: 1 }}
               />
             ) : (
               <ConnectorElbow
