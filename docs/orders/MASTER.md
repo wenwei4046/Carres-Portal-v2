@@ -226,9 +226,10 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
 - `Items` is a default column (`{first item} + {n} more`).
 - **Long words wrap to two lines — owner ruling 2026-09-21.** `Customer`, `Customer Delivery Location`,
   `Showroom`, `Salesperson` and `Items` wrap inside their registry width instead of being cut with `…`
-  (DataGrid `wrap`), and the row grows to the shared two-line listing row (UI MASTER §6.8, 54px). Dates,
-  `SO No`, `PO No` and `DO No` stay on one line. A value longer than two lines still shows whole; it is
-  never ellipsised.
+  (DataGrid `wrap`). **Every row is the same height** — the shared two-line listing row (UI MASTER §6.8,
+  54px) — whether or not its values wrap (owner ruling 2026-09-21). Dates, `SO No`, `PO No` and `DO No` stay
+  on one line. The registry width is measured so the longest real value fits two lines; a value that would
+  need a third line is fixed by widening that registry entry, never by cutting it or growing one row.
 - Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
   retired with it and are re-measured in the build round.
 
