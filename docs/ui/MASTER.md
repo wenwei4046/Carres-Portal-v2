@@ -1500,9 +1500,10 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
 12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard
 ```
 
-**Row height ruling (Jess, 2026-09-21).** The shared one-line row becomes 40px (engine `--grid-row-h`
-default, today 38px — NOT BUILT). Every "38px single-line row" statement below is superseded by it.
-The four pages named in rule 5 keep their own approved row design.
+**Row height ruling (Jess, 2026-09-21).** 40px is the target for a one-line listing. It is adopted PAGE BY
+PAGE through the page's own `rowHeight={40}`; the engine default (`--grid-row-h`, 38px) is NOT changed, so
+no other page moves until its own round. First adopter: Sales Orders (Card 12, NOT BUILT). The four pages
+named in rule 5 keep their own approved row design.
 
 # §6.7 · THE REGISTER SHELL — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
 
