@@ -221,6 +221,11 @@ Order was created (`orders.placed_at`). It is one read-only fact and uses that e
 Register, Order info, Order Route and field catalogs. The bare word `Ordered` is not an SO date:
 Purchasing retains it only for an ordered state or quantity (`Ordered` · `Ordered Qty`).
 
+**Document absence words — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** When the order has no
+Purchase Order yet, `PO No` reads `No PO yet`; when it has no Delivery Order yet, `DO No` reads `No DO yet`.
+Both are muted and one line. `Not recorded` is wrong here: nothing was forgotten, the document does not exist
+yet. The words are governed in `COPY-STANDARD.md`.
+
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
 a door to its owner: SO → SO, PO → PO, DO → DO.
