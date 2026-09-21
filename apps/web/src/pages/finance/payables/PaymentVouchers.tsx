@@ -8,6 +8,7 @@ import {
   type PaymentVoucherDocument,
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
+  type SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -24,6 +25,7 @@ import {
   useApBillOutstanding,
   useApSuppliers,
   usePaymentVoucher,
+  useSupplierBills,
   usePaymentVouchers,
   useSaveVoucher,
   useVoucherAct,
@@ -37,11 +39,13 @@ import {
   creditorKindWord,
   money,
   num,
+  priceCheckWord,
   refusal,
   word,
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, PayablesSwitch, ReadFailed, ReasonModal } from "./PayablesParts";
 import { VoucherAdvanceCard } from "./VoucherAdvance";
+import { paymentVoucherPrint } from "./voucher-print";
 import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
 
@@ -199,6 +203,7 @@ function VoucherDetail() {
   const act = useVoucherAct();
   const [asking, setAsking] = useState<"prepare" | "check" | "approve" | null>(null);
   const [reasonFor, setReasonFor] = useState<"reject" | "cancel" | null>(null);
+  const [printing, setPrinting] = useState(false);
   const doc = query.data;
 
   if (query.isError) {
@@ -224,6 +229,19 @@ function VoucherDetail() {
     });
   const next: "prepare" | "check" | "approve" | null =
     doc.can.prepare ? "prepare" : doc.can.check ? "check" : doc.can.approve ? "approve" : null;
+  const printable = paymentVoucherPrint(doc);
+  const print = async () => {
+    if (!printable) return;
+    setPrinting(true);
+    try {
+      const { renderPaymentVoucherPdf } = await import("@/lib/pdf/render");
+      window.open(URL.createObjectURL(await renderPaymentVoucherPdf(printable)), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The voucher could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
   const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${v.pay_from_account_code} ${v.pay_from_name ?? ""}? `
     + `It is entered in the ledger on ${fmtDate(v.voucher_date)}.`;
 
@@ -238,6 +256,7 @@ function VoucherDetail() {
         status={<span data-testid="voucher-status">{word(VOUCHER_STATUS_WORD, v.status)}</span>}
         right={
           <span className="flex items-center gap-2">
+            {printable && <Button loading={printing} onClick={() => void print()}>Print</Button>}
             {doc.can.edit && (
               <Button icon="edit" onClick={() => navigate(`/finance/payment-vouchers/${id}/edit`)}>Edit</Button>
             )}
@@ -499,6 +518,9 @@ function VoucherForm() {
   const total = voucherTotal(purpose, picks, lines, advance);
   const advanceN = purpose === "SUPPLIER_BILLS" ? (num(advance) ?? 0) : 0;
   const pickedCount = Object.values(picks).filter((p) => p.on).length;
+  // The bill's own price check (the Bills register's Price Check), so Finance
+  // sees it where it decides to pay. A flag, never a block (0477).
+  const billChecks = Object.fromEntries((useSupplierBills().data ?? []).map((b) => [b.id, b]));
 
   const submit = () => {
     const input: PaymentVoucherDraftInput = {
@@ -512,7 +534,7 @@ function VoucherForm() {
       narration: narration.trim() || null,
       lines: lines.map((l) => ({
         accountCode: l.accountCode,
-        description: l.description.trim() || null,
+        description: l.description.trim(),
         amount: Number(l.amount),
         departmentType: l.departmentType,
         departmentId: l.departmentId,
@@ -541,7 +563,8 @@ function VoucherForm() {
     );
   }
 
-  const linesOk = lines.every((l) => l.accountCode !== "" && (num(l.amount) ?? 0) > 0 && l.departmentType !== null);
+  const linesOk = lines.every((l) => l.accountCode !== "" && l.description.trim() !== ""
+    && (num(l.amount) ?? 0) > 0 && l.departmentType !== null);
   const picksOk = Object.values(picks).filter((p) => p.on).every((p) => (num(p.amount) ?? 0) > 0);
   const advanceOk = advance.trim() === "" || (num(advance) ?? -1) >= 0;
   const ready = payFrom !== "" && /^\d{4}-\d{2}-\d{2}$/.test(voucherDate) && linesOk && picksOk && advanceOk
@@ -640,7 +663,7 @@ function VoucherForm() {
                     ? <p>Loading bills…</p>
                     : billRows.length === 0
                       ? <p>This supplier has no confirmed bill left to pay.</p>
-                      : <BillPicks rows={billRows} picks={picks} onChange={setPicks} />}
+                      : <BillPicks rows={billRows} picks={picks} onChange={setPicks} billChecks={billChecks} />}
             </Facts>
           )}
           {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
@@ -675,10 +698,11 @@ function VoucherForm() {
   );
 }
 
-function BillPicks({ rows, picks, onChange }: {
+function BillPicks({ rows, picks, onChange, billChecks }: {
   rows: Array<ApBillOutstandingRow & { available: number }>;
   picks: Record<string, BillPick>;
   onChange: (next: Record<string, BillPick>) => void;
+  billChecks: Record<string, SupplierBillRegisterRow>;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -692,6 +716,7 @@ function BillPicks({ rows, picks, onChange }: {
             <th className="py-1 pr-2">Due date</th>
             <th className="py-1 pr-2 text-right">Total</th>
             <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1 pr-2">Price Check</th>
             <th className="py-1">Pay now</th>
           </tr>
         </thead>
@@ -714,6 +739,7 @@ function BillPicks({ rows, picks, onChange }: {
                 <td className="py-1 pr-2">{b.due_date ? fmtDate(b.due_date) : "No due date"}</td>
                 <td className="py-1 pr-2 text-right">{money(b.total_amount)}</td>
                 <td className="py-1 pr-2 text-right">{money(b.available)}</td>
+                <td className="py-1 pr-2" data-testid={`price-check-${b.bill_id}`}>{billChecks[b.bill_id] ? priceCheckWord(billChecks[b.bill_id]!) : "—"}</td>
                 <td className="py-1">
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}

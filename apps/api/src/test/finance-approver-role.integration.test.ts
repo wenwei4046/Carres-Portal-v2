@@ -114,7 +114,7 @@ describe.skipIf(!URL)("only a finance user or the principal is a finance approve
     voucherId = (
       await q(
         `select public.payment_voucher_save_draft(null, 'DIRECT', null, $1, $2::date, $3,
-                  jsonb_build_array(jsonb_build_object('account_code', $4::text, 'amount', 10))) as id`,
+                  jsonb_build_array(jsonb_build_object('account_code', $4::text, 'description', 'IT line', 'amount', 10))) as id`,
         [`IT payee ${RUN}`, on_date, pay_from, expense],
       )
     ).rows[0].id as string;

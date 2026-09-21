@@ -99,7 +99,8 @@ export const PAYMENT_VOUCHER_METHODS = ["BANK_TRANSFER", "CHEQUE", "CASH", "OTHE
 export const paymentVoucherLineInput = z
   .object({
     accountCode: z.string().trim().min(1, "Choose an account").max(10),
-    description: optText(300),
+    // 0536: a voucher line says what it is for.
+    description: z.string().trim().min(1, "Say what this payment is for").max(300),
     amount: money,
     ...lineDepartmentFields,
   })

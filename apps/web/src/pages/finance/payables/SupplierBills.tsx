@@ -41,6 +41,7 @@ import {
   creditorKindWord,
   money,
   num,
+  priceCheckWord,
   priceDiffWord,
   refusal,
   word,
@@ -103,9 +104,7 @@ function BillRegister() {
       accessor: (r) => r.status === "confirmed" ? money(r.unpaid) : r.status === "cancelled" ? "Cancelled" : "Not confirmed",
       numberValue: (r) => num(r.unpaid), filterType: "number" },
     { key: "price", label: "Price Check", width: 180,
-      accessor: (r) => r.price_flags > 0
-        ? `${r.price_flags} ${r.price_flags === 1 ? "line differs" : "lines differ"} from PO`
-        : r.grn_nos ? "Matches PO" : "No PO price",
+      accessor: (r) => priceCheckWord(r),
       filterValue: (r) => r.price_flags > 0 ? "Differs from PO" : "Matches PO", filterType: "enum" },
     { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
