@@ -3794,11 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (card-routing)
-
-New words on Finance Settings, Money moves and Settings → Payment (migration 0541):
-
-- `Card payout banks` (section heading, Finance Settings) · `Add a card payout bank` (button) · `Card payout bank` (form title)
-- `Card account` · `Machine at` · `Pays out to` (field labels) · `Showroom` · `Dealer` (Machine at choices)
-- `Online payment · Stripe checkout` (the Stripe row on Settings → Payment → Payment methods; `POS card` and `Online payment` are already approved)
-- Refusals: `Choose a card account that is in use.` · `Choose a bank that is in use.` · `Choose showroom or dealer.` · `Choose the card account.` · `Choose the bank.`
