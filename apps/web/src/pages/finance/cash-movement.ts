@@ -20,6 +20,11 @@
  * PER ENTRY. An entry's lines on cash accounts are netted first, so moving
  * money from the cash drawer to the bank (one entry, in on one cash account
  * and out on another) is neither In nor Out.
+ *
+ * PER ACCOUNT. The same lines, read from go-live, also give each account its
+ * own in, out and net since go-live. There a move between two cash accounts is
+ * Out on one and In on the other, so the accounts' figures do not add up to the
+ * weekly totals.
  */
 import { useQuery } from "@tanstack/react-query";
 import type { LedgerAccount, LedgerChart } from "@carres/shared/finance-ledger";
@@ -101,6 +106,30 @@ export interface CashMovement {
   short: boolean;
 }
 
+export interface CashAccountMovement {
+  code: string;
+  name: string;
+  moneyIn: number;
+  moneyOut: number;
+  net: number;
+}
+
+/** Each account's in, out and net over the lines, netted per entry on that account. An account nothing moved through reads 0.00. */
+export function accountMovement(lines: readonly CashLine[], accounts: readonly Pick<LedgerAccount, "code" | "name">[]): CashAccountMovement[] {
+  return accounts.map(({ code, name }) => {
+    const byEntry = new Map<string, number>();
+    for (const l of lines) {
+      if (l.account === code) byEntry.set(l.entryNo, (byEntry.get(l.entryNo) ?? 0) + cents(l.debit) - cents(l.credit));
+    }
+    let inC = 0;
+    let outC = 0;
+    for (const n of byEntry.values()) {
+      if (n > 0) inC += n; else outC -= n;
+    }
+    return { code, name, moneyIn: inC / 100, moneyOut: outC / 100, net: (inC - outC) / 100 };
+  });
+}
+
 /** Weekly in, out and net over the lines — per entry, so a move between two cash accounts nets to nothing. */
 export function weeklyCashMovement(lines: readonly CashLine[], weeks: readonly CashWeek[], goLiveOn: string): CashMovement {
   const byEntry = new Map<string, { date: string; net: number }>();
@@ -162,25 +191,34 @@ export function parseAccountLedger(body: unknown, account: string, from: string,
   return lines;
 }
 
-/** The Net cash tile and the Cashflow chart. Waits for the chart (it names the accounts and go-live). */
+export interface CashAndBank extends CashMovement {
+  /** Each cash and bank account since go-live, in chart order. */
+  accounts: CashAccountMovement[];
+}
+
+/** The Net cash tile, the Cashflow chart and the per-account panel. Waits for the chart (it names the accounts and go-live). */
 export function useCashMovement(chart: LedgerChart | undefined, today: string) {
   const goLive = chart?.go_live_on ?? null;
-  const accounts = chart ? cashAccounts(chart).map((a) => a.code) : [];
+  const accounts = chart ? cashAccounts(chart) : [];
+  const codes = accounts.map((a) => a.code);
   const weeks = goLive ? cashWeeks(goLive, today) : [];
-  const from = weeks[0]?.from ?? null;
+  // From go-live, not from the first of the twelve weeks: the per-account panel covers all of it.
+  // ponytail: one read per account since go-live; an account past the API's 20,000-line cap fails the whole read. Add a server-side per-account sum when one does.
+  const from = weeks.length > 0 ? goLive : null;
   return useQuery({
-    queryKey: [...ledgerKeys.all(), "cash-movement", goLive ?? "", today, accounts.join(",")] as const,
+    queryKey: [...ledgerKeys.all(), "cash-movement", goLive ?? "", today, codes.join(",")] as const,
     enabled: Boolean(chart),
-    queryFn: async (): Promise<CashMovement> => {
+    queryFn: async (): Promise<CashAndBank> => {
       if (!goLive) throw new Error("The ledger has no start date yet.");
-      if (accounts.length === 0) throw new Error(CASH_FAILED);
+      if (codes.length === 0) throw new Error(CASH_FAILED);
       // Nothing has moved yet when today is still before go-live.
-      if (!from) return weeklyCashMovement([], [], goLive);
-      const read = await Promise.all(accounts.map(async (code) => {
+      if (!from) return { ...weeklyCashMovement([], [], goLive), accounts: accountMovement([], accounts) };
+      const read = await Promise.all(codes.map(async (code) => {
         const q = new URLSearchParams({ account: code, from, to: today });
         return parseAccountLedger(await apiFetch<unknown>(`/api/finance/ledger/account-ledger?${q.toString()}`), code, from, today);
       }));
-      return weeklyCashMovement(read.flat(), weeks, goLive);
+      const lines = read.flat();
+      return { ...weeklyCashMovement(lines, weeks, goLive), accounts: accountMovement(lines, accounts) };
     },
   });
 }
