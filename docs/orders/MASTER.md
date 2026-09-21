@@ -398,21 +398,25 @@ The complete 390px PDF, including its balance and signature area, was visible. B
 at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
 clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
-This
-OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
-five questions in the order an operator asks them: **who · when · where · what · money.**
+**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** `SO info` (renamed from
+`Order info`: this is the original Sales Order the showroom opened for the customer) comes FIRST, before
+`Customer`; `MONEY` is renamed `Payment`. The left pane and the Sales Order PDF must tally — the same card
+order and the same words on both sides. The PDF's `Order Details` · `Ordered` · `Sales Location` ·
+`Delivery date` · `Proceed date` labels are therefore wrong and follow the page's words (`SO info` ·
+`SO Doc Date` · `Showroom` · `Customer Requested Delivery Date` · `Proceed Date`). The page reads:
+**when (which order) · who · where · what · payment.**
 
 ```
+SO info                 SO Doc Date · Customer Requested Delivery Date · Proceed Date · Customer reference
+  └ Change delivery date  the governed three fields · creates a Revision · needs approval
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name
   ├ Sales ownership     Dealer · Showroom · Salesperson  (+ the approval lane)
   └ Emergency contact   name · phone · relationship      (own heading, own divider)
-ORDER INFO              SO Date · Requested Delivery Date · Proceed date · Customer reference
-  └ Change delivery date  the governed three fields · creates a Revision · needs approval
 DELIVERY                the MY cascade · building type · billing relationship · billing address
   └ Delivery access     floor · items needing stair carry · lift + the stair working line
 GOODS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
-MONEY                   the payment ledger · Paid · Outstanding · Open this order in Payments →
+PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
