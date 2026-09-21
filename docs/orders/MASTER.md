@@ -412,8 +412,9 @@ was not sold from a showroom (0144), so it is always filled. The page reads:
 **when (which order) · who · where · what · payment.** Also ruled 2026-09-21: `Goods` → `Items` (the same
 word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Sales Location
 and Salesperson join `SO info` (the Register also reads Sales Location · Salesperson beside SO No) and the
-`Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case
-on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
+`Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case,
+**blue (`kit-blue-11`) — owner ruling, Jess 2026-09-22: "remain blue"**, kept after the challenge that blue
+elsewhere means clickable; on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
 amounts never borrow the heading size; only the balance line is bold.
 
 ```
@@ -430,8 +431,9 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): category rows
-                        `SOFA · 2 items` · # · Item Code · Description (name, configuration beneath) · Qty ·
+ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): **NO category
+                        rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
+                        accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
                         Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF's
                         COLUMNS AND WORDS. **The PDF's LOOK is not copied (owner ruling, Jess 2026-09-21,
                         answer "A" over a Shopify-style list):** the page keeps the document's table so staff
