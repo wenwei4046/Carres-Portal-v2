@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { LedgerEntryRow } from "@carres/shared/finance-ledger";
-import { ledgerEntryHref, ledgerSourceWord } from "@carres/shared/finance-ledger";
+import { ledgerAccountHref, ledgerEntryHref, ledgerSourceWord } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import Loading from "@/components/kit/Loading";
@@ -16,7 +16,7 @@ import { useApOutstanding } from "@/lib/payables-queries";
 import { appTodayIso, fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useLatestLedgerEntries, useLedgerChart } from "./ledger/ledger-queries";
-import { CASH_WEEKS, useCashMovement, type CashMovement } from "./cash-movement";
+import { CASH_WEEKS, useCashMovement, type CashAccountMovement, type CashAndBank, type CashMovement } from "./cash-movement";
 import { defaultPackMonth, exportMonthEndPack, packMonths } from "./month-end-pack";
 import {
   AGE_BUCKETS,
@@ -39,7 +39,7 @@ import { FieldError } from "@/components/kit/FieldFrame";
  *   Unpaid · AP · Payables                     money-owed.ts over ap_outstanding
  *                                              → opens AP · Payables
  *   Net cash · 12 wks · Cashflow               cash-movement.ts over the ledger's
- *                                              account ledger (1100 Cash and bank)
+ *   Movement since go-live (per account)       account ledger (1100 Cash and bank)
  *   Activity                                   the Journal's own entries read
  *   Export month-end pack                      month-end-pack.ts: Trial Balance,
  *                                              Profit and Loss, Balance Sheet
@@ -147,6 +147,12 @@ export default function FinanceDashboard() {
             </Panel>
           </div>
 
+          <div className="mb-5">
+            <Panel title="Cash and bank · Movement since go-live">
+              {cashData ? <AccountMovement cash={cashData} today={today} /> : cashMissing}
+            </Panel>
+          </div>
+
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             <Panel title="Activity · Recent transactions"
               right={<Link className="btn-secondary" to="/finance/ledger">Open Journal</Link>}>
@@ -228,6 +234,28 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
       <Total label="Outflow total" value={rm(cash.moneyOut)} testId="dashboard-cashflow-out" />
       <Total label="Net" value={rm(cash.net)} testId="dashboard-cashflow-net" />
     </div>
+  </div>;
+}
+
+/** Each cash and bank account since go-live; each account opens its lines in the Journal. */
+function AccountMovement({ cash, today }: { cash: CashAndBank; today: string }) {
+  const columns: Column<CashAccountMovement>[] = [
+    { key: "account", label: "Account", width: 40,
+      cell: (r) => <Link className="underline underline-offset-2" to={ledgerAccountHref(r.code, cash.goLiveOn, today)}>
+        {r.code} {r.name}</Link> },
+    { key: "in", label: "Inflow", width: 20, align: "right", numeric: true, cell: (r) => rm(r.moneyIn) },
+    { key: "out", label: "Outflow", width: 20, align: "right", numeric: true, cell: (r) => rm(r.moneyOut) },
+    { key: "net", label: "Net", width: 20, align: "right", numeric: true, cell: (r) => rm(r.net) },
+  ];
+  return <div className="flex flex-col gap-3.5" data-testid="dashboard-account-movement">
+    <p className="text-label text-kit-slate-11">
+      Money in and out of each account since {fmtDate(cash.goLiveOn)}, when the ledger started.
+      Money held before then is not counted.
+    </p>
+    <DataTable label="Movement since go-live" testId="dashboard-account-movement-table"
+      rowTestId="dashboard-account-movement-row" rows={cash.accounts} columns={columns} rowId={(r) => r.code}
+      // Never empty: the read fails when the chart has no cash or bank account.
+      empty={null} />
   </div>;
 }
 

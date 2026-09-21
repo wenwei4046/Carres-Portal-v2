@@ -1,7 +1,8 @@
 /**
  * Finance → Reports. The Profit and Loss for a period and the Balance Sheet
  * on a day, both read from the ledger (gl_profit_and_loss and
- * gl_balance_sheet), plus the door to Reports → Payment.
+ * gl_balance_sheet), a twelve-month trend of the Profit and Loss, plus the
+ * door to Reports → Payment.
  *
  * Every figure is a ledger sum served by the API; the page adds nothing up.
  * Each account line opens the Journal narrowed to that account and dates.
@@ -13,13 +14,16 @@
  *  - Top SKUs. finance_top_skus adds up order lines (price × qty) for all
  *    time, whatever period is chosen. That is order value, not income the
  *    ledger recognised, so it would be a second revenue figure.
- *  - A trend. The ledger answers one period per request, so a monthly trend
- *    would cost one request per month. It can return when the ledger serves
- *    a monthly series.
+ *
+ * The trend asks gl_profit_and_loss once per month (twelve at most, none
+ * before go-live), through the same query the statement uses, so the month on
+ * screen is not read twice.
  */
 import { Link, useSearchParams } from "react-router-dom";
+import { useQueries } from "@tanstack/react-query";
 import { ledgerAccountHref } from "@carres/shared/finance-ledger";
 import Button from "@/components/kit/Button";
+import Loading from "@/components/kit/Loading";
 import DatePicker from "@/components/kit/DatePicker";
 import Panel from "@/components/kit/Panel";
 import Select from "@/components/kit/Select";
@@ -27,7 +31,8 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import StatementTable, { nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
-import { useBalanceSheet, useProfitAndLoss } from "./reports/report-queries";
+import { packMonths } from "./month-end-pack";
+import { profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -92,6 +97,52 @@ function ReadFailed({ testId, sentence, retrying, onRetry }: {
   return <div role="alert" data-testid={testId} className="flex flex-col items-start gap-3 text-body">
     <p>{sentence}</p>
     <Button variant="neutral" loading={retrying} onClick={onRetry}>Try again</Button>
+  </div>;
+}
+
+const TREND_MONTHS = 12;
+
+/** A section's served total; a section with no accounts in the chart is 0. */
+const sectionTotal = (pl: Extract<ProfitAndLoss, { status: "ok" }>, kind: string) =>
+  pl.sections.find((s) => s.kind === kind)?.total ?? 0;
+
+/** Income, expense and net result for each of the last twelve months since go-live, oldest first. */
+function ProfitAndLossTrend({ goLive, today }: { goLive: string; today: string }) {
+  const months = packMonths(today, goLive).slice(0, TREND_MONTHS).reverse();
+  const reads = useQueries({ queries: months.map((ym) => profitAndLossQuery(`${ym}-01`, monthEnd(ym))) });
+  if (reads.some((r) => r.isError)) {
+    return <ReadFailed testId="pl-trend-failed" sentence="The profit and loss could not be loaded. Try again."
+      retrying={reads.some((r) => r.isFetching)}
+      onRetry={() => reads.forEach((r) => { if (r.isError) void r.refetch(); })} />;
+  }
+  if (reads.some((r) => !r.data)) return <Loading variant="skeleton" lines={2} />;
+  // A month the ledger calls before go-live has no figures: it is left out, never shown as RM 0.00.
+  const points = months.flatMap((ym, i) => {
+    const pl = reads[i]!.data!;
+    return pl.status === "ok" ? [{ ym, income: sectionTotal(pl, "INCOME"), expense: sectionTotal(pl, "EXPENSE"), net: pl.net }] : [];
+  });
+  const peak = Math.max(0, ...points.map((p) => Math.max(p.income, p.expense)));
+  const height = (n: number) => `${peak > 0 ? (Math.max(n, 0) / peak) * 100 : 0}%`;
+  return <div className="flex flex-col gap-3.5" data-testid="pl-trend">
+    <div className="flex flex-wrap items-center justify-end gap-3.5 text-label text-kit-slate-11">
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-green-11" />Income</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-slate-11" />Expense</span>
+    </div>
+    <div className="overflow-x-auto">
+      <ol className="flex min-w-max gap-2">
+        {points.map((p) => (
+          <li key={p.ym} className="flex w-24 flex-col items-center gap-1" data-testid={`pl-trend-month-${p.ym}`}>
+            <span className="flex h-24 w-full items-end justify-center gap-1" aria-hidden>
+              <span className="w-3 rounded-sm bg-kit-green-11" style={{ height: height(p.income) }} />
+              <span className="w-3 rounded-sm bg-kit-slate-11" style={{ height: height(p.expense) }} />
+            </span>
+            <span className="text-label text-kit-slate-11">{fmtMonth(p.ym)}</span>
+            <span className="text-label tabular-nums">{rm(p.net)}</span>
+            <span className="sr-only">Income {rm(p.income)} · Expense {rm(p.expense)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   </div>;
 }
 
@@ -221,6 +272,10 @@ export default function FinanceReports() {
               </div>
             </Panel>
           </div>
+
+          {goLive && <Panel title="Profit and Loss · Last 12 months">
+            <ProfitAndLossTrend goLive={goLive} today={today} />
+          </Panel>}
         </>}
       </div>
     </div>
