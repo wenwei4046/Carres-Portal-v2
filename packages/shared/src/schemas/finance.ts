@@ -342,6 +342,11 @@ export const ledgerEntryRef = z.union([
   z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z-]{1,39}$/, 'Use an entry number like JE-202609-0003'),
 ]);
 
+/** Rename one account on Finance Settings → Chart of accounts (0539). The code never changes. */
+export const ledgerAccountRenameInput = z.object({
+  name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+}).strict();
+
 /** A trial balance or a balance sheet as it stood at the end of one day.
  *  Omitted = today in Malaysia. */
 export const ledgerAsOfQuery = z.object({
