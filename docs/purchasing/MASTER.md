@@ -430,7 +430,7 @@ identity, delivery method, selected categories, `Supplier work week` and each se
 Production Days. It either saves the complete supplier setup or saves nothing; a sequence of
 separate browser writes may not leave a partial supplier. This supersedes SKU-derived setup for
 this door, while SKU relationships remain the authority for which specific goods that supplier may
-supply. The form never asks for a PO Default Delivery Date: that date belongs to each Purchase Order, not
+supply. The form never asks for a PO Delivery Date: that date belongs to each Purchase Order, not
 Supplier Master.
 
 **BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** the form and API submit
@@ -499,8 +499,8 @@ does not decide it.
 - **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**
   `purchase_orders.official_delivery_date` is stamped from the birth `eta_date` by trigger at
   INSERT; once it holds a value no UPDATE may change it. `eta_date` stays the LIVE planning
-  arrival (the ready-date door may recompute it); the register's `PO Default Delivery Date`, the PDF's
-  `Deliver by` and every reply comparison read the immutable original. Pre-0428 records were
+  arrival (the ready-date door may recompute it); the register's `PO Delivery Date`, the PDF's
+  `PO {n}-Day Delivery Date` and every reply comparison read the immutable original. Pre-0428 records were
   recovered from evidence, not invented: a PO whose eta no door ever moved kept it as the
   original; a PO the legacy delayed door rewrote took the date the earliest delayed reply moved
   FROM; a PO the ready-date door recomputed stays NULL — **an unknown original is recorded as
@@ -561,7 +561,7 @@ Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving re
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
 Delivery Qty and never create available stock. A supplier date may split by quantity. An
 unconfirmed, passed or changed supplier promise creates supplier-contact work; it never rewrites
-the original PO Default Delivery Date or the customer promise. Confirmation work begins only after the
+the original PO Delivery Date or the customer promise. Confirmation work begins only after the
 current PO version has confirmed-sent evidence, Pending Delivery Qty is above zero and no supplier
 answer exists for that version.
 
@@ -744,7 +744,7 @@ Staff selects purpose
 ### 7.3 Receiving and later defect
 
 ```text
-PO/CO carries the official Deliver To and original PO Default Delivery Date
+PO/CO carries the official Deliver To and original PO Delivery Date
 → supplier provides its Supplier DO and may provide a changed Supplier Confirmed Delivery Date
 → Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
 → record Goods Received Date as the physical arrival date, and Goods arrived at as the physical arrival location
@@ -1236,7 +1236,7 @@ only rows satisfying both, never a widening OR.
 ```text
 Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
-PO Default Delivery Date
+PO Delivery Date
 ```
 
 `Items` shows `{first item} + {n} more`, with all items available in expansion.
@@ -1251,7 +1251,7 @@ shell with the rail open during the build.
   `No PO needed`; retain the authoritative selection and coverage gates. Neither a status word
   nor an unknown coverage read authorizes purchasing. Partial/Ordered footer tallies stay retired.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
-  `so_refs`, or a global SKU/supplier/customer match. `PO Default Delivery Date` is
+  `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
   never changed (§5.7) — never `eta_date`, which is the LIVE planning arrival the ready-date door
   recomputes; never `expected_ready_date`; never the internal `Goods Must Arrive`; never an
@@ -1285,8 +1285,8 @@ shell with the rail open during the build.
   keyboard and accessible values disagreed, and a PLAN presented in the same cell as a FACT. The
   one place an unissued demand is arranged is its own row in the expansion, beside `Split`.
 - **A row with no purchase order says so ONCE, under `PO No` (`Not ordered yet`).** `Supplier Deliver To`
-  and `PO Default Delivery Date` describe a document; on a row that has none they stay blank rather than
-  printing the same sentence three times across one row. `Not recorded` under `PO Default Delivery Date`
+  and `PO Delivery Date` describe a document; on a row that has none they stay blank rather than
+  printing the same sentence three times across one row. `Not recorded` under `PO Delivery Date`
   keeps its own separate meaning: the document exists and its original date is not on file.
 - **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
   a Partial order selects only its uncovered remainder; Ordered and fully Ready-Stock rows refuse
@@ -1364,7 +1364,7 @@ review (50/50 from 1130px, stacked below); that preview remains unfinished in th
 **THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
 
 ```text
-PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Default Delivery Date
+PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Delivery Date
 PO-20260820-4827   U1-000-078           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
 PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
                    Item line not recorded
@@ -1685,7 +1685,7 @@ acts within groups. Search, column filters and export retain accurate source val
 ```text
 Status · Proceed Date · MPR No · Approval Status · Purpose · Requested By · PO Safety Days ·
 Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · Supplier ·
-Supplier Deliver To · PO No · PO Default Delivery Date
+Supplier Deliver To · PO No · PO Delivery Date
 ```
 
 **Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
@@ -1802,7 +1802,7 @@ stay in Need approval regardless of unknown remainder. Empty historical groups a
 No PO needed remains collapsed and counted. This changes Manual Purchase labels only, not SO Batch
 register groups.
 
-**Goods order — BUILT:** `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Default Delivery Date`.
+**Goods order — BUILT:** `☐ · Status · Category · Qty · Item · Ready Stock · Supplier · Supplier Deliver To · PO No · PO Delivery Date`.
 Use the SO Batch shared presentation: 8px horizontal padding, two-line headers, two-line item identity,
 blue selection, consistent field widths and the connected stock frame (UI MASTER §6.8–6.9).
 No SKU column; SKU remains searchable. Parent tick selects eligible remaining goods, not an
@@ -2011,7 +2011,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
 - **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
   `Ordered Qty` · `Still To Order` · `PO Issued` (D5, Round 2: the CURRENT PO version's
   marked-sent time — the current-version sending evidence retained on Purchase Orders — or `Sending not confirmed`;
-  never `placed_at`, which is the creation time) · `PO Default Delivery Date` (the
+  never `placed_at`, which is the creation time) · `PO Delivery Date` (the
   ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
   it, else the issue-stamped date) · `Supplier Confirmed Delivery Date` as `Not confirmed` until supplier
   evidence exists, `Same as PO` when the supplier confirms the PO date, or the supplier's changed
@@ -2105,7 +2105,7 @@ Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
 ```text
 PO Date · PO No · SO No / MPR No · Supplier · Items · Supplier Deliver To ·
-PO Default Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
+PO Delivery Date · Supplier Confirmed Delivery Date · Goods Received Date · GRN No · PO Version
 ```
 
 Pin `PO Date` and `PO No` at canvas ≥768px; below that pin PO No only. The goods expansion arrow
@@ -2126,7 +2126,7 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   number. Manual sources still dedupe by request identity, never by label.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
 - **The three delivery-date columns are three columns, and one is NEVER filled in from another**
-  ([shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary)). `PO Default Delivery Date`
+  ([shared UI dictionary](../COPY-STANDARD.md#purchasing-ui-dictionary)). `PO Delivery Date`
   is what Carres planned, preserved when the supplier replies and when Settings later change (0428).
   `Supplier Confirmed Delivery Date` is the supplier's evidenced answer for the current version;
   with no answer it reads `Not confirmed`, and a supplier who moved the date carries
@@ -2160,7 +2160,7 @@ buttons. Classify in priority order Cancelled → Completed → Waiting for good
 (current version marked as sent with goods pending) → Confirm PO sent to supplier. Each PO occurs
 once. A failed/unknown quantity read is never zero or Completed; completed legacy POs without a
 mark stay Completed. Search/filters cover all groups and reveal matching collapsed groups.
-Default order: unmarked by PO Default Delivery Date ascending; Waiting for goods from supplier by
+Default order: unmarked by PO Delivery Date ascending; Waiting for goods from supplier by
 confirmed supplier date, falling back to original PO date, ascending; Completed/Cancelled newest
 first. Unknown dates remain explicit, not invented.
 
@@ -4023,7 +4023,7 @@ proof, linked object and read-only foreign-module state. It never edits another 
 Calendar displays only governed work dates with actual weekday + calendar date. Purchasing /
 Operation uses the Office calendar (Mon–Fri); Receiving / GRN / Warehouse uses the Warehouse
 calendar (Mon–Sat). Sunday and Selangor public holidays are excluded. Recorded business dates are
-never silently moved: PO Default Delivery Date, Supplier Confirmed Delivery Date and Goods Received Date remain the
+never silently moved: PO Delivery Date, Supplier Confirmed Delivery Date and Goods Received Date remain the
 dates actually stated/observed. A computed work due date may use its governed calendar only when
 the rule and resulting date are visible.
 
