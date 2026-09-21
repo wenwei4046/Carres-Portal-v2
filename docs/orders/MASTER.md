@@ -410,7 +410,7 @@ order and the same words on both sides. The PDF's `Order Details` · `Ordered` �
 **when (which order) · who · where · what · payment.** Also ruled 2026-09-21: `Goods` → `Items` (the same
 word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Showroom
 and Salesperson join `SO info` (the Register also reads Showroom · Salesperson beside SO No) and the
-`Sales ownership` heading is retired; **headings have two ranks only** — card title 16px/600 sentence case
+`Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case
 on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
 amounts never borrow the heading size; only the balance line is bold.
 
