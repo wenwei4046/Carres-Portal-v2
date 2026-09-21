@@ -303,8 +303,24 @@ describe("Finance Settings — a money account's number, changed on its own form
 });
 
 describe("Finance Settings — card payout banks (0541)", () => {
-  it("shows each route and saves a new bank for it", async () => {
+  it("is its own tab, not a block under the money accounts", async () => {
     show();
+    await screen.findByText("Public Bank");
+    expect(screen.queryByTestId("card-routes")).not.toBeInTheDocument();
+    /* Radix Tabs picks up a tab on mouseDown, not click (kit-behaviour.test). */
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Card payout banks" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByTestId("card-routes")).toBeInTheDocument();
+  });
+
+  it("says what happens to a card account that is not listed", async () => {
+    show("/finance/settings?tab=card");
+    expect(
+      await screen.findByText(/not listed here fills in no bank — whoever records the card payout chooses it/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows each route and saves a new bank for it", async () => {
+    show("/finance/settings?tab=card");
     const row = await screen.findByTestId("card-route-1131-dealer");
     expect(row).toHaveTextContent("1131 · GHL · Dealer → 1121 · Public Bank");
     fireEvent.click(row);
