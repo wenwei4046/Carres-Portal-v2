@@ -128,6 +128,20 @@ describe("Reports → Payment", () => {
     expect(within(card).getByRole("link", { name: /SO-1319/ }))
       .toHaveAttribute("href", "/finance/invoices?invoice=i-sales");
   });
+  it("Customer balances says nobody owes only when nothing was excluded for having no value", () => {
+    state.invoices = { data: [invoice({ id: "i-settled", paid: 1000, lines: 1000 })],
+      isLoading: false, isError: false };
+    show();
+    expect(screen.getByTestId("report-customer-balances")).toHaveTextContent("No customer owes money.");
+  });
+  it("Customer balances cannot claim nobody owes while an order has no value to read", () => {
+    state.invoices = { data: [invoice({ id: "i-unpriced", paid: 0, lines: 0 })],
+      isLoading: false, isError: false };
+    show();
+    const card = screen.getByTestId("report-customer-balances");
+    expect(card).toHaveTextContent("No order with a recorded value owes money.");
+    expect(within(card).queryByText("No customer owes money.")).not.toBeInTheDocument();
+  });
   it("Storage lists the storage papers with the voided one marked, drafts excluded and said", () => {
     show();
     const card = screen.getByTestId("report-storage");

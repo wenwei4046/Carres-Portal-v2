@@ -262,7 +262,10 @@ export default function FinancePaymentReport() {
             </span>
             <span className="text-body font-semibold tabular-nums shrink-0">{rm(b.outstanding)} still needed</span>
           </Row>)}
-          {owing.length === 0 && <p className="text-meta text-kit-slate-11">No customer owes money.</p>}
+          {/* With orders excluded for having no value, the section cannot say
+              nobody owes — only that nothing it can read does. */}
+          {owing.length === 0 && <p className="text-meta text-kit-slate-11">
+            {unpricedCount > 0 ? "No order with a recorded value owes money." : "No customer owes money."}</p>}
         </div>
       </div></SectionCard>
 
