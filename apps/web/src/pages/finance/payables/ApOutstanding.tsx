@@ -9,6 +9,7 @@ import { useApBillOutstanding, useApOutstanding } from "@/lib/payables-queries";
 import { cents, creditorKindWord, money, num } from "./payables-words";
 import { PayablesSwitch, ReadFailed } from "./PayablesParts";
 import { supplierUnpaid, unpaidTotal } from "../money-owed";
+import SupplierAdvancesOf from "./SupplierAdvancesOf";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
@@ -115,6 +116,7 @@ function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
                 {" · "}{money(b.balance_owing)} unpaid
               </p>
             ))}
+      <SupplierAdvancesOf supplierId={row.supplier_id} />
       <Link className="btn-secondary mt-3 inline-block" to={`/finance/payment-vouchers/new?supplier=${row.supplier_id}`}>
         New Payment Voucher
       </Link>

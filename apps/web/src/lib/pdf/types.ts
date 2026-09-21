@@ -106,6 +106,24 @@ export type OtherDebtorInvoiceTemplateData = {
   issued_by: string | null;
 };
 
+/** Payment voucher (PV, 0477/0529) — printed for Finance's file, signed by
+ *  the three people who prepared, checked and approved it. */
+export type PaymentVoucherTemplateData = {
+  voucher_no: string;
+  voucher_date: string;
+  payee: string;
+  supplier: string | null;
+  pay_from: string;
+  pay_method: string;
+  reference: string | null;
+  narration: string | null;
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  signatures: Array<{ label: string; name: string | null; at: string | null }>;
+};
+
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-
  *  Extension Google Forms, Jess 2026-06-30). The PDF that replaces the Google
  *  Form — exported from the order detail to send the customer. */
