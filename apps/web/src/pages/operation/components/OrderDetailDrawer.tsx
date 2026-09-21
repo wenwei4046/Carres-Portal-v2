@@ -68,6 +68,7 @@ import {
   type OpsStockListResponse,
   type OpsOrderControl,
   type OrderActionTrack,
+  requiredPaymentReference,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -85,6 +86,7 @@ import type {
   InvoiceTemplateData,
   SalesOrderTemplateData,
   PoTemplateData,
+  ReceiptTemplateData,
 } from "@/lib/pdf/types";
 import {
   qk,
@@ -5440,8 +5442,16 @@ async function openReceipt(
   meta: { orderCode: string; customerName: string },
 ) {
   try {
-    const blob = await renderReceiptPdf({
-      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+    // §4 — a numbered receipt prints from the one receipt document (the 0449
+    // snapshot plus the invoices it settles), same as Payment Records.
+    const doc = row.receipt_no
+      ? await apiFetch<{ document: ReceiptTemplateData; voided: boolean; void_reason: string | null }>(
+          `/api/finance/payments/${row.id}/receipt-document`)
+      : null;
+    const blob = await renderReceiptPdf(doc
+      ? { ...doc.document, voided: doc.voided, void_reason: doc.void_reason }
+      : {
+      receipt_no: row.id.slice(0, 8),
       issue_date: row.paid_on,
       order_code: meta.orderCode,
       customer: { name: meta.customerName },
@@ -5604,7 +5614,10 @@ function PaymentForm({
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
   });
   const amt = Number(amount);
-  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
+  // §16 (0535) — a cheque needs its number, a card its approval code.
+  const refWord = requiredPaymentReference(method);
+  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0
+    && (!refWord || refNo.trim() !== "");
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   const acceptFile = (f: File | undefined | null) => {
@@ -5727,7 +5740,7 @@ function PaymentForm({
           </label>
         ) : (
           <label className="block">
-            <span className="t4-label">Ref no (optional)</span>
+            <span className="t4-label">{refWord ?? "Ref no (optional)"}</span>
             <input
               type="text"
               value={refNo}

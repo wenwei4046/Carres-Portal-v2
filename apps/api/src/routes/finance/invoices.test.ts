@@ -227,6 +227,17 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
             select: vi.fn().mockResolvedValue({ data: guaranteeTerms, error: null }),
           };
         }
+        if (table === "order_payments") {
+          // A deposit before the invoice, the balance after it.
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [
+                { amount: 2000, kind: "deposit", voided_at: null, created_at: "2026-04-01T00:00:00Z" },
+                { amount: 3970, kind: "payment", voided_at: null, created_at: "2026-05-02T00:00:00Z" },
+              ], error: null }),
+            }),
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -256,6 +267,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     expect(body.invoice_no).toBe("INV-2026-1240");
     expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
+    expect(body.received_before).toBe(2000);
     expect(body.lines).toHaveLength(1);
     // No guarantee sold on this order → the block is empty, not absent-and-broken.
     expect(body.guarantees).toEqual([]);

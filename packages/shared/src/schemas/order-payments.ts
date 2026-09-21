@@ -83,8 +83,9 @@ export const recordPaymentInputSchema = z.object({
   amount: z.number().positive("amount must be greater than 0"),
   paidOn: isoDate,
   /** 0476: a system word or a method from Settings → Payment (the SQL writer
-   *  checks which; an alias like `bank_transfer` folds to `bank`). */
-  method: paymentMethodKeySchema.default("cash"),
+   *  checks which; an alias like `bank_transfer` folds to `bank`). 0535: no
+   *  default — a payment with no method is refused, never guessed as cash. */
+  method: paymentMethodKeySchema,
   kind: z.enum(PAYMENT_KINDS).default("payment"),
   reference: z.string().trim().max(120).nullish(),
   note: z.string().trim().max(500).nullish(),
@@ -103,6 +104,16 @@ export const recordPaymentInputSchema = z.object({
   duplicateAck: z.boolean().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
+
+/** payment/MASTER.md §16 — the reference a method must carry, or null when
+ *  it is optional. Mirrors the check in `_customer_payment_post` (0535): the
+ *  key folds like `payment_method_key` (POS `credit` / `installment` are card). */
+export function requiredPaymentReference(method: string | null | undefined): "Approval code" | "Cheque number" | null {
+  const k = (method ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (k === "cheque") return "Cheque number";
+  if (["card", "credit", "installment", "credit_card", "debit_card"].includes(k)) return "Approval code";
+  return null;
+}
 
 /** Collect a storage fee — POST /api/operation/orders/:id/storage/collect. Same
  *  shape as a payment minus `kind` (the route forces `kind:'storage'` + stamps
@@ -253,4 +264,16 @@ export function summarizePayments(
     outstanding: safeBill > 0 ? Math.max(0, safeBill - goodsPaid) : 0,
     storageCollected: byKind.storage,
   };
+}
+
+/** Goods money (payment + deposit, live rows only) recorded at or before an
+ *  invoice was issued — the "received before this invoice" line on the Sales
+ *  Invoice PDF (deposit then final invoice, KL Gateway 2026-09-18). */
+export function receivedBeforeInvoice(
+  payments: ReadonlyArray<{ amount: number; kind: PaymentKind; voided_at?: string | null; created_at: string }>,
+  issuedAt: string,
+): number {
+  const cut = Date.parse(issuedAt);
+  const s = summarizePayments(payments.filter((p) => Date.parse(p.created_at) <= cut), 0);
+  return Math.round((s.byKind.payment + s.byKind.deposit) * 100) / 100;
 }

@@ -100,6 +100,8 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   /** Grand total in MYR major units (sum of line_total = subtotal + tax_amount). */
   total: number;
+  /** Goods money received before this invoice was issued (receivedBeforeInvoice). */
+  received_before?: number;
 
   /** Currency display code, default "MYR". */
   currency: string;
