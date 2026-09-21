@@ -1522,8 +1522,9 @@ listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, C
 Date, Showroom); its layout is not redesigned.
 
 **The PDF header — OWNER RULING (Jess, 2026-09-21).** Left: the Carres logo beside the legal name, the registration
-number, then the address in two lines without `Wilayah Persekutuan KL`. Right: line 1 the SO number alone in the
-existing Carres hero size (18pt bold, no `SO No:` label); line 2 `SO Doc Date: {date}`. Carres type sizes are kept
+number, then the address in two lines without `Wilayah Persekutuan KL`. Right, three lines: `SALES ORDER` (the existing
+Carres small grey document word) · the SO number alone in the existing Carres hero size (18pt bold, no `SO No:`
+label) · `SO Doc Date: {date}`. Carres type sizes are kept
 throughout; nothing is resized to match the reference.
 
 **The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (in full). Rows,
