@@ -3794,15 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (bank-charge)
-
-Money moves gain two kinds (0537). Nothing below is approved yet.
-
-| Words | Where and meaning |
-|---|---|
-| `Bank charge` · `Bank credit` | The two new kinds (`BANK_CHARGE` · `BANK_CREDIT`), and the Journal's Source for them (with ` reversal`). A bank charge is money the bank took; a bank credit is money the bank added with no document (interest). |
-| `Goes to 6500 Bank and payment charges.` | Hint under the amount on a bank charge. |
-| `Goes to 4900 Other income. Money from a customer is recorded as a payment, not here.` | Hint under the amount on a bank credit. |
-| `Only a card payout has a fee.` · `Only a card payout has a fee. Record a bank charge as its own money move.` | Form refusal · database refusal, replacing `A bank transfer has no fee.` and its database sentence. |
-| `Choose a bank transfer, a card payout, a bank charge or a bank credit.` | Refusal when no kind is chosen, replacing `Choose a bank transfer or a card payout.` |
-| `A bank charge is taken from a bank account in use.` · `A bank charge goes to 6500 Bank and payment charges.` · `A bank credit comes from 4900 Other income.` · `A bank credit goes into a bank account in use.` | Database refusals for the wrong account on each side. |
