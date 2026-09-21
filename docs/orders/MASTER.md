@@ -1478,9 +1478,8 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   **Amendment notice (owner, 2026-09-21):** while a supplier commitment exists, one lock-icon notice sits
   under the header in BOTH states: `This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`
   It is absent when no supplier commitment exists.
-  **Page header (owner, 2026-09-21, from the 2990 reference):** line 1 `SO-{n} — {CUSTOMER NAME}` at page size;
-  line 2 small: `SO Doc Date {date} · {n} items · Rev {n}` (items = goods lines on the current Revision);
-  right side: `Total RM {amount}` (the one order total, Law D) · `Print ▾` · `More actions` (keeps `Cancel SO`)
+  **Page header (owner, 2026-09-21, from the 2990 reference):** one line `SO-{n} — {CUSTOMER NAME}` at page size — no facts line under it
+  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Total RM {amount}` (the one order total, Law D) · `Print ▾` · `More actions` (keeps `Cancel SO`)
   · dark primary `Edit` last. Tabs stay `Order | Revisions | History | Order Route`. Rejected from 2990: an
   overall status pill (a Sales Order has no overall status), `Relationship Map` (Order Route is that view)
   and a standalone `Cancel SO` button.
