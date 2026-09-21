@@ -1482,7 +1482,7 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   under the header in BOTH states: `This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`
   It is absent when no supplier commitment exists.
   **Page header (owner, 2026-09-21, from the 2990 reference):** one line `SO-{n} — {CUSTOMER NAME}` at page size — no facts line under it
-  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Print ▾` · primary `Edit` · **`⋮` LAST, ICON ONLY — owner ruling
+  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Print ▾` · dark primary `Edit` · **`⋮` LAST, ICON ONLY — owner ruling
   (Jess, 2026-09-21): no visible word beside the three dots** ("English not good does not mean cannot read 3 dot";
   Gmail, Google and SAP print no word on it). It stays last because it is the drawer that grows; its accessible
   name and tooltip are `More actions`, and it keeps `Cancel SO`. **No amount in the header (owner ruling
