@@ -1537,9 +1537,13 @@ exactly and in this order: `SO No` · `SO Doc Date` · `Proceed Date` (printed o
 and lift print on the Delivery Order. The stair-carry charge note stays. The customer signature stays exactly
 as the Sales Portal captures it: the customer signs on the Sales Portal's signature pad (step 3, required),
 and that image prints in the dashed box `Customer Signature · {name}`; there is no company signature box.
-**Table framing — OWNER RULING (Jess, 2026-09-21), from the Houzs reference.** The items table and the payment
-table are fully framed (every cell ruled, horizontal and vertical); the category row (`MATTRESS` · `BEDFRAME` …)
-sits inside the frame across the full width. The items columns are unchanged. The payment table is
+**Table framing — OWNER RULING (Jess, 2026-09-21), exactly the Houzs reference.** Header row: bold regular-case
+titles between a heavy grey top rule and a heavy grey bottom rule, no vertical lines. Category row: the bold
+category word alone (`BEDFRAME`, no count, no fill), no box. Item rows: every cell boxed (horizontal and vertical
+rules), top-aligned; Description is regular weight with the configuration on the following lines in the same ink.
+Columns `# · Item Code · Description · Qty · Unit Price · Discount · Amount (RM)`; Qty reads `1 UNIT`; Unit Price and
+Amount carry the currency (`RM 2,999.00`); an empty Discount reads `—`. No in-table SUBTOTAL row — the totals
+block carries the sums. Carres type sizes are kept. The payment table uses the same header and cell rules. The payment table is
 `# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
 document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
 and `No payments recorded.` instead of an empty table. The section heading is `PAYMENTS RECEIVED` (owner, 2026-09-21,
