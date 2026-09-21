@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import ConnectedSections, { CONNECT_AT_TABLE_HEADER } from "./ConnectedSections";
+import ConnectedSections, { CONNECT_AT_TABLE_HEADER, SECTION_PAD_L } from "./ConnectedSections";
 
 interface Row {
   id: string;
@@ -71,7 +71,11 @@ describe("the connector starts at the caret", () => {
       />
     ));
     fireEvent.click(screen.getAllByRole("button", { name: "Expand row" })[0]!);
-    expect(screen.getByTestId("section-run-goods")).toBeInTheDocument();
+    const run = screen.getByTestId("section-run-goods");
+    /* §6.9: the line touches its destination — it runs the whole padding,
+       from the expansion cell's edge onto the first box's border. */
+    expect(run.style.left).toBe(`-${SECTION_PAD_L}px`);
+    expect(run.style.width).toBe(`${SECTION_PAD_L}px`);
     expect(screen.getByTestId("section-trunk-goods")).toBeInTheDocument();
     expect(screen.getByTestId("section-elbow-po")).toBeInTheDocument();
   });

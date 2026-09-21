@@ -1395,10 +1395,13 @@ div:first-child > .columnsMenuGroup {
 .expansionCaretCell:not(.stickyCell) {
   position: relative;
 }
-/* From beneath the 14px caret (centred in its cell) to the row's bottom edge. */
+/* From beneath the caret to the row's bottom edge. The caret is the `▸` text
+   glyph, about 6.5px tall and centred in its cell, so its lower edge sits ~3px
+   below the middle; the line starts 1px under it (measured, Card 12 walk
+   2026-09-22 — `+7px` assumed a 14px icon and left a 5px gap). */
 .expansionDrop {
   left: calc(50% - 0.5px);
-  top: calc(50% + 7px);
+  top: calc(50% + 4px);
   bottom: 0;
   border-left-width: 1px;
 }
