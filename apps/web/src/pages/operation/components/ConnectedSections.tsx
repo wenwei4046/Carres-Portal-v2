@@ -47,6 +47,7 @@ import {
   ConnectorTrunk,
   CONNECTOR_ELBOW_W,
 } from "@/components/tree-connector";
+import { useExpansionJoined } from "@/components/register/expansion-connector";
 
 /** x of the trunk, inside the expansion cell — under the parent's own identity. */
 export const SECTION_TRUNK_X = 10;
@@ -80,10 +81,23 @@ export default function ConnectedSections({
   sections: readonly ConnectedSection[];
   testId?: string;
 }) {
+  /* ⭐ INSIDE A GRID EXPANSION THE LINE COMES FROM THE CARET (§6.9, Card 12
+     review 2026-09-21). The grid draws the drop and the curve in the caret's
+     own column and hands over at the expansion cell's left edge, at
+     `--expansion-join-y`; this stack carries it flat to the first child and
+     lands that child's heading on the same height. Outside a grid (a detail
+     panel) nothing changes. */
+  const joined = useExpansionJoined();
+  const firstAt = sections[0]?.connectAt ?? CONNECT_AT_TABLE_HEADER;
   return (
     <div
       data-testid={testId}
-      style={{ paddingLeft: SECTION_PAD_L, paddingTop: SECTION_TOP_GAP, paddingBottom: SECTION_TOP_GAP }}
+      data-connected-sections={joined ? "" : undefined}
+      style={{
+        paddingLeft: SECTION_PAD_L,
+        paddingTop: joined ? `calc(var(--expansion-join-y, 21px) - ${firstAt})` : SECTION_TOP_GAP,
+        paddingBottom: SECTION_TOP_GAP,
+      }}
     >
       {sections.map((s, i) => {
         const isLast = i === sections.length - 1;
@@ -94,14 +108,24 @@ export default function ConnectedSections({
             data-testid={`connected-section-${s.key}`}
             style={{ marginTop: i === 0 ? 0 : SECTION_GAP }}
           >
-            <ConnectorElbow
-              /* The trunk's x is measured from the SECTION's left edge, which
-                 the padding above has already moved right. */
-              left={SECTION_TRUNK_X - SECTION_PAD_L}
-              gapAbove={i === 0 ? SECTION_TOP_GAP : SECTION_GAP}
-              connectAt={s.connectAt}
-              testId={`section-elbow-${s.key}`}
-            />
+            {joined && i === 0 ? (
+              /* The run: from the expansion cell's left edge to this box. */
+              <span
+                aria-hidden="true"
+                data-testid={`section-run-${s.key}`}
+                className="pointer-events-none absolute border-kit-slate-6"
+                style={{ left: -SECTION_PAD_L, width: SECTION_PAD_L - 4, top: s.connectAt, borderTopWidth: 1, zIndex: 1 }}
+              />
+            ) : (
+              <ConnectorElbow
+                /* The trunk's x is measured from the SECTION's left edge, which
+                   the padding above has already moved right. */
+                left={SECTION_TRUNK_X - SECTION_PAD_L}
+                gapAbove={i === 0 ? SECTION_TOP_GAP : SECTION_GAP}
+                connectAt={s.connectAt}
+                testId={`section-elbow-${s.key}`}
+              />
+            )}
             {!isLast && (
               <ConnectorTrunk
                 left={SECTION_TRUNK_X - SECTION_PAD_L}

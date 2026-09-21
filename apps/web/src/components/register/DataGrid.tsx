@@ -51,11 +51,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, ChevronRight, Printer, X, Check, ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { appTodayIso } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
+import Tooltip from "@/components/kit/Tooltip";
+import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
@@ -1204,6 +1206,11 @@ function DataGridInner<T>({
     },
     [visibleColumns, expandable?.alignToColumn],
   );
+  /* §6.9 — the caret-anchored connector is drawn only for a FLUSH expansion
+     (the Purchasing geometry), where the stated join height is where the first
+     child begins. Every other expansion renders exactly as before. */
+  const expansionJoinable =
+    Boolean(expandable?.flush) && !expandable?.fitExpansionToViewport && expansionGutter.includes("__expand__");
 
   /* The Columns pill counts DATA columns only — the synthetic __select__ /
      __expand__ columns are chrome, not catalog (2990 subtracted only the
@@ -2086,7 +2093,19 @@ function DataGridInner<T>({
                   }}
                 >
                   {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
-                  {arrow && <span className={styles.sortArrow}>{arrow === "A" ? "^" : "v"}</span>}
+                  {/* ⭐ THE SORT IS AN ICON, NOT A LETTER (Card 12 review, 2026-09-21): a
+                      12px Lucide arrow in the header ink, beside the same 11px
+                      Filter icon. The direction is also spoken, never only drawn. */}
+                  {arrow && (
+                    <span className={styles.sortArrow} data-testid={`sort-${arrow === "A" ? "asc" : "desc"}`}>
+                      {arrow === "A" ? (
+                        <ArrowUp size={12} strokeWidth={2} aria-hidden />
+                      ) : (
+                        <ArrowDown size={12} strokeWidth={2} aria-hidden />
+                      )}
+                      <span className="sr-only">{arrow === "A" ? "sorted ascending" : "sorted descending"}</span>
+                    </span>
+                  )}
                 </button>
               ) : (
                 col.label
@@ -2312,9 +2331,14 @@ function DataGridInner<T>({
               return (
                 <td
                   key={col.key}
-                  className={`${styles.td}${pinClass(col.key)}`}
+                  className={`${styles.td}${pinClass(col.key)}${isExpanded && expansionJoinable ? ` ${styles.expansionCaretCell}` : ""}`}
                   style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
                 >
+                  {/* §6.9 — the drop from beneath the caret, shown only when
+                      this row's expansion holds a connected section stack. */}
+                  {isExpanded && expansionJoinable ? (
+                    <span aria-hidden="true" className={styles.expansionDrop} data-testid="expansion-connector-drop" />
+                  ) : null}
                   <button
                     type="button"
                     aria-label={isExpanded ? "Collapse row" : "Expand row"}
@@ -2446,16 +2470,32 @@ function DataGridInner<T>({
           })}
         </tr>
         {isExpanded && expandable && (
-          <tr className={`${styles.tr} ${styles.trExpansion}`} style={{ background: "var(--grid-expansion, var(--c-cream))" }}>
+          <tr
+            className={`${styles.tr} ${styles.trExpansion}`}
+            style={{
+              background: "var(--grid-expansion, var(--c-cream))",
+              ...(expansionJoinable ? { ["--expansion-join-y" as string]: `${EXPANSION_JOIN_Y}px` } : {}),
+            }}
+          >
             {/* The gutter, kept EMPTY beside the child rows — the indent IS
-                the parent-child link (owner ruling 2026-08-15). */}
-            {expansionGutter.map((key) => (
-              <td
-                key={key}
-                data-testid={`grid-expansion-gutter-${key}`}
-                style={{ padding: 0, borderTop: "1px solid var(--line)" }}
-              />
-            ))}
+                the parent-child link (owner ruling 2026-08-15). Under the caret
+                it carries the §6.9 elbow; any gutter cell after it carries the
+                line across; both show only beside a connected section stack,
+                and pin with the caret so the line holds under a sideways scroll. */}
+            {expansionGutter.map((key, gi) => {
+              const caretAt = expansionGutter.indexOf("__expand__");
+              const piece = !expansionJoinable || caretAt < 0 || gi < caretAt ? null : gi === caretAt ? styles.expansionElbow : styles.expansionRun;
+              return (
+                <td
+                  key={key}
+                  data-testid={`grid-expansion-gutter-${key}`}
+                  className={piece ? styles.expansionGutter : undefined}
+                  style={{ padding: 0, borderTop: "1px solid var(--line)", ...(piece ? pinStyle(key) : {}) }}
+                >
+                  {piece ? <span aria-hidden="true" className={piece} data-testid={`expansion-connector-${gi === caretAt ? "elbow" : "run"}`} /> : null}
+                </td>
+              );
+            })}
             <td
               colSpan={visibleColumns.length - expansionGutter.length}
               data-testid="grid-expansion-cell"
@@ -2466,11 +2506,17 @@ function DataGridInner<T>({
                  column's, the right edge is the parent table's. */
               style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
-              {expandable.fitExpansionToViewport ? (
-                <ViewportExpansion>
-                  {expandable.renderExpansion(row)}
-                </ViewportExpansion>
-              ) : expandable.renderExpansion(row)}
+              {/* The caret line joins only a FLUSH expansion (the §6.9 Purchasing
+                  geometry), where the stated join height is where the first
+                  child begins. A padded or viewport-fitted expansion keeps the
+                  section stack's own first elbow, exactly as before. */}
+              <ExpansionJoinContext.Provider value={expansionJoinable}>
+                {expandable.fitExpansionToViewport ? (
+                  <ViewportExpansion>
+                    {expandable.renderExpansion(row)}
+                  </ViewportExpansion>
+                ) : expandable.renderExpansion(row)}
+              </ExpansionJoinContext.Provider>
             </td>
           </tr>
         )}
@@ -3573,9 +3619,15 @@ function DataGridInner<T>({
 }
 
 /**
- * One line of text that, only when the cell cuts it, becomes a kit Popover
- * trigger showing the whole value (Listing Standard 2026-09-16). Measured on
- * the element itself, so resizing a column turns the door on or off.
+ * One line of text that, only when the cell cuts it, shows the whole value
+ * (Listing Standard 2026-09-16). Measured on the element itself, so resizing a
+ * column turns the door on or off.
+ *
+ * ⭐ HOVER AND KEYBOARD FOCUS SHOW IT; CLICK AND ENTER OPEN IT (ui MASTER §6.0
+ * rule 5, Card 12 review 2026-09-21). One button carries both kit behaviours:
+ * the `Tooltip` answers hover and focus without taking focus out of the grid,
+ * and the `Popover` answers click, Enter and a touch screen's tap, where it
+ * can be read and selected at leisure.
  */
 function OverflowText({ text, label }: { text: string; label: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -3600,16 +3652,18 @@ function OverflowText({ text, label }: { text: string; label: string }) {
     <Popover
       label={label}
       trigger={
-        <button
-          type="button"
-          className={styles.overflowTrigger}
-          aria-label={`${label}: ${text}`}
-          data-testid="cell-overflow"
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          {line}
-        </button>
+        <Tooltip content={text}>
+          <button
+            type="button"
+            className={styles.overflowTrigger}
+            aria-label={`${label}: ${text}`}
+            data-testid="cell-overflow"
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            {line}
+          </button>
+        </Tooltip>
       }
     >
       <p className="max-w-[320px] whitespace-normal break-words text-body text-kit-slate-12">{text}</p>

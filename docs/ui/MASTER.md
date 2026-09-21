@@ -1490,6 +1490,8 @@ Register (orders MASTER §0.1). Status: APPROVED; adoption is per page and is no
             Own approved designs, not this rule: SO Batch Purchase ·
             Manual Purchase · Payment Monitor · Delivery Monitor
 6  HEADER   11px/600 grey band · the same simple filter icon on every column
+            Sort = a 12px arrow icon (ArrowUp / ArrowDown) in the header ink,
+            never a letter; its direction is spoken to a screen reader
 7  EXPAND   ▸ opens a child table · 1px line from ▸ to a bordered child box
             Item = product name on line 1, configuration on line 2
 8  GROUPS   Only where the module MASTER approves them. Sales Orders: flat
@@ -2007,6 +2009,25 @@ frame's top border at every width. **A connector may never be positioned by arit
 declared widths** — the table that placed the cell is the only thing that knows where it is.
 Other modules keep their existing business sections; do not recreate the retired three-sibling-section
 SO Batch arrangement. Use one component implementation, not page-local connector drawings.
+
+**THE ROW-TO-EXPANSION LINE STARTS AT THE CARET — BUILT 2026-09-21 (engine, Card 12 review).** The
+SO-row connector used to be drawn by `ConnectedSections` inside the expansion cell at a fixed 10px,
+which is not where the `▸` is: measured on SO Batch and Sales Orders alike, it began 26px right of
+the caret and ~22px below it. Only the grid knows its caret cell, so the grid now draws the part
+that starts there, positioned by CSS at 50% of that cell and never by arithmetic over widths:
+the **drop** from beneath the caret to the row's edge (in the caret cell), the **curve** down the
+same column to the join height and across to the expansion edge (in the expansion's caret-column
+gutter cell, pinned with the caret so the line holds under a sideways scroll), and
+`ConnectedSections` carries it as a flat **run** to its first child, later sections keeping their
+own elbows on the stack's trunk. The join height is stated: `EXPANSION_JOIN_Y` = 21px (8px air plus
+the 13px middle of a ruled header). It applies to a **flush** expansion holding `ConnectedSections`
+(SO Batch; Sales Orders with Card 12). A padded or viewport-fitted one (the Delivery Monitor brief,
+whose multi-leg route block sits above its panels) keeps the stack's own first elbow, and a plain
+child table gets nothing — their DOM is unchanged. Measured at 1440 on SO Batch: the drop is centred
+on the caret (x 293.5) and starts at its bottom edge; drop, curve and run are continuous; unchanged
+after a 200px sideways scroll. 🟡 SO Batch's goods header is 40px, so the line meets it 8px above
+its middle (inside the band, as before); passing `connectAt` 20px there is Purchasing's one-line
+follow-up.
 
 **ONE EXPANDED STATE PER ROW, AND A SECOND DOOR IS NOT A SECOND PANEL.** A row-leading disclosure
 and an in-cell disclosure (SO Batch's Ready Stock count, Supplier Claims' `{n} Units` link) may
