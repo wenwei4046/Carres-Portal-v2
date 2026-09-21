@@ -224,14 +224,11 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
 - **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
 - **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
-- **Long words wrap to two lines — owner ruling 2026-09-21.** `Customer`, `Customer Delivery Location`,
-  `Showroom`, `Salesperson` and `Items` wrap inside their registry width instead of being cut with `…`
-  (DataGrid `wrap`). **Every row stays the current 38px** (`--grid-row-h`), wrapped or not — the row
-  height never increases (owner ruling 2026-09-21; the 54px two-line row is NOT used here). Two 13px lines
-  at the 16px line height fill 32px of the 38px row; the build proves this is legible in the rendered shell,
-  and where it is not, the registry width grows instead. Dates, `SO No`, `PO No` and `DO No` stay
-  on one line. The registry width is measured so the longest real value fits two lines; a value that would
-  need a third line is fixed by widening that registry entry, never by cutting it or growing one row.
+- **One line, 38px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
+  Salesforce, SAP Fiori, AG Grid).** Every row stays the current 38px (`--grid-row-h`) and never grows.
+  Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
+  column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
+  be widened. Dates, `SO No`, `PO No` and `DO No` never cut.
 - Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
   retired with it and are re-measured in the build round.
 
