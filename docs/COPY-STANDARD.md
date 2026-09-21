@@ -3794,17 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (commission-report)
-
-New on-screen words from Reports → Dealer commission (migration 0544). Not law until approved.
-
-| Where | Proposed words |
-|---|---|
-| Page and report door | `Dealer commission` |
-| Report columns and export | `Commission on collected` · `Commission still to collect` · `Rebate this month` · `Quota left` · `No quota` |
-| Report note | `Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.` |
-| Filters | `All` (as the no-filter choice for Dealer and Showroom) |
-| Rates section | `Commission rates` · `Default rate (%)` · `Product rate` · `Rate (%)` · `Add a product rate` · `Edit` · `Remove` |
-| Quota section | `Renovation quotas` · `Renovation quota` · `Add a renovation quota` · `Quota (RM)` · `Rebate rate (%)` · `Counts from` · `<RM> · <rate>% from <month>` |
-| Quota list, dealer gone | `Dealer not available` |
-| API refusals | `Pick a month.` · `That product is not on the list.` · `That dealer is not on the list.` |
