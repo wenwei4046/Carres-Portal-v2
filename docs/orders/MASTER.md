@@ -407,22 +407,27 @@ billing relationship and billing address move to `Customer` (who pays). `SO info
 order and the same words on both sides. The PDF's `Order Details` · `Ordered` · `Sales Location` ·
 `Delivery date` · `Proceed date` labels are therefore wrong and follow the page's words (`SO info` ·
 `SO Doc Date` · `Showroom` · `Customer Requested Delivery Date` · `Proceed Date`). The page reads:
-**when (which order) · who · where · what · payment.**
+**when (which order) · who · where · what · payment.** Also ruled 2026-09-21: `Goods` → `Items` (the same
+word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Showroom
+and Salesperson join `SO info` (the Register also reads Showroom · Salesperson beside SO No) and the
+`Sales ownership` heading is retired; **headings have two ranks only** — card title 16px/600 sentence case
+on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
+amounts never borrow the heading size; only the balance line is bold.
 
 ```
-SO info                 SO Doc Date · Customer Requested Delivery Date · Proceed Date · Customer reference
+SO info                 SO Doc Date · Proceed Date · Customer Requested Delivery Date · Showroom · Salesperson ·
+                        Dealer (+ the approval lane) · Customer reference — no `Sales ownership` heading
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name.
   │                     Existing customer carries `· {n} orders ›` (owner ruling 2026-09-21, NOT BUILT):
   │                     n = this phone's Sales Orders the reader may see; the link opens the Sales Orders
   │                     Register searched by that phone. No new customer page, no new writer.
-  ├ Sales ownership     Dealer · Showroom · Salesperson  (+ the approval lane)
   ├ Emergency contact   name · phone · relationship      (own heading, own divider)
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-GOODS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
+ITEMS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
 PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```

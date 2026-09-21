@@ -2428,7 +2428,8 @@ same words; only which card carries them moved.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The customer, who sold to them, and who to ring | **`Customer`**, with **`Sales ownership`** and **`Emergency contact`** as its in-card headings | Customer details · Buyer · Client · Contact · Ship to |
+| The customer and who to ring | **`Customer`**, with **`Emergency contact`** and **`Billing`** as its in-card labels. `Sales ownership` is retired 2026-09-21 — Dealer, Showroom and Salesperson live in `SO info` | Customer details · Buyer · Client · Contact · Ship to |
+| The goods sold on the order — card and PDF heading (owner ruling 2026-09-21) | **`Items`** | `Goods` (kept only for readiness: `Goods ready` · `Goods not ready`) · Products · Lines |
 | The Sales Order's own facts — the FIRST card, and the same heading on the PDF (owner ruling 2026-09-21) | **`SO info`** | `Order info` (retired 2026-09-21) · Order details · Sales Order info · Dates · Admin · Meta |
 | The order's payment card — the same heading on the PDF (owner ruling 2026-09-21) | **`Payment`** | `Money` (retired 2026-09-21) · Payment Received · Collections |
 | Where the goods go and what the lorry meets there | **`Delivery`** — one group with NO in-card headings (owner ruling 2026-09-21): address, building type, floor, lift, stair carry. The billing relationship and billing address belong to `Customer` | `Delivery address` / `Delivery access` as headings (retired 2026-09-21) · Ship to · Address · Logistics · Delivery details |
