@@ -1521,6 +1521,14 @@ through the one `sales-order-template.tsx`; both keep doing so — never a secon
 listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, Customer Requested Delivery
 Date, Showroom); its layout is not redesigned.
 
+**The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (written in full on
+the document). **No current fact is deleted:** the rows stay SO No · SO Doc Date (was `Ordered`) · Showroom (was
+`Sales Location`) · Proceed Date (was `Proceed date`; printed only when it exists) · Customer Requested Delivery
+Date (was `Delivery date`) · Salesperson · Sold by (dealer, when there is no showroom). The ONE removal is the
+`Access` row and its `Access not confirmed` note: floor and lift are the Delivery Order's facts and print there,
+not on the Sales Order. The stair-carry charge note stays, because it explains a charge on this order.
+`Bill To` keeps Name · Address · Tel · Email · Emergency; `Deliver To` still prints only when it differs.
+
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
   `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same
   blob. There is no second lookalike renderer, and there is no toolbar on or above the paper —
