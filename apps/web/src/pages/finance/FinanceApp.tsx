@@ -21,6 +21,7 @@ import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
 import SupplierBills from "./payables/SupplierBills";
 import PaymentVouchers from "./payables/PaymentVouchers";
 import FinanceSettings from "./settings/FinanceSettings";
+import DealerCommission from "./reports/DealerCommission";
 import ApOutstanding from "./payables/ApOutstanding";
 
 /**
@@ -97,6 +98,8 @@ export default function FinanceApp() {
           {/* Payment MASTER §16 — Reports → Payment: the six approved
               read-only listings over the same register wires. */}
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
+          {/* 0544 — dealer commission and renovation rebate: rates and a read-only report. */}
+          <Route path="reports/dealer-commission" element={financeOnly(<DealerCommission />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           {/* 0478 — money in that is not a sale: other debtor invoices and
