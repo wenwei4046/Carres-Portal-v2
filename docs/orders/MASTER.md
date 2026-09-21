@@ -1465,11 +1465,15 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 
 ### One page, one state
 
-- **The Order tab is ONE page in ONE state.** There is no reading mode and no editing mode —
-  there is one document with fields in it. `?edit=1` is retired; a URL still carrying it is
-  stripped rather than refused, because the page it asks for is the page it is already on.
-  `View` and `Edit` on the Register's context menu reach the same destination.
-- **Two panes, 50% / 50%.** Left is the form, right is the document. Each pane scrolls on its
+- **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
+  2026-08-15 "one page, one state" rule (international ERP practice — SAP display/change, Odoo and
+  NetSuite Edit/Save — and the 2990 reference). The Order tab opens READ-ONLY. A dark primary `Edit`
+  in the page header enters edit mode; edit mode offers `Cancel` and one commit button:
+  `Submit amendment request` when a supplier commitment makes the change an amendment (the existing
+  governed amendment path), otherwise `Save`. `View` and `Edit` on the Register's context menu open
+  the read-only and the edit state respectively. Leaving edit mode with unsaved changes still refuses
+  safely. Who may press `Edit` is the existing permission; this ruling changes no permission.
+- **Two panes, 50% / 50% — in BOTH states (owner, 2026-09-21: the preview remains).** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
 - **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
