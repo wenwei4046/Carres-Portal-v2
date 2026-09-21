@@ -199,7 +199,7 @@ No deposit · Online order
 2026-09-17 date-first pair (`SO Date · SO No`), and the 2026-09-18 default order. The current build still shows the older order until the Sales Orders listing round.
 
 ```
-Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
+Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
 ```
 
 - **Population.** Only orders Sales has handed to Operation. A `Placed` order is not on this Register,
@@ -215,14 +215,14 @@ Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested
 - **No groups, no status.** The Register is one flat list with no status grouping (owner ruling
   2026-09-21). After-sales service can happen at any point, so a Service Case is never a group and never
   a Register column; the order's Service Cases stay on the order and on Order Route `Linked problems`.
-- **No absence word for a required fact.** Proceed Date, SO Doc Date, SO No, Showroom, Salesperson,
+- **No absence word for a required fact.** Proceed Date, SO Doc Date, SO No, Sales Location, Salesperson,
   Customer Requested Delivery Date, Customer Delivery Location, Customer and Items are required when Sales
   submits the order (Sales Portal entry gate), so every row has them. `Not recorded`, `To be confirmed`
   and `No delivery date` never print in these columns: an empty one would be a system error, not a state
   of the order, and is fixed at its source rather than dressed as data. Only a document that genuinely
   does not exist yet has an absence word (`No PO yet` · `No DO yet`, below).
-- **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
-- **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
+- **`Sales Location`** sits right after SO No (owner ruling 2026-09-21; the word replaced `Showroom` the same day — "showroom is sales location"): where the order was sold is read with its identity. It is the outlet, else the dealer, so it is always filled.
+- **`Salesperson`** follows Sales Location (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
 - **One line, 40px — owner ruling 2026-09-21 (international register practice: Shopify, Linear,
   Salesforce, SAP Fiori, AG Grid).** Every row is 40px, set on this page only (`rowHeight={40}`; the engine default stays 38px so no other page
@@ -404,19 +404,22 @@ with no `Delivery address` / `Delivery access` headings (international furniture
 billing relationship and billing address move to `Customer` (who pays). `SO info` (renamed from
 `Order info`: this is the original Sales Order the showroom opened for the customer) comes FIRST, before
 `Customer`; `MONEY` is renamed `Payment`. The left pane and the Sales Order PDF must tally — the same card
-order and the same words on both sides. The PDF's `Order Details` · `Ordered` · `Sales Location` ·
-`Delivery date` · `Proceed date` labels are therefore wrong and follow the page's words (`SO info` ·
-`SO Doc Date` · `Showroom` · `Customer Requested Delivery Date` · `Proceed Date`). The page reads:
+order and the same words on both sides (`SO info` · `SO Doc Date` · `Proceed Date` · `Customer Requested
+Delivery Date` · `Sales Location` · `Salesperson`). **`Sales Location` IS the word for where the order was sold —
+OWNER RULING (Jess, 2026-09-21): "showroom is sales location".** It replaces `Showroom` on the page, the Register
+column and every field catalog, one word with the PDF; it is the outlet, falling back to the dealer when the order
+was not sold from a showroom (0144), so it is always filled. The page reads:
 **when (which order) · who · where · what · payment.** Also ruled 2026-09-21: `Goods` → `Items` (the same
-word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Showroom
-and Salesperson join `SO info` (the Register also reads Showroom · Salesperson beside SO No) and the
+word as the Register column and the PDF; `Goods` stays the Order Route readiness word); Dealer, Sales Location
+and Salesperson join `SO info` (the Register also reads Sales Location · Salesperson beside SO No) and the
 `Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case
 on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
 amounts never borrow the heading size; only the balance line is bold.
 
 ```
-SO info                 SO Doc Date · Proceed Date · Customer Requested Delivery Date · Showroom · Salesperson ·
-                        Dealer (+ the approval lane) · Customer reference — no `Sales ownership` heading
+SO info                 SO Doc Date · Proceed Date · Customer Requested Delivery Date · Sales Location · Salesperson ·
+                        Dealer (+ the approval lane) — no `Sales ownership` heading. `Customer reference` is
+                        REMOVED from the page (owner ruling 2026-09-21)
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name.
@@ -1479,7 +1482,8 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   under the header in BOTH states: `This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`
   It is absent when no supplier commitment exists.
   **Page header (owner, 2026-09-21, from the 2990 reference):** one line `SO-{n} — {CUSTOMER NAME}` at page size — no facts line under it
-  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Total RM {amount}` (the one order total, Law D) · `Print ▾` · `More actions` (keeps `Cancel SO`)
+  (owner, 2026-09-21: SO Doc Date lives in SO info, Rev in Revisions); right side: `Print ▾` · `More actions` (keeps `Cancel SO`). **No amount in the header (owner ruling
+  2026-09-21)** — the order total is stated once, as the Items table's `TOTAL PAYABLE` and in `Payment`
   · dark primary `Edit` last. Tabs stay `Order | Revisions | History | Order Route`. Rejected from 2990: an
   overall status pill (a Sales Order has no overall status), `Relationship Map` (Order Route is that view)
   and a standalone `Cancel SO` button.

@@ -2280,7 +2280,7 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | A money cell on an order that is fully settled | **`Paid in full`** | Settled · Cleared · Fully paid · Nil outstanding — registered 2026-09-02 (D7): it has been on the SO register and the workspace MONEY card since they were written and was in no dictionary, so the rule it was breaking was this one. Registered rather than reverted, on the `SO Date` precedent (2026-09-01). ⚠️ **The DELIVERY GATE says `Money in full` for the same arithmetic** (outstanding = 0, ruled 2026-09-01, two tables below). Two words, one fact, two surfaces — left as it is deliberately, because unifying them is an owner's call and not a tidy-up. Do not swap one for the other without one. |
 | A money cell on an order nobody has priced | **`No price yet`** | RM 0 · Unpriced · — · Free. The DELIVERY GATE says the longer `No price yet — money does not hold this delivery` because a gate must name the consequence; a register column has no room for one and states only the fact |
 | Money Carres pays a SUPPLIER before its bill, later knocked off that bill (or sent back) | **`Advance`** — **APPROVED, owner ruling YH 11 Sep 2026**, for exactly three places: the payment voucher's advance box, the advance knocked off a bill (the bill's Payments), and the column on `Unpaid by Supplier` showing advance not yet used. Migrations 0484–0485 | Deposit · Prepayment · Down payment · Supplier credit · Refund (`Refund` still has no entry — see the Claims ruling). The phrases built on it (`Advance left`, `Apply advance`, `Money back` …) are PROPOSAL until ruled — § Finance ledger words, *Supplier advances* |
-| Register column naming the selling showroom | **Showroom** | Outlet · Branch · Store |
+| Sales Orders Register column and SO page field naming where the order was sold (owner ruling 2026-09-21: "showroom is sales location") | **`Sales Location`** — the outlet, else the dealer; the same word as the SO PDF | `Showroom` (retired for this fact 2026-09-21) · Outlet · Branch · Store |
 | Register destination summary | **Delivery Location** | Address · Location (ambiguous) · Ship-to |
 | Direct customer-order document identity | **SO No** | Doc. No. · Current |
 | Direct purchase-order document lineage | **PO No** | PO Doc No. · Current |
@@ -2363,7 +2363,7 @@ the drawer and the DO document read them from the shared modules (`delivery-paym
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
 | The register's search placeholder | **`Search sales orders…`** | `SO number, customer, phone or item…` — the box is a governed 200px, so the long form clipped at every width, not only a narrow one |
-| The register's eighth default column | **`Showroom`** | Outlet · Branch · Store |
+| The register column after SO No | **`Sales Location`** (owner ruling 2026-09-21) | `Showroom` · Outlet · Branch · Store |
 | The register's footer count (Listing Standard, owner approved 2026-09-16) | **`{n} sales orders`** · singular **`1 sales order`** · narrowed or capped **`{n} of {m} sales orders`** (`{m}` is the SERVER's `salesOrderTotal` — every Sales Order this user may read, rentals excluded, search not applied; when it is unknown the footer prints **`{n} sales orders`** with no `of`) · ticked **`{n} selected sales orders`** / **`1 selected sales order`** | `{n} orders` · `{n} of {m} orders` · `{n} rows` |
 | The register holds no sales order at all | **`No sales orders yet`** | `No orders yet` · No data |
 | Search or header filters leave nothing | **`No sales orders match these filters`** + **`Clear filters`** (it clears the search too; while this state shows its button, the condition strip keeps its chips but not a second button) | `No matching sales orders.` · No results |
@@ -2428,7 +2428,7 @@ same words; only which card carries them moved.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The customer and who to ring | **`Customer`**, with **`Emergency contact`** and **`Billing`** as its in-card labels. `Sales ownership` is retired 2026-09-21 — Dealer, Showroom and Salesperson live in `SO info` | Customer details · Buyer · Client · Contact · Ship to |
+| The customer and who to ring | **`Customer`**, with **`Emergency contact`** and **`Billing`** as its in-card labels. `Sales ownership` is retired 2026-09-21 — Dealer, Sales Location and Salesperson live in `SO info` | Customer details · Buyer · Client · Contact · Ship to |
 | The goods sold on the order — card and PDF heading (owner ruling 2026-09-21) | **`Items`** | `Goods` (kept only for readiness: `Goods ready` · `Goods not ready`) · Products · Lines |
 | The Sales Order's own facts — the FIRST card, and the same heading on the PDF (owner ruling 2026-09-21) | **`SO info`** | `Order info` (retired 2026-09-21) · Order details · Sales Order info · Dates · Admin · Meta |
 | SO page notice while a supplier commitment exists (owner ruling 2026-09-21) | **`This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`** · the commit button reads **`Submit amendment request`**; with no supplier commitment it reads **`Save`** | Your Save submits an amendment request · Amend · Request change |
