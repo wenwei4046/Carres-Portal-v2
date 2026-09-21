@@ -600,6 +600,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/Service Case/)).not.toBeInTheDocument();
   });
 
+  /* ⭐ THE ONE-LINE LISTING ROW IS 40px ON THIS PAGE ONLY (ui MASTER §6.0 rule 5,
+     owner ruling 2026-09-21). The engine default stays 38px for everyone else. */
+  it("sets its own 40px row through the engine rowHeight, never a page stylesheet", () => {
+    mount();
+    const grid = document.querySelector("[data-row-height]") as HTMLElement;
+    expect(grid).toHaveAttribute("data-row-height", "40");
+    expect(grid.style.getPropertyValue("--grid-row-h")).toBe("40px");
+  });
+
   it("says No PO yet · No DO yet, muted, when neither document exists", () => {
     listHookState.data = { orders: [order({ do_number: null, po_numbers: [] })] };
     mount();
