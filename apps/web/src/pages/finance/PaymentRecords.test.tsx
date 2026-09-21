@@ -12,7 +12,8 @@ import PaymentRecords from "./PaymentRecords";
  */
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
   refetch: vi.fn(), isSuccess: true, error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})),
-  invoices: [] as unknown[], voidMutate: vi.fn() }));
+  invoices: [] as unknown[], voidMutate: vi.fn(),
+  holds: [] as unknown[], openHold: vi.fn(), clearHold: vi.fn() }));
 vi.mock("xlsx", () => ({ utils: { json_to_sheet: state.sheet, book_new: () => ({}),
   book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 vi.mock("@/lib/queries", () => ({
@@ -22,6 +23,9 @@ vi.mock("@/lib/queries", () => ({
     { route_source: "pj_showroom", bank_name: "Hong Leong Bank", account_name: "Carres", account_no: "12345678" },
   ], collection_timing: [] } }),
   useVoidPayment: () => ({ mutate: state.voidMutate, isPending: false }),
+  useFinanceExceptions: () => ({ data: state.holds, isSuccess: true }),
+  useOpenFinanceException: () => ({ mutate: state.openHold, isPending: false }),
+  useClearFinanceException: () => ({ mutate: state.clearHold, isPending: false }),
   useWorkspaceDuties: () => ({ data: { duties: [
     { key: "payment_approver", resolution: { actor_user_id: duty.actor } },
   ] } }),
@@ -70,6 +74,7 @@ beforeEach(() => {
   state.invoices = [INVOICE];
   state.isError = false; state.isSuccess = true; state.isLoading = false; state.error = null;
   state.sheet.mockClear(); state.voidMutate.mockClear();
+  state.holds = []; state.openHold.mockClear(); state.clearHold.mockClear();
   doc.fetch.mockReset(); doc.render.mockReset(); doc.slip.mockReset();
   doc.fetch.mockImplementation(async (url: string) => {
     if (url.includes("/templates")) return { templates: [] };
@@ -286,6 +291,39 @@ describe("Correct allocation and Void payment — the overflow, for the authoris
     fireEvent.change(screen.getByLabelText("Why is this payment being voided"), { target: { value: "Keyed twice" } });
     fireEvent.click(within(form).getByRole("button", { name: "Void payment" }));
     expect(state.voidMutate).toHaveBeenCalledWith({ paymentId: "p1", reason: "Keyed twice" });
+  });
+});
+
+describe("Hold delivery and Clear hold — Finance only (BR-7)", () => {
+  it("an operator sees neither door", () => {
+    duty.me = "approver"; duty.actor = "approver";
+    openFirstPayment();
+    openMenu(screen.getByTestId("payment-record-overflow"));
+    expect(screen.queryByRole("menuitem", { name: "Hold delivery" })).not.toBeInTheDocument();
+  });
+  it("Finance holds with a reason, and clears the open hold with evidence", () => {
+    duty.role = "finance"; duty.me = "fin";
+    openFirstPayment();
+    openMenu(screen.getByTestId("payment-record-overflow"));
+    expect(screen.queryByRole("menuitem", { name: "Clear hold" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Hold delivery" }));
+    const form = screen.getByTestId("finance-hold-form");
+    expect(within(form).getByRole("button", { name: "Hold delivery" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Why is Finance holding this delivery"), { target: { value: "Money not in the bank" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Hold delivery" }));
+    expect(state.openHold).toHaveBeenCalledWith({ reason: "Money not in the bank" });
+  });
+  it("Clear hold names the open hold and sends its id", () => {
+    duty.role = "finance"; duty.me = "fin";
+    state.holds = [{ id: "fe1", status: "open", reason: "Money not in the bank" }];
+    openFirstPayment();
+    openMenu(screen.getByTestId("payment-record-overflow"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Clear hold" }));
+    const form = screen.getByTestId("finance-clear-form");
+    expect(form).toHaveTextContent("Finance is holding this delivery: Money not in the bank");
+    fireEvent.change(screen.getByLabelText("What shows the money is found"), { target: { value: "Found in HLB statement 12 Sep" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Clear hold" }));
+    expect(state.clearHold).toHaveBeenCalledWith({ id: "fe1", evidence: "Found in HLB statement 12 Sep" });
   });
 });
 
