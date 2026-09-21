@@ -1545,7 +1545,7 @@ Columns `# · Item Code · Description · Qty · Unit Price · Discount · Amoun
 Amount carry the currency (`RM 2,999.00`); an empty Discount reads `—`. No in-table SUBTOTAL row — the totals
 block carries the sums. Carres type sizes are kept. Spacing follows the Houzs sample and saves space (owner, 2026-09-21): header and cells 4pt
 top and bottom, 5pt left and right, line height 1.25; the category row 5pt above and 3pt below. **Totals follow the
-sample:** no box and no grey band — plain rows (Subtotal · Paid to date), a thin ink rule, then bold .
+sample:** no box and no grey band — plain rows (Subtotal · Paid to date), a thin ink rule, then bold `BALANCE DUE`.
 The sample's Tax and Total rows are not added: the Sales Order carries no tax (the invoice owns SST), so they would
 only repeat the Subtotal and a dash. The payment table uses the same header
 and cell rules. The payment table is
