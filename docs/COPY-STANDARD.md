@@ -3794,14 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (receipt-data)
-
-NOT LAW until approved. Words added by the receipt-data slice (0535, 2026-09-18).
-
-| Where | Proposed words | Note |
-|---|---|---|
-| Reference label for a card / cheque payment (order drawer, storage collect, AR drawer, top-up) | `Approval code` · `Cheque number` | Same words `lib/payment-methods` already shows on Invoice → Record payment. |
-| Toast when that reference is empty | `Enter the approval code` · `Enter the cheque number` | |
-| Writer refusals (0535) | `choose how the customer paid` · `a cheque payment needs its cheque number` · `a card payment needs its approval code` | Reach the operator through the API's error message. |
-| Payment receipt PDF, detail row | `Invoice` — the invoice number(s) the payment settles | Payment MASTER §4. |
-| Sales Invoice PDF totals card, when money came before the invoice | `Received before this invoice` · `BALANCE DUE` | Line 2132 lists `Balance due` as a rejected word for the delivery gate refusal; this is a different surface (a printed total), so it needs its own ruling. |
