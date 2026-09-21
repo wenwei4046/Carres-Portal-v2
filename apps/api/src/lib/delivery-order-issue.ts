@@ -176,29 +176,42 @@ export async function attemptDeliveryOrderIssue(
   for (let rev = 1; existing.has(doNumber) && rev <= 25; rev++) {
     doNumber = `${base}${amendmentSuffix(rev)}`;
   }
-  // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
-  // in the read above: two callers arriving at the same moment cannot produce
-  // two numbers, and the loser re-reads the winner's.
-  const { data: updated, error } = await sb
-    .from("orders")
-    .update({ do_number: doNumber })
-    .eq("id", orderId)
-    .is("do_number", null)
-    .select("id, do_number")
-    .maybeSingle();
-  if (error) {
-    return { outcome: "error", body: { message: error.message }, status: 500 };
-  }
-  if (!updated) {
-    const { data: raced } = await sb
+  // 0542 · A SPLIT TRIP (the booking names its groups) mints through its own
+  // governed door: the one-live index is keyed by trip, so an earlier trip
+  // that already ran keeps its document and this trip gets its own.
+  if (bookedScope) {
+    const { data, error } = await sb.rpc("delivery_trip_document_mint", {
+      p_order_id: orderId,
+      p_do_number: doNumber,
+    });
+    if (error) return { outcome: "error", body: { message: error.message }, status: 500 };
+    const minted = (data as { do_number?: string } | null)?.do_number ?? doNumber;
+    if (minted !== doNumber) return { outcome: "already", doNumber: minted };
+  } else {
+    // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
+    // in the read above: two callers arriving at the same moment cannot produce
+    // two numbers, and the loser re-reads the winner's.
+    const { data: updated, error } = await sb
       .from("orders")
-      .select("id, do_number")
+      .update({ do_number: doNumber })
       .eq("id", orderId)
+      .is("do_number", null)
+      .select("id, do_number")
       .maybeSingle();
-    return {
-      outcome: "already",
-      doNumber: (raced?.do_number as string | null) ?? null,
-    };
+    if (error) {
+      return { outcome: "error", body: { message: error.message }, status: 500 };
+    }
+    if (!updated) {
+      const { data: raced } = await sb
+        .from("orders")
+        .select("id, do_number")
+        .eq("id", orderId)
+        .maybeSingle();
+      return {
+        outcome: "already",
+        doNumber: (raced?.do_number as string | null) ?? null,
+      };
+    }
   }
 
   // The audit line. FAIL-SOFT, the same door and the same rule as T4/T6/T8: an

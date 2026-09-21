@@ -391,3 +391,24 @@ describe("attemptLegDocumentIssue — a Journey leg's own document (0491)", () =
   });
 });
 
+
+describe("attemptDeliveryOrderIssue — a split trip's own document (0542)", () => {
+  it("a booking that names its groups mints through the trip door, never the order column", async () => {
+    const t = tables({ control: { booking_groups: ["bed"] } });
+    const sb = makeSb(t);
+    sb.rpc.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_trip_document_mint"
+          ? { data: { do_number: DO_NUMBER, trip: 2 }, error: null }
+          : { data: null, error: null },
+      ),
+    );
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_trip_document_mint", {
+      p_order_id: ORDER_ID,
+      p_do_number: DO_NUMBER,
+    });
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+});
