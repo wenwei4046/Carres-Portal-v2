@@ -8,7 +8,9 @@
  *     the row menu, which takes focus and gives it back
  *   · a governed group heading is reachable by Tab
  *   · a load failure keeps the toolbar
- *   · a cut value opens whole by click or keyboard (`overflowText`)
+ *   · a cut value shows whole on hover and keyboard focus, and opens whole by
+ *     click or Enter (`overflowText`, ui MASTER §6.0 rule 5)
+ *   · the header sort indicator is an icon, and says its direction
  *   · below a 768px canvas the row checkbox has a 40×40 target
  *   · with the governed search, the query is a condition and `Clear filters`
  *     clears it — and a no-match state never shows the button twice
@@ -187,6 +189,24 @@ describe("a cut value opens whole", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  /* ⭐ ui MASTER §6.0 rule 5 (Card 12 review, 2026-09-21): hover and keyboard
+     focus show the whole value too, without taking focus off the cell. */
+  it("shows a cut value whole on keyboard focus and on hover, keeping focus on the cell", async () => {
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return (this.textContent ?? "").length > 20 ? 400 : 50;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(180);
+    mount();
+    const trigger = screen.getByTestId("cell-overflow");
+    act(() => trigger.focus());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Tan Sri Dato' Seri Muhammad Hafizuddin");
+    expect(document.activeElement).toBe(trigger);
+    act(() => trigger.blur());
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    fireEvent.pointerMove(trigger, { pointerType: "mouse" });
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Tan Sri Dato' Seri Muhammad Hafizuddin");
+  });
+
   it("prints a value that fits as plain text — no extra control per cell", () => {
     mount();
     expect(screen.queryAllByTestId("cell-overflow")).toHaveLength(0);
@@ -251,5 +271,24 @@ describe("the governed search is a condition", () => {
     await waitFor(() => expect(screen.queryByTestId("link-a")).toBeNull());
     expect(screen.getByTestId("link-b")).toBeInTheDocument();
     expect(screen.queryByTestId("active-conditions")).toBeNull();
+  });
+});
+
+/* ⭐ THE SORT IS AN ICON (Card 12 review, 2026-09-21): a 12px Lucide arrow in
+   the header ink beside the Filter icon — never the letters `v` / `^`. */
+describe("header sort indicator", () => {
+  it("draws a 12px arrow icon for each direction and names the direction", () => {
+    mount();
+    const header = screen.getByRole("button", { name: /^Customer/ });
+    fireEvent.click(header);
+    const asc = screen.getByTestId("sort-asc");
+    expect(asc.querySelector("svg")).toHaveAttribute("width", "12");
+    expect(asc).toHaveTextContent("sorted ascending");
+    expect(asc.textContent).not.toContain("^");
+    fireEvent.click(screen.getByRole("button", { name: /^Customer/ }));
+    const desc = screen.getByTestId("sort-desc");
+    expect(desc.querySelector("svg")).toHaveAttribute("width", "12");
+    expect(desc).toHaveTextContent("sorted descending");
+    expect(desc.textContent?.replace("sorted descending", "")).not.toContain("v");
   });
 });

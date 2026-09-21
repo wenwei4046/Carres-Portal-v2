@@ -1204,12 +1204,15 @@ describe("the expansion — the ONE shared child table", () => {
       "connected-section-po-details",
     ]);
 
-    /* ⭐ EVERY SECTION TAKES THE LINE IN ON ITS OWN ELBOW, and the LAST one
-       draws no trunk — so there is structurally nothing that could run on into
-       the next Sales Order. */
-    for (const key of ["goods", "po-details"]) {
-      expect(within(box).getByTestId(`section-elbow-${key}`)).toBeInTheDocument();
-    }
+    /* ⭐ THE LINE COMES FROM THE CARET (§6.9, Card 12 review 2026-09-21): the
+       grid draws the drop and the curve in the caret column, the first section
+       takes it in as a flat run, every later section on its own elbow — and the
+       LAST one draws no trunk, so nothing can run on into the next Sales Order. */
+    expect(within(box).getByTestId("section-run-goods")).toBeInTheDocument();
+    expect(within(box).queryByTestId("section-elbow-goods")).toBeNull();
+    expect(within(box).getByTestId("section-elbow-po-details")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-elbow")).toBeInTheDocument();
     expect(within(box).getByTestId("section-trunk-goods")).toBeInTheDocument();
     expect(within(box).queryByTestId("section-trunk-po-details")).toBeNull();
   });
@@ -1268,9 +1271,9 @@ describe("the expansion — the ONE shared child table", () => {
     const box = await screen.findByTestId("so-batch-inspector-o1");
     expect(within(box).queryByTestId("po-details-table")).toBeNull();
     expect(within(box).queryByTestId("connected-section-po-details")).toBeNull();
-    /* ONE section, so the LINE still ends in a curve at the goods table. */
+    /* ONE section, so the line from the caret ends at the goods table. */
     expect(within(box).queryByTestId("section-trunk-goods")).toBeNull();
-    expect(within(box).getByTestId("section-elbow-goods")).toBeInTheDocument();
+    expect(within(box).getByTestId("section-run-goods")).toBeInTheDocument();
   });
 
   /**
@@ -1396,9 +1399,13 @@ describe("the expansion — the ONE shared child table", () => {
     expect(within(five).queryByTestId("section-trunk-po-details")).toBeNull();
     expect(within(one).queryByTestId("section-trunk-goods")).toBeNull();
 
-    /* And each row's elbows belong to that row, not to the register. */
-    expect(within(five).getAllByTestId(/^section-elbow-/)).toHaveLength(2);
-    expect(within(one).getAllByTestId(/^section-elbow-/)).toHaveLength(1);
+    /* And each row's line belongs to that row, not to the register: its own
+       run from its own caret, plus an elbow for each later section. */
+    expect(within(five).getAllByTestId(/^section-run-/)).toHaveLength(1);
+    expect(within(five).getAllByTestId(/^section-elbow-/)).toHaveLength(1);
+    expect(within(one).getAllByTestId(/^section-run-/)).toHaveLength(1);
+    expect(within(one).queryAllByTestId(/^section-elbow-/)).toHaveLength(0);
+    expect(screen.getAllByTestId("expansion-connector-drop")).toHaveLength(2);
   });
 
   it("no second hand-drawn mini-table — the box is the shared component", () => {
