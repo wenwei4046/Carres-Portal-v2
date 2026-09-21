@@ -200,7 +200,7 @@ No deposit · Online order
 groups" clause. The current build still shows the older order until the Sales Orders listing round.
 
 ```
-Proceed Date | SO Doc Date | SO No | Showroom | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
+Proceed Date | SO Doc Date | SO No | Showroom | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
 ```
 
 - **Population.** Only orders Sales has handed to Operation. A `Placed` order is not on this Register,
@@ -220,6 +220,7 @@ Proceed Date | SO Doc Date | SO No | Showroom | Customer Requested Delivery Date
   a partial delivery stays here) · `Delivery completed` · `Cancelled`. *Falsifier: the owner names
   other groups.*
 - **`Showroom`** sits right after SO No (owner ruling 2026-09-21): which branch sold the order is read with its identity.
+- **`Salesperson`** follows Showroom (owner ruling 2026-09-21): the existing Sales-ownership field (`salespersons.name`, absence `Not recorded`) promoted to a default. It names who SOLD the order, never an action owner.
 - `Items` is a default column (`{first item} + {n} more`).
 - Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
   retired with it and are re-measured in the build round.
