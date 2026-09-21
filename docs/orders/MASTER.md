@@ -398,7 +398,10 @@ The complete 390px PDF, including its balance and signature area, was visible. B
 at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
 clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
-**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** `SO info` (renamed from
+**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** `Delivery` stays its own card
+and answers one question — can we deliver it and how is it carried — so address and access are ONE group
+with no `Delivery address` / `Delivery access` headings (international furniture-retail practice); the
+billing relationship and billing address move to `Customer` (who pays). `SO info` (renamed from
 `Order info`: this is the original Sales Order the showroom opened for the customer) comes FIRST, before
 `Customer`; `MONEY` is renamed `Payment`. The left pane and the Sales Order PDF must tally — the same card
 order and the same words on both sides. The PDF's `Order Details` · `Ordered` · `Sales Location` ·
@@ -412,9 +415,10 @@ SO info                 SO Doc Date · Customer Requested Delivery Date · Proce
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name
   ├ Sales ownership     Dealer · Showroom · Salesperson  (+ the approval lane)
-  └ Emergency contact   name · phone · relationship      (own heading, own divider)
-DELIVERY                the MY cascade · building type · billing relationship · billing address
-  └ Delivery access     floor · items needing stair carry · lift + the stair working line
+  ├ Emergency contact   name · phone · relationship      (own heading, own divider)
+  └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
+DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
+                        → building type → floor → lift → items needing stair carry + the stair working line
 GOODS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
 PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
