@@ -1539,11 +1539,13 @@ as the Sales Portal captures it: the customer signs on the Sales Portal's signat
 and that image prints in the dashed box `Customer Signature · {name}`; there is no company signature box.
 **Table framing — OWNER RULING (Jess, 2026-09-21), exactly the Houzs reference.** Header row: bold regular-case
 titles between a heavy grey top rule and a heavy grey bottom rule, no vertical lines. Category row: the bold
-category word alone (`BEDFRAME`, no count, no fill), no box. Item rows: every cell boxed (horizontal and vertical
+category with the Carres count (`MATTRESS · 1 item`), no fill, no box, with air above it. Item rows: every cell boxed (horizontal and vertical
 rules), top-aligned; Description is regular weight with the configuration on the following lines in the same ink.
 Columns `# · Item Code · Description · Qty · Unit Price · Discount · Amount (RM)`; Qty reads `1 UNIT`; Unit Price and
 Amount carry the currency (`RM 2,999.00`); an empty Discount reads `—`. No in-table SUBTOTAL row — the totals
-block carries the sums. Carres type sizes are kept. The payment table uses the same header and cell rules. The payment table is
+block carries the sums. Carres type sizes are kept. Spacing (owner, 2026-09-21: rows must breathe): every cell 8pt top and bottom, 6pt
+left and right, line height 1.45; the category row 10pt above and 6pt below. The payment table uses the same header
+and cell rules. The payment table is
 `# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
 document (who collected stays in Payments and on the Receipt). With no payment the section prints its heading
 and `No payments recorded.` instead of an empty table. The section heading is `PAYMENTS RECEIVED` (owner, 2026-09-21,
