@@ -1319,8 +1319,40 @@ export function groupSelectionsIntoDocuments(
 
 // ─── The selection bar ───────────────────────────────────────────────────────
 
+/**
+ * ⭐ THE SELECTION SENTENCE NAMES EVERY COUNT IT PRINTS (2026-09-21).
+ *
+ * `2 selected · 2 units · Issue 2 POs` beside ONE ticked Sales Order counted
+ * purchase demands under a bare `selected`, and called a quantity `units` —
+ * the word Carres keeps for an exact physical Unit with a Unit ID, which an
+ * unissued purchase line never has (`docs/purchasing/MASTER.md` §9.2). Each
+ * count now carries its own noun: the ticked records, the item lines they
+ * cover, the quantity, and the purchase orders the click creates.
+ */
+export function purchaseSelectionSentence(f: {
+  records: number;
+  /** The record noun, singular and plural: `Sales Order` / `Manual Purchase`. */
+  recordWord: readonly [string, string];
+  itemLines: number;
+  qty: number;
+  pos: number;
+}): string {
+  const [one, many] = f.recordWord;
+  return [
+    `${f.records} ${f.records === 1 ? one : many}`,
+    `${f.itemLines} item ${f.itemLines === 1 ? "line" : "lines"}`,
+    `Qty ${f.qty}`,
+    `Issue ${f.pos} ${f.pos === 1 ? "PO" : "POs"}`,
+  ].join(" · ");
+}
+
 export interface SoBatchSelectionSummary {
+  /** Selected purchase demands — the tick unit, not a visible count. */
   lines: number;
+  /** Distinct Sales Orders the selection draws from. */
+  orders: number;
+  /** Distinct Sales Order item lines those demands cover. */
+  itemLines: number;
   units: number;
   documents: number;
   /** Empty when nothing is selected — a bar that says `0 selected` is noise. */
@@ -1332,16 +1364,34 @@ export function soBatchSelectionSummary(
   rowsById: ReadonlyMap<string, PurchaseDemandRow>,
 ): SoBatchSelectionSummary {
   const documents = groupSelectionsIntoDocuments(selections, rowsById);
-  const lines = new Set(documents.flatMap((d) => d.lines.map((l) => l.demandId))).size;
+  const demandIds = new Set(documents.flatMap((d) => d.lines.map((l) => l.demandId)));
+  const lines = demandIds.size;
   const units = documents.reduce((s, d) => s + d.qty, 0);
-  if (lines === 0) return { lines: 0, units: 0, documents: 0, text: "" };
+  if (lines === 0) {
+    return { lines: 0, orders: 0, itemLines: 0, units: 0, documents: 0, text: "" };
+  }
+  const orders = new Set(documents.flatMap((d) => d.lines.map((l) => l.orderId))).size;
+  /* A set demand covers several order lines; a demand with no recorded line
+     still stands for one. */
+  const itemLineIds = new Set<string>();
+  for (const id of demandIds) {
+    const row = rowsById.get(id);
+    const ids = row?.lineIds.length ? row.lineIds : [id];
+    for (const lineId of ids) itemLineIds.add(lineId);
+  }
   return {
     lines,
+    orders,
+    itemLines: itemLineIds.size,
     units,
     documents: documents.length,
-    text: `${lines} selected · ${units} ${units === 1 ? "unit" : "units"} · Issue ${
-      documents.length
-    } ${documents.length === 1 ? "PO" : "POs"}`,
+    text: purchaseSelectionSentence({
+      records: orders,
+      recordWord: ["Sales Order", "Sales Orders"],
+      itemLines: itemLineIds.size,
+      qty: units,
+      pos: documents.length,
+    }),
   };
 }
 
@@ -1539,6 +1589,40 @@ export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly Pu
     absence,
     rank: 1,
   };
+}
+
+/**
+ * WHY A SALES ORDER'S TICK IS REFUSED (2026-09-21) — the accessible
+ * description and tooltip of its disabled checkbox. Only facts the row or its
+ * expansion already print, in their governed words:
+ *
+ *   a blocked line   its state word (`SKU not found`, `Supplier not
+ *                    assigned`, …), every distinct one, in line order
+ *   otherwise        the parent's own absence word (`Already on a PO`,
+ *                    `Coverage not checked`, `Not planned`)
+ *
+ * Null when the tick is offered, when the order has finished buying, or when
+ * nothing is left to buy — the `No purchase needed` heading already answers.
+ * No eligibility rule lives here: it reads `isSelectableForOrder` and
+ * `soBatchOrderPlanning`, the two the checkbox and the cell already obey.
+ */
+export function soBatchOrderUnselectableReason(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): string | null {
+  if (order.status === "ordered") return null;
+  if (leaves.some((r) => isSelectableForOrder(r, order.status))) return null;
+  const blocked = [
+    ...new Set(
+      leaves
+        .filter((r) => !isPurchaseDemandTimingState(r.state))
+        .map((r) => stateWords[r.state]),
+    ),
+  ];
+  if (blocked.length > 0) return blocked.join(" · ");
+  const plan = soBatchOrderPlanning(order, leaves);
+  return plan.absence ? soBatchOrderByAbsenceWord(plan.absence) : null;
 }
 
 /** Why a `To buy` order has no Order By (S1). */

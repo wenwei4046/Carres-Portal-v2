@@ -205,7 +205,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
 
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
     expect(screen.getByTestId("selection-bar")).toHaveTextContent(
-      "1 selected · 2 units · Issue 1 PO",
+      "1 Sales Order · 1 item line · Qty 2 · Issue 1 PO",
     );
 
     apiFetch.mockClear();

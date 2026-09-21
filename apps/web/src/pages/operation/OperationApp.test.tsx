@@ -185,6 +185,25 @@ describe("OperationApp — procurement descendant routing", () => {
   });
 });
 
+/* 2026-09-21 — an address no page answers used to render an empty pane. */
+describe("OperationApp — an unknown ?tab= answers", () => {
+  it("?tab=purchase-orders says Page not found and offers the Dashboard", async () => {
+    renderApp("/operation?tab=purchase-orders");
+    expect(await screen.findByTestId("operation-tab-not-found")).toHaveTextContent(
+      "Page not found.",
+    );
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Dashboard" }));
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/operation?tab=dashboard");
+    expect(await screen.findByTestId("dashboard-stub")).toBeInTheDocument();
+  });
+
+  it("a real tab never shows it", () => {
+    renderApp("/operation?tab=manual-purchase");
+    expect(screen.queryByTestId("operation-tab-not-found")).not.toBeInTheDocument();
+  });
+});
+
 /**
  * ⭐ SALES ORDER PRODUCTION CUTOVER — `docs/SALES-ORDER-CUTOVER.md`.
  *

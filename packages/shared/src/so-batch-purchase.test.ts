@@ -29,6 +29,7 @@ import {
   composeDocumentLines,
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
+  soBatchOrderUnselectableReason,
   isSelectableForBuying,
   isSelectableForOrder,
   type DestinationAllocation,
@@ -36,6 +37,7 @@ import {
   type SoBatchSelection,
 } from "./so-batch-purchase";
 import type { PurchaseDemandRow } from "./purchase-demands";
+import { purchaseDemandStateWords } from "./purchase-demands";
 
 /**
  * SO BATCH PURCHASE — the pure arrangement contract
@@ -932,10 +934,10 @@ describe("documents are grouped by supplier × Deliver To", () => {
   });
 });
 
-describe("the selection bar counts lines, units and documents", () => {
-  it("says how many lines, how many units and how many POs will be created", () => {
+describe("the selection bar names orders, item lines, qty and documents", () => {
+  it("says how many Sales Orders, item lines, how much qty and how many POs", () => {
     const a = row({ id: "a", toBuy: 2 });
-    const b = row({ id: "b", supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
+    const b = row({ id: "b", lineIds: ["l2", "l3"], supplierId: "s-ohana", supplier: "Ohana", toBuy: 5 });
     const summary = soBatchSelectionSummary(
       [
         sel(a, [{ destinationId: KLANG.id, qty: 2 }]),
@@ -947,9 +949,22 @@ describe("the selection bar counts lines, units and documents", () => {
       new Map([[a.id, a], [b.id, b]]),
     );
     expect(summary.lines).toBe(2);
+    expect(summary.orders).toBe(1);
+    expect(summary.itemLines).toBe(3);
     expect(summary.units).toBe(7);
     expect(summary.documents).toBe(3);
-    expect(summary.text).toBe("2 selected · 7 units · Issue 3 POs");
+    // Never `units` for a quantity: a Unit is an exact physical Unit ID.
+    expect(summary.text).toBe("1 Sales Order · 3 item lines · Qty 7 · Issue 3 POs");
+  });
+
+  it("counts each Sales Order once across its demands", () => {
+    const a = row({ id: "a", orderId: "o1", lineIds: ["l1"], toBuy: 1 });
+    const b = row({ id: "b", orderId: "o2", lineIds: ["l9"], toBuy: 1 });
+    const summary = soBatchSelectionSummary(
+      [sel(a, [{ destinationId: KLANG.id, qty: 1 }]), sel(b, [{ destinationId: KLANG.id, qty: 1 }])],
+      new Map([[a.id, a], [b.id, b]]),
+    );
+    expect(summary.text).toBe("2 Sales Orders · 2 item lines · Qty 2 · Issue 1 PO");
   });
 
   it("says nothing at all when nothing is selected", () => {
@@ -964,7 +979,7 @@ describe("the selection bar counts lines, units and documents", () => {
       [sel(a, [{ destinationId: KLANG.id, qty: 1 }])],
       new Map([[a.id, a]]),
     );
-    expect(summary.text).toBe("1 selected · 1 unit · Issue 1 PO");
+    expect(summary.text).toBe("1 Sales Order · 1 item line · Qty 1 · Issue 1 PO");
   });
 });
 
@@ -1322,5 +1337,43 @@ describe("soBatchOrderSafetyDays — the tightest measured margin, or a stated a
     expect(soBatchOrderPlanning(o, leaves).group).toBe("to-buy");
     expect(soBatchOrderStatusWord(soBatchOrderPlanning(o, leaves).group)).toBe("Need PO");
     expect(soBatchOrderSafetyDays(o, leaves).kind).toBe("days");
+  });
+});
+
+describe("a refused Sales Order tick names its reason", () => {
+  const words = purchaseDemandStateWords(14);
+  /* Still owes one unit, so it stays under `To buy` (R1). */
+  const order = railOrder({ orderId: "o1", so: 1286, lines: [line({ orderLineId: "l1" })] });
+
+  it("offers no reason when the tick is offered", () => {
+    expect(soBatchOrderUnselectableReason(order, [row()], words)).toBeNull();
+  });
+
+  it("names every distinct blocker in its governed state word", () => {
+    const leaves = [
+      row({ id: "x", state: "no_sku", toBuy: null, supplierId: null, issueRef: null }),
+      row({ id: "y", state: "no_supplier", toBuy: null, supplierId: null, issueRef: null }),
+      row({ id: "z", state: "no_sku", toBuy: null, supplierId: null, issueRef: null }),
+    ];
+    expect(soBatchOrderUnselectableReason(order, leaves, words)).toBe(
+      "SKU not found · Supplier not assigned",
+    );
+  });
+
+  it("falls back to the row's own absence word", () => {
+    const covered = row({ fullyOnPo: true });
+    expect(soBatchOrderUnselectableReason(order, [covered], words)).toBe("Already on a PO");
+    const unknown = row({ fullyOnPo: undefined });
+    expect(soBatchOrderUnselectableReason(order, [unknown], words)).toBe("Coverage not checked");
+  });
+
+  it("says nothing on an order that has finished buying", () => {
+    const ordered = railOrder({ orderId: "o1", status: "ordered" });
+    expect(soBatchOrderUnselectableReason(ordered, [row()], words)).toBeNull();
+  });
+
+  it("says nothing when nothing is left to buy — the group heading answers", () => {
+    const done = railOrder({ orderId: "o1" });
+    expect(soBatchOrderUnselectableReason(done, [row({ fullyOnPo: true })], words)).toBeNull();
   });
 });

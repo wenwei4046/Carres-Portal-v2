@@ -958,6 +958,18 @@ An unavailable row explains its own blocker inside that Sales Order's framed exp
 Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
 the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
 
+**Refused ticks and the missing-SKU door — BUILT 2026-09-21 (defect fix, production walk owed).**
+The refused parent checkbox carries the same fact as its accessible description and hover/focus
+tooltip: every distinct blocker state word (`SKU not found · Supplier not assigned`), otherwise the
+row's own absence word (`Already on a PO` · `Coverage not checked` · `Not planned`); nothing for an
+order that finished buying or has nothing left to buy, where the group heading already answers.
+Manual Purchase attaches its printed dead-row sentence or approval badge the same way. The
+`SKU not found` fix line `Add this item to the SKU catalog` links to Operation Catalog's SKU
+Master, whose governed `+ New SKU` the API allows Operation to use. The §4 in-context supplier/SKU
+request that returns to the same buy remains **APPROVED / NOT BUILT**; the other blocker fix lines
+stay text until their doors exist. The `No Deliver To destinations` band draws only after the list
+has loaded — an unread list is not an empty one.
+
 ```text
 ORDER TIMING
   Can order early
@@ -1066,7 +1078,9 @@ SETUP TO FIX              ← the whole section renders only when at least one a
 - **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
   never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
   bottom action bar. The selected bar direction is
-  `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]`.
+  `1 Sales Order · 1 item line · Qty 1 · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]`
+  (corrected 2026-09-21: the bar names Sales Orders, item lines, quantity and resulting POs; it
+  never calls a quantity `units`, because a Unit is an exact physical Unit ID).
   `[YJ]` is a compact structured owner
   avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
   with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
@@ -1880,7 +1894,7 @@ Only APPROVED goods with a CONFIRMED live remaining quantity take the tick; an a
 beside `Remaining quantity not checked` and refuses it (Round 2). A tick dies the moment a refetch
 makes its row unbuyable. With no selection there is NO PO Duty block,
 initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
-the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the resolved
+the one issue action — `{n} Manual Purchase(s) · {l} item line(s) · Qty {q} · Issue {p} PO(s)`, the resolved
 person, `Issue PO` — where the PO count is the same document partition the issue door
 groups by (supplier × category × destination × purpose × Manual Delivery Date, merged across
 requests only when every fact matches). One PO has one official supplier-facing Delivery Date;
