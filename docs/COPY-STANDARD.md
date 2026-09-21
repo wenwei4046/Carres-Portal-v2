@@ -3794,16 +3794,3 @@ there only. The later owner confirmation removes the permanent bottom-of-rail bu
 Receiving too. Active-filter clearing stays in the TOOLBAR, where each active condition names
 itself and clears itself, and pressing a chosen rail row again still clears that one group.
 
-## PROPOSAL — PENDING APPROVAL (exception-buttons)
-
-BR-7: Finance holds and clears a delivery from the Payment Record overflow (Finance and principal only).
-
-| Where | Proposed words |
-|---|---|
-| Overflow item, form title and button to open a hold | **`Hold delivery`** |
-| Form sentence | **`The Delivery Order is not issued while Finance holds this delivery.`** |
-| Reason field label | **`Why is Finance holding this delivery`** |
-| Overflow item, form title and button to lift it | **`Clear hold`** |
-| Clear form sentence | reuses **`Finance is holding this delivery: {reason}`** |
-| Evidence field label | **`What shows the money is found`** |
-| Toasts | **`Delivery held`** · **`Hold cleared`** · **`The delivery was not held — {error}`** · **`The hold was not cleared — {error}`** |
