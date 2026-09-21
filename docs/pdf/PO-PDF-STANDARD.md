@@ -89,6 +89,18 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
     supplier's instruction is one line on its own package label —
     `CARRES UNIT ID: U1-000-001` — no QR, barcode or Carres label template
     is required. A source-scan test fails the template if `Item ID` returns.
+  - **HOW A UNIT ID PRINTS — owner ruling (Jess, 2026-09-21).** Ink, 7.5pt —
+    the table body's size, never the grey 7pt that made it the faintest text
+    on the page. **The last three digits are BOLD** (`U1-000-`**`004`**) — the
+    running number is the part a packer reads; the prefix is the same on every
+    row. Always the last three, never "only the digits that changed": a run
+    `008 → 013` changes two digits, and a single Unit has nothing that changes.
+    Underline was tried and refused — it blurs into the grid hairlines on a
+    photo or fax. Every code prints in FULL. A run of consecutive Units prints
+    as ONE line `U1-000-001 to U1-000-004` (measured 32.4mm with the bold
+    digits); consecutiveness is COMPUTED from the codes, never assumed — a gap
+    starts a new run on its own line, and `U1-999-999 → U2-000-001` counts as
+    consecutive.
   - **Per-line `SO No` comes from the LINE's own lineage** (`po_line_sources`,
     0382). One aggregated SKU serving three customers prints all three with the
     quantity beside each — `SO-1318 × 2` — because ten mattresses stop being
@@ -160,3 +172,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-08-24 | **P5 CLOSED**: per-line `SO No` reads `po_line_sources` (0382), so a bulk PO prints its per-customer breakdown instead of a blank column. `Issued by` is the real `audit_log` actor and the supplier's FULL address is read from `suppliers.address` (0383) — both were hard-coded `null` before. Item ID is fed by the `U1-000-001` allocator (0381). No visual or business rule changed. | CARD-2026-08-22-purchasing-02 |
 | 2026-08-28 | **Owner B**: one PO may carry several governed Deliver To destinations. The header names every exact destination and the items table prints each line's effective destination. A post-send destination change still mints a new version and must be sent again. | Owner |
 | 2026-09-07 | **UNIT ID BORN WITH THE OFFICIAL PO.** Column heading `ITEM ID` → `UNIT ID` (the only approved word). IDs are born in the PO's own transaction for exact-unit lines only, bound to the line (0442 · 0443); a quantity line prints `—` by law; the document reads each line's own Units (`purchasing_po_document`, 0443) and therefore shows exactly what the PO object shows. Supplier instruction stays `CARRES UNIT ID: U1-000-001` on the supplier's own label. | Owner (Purchasing CARD 10) |
+| 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
