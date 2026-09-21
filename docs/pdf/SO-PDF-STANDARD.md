@@ -203,8 +203,9 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
         ↑ dashed box STRETCHES to the card's exact height (same top/bottom)
 ```
 
-- The items table's closing row is **GOODS TOTAL** — the same figure the card
-  calls `Goods total`; one figure, one name. Summary-row money carries **RM**
+- The items table's closing row is **TOTAL PAYABLE** — the same figure the card
+  calls `Total payable`; one figure, one name (owner, 2026-09-21: Carres is
+  SST-registered, so `Goods total` is retired). Summary-row money carries **RM**
   (`RM 100.00 · RM 8,920.00`); detail cells stay digits-only.
 - **The payments table closes with its own `TOTAL RECEIVED` row**, summed from
   the rows it printed — the same law as the goods SUBTOTAL (owner, 2026-09-21:
@@ -227,18 +228,15 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   110mm so the left rail holds with the tables, and the box sits at its bottom
   so it finishes level with the totals card. Printed **name only** — no phone,
   BILL TO has it (round 15; international form: signature over printed name).
-- Totals card, FIVE rows (owner, 2026-09-21 — supersedes round 22's three):
-  `Subtotal · Tax · Total · Paid to date · BALANCE DUE`. **`Tax` prints the
-  absence dash `—`, and it is TRUE:** the portal charges no SST. Verified
-  2026-09-21 — the POS computes no tax, `order-money.ts` has no tax term, and
-  both auto-issue RPCs (`0098`, `0229`) INSERT `tax_amount = 0`; `0098` says so
-  in words: `Tax: 0 (V1 — no SST until Loo wires it)`. Saying `Tax —` is the
-  customer being TOLD we do not charge, which silence could not do.
-  **This overturns the 2026-08-09 "the SO does not talk tax" ruling.** That
-  ruling existed to stop the SO contradicting the invoice; the audit found the
-  contradiction lives in the INVOICE (it prints `Subtotal (excl. SST)` equal to
-  `Total`, `SST 8% RM 0.00`, and a footer claiming SST is included). Fixing the
-  invoice is a separate card — do NOT silence the SO for it.
+- **Totals card — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Carres is SST-registered and its
+  prices are SST-inclusive, so the tax is real and is shown, in the SAME three-row shape the Sales Invoice uses:
+  `Total excluding SST · SST 8% · Total payable · Paid to date · BALANCE DUE`.
+  Example: `RM 5,583.33 · RM 446.67 · RM 6,030.00 · RM 3,740.00 · RM 2,290.00`. The SST figure is **computed
+  once and stored** (`invoices.tax_amount`, by the auto-issue RPCs) and every document READS it — the SO never
+  re-computes it. Order of work: ① the invoice RPCs (`0098`/`0229` descendants, which today write
+  `tax_amount = 0`) store the inclusive SST; ② the Sales Invoice prints that stored figure; ③ this card follows.
+  Until ① lands the card keeps its current rows. The 8% rate is the code's (`tax_amount = total × 0.08 ÷ 1.08`);
+  the rate itself and any correction of documents already issued with SST RM 0.00 are the tax agent's decision.
 - Company signs nothing — the footer sentence says so.
 - Terms 8pt grey, numbered from an array so gated clauses renumber themselves.
 

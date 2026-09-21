@@ -3205,8 +3205,8 @@ vocabulary, and the two files may not disagree.
 | Who the customer calls | **`Salesperson`** | `Agent` — Houzs prints both for one person |
 | Who made the document | **`Issued by {name}`** (footer) | `Printed by` — a reprint would name a different person |
 | No payments on file | **`No payments recorded.`** | a vanished block |
-| Tax we do not charge | **`Tax`** + the absence dash | silence |
-| Sum of the goods rows | **`Goods total`** (table: `GOODS TOTAL`) | `Subtotal` — "sub-" promises a step that never comes |
+| The Sales Order totals (owner ruling 2026-09-21 · NOT BUILT) | **`Total excluding SST · SST 8% · Total payable · Paid to date · BALANCE DUE`** — the Sales Invoice's shape | `Tax —` (Carres IS SST-registered) · `Goods total` |
+| Items table closing row | **`TOTAL PAYABLE`** — the same figure as `Total payable` | `GOODS TOTAL` (retired 2026-09-21) · `Subtotal` |
 | What the customer owes in all | **`Total payable`** | `Total` alone · `Grand total` |
 
 **`Salesperson` and `Issued by` may never read the same field.** `Salesperson`

@@ -446,6 +446,11 @@ Delivery Operations records partner, destination, floor, quantity, carry-up, dis
 disposal/take-out, actual service and evidence. Normal delivery does not wait for quote/price.
 After service, Operation may upload the partner's actual cost and negotiate disputed partner cost.
 
+**SST — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Carres is SST-registered; customer prices are
+SST-inclusive. The auto-issue invoice RPCs must STORE the inclusive SST in `invoices.tax_amount` (today they write
+0); the Sales Invoice and the Sales Order print that stored figure and never compute their own. Rate and any
+correction of already-issued documents are the tax agent's decision.
+
 Finance/Commercial authority owns customer invoice total, invoice-value percentage, RM2,000
 boundary, SST, currency, customer-charge calculation, approval and correction. Operation never
 changes those customer-money inputs. `Customer charge being checked` does not block Delivery.
