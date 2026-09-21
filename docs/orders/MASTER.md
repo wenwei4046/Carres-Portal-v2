@@ -1513,51 +1513,18 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 
 ### The preview IS the document
 
-**ONE SALES ORDER DOCUMENT — OWNER RULING (Jess, 2026-09-21).** The owner's reference layout (the
-`HC-SO-2609-123` sample: logo + legal name + address left; `SALES ORDER` + number + date right; a two-block
-information band; the category-grouped bordered items table; payment, amount in words, totals, signature
-boxes, terms) is THE Sales Order document. The Sales Portal (new-order step 3) and this page already render
-through the one `sales-order-template.tsx`; both keep doing so — never a second layout. Its word changes are
-listed with the page words above (SO info, Payment, SO Doc Date, Proceed Date, Customer Requested Delivery
-Date, Showroom); its layout is not redesigned.
-
-**The PDF header — OWNER RULING (Jess, 2026-09-21).** Left: the Carres logo beside the legal name, the registration
-number, then the address in two lines without `Wilayah Persekutuan KL`. Right, two lines only: `SALES ORDER` (the existing
-Carres small grey document word) · the SO number alone in the existing Carres hero size (18pt bold, no `SO No:`
-label). The SO Doc Date prints once, in SALES ORDER INFO. **Every date on the document reads `Fri, 21 Aug 2026`**
-— weekday plus four-digit year (owner, 2026-09-21), through the one shared `fmtDate` with `year: "always"`; the
-template's private `niceDate`/`capsDate` formatter (two-digit year) is retired. Carres type sizes are kept
-throughout; nothing is resized to match the reference.
-
-**The PDF information block — OWNER RULING (Jess, 2026-09-21).** Heading `SALES ORDER INFO` (in full). Rows,
-exactly and in this order: `SO No` · `SO Doc Date` · `Proceed Date` (printed only when it exists) ·
-`Customer Requested Delivery Date` (one line: the label column is widened to hold it, never wrapped) ·
-`Sales Location` (the outlet name; on this document the owner's word, more accurate than Showroom) ·
-`Salesperson`. `Sold by` is removed. The `Access` row and its `Access not confirmed` note are removed: floor
-and lift print on the Delivery Order. The stair-carry charge note stays. The customer signature stays exactly
-as the Sales Portal captures it: the customer signs on the Sales Portal's signature pad (step 3, required),
-and that image prints in the dashed box `Customer Signature · {name}`; there is no company signature box.
-**Table framing — OWNER RULING (Jess, 2026-09-21), exactly the Houzs reference.** Header row: bold regular-case
-titles between a heavy grey top rule and a heavy grey bottom rule, no vertical lines. Category row: the bold
-category with the Carres count (`MATTRESS · 1 item`), no fill, no box, with air above it. Item rows: every cell boxed (horizontal and vertical
-rules), top-aligned; Description is regular weight with the configuration on the following lines in the same ink.
-Columns `# · Item Code · Description · Qty · Unit Price · Discount · Amount (RM)`; Qty reads `1 UNIT`; Unit Price and
-Amount carry the currency (`RM 2,999.00`); an empty Discount reads `—`. No in-table SUBTOTAL row — the totals
-block carries the sums. Carres type sizes are kept. Spacing follows the Houzs sample and saves space (owner, 2026-09-21): header and cells 4pt
-top and bottom, 5pt left and right, line height 1.25; the category row 5pt above and 3pt below. **Totals follow the
-sample:** no box and no grey band — plain rows (Subtotal · Paid to date), a thin ink rule, then bold `BALANCE DUE`.
-The sample's Tax and Total rows are not added: the Sales Order carries no tax (the invoice owns SST), so they would
-only repeat the Subtotal and a dash. The payment table uses the same header
-and cell rules. The payment table is
-`# · Date · Payment Received · Approval Code · Amount (RM)` — `Collected By` is removed from the Sales Order
-document (who collected stays in Payments and on the Receipt). The payment table carries NO separate section title
-(owner, 2026-09-21: its own `Payment Received` column header already names it); with no payment it prints its header
-row and one muted line `No payments recorded.`. **Footer left** prints `Printed by {staff name} · {dd/mm/yyyy hh:mm}` instead of the
-SO number (continuation pages already carry the number in their header line); a print from a shared, role-labelled
-login prints `Printed {dd/mm/yyyy hh:mm}` with no name (staff identity law). Footer centre and `Page {n} of {m}` stay.
-**Proceed Date reads `orders.proceeded_at`** (the actual handoff) — the template's current `proceed_date` feed is
-the planned production-start field and is a defect to fix in the build.
-`Bill To` keeps Name · Address · Tel · Email · Emergency; `Deliver To` still prints only when it differs.
+**ONE SALES ORDER DOCUMENT — OWNER RULING (Jess, 2026-09-21) · BUILT (#1493, `d0047846`).** The Sales Order PDF
+is the owner-accepted `SO-FINAL` document, and **`docs/pdf/SO-PDF-STANDARD.md` is its only authority** — layout,
+widths, words and the pagination mechanism live there, not here. The Sales Portal (new-order step 3) and this
+page render through the one `sales-order-template.tsx`; never a second layout. In short: Carres mark beside the
+legal name and SSM; the SO number with `SALES ORDER` beneath it on the right; `BILL TO` · `SALES ORDER INFO`
+(SO No · SO Doc Date · Proceed Date · Customer Requested / Delivery Date · Sales Location · Salesperson; Access
+removed — it is a Delivery Order fact); the category-banded box table closing on `GOODS TOTAL`, its column bar
+repeated on every goods page; the payment table closing on `TOTAL RECEIVED` (`No payments recorded.` when none);
+`Goods total · Tax · Total payable · Paid to date · BALANCE DUE`; the customer signature box; the five terms from
+`lib/order-terms.ts`; footer `{SO no} · Issued by {creation actor}`. **Open (standard §10):** the API must send
+`issued_by`, `lines[].category` and `lines[].discount`; Proceed Date must read `orders.proceeded_at`, not the
+planned `proceed_date`.
 
 - **The right pane renders through THE SAME template call the Print/PDF path uses.** One
   `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same

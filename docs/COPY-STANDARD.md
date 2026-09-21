@@ -2432,7 +2432,7 @@ same words; only which card carries them moved.
 | The goods sold on the order — card and PDF heading (owner ruling 2026-09-21) | **`Items`** | `Goods` (kept only for readiness: `Goods ready` · `Goods not ready`) · Products · Lines |
 | The Sales Order's own facts — the FIRST card, and the same heading on the PDF (owner ruling 2026-09-21) | **`SO info`** | `Order info` (retired 2026-09-21) · Order details · Sales Order info · Dates · Admin · Meta |
 | SO page notice while a supplier commitment exists (owner ruling 2026-09-21) | **`This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`** · the commit button reads **`Submit amendment request`**; with no supplier commitment it reads **`Save`** | Your Save submits an amendment request · Amend · Request change |
-| The order's payment card (owner ruling 2026-09-21) | **`Payment`** on the page; the Sales Order PDF section prints **`PAYMENTS RECEIVED`** (owner, 2026-09-21, Houzs reference) | `Money` (retired 2026-09-21) · Payment Received · Collections |
+| The order's payment card (owner ruling 2026-09-21) | **`Payment`** on the page; the Sales Order PDF's payment words are the SO document's own list below (`TOTAL RECEIVED` · `No payments recorded.`) | `Money` (retired 2026-09-21) · Payment Received · Collections |
 | Where the goods go and what the lorry meets there | **`Delivery`** — one group with NO in-card headings (owner ruling 2026-09-21): address, building type, floor, lift, stair carry. The billing relationship and billing address belong to `Customer` | `Delivery address` / `Delivery access` as headings (retired 2026-09-21) · Ship to · Address · Logistics · Delivery details |
 | Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`**; an existing customer adds **`· {n} orders ›`** (singular **`· 1 order ›`**), a door to the Sales Orders Register searched by the phone (owner ruling 2026-09-21) | New/Returning · First-time · Repeat · a coloured status dot with no word |
 | ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
@@ -2798,9 +2798,8 @@ the moment `27` appears, it is carrying the whole meaning, and the operator sees
 the day off the date itself. `12 Aug` does not say whether the truck moves on a working day;
 `Wed, 12 Aug` does. The year is context the reader already has; the weekday is not.
 
-**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year, in FOUR digits** — `fmtDate(iso, { year:
-"always" })` prints `Fri, 21 Aug 2026` (owner ruling 2026-09-21: a filed document re-read years later must not
-show `26`). A screen is read today, so "this year" is a fact the reader is holding. A service
+**THE ONE EXCEPTION: a PRINTED DOCUMENT always carries its year** — `fmtDate(iso, { year:
+"always" })`. A screen is read today, so "this year" is a fact the reader is holding. A service
 note or a receipt is printed, filed and re-read in a later year by a customer or a technician
 who is holding nothing, and `Request Date: Wed, 12 Aug` has lost a fact the document exists to
 carry. **It is an option ON the one formatter, never a second formatter.**
