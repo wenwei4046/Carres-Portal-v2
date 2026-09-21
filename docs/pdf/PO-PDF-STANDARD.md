@@ -66,15 +66,30 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   names both parties completely. Detail rows read in time order:
   `PO No · Issued · Deliver by (bold, last)`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
-  deliver-to-at-section-2). **ONE PO = ONE DELIVER TO** (Jess, 2026-09-22 —
-  overwrites Owner B of 2026-08-28; `docs/purchasing/MASTER.md` §5.4). A sofa PO
-  is always one location; mattress/bedframe goods for another location are
-  another PO (split before issue, or `Change Deliver To` after sending). DELIVER
-  TO prints that one exact name and address. Nice Future prints its fixed
-  collection sentence via `delivery_instructions`.
+  deliver-to-at-section-2). **A PO may carry one or several Deliver To**
+  (Jess, 2026-09-22; `docs/purchasing/MASTER.md` §5.4): a sofa PO is always
+  one; a mattress/bedframe PO may split its goods across several, and a later
+  change keeps the SAME PO number as a new revision. DELIVER TO prints one
+  exact name and address — the destination of the goods on that page. Nice
+  Future prints its fixed collection sentence via `delivery_instructions`.
+- **ONE PDF, ONE PAGE GROUP PER DELIVER TO (Jess, 2026-09-22).** A PO with
+  several Deliver To is still ONE complete PDF with ONE PO number and ONE
+  revision. **Each Deliver To starts on a new page**, and its pages carry
+  only its own goods; a destination may run onto further pages when its
+  goods need them. The first page of each destination prints section 2 with
+  THAT destination in DELIVER TO, headed `DELIVER TO (1 of 2)` so a reader
+  holding one destination's pages knows another exists. **Every page — first,
+  continuation and every destination — carries the same PO number and
+  revision** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
+  (page group 1) + 2 for AL (page group 2); still 6 on one PO — no second PO,
+  no `Moved from` line, no new Unit IDs. A one-destination PO prints exactly
+  as before, with no `(1 of 1)`.
 - **Items table**: `# · SO NO · UNIT ID · DESCRIPTION · QTY` — the same five
-  columns on every PO. There is no DELIVER TO column and no per-location group:
-  the address prints once, in section 2.
+  columns on every PO and every destination's pages. There is no per-line
+  DELIVER TO column: the destination is the page's section 2. `#` numbers run
+  on across destinations; each destination's table closes with its own
+  `TOTAL`. **Issued documents are never re-rendered to a newer rule**: a
+  revision already sent reprints exactly as the supplier received it.
   - **UNIT ID — the only approved word; `ITEM ID` is retired (owner ruling
     2026-09-07).** The column prints `ops_stock_items.unit_code` for the
     Units THIS LINE was born with: an exact-unit line (Catalog
@@ -176,4 +191,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-07 | **UNIT ID BORN WITH THE OFFICIAL PO.** Column heading `ITEM ID` → `UNIT ID` (the only approved word). IDs are born in the PO's own transaction for exact-unit lines only, bound to the line (0442 · 0443); a quantity line prints `—` by law; the document reads each line's own Units (`purchasing_po_document`, 0443) and therefore shows exactly what the PO object shows. Supplier instruction stays `CARRES UNIT ID: U1-000-001` on the supplier's own label. | Owner (Purchasing CARD 10) |
 | 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
 | 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
-| 2026-09-22 | **ONE PO = ONE DELIVER TO** — Owner B (2026-08-28) overwritten. Mattress/bedframe goods for another location become their own PO (`Change Deliver To` splits a sent PO; purchasing MASTER §5.4). The per-line DELIVER TO column and `Multiple destinations` are deleted; every PO prints the same five columns. (Corrects the same-day entry that misread "split" as several locations on one PO.) | Jess |
+| 2026-09-22 | **Several Deliver To on one PO, one page group each** (Jess): sofa PO = one Deliver To; mattress/bedframe may split; a later move keeps the SAME PO number as a new revision — no second PO, no `Moved from`, no new Unit IDs. Each Deliver To starts on a new page of one PDF; every page carries the PO number and revision. The per-line DELIVER TO column and `Multiple destinations` are deleted; five columns everywhere. Same-day entries that read "split" as separate POs are overwritten. | Jess |

@@ -1513,6 +1513,21 @@ Settings owns the expandable list; these are its exact management words:
 `Not available for new POs`. A future destination is added here and then appears in every governed
 Purchasing picker. No SO Batch Purchase page keeps its own destination list.
 
+**`Change Deliver To` — the words (Jess, 2026-09-22 · APPROVED TARGET / NOT BUILT).** Moving part of
+a sent PO to another Deliver To keeps the SAME PO number and mints its next revision (purchasing
+MASTER §5.4). There is never a second PO, so there is no `Moved from` / `Split from` word.
+
+| What | The word |
+|---|---|
+| The edit and its screen title | **`Change Deliver To`** |
+| Screen fields, in order | **`Item`** · **`Current Deliver To`** · **`Qty on this PO`** · **`Qty you can move`** · **`Qty to move`** · **`New Deliver To`** · **`Reason`** |
+| The check before saving | **`Review changes`** |
+| The review's closing row | **`Total — unchanged`** |
+| PDF section-2 heading when one PO has several Deliver To | **`DELIVER TO (1 of 2)`** — `(n of m)` only when m > 1 |
+
+Banned here: `Current location` / `Location` (`Location` is a banned synonym of Deliver To) ·
+`New PO` · `Moved from` · `Split from`.
+
 The Settings introduction is **`The settings the ordering engine reads. Change one here and SO Batch
 Purchase uses it the same day.`** It covers both destination master data and timing rules; do not narrow
 it back to numbers only.

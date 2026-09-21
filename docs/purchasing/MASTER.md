@@ -329,65 +329,69 @@ from Warehouse authority. An external destination does not create Carres Stock m
 can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
 exist, a new destination may not silently invent who receives or what Stock consequence follows.
 
-**ONE PO = ONE DELIVER TO — owner ruling (Jess, 2026-09-22; overwrites Owner B of 2026-08-28).**
-A PO carries exactly one governed Deliver To. A sofa PO is always one location. Mattress and
-bedframe goods may go to several locations, but each location is its **own PO**: split before
-issue in SO Batch Purchase / Manual Purchase, or later with `Change Deliver To` below. A closed
-destination remains visible on old records but cannot be selected for new work. The PO's
-Deliver To is Purchasing-owned truth read by Sales Order and receiving/logistics.
+**ONE PO MAY CARRY SEVERAL DELIVER TO — owner ruling (Jess, 2026-09-22).** A sofa PO is always one
+Deliver To. A mattress or bedframe PO may send its goods to one or several governed Deliver To
+destinations; each goods line names its own (a null line follows the PO default). Moving goods to
+another destination after the supplier received the PDF keeps the **SAME PO number and mints a new
+revision** of that PO — never a second PO, never a new PO number, never a duplicate demand and never
+a new Unit ID. A closed destination remains visible on old records but cannot be selected for new
+work. Each goods line's Deliver To is Purchasing-owned truth read by Sales Order and
+receiving/logistics.
 
-- Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase; each
-  destination issues as its own PO.
+- Before issue: change or split quantity and Deliver To freely in SO Batch Purchase / Manual Purchase.
 - Numbered PDF prepared but not sent: update the same issue surface; History records it.
-- Supplier already received a PDF: use `Change Deliver To` (below). It never silently changes the
-  paper already sent.
+- Supplier already received a PDF: use `Change Deliver To` (below). It mints a new revision and send
+  work; it never silently changes the paper already sent.
 
-#### `Change Deliver To` — move part of a sent PO to another location
+#### `Change Deliver To` — send part of a sent PO to another destination
 
 **APPROVED TARGET / NOT BUILT (Jess, 2026-09-22).** The existing PO Edit does not yet do this. The
-staff member picks, inside the original PO, the goods to send elsewhere; the system splits the PO.
-Nothing is typed twice and no second PO is opened by hand.
+staff member picks, inside the PO, the goods to send elsewhere; the system writes the next revision
+of the SAME PO. Nothing is typed twice and no second PO exists.
 
 Place: PO detail → `Edit` → `Deliver To`.
 
 ```text
 Change Deliver To
 
-Item              Forte Mattress · King
-Current location  Carres Klang Warehouse
-Qty on this PO    6
-Qty you can move  6
+Item                Forte Mattress · King
+Current Deliver To  Carres Klang Warehouse
+Qty on this PO      6
+Qty you can move    6
 
-Qty to move       [ 2 ]
-New Deliver To    [ AL Sungai Buloh ▾ ]
-Reason            [ ... ]
+Qty to move         [ 2 ]
+New Deliver To      [ AL Sungai Buloh ▾ ]
+Reason              [ ... ]
 
-                         [Review changes]
+                           [Review changes]
 ```
 
-`Review changes` shows the result before anything is saved:
+`Review changes` shows the result before anything is saved — example `PO-0042`, V1 → V2:
 
-| Result | Deliver To | Qty |
+| PO-0042 V2 | Deliver To | Qty |
 |---|---|---:|
-| Original PO, new version | Carres Klang Warehouse | 4 |
-| New PO, linked to the original | AL Sungai Buloh | 2 |
-| **Total bought — unchanged** | | **6** |
+| Forte Mattress · King | Carres Klang Warehouse | 4 |
+| Forte Mattress · King | AL Sungai Buloh | 2 |
+| **Total — unchanged** | | **6** |
 
-On confirm, one transaction saves the original PO's new version, the new linked PO and the change
-record (who, when, reason). Every earlier version stays readable in Revisions and History.
+On confirm, one transaction saves the new revision and the change record (who, when, reason). The
+moved quantity becomes its own goods line on the SAME PO; its SO allocation moves with it, so the
+demand is covered once, never twice.
 
-- **Nothing is marked as sent.** Both documents then go through the normal send-and-confirm work
-  (§5.6): send the revised original and the new PO, record the actual sending, follow up the
-  supplier's confirmation. The message to the supplier says it is **still 6 pieces — 2 now go to
-  AL; this is not an extra order.**
+- **Historical documents stay exactly as issued.** V1's PDF remains reprintable as sent; V1's actual
+  sending record and any supplier acknowledgement/confirmation stay attached to V1 and are never
+  rewritten, moved to V2 or deleted. Revisions and History show both versions.
+- **Nothing is marked as sent.** V2 goes through the normal send-and-confirm work (§5.6): send V2,
+  record the actual sending, follow up the supplier's confirmation of V2. The supplier message says
+  it is **still 6 pieces on the same PO — 2 now go to AL; this is not an extra order.**
 - **Only undelivered quantity can move.** Quantity already received or in delivery cannot be
   selected; the screen says why and leads to redelivery / transfer instead.
 - **Exact-unit goods move by Unit.** The staff member picks the exact Units, never just "2". The
-  moved Units keep their Unit IDs and bind to the new PO's line — a destination change never voids
-  or mints a Unit (§6.2). The original line's reduction here is a MOVE, not the §6.2 reduction that
-  retires surplus Units.
-- The new PO is a new object with its own PO No (§6.1 numbering); the relationship is a link, never
-  matching digits.
+  moved Units keep their Unit IDs and bind to the new line of the same PO — a destination change
+  never voids or mints a Unit (§6.2). This is a MOVE, not the §6.2 reduction that retires surplus
+  Units.
+- The PDF of a PO with several Deliver To prints each destination from a new page
+  (`docs/pdf/PO-PDF-STANDARD.md` §2).
 
 ### 5.5 Supplier and SKU resolution
 
