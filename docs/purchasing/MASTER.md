@@ -1596,7 +1596,20 @@ blank `SO NO`.
 ### 9.2 Manual Purchase
 
 **CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; BUILT in
-PURCHASING CARD 13 (migration 0562). The authenticated production walk is OWED.**
+PURCHASING CARD 13.**
+
+**MIGRATION STATE, exactly (2026-09-23).** `0562_a_manual_purchase_says_what_it_needs`
+is **APPLIED to production** through the governed `apply_migration` path (tracker
+`20260922211119`); `md5(statements[1])` equals the committed file's md5, the column is
+present and nullable, and all three requirement-carrying doors exist. It deliberately
+leaves the superseded overloads standing: a migration lands before its bundle, and
+dropping the nine-name door would have refused every Manual Purchase raised in that
+window. **`0563_one_create_door_per_name_again` is WRITTEN AND NOT APPLIED** — it drops
+them and re-asserts one door per name, and it is applied only after all three production
+surfaces report this card's merge SHA. Until the bundle is live, a request raised by the
+old bundle records no requirement: the honest NULL, not a dropped fact.
+**The authenticated production walk is OWED**, and so is the merge itself — see the
+card's delivery note below.
 Reuse the selected Sales Order form composition, with a 50/50 form and live MPR
 preview at the governed readable desktop width; use the shared stacked layout
 below it. This overrides the former blanket ban on a Manual Purchase split
@@ -2244,6 +2257,18 @@ demand goes to PO Duty by Order By.
 **Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
 missing governed Catalog/supplier relationship, refused/withdrawn request.
 **Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
+
+**PURCHASING CARD 13 — DELIVERY NOTE, 2026-09-23.** The vertical slice is implemented on
+`build/purchasing-13-manual-purchase` and its gates ran locally. **It is NOT merged and NOT
+deployed**, and the reason is a credential, not a decision: `git push` fails with
+`failed to get: -60008` / `could not read Username for 'https://github.com'` — this machine's
+login keychain refuses to hand git the GitHub credential to a non-interactive session, and
+`gh auth status` reports the stored token invalid. A second lane on the same machine
+(`build/so-nav-amendment`) is stuck one commit ahead for the same reason, so it is the
+machine's credential state, not this branch. Nothing else is owed before merge: the branch
+is rebased on `origin/main`, `ci:migrations` and the migration replay pass (0562 replays
+cleanly; the only new replay failure on the chain is another lane's `0561`), and the
+Manual Purchase suite is green.
 
 ### 9.3 Purchase Orders
 
