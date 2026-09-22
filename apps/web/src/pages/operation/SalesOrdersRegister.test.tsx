@@ -427,8 +427,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
     /* Owner ruling 2026-09-22: an unclassified line is a catalogue data
-       error, reported for correction — never printed as a kind of goods. */
+       error — never printed as a kind of goods, and never silently dropped:
+       it is counted apart under the dictionary's `Not in catalog`. */
     expect(footer).not.toHaveTextContent("Other goods");
+    expect(footer).toHaveTextContent(/Not in catalog 5$/);
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -540,7 +542,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
     }
     expect(footer).not.toHaveTextContent("Other goods");
-    expect(footer).toHaveTextContent("1 sales order");
+    expect(footer).toHaveTextContent(/^1 sales order · Not in catalog 5$/);
+  });
+
+  it("the goods Category cell says `Not in catalog`, muted, never `Other goods`", () => {
+    listHookState.data = {
+      orders: [order({ order_lines: [{ id: "l-x", sku: "M1201F-K", qty: 1, unit_price: 2999, category: null, attrs: {} }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-M1201F-K");
+    expect(row).not.toHaveTextContent("Other goods");
+    const cell = within(row).getByText("Not in catalog");
+    expect(cell).toHaveAttribute("data-absence", "true");
   });
 
   /* Owner ruling 2026-09-22: services never enter `Qty:`; they print apart. */

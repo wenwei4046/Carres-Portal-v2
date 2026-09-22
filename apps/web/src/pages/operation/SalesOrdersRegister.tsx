@@ -76,6 +76,7 @@ import {
   MUTED_ABSENCES,
   NO_DO_YET,
   NO_PO_YET,
+  NOT_IN_CATALOG,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
@@ -423,7 +424,12 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
-        category: goodsCategoryOf(line),
+        /* The shared ladder says `Other goods` for a line with no catalog row;
+           this page prints the dictionary's `Not in catalog`, muted (owner
+           ruling 2026-09-22). Other pages keep their own word. */
+        ...(goodsCategoryOf(line) === "Other goods"
+          ? { category: NOT_IN_CATALOG, categoryNode: absenceAware(NOT_IN_CATALOG) }
+          : { category: goodsCategoryOf(line) }),
         unitIds: fact?.verifiedUnitIds ?? fact?.unitIds ?? [],
         unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
           <UnitEvidence singleLineCodes ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
@@ -899,6 +905,10 @@ function RegisterResultSummary({
     (label) => label !== "Service" && label !== "Other goods" && (counts.get(label) ?? 0) > 0,
   ).map((label) => `${label} ${counts.get(label)}`);
   const services = counts.get("Service") ?? 0;
+  /* ⭐ NEVER A SILENT UNDER-COUNT (owner ruling 2026-09-22): a goods line the
+     ladder cannot name stays out of `Qty:` but is counted apart under the
+     dictionary's `Not in catalog`, and only when there is one. */
+  const notInCatalog = counts.get("Other goods") ?? 0;
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */
@@ -906,6 +916,7 @@ function RegisterResultSummary({
     countWord,
     ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : []),
     ...(services > 0 ? [`Services ${services}`] : []),
+    ...(notInCatalog > 0 ? [`${NOT_IN_CATALOG} ${notInCatalog}`] : []),
   ].join(" · ");
   return <span className="block truncate" title={line}>{line}</span>;
 }
