@@ -227,8 +227,8 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   is a separate evidence gate and must never be rendered as a handwritten signature.
 - **Category quantity footer — owner-approved 2026-09-22:** use the same breakdown as the page:
   `Qty: Mattress 2 · Accessory 1`, with `Services: Delivery fee · Stair carry` separately. Only show
-  categories/services present; gifts count in their goods category and Other goods is included when
-  counted. Service quantities remain on the service rows, never in the goods count. Do not print the
+  categories/services present; gifts count in their goods category; there is no `Other goods` (owner
+  2026-09-22 — an unclassified line is a catalogue data error, never printed). Service quantities remain on the service rows, never in the goods count. Do not print the
   three technical labels Goods lines / Physical pieces / Service quantity. The TOTAL PAYABLE amount
   is unchanged. Preserve distinct internal counting and the separate SST ruling.
 - BALANCE DUE is never bigger — the grey band and bold carry the emphasis.

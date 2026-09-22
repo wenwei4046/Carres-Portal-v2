@@ -390,7 +390,7 @@ The normal toolbar exposes Search, Export and Columns with labels, wrapping on n
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
 customer names and imported references are not parsed as partial SO numbers.
 Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
-The footer explicitly labels category values as Qty and includes Other goods when counted.
+The footer explicitly labels goods category values as `Qty:`; services print apart as `Services {n}`. **No `Other goods` (owner ruling, Jess 2026-09-22: "no such other goods, write clear").** Every product must carry its catalogue category; an order line the system cannot classify is a data error reported for the catalogue to fix, never printed to staff as a kind of goods. Services never enter `Qty:` — the Register footer prints them as a separate `Services {n}`; the object page and document name them (`Services: Delivery fee · Stair carry`).
 Default column widths fit the eight-column sample at 1180px without shrinking typography;
 existing saved column layouts are preserved. Destination header padding and spacing adapt on
 narrow screens. Local Edge checks at 1180/390/320px show no document overflow; the narrow grid
@@ -566,7 +566,8 @@ impact → Save or Submit amendment request → approval takes effect → each o
    bare Remove button.
 4. **Quantity presentation — owner-approved 2026-09-22:** reuse the category footer on both
    page and document: `Qty: Mattress 2 · Accessory 1`, separately `Services: Delivery fee · Stair carry`.
-   List only categories present; include `Other goods` when counted. Gifts count under their actual
+   List only categories present; there is no `Other goods` (owner 2026-09-22 — an unclassified line is a
+   catalogue data error, reported, never printed). Gifts count under their actual
    goods category. Sofa quantities follow real deliverable modules, not sales bundles or packing boxes.
    Remove the displayed `Goods lines` / `Physical pieces` / `Service quantity` summary. Internally keep
    line count, physical quantity and service billing quantity distinct; service never inflates goods.
@@ -1499,8 +1500,8 @@ query.**
   words may print, so no unruled abbreviation (`M.P`, a supplier's code) can reach the screen. The
   previous shape ALSO under-counted: its word list was both the order and the filter, so any label
   outside it — `Disposal`, any unrecognised accessory — was silently dropped from a tally that
-  claims to describe the filtered result. Anything not positively recognised is now `Other goods`,
-  governed and still counted. The line truncates rather than wrapping (the footer is one line by
+  claims to describe the filtered result. ⛔ The `Other goods` fallback is RETIRED (owner 2026-09-22): an
+  unrecognised line is a catalogue data error reported for correction, never a printed kind of goods. The line truncates rather than wrapping (the footer is one line by
   law) and carries the full sentence in its title.
 - **The search placeholder fits its box.** The box is a governed 200px at every width, so the
   four-item placeholder clipped on a wide window as well as a narrow one — it was never a
