@@ -36,7 +36,7 @@ describe("mapPgError", () => {
     expect(m.body.message).toBe("not found");
   });
 
-  it("maps SQLSTATE 22023 to 422 invalid_param", () => {
+  it("maps an UNTAGGED SQLSTATE 22023 to 422 invalid_param", () => {
     const m = mapPgError({ code: "22023", message: "bad arg" });
     expect(m.status).toBe(422);
     expect(m.body).toEqual({
@@ -44,6 +44,24 @@ describe("mapPgError", () => {
       code: "invalid_param",
       message: "bad arg",
     });
+  });
+
+  /* 0535 / 0551 — _customer_payment_post raises these three next to the
+   * sentence the screen shows. The tag rides PostgrestError.details; each one
+   * must arrive as its own `code` so the form can act on it, and the sentence
+   * must arrive whole. */
+  it.each([
+    ["payment_reference_required", "a bank transfer needs its reference number"],
+    ["payment_reference_required", "a cheque payment needs its cheque number"],
+    ["payment_reference_required", "a DuitNow QR payment needs its reference number"],
+    ["payment_reference_required", "a card payment needs its approval code"],
+    ["payment_method_required", "choose how the customer paid"],
+    ["payment_account_unmapped",
+      'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment'],
+  ])("a 22023 tagged %s reaches the caller as that code and its own sentence", (tag, sentence) => {
+    const m = mapPgError({ code: "22023", message: sentence, details: tag });
+    expect(m.status).toBe(422);
+    expect(m.body).toEqual({ error: "invalid_param", code: tag, message: sentence });
   });
 
   it("falls back to 'invalid param' message when 22023 has no message", () => {
