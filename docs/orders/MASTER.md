@@ -261,9 +261,18 @@ Expand a category into model, size and purchasing-relevant configuration. Clicki
 quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
 An empty result is not evidence of zero demand when its underlying facts failed to load.
 
+**Rail interaction — owner approved 2026-09-22; preview target.**
+Use existing FilterRailRow buttons for dealer and category facets, not checkboxes. Click a full
+row to select; click again to deselect; multiple selected rows stay highlighted. View navigation
+remains mutually exclusive. Keep shared row geometry, wrapping and pressed-state semantics.
+Remove dealer counts and their all-dates explanatory sentence from this SO preview. Date and
+location controls remain governed selects; identify Customer Requested Delivery Date at the
+month control. This is SO composition approval, not a global change to other pages or to
+FilterRailSelect single-selection behaviour.
+
 **Monthly presentation — owner approved 2026-09-22; not implemented/verified.**
 The content header contains `Monthly demand`, the selected month/year range, and
-`Undelivered items by requested delivery month`. Replace ambiguous Earlier/Later headings with
+`Items still to deliver`. Replace ambiguous Earlier/Later headings with
 `Before {MMM YYYY}` and `After {MMM YYYY}`, updated with the selected window. These mean outside
 the selected window, not necessarily overdue relative to today. Keep all monthly years explicit.
 Do not repeat default All dealers / All states, gift/service calculation explanations, or the

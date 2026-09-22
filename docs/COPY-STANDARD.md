@@ -19,7 +19,8 @@ Scope: outright-sales Monthly demand only; approval is not implementation eviden
 |---|---|
 | View heading | `Monthly demand` |
 | Date range | `{MMM YYYY} – {MMM YYYY}`; use consistent English month abbreviations, e.g. `Sep 2026 – Feb 2027` |
-| Quantity and date basis | `Undelivered items by requested delivery month` |
+| Quantity basis | `Items still to deliver` |
+| Month control date basis | `Customer Requested Delivery Date` (existing governed field name) |
 | Before-window column | `Before {MMM YYYY}`; not `Earlier`, and not automatically `Overdue` |
 | After-window column | `After {MMM YYYY}`; not `Later` |
 | Missing requested-date exception | `1 order missing delivery date` / `{n} orders missing delivery date`; only when present, opens affected orders and quantities |
