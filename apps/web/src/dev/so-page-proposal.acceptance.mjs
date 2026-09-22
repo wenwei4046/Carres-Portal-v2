@@ -79,7 +79,7 @@ ok(t.includes("Qty: Mattress 1 · Accessory 1"), "Rev 2 applied");
 r = await revs(p); ok(/Rev 2 · Current .*? Not signed/.test(r), "Revisions: Rev 2 not signed yet");
 await p.evaluate(() => window.__signCurrent()); await p.waitForTimeout(800);
 r = await revs(p); ok(/Rev 2 · Current .*? Signed Tue, 22 Sep 2026/.test(r), "Rev 2 signed (by the POS/e-sign stand-in)");
-await edit(p); await p.getByRole("button", { name: "Configure" }).first().click();
+await edit(p); await p.getByRole("button", { name: /Configure Jager/ }).click();
 await p.locator("#l1-size").click(); await p.getByRole("option", { name: "Queen" }).click();
 await p.locator("#why").fill("Customer changes to Queen.");
 await p.locator("#evidence").fill("Signed change form, Tue 22 Sep 15:10");
@@ -113,8 +113,44 @@ ok(t.includes("Purchase demand only") && !t.includes("PO-150926-0142"), "no-PO: 
 ok(await p.getByRole("button", { name: /Submit amendment request/ }).count() === 1, "no-PO item change still needs approval");
 await p.close();
 
+
+console.log("── H · out-of-date request, and a correction that must NOT make it out of date");
+p = await open("?as=management");
+await edit(p); await p.locator("#qty-l1").fill("1"); await p.locator("#why").fill("Customer keeps one mattress."); await p.locator("#evidence").fill("WhatsApp 22 Sep");
+await p.getByRole("button", { name: "Submit amendment request" }).click(); await p.waitForTimeout(600);
+await edit(p); await p.locator("#phone").fill("0162157299"); await p.locator("#why").fill("New number.");
+ok(await p.getByRole("button", { name: /^Save$/ }).isEnabled(), "a contact correction can still be saved while a request waits");
+await p.getByRole("button", { name: /^Save$/ }).click(); await p.waitForTimeout(800);
+t = flat(await form(p));
+ok(t.includes("Waiting for management") && !t.includes("Out of date"), "the correction does not make the request out of date");
+await p.evaluate(() => window.__landOtherChange()); await p.waitForTimeout(800);
+t = flat(await form(p));
+ok(t.includes("Out of date — propose again") && t.includes("Nothing was applied"), "another approved change makes the request out of date");
+ok((await p.getByRole("button", { name: /Approve and apply/ }).count()) === 0, "out-of-date request cannot be approved");
+ok(/Rev 1 \(sent on\)/.test(t) && /Rev 3 \(now\)/.test(t) && t.includes("Thu, 1 Oct"), "shows sent-on, now and proposed values");
+await shot(p, "v12-stale", 0);
+await p.getByRole("button", { name: "Propose this version again" }).click(); await p.waitForTimeout(600);
+ok(await p.locator("#qty-l1").inputValue() === "1" && await p.getByRole("button", { name: /Submit amendment request/ }).count() === 1, "propose again: edit reopens with the proposal on top of the current order");
+await p.close();
+
+console.log("── I · kit measurements");
+p = await open();
+const m = await p.evaluate(() => {
+  const h2 = document.querySelector('[data-kit="panel"] h2');
+  const label = document.querySelector('[data-kit="panel"] label');
+  return { panelTitle: h2 && getComputedStyle(h2).color, label: label && getComputedStyle(label).fontSize };
+});
+console.log("MEASURE panel title color", m.panelTitle, "· label size", m.label);
+ok(m.label === "11px", "labels use kit FieldFrame 11px (locked)");
+await edit(p); await p.waitForTimeout(400);
+const rows = await p.evaluate(() => [...document.querySelectorAll('[data-pane="form"] table')].slice(0,1).map(t => [...t.querySelectorAll("tbody tr")].map(r => Math.round(r.getBoundingClientRect().height))));
+const inp = await p.evaluate(() => { const e = document.querySelector("#qty-l1"); const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width) }; });
+console.log("MEASURE items row heights in edit", JSON.stringify(rows), "· qty input", JSON.stringify(inp));
+await shot(p, "v12-edit-items", 0.55);
+await p.close();
+
 console.log("── G · widths and states");
 for (const w of [1440, 1180, 820, 390]) { const q = await open("", w); const ov = await q.evaluate(() => document.documentElement.scrollWidth - innerWidth); ok(ov === 0 && (await q.locator("canvas").count()) > 0, `${w}px: no page sideways scroll, document shown`); if (w === 390) await q.screenshot({ path: "shots/v11-390.png", fullPage: true }); await q.close(); }
-for (const s of ["loading", "error"]) { const q = await open(`?state=${s}`); ok(s === "loading" ? (await q.locator('[aria-busy="true"][aria-label="Opening the sales order"]').count()) === 1 : (await q.getByRole("button", { name: "Try again" }).count()) === 1 && (await q.locator("body").innerText()).includes("This sales order could not be opened"), `state ${s} renders`); await q.screenshot({ path: `shots/v11-${s}.png` }); await q.close(); }
+for (const s of ["loading", "error"]) { const q = await open(`?state=${s}`); ok(s === "loading" ? (await q.locator('[data-testid="page-loading"] [data-testid="kit-loading-skeleton"]').count()) === 2 : (await q.getByRole("button", { name: "Try again" }).count()) === 1 && (await q.locator("body").innerText()).includes("This sales order could not be opened"), `state ${s} renders`); await q.screenshot({ path: `shots/v11-${s}.png` }); await q.close(); }
 console.log(`TOTAL ${pass} passed · ${fail} failed`);
 await b.close();

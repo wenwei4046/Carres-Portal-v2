@@ -879,8 +879,16 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
         {/* the two boxes share TOP and BOTTOM lines: the row stretches the
             dashed signature box to the totals card's exact height (round 27) */}
         <View style={styles.totalsZone} wrap={false}>
-          {/* Customer signature REMOVED from the SO page panels (owner, 2026-09-22). */}
-          <View style={{ flexGrow: 1 }} />
+          <View style={styles.signCol}>
+            <View style={styles.signBox}>
+              {data.review_signature && data.review_signature.rev === data.review_rev && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+            </View>
+            <Text style={[styles.signCaption, { marginTop: mm(1.4) }]}>
+              {data.review_signature && data.review_signature.rev === data.review_rev
+                ? `Customer Signature · ${displayCustomerName(customer.name)} · Rev ${data.review_rev} · ${data.review_signature.at}`
+                : `Rev ${data.review_rev} · not signed by the customer`}
+            </Text>
+          </View>
           <View style={styles.totalsBlock}>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Goods amount</Text>
