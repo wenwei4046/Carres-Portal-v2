@@ -1619,7 +1619,10 @@ delivery in this new programme as well as its legacy work. This is not nationwid
 Other regions' partners, capacity and rates remain to be established; the legacy HOUZS route is
 not automatically an appointment for Diglant. The 100/200/500 monthly KPI scenarios are not actual
 or guaranteed volume; regional actual demand informs later partner selection and volume/rate
-negotiation. Preserve the legacy rules above.
+negotiation. Jess confirmed the reporting target: regional actual volume, weekly consolidated
+pickup quantity/frequency, complete transport cost per mattress delivered, and waiting/delay/damage/
+redelivery performance (APPROVED TARGET / NOT BUILT). Rental §5.8 owns this planning/report scope;
+Delivery remains owner of its physical evidence. Preserve the legacy rules above.
 Reuse Delivery's Unit evidence and route-planning ownership without inventing a Carres warehouse
 receipt or claiming the factory-origin route is built. The approximately 3–6 month business review
 is not an automatic move into Carres storage.
