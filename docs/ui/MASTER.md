@@ -557,8 +557,16 @@ is the only way an operator can see what a supplier will read without printing i
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
                Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
-NEVER        Display Request · Manual Purchase
+NEVER        Display Request
+EXCEPTION    Manual Purchase create / returned-request edit: internal MPR preview
+             (owner 2026-09-22; APPROVED / NOT BUILT; Purchasing §9.2).
 ```
+Manual Purchase creation uses the same Sales Order form composition: left form,
+right live MPR preview, with `Request Details → Delivery → Items` on both sides.
+Apply the governed readable split/stack behavior; ordinary saved MPR detail and
+its Register do not acquire this split. The preview is internal request content,
+not a supplier-facing PO. Purchasing §9.2 and COPY own fields and actions.
+
 The GRN is an official A4 document the supplier and auditors read, so its object and Amend
 Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
 

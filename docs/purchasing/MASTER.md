@@ -1591,10 +1591,65 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
+**CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; APPROVED / NOT BUILT.**
+Reuse the selected Sales Order form composition, with a 50/50 form and live MPR
+preview at the governed readable desktop width; use the shared stacked layout
+below it. This overrides the former blanket ban on a Manual Purchase split
+preview for creation and returned-request editing only. Ordinary saved-object
+view and the Register retain their separately governed layouts.
+
+The three sections, in the SAME reading order on the form and preview, are:
+
+1. **Request Details** — `Purpose`; its structured Service Case / Staff member /
+   Subsidiary / `What is this for?` field where applicable; optional
+   `Purchase requirement`; the existing explicit `Can stock answer this?` choice
+   (no inferred/default answer); automatic `Requested By` and `Proceed Date`.
+   The requirement stays here, never a separate section or a bottom-of-form question.
+   Proceed Date previews server time and records the actual successful hand-off;
+   it is not a manually backdated document date. Requester is the real individual.
+2. **Delivery** — `Deliver To` from governed destinations, then `Delivery Date`.
+   Complete item/Settings facts provide the request's default arrival date;
+   staff can adjust it and the system never silently overwrites that choice.
+3. **Items** — Catalog search/selection, automatically resolved name, specification
+   and Supplier, editable positive whole `Qty`, optional `Note`, `+ Add line` and
+   `Remove` for unsubmitted lines. Supplier is not an independent first-section
+   choice: a request can contain several Catalog-derived suppliers. Stock reference
+   opens with its governed loading/error/unknown/available meanings and does not
+   silently reserve or subtract stock. Existing concrete-need versus extra-stock
+   rules continue to apply.
+
+The right pane is a live **internal MPR preview**, using the same draft facts and
+section sequence, with total requested goods quantity. Before submission it is
+clearly a draft; it never invents an MPR/PO number, claims approval, or represents
+an issued supplier PO. Supplier-facing documents appear at Issue PO, one preview
+per actual grouped PO, using PO-PDF-STANDARD. Never combine several suppliers on
+one PO. No Payment / Paid to date / Balance due / financial-progress section.
+Use the existing top action placement and governed submission action; typing,
+previewing, printing or downloading never submits a request or sends a PO.
+
+**Approval boundary — explicit unresolved distinction, not a new decision here.**
+Jess has ruled that price/financial approval must not block placing an order and
+any required financial approval is Jess-only. The built MPR request-authorisation
+rule below is a different gate; this layout approval does not abolish it or prove
+it reconciled with that wider placement ruling. Do not invent a financial gate,
+rename the request gate as financial approval, or claim the business conflict is
+resolved. Price entry for placing a PO does not add an MPR price editor by inference.
+
+**Date boundary.** MPR `Delivery Date` is the requested arrival date, not the
+PO's immutable `PO Delivery Date`. The latter's approved Settings-only working-day
+rule is §5.7 (no added transit days). The existing MPR grouping/approved-date
+handoff below must be reconciled with §5.7 before BUILD; this layout approval does
+not silently change request planning or claim those two dates are identical.
+
+**Empty PO fact.** Where a request has no linked PO, print `No PO yet`, never a
+blank, a dash, or `Not ordered yet`. Failed/unknown lineage still uses its own
+loading/error state and never asserts that no PO exists.
+
+
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
 Every request requires approval, regardless of purpose or amount; the decision and issue doors
 enforce it. Per-purpose approval configuration is retired. The Register, rail, object rounds and
-the create form below describe the built page; fixture walks cover every state, and the
+the historical create-form implementation below describe the built page; the 2026-09-22 create blueprint above is not built; fixture walks cover every state, and the
 authenticated owner walk remains owed.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
@@ -1712,7 +1767,7 @@ every operator-facing surface; the search still finds it. `MPR` = Manual Purchas
 approved before it becomes one or more POs. `MP` is not used — it is already the Mattress Protector
 SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` values stay searchable.
 `MPR No` and `Proceed Date` pin at canvas ≥768px, `MPR No` alone below; `MPR No` opens the request.
-`PO No` lists every resulting PO (blank before any PO), each opening its own PO; one row remains one
+`PO No` lists every resulting PO (`No PO yet` before any PO), each opening its own PO; one row remains one
 request. Customer and supplier facts use the shared dictionary. Existing groups and sorting stay.
 
 **Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
@@ -1764,7 +1819,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - MPR No is the permanent request number; UUID remains an internal key, never the displayed identity.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
-  `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
+  `No PO yet` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
   exact linked PO list. Never a UUID, never a SKU/supplier/date inference, and never the
   Manual Purchase identity — a purchase may have no PO or several.
 - `Items` speaks Catalog human words through the ONE item-label arithmetic
@@ -1787,7 +1842,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   `Items`, `Supplier Deliver To`, `Requested By`, dates and `PO No` are narrower than the registry
   and the convergence is named there, to be closed in this page's own round. Saved layout key
   `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
-- **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
+- **Measured create implementation (D1, Round 2; target superseded by the create blueprint above).** Below a 640px form the item search takes a whole row, `Qty` ·
   `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
   `Send for approval` move from the shell header into a bar pinned to the bottom — exactly one pair
   is displayed at any width. The Delivery Date picker's floor is the Purchasing Settings number
@@ -1951,7 +2006,7 @@ different dates therefore report and create different POs. The issued PO saves t
 Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
 stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
 
-**Object detail.** Clicking `MPR No` opens the full-width, one-scroll object on the shared
+**Saved object view (not the create/edit workspace above).** Clicking `MPR No` opens the full-width, one-scroll object on the shared
 Object Header + Summary + Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
