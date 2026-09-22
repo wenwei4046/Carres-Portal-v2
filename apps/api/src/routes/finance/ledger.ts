@@ -2,8 +2,9 @@ import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
+  ledgerAccountCodeShape,
   ledgerAccountLedgerQuery,
-  ledgerAccountRenameInput,
+  ledgerAccountUpdateInput,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
   ledgerEntryRef,
@@ -46,12 +47,16 @@ import financeMoneyAccountsRouter from "./money-accounts";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes but the account rename. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the one account door. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
  *   GET /accounts           the chart, and the day the ledger started
- *   PATCH /accounts/:code   rename one account (gl_account_rename, 0539) — the code never changes
+ *   PATCH /accounts/:code   one account's name and number (gl_account_update, 0550) — a new
+ *                           number is carried to every row that names it, by `on update cascade`.
+ *                           An account named on a document that has left Draft cannot be
+ *                           renumbered: 0550's own ceiling, refused by the frozen-document
+ *                           triggers as a 422/500, not by anything here.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -376,19 +381,48 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   return c.json(read.chart);
 });
 
+/**
+ * 0550's refusals each carry a DETAIL tag, and the sentence the user must read
+ * is the function's own message — `mapPgError` already answers with that
+ * message and the status the tag deserves:
+ *
+ *   not_finance    42501 → 403   Only Finance changes the chart of accounts.
+ *   account_missing P0002 → 404  That account is not in the chart.
+ *   name_missing   22023 → 422   Type the account name.
+ *   name_too_long  22023 → 422   Keep the name to 60 characters.
+ *   name_exists    22023 → 422   An account named X is already in the chart.
+ *   code_shape     22023 → 422   A number is four digits, or three digits, …
+ *   code_exists    22023 → 422   An account numbered X is already in the chart.
+ *
+ * What is added here is the tag itself, forwarded as `code` — the same
+ * passthrough money-moves.ts and payables.ts do — so the modal can put the
+ * sentence under the field it is about instead of at the foot of the form.
+ * A 500 keeps `rpc_failed`: a tag on a break is not a refusal.
+ */
+function accountError(c: Context<AppEnv>, error: PgError) {
+  const m = mapPgError(error);
+  if (error.details && m.status !== 500) return c.json({ ...m.body, code: error.details }, m.status);
+  return c.json(m.body, m.status);
+}
+
 financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
   const code = c.req.param("code");
-  if (!/^\d{4}$/.test(code)) {
+  // Both shapes 0550 accepts, not just four digits — an account renumbered to
+  // 100-0001 must still be reachable by its own path.
+  if (!ledgerAccountCodeShape.test(code)) {
     return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
   }
-  const body = await parseJsonBody(c, ledgerAccountRenameInput);
+  const body = await parseJsonBody(c, ledgerAccountUpdateInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_account_rename", { p_code: code, p_name: body.data.name });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  // No number given means the number stays; the function reads null as "keep".
+  const { data, error } = await sb.rpc("gl_account_update", {
+    p_code: code,
+    p_name: body.data.name,
+    p_new_code: body.data.code ?? null,
+  });
+  if (error) return accountError(c, error);
+  // The answer is the number the account now carries, which is the new one.
   return c.json({ code: data as string });
 });
 
