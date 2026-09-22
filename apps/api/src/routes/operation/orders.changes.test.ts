@@ -65,6 +65,9 @@ const lines = () => [
 ];
 const addons = () => [{ id: A1, addon_key: "DELIVERY", qty: 1, unit_price: 250 }];
 
+type Body = Record<string, unknown>;
+const bodyOf = async (res: Response): Promise<Body> => (await res.json()) as Body;
+
 async function post(body: unknown, role = "operation") {
   const jwt = await signTestJwt("11111111-1111-1111-1111-000000000999", { email: `${role}@carres.com`, app_metadata: { role } });
   return app.fetch(
@@ -83,7 +86,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     const rpc = mockDb(() => ({ data: null, error: null }));
     const res = await post({ header: header(), lines: lines(), addons: addons(), reason: "x" });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("nothing_changed");
+    expect((await bodyOf(res)).code).toBe("nothing_changed");
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -91,7 +94,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     const rpc = mockDb(() => ({ data: { revision: 2, changed: ["customer_phone"] }, error: null }));
     const res = await post({ header: header({ customer_phone: "0199999999" }), lines: lines(), addons: addons(), reason: "New number" });
     expect(res.status).toBe(201);
-    expect((await res.json()).action).toBe("saved");
+    expect((await bodyOf(res)).action).toBe("saved");
     expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
       p_order_id: ORDER_ID, p_header: { customer_phone: "0199999999" }, p_lines: null,
       p_change: { change_type: "staff_correction", note: "New number" },
@@ -104,7 +107,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     l[1]!.qty = 1;
     const res = await post({ header: header(), lines: l, addons: addons(), reason: "Customer keeps one pillow" });
     expect(res.status).toBe(201);
-    const out = await res.json();
+    const out = await bodyOf(res);
     expect(out).toMatchObject({ action: "submitted", amendmentId: AMEND, evidenceRecorded: false });
     const call = rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")!;
     const proposed = (call[1] as { p_proposed: Record<string, unknown> }).p_proposed;
@@ -123,7 +126,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
       evidenceNote: "WhatsApp 22 Sep 09:40",
     });
     expect(res.status).toBe(201);
-    expect((await res.json()).evidenceRecorded).toBe(true);
+    expect((await bodyOf(res)).evidenceRecorded).toBe(true);
     const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed.header).toEqual({ customer_phone: "0199999999", proceed_date: "2026-09-20" });
     expect(proposed.base_header).toEqual({ customer_phone: "0100000000", proceed_date: "2026-09-17" });
@@ -166,7 +169,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     l[1]!.qty = 1;
     const res = await post({ header: header(), lines: l, addons: addons(), reason: "x" });
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("amendment_exists");
+    expect((await bodyOf(res)).code).toBe("amendment_exists");
   });
 });
 
