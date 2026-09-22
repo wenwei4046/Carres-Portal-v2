@@ -109,3 +109,37 @@ The future Subscription has its own Claim policy and does not inherit the curren
 | **The archived signed PDF** | The signature is captured; the rendered agreement PDF has no writer yet. |
 | **Store-side reading of agreements** | Needs a dealer-scoped RLS read. |
 | **Interest as "per month or part thereof"** | The harsher reading is a one-line change in BOTH the shared function and its SQL mirror. Now that a button exists, it is worth an explicit ruling. |
+
+
+---
+
+# §4 · Mattress Subscription planning boundary — 2026-09-22
+
+## Confirmed owner facts / direction — RULING, not full blueprint approval
+
+Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
+
+- Diglant is the mattress manufacturer and an investor in Carres. Carres has a monthly
+  mattress quantity KPI and forecasts orders to Diglant in advance. Forecast purchasing,
+  followed by allocation when customers sign, replaces per-customer shortage purchasing as
+  the proposed primary supply model. Existing Purchasing approval/allocation law still applies.
+- Manufacturer lead time is 45 days. Carres assigns Logistics to collect at Diglant in Klang
+  and deliver across Malaysia, including Sabah/Sarawak. The 45 days must not be treated as
+  including final nationwide delivery. Calendar basis/start trigger still require supplier evidence.
+- One Carres-issued Unit ID identifies each physical mattress; Diglant attaches those labels.
+  A direct route must never fabricate a Carres warehouse receipt.
+- Go-live starts empty. Early forecasts are manager-entered; automatic suggestions may begin
+  only after three months of genuine sales, never imported/test transactions.
+- The requested review scope is a fixed-day monthly proposal by model/size, manager revision
+  with rationale/version, PDF for manual sending, and forecast/sold/picked-up comparison.
+  This is authority to PLAN, not to enable scheduling, place orders or contact Diglant.
+  PDF generation/download and opening WhatsApp are not evidence of sending.
+- Finance is outside this planning mission. §§1–3's existing Rental law remains untouched;
+  its rent-to-own commercial terms do not automatically govern the new mattress programme.
+- Customer-receipt-based service activation was positively identified in the supplied review;
+  its full operational policy remains PROPOSAL / NOT LAW, not blanket approval.
+- **UNKNOWN:** completed mattresses held at Diglant until individual collection versus bulk
+  pickup into Carres storage. No default location or actual receipt may be invented.
+
+The complete recommendation below remains subject to owner review. Earlier proposals in another
+worktree/branch are unapproved context only; this file is the sole Rental/Subscription authority.
