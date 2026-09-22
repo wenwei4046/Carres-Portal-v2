@@ -205,6 +205,23 @@ Shared measures must retain one owning calculation. This direction does not appr
 formula, target-entry engine, copy or finished layout. The current independent demand preview
 covers only a subset, not the enlarged monthly overview.
 
+**Portal composition — owner approved 2026-09-22; independent preview only.**
+Order list remains the order-finding surface. Monthly overview uses the governed Tabs to switch
+Dealer sales / Delivery progress / Monthly demand, one main table at a time; Operation received
+is a compact summary in Delivery progress. Reuse the standard ModuleHeader/Shell, FilterRail,
+Tabs and governed table interactions. Do not compose this as a PDF or four vertically stacked
+reports. Preview global utility controls may be omitted to avoid connecting to live services;
+that isolation is not a proposal to remove production portal navigation.
+Month and Region use governed selection controls. Dealer/Sales Location and Category keep approved
+clickable multi-selection; no rail Clear filters. Region adapts the Purchasing grouping: Klang
+Valley combines Kuala Lumpur, Selangor, Putrajaya; other states retain their names. Actual order
+address remains Customer Delivery Location. Region is not a dealer's own location. Dealer and
+Region persist between the three tabs; Category resets on tab change and scopes all numbers in
+the active table. With Category selected, Dealer sales hides whole-order service amount and total
+payable rather than allocating them to selected goods; its source-order detail does the same.
+New view names and headings are owner-approved as this report's scope; no cross-portal rewrite
+is authorised. A shared shell alone is not evidence of full production integration.
+
 **Monthly reporting measures — owner-approved direction 2026-09-22; not built.**
 - Dealer sales comparison uses SO Doc Date in Malaysian calendar months. Compare each selected
   Dealer/Sales Location separately plus a total; keep order count, actual goods-category quantities,

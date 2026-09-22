@@ -11,6 +11,19 @@
 
 ---
 
+## Sales Orders monthly overview — owner approved 2026-09-22
+
+Portal views: `Order list` / `Monthly overview`. Monthly overview tabs: `Dealer sales` /
+`Delivery progress` / `Monthly demand`. `Operation received` is the Proceed Date summary.
+Filters: `Month`, `Future demand` (3/6 months), `Dealer / Sales Location`, `Region`, `Category`.
+`Region` uses Klang Valley / state grouping defined in Orders MASTER; `Customer Delivery Location`
+remains the actual customer's address. Do not invent `Demand product category` or confuse the
+Region with a dealer address. Dealer comparison columns: `Dealer / Sales Location`, `Orders`,
+`Qty`, `Goods amount`, `Service amount`, `Total payable`. Selected-category scope omits the last
+two whole-order amounts rather than inventing an allocation. Delivery comparison columns:
+`Dealer / Sales Location`, `Category`, `Required`, `Delivered`, `Still to deliver`.
+This is approved display scope, not evidence that the report or historical calculations are built.
+
 ## Sales Orders Monthly demand — owner-approved copy, 2026-09-22
 
 Scope: outright-sales Monthly demand only; approval is not implementation evidence.
