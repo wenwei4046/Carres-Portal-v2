@@ -282,6 +282,8 @@ export interface GoodsMiniLine {
   key: string;
   /** Already display-cased by `categoryWord`. */
   category: string;
+  /** Optional page-drawn Category cell (e.g. a muted absence word). */
+  categoryNode?: ReactNode;
   /** One printed line each; empty means the absence below is printed instead. */
   unitIds: string[];
   /** Optional read-only inspection surface supplied by the owning page. */
@@ -954,7 +956,7 @@ export default function GoodsMiniTable({
             const cell = (key: string) => {
               switch (key) {
                 case "category":
-                  return line.category;
+                  return line.categoryNode ?? line.category;
                 case "sku":
                   /* Sales Orders: plain 13px, one line, never a scroll box (§6.0 rule 5). */
                   return salesOrderLayout

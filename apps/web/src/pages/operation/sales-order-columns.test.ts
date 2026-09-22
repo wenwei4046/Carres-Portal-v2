@@ -19,6 +19,7 @@ import {
   NO_DATE_YET,
   NO_DO_YET,
   NO_PO_YET,
+  NOT_IN_CATALOG,
   NOT_RECORDED,
   REGISTER_FIELDS,
   registerItemsSummary,
@@ -160,7 +161,8 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
     expect(MUTED_ABSENCES.has(NO_PO_YET)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DO_YET)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
-    expect(MUTED_ABSENCES.size).toBe(3);
+    expect(MUTED_ABSENCES.has(NOT_IN_CATALOG)).toBe(true);
+    expect(MUTED_ABSENCES.size).toBe(4);
   });
 
   it("every width is a registry entry — the catalog types no pixel number", () => {

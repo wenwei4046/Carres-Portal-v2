@@ -427,8 +427,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
     /* Owner ruling 2026-09-22: an unclassified line is a catalogue data
-       error, reported for correction — never printed as a kind of goods. */
+       error — never printed as a kind of goods, and never silently dropped:
+       it is counted apart under the dictionary's `Not in catalog`. */
     expect(footer).not.toHaveTextContent("Other goods");
+    expect(footer).toHaveTextContent(/Not in catalog 5$/);
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -540,7 +542,51 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
     }
     expect(footer).not.toHaveTextContent("Other goods");
-    expect(footer).toHaveTextContent("1 sales order");
+    expect(footer).toHaveTextContent(/^1 sales order · Not in catalog 5$/);
+  });
+
+  /* Owner ruling 2026-09-22 (Jess): {n} is the PHYSICAL quantity, and the
+     click lists SO No · original SKU · product name · qty. */
+  it("`Not in catalog {n}` counts physical qty and opens the lines behind it", () => {
+    listHookState.data = {
+      orders: [
+        order({ id: "o-a", so: 1206, order_lines: [
+          { id: "a1", sku: "M1201F-K", qty: 1, unit_price: 2999, category: null, attrs: {}, label: "Mystery mattress" },
+          { id: "a2", sku: "B1201S-K", qty: 1, unit_price: 2499, category: "mattress" },
+        ] }),
+        order({ id: "o-b", so: 1300, order_lines: [
+          { id: "b1", sku: "ODD-THING", qty: 3, unit_price: 10, category: null, attrs: {} },
+        ] }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    // 1 + 3 physical pieces, not 2 lines or 2 orders.
+    expect(footer).toHaveTextContent(/Not in catalog 4$/);
+    fireEvent.click(screen.getByTestId("footer-not-in-catalog"));
+    const list = screen.getByTestId("not-in-catalog-list");
+    const rows = within(list).getAllByRole("row").slice(1).map((r) => r.textContent);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("SO-1206");
+    expect(rows[0]).toContain("M1201F-K");
+    expect(rows[0]).toContain("1");
+    expect(rows[1]).toContain("SO-1300");
+    expect(rows[1]).toContain("ODD-THING");
+    expect(rows[1]).toContain("3");
+    fireEvent.click(within(list).getByRole("button", { name: "SO-1206" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/o-a");
+  });
+
+  it("the goods Category cell says `Not in catalog`, muted, never `Other goods`", () => {
+    listHookState.data = {
+      orders: [order({ order_lines: [{ id: "l-x", sku: "M1201F-K", qty: 1, unit_price: 2999, category: null, attrs: {} }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-M1201F-K");
+    expect(row).not.toHaveTextContent("Other goods");
+    const cell = within(row).getByText("Not in catalog");
+    expect(cell).toHaveAttribute("data-absence", "true");
   });
 
   /* Owner ruling 2026-09-22: services never enter `Qty:`; they print apart. */
