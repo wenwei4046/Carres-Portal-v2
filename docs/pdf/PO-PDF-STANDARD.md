@@ -39,12 +39,19 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
-- **WHERE THE VERSION PRINTS, INCLUDING V1** (0378; placement Jess
-  2026-09-22). The word is the dictionary's `V{n}`. **The version prints in
-  three places: the PO DETAILS `PO No` row (`PO-2609-0042 V2`), every
-  continuation page header and the footer. The page-1 hero number does NOT
-  repeat it** (`PO-2609-0042` alone). No separate `Version` row and no second
-  line under `PURCHASE ORDER`. A supplier holding two papers with one
+- **EVERY PAGE PRINTS THE SAME FULL HEADER, AND THE NUMBER CARRIES ITS
+  VERSION — INCLUDING V1** (owner, 2026-09-22; overrides, for the PO only,
+  SO-PDF-STANDARD §3's one-line continuation header). Logo · `CARRES SDN.
+  BHD.` · SSM · the registered address · the hero **`PO-2609-0042 V2`** 18/700
+  with `PURCHASE ORDER` beneath — identical on page 1, every continuation page
+  and every Deliver To's pages. Between pages only the Deliver To, the goods
+  and the footer's `Page n of m` change. The same `PO-… V{n}` also prints in
+  the PO DETAILS `PO No` row and the footer. No separate `Version` row and no
+  version printed on its own. **Measured:** the hero with its version is
+  52.9mm, which leaves 112mm beside the 13mm logo — the address's old second
+  line (122.4mm) would run under `PURCHASE ORDER`, so the address prints on
+  THREE lines (71.0 · 60.8 · 61.0mm) and the header reserve is 26mm, not
+  22mm. The dictionary word is `V{n}`. A supplier holding two papers with one
   number cannot tell which to build from without it, so V1 prints too
   (`Version 1 prints nothing` is only the internal REVISIONS PANEL's rule).
   The version the PDF prints is the version the confirmation records:
@@ -96,8 +103,8 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   THAT destination's full name and address in DELIVER TO — plain `DELIVER TO`,
   never `(1 of 2)` (owner, 2026-09-22: location, quantity and page number each
   say one thing). The footer's `Page 1 of 2` carries the page count. **Every page — first,
-  continuation and every destination — carries the same PO number and
-  revision** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
+  continuation and every destination — prints the same full header with
+  the same `PO-… V{n}`** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
   (page group 1) + 2 for AL (page group 2); still 6 on one PO — no second PO,
   no `Moved from` line, no new Unit IDs. A one-destination PO prints exactly
   as before.
@@ -217,3 +224,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | Several-Deliver-To pages simplified (owner, on the rendered preview): plain `DELIVER TO` with that location's full name and address — `(1 of 2)` deleted; each location's table keeps its `TOTAL`; the last page adds **`PO TOTAL`** (whole-PO quantity, nothing beside it); page count lives in the footer `Page n of m`. Version wording corrected: the version travels with every printed PO identity (`PO No` row, page headers, footer) and never prints on its own. | Jess |
 | 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
 | 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
+| 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO-… V{n}` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
