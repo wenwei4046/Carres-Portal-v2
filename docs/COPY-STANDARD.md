@@ -4042,3 +4042,17 @@ Payables, 18 Sep 2026. Words new to this standard:
   `{bill No} · Supplier invoice {No}` · `Advance` · signature blocks `Prepared By` (left),
   `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
   not yet signed. A draft voucher has no number and no PDF.
+
+
+## Sales Orders monthly overview — owner approved 2026-09-23 · target not built
+
+| Surface | Approved wording |
+|---|---|
+| SO reporting view beside `Order list` | `Monthly overview` |
+| Monthly comparison tab | `Dealer sales` |
+| Requested-month fulfilment tab | `Delivery progress` |
+| Forward confirmed-demand tab | `Monthly demand` |
+
+Use existing `SO Doc Date` for sales and `Customer Requested Delivery Date` for delivery/demand.
+Reuse existing `Dealer / Sales Location`, `Region` and `Category` wording; do not create a second
+regional dictionary. Approval of these titles does not approve every experimental prototype label.

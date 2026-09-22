@@ -193,11 +193,12 @@ No deposit · Online order
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
-## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
+## Monthly overview — owner approved 2026-09-23 · APPROVED TARGET / NOT BUILT
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
-provides two views: the existing order list and monthly demand. This is confirmed order demand,
+provides two views: the existing Order list and Monthly overview. Monthly overview uses three kit
+tabs: Dealer sales, Delivery progress and Monthly demand, with one primary table at a time. This is confirmed order demand,
 not a portal Dashboard and not an estimate of orders customers have not placed. The approved
 monthly view does not replace the flat Register with month/status groups or change its population:
 use the existing permission-scoped orders handed from Sales to Operation; unsubmitted/Placed
@@ -218,7 +219,7 @@ Both views use the shared rail shell under the following owner ruling.
 
 **Left rail — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
 Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240px width,
-wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
+wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly overview;
 each view exposes only its own controls. Do not add a second handmade rail.
 
 - Order list: Dealer / Sales Location; customer delivery State / City; date field (Proceed Date,
@@ -228,9 +229,12 @@ each view exposes only its own controls. Do not add a second handmade rail.
   Has open cases, Closed cases only, No cases). These are read-only factual filters, not a mutable
   overall status, work queue or new status/group column. Service case filters read Service's truth.
   Unknown underlying facts must not be classified as completed or no cases.
-- Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
-  Dealer / Sales Location, customer delivery State / City, actual catalog product categories.
-  The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
+- Monthly overview: one selected month for Dealer sales and Delivery progress; starting month
+  and 3/6-month period for Monthly demand. State the date basis beside the month control.
+  Dealer / Sales Location, Region and actual catalog Category filters apply. Region uses the
+  same recorded delivery-state grouping and governed control as Purchasing, not a second mapping.
+  Preserve Dealer and Region on tab changes; clear Category so a hidden filter cannot mislead.
+  The requested-delivery-date basis remains explicit for delivery and demand. Delivery/completion/service-case filters
   do not appear here and do not silently carry over from the list.
 - No Clear filters button inside either SO rail: this is Jess's explicit instruction, not
   approval inferred from silence. Click a selected facet again to deselect; a select retains All;
@@ -244,6 +248,38 @@ each view exposes only its own controls. Do not add a second handmade rail.
   reconciliation; this approval is not a claim that all illustrated wording is registered.
 - Source classifications are catalog-owned; never print Other goods. Missing classifications are
   traceable data errors, not silently omitted physical demand. Services are separate from Qty.
+
+**Monthly reading contract — owner approved 2026-09-23.**
+- Dealer sales: compare each Dealer / Sales Location's accepted orders, category quantities,
+  goods amount, service amount and total amount for the month using SO Doc Date. Keep service
+  money separate from goods; gifts retain their actual category. A product-category filter must
+  not attribute a whole order's services or total to only the selected goods; show the scoped goods
+  measure, with complete-order money only in a clearly distinct order context.
+- Delivery progress: selected Customer Requested Delivery Date month, showing required, actually
+  delivered and still-to-deliver quantities by dealer and product. Read Delivery's authoritative
+  fulfilment evidence, not an imported legacy completion flag.
+- Monthly demand: effective remaining physical commitments by requested month, category, model
+  and configuration. Click a quantity or month to see source orders and the same scoped supply
+  coverage beneath the matrix; SO links open SO and purchasing execution opens Purchasing.
+- Permissions: only authorised internal roles may compare all permitted dealers; dealer users
+  see only their own authorised records. Scope totals, drill-down and exports identically.
+- Read failures/partial or stale source evidence are unavailable/unknown, never zero. A successful
+  empty query is a no-data state. Keep normal samples valid; do not fabricate a missing-date warning.
+
+**Historical monthly sales — owner approved 2026-09-23; not built.** Preserve the original
+month's accepted order-issue facts. An applied amendment or cancellation contributes the signed
+quantity and amount difference in its effective month, traceable to the original SO and the
+before/after versions. Do not silently recompute past monthly results from today's effective
+order. Show original intake and period adjustments distinctly so net movement is reconcilable;
+an adjustment is not a newly received order. Pending or rejected changes have no effective
+adjustment. This is an operational sales reporting contract, not Finance revenue recognition,
+commission policy or permission to rewrite issued documents. Future demand uses the current
+effective commitment and actual fulfilment, not frozen historical monthly sales quantities.
+
+**Scope boundary.** No costs/margins, Subscription, main Dashboard metrics or Order Route build.
+Do not invent KPI targets, attainment percentages or predicted new sales without an approved
+source. Monthly planning and preview work must not block the independently authorised Amendment
+build. This approval authorises this reporting target and independent preview, not deployment.
 
 **Quantity matrix.** Columns are calendar months with years; rows are product categories.
 Every number means physical goods still owed to the customer, not order lines or original sold
