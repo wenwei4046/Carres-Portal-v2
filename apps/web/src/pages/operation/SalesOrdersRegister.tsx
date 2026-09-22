@@ -822,8 +822,9 @@ export default function SalesOrdersRegister() {
  *   footer that under-counts is worse than one that abbreviates: it is a
  *   number the operator trusts and cannot reproduce.
  *
- * Anything not positively recognised is `Other goods` — governed, honest, and
- * still counted.
+ * Anything not positively recognised is `Other goods` in the shared ladder —
+ * and this footer never prints it (owner ruling 2026-09-22): an unclassified
+ * line is a catalogue data error, reported for correction.
  */
 const FOOTER_WORDS = GOODS_CATEGORY_WORDS;
 
@@ -889,14 +890,22 @@ function RegisterResultSummary({
     : total == null || !narrowed
       ? `${filtered.length} ${salesOrders(filtered.length)}`
       : `${filtered.length} of ${total} ${salesOrders(total)}`;
-  // A quantity breakdown must account for every counted line, including
-  // goods the classifier cannot name. It is separate from the order count.
+  /* ⭐ OWNER RULING 2026-09-22 (COPY-STANDARD, SO category footer): `Qty:`
+     names GOODS categories only. Services never enter it — they print apart
+     as `Services {n}`. And there is no `Other goods`: a line the ladder
+     cannot name is a catalogue data error, reported for correction, never
+     printed to staff as a kind of goods. */
   const parts = FOOTER_WORDS.filter(
-    (label) => (counts.get(label) ?? 0) > 0,
+    (label) => label !== "Service" && label !== "Other goods" && (counts.get(label) ?? 0) > 0,
   ).map((label) => `${label} ${counts.get(label)}`);
+  const services = counts.get("Service") ?? 0;
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */
-  const line = [countWord, ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : [])].join(" · ");
+  const line = [
+    countWord,
+    ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : []),
+    ...(services > 0 ? [`Services ${services}`] : []),
+  ].join(" · ");
   return <span className="block truncate" title={line}>{line}</span>;
 }

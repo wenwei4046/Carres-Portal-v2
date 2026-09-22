@@ -220,6 +220,24 @@ export type DataGridProps<T> = {
   };
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
+  /**
+   * ROW DRAG (0557, Chart of accounts). Absent on every other grid, and when
+   * it is absent nothing here changes: no row is draggable and no key is
+   * intercepted. The grid owns the gesture only — WHICH rows may swap and what
+   * a swap means are the page's, because only the page knows the tree.
+   *
+   * KEYBOARD IS NOT OPTIONAL. Alt + ArrowUp / ArrowDown moves the focused row
+   * to the nearest row above/below that `canDrop` accepts, so a drag-only
+   * control never locks out a keyboard operator. Alt is what keeps ↑/↓ as
+   * plain row navigation.
+   */
+  rowDrag?: {
+    /** True when `dragged` may take `target`'s place. A move the server would
+        refuse must answer false here, so the screen never offers it. */
+    canDrop: (dragged: T, target: T) => boolean;
+    /** Put `dragged` where `target` is. The page persists it. */
+    onMove: (dragged: T, target: T) => void;
+  };
   searchPlaceholder?: string;
   /** Human filename stem for the "Export Excel" button, e.g. "Purchase Orders".
       Falls back to a cleaned storageKey when omitted. A YYYY-MM-DD date is
@@ -632,6 +650,7 @@ function DataGridInner<T>({
   initialGroupBy,
   fixedGroups,
   rowKey,
+  rowDrag,
   searchPlaceholder = "Search…",
   exportName,
   onRowDoubleClick,
@@ -1515,6 +1534,9 @@ function DataGridInner<T>({
   );
   /** A row the keyboard moved to that may not be rendered yet (virtual list). */
   const pendingRowFocus = useRef<string | null>(null);
+  /* The row a drag is carrying. A ref, not state: dragover fires per pixel and
+     re-rendering the whole grid on each one is how a drag starts stuttering. */
+  const draggingRow = useRef<T | null>(null);
 
   /* ⭐ A MATCH IS NEVER HIDDEN IN A COLLAPSED GROUP (owner ruling R1). While a
      search, column filter or page filter narrows the Register, every governed
@@ -2209,6 +2231,32 @@ function DataGridInner<T>({
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
+          draggable={rowDrag ? true : undefined}
+          onDragStart={rowDrag ? ((e) => {
+            draggingRow.current = row;
+            e.dataTransfer.effectAllowed = "move";
+            /* Firefox starts no drag at all without payload. The key is the
+               payload; the row itself is held in the ref. */
+            e.dataTransfer.setData("text/plain", key);
+          }) : undefined}
+          onDragEnd={rowDrag ? (() => { draggingRow.current = null; }) : undefined}
+          onDragOver={rowDrag ? ((e) => {
+            const from = draggingRow.current;
+            /* preventDefault is what ALLOWS the drop. Not calling it on a row
+               that may not take the move is how the screen refuses to offer a
+               move the server would refuse. */
+            if (!from || from === row || !rowDrag.canDrop(from, row)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          }) : undefined}
+          onDrop={rowDrag ? ((e) => {
+            const from = draggingRow.current;
+            draggingRow.current = null;
+            if (!from || from === row || !rowDrag.canDrop(from, row)) return;
+            e.preventDefault();
+            pendingRowFocus.current = rowKey(from);
+            rowDrag.onMove(from, row);
+          }) : undefined}
           data-grid-expansion-key={expandKey ?? undefined}
           data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
           className={`${styles.tr} ${
@@ -2276,6 +2324,25 @@ function DataGridInner<T>({
               return;
             }
             if (e.target !== tr) return;
+            if (rowDrag && e.altKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              /* The keyboard half of the drag: the nearest row in that
+                 direction that will TAKE the move. Nearest, not adjacent — a
+                 row's next sibling can sit several rows away with another
+                 heading's children printed in between. */
+              const order = renderList.filter((it) => it.kind === "row");
+              const at = order.findIndex((it) => it.kind === "row" && rowKey(it.row) === key);
+              const step = e.key === "ArrowDown" ? 1 : -1;
+              for (let i = at + step; i >= 0 && i < order.length; i += step) {
+                const cand = order[i];
+                if (!cand || cand.kind !== "row" || !rowDrag.canDrop(row, cand.row)) continue;
+                e.preventDefault();
+                pendingRowFocus.current = key;
+                setActiveRowKey(key);
+                rowDrag.onMove(row, cand.row);
+                return;
+              }
+              return;
+            }
             if (["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"].includes(e.key)) {
               /* ↑/↓ one row · Home/End first/last · PageUp/PageDown one screen —
                  counted in the FULL list, so a virtual window never ends the walk. */
@@ -3631,7 +3698,9 @@ function DataGridInner<T>({
  * and the `Popover` answers click, Enter and a touch screen's tap, where it
  * can be read and selected at leisure.
  */
-function OverflowText({ text, label }: { text: string; label: string }) {
+/* Exported (2026-09-22) so the SO goods table's configuration line reuses the
+   engine's ONE cut-value door instead of drawing a second (UI MASTER §6.8). */
+export function OverflowText({ text, label }: { text: string; label: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
   useLayoutEffect(() => {

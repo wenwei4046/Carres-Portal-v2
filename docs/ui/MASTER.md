@@ -557,8 +557,16 @@ is the only way an operator can see what a supplier will read without printing i
 ```
 SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
                Purchase Return · Repair Order · Supplier Claim · Goods Receipt (GRN)
-NEVER        Display Request · Manual Purchase
+NEVER        Display Request
+EXCEPTION    Manual Purchase create / returned-request edit: internal MPR preview
+             (owner 2026-09-22; APPROVED / NOT BUILT; Purchasing §9.2).
 ```
+Manual Purchase creation uses the same Sales Order form composition: left form,
+right live MPR preview, with `Request Details → Delivery → Items` on both sides.
+Apply the governed readable split/stack behavior; ordinary saved MPR detail and
+its Register do not acquire this split. The preview is internal request content,
+not a supplier-facing PO. Purchasing §9.2 and COPY own fields and actions.
+
 The GRN is an official A4 document the supplier and auditors read, so its object and Amend
 Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
 
@@ -1177,6 +1185,15 @@ A rail SECTION whose facts are a long, open-ended list collapses into ONE contro
   control wears the rail's own ACTIVE treatment — the `kit-blue-3` field with the `kit-blue-9`
   left-edge marker — so a narrowed section is exactly as visible as a selected row was.
 - **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
+
+**SALES ORDERS RAIL — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+Orders MASTER's monthly-demand/left-rail section owns the two views and their factual filters.
+Reuse FilterRail's shell, widths, wrapping and responsive grammar. No Clear filters is rendered
+inside the SO rail: selected facets toggle off and selects retain All. The shared active-condition
+bar/list-toolbar clear behaviour remains unchanged, as with the existing PO rail ruling.
+Dealer/product multi-selection is an SO-specific target, not a capability of the current
+single-slot FilterRailSelect and not a portal-wide change. Its governed kit interaction remains
+unbuilt; do not implement a page-local substitute or infer permission to alter other module rails.
 
 **LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`

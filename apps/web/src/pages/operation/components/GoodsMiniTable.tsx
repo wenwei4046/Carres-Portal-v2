@@ -52,6 +52,7 @@ import { Fragment, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
+import { OverflowText } from "@/components/register/DataGrid";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -960,13 +961,29 @@ export default function GoodsMiniTable({
                     ? <span className="whitespace-nowrap">{line.sku}</span>
                     : <span className="font-medium">{line.sku}</span>;
                 case "item":
+                  /* ⭐ ONE TWO-LINE GEOMETRY PER GOODS TABLE (UI MASTER §6.8, owner
+                     review 2026-09-22). Sales Orders rows were 1, 2 or 3 lines
+                     tall because the configuration wrapped. Now line 1 is the
+                     product name and line 2 the configuration on ONE line: a
+                     long one ends in … and opens whole on hover, keyboard focus
+                     and click (the engine's own OverflowText). A line with no
+                     configuration keeps the same empty second line, so every
+                     row is the same height. Nothing wraps to a third line. */
+                  if (salesOrderLayout) {
+                    return (
+                      <div className="min-w-0" data-testid="so-goods-item">
+                        <div className="truncate text-kit-slate-12" title={line.item}>{line.item}</div>
+                        <div className="mt-0.5 h-[14px] min-w-0 text-[11px] leading-[14px] text-kit-slate-11">
+                          {line.itemDetail ? <OverflowText text={line.itemDetail} label={line.item} /> : null}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <>
-                      {/* Sales Orders: the name in plain 13px, the configuration as
-                          the governed second fact — 11px slate-11 (§6.0 rule 5, §6.8). */}
-                      <div className={salesOrderLayout ? "text-kit-slate-12" : "font-medium text-base-900"}>{line.item}</div>
+                      <div className="font-medium text-base-900">{line.item}</div>
                       {line.itemDetail ? (
-                        <div className={salesOrderLayout ? "mt-0.5 text-[11px] leading-[14px] text-kit-slate-11" : "mt-0.5 text-base-600"}>{line.itemDetail}</div>
+                        <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
                       ) : null}
                     </>
                   );

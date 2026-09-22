@@ -607,8 +607,9 @@ export {
 // The read-only Finance Ledger (Journal · Trial Balance · Self-check).
 export {
   ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
-  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
   ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE,
+  type LedgerAccountReorderInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
