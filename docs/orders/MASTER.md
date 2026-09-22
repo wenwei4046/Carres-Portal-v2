@@ -201,19 +201,49 @@ provides two views: the existing order list and monthly demand. This is confirme
 not a portal Dashboard and not an estimate of orders customers have not placed. The approved
 monthly view does not replace the flat Register with month/status groups or change its population:
 use the existing permission-scoped orders handed from Sales to Operation; unsubmitted/Placed
-orders are not silently added. Earlier proposals to default the order list to unfinished orders
-or add completion/service-case quick views are not approved by this ruling.
+orders are not silently added. The earlier proposal to default the order list to unfinished orders
+is superseded by the approved list filters below; no default unfinished-only population is introduced.
 
 **Time and filters.** The monthly view defaults to the current calendar month plus the next five
 months. Offer three months, six months and a chosen starting month. Always retain separate
 buckets for outstanding demand earlier than the selected first month, later than its final month,
-and demand without a definite requested delivery date. Assign months using the customer's
+and a visible data-quality exception count for demand without a definite requested delivery date;
+do not present missing required dates as an ordinary monthly demand category. Assign months using the customer's
 requested delivery date, never document date, Proceed Date, supplier ETA or confirmed transport
 booking. Do not manufacture a date for ambiguous/missing source data. These buckets preserve
 visibility; they do not relax the order-entry requirement for a requested date. The local filter
 rail belongs to this monthly view and filters Dealer / Sales Location, customer delivery region
 and product category. Dealer location and customer delivery destination remain different facts.
-The existing list's no-rail rule does not prohibit this newly approved monthly-view rail.
+Both views use the shared rail shell under the following owner ruling.
+
+**Left rail — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240px width,
+wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
+each view exposes only its own controls. Do not add a second handmade rail.
+
+- Order list: Dealer / Sales Location; customer delivery State / City; date field (Proceed Date,
+  SO Doc Date, Customer Requested Delivery Date) and range (All dates, Today, This week, This month,
+  custom); delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
+  obligations (All, Outstanding obligations, No action required); linked Service Cases (All,
+  Has open cases, Closed cases only, No cases). These are read-only factual filters, not a mutable
+  overall status, work queue or new status/group column. Service case filters read Service's truth.
+  Unknown underlying facts must not be classified as completed or no cases.
+- Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
+  Dealer / Sales Location, customer delivery State / City, actual catalog product categories.
+  The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
+  do not appear here and do not silently carry over from the list.
+- No Clear filters button inside either SO rail: this is Jess's explicit instruction, not
+  approval inferred from silence. Click a selected facet again to deselect; a select retains All;
+  no chosen values means All. Month/period controls retain their selected reporting window.
+  This does not remove the shared active-condition/list-toolbar clear control or alter other pages.
+- Dealer supports search and multi-selection; selected choices remain visible. Product-category
+  selection may also narrow to several actual categories. This SO-specific approved target exceeds
+  the existing single-slot FilterRailSelect: its multi-select interaction is NOT BUILT and must be
+  admitted through governed kit design before application implementation. Do not change other
+  modules' single-selection behaviour as a side effect. New English copy remains subject to COPY
+  reconciliation; this approval is not a claim that all illustrated wording is registered.
+- Source classifications are catalog-owned; never print Other goods. Missing classifications are
+  traceable data errors, not silently omitted physical demand. Services are separate from Qty.
 
 **Quantity matrix.** Columns are calendar months with years; rows are product categories.
 Every number means physical goods still owed to the customer, not order lines or original sold
@@ -333,7 +363,7 @@ a door to its owner: SO → SO, PO → PO, DO → DO.
 ### Listing Standard — owner approved 2026-09-16
 
 The shared ERP Listing Standard applies to this Register without changing what it is (a record
-register: the owner-ruled columns and groups above, no rail, no owners, no action sentences, no
+register: the owner-ruled columns above, the approved SO filter rail, no owners, no action sentences, no
 Priority).
 
 ```
