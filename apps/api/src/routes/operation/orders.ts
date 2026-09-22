@@ -2423,14 +2423,40 @@ operationOrdersRouter.post(
       );
     }
     const sb = userClient(c.env, c.var.auth.jwt);
+    const amendmentId = c.req.param("amendmentId");
     const { data, error } = await sb.rpc("sales_order_decide_amendment", {
-      p_amendment_id: c.req.param("amendmentId"),
+      p_amendment_id: amendmentId,
       p_decision: parsed.data.decision,
       p_note: parsed.data.note ?? null,
     });
     if (error) {
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
+    }
+    /* 0562 · THE STAIR FEE IS PRICED FROM WHAT THE ORDER NOW SAYS. Until this
+       card, an approved amendment could not move the three delivery inputs and
+       carried no quantities the fee is priced from, so the stamp could not go
+       stale here. It can now — an approved change moves floor, lift, stair
+       count and line quantities in one complete version. The same re-stamp the
+       office save runs reads the SAVED row back and runs the ONE arithmetic
+       (Law D); it writes nothing when the number has not moved, and it never
+       fails the decision that already succeeded. */
+    const applied = (data as { status?: string } | null)?.status === "applied";
+    if (applied) {
+      const owner = await sb
+        .from("sales_order_amendments")
+        .select("order_id")
+        .eq("id", amendmentId)
+        .maybeSingle();
+      const orderId = (owner.data as { order_id?: string } | null)?.order_id;
+      if (orderId) {
+        const restamp = await restampStairCarry(sb, orderId);
+        if (!restamp.ok) {
+          console.error("stair carry re-stamp failed", { orderId, amendmentId, reason: restamp.reason });
+        }
+      } else {
+        console.error("stair carry re-stamp skipped - amendment owner unreadable", { amendmentId });
+      }
     }
     return c.json(data);
   },

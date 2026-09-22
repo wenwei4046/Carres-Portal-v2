@@ -130,7 +130,7 @@ export function WaitingRequest(props: {
   const covered = Boolean(a.evidence_covers_proposal);
   return (
     <section
-      className="rounded-card border border-kit-amber-7 bg-kit-amber-2 px-4 py-3"
+      className="rounded-card border border-kit-amber-6 bg-kit-amber-3 px-4 py-3"
       data-testid="waiting-request"
       aria-label="Amendment request"
     >

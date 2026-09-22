@@ -9,6 +9,7 @@ vi.mock("../../lib/stair-carry-restamp", () => ({
   restampStairCarry: vi.fn(async () => ({ ok: true })),
 }));
 import { userClient } from "../../lib/supabase";
+import { restampStairCarry } from "../../lib/stair-carry-restamp";
 
 const env = { SUPABASE_URL: "https://test.supabase.co", SUPABASE_ANON_KEY: "a", SUPABASE_SERVICE_ROLE_KEY: "s", SUPABASE_JWT_SECRET: "u" };
 const ORDER_ID = "85ff15dc-4dd8-4f04-913b-e1617784868e";
@@ -40,7 +41,13 @@ function mockDb(rpcImpl: (name: string, args: Record<string, unknown>) => { data
     return chain;
   };
   vi.mocked(userClient).mockReturnValue({
-    from: vi.fn((t: string) => table(t === "orders" ? ORDER : t === "order_lines" ? LINES : ADDONS)),
+    from: vi.fn((t: string) =>
+      table(
+        t === "orders" ? ORDER
+          : t === "order_lines" ? LINES
+            : t === "sales_order_amendments" ? { order_id: ORDER_ID }
+              : ADDONS,
+      )),
     rpc,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
@@ -180,5 +187,44 @@ describe("evidence and withdraw doors", () => {
       method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ reason: "" }),
     }), env);
     expect(res.status).toBe(422);
+  });
+});
+
+describe("the approved amendment re-stamps the stair fee (0562)", () => {
+  /* Until this card the three delivery inputs could not move by amendment and
+     the proposal carried no quantities, so the stamped fee could not go stale
+     here. It can now: without the re-stamp the order prints a fee its own
+     inputs no longer produce. */
+  async function decide(decision: "approve" | "reject", rpcImpl: (name: string) => { data: unknown; error: unknown }) {
+    const rpc = mockDb(rpcImpl);
+    const jwt = await signTestJwt("11111111-1111-1111-1111-000000000998", {
+      email: "p@carres.com", app_metadata: { role: "principal" },
+    });
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/amendment/${AMEND}/decide`, {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, note: "ok" }),
+    }), env);
+    return { res, rpc };
+  }
+
+  it("re-prices the fee from the SAVED order after the change takes effect", async () => {
+    vi.mocked(restampStairCarry).mockClear();
+    const { res } = await decide("approve", (name) =>
+      name === "sales_order_decide_amendment"
+        ? { data: { id: AMEND, status: "applied", revision: 4 }, error: null }
+        : { data: {}, error: null });
+    expect(res.status).toBe(200);
+    expect(restampStairCarry).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(restampStairCarry).mock.calls[0]![1]).toBe(ORDER_ID);
+  });
+
+  it("a rejection changes nothing, so nothing is re-priced", async () => {
+    vi.mocked(restampStairCarry).mockClear();
+    const { res } = await decide("reject", (name) =>
+      name === "sales_order_decide_amendment"
+        ? { data: { id: AMEND, status: "rejected" }, error: null }
+        : { data: {}, error: null });
+    expect(res.status).toBe(200);
+    expect(restampStairCarry).not.toHaveBeenCalled();
   });
 });
