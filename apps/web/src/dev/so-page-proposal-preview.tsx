@@ -21,10 +21,22 @@ import Tabs from "@/components/kit/Tabs";
 import Icon from "@/components/kit/Icon";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
-import { renderSalesOrderPdf } from "@/lib/pdf/render";
-import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import { pdf } from "@react-pdf/renderer";
+import * as pdfjs from "pdfjs-dist";
+import { registerNotoSansSC } from "@/lib/pdf/fonts/noto";
+import { ReviewSalesOrderTemplate, type ReviewSoData } from "./review-so-template";
 import { fmtDate } from "@/lib/fmt-date";
 import "@/index.css";
+
+/** Review copy only — never the official template. */
+const renderReview = (d: ReviewSoData) => { registerNotoSansSC(); return pdf(ReviewSalesOrderTemplate(d)).toBlob(); };
+/** A drawn signature image (fixture). */
+const SIGNATURE_PNG = (() => {
+  const c = document.createElement("canvas"); c.width = 320; c.height = 120;
+  const g = c.getContext("2d")!; g.strokeStyle = "#1A1714"; g.lineWidth = 3; g.beginPath();
+  g.moveTo(20, 80); g.bezierCurveTo(50, 20, 70, 110, 100, 60); g.bezierCurveTo(130, 20, 160, 100, 190, 70); g.bezierCurveTo(220, 40, 250, 100, 300, 50); g.stroke();
+  return c.toDataURL("image/png");
+})();
 
 (globalThis as { __CARRES_LOGO_SRC__?: string }).__CARRES_LOGO_SRC__ =
   new URL("carres-logo.png", window.location.href).href;
@@ -114,7 +126,7 @@ const lineChanged = (l: Line, was?: Line) =>
   !!l.added || !!l.removed || !was || was.qty !== l.qty || was.unit !== l.unit || JSON.stringify(was.config) !== JSON.stringify(l.config);
 const isDate = (k: keyof Form) => k === "proceed" || k === "requested" || k === "birthday";
 
-type Version = { rev: number; form: Form; lines: Line[]; title: string; meta: string; reason?: string; signed: boolean };
+type Version = { rev: number; form: Form; lines: Line[]; title: string; meta: string; reason?: string; signedAt: string | null; issuedOn: string };
 type Request = { form: Form; lines: Line[]; reason: string; evidence: string; status: "waiting" | "rejected"; decision?: string };
 const NOW = "Tue, 22 Sep 2026 10:05";
 
@@ -150,7 +162,7 @@ const cellInput = "h-8 w-full rounded-control border border-kit-slate-5 bg-white
 /* ── the page ────────────────────────────────────────────────────────── */
 function Page() {
   const [versions, setVersions] = useState<Version[]>([
-    { rev: 1, form: BASE, lines: LINES0, title: "Original order", meta: "Recorded by Bernard Tan · Fri, 21 Aug 2026 10:02", signed: true },
+    { rev: 1, form: BASE, lines: LINES0, title: "Original order", meta: "Recorded by Bernard Tan · Fri, 21 Aug 2026 10:02", signedAt: "Fri, 21 Aug 2026 10:05", issuedOn: "2026-08-21" },
   ]);
   const current = versions[versions.length - 1];
   const [request, setRequest] = useState<Request | null>(null);
@@ -194,7 +206,7 @@ function Page() {
       flash("Sent for approval. The order stays as it is until management approves.");
     } else {
       const rev = current.rev + 1;
-      setVersions((v) => [...v, { rev, form, lines: current.lines, title: "Staff correction", meta: `Saved by Shasha · ${NOW}`, reason, signed: false }]);
+      setVersions((v) => [...v, { rev, form, lines: current.lines, title: "Staff correction", meta: `Saved by Shasha · ${NOW}`, reason, signedAt: null, issuedOn: "2026-09-22" }]);
       setHistory((h) => [{ title: "Order corrected", meta: `Shasha · Operation · ${NOW}`, note: `Rev ${rev} · ${changedFields.map((k) => LABEL[k]).join(" · ")}` }, ...h]);
       flash("Saved");
     }
@@ -204,9 +216,14 @@ function Page() {
     if (!request) return;
     const rev = current.rev + 1;
     const kept = live(request.lines).map(({ added: _a, ...l }) => l);
-    setVersions((v) => [...v, { rev, form: request.form, lines: kept, title: "Customer change", meta: "Approved by Jess · Tue, 22 Sep 2026 11:20", reason: request.reason, signed: false }]);
+    setVersions((v) => [...v, { rev, form: request.form, lines: kept, title: "Customer change", meta: `Approved by Jess · Tue, 22 Sep 2026 ${10 + rev}:20`, reason: request.reason, signedAt: null, issuedOn: "2026-09-22" }]);
     setHistory((h) => [{ title: "Amendment approved and applied", meta: "Jess · Principal · Tue, 22 Sep 2026 11:20", note: `Rev ${rev} · Customer agreement: ${request.evidence}` }, ...h]);
     setRequest(null); setDecision(""); flash(`Approved and applied · Rev ${rev} is now the order`);
+  };
+  const signCurrent = () => {
+    const at = `Tue, 22 Sep 2026 ${12 + current.rev}:00`;
+    setVersions((vs) => vs.map((v) => (v.rev === current.rev ? { ...v, signedAt: at } : v)));
+    setHistory((h) => [{ title: `Customer signed Rev ${current.rev}`, meta: `${current.form.name} · ${at}`, note: `Signed on the Rev ${current.rev} document` }, ...h]);
   };
   const reject = () => {
     if (!request) return;
@@ -217,7 +234,12 @@ function Page() {
 
   /* The document pane always shows the EFFECTIVE revision, or the version being viewed. */
   const docVersion = viewRev ? versions.find((v) => v.rev === viewRev)! : current;
-  const pdfFor = (v: Version): SalesOrderTemplateData => {
+  /* A version's retained document shows the payments recorded when it was issued — never today's. */
+  /* The current version printed today shows today's payments; an older version's retained
+     document shows only what was paid when it was issued. */
+  const paidOn = (v: Version) => PAYMENTS.filter((p) => !p.voided && (v.rev === current.rev || p.date <= v.issuedOn));
+  const paidSum = (v: Version) => paidOn(v).reduce((n, p) => n + p.amount, 0);
+  const pdfFor = (v: Version): ReviewSoData => {
     const ls = live(v.lines);
     return {
       so_number: "SO-1319", issue_date: "2026-08-21", order_id: "x", order_code: "SO-1319", status_label: "", channel: "showroom",
@@ -229,16 +251,26 @@ function Page() {
       lines: ls.filter((l) => l.kind !== "service").map((l) => ({ sku: skuOf(l), description: `${l.name}${configText(l) ? ` · ${configText(l)}` : ""}`,
         qty: l.qty, unit_price: l.unit, line_total: l.qty * l.unit, attrs: null, category: CATALOGUE.find((m) => m.sku === l.sku)?.category ?? "accessory" })) as SalesOrderTemplateData["lines"],
       addons: ls.filter((l) => l.kind === "service").map((l) => ({ label: l.name, sku: "ADD-ON", qty: l.qty, unit_price: l.unit, line_total: l.qty * l.unit })),
-      payments: PAYMENTS.filter((p) => !p.voided).map((p) => ({ label: p.method, reference: p.code, amount: p.amount, date: p.date, approval_code: p.code, collected_by: p.by })),
-      subtotal: total(ls), total: total(ls), paid: PAID, balance_due: total(ls) - PAID, currency: "MYR", issued_by: "Bernard Tan", signed: v.signed,
-    } as SalesOrderTemplateData;
+      payments: paidOn(v).map((p) => ({ label: p.method, reference: p.code, amount: p.amount, date: p.date, approval_code: p.code, collected_by: p.by })),
+      subtotal: total(ls), total: total(ls), paid: paidSum(v), balance_due: Math.max(total(ls) - paidSum(v), 0), currency: "MYR", issued_by: "Bernard Tan",
+      signed: !!v.signedAt, signature_url: v.signedAt ? SIGNATURE_PNG : null,
+      review_rev: v.rev, review_signature: v.signedAt ? { by: v.form.name, at: v.signedAt, rev: v.rev } : null,
+    } as ReviewSoData;
   };
   const pdfData = useMemo(() => pdfFor(docVersion), [docVersion]);
   const showPdf = PAGE_STATE === "ready" && tab === "Order";
-  const { setPane } = usePdfCanvases(showPdf ? `rev-${docVersion.rev}` : null, () => renderSalesOrderPdf(pdfData));
+  const { setPane } = usePdfCanvases(showPdf ? `rev-${docVersion.rev}-${docVersion.signedAt ?? "u"}` : null, () => renderReview(pdfData));
   const printVersion = async (v: Version) => {
-    const blob = await renderSalesOrderPdf(pdfFor(v));
+    const blob = await renderReview(pdfFor(v));
     window.open(URL.createObjectURL(blob), "_blank");
+  };
+  /* Test hook (preview only): the text of a version's printed document. */
+  (window as unknown as { __docText?: (rev: number) => Promise<string> }).__docText = async (rev: number) => {
+    const v = versions.find((x) => x.rev === rev)!;
+    const doc = await pdfjs.getDocument({ data: await (await renderReview(pdfFor(v))).arrayBuffer() }).promise;
+    let out = "";
+    for (let i = 1; i <= doc.numPages; i++) out += (await (await doc.getPage(i)).getTextContent()).items.map((it) => ("str" in it ? it.str : "")).join(" ") + "\n";
+    return out;
   };
 
   if (PAGE_STATE !== "ready")
@@ -397,6 +429,8 @@ function Page() {
 
   /* ── fields: grey = editable, plain = not this page's to change ── */
   const orderCards = (src: Version, readOnly: boolean) => {
+    const pays = readOnly && src.rev !== current.rev ? PAYMENTS.filter((p) => p.date <= src.issuedOn) : PAYMENTS;
+    const paid = pays.filter((p) => !p.voided).reduce((n, p) => n + p.amount, 0);
     const edit = editing && !readOnly;
     const ls = readOnly ? src.lines : edit ? lines : current.lines;
     const G = (k: keyof Form, kind: "text" | "tel" | "email" | "date" | "lift" = "text") => {
@@ -537,7 +571,7 @@ function Page() {
                 <th className={th}>Date</th><th className={th}>Payment received</th><th className={th}>Approval code</th><th className={th}>Collected by</th><th className={`${th} text-right`}>Amount (RM)</th>
               </tr></thead>
               <tbody>
-                {PAYMENTS.map((p) => (
+                {pays.map((p) => (
                   <tr key={p.receipt} className={`border-b border-kit-slate-5 align-top ${p.voided ? "text-kit-slate-11" : "text-kit-slate-12"}`}>
                     <td className="whitespace-nowrap px-2 py-2">{day(p.date)}</td>
                     <td className="px-2 py-2">{p.method}
@@ -551,7 +585,7 @@ function Page() {
                 ))}
               </tbody>
               <tfoot className="text-kit-slate-12">
-                {([["Goods total", goodsTotal(ls)], ["Services", serviceTotal(ls)], ["Total payable", total(ls)], ["Paid to date", PAID]] as const).map(([k, v]) => (
+                {([["Goods amount", goodsTotal(ls)], ["Service amount", serviceTotal(ls)], ["Total payable", total(ls)], ["Paid to date", paid]] as const).map(([k, v]) => (
                   <tr key={k} className="border-b border-kit-slate-5">
                     <td colSpan={4} className="px-2 py-2 text-right">{k}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(v)}</td>
@@ -559,23 +593,29 @@ function Page() {
                 ))}
                 <tr className="font-semibold">
                   <td colSpan={4} className="px-2 py-2 text-right">Balance due</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${total(ls) - PAID > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total(ls) - PAID, 0))}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${total(ls) - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total(ls) - paid, 0))}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-          {PAID > total(ls) && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(PAID - total(ls))} needs review</p>}
+          {paid > total(ls) && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(paid - total(ls))} needs review</p>}
         </Card>
         <Card title="Customer signature">
-          {src.signed ? (
+          {src.signedAt ? (
             <div className="flex flex-wrap items-end gap-4">
-              <svg viewBox="0 0 160 60" className="h-16 w-40 rounded-control border border-kit-slate-5 bg-white" role="img" aria-label="Customer signature">
-                <path d="M10 40 C 25 10, 35 55, 50 30 S 75 15, 85 38 S 110 50, 125 22 L 150 30" fill="none" stroke="#1A1714" strokeWidth="2" />
-              </svg>
-              <span className="text-body text-kit-slate-12">Signed by {src.form.name} · Rev {src.rev} · Fri, 21 Aug 2026 10:02</span>
+              <img src={SIGNATURE_PNG} alt={`Customer signature on Rev ${src.rev}`} className="h-16 w-40 rounded-control border border-kit-slate-5 bg-white object-contain" />
+              <span className="text-body text-kit-slate-12">Signed by {src.form.name} · Rev {src.rev} · {src.signedAt}</span>
             </div>
           ) : (
-            <p className="text-body text-kit-slate-12">Rev {src.rev} is not signed. The customer signed Rev 1; that signature stays with Rev 1 and its document.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-body text-kit-slate-12">
+                Rev {src.rev} is not signed.{" "}
+                {(() => { const last = [...versions].reverse().find((v) => v.signedAt && v.rev < src.rev); return last ? `The last signed version is Rev ${last.rev}; its signature stays with Rev ${last.rev} and its document.` : ""; })()}
+              </p>
+              {!readOnly && !editing && src.rev === current.rev && (
+                <Button size="sm" variant="neutral" icon="edit" onClick={signCurrent}>Preview only: customer signs Rev {src.rev}</Button>
+              )}
+            </div>
           )}
         </Card>
       </>
@@ -606,7 +646,7 @@ function Page() {
       <aside className="min-w-0 border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:min-h-0 lg:w-1/2 lg:overflow-auto lg:border-l lg:border-t-0" aria-label="Sales Order document">
         {(pending || editing) && !viewing && (
           <div className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-12">
-            The document shows the order as it is now (Rev {current.rev}). {editing ? "Your changes appear in the review on the left." : "It changes only after approval."}
+            Review sample. The document shows the order as it is now (Rev {current.rev}). {editing ? "Your changes appear in the review on the left." : "It changes only after approval."}
           </div>
         )}
         <div className="mx-auto max-w-[700px]"><div ref={setPane} className="min-h-[400px] overflow-x-auto" /></div>
@@ -620,7 +660,7 @@ function Page() {
         <li key={v.rev} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
           <div>
             <p className="text-body font-semibold text-kit-slate-12">{v.title}</p>
-            <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta} · {v.signed ? "Signed" : "Not signed"}</p>
+            <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta} · {v.signedAt ? `Signed ${v.signedAt}` : "Not signed"}</p>
             {v.reason && <p className="text-body text-kit-slate-12">Reason for change: {v.reason}</p>}
             <p className="text-meta text-kit-slate-11">Goods lines {goodsLines(v.lines)} · Physical pieces {pieces(v.lines)} · Service quantity {serviceQty(v.lines)} · Total payable RM {money(total(v.lines))}</p>
           </div>
