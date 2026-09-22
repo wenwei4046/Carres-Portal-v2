@@ -404,9 +404,9 @@ function Page() {
   const items = (
     <Card title="Items">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] border-separate border-spacing-y-1 text-body">
+        <table className="w-full min-w-[600px] border-collapse text-body">
           <thead>
-            <tr className="text-left text-meta text-kit-slate-11">
+            <tr className="border-b border-kit-slate-5 text-left text-meta text-kit-slate-11">
               <th className="w-8 whitespace-nowrap px-2 py-1 font-normal">#</th>
               <th className="whitespace-nowrap w-32 px-2 py-1 font-normal">Item Code</th>
               <th className="px-2 py-1 font-normal">Description</th>
@@ -423,14 +423,14 @@ function Page() {
               const gone = l.removed;
               const strike = gone ? "line-through text-kit-slate-11" : "";
               return (
-                <tr key={l.id} className="align-top">
-                  <td className={`px-2 py-2 tabular-nums text-kit-slate-11 ${strike}`}>{i + 1}</td>
+                <tr key={l.id} className="border-b border-kit-slate-5 align-top">
+                  <td className={`px-2 py-1 tabular-nums text-kit-slate-11 ${strike}`}><span className="flex min-h-8 items-center">{i + 1}</span></td>
                   <td className="px-1 py-1">
                     {editing && !gone ? <input id={`code-${l.id}`} aria-label={`Item Code line ${i + 1}`} className={cellInput} value={l.sku} onChange={(e) => patchLine(l.id, { sku: e.target.value })} />
                       : <GreyBox><span className={`whitespace-nowrap font-mono text-meta ${strike}`}>{l.sku}</span></GreyBox>}
                   </td>
-                  <td className="min-w-[140px] px-2 py-2">
-                    <div className={strike}>{l.name}</div>
+                  <td className="min-w-[140px] px-2 py-1">
+                    <div className={`flex min-h-8 items-center ${strike}`}>{l.name}</div>
                     {l.config && <div className={`text-meta text-kit-slate-11 ${strike}`}>{l.config}</div>}
                     {editing && l.added && <div className="text-meta text-kit-blue-11">Added</div>}
                     {editing && gone && <div className="whitespace-nowrap text-meta text-kit-red-11">Removed</div>}
@@ -447,9 +447,9 @@ function Page() {
                       : <GreyBox><span className={`w-full text-right tabular-nums ${strike}`}>{money(l.unit)}</span></GreyBox>}
                     {editing && !gone && was && was.unit !== l.unit && <Was>{money(was.unit)}</Was>}
                   </td>
-                  <td className={`px-2 py-2 text-right text-kit-slate-11 ${strike}`}>—</td>
-                  <td className={`px-2 py-2 text-right tabular-nums ${strike}`}>
-                    {money(l.qty * l.unit)}
+                  <td className={`px-2 py-1 text-right text-kit-slate-11 ${strike}`}><span className="flex min-h-8 items-center justify-end">—</span></td>
+                  <td className={`px-2 py-1 text-right tabular-nums ${strike}`}>
+                    <span className="flex min-h-8 items-center justify-end">{money(l.qty * l.unit)}</span>
                     {editing && !gone && was && was.qty * was.unit !== l.qty * l.unit && <Was>{money(was.qty * was.unit)}</Was>}
                   </td>
                   {editing && (
@@ -465,6 +465,18 @@ function Page() {
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="font-semibold text-kit-slate-12">
+              <td colSpan={3} className="px-2 py-2 text-right">TOTAL PAYABLE</td>
+              <td className="px-2 py-2 text-center tabular-nums">{goodsQty(shownLines)} pcs</td>
+              <td colSpan={2} />
+              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
+                RM {money(total)}
+                {editing && total !== sum(savedLines) && <Was>RM {money(sum(savedLines))}</Was>}
+              </td>
+              {editing && <td />}
+            </tr>
+          </tfoot>
         </table>
       </div>
       {editing && (
@@ -472,14 +484,6 @@ function Page() {
           <Button variant="ghost" icon="add" disabled={lines.some((l) => l.id === NEW_LINE.id)} onClick={() => setLines((ls) => [...ls, { ...NEW_LINE }])}>Add item</Button>
         </div>
       )}
-      <div className="mt-3 flex flex-wrap items-baseline justify-end gap-x-8 gap-y-1 border-t border-kit-slate-5 pt-3 text-body text-kit-slate-12">
-        <span className="font-semibold">TOTAL PAYABLE</span>
-        <span className="tabular-nums">{goodsQty(shownLines)} pcs</span>
-        <span className="text-right">
-          <span className="font-semibold tabular-nums">RM {money(total)}</span>
-          {editing && total !== sum(savedLines) && <Was>RM {money(sum(savedLines))}</Was>}
-        </span>
-      </div>
     </Card>
   );
 
@@ -509,13 +513,21 @@ function Page() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="font-semibold text-kit-slate-12">
+              <td colSpan={4} className="px-2 py-2 text-right">TOTAL RECEIVED</td>
+              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(paid)}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
-      <dl className="ml-auto mt-3 grid w-72 grid-cols-2 gap-y-2 text-body text-kit-slate-12">
-        <dt className="font-semibold">TOTAL RECEIVED</dt><dd className="text-right font-semibold tabular-nums">RM {money(paid)}</dd>
+      <dl className="ml-auto mt-3 grid w-72 grid-cols-2 text-body text-kit-slate-12 [&>*]:border-b [&>*]:border-kit-slate-5 [&>*]:px-2 [&>*]:py-2">
+        <dt>Goods total</dt><dd className="text-right tabular-nums">RM {money(total)}</dd>
+        <dt>Tax</dt><dd className="text-right text-kit-slate-11">—</dd>
+        <dt>Total payable</dt><dd className="text-right tabular-nums">RM {money(total)}</dd>
         <dt>Paid to date</dt><dd className="text-right tabular-nums">RM {money(paid)}</dd>
-        <dt className="border-t border-kit-slate-5 pt-2 text-strong">Balance due</dt>
-        <dd className={`border-t border-kit-slate-5 pt-2 text-right text-strong tabular-nums ${total - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total - paid, 0))}</dd>
+        <dt className="font-semibold">Balance due</dt>
+        <dd className={`text-right font-semibold tabular-nums ${total - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total - paid, 0))}</dd>
       </dl>
       {paid > total && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(paid - total)} needs review</p>}
     </Card>
