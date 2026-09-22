@@ -566,6 +566,10 @@ right live MPR preview, with `Request Details → Delivery → Items` on both si
 Apply the governed readable split/stack behavior; ordinary saved MPR detail and
 its Register do not acquire this split. The preview is internal request content,
 not a supplier-facing PO. Purchasing §9.2 and COPY own fields and actions.
+The downstream MPR Issue PO journey reuses the existing Review Purchase Orders
+composition before creation, with the actual PO draft selected on the left;
+it does not relabel the internal MPR preview as a PO. Purchasing §9.2 owns the
+five grouping facts, request approval and distinct request/PO dates.
 
 The GRN is an official A4 document the supplier and auditors read, so its object and Amend
 Receiving use the 50/50 official preview (owner ruling 2026-09-06, Purchasing MASTER §9.4).
