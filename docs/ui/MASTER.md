@@ -2238,3 +2238,14 @@ Purchasing §9.7 permits Issue while non-Carres owner consent is outstanding. Sh
 fact and evidence in RO detail and its follow-up in the existing Workspace projection; do not
 disable Issue solely for missing consent or add a second repair task list. This ruling adds no
 financial/Work register column and does not approve the remaining RO prototype layout.
+
+
+### GRN document boundary — owner approved 2026-09-23 · NOT BUILT
+
+The GRN document composition and receipt arithmetic are owned by Purchasing MASTER
+§9.4, not by the register template or SO PDF. Retain the reviewed two information
+blocks, the PO-family company letterhead and grouped item/Unit evidence; creation
+time, physical arrival time, planned destination and actual site remain distinct.
+Use COPY's accepted `Received Qty` versus `Physical arrived Qty` distinction. This
+is not authority to redesign Manual Purchase, replace its PO with a GRN, or mark
+a PDF production-verified. Screen blue heading styles do not recolour printed PDFs.
