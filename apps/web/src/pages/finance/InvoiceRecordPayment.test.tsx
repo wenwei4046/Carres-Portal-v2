@@ -55,6 +55,12 @@ function show() {
   );
 }
 
+/** 0551 — the form opens on Bank transfer, and a bank transfer is matched by
+ *  its reference number, so Review stays shut until one is typed. */
+function typeBankReference(value = "MBB-778812") {
+  fireEvent.change(screen.getByLabelText("Reference number"), { target: { value } });
+}
+
 beforeEach(() => {
   state.mutate.mockReset();
   state.upload.mockClear();
@@ -89,18 +95,22 @@ describe("the methods are the Settings → Payment list (0476)", () => {
 });
 
 describe("Record payment (§16)", () => {
-  it("pre-fills the outstanding amount and blocks Review until evidence is attached", () => {
+  it("pre-fills the outstanding amount and blocks Review until evidence and the reference are there", () => {
     show();
     expect(screen.getByLabelText("Payment amount")).toHaveValue(600);
     expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
     const file = new File(["slip"], "slip.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Transfer slip"), { target: { files: [file] } });
+    // 0551 — the slip alone is not enough any more.
+    expect(screen.getByRole("button", { name: "Review payment" })).toBeDisabled();
+    typeBankReference();
     expect(screen.getByRole("button", { name: "Review payment" })).toBeEnabled();
   });
   it("review states the two governed sentences before any money moves", () => {
     show();
     const file = new File(["slip"], "slip.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Transfer slip"), { target: { files: [file] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     expect(screen.getByText("This records customer money.")).toBeInTheDocument();
     expect(screen.getByText("This does not confirm the bank account.")).toBeInTheDocument();
@@ -110,6 +120,7 @@ describe("Record payment (§16)", () => {
     show();
     const file = new File(["slip"], "slip.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Transfer slip"), { target: { files: [file] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
     await waitFor(() => expect(state.mutate).toHaveBeenCalledTimes(1));
@@ -133,6 +144,7 @@ describe("Record payment (§16)", () => {
     show();
     const file = new File(["slip"], "slip.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Transfer slip"), { target: { files: [file] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
     await waitFor(() => expect(state.upload).toHaveBeenCalled());
@@ -177,6 +189,7 @@ describe("§5 — a likely duplicate must be inspected before the money is recor
     // The evidence is what opens Review (the §16 upload-first rule).
     fireEvent.change(screen.getByLabelText("Transfer slip"),
       { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     const warn = await screen.findByTestId("likely-duplicate-warning");
     expect(warn).toHaveTextContent("RC-080926-0001");
@@ -193,6 +206,7 @@ describe("§5 — a likely duplicate must be inspected before the money is recor
     fireEvent.change(screen.getByLabelText("Paid date"), { target: { value: "2026-09-01" } });
     fireEvent.change(screen.getByLabelText("Transfer slip"),
       { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     await screen.findByTestId("invoice-record-review");
     expect(screen.queryByTestId("likely-duplicate-warning")).not.toBeInTheDocument();
@@ -218,6 +232,7 @@ describe("§5 (0448) — the tick asks, the server decides", () => {
     showWith(unknown);
     fireEvent.change(screen.getByLabelText("Transfer slip"),
       { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     const warn = await screen.findByTestId("likely-duplicate-warning");
     expect(warn).toHaveTextContent("The earlier payments could not be read.");
@@ -242,6 +257,7 @@ describe("§5 (0448) — the tick asks, the server decides", () => {
     fireEvent.change(screen.getByLabelText("Paid date"), { target: { value: "2026-09-08" } });
     fireEvent.change(screen.getByLabelText("Transfer slip"),
       { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     await screen.findByTestId("likely-duplicate-warning");
     fireEvent.click(screen.getByLabelText("I checked the earlier payment"));
@@ -255,6 +271,7 @@ describe("§5 (0448) — the tick asks, the server decides", () => {
     fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "123" } });
     fireEvent.change(screen.getByLabelText("Transfer slip"),
       { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    typeBankReference();
     fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
     await screen.findByTestId("invoice-record-review");
     fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
