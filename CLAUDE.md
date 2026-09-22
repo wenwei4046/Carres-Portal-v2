@@ -88,7 +88,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
 | Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
 | Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
-| Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | The approved top-to-toe target; current implementation may lag |
+| Delivery | `docs/delivery/MASTER.md` §§8.2–8.4; UI/COPY | **APPROVED TARGET / NOT BUILT — daily work and actor wording, reconfirmed 2026-09-21** | Left rail shows each day’s work; 72px register stays. Shared Calendar must pass replacement acceptance before local calendars retire. Messages name actor, act and counterparty. Warehouse keeps five pages; column merging is not approved |
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
 | Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
 | Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
@@ -567,7 +567,9 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > approval names an Owner Rule. That rule resolves either a stable object owner such as the Sales
 > Order PIC, or a governed Duty through Staff & Duties; today's Buddy cover may act without
 > replacing the normal owner, and actual actor evidence is retained. A module may never hard-code a
-> person's name, keep a second assignment list, or turn owner identity into action-sentence text.
+> person's name, keep a second assignment list, or turn resolved staff identity into action-sentence text.
+> The 2026-09-21 UI/COPY ruling names operating parties in messages (`Carres to call customer`,
+> `{partner} to call customer`) so the actor is clear; the individual owner remains metadata.
 
 ## 8.1 · Modules
 

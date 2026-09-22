@@ -528,25 +528,24 @@ Delivery Order document — the DOCUMENT's own life
    named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
-  before the arrangement is agreed — the ACTOR rungs, unchanged:
-    Operation must assign logistics · Call customer · Waiting for customer reply ·
-    Confirm delivery time
+  before the arrangement is agreed — actor-qualified messages (2026-09-21 target):
+    Operation must assign logistics · Carres to call customer · {partner} to call customer ·
+    Waiting for customer reply · {responsible party} to agree time with customer
   once it is agreed — the JOURNEY rungs (re-ruled 2026-09-14):
-    customer leg   Confirmed · Waiting for {partner} pickup · Collected by {partner} ·
+    customer leg   {partner} and customer agreed · Waiting for {partner} pickup · Collected by {partner} ·
                    On the way to customer · Delivered to customer · Failed Delivery
     transfer leg   Transfer confirmed · Collected for transfer · In transit to {stop} ·
                    Arrived at {stop} · Transfer failed
   across both      Overdue · Order details incomplete
 ```
 
-**Re-ruled 2026-09-14, replacing the 2026-09-13 spellings one-for-one** (one fact, one word — the
-column, the `DELIVERY STATUS` dropdown, the schedule card and every report read the SAME
-arithmetic): `Confirmed for {weekday, date}` → **`Confirmed`** (the day and window are column 8's
-job, and on a card the date column already names the day) · `Goods collected by {partner}` →
-**`Collected by {partner}`** · `{partner} is delivering to the customer` → **`On the way to
-customer`** · `Delivered` → **`Delivered to customer`** · `Arrived` → **`Arrived at {stop}`**.
-`Waiting for {partner} pickup` is KEPT: it is a recorded fact (the document exists, the partner
-has not collected) that the new ladder does not otherwise express.
+**Actor wording — approved target 2026-09-21.** Monitor progress, its status options, Search,
+exports and shared projections use the same message and owning fact. Customer-leg agreement
+reads `{partner} and customer agreed` only with recorded agreement evidence. `Confirmed` may
+remain an internal key; this is not a global replacement of document or date-field terminology.
+`Collected by {partner}`, `On the way to customer`, `Delivered to customer`, `Arrived at {stop}`
+and `Waiting for {partner} pickup` keep their existing event meanings. The actual partner name
+is data, never a default. Transfer confirmation does not assert the destination warehouse replied.
 
 **`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
 intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
@@ -558,40 +557,15 @@ them. `Logistics Performance` counts customer-leg results only.
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
 
-**THE DELIVERY SCHEDULE CARD — TWO FACTS, TWO LINES (owner ruling 2026-09-14).** The Monitor tab
-is **`Delivery schedule`**; `Confirmed deliveries` is retired and survives only in dated historical
-walk records. The schedule carries both kinds of logistics work under a type label that is never
-mixed and never summed:
-
-```
-DELIVERY   the final customer leg          TRANSFER   an intermediate warehouse leg
-
-tab count and split, following the SELECTED RANGE and every active filter:
-  Delivery schedule {n}
-  {c} customer deliveries · {t} transfers          e.g. `0 customer deliveries · 2 transfers`
-
-LINE 1 · JOURNEY PROGRESS                  LINE 2 · READINESS OR BLOCKER
-  customer leg        transfer leg           Ready · Stock risk · Payment blocked ·
-  Confirmed           Transfer confirmed     Logistics details incomplete · DO not released
-  Collected by {p}    Collected for transfer
-  On the way to       In transit to {stop}
-    customer
-  Delivered to        Arrived at {stop}
-    customer
-  Failed Delivery     Transfer failed
-```
-
-Progress and readiness never merge into one status. The two ladders share no word. A transfer is
-never counted as a customer delivery and never produces a `Delivered to customer` result. A
-transfer card prints its own `{from} → {to}` route, never the customer's town.
-
-**`Arrived at customer` is not a Carres word** — no arrival-at-customer fact is recorded, and it
-may never be inferred from a time, an ETA or a location.
-
-**Schedule view words:** `Day` · **`3 days`** (768–1279px) · **`Work week`** (≥1280px, Mon–Sat) ·
-`Month`. **A three-day layout is never labelled `Week`.**
-The schedule boundary is **`Confirmed dates only`**: a date can be confirmed while its time
-still needs agreeing. It applies equally to customer deliveries and transfers.
+**DELIVERY EVENT PROJECTION — APPROVED TARGET / NOT BUILT, 2026-09-18.**
+Delivery MASTER §8.2 replaces Monitor's local schedule and two-month rail with the daily work
+plan and shared right Calendar after replacement acceptance. The Calendar must preserve separate
+`DELIVERY` and `TRANSFER` event kinds and counts, actual routes, owning dates and exact doors.
+A transfer is never counted as a customer delivery and never produces `Delivered to customer`.
+Progress and readiness/blocker remain distinct facts; `Ready`, `Stock risk`, `Payment blocked`,
+`Logistics details incomplete` and `DO not released` retain their meanings. This does not
+replace Warehouse's schedules. `Arrived at customer` is not admitted without an owning event;
+it cannot be inferred from a time, ETA or location.
 
 **Expanded-row words:** **`Logistics details incomplete`** · **`DO not released`** ·
 **`Leg {n} of {m}`** · `Access not recorded` (orange, actionable — never a grey absence).
@@ -604,10 +578,9 @@ may not appear in the Delivery Orders register, which describes documents.
 
 Banned as status words on either surface, because each names a mood rather than a fact:
 `Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
-**This ban was tested and upheld on 2026-09-14:** a proposed schedule ladder opened with
-`Scheduled` / `Transfer scheduled`, and the owner ruled the governed **`Confirmed`** /
-**`Transfer confirmed`** instead. `Delivery failed` is likewise not a second spelling of
-**`Failed Delivery`**.
+**Customer and transfer agreement keep distinct words:** the actor-qualified customer agreement
+message above and `Transfer confirmed`. `Delivery failed` is not a second spelling of
+`Failed Delivery`. This bans vague progress replacements, not Warehouse’s separate date badges.
 
 **Delivery workspace rail and action words — owner ruling 2026-08-24, editor words re-ruled
 2026-09-13.** The rail's overdue queue is **`Overdue delivery`**, never `Date passed`. The two
@@ -679,29 +652,39 @@ progress icon appears inside a status fact. Governed functional icons remain: Se
 Columns, the expand chevron, Download, Hide and Show filters, the calendar arrows and the rest of
 the existing Carres utility set.
 
-**Delivery Work sentences are two structured lines (owner ruling 2026-09-13).** Line one is the
-act with its recipient; line two is the required result. Owner, source object and the actual
-working date are structured metadata beside the sentence, never joined into it, and no `—`
-appears in either line. The row's status word carries the fact. The complete table is
-`delivery/MASTER.md` §10; the load-bearing pairs are `Call NETS` over `Confirm the delivery
-date`, `Call NETS` over `Confirm the delivery time`, `Call the customer` over `Confirm the
-delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delivery photo` over
-`Attach the photo from NETS`, `Check the delivery proof` over `Accept it, ask for more, or reject
-it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
+**ACTOR, ACT AND COUNTERPARTY — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-21 (reconfirming the 2026-09-18 direction).**
+Operational messages must answer who does what, to whom. Shortening may not remove the actor
+or make an agreement look unilateral. Line 1 names the responsible operating party, the act and
+its counterparty; line 2 supplies the purpose or evidenced result. For example:
 
-**THE MONITOR `Delivery Status` CELL — owner ruling 2026-09-14.** The same law, applied to the
-register column that used to name a party: line one is the ACT — **`Call customer`**, or
-**`Confirm delivery time`** when the day is agreed and only the window is missing — and line two
-is the CONTACT DEADLINE, drawn as a kit glyph and a day (`call` while there is time, `late` in red
-once there is not). **`{partner} must contact the customer` and `Operation must call the customer`
-are retired on Monitor**: the party is the `Logistics` column's own fact and may not re-enter the
-action sentence. **`Call by {date}` is retired from every visible line** — it printed the verb the
-status word above it had just said, and it printed the same day twice on one row. The words move
-to the tooltip, the accessible name, Search and the Excel export: `Contact deadline {date}`, and
-`Contact deadline {date} · overdue, the deadline does not move` once it has passed. No `—`
-appears in either, and no glyph replaces the action text. `Call by {date}` survives ONLY on the
-order detail's `Before you call` panel, whose entry below is unchanged. The complete cell law is
-`delivery/MASTER.md` §8.3.
+```
+Carres to call customer
+Agree delivery date and time
+
+{partner} to call customer
+Agree delivery date and time
+
+Carres to ask {partner}
+Confirm the delivery date
+
+{partner} and customer agreed
+{date} · {time window}
+```
+
+`{partner}` is the recorded logistics name, never a hard-coded NETS default. The contact policy
+and shared Work contract decide whether Carres or the partner acts. An internal Carres follow-up
+with the partner and the partner's customer call are different responsibilities. A resolved staff
+avatar identifies the accountable individual; it does not replace the operating party in a
+message where the reader otherwise cannot tell who acts. No page invents owners or agreements.
+An agreement sentence requires the owning record's evidence; unknown does not mean the customer
+refused or has not decided. `Waiting for customer reply` requires a recorded contact result.
+Icons supplement words and never replace the actor, act or counterparty. Contact deadline remains
+an explicitly identified work date, distinct from delivery day; in a contact status cell it may
+occupy line 2 as the existing kit icon + date, while the purpose is in the opened work details.
+In a daily work view the visible work-date context must remain available. Never squeeze purpose,
+deadline and result into a third line of a 72px cell. Full messages are accessible by tap and
+keyboard. Exact placement is still a design draft; this ruling approves meaning and sentence
+structure, not a new column layout or a new Work engine.
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
 
@@ -3061,18 +3044,20 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | String | Where it appears | Status |
 |---|---|---|
 | `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
-| `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
-| `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **RULED 2026-09-07** |
-| `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
+| `WORK TO DO` | Delivery Monitor’s daily plan: actual dates followed by work types and counts, sourced from shared Work; Delivery Orders keeps its existing queue group | **PROPOSED WORDING / NOT LAW 2026-09-18**, Delivery MASTER §8.2 |
+| `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
+| `All delivery work` | The complete Delivery work listing, including admitted work without a usable date; no hidden day filter | **PROPOSED WORDING / NOT LAW 2026-09-18** |
+| `{fmtDate}` + `Today` | Delivery daily-plan heading; Today is additional to its actual date. Each work-type label comes from the admitted shared Work rule, with the distinct delivery-scope count opened by that selection | **PROPOSED WORDING / NOT LAW 2026-09-18**; do not sum overlapping work types |
+| `Earlier unfinished work` · `No date yet` | Delivery daily-plan access to unfinished earlier work, retaining original dates, and admitted work without a usable due date. Neither label accuses a supplier or creates a task | **PROPOSED WORDING / NOT LAW 2026-09-18** |
 | `STATE` · `LOGISTICS` | Monitor's second and third rail groups. The State dropdown offers **All states**; the Logistics dropdown offers **All** under its visible **LOGISTICS** heading. Each clears only that filter. | `REGION` · `LOGISTICS PARTNER` · `All partners` |
-| `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
+| `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
 | `{n} deliveries` / `{n} of {m} deliveries` · `No deliveries` · `No matching deliveries.` | Monitor's work-list footer and empty states; `1 delivery` / `{n} deliveries` on the Assign logistics door | **RULED 2026-09-07** (`delivery scope(s)` RETIRED from every employee surface) |
-| `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
-| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
-| `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
-| `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
-| `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
-| `Open No confirmed date` | that state's one door | **RULED 2026-09-06** |
+| `Calendar view` | the Day · Week · Month control's accessible name only | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
+| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance (month-calendar correction) |
+| `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
+| `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
+| `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
+| `Open No confirmed date` | that state's one door | **TRANSITION ONLY** — retire with the local Delivery calendar after §8.2 acceptance |
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
 | `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |

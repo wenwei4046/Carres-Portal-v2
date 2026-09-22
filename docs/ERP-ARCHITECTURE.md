@@ -64,7 +64,10 @@ meeting, training and SOP. Its approved operating model lives once in
 **ACTION HAS AN OWNER; A BUSINESS OBJECT DOES NOT GAIN ONE UNIVERSAL OWNER.** Every action and
 approval carries an owner rule expressed as a shared duty, a resolved primary holder, optional
 today's buddy cover, actual actor and evidence. Workspace owns assignment. Modules only name the
-duty required. Owner identity is metadata/avatar, never repeated inside the action sentence.
+duty required. Resolved individual identity is metadata/avatar, never repeated inside the action
+sentence. Operating parties are distinct from that individual: UI/COPY’s owner-confirmed
+2026-09-21 grammar names who does what to whom (`Carres to call customer`, `{partner} to call
+customer`) without inventing a resolver, assignment or duplicate Work item.
 
 The approved end-to-end Sales Order V2 target, its implementation state and its restart order
 live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 1 production

@@ -439,7 +439,7 @@ made is written to the order's history, never hidden.
 ```
 Monitor            daily delivery arrangement, assignment, customer confirmation, confirmed
                    day and time, ETA, current work, exceptions, partner filters and the
-                   two-month calendar                                    ?tab=delivery
+                   daily work plan (approved target; not built)          ?tab=delivery
 Delivery Orders    the formal Delivery Order register                    /operation/delivery-orders
 Delivery Order     one formal DO, its evidence and history — a door on a number, never navigation
 ```
@@ -456,139 +456,106 @@ settings door behind the page-header gear.
 Delivery applies the governed Shell, Register and Object Detail Templates and invents no other UI
 system.
 
-### 8.2 · Monitor: two views, the rail, the calendar
+### 8.2 · Monitor: daily work plan and one work list
 
-Monitor answers the operator's morning question: *what do I owe today, and which row do I open?*
-It has two tabs, each the page's own first control, each carrying its live count:
+**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-18.** Monitor answers *what must be done on
+each day, and which record do I open?* Its only main surface is the existing `Work to do`
+register (§8.3), with the existing fixed 72px parent rows and shared `MonitorTwoLines`.
+The local `Delivery schedule` view and the left rail's two month calendars retire only after
+the replacement acceptance gate below passes. Current deployed calendars are transition
+implementation, not the target layout. Owner reconfirmed persistence on 2026-09-21. This documentation approval claims no implementation,
+rendered acceptance or production verification.
 
-```
-one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Delivery schedule
-page-owned 240px FilterRail  ·  the complete current month above the complete next month, fixed
-                                on top; the filter groups scroll below
-Work to do (DEFAULT)         ·  the selectable Register work list (shared DataGrid, §8.3) over the
-                                picked WORK TO DO queue; `All delivery work` when the URL names none
-Delivery schedule            ·  Day / Work week / Month in the page toolbar; `Work week` is the
-                                desktop default and its six Mon–Sat columns fit without horizontal
-                                date scrolling
-```
-
-**`Delivery schedule` — owner ruling 2026-09-14, APPROVED / LOCKED.** The tab names a PLACE, not a
-state: confirmation is one condition of a row inside the schedule, never the name of the whole
-view. `Confirmed deliveries` is the RETIRED spelling — it still resolves from any stored URL, and
-it survives only inside dated §16 production-walk records, which are historical observation and are
-never rewritten. No current law, dictionary, label, test or comment may spell it.
-
-**TWO KINDS OF WORK, ONE PLACE, NEVER ONE TOTAL — owner ruling 2026-09-14, APPROVED / LOCKED.**
-Operations monitors all logistics work in one place, so the schedule carries BOTH the final
-customer delivery and the intermediate warehouse transfer. Their meaning and their totals never
-merge:
+**DIRECTION APPROVED; DETAIL PROPOSAL / NOT LAW.** The owner confirmed daily work in the left
+rail, the 72px central list, shared right Calendar and preservation of Warehouse’s five pages.
+The precise daily-plan composition, counting contract, new labels and acceptance details below
+are a review draft. No new `Work`, `Ready?`, `Owner` or `Act` column set has been approved;
+§8.3 remains the current column contract.
 
 ```
-DELIVERY    the final customer leg — the goods reach the person who bought them
-TRANSFER    an intermediate Journey leg — the goods reach a named partner warehouse
+Destination Header       Monitor
+Left rail, 240px         actual dates → work types and counts; existing factual filters below
+Main work surface        selected day's work, or selected day + work type; shared 72px register
+Right Quick Rail         Calendar for cross-date event discovery and exact business doors
 ```
 
-The tab prints the count of the CURRENT SCOPE and, beneath it, the split that scope actually holds:
+**THE LEFT RAIL SAYS WHAT TO DO EACH DAY.** An actual weekday/date heading contains the
+recorded work types due that day and their counts, not just one unexplained daily number.
+Today is an additional marker beside its actual date; selection and Today stay visually distinct.
+Selecting a date shows that day's work. Selecting a work type under it narrows the same list.
+Previous/next navigation exposes earlier and later dates; a week caption must describe the
+actual displayed range. Use the activity's governed calendar, never Payment's weekdays by analogy.
+The phone filter surface retains this same date/work selection and readable work descriptions.
 
-```
-Delivery schedule  {n}
-{c} customer deliveries · {t} transfers
-```
+The plan projects the existing shared Work Engine's admitted items and governed action dates.
+It creates no tasks, dates, owner resolver, manual planning store or second completion rule.
+A contact deadline is not the delivery appointment. Assignment, contact, result and proof work
+retain their own triggers, owners and completion facts (§10). Each work-type count is the number
+of distinct delivery scopes matching that day and type, the same population its click lists.
+One scope can owe several different acts; never sum type counts into an unexplained daily total.
+Current work messages and full details remain reachable through the existing status and owning
+work/object doors; this change does not introduce a generic Work column into registers.
 
-**The split follows the selected range and every active filter, and an old total is never
-preserved.** A range holding no customer delivery and two transfers reads exactly
-`0 customer deliveries · 2 transfers` — never `2 customer deliveries` because four rows somewhere
-else carry a confirmed date. **A transfer is never counted as a customer delivery, never enters
-customer-delivery performance, and never produces a `Delivered to customer` result** — in the tab
-count, the day and month counts, the rail marks, Logistics Performance, Commitment, First
-Delivery or any report. A transfer's completion is `Arrived at {stop}` and nothing else.
+**NOTHING UNFINISHED DISAPPEARS.** Earlier unfinished work remains immediately reachable from
+the plan with its original actual date. It is not silently moved to Today or counted twice.
+`All delivery work` keeps the complete work population reachable, including an admitted item
+without a usable date. A proposed `No date yet` entrance makes those admitted items explicit;
+a source with no contact deadline or incomplete order details is not automatically a Work item. Missing dates are explicit, never invented. An absent due date does not
+create a new task. Overdue contact, overdue delivery and missing proof stay distinct facts.
+Date/type selection, remaining filters, list rows, displayed counts and export use one scope.
+A failed or incomplete read never renders as an empty plan. No imported-test-data cleanup work
+is introduced. Missing Sales facts keep their owning Sales door.
 
-**The rail's two-month calendar.** The rail's first, fixed region is the complete current month
-above the complete next month on the kit's one calendar primitive (`MonthCalendar`), never a
-one-week strip. One pair of arrows moves both months by one month. **Today is visibly distinct
-(a blue ring) and the selected date keeps the governed blue FILL, so the two never compete. The
-current work week carries a subtle grey band.** Sundays stay visible, muted and take no click. A
-date carries **two separate marks — customer delivery and transfer — never one mark for both**, by
-shape and position so colour is never the only carrier, and the same split rides its accessible
-sentence. **Marks and counts follow the picked scope and every active filter.** Clicking a date
-opens that date's Day view on `Delivery schedule` and keeps every STATE, LOGISTICS and
-DELIVERY STATUS narrowing.
+**KEEP THE REGISTER POWERS.** Search, typed column filters, selection, Columns, Export, details,
+source links and position-preserving return survive. `STATE`, `LOGISTICS` and `DELIVERY STATUS`
+remain factual narrowing controls using their existing meanings; the daily work plan replaces
+the local calendars and the undated flat work-queue presentation. Long cell content keeps the
+existing keyboard/tap-accessible full-content door; 72px rows never grow or squeeze a third line.
+Old calendar and queue URLs must resolve to the corresponding date/source scope in the list or
+shared Calendar without losing the document, Journey leg or applicable filters.
 
-**The four rail groups.** Counts are deliveries (a Journey leg is its own delivery), each group's
-counts computed over the rows the other groups already narrowed (Law D):
+**ONE CALENDAR ENTRY, AUTHORITATIVE EVENTS.** The right Quick Rail Calendar consumes current
+owning-module projections: Delivery arrangements and Journey legs for delivery appointments,
+Warehouse/Delivery handover events for pickups, and the same supplier promise / PO date / ETA
+precedence as Inbound for arrivals. §10's contact deadlines, handover deadlines, failed-delivery
+follow-up and return due dates keep their owning event/work dates. Calendar is read-only and
+opens the precise source, Site and leg/arrangement; a provisional date never becomes confirmed.
+No legacy order booking or purchasing date fallback may contradict the owning module's answer.
+Permissions apply before projection, and errors/incomplete results remain explicit.
 
-- **`WORK TO DO`**, rows in this order: `All delivery work` · `No logistics picked` · `Call
-  customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
-  proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
-  2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
-  to `Work to do` and is not drawn on the schedule tab.
-  **`Order details incomplete` is a door, not a backlog (owner ruling 2026-09-14).** A row missing
-  a required Sales fact gets its own queue so it can be worked deliberately, and it never competes
-  for the top of `All delivery work`. It licenses NO data cleanup, repair worklist or backfill —
-  Constitution §6 rules every such row today is imported test data that go-live discards.
-- **`STATE`**: a kit dropdown of the direct state names the data genuinely carries, ordered by
-  count; leg 1 of a Singapore journey counts under Johor and leg 2 under Singapore; `All` clears
-  only this group.
-- **`LOGISTICS`**: a kit dropdown of the partners genuinely carrying a row, governed roster
-  order first; `No logistics picked` is never duplicated here.
-- **`DELIVERY STATUS`**: a kit dropdown offering `All` plus the §8.4 status words, each with its
-  live count, zero included.
+Customer delivery and intermediate transfer remain separate event kinds and counts. A daily
+`Deliveries / Transfers` event summary, if proposed for the work rail, is a separate event lens
+and must never be added to the due-work counts; its placement is not approved by this direction. A transfer
+shows its actual From/To and completes as `Arrived at {stop}`, never `Delivered to customer`.
+Journey progress and readiness/blocker remain distinct facts wherever shown. Calendar aggregation
+never creates dispatch permission, changes custody or copies a Work owner. The actual route,
+all product details, services, Logistics, DO and arrangement doors formerly reached from the
+local calendar remain reachable from the shared Calendar and corresponding register/object.
 
-A pick narrows whichever view is open and never switches it. `Clear filters` clears every
-narrowing and stays on the view. The URL names the whole view in one param (`?view=` holds a
-calendar word or a WORK TO DO queue), plus `?date=`, `?region=`, `?logistics=`, `?status=`,
-`?q=`; every retired spelling still resolves. Below 1100px the rail starts collapsed behind a
-44px `Show filters` strip; a remembered choice wins at any width. On a phone the rail becomes the
-filter drawer and the work list becomes one card per delivery carrying the same facts.
+**REPLACEMENT ACCEPTANCE GATE.** Before retiring either local calendar, demonstrate:
 
-**`Call customer` and the contact week.** Under `Call customer`, and under no other queue, a
-Monday-to-Saturday strip lists the six operating days with the count of contact deadlines due on
-each, its own arrows, and the caption `Contact deadlines — not supplier or delivery dates`. An
-`Overdue contact` chip beside the six days answers across every date. `Overdue delivery` (the rail
-queue: a confirmed trip whose day has passed with no result) and `Overdue contact` (a conversation
-that missed its deadline) are two populations and never share one bare `Overdue` count. `Call
-customer` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
+- the same record, date, Site and Journey leg agree across the owning module and Quick Rail;
+- confirmed deliveries, transfers, arrivals, pickups and §10's dated follow-up events are
+  covered, including undated, partial, empty, failed and incomplete reads;
+- every daily work-type count opens exactly that filtered population; earlier unfinished work
+  is retained without duplicate counting or changing its due date;
+- source/DO/arrangement doors and historical links open the correct object and preserve return;
+- signed-in desktop and phone checks prove day selection, long-message access, keyboard focus,
+  allowed-role visibility and the read-only Calendar boundary.
 
-**The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
-it does not honour (owner ruling 2026-09-14):
+**MEASURED GAP (2026-09-18, source inspection).** `CalendarPanel.tsx` currently derives deliveries
+through `orderBookingDay(useOperationOrders())` and receiving through
+`usePurchaseToday().receive` with `etaDate ?? expectedReadyDate`. It does not yet consume the
+complete event contract above. It is not a proven replacement. The proposed design's 8/10 is
+an assessment, not an acceptance score. Failure of any gate keeps the existing calendar
+capability available until the replacement is complete.
 
-```
-Day         < 768px, and any width on demand   one operating day, full cards
-3 days      768 – 1279px                       a fixed half-week, Mon–Wed or Thu–Sat
-Work week   ≥ 1280px, the desktop DEFAULT      the six Mon–Sat operating days
-Month       any width                          the capacity overview
-```
+**SCOPE.** This ruling changes Delivery presentation and the shared Calendar dependency.
+Warehouse retains Arrival Schedule, Pickup Schedule, Inbound, Inventory and Outbound, including
+its six-working-day schedules. Payment retains its own approved plan-day and unfinished-work
+rules. Neither inherits a page merger, 72px rows or a different working calendar from Delivery.
 
-**No three-day layout is ever labelled `Week`,** and the six-day desktop view is `Work week`
-because Sunday is a non-delivery day. `Month` prints `Deliveries {n}`, `Transfers {n}`,
-`Exceptions {n}` and `No logistics picked {n}` per date, zero lines omitted, with deliveries and
-transfers never summed. Day, `3 days`, `Work week` and `Month` share one `?date=` and one
-selection; arrows replace the whole window and never scroll it.
-
-**The card carries TWO FACTS, never one vague status (owner ruling 2026-09-14).** The compact
-card shows its type (`DELIVERY` · `TRANSFER`), the DO number when present, the SO on its own
-line and the confirmed window. It carries the actual route or delivery locality, each physical
-product line's icon and quantity, written service details and the assigned Logistics name.
-Customer names and legacy references stay off the card face. Below those facts are
-**line 1 the journey progress · line 2 the readiness or blocker** (§8.4), then the existing
-DO or arrangement door. No missing DO placeholder is added to the calendar card.
-Progress and readiness never merge into one line. The status never repeats the date of the column
-it already sits in, and it is a text line, never a pill that can truncate. A transfer card is
-visually distinct (its own ground and left rule) and **prints its OWN route — `{from} → {to}` —
-never the customer's town**. Never a phone, money detail, employee name, driver, vehicle,
-expected arrival or upload time. An unconfirmed delivery never enters a date cell. A fully empty
-range shows one spanning state `No deliveries are scheduled from {first} to {last}.` with the real
-`{n} deliveries need a confirmed date.` count and its door.
-
-**Compact calendar — deployed and observed (2026-09-14).**
-The owner-approved compact composition is implemented in the shared `ScheduleCard`:
-DO number when present, SO number on its own line, no legacy reference or customer name on
-the face; every physical product line has its own category icon and quantity, with its full
-name in a keyboard/tap-accessible Popover. Services remain written out. The Logistics row
-appears only for an explicit assignment. A real journey uses its actual From and To; no fixed
-transit stop is inferred. The one footer is `Open DO` or the existing `Edit Delivery` door.
-An unissued DO is omitted from the calendar card; the register's absence is the owner's `DO`.
+**PRESERVED RECEIPT EVIDENCE CONTRACT.**
 
 Receipt marks currently require exact `reserved_order_line_id` bindings in reserved/sold
 stock records. Same-SKU pooling cannot light two product lines green. Missing, invalid or
@@ -602,56 +569,6 @@ exclusive-source rule, including the complete-owner-read check, is used by the o
 Incoming evidence is read in page-wide
 batches and never counted as reserved stock or permission to dispatch. The zero-received mark
 is gray; verified full receipt is green; partial receipt shows its quantity; absence stays unknown.
-Production release PR #1316, `e8456cb8365503e5a73af9710d94d30bbadf4aea`, passed the
-required CI and deployment checks; all five public deployment probes matched that revision.
-An authenticated Principal browser walk measured 1440px and 949px. The September 14–19
-window showed zero customer deliveries and two transfers, with every physical line on
-SO-1209 separate and the actual Klang Warehouse → JB transit route. Its product Popover
-showed the full name, quantity and receipt uncertainty; Escape returned focus to the trigger.
-The 949px view used three days, retained both calendars and reopened its dropdown filters
-after collapse. These trial rows prove rendering, not business volume or carrier coverage.
-The walk did not exercise Operation-role RLS, every receipt state, or any production write.
-The card-to-row reveal correction in §8.6 is production-verified in PR #1317 at
-`718f00acb05557cc32045a298e7eef3cc0ec59ce`. Exact-head CI and production run
-`34835852993` passed; all five public probes matched. At both 1440×900 and 949×912,
-clicking SO-1209's calendar arrangement link expanded its exact first-leg row and placed it
-at y=179, immediately below the y=143 viewport and 36px sticky header. ScrollTop was 2161
-and the expanded disclosure received focus. At 949px, horizontal scrollLeft=1898 retained
-SO at x=370–520 and Customer at x=520–690, with the expanded brief still visible. The loaded
-production entry asset was `index-DFzOMPX6.js`; no browser console errors were observed.
-This was an authenticated Principal read-only walk, not an Operation-role permission test.
-
-Calendar progress now reads the existing shared recorded ladder with data-gap and overdue
-overlays removed, while Work queues retain those overlays. A card can therefore show `Confirmed`
-or `Collected by {partner}` without losing that fact when Sales details are missing. Transfer
-progress uses its own words and actual destination; a missing destination never creates a stop.
-Before collection, its supporting line names the payment, stock, Logistics or DO blocker.
-Unpriced and incomplete Sales facts cannot produce `Ready`. Once collection/result is recorded,
-the supporting line keeps the recorded ETA, failure reason or proof owed instead of re-testing
-pre-departure stock against goods that have moved. This display never authorises issue or dispatch.
-The Monitor Payment cell reads `No price yet` for unknown valuation, never `Paid`.
-Validation for this correction: 4,765 web tests, 30 shared status tests and workspace typecheck
-pass. Local Chrome at 1440px, 949px and 390px preserves product detail focus/viewport bounds and
-shows progress separately from the missing-fact or proof line. This is local evidence only.
-
-The schedule classifies each intermediate leg as `TRANSFER`, and only the final leg
-as customer delivery. A recorded intermediate arrival does not become customer `Delivered` or
-remain overdue. The tab total and customer/transfer split use the same visible date window and
-active filters. Month summaries and the two-month rail keep the two event counts separate;
-the rail uses a circle/square legend, a blue today ring and a subtle current-work-week ground.
-Evidence: 254 targeted Delivery tests and workspace typecheck pass. Dedicated local Chrome
-checks at 1440px, 949px and 390px show the transfer's actual Klang WH → JB transit route and
-TEOW assignment, with no customer locality substituted; all card bounds fit their viewport.
-These checks use illustrative fixtures, not production records or deployed screenshots.
-Local Chrome verification covers 1440px, 949px and 390px: all three product lines remain
-separate, the correct line's details stay inside the viewport, Escape returns focus to its
-trigger, and mobile product/footer targets measure 40px high. The calendar control reads
-`Work week`, `3 days` and `Day` for the corresponding windows. These are fixture checks,
-not production screenshots or proof of the missing receipt states.
-The incoming correction adds local coverage for the gray zero-received case beside green,
-partial and unknown marks. Validation: 224 targeted web tests, 33 shared receipt tests,
-3,275 API tests pass (14 optional integration tests skipped); typecheck and the production-mode
-web build pass. No migration, RLS change or new writer is introduced.
 
 ### 8.3 · The Monitor register — owner ruling 2026-09-12, APPROVED / LOCKED
 
@@ -711,38 +628,44 @@ reference, never stacked as a third line, and never hidden: the WHOLE journey �
 place, every recorded result — is one right-click away on `Open Order Route`, the same door the
 Delivery Orders register offers from the same menu.
 
-**THE WORK FORMAT — owner ruling 2026-09-14, APPROVED / LOCKED.** Column 3 states the ACT, then
-the contact deadline as a glyph and a day:
+**ACTOR, ACT AND COUNTERPARTY — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-21 (reconfirming the 2026-09-18 direction).**
+Operational messages must answer who does what, to whom. Shortening may not remove the actor
+or make an agreement look unilateral. Line 1 names the responsible operating party, the act and
+its counterparty; line 2 supplies the purpose or evidenced result. For example:
 
 ```
-Call customer                 nothing has been agreed yet
-[call] Fri, 18 Sep
+Carres to call customer
+Agree delivery date and time
 
-Confirm delivery time         the DAY is agreed and the window is not
-[call] Fri, 18 Sep
+{partner} to call customer
+Agree delivery date and time
 
-Call customer                 the deadline has passed
-[late] Fri, 18 Sep            red, and it keeps the day it missed
+Carres to ask {partner}
+Confirm the delivery date
+
+{partner} and customer agreed
+{date} · {time window}
 ```
 
-The glyphs are the kit's own (`components/kit/Icon`: `call` and `late`) at the row size. No glyph
-replaces the action text and the action text never becomes an icon. **The party leaves the
-sentence:** `NETS must contact the customer` spent the column naming a company the `Logistics`
-column already carries, and buried the one word that says what to do. Who owns the call stays a
-Delivery Settings fact and its own status rung; the row reads the same either way. **No dash
-joins an act to a party or to an explanation**, in the cell or in its tooltip.
+`{partner}` is the recorded logistics name, never a hard-coded NETS default. The contact policy
+and shared Work contract decide whether Carres or the partner acts. An internal Carres follow-up
+with the partner and the partner's customer call are different responsibilities. A resolved staff
+avatar identifies the accountable individual; it does not replace the operating party in a
+message where the reader otherwise cannot tell who acts. No page invents owners or agreements.
+An agreement sentence requires the owning record's evidence; unknown does not mean the customer
+refused or has not decided. `Waiting for customer reply` requires a recorded contact result.
+Icons supplement words and never replace the actor, act or counterparty. Contact deadline remains
+an explicitly identified work date, distinct from delivery day; in a contact status cell it may
+occupy line 2 as the existing kit icon + date, while the purpose is in the opened work details.
+In a daily work view the visible work-date context must remain available. Never squeeze purpose,
+deadline and result into a third line of a 72px cell. Full messages are accessible by tap and
+keyboard. Exact placement is still a design draft; this ruling approves meaning and sentence
+structure, not a new column layout or a new Work engine.
 
-**The deadline is stated ONCE, and it is stated in Work.** `Call by {date}` is retired from every
-visible line: it printed the verb column 3 had just said, and it printed the same day twice on
-one row — once under the status and again under `Confirmed Delivery`. The words did not
-disappear. `Contact deadline {date}`, and `Contact deadline {date} · overdue, the deadline does
-not move` once it has passed, are the cell's `title` and its accessible name, and they are what
-Search matches and what the Excel export prints. A row whose customer named no day owes no
-deadline and shows none: a step with no anchor can never be late.
-
-**One option per printed word.** The `DELIVERY STATUS` dropdown filters what the column SAYS, so
-the two contact rungs — which now print one sentence — are ONE option, and the pick narrows by
-the label rather than by the internal key.
+**One option per printed word.** The `DELIVERY STATUS` dropdown, Search and exports read the
+same actor-aware message as the row. Carres customer contact and partner customer contact may
+not collapse into a label that hides who acts. This changes displayed wording, not the source
+status keys, contact policy or Work ownership.
 
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
@@ -1074,7 +997,8 @@ line sits beside it and says otherwise.
 ```
 LINE 1 · JOURNEY PROGRESS                      LINE 2 · READINESS OR BLOCKER
   customer leg          transfer leg             Ready
-  Confirmed             Transfer confirmed       Stock risk
+  {partner} and         Transfer confirmed       Stock risk
+    customer agreed
   Collected by {p}      Collected for transfer   Payment blocked
   On the way to         In transit to {stop}     Logistics details incomplete
     customer                                     DO not released
@@ -1103,11 +1027,11 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | Recorded facts | Line 1 | Colour | Line 2 |
 |---|---|---|---|
 | no partner on the scope | `Operation must assign logistics` | orange | |
-| partner set, no contact record, the partner contacts the customer | `Call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, no contact record, Carres contacts the customer | `Call customer` — the same act, a different owner | orange | the contact deadline, as a glyph and a day (§8.3) |
-| partner set, the DAY is agreed and the window is not | `Confirm delivery time` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, the partner contacts the customer | `{partner} to call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, no contact record, Carres contacts the customer | `Carres to call customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
+| partner set, the DAY is agreed and the window is not | `{responsible party} to agree time with customer` | orange | the contact deadline, as a glyph and a day (§8.3) |
 | latest contact result is `Waiting for Customer Reply` | `Waiting for customer reply` | orange | `Asked {date}` |
-| day and window recorded — a CUSTOMER leg | `Confirmed` | green | the window |
+| day and window recorded — a CUSTOMER leg | `{partner} and customer agreed`, only with owning agreement evidence | green | the window |
 | day and window recorded — a TRANSFER leg | `Transfer confirmed` | none | the window |
 | DO exists, no handover recorded | `Waiting for {partner} pickup` | none | `Handover {date}` when Warehouse scheduled it |
 | Warehouse handed over and the partner's receipt is recorded — a CUSTOMER leg | `Collected by {partner}` | none | `Collected {date} {time}` |
@@ -1121,8 +1045,9 @@ say one word for one fact). `Out for delivery` stays retired and is not restored
 | attempt `partial` or `failed` — a TRANSFER leg | `Transfer failed` | red | the one reason |
 | a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the contact deadline when one is owed, otherwise the missing fact — see the coexistence finding in §8.3.1; the fact always prints in panel 1 |
 
-**Retired on Monitor by the 2026-09-14 ruling:** `{partner} must contact the customer` ·
-`Operation must call the customer` · `Call by {date}` on any visible line.
+**Monitor message spelling:** §8.3 owns the actor + act + counterparty wording. Bare
+`Call customer` cannot hide whether Carres or Logistics must call. The accessible deadline
+label stays `Contact deadline {date}`; this ruling does not change the due-date arithmetic.
 
 **Retired on Monitor, never to return:** `Waiting for customer date` · `Delivery confirmed` ·
 `Waiting for warehouse` · `Ready for handover` · `Out for delivery` · `Created` · any bare
@@ -1234,7 +1159,7 @@ Malaysian public holidays refused) · `Confirmed time` (governed windows) · `In
 from` (`{partner}` · `Customer` · `Operation on behalf of {partner}`) · `WhatsApp proof` (required
 when the new date is later than `Requested Delivery Date`) · `Save confirmed delivery`. The Save
 button names its gap while disabled: `Save confirmed delivery — upload the WhatsApp reply`.
-Cancel restores the read state. A day saved without a window keeps the row in `Call customer`
+Cancel restores the read state. A day saved without a window keeps the row in the actor-qualified time-agreement step
 with `No time agreed`.
 
 **A later date is never a silent edit.** When the new date is later than the customer's
@@ -1418,15 +1343,18 @@ number.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 
-Operation starts in Monitor and works the rail in order: `Failed Delivery`, `Overdue delivery`,
-`Upload delivery proof`, `No logistics picked`, `Call customer`, then the calendar for the days
-ahead. From assignment through confirmation, Warehouse preparation, handover, delivery day,
-result, proof and return, every row states one concrete next fact and one resolved owner.
+Operation starts in Monitor with the daily work plan (§8.2), opens a date and its work type,
+and processes the matching register rows. Earlier unfinished work stays reachable under its
+original dates; Quick Rail Calendar finds arrangements and other dates. Assignment, contact,
+Warehouse preparation, handover, result, proof and return retain their shared Work owners and
+authoritative completion facts; the plan invents no work or owner.
 
-**Every Delivery Work sentence is two structured lines (owner ruling 2026-09-13).** Line one is
-the act with its recipient; line two is the required result. Owner, source object and the actual
-working date are structured metadata beside the sentence, never joined into it, and no `—`
-appears in any line. The row's status word carries the fact.
+**Every Delivery Work sentence follows §8.3’s actor + act + counterparty rule (owner correction
+2026-09-18, target not built).** Line two states the required result. The resolved individual,
+source and actual working date remain structured metadata. The table below retains the action
+purpose and completion facts; displayed sentences include the authoritative responsible party,
+for example `Carres to ask {partner}` or `{partner} to call customer`. Internal follow-up
+ownership must not be mistaken for the partner who performs the customer call.
 
 | Trigger | Line 1 | Line 2 | Owner rule | Completion fact |
 |---|---|---|---|---|

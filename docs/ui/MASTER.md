@@ -722,8 +722,10 @@ directory only and said so.*
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind
   every panel that renders an event, not only this one.
-- **The calendar's day comes from the BOOKING, through the one shared rule** — never from the
-  promised date, or two surfaces put one order on two days.
+- **Calendar reads each event’s owning date projection.** Delivery arrangements/legs, Warehouse
+  arrival and handover projections, and dated follow-up Work retain their separate dates. A
+  legacy booking or purchasing fallback must not contradict the owner. Delivery MASTER §8.2
+  governs the approved-target replacement gate; Calendar creates no dates or work.
 - **The calendar names actual days, never `Today` / `Tomorrow`** (owner ruling 2026-08-15). Both
   single-day chips and every day heading print the real weekday + date; `This week` survives
   because it is a SPAN. The full ruling, its one history-group exception and the structural
@@ -737,9 +739,15 @@ directory only and said so.*
 
 ### WORK OWNER + TWO-LINE ACTION GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-14
 
-- **Action owner is structured identity, not sentence copy.** Show the resolved owner as the
-  governed compact avatar/initial chip. The accessible name and hover label expose the full staff
-  name. Do not prepend or repeat the name inside every action sentence.
+- **Actor + act + counterparty — owner reconfirmation 2026-09-21, APPROVED TARGET / NOT BUILT.**
+  Operational UI must make clear who does what, to whom. The responsible party is part of the
+  message when omitting it makes ownership ambiguous (`Carres to call customer`,
+  `{partner} to call customer`). An agreement names both parties and its evidenced result.
+  Icons and terse status words cannot replace that meaning. The accountable individual remains
+  the shared Work resolver’s avatar with full accessible name; no page invents an owner.
+  Line 2 supplies purpose/result, or the clearly identified due date in a contact status cell.
+  Existing 72px cells retain two lines and accessible full-text reveal; this is not a new Work
+  column or an obligation to put actor sentences in ordinary quantity/date fields.
 - **My Work** may omit the current user's repeated avatar because the scope already answers who.
   **Team Work** groups by owner identity — avatar · full name · the counts — and individual rows
   do not repeat that group identity unless the row is shown outside the group. **The count words
@@ -774,21 +782,19 @@ directory only and said so.*
   No other register may copy this without its own owner ruling. **THE SECOND RULED EXCEPTION —
   the Delivery Monitor's `Delivery Status` column (owner ruling 2026-09-13, journey rungs re-ruled
   2026-09-14, `../delivery/MASTER.md` §8.4):** its status word names the actor and the fact in
-  primary-school English (`Operation must call the customer` · `Waiting for {partner} pickup` ·
+  primary-school English (`Carres to call customer` · `{partner} to call customer` · `Waiting for {partner} pickup` ·
   `Collected by {partner}` · `On the way to customer`), one arithmetic, no owner avatar and no
   second action. It is a status word, not an action sentence.
-  **THE DELIVERY SCHEDULE CARD CARRIES TWO FACTS ON TWO LINES — owner ruling 2026-09-14
-  (`../delivery/MASTER.md` §8.2 · §8.4):** line 1 the journey progress, line 2 the readiness or
-  blocker (`Ready` · `Stock risk` · `Payment blocked` · `Logistics details incomplete` ·
-  `DO not released`). The two never merge into one status, because a progress rung and a
-  readiness fact answer different questions and come from different arithmetics. Every card also
-  wears a TYPE label (`DELIVERY` · `TRANSFER`) whose two populations are never summed into one
-  total. No other surface adopts this grammar without its own owner ruling.
-- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner ruling 2026-09-13.** For Delivery
-  Work, line 1 is the act with its recipient (`Call NETS`) and line 2 the required result
-  (`Confirm the delivery date`); the row's status word carries the fact. Owner, source object and
-  the actual working date are structured metadata beside the sentence, never joined into it, and
-  no `—` appears in either line. The 13 / 11 sizes below apply unchanged.
+  **DELIVERY PROGRESS AND READINESS REMAIN DISTINCT FACTS.** Journey progress and a readiness
+  blocker answer different questions and retain their owning arithmetics. Customer delivery and
+  intermediate transfer remain different event kinds and counts. Delivery's local calendar-card
+  layout retires under the approved-target replacement gate in `../delivery/MASTER.md` §8.2;
+  it is not a shared Warehouse layout. Reusing kit primitives never transfers business meanings.
+- **DELIVERY WORK SENTENCES ARE TWO STRUCTURED LINES — owner reconfirmation 2026-09-21.**
+  Line 1 identifies the responsible party, act and counterparty; line 2 gives the purpose or
+  recorded result. Delivery MASTER §8.3 owns the exact evidence and deadline rules. The resolved
+  individual, source and work date remain identifiable without inventing another owner.
+  The 13 / 11 sizes below apply unchanged.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -1178,25 +1184,22 @@ A rail SECTION whose facts are a long, open-ended list collapses into ONE contro
   left-edge marker — so a narrowed section is exactly as visible as a selected row was.
 - **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
 
-**LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
-Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
-block: the header stays put while the filter groups scroll independently beneath it, separated
-by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
-month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
-it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
-instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
-it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
-keeps Sunday visible in the muted non-working state, and marks a day by printing a COUNT under
-the date with the same fact in the day's aria sentence — colour is never the only signal.
-Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the kit's exported
-DatePicker skin and dot markers) predates the kit component by hours and migrates onto it in its
-own card — §6.1's second-occurrence rule; nobody draws a third month grid. On Monitor, the month
-calendar is the persistent date picker: choosing a date opens that date's `Day` view. The page
-toolbar owns `Day · 3 days · Work week · Month` (owner ruling 2026-09-14 — a layout never wears a
-word it does not honour, so a three-day half-week is never labelled `Week`); `Calendar` is never
-repeated as a `WORK TO DO` rail row. **Today is a ring and the selected date is the blue FILL, so
-the two never compete, and the current work week carries a subtle band** — a marker that marks a
-day by shape and position, never by colour alone.
+**LOCAL FILTER RAIL FIXED HEADER AND DATE CONTENT.** `FilterRail` accepts an optional fixed
+`header` block, with independently scrolling filter groups and a hairline between them. The kit
+`MonthCalendar` remains the shared permanent month primitive wherever a module requires one;
+no caller draws a new month grid. Each module owns the meaning of its marks and selection.
+
+**DELIVERY DAILY WORK PLAN — DIRECTION APPROVED / NOT BUILT, 2026-09-18.** Delivery Monitor's
+left rail shows actual dates, each day's work types and counts; selecting a date/type narrows the
+existing 72px work list. It replaces Delivery's two-month rail calendar and local schedule view
+only after `../delivery/MASTER.md` §8.2's shared Calendar replacement gate passes. Right Quick Rail
+Calendar provides cross-date event discovery and exact source doors using the owning modules'
+current dates. Detailed composition/counting is a proposal in that section, not a new approved
+column contract. Work and event dates are not interchangeable. The plan reads the shared Work
+Engine and creates no local work model. Today remains distinct from selection. This exception
+changes neither generic register rail ownership nor Payment's own plan rules, and does not merge
+Warehouse's five pages or remove its six-day schedules. Shared typography, controls and date
+formatting do not require every module to use an identical composition.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. **S3 (BUILT 2026-09-17, SO Batch Purchase and Manual
