@@ -990,6 +990,36 @@ everything about sequencing** — and it is the first thing a build plan needs.
 
 ---
 
+## §6.3 · Diglant Subscription cross-module boundary — owner-confirmed 2026-09-22/23
+
+**APPROVED TARGET / NOT BUILT.** The only Rental/Subscription authority is
+[`rental/MASTER.md`](rental/MASTER.md), especially §4 (owner rulings), §5.6 (advance PO and later
+customer SO), §5.8 (factory holding and logistics evidence), and §5.9 (service lifecycle).
+Its other sections explicitly marked PROPOSAL / NOT LAW remain proposals; neither this pointer
+nor circulation to other tasks approves the entire blueprint or starts implementation.
+
+- Purchasing may issue an approved advance PO before a customer SO exists. Later SO demand
+  checks eligible stock and evidenced PO supply first, buying only the verified uncovered balance.
+  A date risk or missing evidence must not become a duplicate purchase. Unit/PO coverage is counted once.
+- Initial completed stock remains at Diglant Klang. Carres arranges pickup; NETS is the short-term
+  Klang Valley choice, not a nationwide appointment. Other regions need actual partners and rates.
+  Factory holding does not prove Carres warehouse receipt, ownership transfer or Ready Stock status.
+- Subscription owns contract/service facts; Sales Orders owns customer fulfilment commitments;
+  Purchasing, Receiving, Stock and Delivery retain their existing writers and evidence. Customer
+  receipt with accepted proof precedes service activation; pickup/intermediate arrival does not.
+  Visit completion, upgrade recovery/new delivery and termination/physical recovery remain distinct.
+- Actual regional volume, pickup frequency, complete delivery cost and delivery performance inform
+  partner decisions. 100/200/500 are scenarios; the approximately 3–6 month review is not a lease,
+  guaranteed volume or automatic warehouse move. No expansion of existing Finance/Rental billing law.
+
+**All Portal planning/build tasks:** read these scoped owner rulings before changing a connected
+boundary. Keep legacy business rules in their original scope. Do not reintroduce per-customer
+procurement as the primary Diglant supply model, assign legacy nationwide partners by inference,
+copy old rent-to-own terms, or promote unfinished proposals because another task mentioned them.
+Use current shared repository authority; pending branch-only changes must be identified as such.
+
+---
+
 # §7 · What Orders V1 leaves behind
 
 **The evidence base.** It is the only place in the business where the whole customer journey
