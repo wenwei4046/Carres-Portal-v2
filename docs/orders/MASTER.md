@@ -270,16 +270,16 @@ location controls remain governed selects; identify Customer Requested Delivery 
 month control. This is SO composition approval, not a global change to other pages or to
 FilterRailSelect single-selection behaviour.
 
-**Review evidence — owner ruling 2026-09-22.** Owner-facing Sales Orders reviews and previews
-must use verified real records and real business cases; do not invent orders, quantities,
-dealers, exceptions or expected outcomes to fill missing evidence. Identify source and verification
-status. Another chat's report is attributed evidence, not this reviewer's independent verification.
-Distinguish real operating records from existing test/import records; repository or database
-existence alone does not make a record a genuine customer transaction. Missing evidence remains
-unverified; no fabricated substitute. Synthetic monthly-preview data is withdrawn from business
-review and its numerical tests prove only fixture behaviour. Existing layout approval is retained,
-but the fixture preview cannot substantiate production quantities, business readiness or ratings.
-This does not authorise editing live records or exposing real customer data through public artifacts.
+**Review evidence — owner ruling 2026-09-22.** Proposals and independent review prototypes
+may use clearly labelled fictional data to demonstrate layout, interactions and proposed scenarios.
+Keep arithmetic consistent and distinguish simulated behaviour from implemented or production-verified
+behaviour. Do not present fictional orders, quantities, dealers or exceptions as actual business
+facts or use fixture tests to substantiate production readiness. Actual audits and defect claims
+require traceable evidence; identify its source and verification status. Another chat's report is
+attributed evidence, not this reviewer's independent verification. Distinguish existing test/import
+records from genuine customer transactions. Missing real evidence remains unverified. The synthetic
+monthly preview may continue as a design proposal; its ratings concern design, not verified live
+operation. This does not authorise editing live records or exposing customer data in public artifacts.
 
 **Monthly presentation — owner approved 2026-09-22; not implemented/verified.**
 The content header contains `Monthly demand`, the selected month/year range, and
@@ -295,7 +295,7 @@ Category expansion reveals models/configurations; a quantity opens contributing 
 dealer, requested delivery date and remaining quantity. Clickability and keyboard focus must
 be explicit; colour or hover alone is insufficient. Reuse governed kit and token values.
 This approval covers composition and the exact COPY below, not production readiness or a
-claim of complete accessibility. Previously illustrated fictional figures are withdrawn from business review.
+claim of complete accessibility. Illustrative figures are labelled fictional and are not required defaults or live facts.
 
 **Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
 coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
@@ -315,7 +315,7 @@ ownership; historical deliveries and documents remain unchanged by the reporting
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
-dealer/destination filtering and exact SO drill-down. Use verified real cases under the review-evidence ruling above. The operating model and composition above are approved; final
+dealer/destination filtering and exact SO drill-down. Use labelled proposal scenarios or verified real cases, distinguishing them under the review-evidence ruling above. The operating model and composition above are approved; final
 English COPY, kit fit, responsive/keyboard behaviour and cross-module source completeness still
 require design verification. No application implementation, production validation, Card numbering
 or approval of the whole SO Blueprint is implied by this local approval.
