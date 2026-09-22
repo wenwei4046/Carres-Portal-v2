@@ -193,6 +193,92 @@ No deposit · Online order
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
+## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
+
+**Purpose and placement.** Jess approved a six-month view of the quantities still owed on
+accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
+provides two views: the existing order list and monthly demand. This is confirmed order demand,
+not a portal Dashboard and not an estimate of orders customers have not placed. The approved
+monthly view does not replace the flat Register with month/status groups or change its population:
+use the existing permission-scoped orders handed from Sales to Operation; unsubmitted/Placed
+orders are not silently added. The earlier proposal to default the order list to unfinished orders
+is superseded by the approved list filters below; no default unfinished-only population is introduced.
+
+**Time and filters.** The monthly view defaults to the current calendar month plus the next five
+months. Offer three months, six months and a chosen starting month. Always retain separate
+buckets for outstanding demand earlier than the selected first month, later than its final month,
+and a visible data-quality exception count for demand without a definite requested delivery date;
+do not present missing required dates as an ordinary monthly demand category. Assign months using the customer's
+requested delivery date, never document date, Proceed Date, supplier ETA or confirmed transport
+booking. Do not manufacture a date for ambiguous/missing source data. These buckets preserve
+visibility; they do not relax the order-entry requirement for a requested date. The local filter
+rail belongs to this monthly view and filters Dealer / Sales Location, customer delivery region
+and product category. Dealer location and customer delivery destination remain different facts.
+Both views use the shared rail shell under the following owner ruling.
+
+**Left rail — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT.**
+Use the existing `FilterRail` family in `workspace-rail.tsx`, with governed 240px width,
+wrapping labels and collapse behaviour. One view selector chooses Order list or Monthly demand;
+each view exposes only its own controls. Do not add a second handmade rail.
+
+- Order list: Dealer / Sales Location; customer delivery State / City; date field (Proceed Date,
+  SO Doc Date, Customer Requested Delivery Date) and range (All dates, Today, This week, This month,
+  custom); delivery condition (All, Not delivered, Partially delivered, Fully delivered); whole-order
+  obligations (All, Outstanding obligations, No action required); linked Service Cases (All,
+  Has open cases, Closed cases only, No cases). These are read-only factual filters, not a mutable
+  overall status, work queue or new status/group column. Service case filters read Service's truth.
+  Unknown underlying facts must not be classified as completed or no cases.
+- Monthly demand: starting month, 3/6-month period with explicit first/last month and year;
+  Dealer / Sales Location, customer delivery State / City, actual catalog product categories.
+  The requested-delivery-date basis remains explicit. Delivery/completion/service-case filters
+  do not appear here and do not silently carry over from the list.
+- No Clear filters button inside either SO rail: this is Jess's explicit instruction, not
+  approval inferred from silence. Click a selected facet again to deselect; a select retains All;
+  no chosen values means All. Month/period controls retain their selected reporting window.
+  This does not remove the shared active-condition/list-toolbar clear control or alter other pages.
+- Dealer supports search and multi-selection; selected choices remain visible. Product-category
+  selection may also narrow to several actual categories. This SO-specific approved target exceeds
+  the existing single-slot FilterRailSelect: its multi-select interaction is NOT BUILT and must be
+  admitted through governed kit design before application implementation. Do not change other
+  modules' single-selection behaviour as a side effect. New English copy remains subject to COPY
+  reconciliation; this approval is not a claim that all illustrated wording is registered.
+- Source classifications are catalog-owned; never print Other goods. Missing classifications are
+  traceable data errors, not silently omitted physical demand. Services are separate from Qty.
+
+**Quantity matrix.** Columns are calendar months with years; rows are product categories.
+Every number means physical goods still owed to the customer, not order lines or original sold
+quantity: use the effective commitment and authoritative actual fulfilment. Partial delivery
+reduces only the quantity actually fulfilled. Gifts count in their actual product category;
+services do not count as physical pieces. Applied cancellations/amendments change the effective
+demand; pending requests do not. Preserve quantity unit and product/configuration identity.
+Expand a category into model, size and purchasing-relevant configuration. Clicking a month/product
+quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
+An empty result is not evidence of zero demand when its underlying facts failed to load.
+
+**Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
+coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
+Purchasing calculations; do not create a second demand engine or allocate/purchase from this
+report. Stock and PO coverage must not double-count the same quantity, including after PO receipt.
+Available but unallocated stock is not represented as stock already arranged for these orders.
+PO coverage is not proof of timely delivery: separately expose supplier timing risks or unknown
+arrival evidence against the customer's requested date, without inventing a new promised date.
+Counts and drill-downs must reconcile at the same scope; unavailable coverage is unknown, not zero.
+
+**Forecast boundary.** Confirmed demand is the approved planning baseline. Future sales targets
+or predicted new dealer orders would be a separately identified input; no target-entry engine,
+forecast model or automatic purchasing based on speculative orders is approved here. Do not blend
+unreceived orders into confirmed demand. Delivery, Purchasing, Stock and Payments retain all write
+ownership; historical deliveries and documents remain unchanged by the reporting view.
+
+**Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
+previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
+gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
+dealer/destination filtering and exact SO drill-down. Fictional sample quantities in the chat are
+examples, not business facts. The operating model and composition above are approved; final
+English COPY, kit fit, responsive/keyboard behaviour and cross-module source completeness still
+require design verification. No application implementation, production validation, Card numbering
+or approval of the whole SO Blueprint is implied by this local approval.
+
 ## Sales Orders Register — find truth, never assign work
 
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
@@ -277,7 +363,7 @@ a door to its owner: SO → SO, PO → PO, DO → DO.
 ### Listing Standard — owner approved 2026-09-16
 
 The shared ERP Listing Standard applies to this Register without changing what it is (a record
-register: the owner-ruled columns and groups above, no rail, no owners, no action sentences, no
+register: the owner-ruled columns above, the approved SO filter rail, no owners, no action sentences, no
 Priority).
 
 ```
@@ -390,7 +476,7 @@ The normal toolbar exposes Search, Export and Columns with labels, wrapping on n
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
 customer names and imported references are not parsed as partial SO numbers.
 Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
-The footer explicitly labels category values as Qty and includes Other goods when counted.
+The footer explicitly labels goods category values as `Qty:`; services print apart as `Services {n}`. **No `Other goods` (owner ruling, Jess 2026-09-22: "no such other goods, write clear").** Every product must carry its catalogue category; an order line the system cannot classify is a data error reported for the catalogue to fix, never printed to staff as a kind of goods. Services never enter `Qty:` — the Register footer prints them as a separate `Services {n}`; the object page and document name them (`Services: Delivery fee · Stair carry`).
 Default column widths fit the eight-column sample at 1180px without shrinking typography;
 existing saved column layouts are preserved. Destination header padding and spacing adapt on
 narrow screens. Local Edge checks at 1180/390/320px show no document overflow; the narrow grid
@@ -566,7 +652,8 @@ impact → Save or Submit amendment request → approval takes effect → each o
    bare Remove button.
 4. **Quantity presentation — owner-approved 2026-09-22:** reuse the category footer on both
    page and document: `Qty: Mattress 2 · Accessory 1`, separately `Services: Delivery fee · Stair carry`.
-   List only categories present; include `Other goods` when counted. Gifts count under their actual
+   List only categories present; there is no `Other goods` (owner 2026-09-22 — an unclassified line is a
+   catalogue data error, reported, never printed). Gifts count under their actual
    goods category. Sofa quantities follow real deliverable modules, not sales bundles or packing boxes.
    Remove the displayed `Goods lines` / `Physical pieces` / `Service quantity` summary. Internally keep
    line count, physical quantity and service billing quantity distinct; service never inflates goods.
@@ -1499,8 +1586,8 @@ query.**
   words may print, so no unruled abbreviation (`M.P`, a supplier's code) can reach the screen. The
   previous shape ALSO under-counted: its word list was both the order and the filter, so any label
   outside it — `Disposal`, any unrecognised accessory — was silently dropped from a tally that
-  claims to describe the filtered result. Anything not positively recognised is now `Other goods`,
-  governed and still counted. The line truncates rather than wrapping (the footer is one line by
+  claims to describe the filtered result. ⛔ The `Other goods` fallback is RETIRED (owner 2026-09-22): an
+  unrecognised line is a catalogue data error reported for correction, never a printed kind of goods. The line truncates rather than wrapping (the footer is one line by
   law) and carries the full sentence in its title.
 - **The search placeholder fits its box.** The box is a governed 200px at every width, so the
   four-item placeholder clipped on a wide window as well as a narrow one — it was never a

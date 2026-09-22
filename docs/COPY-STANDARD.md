@@ -2496,7 +2496,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | SO goods with order/SKU association but no proven line association (2026-09-11 review) | **`Unit ID link not verified`**; full evidence remains inspectable | Not allocated · silently assigning the same IDs to every matching SKU line |
 | Proven SO line Unit IDs exceed its ordered Qty | **`Unit ID count exceeds order quantity`** | truncating the IDs to fit Qty |
 | SO expansion read fails | **`Could not load goods details`** · **`Retry`** | Not allocated · Not recorded |
-| SO category footer breakdown — Register, object page and document | **`Qty:`** before quantities of categories present; gifts count in their actual category; include **`Other goods`** when counted | Goods lines · Physical pieces · a partial breakdown presented as the complete item count |
+| SO category footer breakdown — Register, object page and document (owner ruling 2026-09-22) | **`Qty:`** before quantities of the goods categories present; gifts count in their actual category; services never in `Qty:` — Register footer `· Services {n}`, object page and document `Services: {names}` | `Other goods` (retired 2026-09-22: an unclassified line is a catalogue data error, reported, never printed) · `Service {n}` inside `Qty:` · Goods lines · Physical pieces · a partial breakdown presented as the complete item count |
 | Saved SO configuration `gap=KIV` | **`Mattress gap: Confirm later`** — same meaning as the POS configurator | gap KIV |
 | The stair-carry count, when the salesperson named none | **`0`** — the box carries the number it means, and the hint states the range (**`0 to {n}`**) | Auto · All · Default · ⛔ **`Empty = every item`** (the retired hint). Unset means NONE from 2026-08-27: somebody says how many pieces need carrying before the customer is charged for carrying them |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
@@ -3882,6 +3882,16 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 | Form | `Account` · `{code} · {kind}` | The rename form's heading, and the line under it. Only the name changes; the code never does. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
 | Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
+| Refusals (database, 0557 — moving an account) | `The chart changed while you were dragging. Open it again and redo the move.` · `Move an account only among the accounts under the same heading.` · `Send every account under this heading, in the order you want them.` · `Send the order the chart was in before the drag.` · `The same account is listed twice.` · `The order has a blank where an account should be.` | Six causes, six sentences — **a refusal may not borrow another refusal's cause.** In order: somebody else moved an account while this screen was open, so this move is refused whole and nothing of theirs is lost · the move crossed into another heading, which is a reparent and a different ruling · the list left an account out, or was empty · the caller sent no before-order to check against · one account twice · a blank where a code should be. `Only Finance changes the chart of accounts.` and `That account is not in the chart.` are reused from 0539, unchanged. |
+
+**The move control IS built** (0557, owner ruling: *"for chart of accounts, actual dragging"*). A row on
+Finance -> Settings -> Chart of accounts is dragged among the accounts under its own heading; `rowDrag`
+was added to the shared `DataGrid` for it, using the browser's own drag and drop. The six sentences
+above are the server's refusals and the screen prints them as they come, so their wording is already
+settled. The screen never offers a move across a heading, so `Move an account only among the accounts
+under the same heading.` should not be reachable from this page.
+
+| PROPOSAL - PENDING APPROVAL | `Drag an account to move it. Hold Alt and press the up or down arrow to move it from the keyboard.` | One line above the chart. A drag with no keyboard equal locks out anyone not using a mouse, and a keyboard move nobody is told about is not a control. Plain ASCII throughout; the only punctuation is the full stop. **NOT APPROVED — it is on the screen in this branch and must be approved or replaced before merge.** |
 
 Finance words that never appear on screen. A finance person says the word on the left; the screen
 always says the word on the right. One fact, one word (rule 2).
