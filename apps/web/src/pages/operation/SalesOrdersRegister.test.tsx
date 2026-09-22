@@ -635,6 +635,14 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(itemCell).toHaveTextContent("CodySuper King");
     /* The SKU keeps its own column and is not repeated as the item. */
     expect(itemCell).not.toHaveTextContent("B1201S-K");
+    /* Owner review 2026-09-22: nothing here is bold. The name is plain 13px,
+       the configuration the 11px slate-11 second fact, and the SKU plain on
+       one line — never a scroll box that cuts it. */
+    expect(within(row).getByText("Cody").className).not.toContain("font-medium");
+    expect(within(row).getByText("Super King").className).toContain("text-[11px]");
+    const sku = within(row).getByText("B1201S-K");
+    expect(sku.className).not.toContain("font-medium");
+    expect(sku.className).not.toContain("overflow-x-auto");
   });
 
   it("reads the Delivery Orders off the order row, not a second capped read", () => {
@@ -799,7 +807,12 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const cell = screen.getByTestId("grid-expansion-cell");
     expect(cell).toHaveAttribute("colspan", "11");
     expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
-    expect(within(cell).getByRole("table")).toHaveStyle({ minWidth: "908px" });
+    /* §6.8 (owner review 2026-09-22): measured widths, the table takes their
+       sum and never stretches to the sheet; the frame hugs it. */
+    const goods = within(cell).getByRole("table");
+    expect(goods).toHaveStyle({ width: "986px" });
+    expect(goods.className).not.toContain("w-full");
+    expect(within(cell).getByTestId("goods-mini-table").className).toContain("w-fit");
     /* The Purchasing reference: flush under the row, and the section stack
        draws the line from the caret to the goods frame and ends there. */
     expect(cell).toHaveStyle({ paddingTop: "0px", paddingBottom: "0px" });

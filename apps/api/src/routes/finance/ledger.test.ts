@@ -261,6 +261,59 @@ describe("GET /entries", () => {
     expect((await json(res)).total).toBe(0);
   });
 
+  /**
+   * The department read is a read of LINES — one view row per ledger line —
+   * so it runs past PostgREST's 1000-row ceiling long before the department
+   * has 1000 entries. Read once with no `.range()` (PR #1495) every line past
+   * the first 1000 was dropped and its entries silently left the Journal.
+   *
+   * `page` answers like PostgREST: at most 1000 rows per `.range()`.
+   */
+  const pagedDepartment = (total: number, entryOf: (i: number) => string) => (call: Call): Result => {
+    if (call.name !== "gl_line_departments") return ok([], 0);
+    const r = ops(call, "range")[0] as [string, number, number] | undefined;
+    if (!r) return ok([], null);
+    const [, from, to] = r;
+    const data: Array<{ entry_id: string }> = [];
+    for (let i = from; i <= Math.min(to, total - 1); i += 1) data.push({ entry_id: entryOf(i) });
+    return ok(data, null);
+  };
+
+  it("reads the department past 1000 view rows, and keeps the entries on the later pages", async () => {
+    // 1500 lines over 150 entries — ten lines each, so e-149 is on page 2.
+    const { calls } = fakeClient(pagedDepartment(1500, (i) => `e-${Math.floor(i / 10)}`));
+    const res = await get("/entries?departmentType=SHOWROOM");
+    expect(res.status).toBe(200);
+    const dept = calls.filter((x) => x.name === "gl_line_departments");
+    expect(dept.map((d) => ops(d, "range")[0])).toEqual([["range", 0, 999], ["range", 1000, 1999]]);
+    const ids = ops(calls.find((x) => x.name === "gl_entries"), "in")[0]![2] as string[];
+    expect(ids).toHaveLength(150);
+    expect(ids).toContain("e-149");
+  });
+
+  it("refuses a department whose id list would not fit one URL", async () => {
+    // 201 distinct entries — one past IN_URL_MAX, which is 200.
+    const { calls } = fakeClient(pagedDepartment(201, (i) => `e-${i}`));
+    const res = await get("/entries?departmentType=SHOWROOM");
+    expect(res.status).toBe(422);
+    expect(await json(res)).toEqual({
+      error: "invalid_param",
+      code: "too_many_rows",
+      message: "There are too many entries in this department to list here.",
+    });
+    // A refusal, not a short list: the Journal itself was never read.
+    expect(calls.find((x) => x.name === "gl_entries")).toBeUndefined();
+  });
+
+  it("refuses a department read that runs past 20 pages", async () => {
+    const { calls } = fakeClient(pagedDepartment(50_000, () => "e-1"));
+    const res = await get("/entries?departmentType=SHOWROOM");
+    expect(res.status).toBe(422);
+    expect((await json(res)).code).toBe("too_many_rows");
+    expect(calls.filter((x) => x.name === "gl_line_departments")).toHaveLength(20);
+    expect(calls.find((x) => x.name === "gl_entries")).toBeUndefined();
+  });
+
   it.each([
     ["?from=2026-09-30&to=2026-09-01", "backwards dates"],
     ["?q=a,b", "a comma in the search"],

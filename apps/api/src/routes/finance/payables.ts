@@ -15,7 +15,7 @@ import {
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
-import { departmentQuery, keepByDepartment, withLineDepartments } from "../../lib/line-departments";
+import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
 import type { AppEnv } from "../../types";
 
 /**
@@ -206,6 +206,7 @@ payablesRouter.get("/bills", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("supplier_bill_register");
   if (error) return pgFail(c, error);
   const kept = await keepByDepartment(sb(c), BILL_LINES, (data ?? []) as Array<{ id: string }>, (r) => r.id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
   if ("error" in kept) return pgFail(c, kept.error);
   return c.json({ rows: kept.rows });
 });
@@ -300,6 +301,7 @@ payablesRouter.get("/vouchers", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("payment_voucher_register");
   if (error) return pgFail(c, error);
   const kept = await keepByDepartment(sb(c), VOUCHER_LINES, (data ?? []) as Array<{ id: string }>, (r) => r.id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
   if ("error" in kept) return pgFail(c, kept.error);
   return c.json({ rows: kept.rows });
 });

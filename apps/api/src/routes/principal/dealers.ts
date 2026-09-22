@@ -240,6 +240,20 @@ principalDealersRouter.patch("/:id", async (c) => {
     p_dealer_id: id,
     p_patch: patch,
   });
+  // `code` is the one master field the keyer invents, and 0543's
+  // dealers_code_unique is the only unique constraint this door can trip. Name
+  // it here, the way the catalog's option pools and the supplier slug do;
+  // mapPgError's generic "that value is already used" is the fallback under it.
+  if (error?.code === "23505" && patch.code !== undefined) {
+    return c.json(
+      {
+        error: "conflict",
+        code: "dealer_code_taken",
+        message: `Another dealer already uses the code ${patch.code}. Pick a different code.`,
+      },
+      409,
+    );
+  }
   if (error) return fail(c, error);
   return c.json({ ok: true, dealer: data });
 });

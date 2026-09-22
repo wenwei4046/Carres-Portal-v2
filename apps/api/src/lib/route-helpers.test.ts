@@ -77,13 +77,44 @@ describe("mapPgError", () => {
   });
 
   it("maps unknown SQLSTATE to 500 rpc_failed", () => {
-    const m = mapPgError({ code: "23505", message: "duplicate key" });
+    const m = mapPgError({ code: "XX000", message: "internal error" });
     expect(m.status).toBe(500);
     expect(m.body).toEqual({
       error: "rpc_failed",
       code: "rpc_failed",
-      message: "duplicate key",
+      message: "internal error",
     });
+  });
+
+  // 0543 dealer master: a `code` another dealer already has raised 23505, fell
+  // through to `default`, and Finance got HTTP 500 with the raw constraint name
+  // in the toast. A taken value is the keyer's mistake — 409, same as every
+  // route that already special-cases it (ops/issues.ts, rental.ts, catalog.ts).
+  it("maps SQLSTATE 23505 to 409 conflict (already_exists)", () => {
+    const m = mapPgError({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+      details: "Key (code)=(JB1) already exists.",
+    });
+    expect(m.status).toBe(409);
+    expect(m.body).toEqual({
+      error: "conflict",
+      code: "already_exists",
+      message: "That value is already used. Change it and save again.",
+    });
+  });
+
+  // The one case that must NOT forward error.message: a constraint name is not
+  // a sentence and the operator cannot read it.
+  it("23505 never leaks the constraint name or the Postgres key text", () => {
+    const m = mapPgError({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+      details: "Key (code)=(JB1) already exists.",
+    });
+    expect(m.body.message).not.toContain("dealers_code_unique");
+    expect(m.body.message).not.toContain("duplicate key");
+    expect(m.body.message).not.toContain("Key (code)");
   });
 
   // v3-active.1 (migration 0037): the batch RPC's _v3_claim_threads_for_po

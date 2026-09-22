@@ -1523,7 +1523,8 @@ MASTER §5.4). There is never a second PO, so there is no `Moved from` / `Split 
 | Screen fields, in order | **`Item`** · **`Current Deliver To`** · **`Qty on this PO`** · **`Qty you can move`** · **`Qty to move`** · **`New Deliver To`** · **`Reason`** |
 | The check before saving | **`Review changes`** |
 | The review's closing row | **`Total — unchanged`** |
-| PDF section-2 heading when one PO has several Deliver To | **`DELIVER TO (1 of 2)`** — `(n of m)` only when m > 1 |
+| PDF section-2 heading on every Deliver To's first page | plain **`DELIVER TO`** + that location's full name and address — never `(1 of 2)`; the page count is the footer's `Page n of m` |
+| PDF closing quantity: one location's table · the whole PO (last page, only when a PO has several Deliver To) | **`TOTAL`** · **`PO TOTAL`** — nothing printed beside `PO TOTAL` (`PO TOTAL · 2 Deliver To` refused as confusing, 2026-09-22) |
 
 Banned here: `Current location` / `Location` (`Location` is a banned synonym of Deliver To) ·
 `New PO` · `Moved from` · `Split from`.
@@ -1616,8 +1617,9 @@ entry, and both were live on Carres screens for months with none.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| Add one more line to the list being typed | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
+| Add one more line to a form (SO object draft exception: see Sales Order amendment words) | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
 | Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
+| Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · Rev {n}`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
 
 **Loo chose from three candidates with their costs attached**, and the two he did not choose
 are recorded because each was already on a real screen and a later chat will find them:
@@ -2446,7 +2448,7 @@ same words; only which card carries them moved.
 | The customer and who to ring | **`Customer`**, with **`Emergency contact`** and **`Billing`** as its in-card labels. `Sales ownership` is retired 2026-09-21 — Dealer, Sales Location and Salesperson live in `SO info` | Customer details · Buyer · Client · Contact · Ship to |
 | The goods sold on the order — card and PDF heading (owner ruling 2026-09-21) | **`Items`** | `Goods` (kept only for readiness: `Goods ready` · `Goods not ready`) · Products · Lines |
 | The Sales Order's own facts — the FIRST card, and the same heading on the PDF (owner ruling 2026-09-21) | **`SO info`** | `Order info` (retired 2026-09-21) · Order details · Sales Order info · Dates · Admin · Meta |
-| SO page notice while a supplier commitment exists (owner ruling 2026-09-21) | **`This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`** · the commit button reads **`Submit amendment request`**; with no supplier commitment it reads **`Save`** | Your Save submits an amendment request · Amend · Request change |
+| SO page notice while a supplier commitment exists (owner ruling 2026-09-21) | **`This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.`** · the server offers **`Save`** only for permitted non-commercial corrections and **`Submit amendment request`** for commercial/protected changes, regardless of supplier commitment (owner-approved 2026-09-22) | Your Save submits an amendment request · Amend · Request change |
 | The order's payment card (owner ruling 2026-09-21) | **`Payment`** on the page; the Sales Order PDF's payment words are the SO document's own list below (`TOTAL RECEIVED` · `No payments recorded.`) | `Money` (retired 2026-09-21) · Payment Received · Collections |
 | Where the goods go and what the lorry meets there | **`Delivery`** — one group with NO in-card headings (owner ruling 2026-09-21): address, building type, floor, lift, stair carry. The billing relationship and billing address belong to `Customer` | `Delivery address` / `Delivery access` as headings (retired 2026-09-21) · Ship to · Address · Logistics · Delivery details |
 | Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`**; an existing customer adds **`· {n} orders ›`** (singular **`· 1 order ›`**), a door to the Sales Orders Register searched by the phone (owner ruling 2026-09-21) | New/Returning · First-time · Repeat · a coloured status dot with no word |
@@ -2632,10 +2634,23 @@ surface is how a dictionary splits.
 
 ### The Sales Order amendment words
 
+**APPROVED / LOCKED — owner approval 2026-09-22.** For the Sales Order object draft only,
+`Add item` is the approved catalogue action. This explicit surface exception replaces the generic
+`Add line` restriction here; other forms retain `Add line`. `Remove` / `Restore` describe draft
+operations; `Cancelled · Rev {n}` describes approved cancellation. A receiving-state word does not
+automatically become a Sales Order state. These words are approved target copy, not build proof.
+
 | Meaning | Use exactly |
 |---|---|
-| Open the governed customer-change form | **Propose a change to the customer** |
-| Persist the proposal without changing the order | **Record the proposal** |
+| Enter the whole-page Sales Order draft | **Edit** |
+| Submit the governed request without changing the effective order | **Submit amendment request** |
+| Add a catalogue-backed goods row in the SO object draft | **Add item** |
+| Restore a row removed from the unsent SO draft | **Restore** |
+| Compare changed values | **Before** / **After** |
+| Open a complete historical revision | **View version** |
+| Leave historical revision for effective order | **Return to current** |
+| Print that revision's own retained document | **Print this version** |
+| Separate commercial lines, physical goods and services | **Goods lines** / **Physical pieces** / **Service quantity** |
 | A submitted proposal awaiting its authorised decision | **Waiting for management** |
 | Impact heading before a decision | **Before approval** |
 | Decision field | **Management decision reason** |
@@ -3939,6 +3954,10 @@ NOT LAW until approved. Words added by the receipt-data slice (0535, 2026-09-18)
 | Reference label for a card / cheque payment (order drawer, storage collect, AR drawer, top-up) | `Approval code` · `Cheque number` | Same words `lib/payment-methods` already shows on Invoice → Record payment. |
 | Toast when that reference is empty | `Enter the approval code` · `Enter the cheque number` | |
 | Writer refusals (0535) | `choose how the customer paid` · `a cheque payment needs its cheque number` · `a card payment needs its approval code` | Reach the operator through the API's error message. |
+| Reference label for a bank transfer / DuitNow QR payment (0551 — Invoice → Record payment, order drawer Money card, storage collect, AR drawer, top-up) | `Reference number` | The database's own word. Replaces the bare `Reference` on those two methods; a method the writer leaves optional keeps `Reference`. |
+| Toast when that reference is empty (0551) | `Enter the reference number` | Same sentence shape as `Enter the approval code`. |
+| Principal → Approvals, top-up drawer field heading (0551) | `Reference number (required to approve)` · `Cheque number (required to approve)` | Matches the sibling heading `Method (required to approve)` already on that drawer. Stays `Reference (optional)` for cash. |
+| Writer refusals (0551) | `a bank transfer needs its reference number` · `a DuitNow QR payment needs its reference number` | Reach the operator through the API's error message. |
 | Payment receipt PDF, detail row | `Invoice` — the invoice number(s) the payment settles | Payment MASTER §4. |
 | Sales Invoice PDF totals card, when money came before the invoice | `Received before this invoice` · `BALANCE DUE` | Line 2132 lists `Balance due` as a rejected word for the delivery gate refusal; this is a different surface (a printed total), so it needs its own ruling. |
 

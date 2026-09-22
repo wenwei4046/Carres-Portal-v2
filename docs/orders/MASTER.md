@@ -350,8 +350,12 @@ presentation correction. The [release receipt](https://github.com/wenwei4046/Car
 records CI, the exact merged/deployed SHA and authenticated read-only production closure; the
 implementation and fixture measurements alone do not claim deployment.
 Expanded goods has exactly the six columns above: SKU stays separate;
-Item is always last and takes remaining space. All other child tracks have consistent fixed,
-content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
+Item is always last. **Every column is a fixed, content-measured width and the table takes their sum;
+it never stretches to the sheet, and its frame hugs it (owner review 2026-09-22 — `Item` had grown to
+957px):** Category 132 · Unit ID 140 · Deliver To 200 · SKU 210 (longest catalog goods SKU
+`MEMORY-FOAM-PILLOW-asd` 191.3px) · Qty 64 · Item 240 (the purchasing goods table's number; a long
+configuration wraps) = 986px. Nothing is bold: SKU and the item name are plain 13px, the configuration
+is the 11px slate-11 second fact (UI §6.0 rule 5). Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
 The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
 flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
@@ -473,7 +477,17 @@ ITEMS                   the SO document's own table (owner ruling 2026-09-21, NO
                         can check page against paper column by column, but draws it in the portal's web style —
                         no black ink header bar (owner: "copied the same black header? … not international"),
                         each item row a soft grey box, the same grey-box treatment as the rest of the page
-PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
+PAYMENT                 the same money zone as the PDF, one arithmetic (owner approval, Jess 2026-09-22):
+                        the payment table (Date · Payment received · Approval code · Collected by ·
+                        Amount (RM)) lists the rows only — the duplicate `TOTAL RECEIVED` row is REMOVED
+                        from BOTH page and PDF; paid money is totalled once, as `Paid to date`. The totals
+                        show goods amount · service amount · `Total payable` · `Paid to date` ·
+                        `Balance due` (the goods/service row words are pending COPY review; a combined
+                        total is never labelled `Goods total`; SST rows follow the separate SST ruling).
+                        Voided payments stay, struck, with the reason, and are never counted.
+                        Open this order in Payments →. Items and Payment share ONE table style: 12px grey
+                        headers over a 1px line, 13px rows divided by 1px lines, amounts right-aligned in
+                        the same column position, only the closing total bold
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
@@ -492,10 +506,10 @@ and survive as in-card headings; `Block` and `SubHead` render the same string at
 rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
 pins the card list, its order and the placement of every moved field.
 
-**THE ORDER TOTAL IS STATED ONCE.** It sits under the `GOODS` table that produces it, and it is
-`orderMoney({lineSum, addonSum})` — the same value the register and the document read, never a
-re-sum of the printed rows (Law D). `MONEY` therefore carries only the collections facts: the
-ledger, `Paid` and `Outstanding`. A service — stair carry included, which is a stamped
+**THE ORDER TOTAL HAS ONE ARITHMETIC.** Every place it prints — the Items `TOTAL PAYABLE` row and the
+Payment totals card, which the page now repeats because the PDF does (owner ruling 2026-09-22 overwrites
+the 2026-09-11 "stated once" placement) — reads the same `orderMoney({lineSum, addonSum})` value the
+register and the document read, never a re-sum of the printed rows (Law D). A service — stair carry included, which is a stamped
 `STAIR_CARRY` addon — is counted in that total exactly once and is never charged again as a
 separate summary. The stair WORKING LINE on `DELIVERY` explains the charge; it does not levy it.
 
@@ -524,13 +538,13 @@ with it**; what survives is the rule it existed to serve — *a door, never a du
 **PROCEED DATE CAN BE EDITED — OWNER RULING (Jess, 2026-09-22): "proceed date can edit".** This
 overwrites the 2026-08-26 read-only rule. On the SO page it is a grey (editable) field like the rest;
 it changes through `Edit` with `Reason for change`, is recorded in History, and — like the other
-contractual facts — goes for approval while a supplier commitment exists. The CREATE door keeps the
+contractual facts — goes through the governed approval path regardless of supplier commitment. The CREATE door keeps the
 picker.
 
 **THE SO PAGE FIELD STANDARD — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** A grey box
 means "this can be changed with `Edit`" and nothing else ("every grey meaning can edit"; "all can
 edit"). Every fact on the page is a grey box — customer, delivery, SO info, Sales Location ·
-Salesperson · Dealer (approval), Items Code · Qty · Unit (amendment when a supplier commitment exists),
+Salesperson · Dealer (approval), catalogue-backed Item Code · Qty · Unit (governed commercial amendment),
 Proceed Date — EXCEPT three, which print as plain text because they are not this page's to change:
 `SO Doc Date` (the order's birth stamp), the payment rows (Payments owns them; the door is `Open this
 order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
@@ -550,11 +564,69 @@ impact → Save or Submit amendment request → approval takes effect → each o
 3. **The reason, the before/after and the impact are shown before submitting** — which item, what
    quantity, the amount change and the linked PO / Stock Unit / Delivery / Payment consequence — not a
    bare Remove button.
-4. **A goods count counts goods only.** Delivery fee and Stair carry are services and are never goods
-   pieces (e.g. `2 + 1 + 1 = 4 pcs` beside the RM total, the services priced but not counted).
+4. **Three counts, never merged:** goods lines (gift lines included) · physical pieces (gifts included;
+   a sofa set counts its real modules) · service quantity. Services are priced but never physical
+   pieces; the stair-carry pieces carried and the service's charged quantity are different facts.
+   Worked sample (SO-1319): 2 goods lines · 3 physical pieces · 2 services · goods RM3,780.00 ·
+   services RM350.00 · Total payable RM4,130.00 · Paid to date RM1,999.50 (the voided RM1,200 excluded) ·
+   Balance due RM2,130.50.
 5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
-`Added`, `Removed` and `Undo` on screen remain PROPOSAL words until registered in COPY-STANDARD.
+
+**Refined 2026-09-22 (owner approval of the reviewed plan):**
+- **Item contract.** A new line is added with `Add item` (the owner-approved SO object draft exception in COPY-STANDARD) and picked from the catalogue; an Item Code is never free text that leaves a
+  mismatched name or configuration. Each line's configuration opens only the fields its model really
+  offers (size, fabric, colour, heights, gap, sofa build …); a field the model fixes (e.g. firmness) is
+  read-only. Gift / PWP / bundle lines keep their eligibility and source — a generic price or qty box
+  never replaces that protection; cancelling a parent item shows the gift consequence.
+- **Services follow their own pricing contract:** per-trip charges show qty 1; per-piece charges keep
+  their real quantity.
+- **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
+  visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
+  with the edit-mode `Cancel` and `Cancel SO`.
+- **Before submitting** the reason (required) and a `Before` / `After` review show the three counts, the
+  amount change and each affected object with its owner: purchase demand, an issued PO or promised
+  production (Purchasing settles it with the supplier), received goods and Units (Receiving / Stock),
+  DO (Delivery), money and refunds (Payments), and — for Proceed Date — the purchase-release timing, and —
+  for Sales Location / Salesperson / Dealer — ownership and commission. Issued PO, receipts, Units, DOs and
+  payments are never rewritten by an SO change.
+- **Decisions.** Pending: the effective SO, its official PDF and its signature are unchanged. Reject:
+  the order is kept, the reason recorded. Approve: a complete new version takes effect and each owner
+  handles its consequence. An applied version is corrected only by a new controlled change, never
+  "rejected" afterwards. A version conflict shows the base, current and proposed values and asks for a
+  new review — never a silent overwrite.
+- **Old versions and signatures.** A revision opens the complete old order and prints its OWN stored
+  document; a missing historical file is stated, never rebuilt from current data. A signature belongs
+  to the exact version and document the customer signed; a new unsigned version says it is unsigned and
+  never borrows the old signature.
+- **Proposal tooling stays out of the product.** Demo switches, role pickers and page-state selectors
+  used to review a prototype never enter the staff page.
+- The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
+  `Restore`, `Before` / `After`, `View version` / `Return to current`, `Print this version`,
+  `Goods lines` / `Physical pieces` / `Service quantity`. `Waiting for management` and
+  `Before approval` remain the governed waiting state and impact heading.
+
+### Customer agreement evidence — APPROVED / LOCKED 2026-09-22
+
+A change to the customer's actual agreement must have a recorded, traceable basis for that customer's
+acceptance before it takes effect. A signed document or a reference to the relevant customer
+confirmation (for example, WhatsApp) is acceptable; a new handwritten signature is not required for
+every amendment. A manager's statement or checkbox saying the customer agreed is not sufficient by
+itself and cannot substitute for the evidence.
+
+For Staff correction, where the actual customer agreement has not changed, reference the original
+agreement evidence instead of asking the customer to agree again. Calling a change Staff correction
+never bypasses commercial approval or evidence checks when the agreement actually changes.
+
+The request may remain recorded while evidence is incomplete; it cannot take effect. Sales records
+the confirmation basis; the authorised approver checks that it covers the proposed change. Evidence
+must remain traceable to the proposal it supports. Following conflict review or a changed proposal,
+verify that the evidence still covers the resulting terms; do not silently reuse approval for different
+terms. The server enforces this gate together with the existing permission, revision and impact gates.
+Recording a communication reference does not authorise contacting customers or external parties.
+
+This evidence gate neither rewrites historical signatures nor turns a WhatsApp confirmation into a
+signature. Preserve the actual revision/document association and separately identify unsigned versions.
 
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
@@ -675,16 +747,12 @@ orders from the day it ships.
   hazard, not a field.
 - The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
 
-**`Propose a change to the customer` MOVED INTO `More actions`** — 2026-08-26, on the exact
-precedent `Report a problem` set on 2026-08-15: a rare act does not hold permanent space on a page
-read every day. Its standing sentence is deleted and its idle strip with it.
+**Commercial change entry — owner-approved 2026-09-22, target not built.** Whole-page `Edit`
+contains the commercial draft and preserves items, configuration, unit price, services, dates and
+Instalment months. The server selects `Save` or `Submit amendment request` from actual changes and
+permissions. Do not retain a competing proposal modal as the only way to edit those fields. A live
+request remains visible; submission never changes the effective SO or its official document.
 
-⛔ **The door was NOT deleted, and that distinction is load-bearing.** That modal is the only way to
-change **items, unit price and instalment months** anywhere on the Sales Order — `AMEND DELIVERY
-DATE` submits a date and nothing else. Removing the button would have retired three capabilities
-silently, so it moved instead. A LIVE proposal still draws its panel on the card, because a pending
-amendment is truth rather than an action; only the rule and padding are conditional on one
-existing. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`.
 
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
 uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
@@ -925,9 +993,8 @@ read only as implementation history.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
   SO → SO, PO → PO, DO → DO.
 - The approved row interaction is a 2990-style right-click context menu. Preserve useful document
-  capabilities. `View` and `Edit` reach the SAME destination — the object page has one state and
-  its fields are already editable (SALES ORDER OBJECT PAGE V2 below, which overwrites the earlier
-  "formal edit context" wording); Preview/Print do not edit. Do not add `Issue PO`, `Issue DO` or
+  capabilities. `View` and `Edit` reach the object page in read-only and edit states respectively;
+  Preview/Print do not edit. Do not add `Issue PO`, `Issue DO` or
   other operational acts whose owner is Purchasing, Delivery, Money, Stock, Receiving, Claims or
   Work.
 
@@ -939,7 +1006,8 @@ read only as implementation history.
 - Operation may directly correct safe contact and operational facts. A harmless contact correction
   is not the same as a destination or other change that alters a customer commitment.
 - Sales owns customer/commercial amendments. Operation may submit/route a customer change request.
-  Management may approve/reject or directly amend when authorised. Every applied change carries a
+  Management may approve/reject when authorised; its own commercial changes use the same governed
+  request, evidence and approval gates. Every applied change carries a
   structured reason, Before/After, actor and time.
 - The same customer transaction keeps the same SO number. Cancel only when that transaction is
   cancelled. A placed PO does not force cancel/reorder; it changes a simple edit into a governed
@@ -1541,9 +1609,14 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
   2026-08-15 "one page, one state" rule (international ERP practice — SAP display/change, Odoo and
   NetSuite Edit/Save — and the 2990 reference). The Order tab opens READ-ONLY. A dark primary `Edit`
-  in the page header enters edit mode; edit mode offers `Cancel` and one commit button:
-  `Submit amendment request` when a supplier commitment makes the change an amendment (the existing
-  governed amendment path), otherwise `Save`. `View` and `Edit` on the Register's context menu open
+  in the page header enters edit mode; edit mode offers `Cancel` and ONE commit button that the SYSTEM
+  chooses — never the employee, and never from "is there a PO" alone (**owner approval, Jess 2026-09-22,
+  overwriting the 2026-09-21 supplier-commitment split**): `Save` only for a permitted correction that
+  changes no commercial commitment; `Submit amendment request` for any change to items, configuration,
+  quantity, price, service, the delivery/proceed promise or protected ownership (Sales Location ·
+  Salesperson · Dealer). A mixed change goes to review whole — nothing is partly saved behind the
+  employee's back. When a linked fact (PO, receipt, Unit, DO, payment) cannot be read, the draft is kept,
+  the error is stated and submitting pauses. `View` and `Edit` on the Register's context menu open
   the read-only and the edit state respectively. Leaving edit mode with unsaved changes still refuses
   safely. Who may press `Edit` is the existing permission; this ruling changes no permission.
   **Amendment notice (owner, 2026-09-21):** while a supplier commitment exists, one lock-icon notice sits
@@ -1675,15 +1748,10 @@ planned `proceed_date`.
 
 ### Amend delivery date · money · ownership · actions
 
-- **`AMEND DELIVERY DATE` is a section with exactly three fields** —
-  `Amend date (from customer)` · `Amended delivery date` · `Amend reason *` — carrying the section
-  note `creates a Revision · needs approval`. It submits the governed amendment machinery
-  (`sales_order_submit_amendment`): reason mandatory, Before/After + actor + time recorded, the
-  prior version and its PDF preserved. **It is a narrower FORM over the same act as
-  `Propose a change to the customer`, not a second record** — one live amendment per order still
-  holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
-  column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
-  change phoned in on Monday and typed on Thursday is a Monday request.
+- **Delivery-date changes belong to the whole-page draft**, not a competing date-only form.
+  Preserve customer-request date, reason, Before/After, actor/time and historical document truth.
+  One live amendment per order remains the rule. Customer-request date remains distinct from the
+  submission timestamp (`sales_order_amendments.customer_asked_on`); it is not inferred from prose.
 - **The MONEY block is read-only, and its three amounts are ONE SIZE** — Total · Paid ·
   **Outstanding, red whenever any of it is still owed**. The red is the 2026-08-15 owner ruling
   and it stands; it overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when
@@ -1838,7 +1906,7 @@ Shopify-style transaction/version discipline add no unresolved business rule.
 | Context actions + bulk | Built right-click `Open · Edit · Print PDF · Copy SO No`; bulk Export only | 2990 proves right-click document action pattern | **KEEP / ADAPT** | Rename/open semantics to explicit View/Preview where needed; add no execution acts; preserve selection only for truthful export |
 | View / Preview | Built workspace presents saved truth and the actual PDF; explicit Edit changes context | 2990 detail is read-only until Edit | **KEEP / ADAPT** | PR #754 production-verified 2026-08-13; direct SO/PO/DO lineage completeness remains in the later dependency scopes |
 | Edit / field contract | Built UI and API restrict Edit to safe customer/contact/address/access/proceed-date corrections; items and promised delivery remain read-only | 2990 has a comprehensive backend form | **KEEP / IMPROVE** | PR #754 production-verified 2026-08-13; authoritative Sales Portal/POS parity and the complete role matrix continue through Amendment/Approval |
-| Amendment request + approval | Request/apply foundations and stale detection exist; current UI places amendment beside items | 2990 has separate Amendments and amend fields | **ADAPT / BUILD** | Sales ownership, operation routing, management approve/reject/direct amend, structured Before/After/reason; impact preview across all owners |
+| Amendment request + approval | Request/apply foundations and stale detection exist; current UI places amendment beside items | 2990 has separate Amendments and amend fields | **ADAPT / BUILD** | Sales ownership, operation routing, management approval/rejection through the governed gates, structured Before/After/reason; impact preview across all owners |
 | Revisions | Revision snapshots and historical rendering/PDF exist; current UI combines `History / Revision`; Rev 1 may be minted only on first save | 2990 exposes Revisions and current document identity | **ADAPT / BUILD** | Backstop original Rev 1 at transaction birth; only approved applied amendment mints next Rev; separate complete-version view |
 | History / audit | Order history and revision events render together; actor/cause coverage is partial | 2990 has History | **ADAPT / BUILD** | Separate append-only event view; actor/time/reason/Before/After and permission decisions |
 | Actual PDF + Print | One live renderer and historical snapshot rendering exist; Print opens same blob | 2990 has Print PDF | **KEEP / ADAPT** | Archive/address stable current + per-Revision document truth; follow `SO-PDF-STANDARD.md` |

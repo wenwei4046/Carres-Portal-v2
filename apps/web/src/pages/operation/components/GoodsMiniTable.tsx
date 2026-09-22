@@ -272,6 +272,8 @@ const SELECT_WIDTH = 36;
  * answer everywhere else (Purchase Orders, To Order), never truncation.
  */
 const ITEM_FLOOR = 220;
+/** Sales Orders goods `SKU`: the longest catalog goods SKU, one line (§6.8). */
+const SALES_ORDER_SKU_WIDTH = 210;
 
 /** One goods line, already resolved to strings by the page that owns the data. */
 export interface GoodsMiniLine {
@@ -740,6 +742,17 @@ export default function GoodsMiniTable({
        second line inside its cell; it is never clipped. */
     REGISTRY.item = { key: "item", label: itemHeading ?? "Item", width: 240 };
   }
+  /* ⭐ THE SALES ORDERS GOODS TABLE TAKES MEASURED WIDTHS TOO (§6.8, owner
+     review 2026-09-22). It was the last goods table still stretched with
+     `w-full`, so on a 1974px sheet `Item` grew to 957px. Now every column is
+     fixed and the table takes the sum, exactly as SO Batch does: `Item` takes
+     the purchasing goods table's 240 and a long configuration wraps inside it;
+     `SKU` widens to hold the longest catalog goods SKU on one line
+     (`MEMORY-FOAM-PILLOW-asd` 191.3px + 16 padding + 1 rule = 210, measured in the rendered shell 2026-09-22). */
+  if (salesOrderLayout) {
+    REGISTRY.sku = { key: "sku", label: "SKU", width: SALES_ORDER_SKU_WIDTH };
+    REGISTRY.item = { key: "item", label: itemHeading ?? "Item", width: 240 };
+  }
   /**
    * ⭐ THE RECEIVING GOODS ORDER — owner ruling 2026-09-18, Purchasing §9.4.
    * The destination takes the SAME one word the sibling pages use: the
@@ -836,8 +849,9 @@ export default function GoodsMiniTable({
     columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
   /* Content decides the width on the SO Batch layout; every other caller keeps
      `w-full` and its one flexible column. */
-  const tableStyle = purchasingGoodsLayout ? { width: minWidth } : { minWidth };
-  const tableClass = purchasingGoodsLayout
+  const fixedWidths = purchasingGoodsLayout || salesOrderLayout;
+  const tableStyle = fixedWidths ? { width: minWidth } : { minWidth };
+  const tableClass = fixedWidths
     ? "table-fixed text-left"
     : "w-full table-fixed text-left";
   return (
@@ -864,7 +878,7 @@ export default function GoodsMiniTable({
        */
       className={`overflow-x-auto rounded-control bg-white ${
         purchasingGoodsLayout ? "border border-kit-blue-6" : "border border-base-200"
-      }`}
+      }${salesOrderLayout ? " w-fit max-w-full" : ""}`}
       data-testid="goods-mini-table"
     >
       <table
@@ -941,13 +955,18 @@ export default function GoodsMiniTable({
                 case "category":
                   return line.category;
                 case "sku":
-                  return <span className={salesOrderLayout ? "block max-w-full overflow-x-auto whitespace-nowrap font-medium" : "font-medium"} title={salesOrderLayout ? line.sku : undefined} tabIndex={salesOrderLayout ? 0 : undefined}>{line.sku}</span>;
+                  /* Sales Orders: plain 13px, one line, never a scroll box (§6.0 rule 5). */
+                  return salesOrderLayout
+                    ? <span className="whitespace-nowrap">{line.sku}</span>
+                    : <span className="font-medium">{line.sku}</span>;
                 case "item":
                   return (
                     <>
-                      <div className="font-medium text-base-900">{line.item}</div>
+                      {/* Sales Orders: the name in plain 13px, the configuration as
+                          the governed second fact — 11px slate-11 (§6.0 rule 5, §6.8). */}
+                      <div className={salesOrderLayout ? "text-kit-slate-12" : "font-medium text-base-900"}>{line.item}</div>
                       {line.itemDetail ? (
-                        <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
+                        <div className={salesOrderLayout ? "mt-0.5 text-[11px] leading-[14px] text-kit-slate-11" : "mt-0.5 text-base-600"}>{line.itemDetail}</div>
                       ) : null}
                     </>
                   );
