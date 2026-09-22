@@ -39,6 +39,7 @@ import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/render
 import { displayCustomerName } from "@/lib/customer-name";
 import { lineConfigBits } from "@/pages/dealer/new-order/special-addons-picker";
 import { NOTO_SANS_SC_FAMILY } from "@/lib/pdf/fonts/noto";
+import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
 // main moved the money formatters into the shared letterhead (#1337) — the
 // document family keeps ONE date and money format. Take theirs, keep ours.
 import { CARRES_COMPANY, formatMoney, moneyDigits } from "@/lib/pdf/letterhead";
@@ -396,6 +397,8 @@ function ColumnRules({ xs = RULE_X }: { xs?: readonly number[] }) {
 export type ReviewSoData = SalesOrderTemplateData & {
   review_rev: number;
   review_signature: { by: string; at: string; rev: number } | null;
+  /** Payments has not confirmed the paid figure: print "To check", never a computed balance. */
+  review_payment_check?: string | null;
 };
 
 export function ReviewSalesOrderTemplate(data: ReviewSoData) {
@@ -470,12 +473,15 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
   /* Owner ruling 2026-09-22: quantities by product kind, services named, never counted as goods. */
   const kindQty = new Map<string, number>();
   for (const l of lines) {
-    const k = (l.category ?? "other").trim();
-    const name = k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+    /* The Register's ladder (Law D); an unnamed line keeps its qty under the PROPOSED "Items to check". */
+    const w = goodsCategoryWordOf({ sku: l.sku, attrs: (l.attrs ?? null) as Record<string, unknown> | null, category: l.category ?? null });
+    const name = w === "Other goods" ? "Items to check" : w;
     kindQty.set(name, (kindQty.get(name) ?? 0) + Number(l.qty));
   }
-  const qtyLine = `Qty: ${[...kindQty].map(([k, n]) => `${k} ${n}`).join(" · ")}`;
-  const servicesLine = addons.length ? `Services: ${addons.map((a) => a.label).join(" · ")}` : "";
+  const rank = (k: string) => { const i = (GOODS_CATEGORY_WORDS as readonly string[]).indexOf(k); return i < 0 ? 99 : i; };
+  const qtyLine = `Qty: ${[...kindQty].sort((a, b) => rank(a[0]) - rank(b[0])).map(([k, n]) => `${k} ${n}`).join(" · ")}`;
+  /* Services summary: name and quantity (a line count is not a service quantity). The table row keeps the plain name. */
+  const servicesLine = addons.length ? `Services: ${addons.map((a) => (Number(a.qty) > 1 ? `${a.label} ×${a.qty}` : a.label)).join(" · ")}` : "";
   const serviceAmount = addons.reduce((n, a) => n + Number(a.line_total), 0);
   const totalDiscount = lines.reduce((n, l) => n + (l.discount && l.discount > 0 ? l.discount : 0), 0);
   const totalAmount =
@@ -795,9 +801,10 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
           <View style={[styles.bAmount, styles.gridV]}><Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text></View>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: mm(1.5) }}>
+        {/* Stacked, not side by side: a real order's Qty line (SO-1206) ran into the Services line. */}
+        <View style={{ marginTop: mm(1.5) }}>
           <Text style={{ fontSize: 7.5, color: "#1A1714" }}>{qtyLine}</Text>
-          <Text style={{ fontSize: 7.5, color: "#1A1714" }}>{servicesLine}</Text>
+          {servicesLine ? <Text style={{ fontSize: 7.5, color: "#1A1714", marginTop: mm(0.8) }}>{servicesLine}</Text> : null}
         </View>
 
         {/* Vouchers whose trigger line isn't on the doc (defensive) */}
@@ -904,11 +911,11 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
             </View>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Paid to date</Text>
-              <Text style={styles.totalsValue}>{money(paid)}</Text>
+              <Text style={styles.totalsValue}>{data.review_payment_check ?? money(paid)}</Text>
             </View>
             <View style={styles.balanceBox}>
               <Text style={styles.balanceLabel}>BALANCE DUE</Text>
-              <Text style={styles.balanceValue}>{money(balance_due)}</Text>
+              <Text style={styles.balanceValue}>{data.review_payment_check ?? money(balance_due)}</Text>
             </View>
           </View>
         </View>
