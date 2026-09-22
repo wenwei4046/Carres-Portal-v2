@@ -160,8 +160,8 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
     keep the old document-level fallback.
   - CR/TCF import refs never appear. No database words on paper. No UOM
     column. An item never splits across pages.
-  - A BULK PO (several SOs) closes with the family `TOTAL` row (qty only);
-    a one-customer PO does not.
+  - EVERY PO's table closes with the family `TOTAL` row (qty only) — one
+    layout for every PO, a one-customer PO included.
 - **Consolidation** (business, unchanged): mattress/bedframe group by model,
   quantity summed, owning SOs listed; sofa = one customer order, max 2 sets.
   The §6.2 bedframe one-PO-one-customer ruling and its recorded conflict with
@@ -174,9 +174,9 @@ One drawing per model with module lines: bordered module boxes (no outer union
 outline), back strip on top, chaise deeper toward the viewer, module code +
 that module's fabric under each box, TV marker beneath. Caption: `Top view.
 Back at the top. TV in front.` Why: LHF/RHF words alone get sofas built
-mirror-reversed; the picture is the contract. One set per page remains the
-target for the sofa PO's paging (implement with the long-order pass, matching
-the DO's per-set pages).
+mirror-reversed; the picture is the contract. **One set per page — BUILT
+2026-09-22:** each model's drawing takes a page of its own after the goods
+table, headed `SOFA LAYOUT · {model}`, under the same full header.
 
 ## 4 · Footer & audit
 
@@ -225,3 +225,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
 | 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
 | 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO-… V{n}` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
+| 2026-09-22 | **BUILT** (`po-template.tsx`, `GET /print-data`): every rule of 2026-09-21/22 above. The route ADDS `delivery_working_days` (shared `poDeliveryWorkingDays`, the supplier's week + holidays) and `delivery_method` (`suppliers.kind = 'factory_pickup'` → `We collect`) beside the SQL document and overwrites nothing; a kept version (`?version=N`) gets neither and reprints as sent. Every PO closes with `TOTAL`; sofa drawings one set per page. Words never split at a line end (family, SO-PDF-STANDARD §9). No migration. | Jess |

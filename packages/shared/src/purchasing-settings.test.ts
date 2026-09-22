@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addWorkingDays } from "./working-days";
-import {
+import { poDeliveryWorkingDays,
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
   orderByFromDeliveryDate,
@@ -517,5 +517,32 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
     expect(workWeekLabel([0])).toBe(weekdayListLabel([1, 2, 3, 4, 5, 6]));
     // Two working days do not collapse into a range — `Mon Tue`, never `Mon–Tue`.
     expect(weekdayListLabel([1, 2])).toBe("Mon Tue");
+  });
+});
+
+describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2026-09-22)", () => {
+  const settings = {
+    suppliers: [
+      { id: "nf", name: "Nice Future", categories: [], offDays: [0, 6], transitDays: 1 },
+      { id: "ohana", name: "Ohana", categories: [], offDays: [0], transitDays: 1 },
+    ],
+  } as unknown as Pick<import("./purchasing-settings").PurchasingSettings, "suppliers">;
+
+  it("Mon 21 Sep 2026 → Fri 9 Oct 2026 on a Mon–Fri supplier is 14 — the owner's example", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(14);
+  });
+
+  it("counts on THIS supplier's week — a Saturday-working factory gets more days in the same span", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "ohana", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(16); // + Sat 26 Sep, Sat 3 Oct
+  });
+
+  it("skips a public holiday", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set(["2026-10-01"]) })).toBe(13);
+  });
+
+  it("no date, or a date not after the PO Date, is no number — never a guess", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: null })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: null, deliveryDateIso: "2026-10-09" })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-10-09", deliveryDateIso: "2026-10-09" })).toBeNull();
   });
 });
