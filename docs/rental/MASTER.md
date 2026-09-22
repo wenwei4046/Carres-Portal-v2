@@ -144,9 +144,15 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   stay at Diglant Klang; Carres arranges pickup. No larger/new Carres warehouse is assumed.
   Demand volume, required warehouse size and suitable partners are not yet understood; avoid
   the upfront warehouse investment while learning the new business.
-- NETS currently supports the legacy/traditional business. Diglant is a new business-model
-  partnership; neither NETS nor another legacy partner is automatically appointed to this programme.
-  Legacy Delivery rules remain valid in their scope, not proof of the new programme's partner choice.
+- **OWNER RULING — Jess, 2026-09-22:** NETS supports the legacy business and is also the
+  short-term delivery choice for the new Diglant programme in Klang Valley. NETS is not the
+  nationwide solution. Other regional partners, capacity and acceptable rates remain unknown;
+  do not infer an appointment of HOUZS or another legacy partner for this new programme.
+- Monthly KPI levels of 100 / 200 / 500 mattresses are growth scenarios, not measured sales,
+  signed volume guarantees or triggers to lease warehouses. Jess needs actual volume and its
+  regional distribution before selecting additional partners and negotiating volume/rates.
+  Multiple logistics partners and possibly storage locations may be needed as the business grows;
+  neither their identities, prices nor network design are approved by these scenarios.
 - After approximately 3–6 months of actual operation, Jess will evaluate volume and logistics
   options before deciding whether to rent another location and manage storage. This is a review
   horizon, not an automatic warehouse move, lease commitment or scheduled reminder authorization.
@@ -178,7 +184,7 @@ Finance 不在此次讨论范围内。没有应用代码、Card、部署、生�
 | RESOLVED FROM AUTHORITY | ERP Architecture §§1、3；Rental §2 | 独立合同所有权、订单履约、一个动作一个 owner；Purchase/Rental 不混单；已签文本保留版本 |
 | RESOLVED FROM AUTHORITY | Purchasing §§5.6、6.2、9.2；Stock §§3–5 | 正式 PO 发出时产生 Unit ID；报告不能生 Unit；采购审批和额外备货规则不被预测绕过 |
 | RESOLVED FROM AUTHORITY | Orders 月度需求／Forecast boundary（约 245–270 行）；COPY Sales Order footer | 当前批准的需求是已确认未交付需求；新预测不混入该表；SO Register 目前排除 Rental |
-| RESOLVED FROM AUTHORITY | Delivery §§1.1、5.3、14.1 | 唯一交接链和倒排日期；传统业务东马经 HOUZS。新 Diglant 计划的伙伴尚未指定，不自动继承该任命 |
+| RESOLVED FROM AUTHORITY | Delivery §§1.1、5.3、14.1 | 唯一交接链和倒排日期；传统业务东马经 HOUZS。新 Diglant 计划短期 NETS 负责 Klang Valley，其他地区伙伴未定，不自动继承 HOUZS 任命 |
 | APPROVED TARGET / NOT BUILT | Rental §2；Service Subscription boundary；Guarantee Future Subscription；Purchasing §5.4 | 每年三次清洁、独立 Visit/Upgrade、独立 Claim 政策；外部目的地 Receiving 语义已有目标，不能声称已建成 |
 | BUILT IN SOURCE / 本任务未生产验证 | `apps/api/src/routes/operation/orders.ts:354–364`；`supabase/migrations/0275_rental_makes_a_sales_order.sql:224–250`；`apps/web/src/pages/operation/OperationRental.tsx:1–80` | 已有 Rental→零金额履约 SO 链接、Rental 资产列表；总数查询仍排除 Rental。旧 `RU-` 展示不能成为床垫第二身份 |
 | REAL GAP / CONTRADICTION | 上述规则与 §4 新方向 | 共用 SO 入口/可见范围、预测转采购去重、未提货 Unit 的未来供应关联、工厂起点交接和收货语义需要跨模块批准；不能假装现有 Ready Stock 已支持 |
@@ -369,7 +375,7 @@ Customer receipt date / forecast fulfilment window
 西马：按实际地区、伙伴提货/派送工作日及容量倒排，Klang Valley 与外州不能共用一个
 随意写死的运输天数。东马：仍需覆盖海运、港口、中转及末程，以实际选定伙伴提供的
 窗口/确认资料规划，不假装 Carres 调度其内部船次。Delivery §14.1 的 HOUZS 是传统
-业务既有规则，不代表本轮已任命 HOUZS 承接 Diglant；NETS 也不是默认任命。
+业务既有规则，不代表本轮已任命 HOUZS 承接 Diglant；短期 Klang Valley 使用 NETS，这是本轮 owner 明确选择；不把其覆盖扩大到全国。
 海运内部节点只作有来源的观察/预计，不凭猜测制造 DO、收货或每段完成记录。
 新合作需落实每段交接、客户联系及最终证明责任；Carres 仍 owns Logistics assignment，
 只有真实交接点、确切 Unit、有来源的伙伴回复和到货证明才形成履约事实。
@@ -408,6 +414,29 @@ Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际�
 和包装占地、存放天数、提货频率/等待时间、各地区交付表现、破损及物流报价。若考虑
 仓库，再根据真实堆放限制、周转空间及通道估算面积，不凭销量直接猜平方米。
 留货/物流问题先走运营异常解决；转为自仓仍需 Jess 新决定，不能由指标自动触发租仓。
+
+**OWNER RULING — 规模与伙伴选择：** 短期 NETS 配送 Klang Valley；扩张需要先弄清实际
+货量，才能按量谈价、选择地区伙伴。100/200/500 张是 KPI 规模情景，不是当前销量，
+也不代表单仓或 NETS 能承担全国配送。候选伙伴的实际能力、风险和可接受价格尚未知。
+
+**RECOMMENDATION / PROPOSAL / NOT LAW — 为谈量谈价准备的数据：** 月报除全国总量外，
+按实际客户州属/地区列确认需求、实际配送、未交量、每周可集运张数、每单床垫数、
+提货频率、所需交付窗口、失败/重送及破损。Klang Valley、西马其他地区、Sabah、Sarawak
+分开看；预测地域占比标为假设，不能拿全国 KPI 向某地区伙伴保证货量。
+允许先收集候选报价以了解市场，最终选择及量价承诺再按真实数据判断；不必等量到
+500 张才开始了解，但本 PLAN 不联系任何伙伴或承诺最低量。
+
+同口径比较候选伙伴的可服务地区、真实容量、Klang 工厂提货、集运/海运与末程责任、
+时效、交接/签收证据、异常处理以及报价的适用数量和有效期。价格比较建议记录一张
+实际送达床垫所需的全部物流报价组成：提货、干线/海运、末程、偏远/楼层、等待、重送
+和暂存；只记有依据的报价/实际物流费用，不扩展 Finance 或另建结算账。
+量不足的区域暴露最低批量和等待时间，不能以便宜干线价假装整程便宜。
+
+建议用 100/200/500 张分别做区域分布与集运频率情景，显示运输成本、所需容量及
+数据未知项，不为每档硬定仓库数量/面积。实际量集中可谈固定频次/量价，地区分散则
+比较多伙伴组合；任何保量条款均须另行 owner 决定。运营复盘可持续更新，约 3–6 个月
+的租仓评估仍保留；此处没有设提醒、自动换伙伴或启动市场联络。
+
 
 ## 5.9 · 客户、激活、服务、变更到结束
 
@@ -530,7 +559,7 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 🟡 **新员工易混淆：** forecast/KPI/PO/提货/收到五种事实。修复为分栏、带月份、可追源。
 🔴 **不能照当前能力直接执行：** 工厂起点收货/DO、时间口径与未来供应关联。修复为保留
 真实来源、未知日期和禁止虚构收货；未来执行前需在 owning authority 收口。
-🟡 **业务仍未定：** 新计划条款、实际伙伴和留货执行条件；初期 Diglant 留货已确定。
+🟡 **业务仍未定：** 新计划条款、Klang Valley 以外伙伴和留货执行条件；初期 Diglant 留货已确定。
 不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
 
 **CURRENT MISSION：** 全量推荐已形成，owner review 待完成。不是 PLAN MISSION COMPLETE，

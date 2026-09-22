@@ -1614,9 +1614,12 @@ partner, or Carres contacting the East Malaysia customer directly.
 
 **New Diglant Subscription scope — owner clarification, 2026-09-22.** The initial storage
 ruling lives in `../rental/MASTER.md` §4 and §5.8: completed mattresses stay at Diglant Klang;
-Carres arranges Logistics pickup. NETS currently serves the legacy business. Neither its default
-assignment nor the legacy HOUZS route constitutes an appointment for this new programme; actual
-partners and their responsibilities remain to be established. Preserve the legacy rules above.
+Carres arranges Logistics pickup. Jess explicitly selects NETS for short-term Klang Valley
+delivery in this new programme as well as its legacy work. This is not nationwide coverage.
+Other regions' partners, capacity and rates remain to be established; the legacy HOUZS route is
+not automatically an appointment for Diglant. The 100/200/500 monthly KPI scenarios are not actual
+or guaranteed volume; regional actual demand informs later partner selection and volume/rate
+negotiation. Preserve the legacy rules above.
 Reuse Delivery's Unit evidence and route-planning ownership without inventing a Carres warehouse
 receipt or claiming the factory-origin route is built. The approximately 3–6 month business review
 is not an automatic move into Carres storage.
