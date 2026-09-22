@@ -1032,9 +1032,10 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 
 | Fact | Exact copy |
 |---|---|
-| PO document issue date (not sent-mark date) | `PO Date` |
-| GRN creation date; physical arrival is separately Goods Received Date | `GRN Date` |
-| DO issue date | `DO Date` |
+| PO document issue date (not sent-mark date) | `PO Doc Date` |
+| GRN creation date; physical arrival is separately Goods Received Date | `GRN Doc Date` |
+| DO issue date | `DO Doc Date` |
+| **Every document's own date — owner ruling (Jess, 2026-09-23)** | **`{DOC} Doc Date`** on every Carres document and every screen that names that date: `SO Doc Date` · `PO Doc Date` · `GRN Doc Date` · `DO Doc Date` · `RO Doc Date` · `PR Doc Date` — and every document added later. `PO Date` · `GRN Date` · `DO Date` are RETIRED. |
 | Separate delivery facts | `PO Delivery Date` · `Supplier Confirmed Delivery Date` · `Goods Received Date` |
 | `Supplier Confirmed Delivery Date` with no answer | `Not confirmed` (the dictionary's word for THIS column — its head already says whose date it is) |
 | The supplier moved the date, second line | `Supplier changed from {date}` |
