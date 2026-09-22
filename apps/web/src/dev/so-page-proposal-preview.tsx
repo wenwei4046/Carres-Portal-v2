@@ -491,7 +491,7 @@ function Page() {
     <Card title="Payment" aside={<a className="text-meta text-kit-blue-11 hover:underline" href="#payments">Open this order in Payments →</a>}>
       <p className="mb-2 text-meta text-kit-slate-11">Payment details recorded at sale: 12-month instalment · BANK-REFERENCE · <a className="text-kit-blue-11 hover:underline" href="#slip">View slip</a></p>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] border-collapse text-body">
+        <table className="w-full min-w-[600px] border-collapse text-body">
           <thead>
             <tr className="border-b border-kit-slate-5 text-left text-meta text-kit-slate-11">
               <th className="whitespace-nowrap px-2 py-1 font-normal">Date</th><th className="whitespace-nowrap px-2 py-1 font-normal">Payment received</th>
@@ -513,22 +513,29 @@ function Page() {
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr className="font-semibold text-kit-slate-12">
+          <tfoot className="text-kit-slate-12">
+            <tr className="border-b border-kit-slate-5 font-semibold">
               <td colSpan={4} className="px-2 py-2 text-right">TOTAL RECEIVED</td>
               <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(paid)}</td>
+            </tr>
+            {([
+              ["Goods total", `RM ${money(total)}`],
+              ["Tax", "—"],
+              ["Total payable", `RM ${money(total)}`],
+              ["Paid to date", `RM ${money(paid)}`],
+            ] as const).map(([k, v]) => (
+              <tr key={k} className="border-b border-kit-slate-5">
+                <td colSpan={4} className="px-2 py-2 text-right">{k}</td>
+                <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${v === "—" ? "text-kit-slate-11" : ""}`}>{v}</td>
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td colSpan={4} className="px-2 py-2 text-right">Balance due</td>
+              <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${total - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total - paid, 0))}</td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <dl className="ml-auto mt-3 grid w-72 grid-cols-2 text-body text-kit-slate-12 [&>*]:border-b [&>*]:border-kit-slate-5 [&>*]:px-2 [&>*]:py-2">
-        <dt>Goods total</dt><dd className="text-right tabular-nums">RM {money(total)}</dd>
-        <dt>Tax</dt><dd className="text-right text-kit-slate-11">—</dd>
-        <dt>Total payable</dt><dd className="text-right tabular-nums">RM {money(total)}</dd>
-        <dt>Paid to date</dt><dd className="text-right tabular-nums">RM {money(paid)}</dd>
-        <dt className="font-semibold">Balance due</dt>
-        <dd className={`text-right font-semibold tabular-nums ${total - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total - paid, 0))}</dd>
-      </dl>
       {paid > total && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(paid - total)} needs review</p>}
     </Card>
   );
