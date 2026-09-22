@@ -3,7 +3,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { PoTemplate } from "./po-template";
+import { PoTemplate, poPrintDate, unitRuns } from "./po-template";
 import type { PoTemplateData } from "./types";
 
 // PO-PDF-STANDARD guard (2026-08-02). A render test only sees the branches its
@@ -23,11 +23,62 @@ const SRC = readFileSync(
 // comments fails on the very sentence explaining why the rule exists.
 const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
+/** Every string the element tree would print. Function components (the
+ *  template's section 2, table head and total rows) are expanded; a `render`
+ *  prop (the page counter) is not — react-pdf fills it at layout time. */
 function renderedText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(renderedText).join(" ");
   if (!isValidElement(node)) return "";
-  return renderedText((node as ReactElement<{ children?: ReactNode }>).props.children);
+  const el = node as ReactElement<{ children?: ReactNode }>;
+  if (typeof el.type === "function") {
+    return renderedText((el.type as (p: unknown) => ReactNode)(el.props));
+  }
+  return renderedText(el.props.children);
+}
+
+/** The page-level blocks in order, and whether each one starts a new page. */
+function pageBlocks(data: PoTemplateData): Array<{ text: string; breaks: boolean }> {
+  const doc = PoTemplate(data) as ReactElement<{ children: ReactElement<{ children: ReactNode[] }> }>;
+  const page = doc.props.children;
+  const kids = (page.props.children as ReactNode[]).flat() as ReactElement<{ break?: boolean }>[];
+  return kids
+    .filter((k) => isValidElement(k) && !(k.props as { fixed?: boolean }).fixed)
+    .map((k) => ({ text: renderedText(k), breaks: Boolean(k.props.break) }));
+}
+
+const KLANG = { name: "Carres Klang Warehouse", address: "Lot 6515, Batu 5 1/2, Jalan Kapar, 42100 Klang, Selangor" };
+const AL = { name: "AL Sungai Buloh", address: "Lot 88, Jalan Industri 3, 47000 Sungai Buloh, Selangor" };
+const U = (a: number, n: number) => Array.from({ length: n }, (_, i) => `U1-000-${String(a + i).padStart(3, "0")}`);
+
+/** The owner's worked example (2026-09-22): PO-0042 V2 = the SAME 6 King as
+ *  V1, 4 to Klang + 2 to AL. Same goods, same Unit IDs, one PO. */
+function twoLocationV2(): PoTemplateData {
+  return {
+    po_number: "PO-2609-0042",
+    po_id: "PO-2609-0042",
+    version: 2,
+    issue_date: "2026-09-21",
+    supplier: { name: "Nice Future Sdn Bhd", address: "Lot 12, Johor Bahru", contact: "+60 7-236 8800" },
+    destination: KLANG,
+    delivery_instructions: null,
+    eta_date: "2026-10-09",
+    delivery_working_days: 14,
+    delivery_method: "supplier_delivers",
+    issued_by: "Shasha",
+    so_refs: [1256, 1318, 1290],
+    lines: [
+      {
+        sku: "B1201F-K", description: "Forte Mattress — King", qty: 4, unit: "pc", destination: KLANG,
+        identity_mode: "exact_unit", unit_codes: U(1, 4), sources: [{ so: 1256, qty: 2 }, { so: 1318, qty: 2 }],
+      },
+      {
+        sku: "B1201F-K", description: "Forte Mattress — King", qty: 2, unit: "pc", destination: AL,
+        identity_mode: "exact_unit", unit_codes: U(5, 2), sources: [{ so: 1290, qty: 2 }],
+      },
+    ],
+    terms: null,
+  };
 }
 
 describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
@@ -38,48 +89,45 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   });
 
   /**
-   * ⭐ 0378 — THE DOCUMENT PRINTS ITS OWN VERSION, INCLUDING VERSION 1.
-   *
-   * A supplier holding two papers with one number and no version cannot tell
-   * which to build from. (`Version 1 prints nothing` is the internal REVISIONS
-   * PANEL's rule — `docs/COPY-STANDARD.md` — and this is paper that leaves the
-   * building; the panel rule is untouched.)
+   * ⭐ 0378 + owner 2026-09-22 — THE VERSION TRAVELS WITH THE NUMBER, V1 TOO,
+   * on the hero, the PO No row and the footer of EVERY page. It never prints
+   * on its own (`Version` row, a second line under PURCHASE ORDER).
    */
-  it("prints its version, and takes it from the document payload", () => {
-    expect(SRC).toContain("versionLabel");
-    expect(SRC).toMatch(/Version \$\{version \?\? 1\}/);
-    // It comes off the official payload, not from a prop somebody could pass.
+  it("prints PO-… V{n} from the payload, and never a Version row of its own", () => {
+    expect(SRC).toMatch(/`\$\{po_number\} V\$\{version \?\? 1\}`/);
     expect(SRC).toMatch(/const \{ po_number, version,/);
-    // It appears on the first-page identity block AND the continuation header.
-    expect(SRC).toMatch(/docTitle[^\n]*>\{versionLabel\}/);
-    expect(SRC).toContain("{versionLabel}");
-    // And as its own PO DETAILS row.
-    expect(SRC).toMatch(/\["Version",/);
+    expect(CODE).not.toMatch(/\["Version",/);
+    expect(CODE).not.toMatch(/versionLabel/);
+    const text = renderedText(PoTemplate(twoLocationV2()));
+    expect(text.split("PO-2609-0042 V2").length - 1).toBeGreaterThanOrEqual(3);
   });
 
-  it("never invents a version — a payload without one reads Version 1", () => {
-    // `version ?? 1` and nothing else; no counting, no lookup, no default prop.
+  it("never invents a version — a payload without one reads V1", () => {
     expect(CODE).not.toMatch(/version\s*\+\+|version\s*\+\s*1/);
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), version: undefined as unknown as number }));
+    expect(text).toContain("PO-2609-0042 V1");
   });
 
-  it("carries the Law's fixed strings", () => {
-    for (const s of [
-      "Deliver by",
-      "Version",
-      "PURCHASE ORDER",
-      "Computer-generated document · No signature required.",
-      "SO No",
-      "Unit ID",
-      "TOTAL",
-      "Top view. Back at the top. TV in front.",
-    ]) {
+  it("the SAME full header on every page — one fixed header, no one-line continuation", () => {
+    expect(CODE).not.toMatch(/pageNumber === 1/);
+    expect(CODE).not.toMatch(/subPageNumber === 1/);
+    const text = renderedText(PoTemplate(twoLocationV2()));
+    expect(text.split("PURCHASE ORDER").length - 1).toBe(1);
+  });
+
+  it("carries the dictionary's words, and not the retired ones", () => {
+    for (const s of ["PO Date", "Delivery Method", "PO TOTAL", "TOTAL", "Unit ID", "SO No",
+      "Computer-generated document · No signature required.", "Top view. Back at the top. TV in front."]) {
       expect(SRC, s).toContain(s);
     }
+    for (const retired of ["Deliver by", "Issued\"", "PO Doc Date", "Supplier Default", "Multiple destinations"]) {
+      expect(CODE, retired).not.toContain(retired);
+    }
+    // `(1 of 2)` on a Deliver To heading is retired; the footer's `Page n of m` stays.
+    expect(CODE).not.toMatch(/\(\$\{[^}]+\} of \$\{/);
   });
 
   it("never prints the retired word `Item ID` — the ERP word is `Unit ID` (owner ruling 2026-09-07)", () => {
-    /* COPY-STANDARD: `Item ID` is a banned substitute for `Unit ID`. A
-       heading that regresses to it fails here before it reaches a supplier. */
     expect(SRC).not.toMatch(/Item ID/);
     expect(SRC).not.toMatch(/ITEM ID/);
     expect(SRC).toMatch(/>Unit ID</);
@@ -94,76 +142,137 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   });
 });
 
-/**
- * ⭐ THE DOCUMENT CARRIES THE FACTS IT CLAIMS
- * (0382 · 0383; CARD-2026-08-22-purchasing-02 closure §6 · §7).
- *
- * `SO NO` and the Unit ID column were columns with nothing behind them: the schema kept
- * `so_refs` on the DOCUMENT, so every bulk purchase order printed a blank
- * customer column, and the route hard-coded the issuer to `null`.
- */
-describe("po-template prints the lineage and the issuer it is given", () => {
-  it("prints every line's governed destination on a multi-destination PO", () => {
-    const data: PoTemplateData = {
-      po_number: "PO-9801",
-      po_id: "PO-9801",
-      version: 2,
-      issue_date: "2026-08-28",
-      supplier: { name: "Ohana", address: "Muar", contact: null },
-      destination: { name: "Carres Klang", address: "Klang address" },
-      delivery_instructions: null,
-      eta_date: "2026-09-05",
-      issued_by: "Yee Jin",
-      lines: [
-        {
-          sku: "CODY-Q",
-          description: "Cody Queen",
-          qty: 1,
-          unit: "pc",
-          destination: { name: "Carres Klang", address: "Klang address" },
-        },
-        {
-          sku: "JAGER-K",
-          description: "Jager King",
-          qty: 1,
-          unit: "pc",
-          destination: { name: "Partner Penang", address: "Penang address" },
-        },
-      ],
-      terms: null,
-    };
-
-    const text = renderedText(PoTemplate(data));
-    expect(text).toContain("Multiple destinations");
-    expect(text).toContain("Carres Klang");
-    expect(text).toContain("Partner Penang");
-    expect(text).toContain("Penang address");
+describe("PO {n}-Day Delivery Date and Delivery Method (owner 2026-09-22)", () => {
+  it("names the working days the payload counted, and prints the date as Fri, 9 Oct 2026", () => {
+    const text = renderedText(PoTemplate(twoLocationV2()));
+    expect(text).toContain("PO 14-Day\nDelivery Date");
+    expect(text).toContain("Fri, 9 Oct 2026");
+    expect(text).toContain("Mon, 21 Sep 2026");
+    expect(text).toContain("Supplier delivers");
+    expect(poPrintDate("2026-10-09")).toBe("Fri, 9 Oct 2026");
   });
 
+  it("without a counted n the label is the plain PO Delivery Date — never a guessed number", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), delivery_working_days: null, delivery_method: null }));
+    expect(text).toContain("PO Delivery Date");
+    expect(text).not.toMatch(/PO \d+-Day/);
+    expect(text).not.toContain("Delivery Method");
+  });
+
+  it("an unknown date reads Not recorded; a collection supplier reads We collect", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), eta_date: null, delivery_working_days: null, delivery_method: "we_collect" }));
+    expect(text).toContain("Not recorded");
+    expect(text).toContain("We collect");
+  });
+});
+
+describe("one PO, one page group per Deliver To (owner 2026-09-22)", () => {
+  it("each Deliver To starts a new page with its own name, address and TOTAL; the last closes with PO TOTAL", () => {
+    const blocks = pageBlocks(twoLocationV2());
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]!.breaks).toBe(false);
+    expect(blocks[1]!.breaks).toBe(true);
+    expect(blocks[0]!.text).toContain(KLANG.name);
+    expect(blocks[0]!.text).toContain(KLANG.address);
+    expect(blocks[0]!.text).not.toContain(AL.name);
+    expect(blocks[0]!.text).toMatch(/TOTAL\s+4/);
+    expect(blocks[0]!.text).not.toContain("PO TOTAL");
+    expect(blocks[1]!.text).toContain(AL.name);
+    expect(blocks[1]!.text).toContain(AL.address);
+    expect(blocks[1]!.text).toMatch(/TOTAL\s+2/);
+    expect(blocks[1]!.text).toMatch(/PO TOTAL\s+6/);
+  });
+
+  it("# numbers run on across locations, and no page says (1 of 2)", () => {
+    const blocks = pageBlocks(twoLocationV2());
+    expect(blocks[1]!.text).toMatch(/\b2\b/);
+    expect(blocks.map((b) => b.text).join(" ")).not.toMatch(/\(\d+ of \d+\)/);
+  });
+
+  it("a one-location PO prints one page group and no PO TOTAL", () => {
+    const data = twoLocationV2();
+    data.lines = [{ ...data.lines[0]!, qty: 6, destination: KLANG, unit_codes: U(1, 6) }];
+    const blocks = pageBlocks(data);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.text).toMatch(/TOTAL\s+6/);
+    expect(blocks[0]!.text).not.toContain("PO TOTAL");
+  });
+
+  it("five columns on every PO — no per-line DELIVER TO column", () => {
+    const heads = [...CODE.matchAll(/styles\.th[^>]*>([^<]+)</g)].map((m) => m[1]);
+    expect(heads).toEqual(["#", "SO No", "Unit ID", "Description", "Qty"]);
+  });
+});
+
+describe("Unit IDs — runs computed from the codes, last three digits bold", () => {
+  it("consecutive codes collapse to first/last; a gap starts a new run", () => {
+    expect(unitRuns(U(1, 4))).toEqual([{ first: "U1-000-001", last: "U1-000-004" }]);
+    expect(unitRuns(["U1-000-107", "U1-000-109"])).toEqual([
+      { first: "U1-000-107", last: null },
+      { first: "U1-000-109", last: null },
+    ]);
+    expect(unitRuns(["U1-000-003", "U1-000-001", "U1-000-002"])).toEqual([{ first: "U1-000-001", last: "U1-000-003" }]);
+  });
+
+  it("U1-999-999 → U2-000-001 is consecutive; a grandfathered id- code stands alone", () => {
+    expect(unitRuns(["U1-999-999", "U2-000-001"])).toEqual([{ first: "U1-999-999", last: "U2-000-001" }]);
+    expect(unitRuns(["id-abc123456", "U1-000-001"])).toEqual([
+      { first: "U1-000-001", last: null },
+      { first: "id-abc123456", last: null },
+    ]);
+  });
+
+  it("prints the run with `to`, and bolds only the last three digits", () => {
+    const text = renderedText(PoTemplate(twoLocationV2()));
+    expect(text).toMatch(/U1-000-\s*001\s+to\s+U1-000-\s*004/);
+    expect(SRC).toMatch(/code\.slice\(-3\)/);
+    expect(SRC).toMatch(/fontWeight: 700 \}\}>\{code\.slice\(-3\)\}/);
+  });
+
+  it("a quantity line prints —; an exact-unit line with no Unit IDs says so before it is sent", () => {
+    const data = twoLocationV2();
+    data.lines = [
+      { sku: "PIL-STD", description: "Pillow — Standard", qty: 4, unit: "pc", identity_mode: "quantity", unit_codes: [], sources: [{ so: 1311, qty: 4 }] },
+      { sku: "B1201F-K", description: "Forte Mattress — King", qty: 1, unit: "pc", identity_mode: "exact_unit", unit_codes: [], sources: [{ so: 1311, qty: 1 }] },
+    ];
+    const text = renderedText(PoTemplate(data));
+    expect(text).toContain("—");
+    expect(text).toContain("Unit IDs missing on this line — do not send this PO");
+  });
+
+  it("QTY is a count — centred, one weight", () => {
+    expect(SRC).toMatch(/cellQty: \{[^}]*textAlign: "center"/);
+    expect(CODE).not.toMatch(/qty > 1 \?/);
+  });
+});
+
+describe("po-template prints the lineage and the issuer it is given", () => {
   it("reads SO NO from the LINE's own sources, not only the document", () => {
-    /* The old rule — print the SO only when the whole PO covers exactly one —
-       is now the fallback for purchase orders raised before 0382. */
     expect(SRC).toContain("const soCell =");
     expect(SRC).toMatch(/line\.sources/);
     expect(SRC).toMatch(/soCell\(line\)/);
-    /* A line serving several customers prints each with its quantity: ten
-       mattresses are not interchangeable once three people are promised them. */
     expect(SRC).toMatch(/SO-\$\{s\.so\} × \$\{s\.qty\}/);
-    /* And the document-level fallback survives for the older documents. */
     expect(SRC).toMatch(/so_refs && so_refs\.length === 1/);
+    expect(renderedText(PoTemplate(twoLocationV2()))).toContain("SO-1256 × 2");
   });
 
-  it("still fills Unit ID from the units the issue actually minted", () => {
-    expect(SRC).toMatch(/line\.unit_codes/);
-    /* An em dash, not an empty cell — a blank column reads as a defect. */
-    expect(SRC).toMatch(/unit_codes\.join\("\\n"\) : "—"/);
+  it("names the issuer, and says so when the document authority has none", () => {
+    expect(renderedText(PoTemplate(twoLocationV2()))).toContain("Issued by Shasha");
+    expect(renderedText(PoTemplate({ ...twoLocationV2(), issued_by: null }))).toContain("Issued by Not recorded");
   });
 
-  it("names the issuer when the document authority carries one", () => {
-    expect(SRC).toMatch(/issued_by \? ` · Issued by \$\{issued_by\}`/);
-  });
-
-  it("prints the supplier's own address, because a formal document names both parties", () => {
+  it("prints the supplier's own address and both party names bold", () => {
     expect(SRC).toMatch(/supplier\.address \?/);
+    expect(SRC).toMatch(/\{supplier\.name\}/);
+    expect(SRC.match(/fontWeight: 600 \}\]\}>\{(supplier|dest)\.name\}/g)).toHaveLength(2);
+  });
+
+  it("a draft prints DRAFT, invents no number, version, date or issuer", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), draft: true, po_number: "DRAFT", version: 0, issue_date: "", eta_date: null }));
+    expect(text).toContain("Assigned when issued");
+    expect(text).toContain("DRAFT · Not issued · Do not send to supplier.");
+    expect(text).not.toContain("V0");
+    expect(text).not.toContain("Issued by");
+    expect(text).not.toContain("Not recorded");
   });
 });

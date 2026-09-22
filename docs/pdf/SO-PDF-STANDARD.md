@@ -348,6 +348,10 @@ payment — not this document's job).
 
 - **Noto Sans SC** (weights 400/500/600/700) — deliberately NOT 2990's Helvetica,
   which cannot print Chinese customer names.
+- **A word never splits at a line end** (family-wide, 2026-09-22). react-pdf's
+  default hyphenation printed `Deliv-` / `ery` and `Ware-` / `house`; the
+  font registration (`fonts/noto.ts`) turns it off so the whole word moves to
+  the next line. Every Carres document inherits it.
 - Footer, fixed every page: `{SO no} · Issued by {name}` · `Computer-generated
   document · No company signature required.` · `Page n of m`. 7.5pt grey. No
   address in the footer.
