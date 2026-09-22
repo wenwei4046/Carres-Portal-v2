@@ -262,7 +262,7 @@ begin
                            case when p_voucher_id is null then 'created' else 'edited' end, null);
   return v_id;
 end;
-$function$
+$function$;
 
 -- Sanity: the guard is in the body this migration just wrote, and it is the
 -- non-whitespace test rather than one-argument btrim(), which trims the space
