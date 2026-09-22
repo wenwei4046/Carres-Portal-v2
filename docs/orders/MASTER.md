@@ -195,6 +195,28 @@ No deposit · Online order
 
 ## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
 
+**Monthly overview scope — owner direction 2026-09-22; expanded design pending review.**
+Sales Orders is the outright-sales operational monthly reading surface: orders received,
+commercial quantities/amounts, fulfilment progress and forward physical demand. A remaining-demand
+matrix alone does not fulfil that mission. It stays separate from the one global Dashboard,
+which admits selected authoritative management facts and links to owning detail rather than copying
+this report. No Subscription population, company-wide finance or personal Work queue belongs here.
+Shared measures must retain one owning calculation. This direction does not approve a new KPI
+formula, target-entry engine, copy or finished layout. The current independent demand preview
+covers only a subset, not the enlarged monthly overview.
+
+**Expanded monthly composition — PROPOSAL / NOT LAW.** Recommend an orders-received summary,
+a due-month delivery view and a six-month model/configuration demand table. Each declares its
+own date basis. SO Doc Date is commercial document date; Proceed Date is handover to Operation;
+neither automatically defines an approved sales/commission KPI. Requested delivery month groups
+customer obligations; actual Delivery events measure work completed in a calendar month. For a
+due-month cohort, delivered and remaining quantities refer to those same obligations, not all
+shipments occurring that month. Show prior outstanding commitments separately. Pending amendments
+do not rewrite effective quantities; cancellations/returns and changed commitments must retain
+traceable treatment. Target attainment appears only with an approved target and metric contract;
+otherwise show actuals without invented targets or percentages. The final layout, metric definitions
+and date wording require integrated review before altering the current approved preview.
+
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
 provides two views: the existing order list and monthly demand. This is confirmed order demand,
