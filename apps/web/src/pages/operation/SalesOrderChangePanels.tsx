@@ -14,6 +14,9 @@
  *                    changes the effective order or its document until the
  *                    database applies the complete version.
  */
+// design-standard: not-a-list-page — these are two panels INSIDE the Sales Order
+// object page. The tables are a Before/After comparison of one order's own change,
+// never a register of records: no rows to filter, sort, page or open.
 import { useState } from "react";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
