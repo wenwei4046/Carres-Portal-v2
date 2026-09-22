@@ -203,4 +203,66 @@ for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }
+/**
+ * A REBUILT FUNCTION MUST CARRY EVERY GUARD IT ALREADY HAD.
+ *
+ * Measured 2026-09-22: `0536_a_voucher_line_says_what_it_is_for.sql` taught
+ * `payment_voucher_save_draft` to refuse a direct line with no description.
+ * Four days later `0540_every_finance_line_carries_a_department.sql` rebuilt
+ * the same function — from `0484`'s body, the one BEFORE 0536 — and the guard
+ * was simply not carried forward. 0540 is the last definition, so 0540 is what
+ * runs, and the database accepted a blank description again for two weeks.
+ *
+ * NOTHING FAILED. The only test of the rule is a web test, and a greyed-out
+ * Save button in `apps/web` was the only thing left enforcing it. A rule that
+ * lives in the database needs a check that reads the database's own text.
+ *
+ * So: for each entry below, find the LAST migration that defines the function
+ * and read THAT definition's body. Whole-file matching would be vacuous here —
+ * 0540 contains `line_needs_description` inside `supplier_bill_save_draft`, a
+ * different function, and would have passed while the voucher guard was gone.
+ *
+ * Add an entry when a guard is restored, not for every guard ever written:
+ * this list is for rules that have already been lost once.
+ */
+const REBUILT_GUARDS = [
+  {
+    fn: "payment_voucher_save_draft",
+    needle: "line_needs_description",
+    story: "0536 wrote it, 0540 dropped it, 0552 put it back",
+  },
+];
+
+function functionBodies(sql, fn) {
+  const head = new RegExp(`create\\s+(?:or\\s+replace\\s+)?function\\s+(?:public\\.)?${fn}\\s*\\(`, "gi");
+  const bodies = [];
+  for (let m = head.exec(sql); m; m = head.exec(sql)) {
+    const tag = /\bas\s+(\$[A-Za-z_]*\$)/i.exec(sql.slice(m.index, m.index + 4000));
+    if (!tag) continue;
+    const start = m.index + tag.index + tag[0].length;
+    const end = sql.indexOf(tag[1], start);
+    bodies.push(sql.slice(start, end < 0 ? sql.length : end));
+  }
+  return bodies;
+}
+
+for (const { fn, needle, story } of REBUILT_GUARDS) {
+  let lastFile = null;
+  let lastBody = null;
+  for (const file of files) {
+    const bodies = functionBodies(await readFile(`${dir}/${file}`, "utf8"), fn);
+    if (bodies.length) {
+      lastFile = file;
+      lastBody = bodies[bodies.length - 1];
+    }
+  }
+  if (!lastBody) throw new Error(`No migration defines ${fn}, so its guard check is stale. Fix the list in this script.`);
+  if (!lastBody.includes(needle)) {
+    throw new Error(
+      `${lastFile} is the last definition of ${fn} and its body has lost the guard '${needle}' (${story}). ` +
+        `A rebuilt function must carry forward every guard it already had.`,
+    );
+  }
+}
+
 console.log(`Validated ${files.length} migration filenames and ${changed.length} migration change(s). No migration was applied.`);
