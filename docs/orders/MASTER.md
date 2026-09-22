@@ -193,6 +193,62 @@ No deposit · Online order
 - `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
   order` when those are the authoritative facts.
 
+## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
+
+**Purpose and placement.** Jess approved a six-month view of the quantities still owed on
+accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
+provides two views: the existing order list and monthly demand. This is confirmed order demand,
+not a portal Dashboard and not an estimate of orders customers have not placed. The approved
+monthly view does not replace the flat Register with month/status groups or change its population:
+use the existing permission-scoped orders handed from Sales to Operation; unsubmitted/Placed
+orders are not silently added. Earlier proposals to default the order list to unfinished orders
+or add completion/service-case quick views are not approved by this ruling.
+
+**Time and filters.** The monthly view defaults to the current calendar month plus the next five
+months. Offer three months, six months and a chosen starting month. Always retain separate
+buckets for outstanding demand earlier than the selected first month, later than its final month,
+and demand without a definite requested delivery date. Assign months using the customer's
+requested delivery date, never document date, Proceed Date, supplier ETA or confirmed transport
+booking. Do not manufacture a date for ambiguous/missing source data. These buckets preserve
+visibility; they do not relax the order-entry requirement for a requested date. The local filter
+rail belongs to this monthly view and filters Dealer / Sales Location, customer delivery region
+and product category. Dealer location and customer delivery destination remain different facts.
+The existing list's no-rail rule does not prohibit this newly approved monthly-view rail.
+
+**Quantity matrix.** Columns are calendar months with years; rows are product categories.
+Every number means physical goods still owed to the customer, not order lines or original sold
+quantity: use the effective commitment and authoritative actual fulfilment. Partial delivery
+reduces only the quantity actually fulfilled. Gifts count in their actual product category;
+services do not count as physical pieces. Applied cancellations/amendments change the effective
+demand; pending requests do not. Preserve quantity unit and product/configuration identity.
+Expand a category into model, size and purchasing-relevant configuration. Clicking a month/product
+quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
+An empty result is not evidence of zero demand when its underlying facts failed to load.
+
+**Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
+coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
+Purchasing calculations; do not create a second demand engine or allocate/purchase from this
+report. Stock and PO coverage must not double-count the same quantity, including after PO receipt.
+Available but unallocated stock is not represented as stock already arranged for these orders.
+PO coverage is not proof of timely delivery: separately expose supplier timing risks or unknown
+arrival evidence against the customer's requested date, without inventing a new promised date.
+Counts and drill-downs must reconcile at the same scope; unavailable coverage is unknown, not zero.
+
+**Forecast boundary.** Confirmed demand is the approved planning baseline. Future sales targets
+or predicted new dealer orders would be a separately identified input; no target-entry engine,
+forecast model or automatic purchasing based on speculative orders is approved here. Do not blend
+unreceived orders into confirmed demand. Delivery, Purchasing, Stock and Payments retain all write
+ownership; historical deliveries and documents remain unchanged by the reporting view.
+
+**Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
+previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
+gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
+dealer/destination filtering and exact SO drill-down. Fictional sample quantities in the chat are
+examples, not business facts. The operating model and composition above are approved; final
+English COPY, kit fit, responsive/keyboard behaviour and cross-module source completeness still
+require design verification. No application implementation, production validation, Card numbering
+or approval of the whole SO Blueprint is implied by this local approval.
+
 ## Sales Orders Register — find truth, never assign work
 
 **THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
