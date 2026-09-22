@@ -21,6 +21,25 @@ describe("dealer commission", () => {
     expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 125, stillToCollect: 125 });
   });
 
+  // 0555 is written but NOT applied, so no database sends "unmatched" yet.
+  // This pins the arithmetic the ruling would switch on.
+  it("a line whose sku is gone is in the bill and earns nothing (0555, unapplied)", () => {
+    const o = order({ lines: [
+      { modelId: null, category: "sofa", value: 1000 },
+      { modelId: null, category: "unmatched", value: 1000 },
+    ] });
+    expect(orderCommission(o, at25, 2000)).toEqual({ earned: 250, full: 250 });
+  });
+
+  it("an order with no payments carries its whole commission in still to collect (0553)", () => {
+    const src: DcSource = {
+      settings: { defaultRate: 25 }, rates: [], quotas: [], models: [], outlets: [],
+      dealers: [{ id: "d1", name: "Dealer" }],
+      orders: [order({ lines: [{ modelId: null, category: "sofa", value: 1000 }], payments: null })],
+    };
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 0, stillToCollect: 250 });
+  });
+
   it("transport and guarantee earn nothing", () => {
     const o = order({ addons: 100, lines: [
       { modelId: null, category: "sofa", value: 1000 },

@@ -57,13 +57,20 @@ export function useSaveCardRoute() {
   });
 }
 
-/** Rename one chart account (0539). The chart read is `useLedgerChart`; the
- *  ["finance"] refresh re-reads it with everything else. */
-export function useRenameAccount() {
+/** One chart account's name (0539) and, since 0550, its number. The chart read
+ *  is `useLedgerChart`; the ["finance"] refresh re-reads it with everything
+ *  else, which matters far more for a number than for a name — a new number is
+ *  carried to every row that names the account, so any screen holding the old
+ *  one is stale. `newCode` equal to the current number is left out of the body:
+ *  the door reads a missing number as "keep this one". */
+export function useSaveAccount() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, { code: string; name: string }>({
+  return useMutation<{ code: string }, Error, { code: string; name: string; newCode?: string }>({
     mutationFn: (v) =>
-      apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
+      apiFetch(`/api/finance/ledger/accounts/${v.code}`, {
+        method: "PATCH",
+        body: JSON.stringify(v.newCode && v.newCode !== v.code ? { name: v.name, code: v.newCode } : { name: v.name }),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }

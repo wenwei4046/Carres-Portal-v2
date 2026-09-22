@@ -16,7 +16,7 @@ import { useApOutstanding } from "@/lib/payables-queries";
 import { appTodayIso, fmtDate, fmtDateShort, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { useLatestLedgerEntries, useLedgerChart } from "./ledger/ledger-queries";
-import { CASH_WEEKS, useCashMovement, type CashAccountMovement, type CashAndBank, type CashMovement } from "./cash-movement";
+import { CASH_WEEKS, useCashAccountMovement, useCashMovement, type CashAccountMovement, type CashMovement } from "./cash-movement";
 import { defaultPackMonth, exportMonthEndPack, packMonths } from "./month-end-pack";
 import {
   AGE_BUCKETS,
@@ -45,7 +45,9 @@ import { FieldError } from "@/components/kit/FieldFrame";
  *                                              Profit and Loss, Balance Sheet
  *
  * Nothing here reads the 0062–0064 finance functions. A figure whose read
- * failed says `Could not load {source}`, never RM 0.00 (Workspace MASTER §8.2).
+ * failed says `Could not load {source}`, never RM 0.00 (Workspace MASTER §8.2)
+ * — and says it in its own box alone: the twelve-week cash read and the
+ * since-go-live per-account read are two reads, so neither can blank the other.
  */
 export default function FinanceDashboard() {
   const today = appTodayIso();
@@ -53,6 +55,9 @@ export default function FinanceDashboard() {
   const payables = useApOutstanding();
   const chart = useLedgerChart();
   const cash = useCashMovement(chart.data, today);
+  // Its own read over its own window: the panel's window grows, the tile's and the chart's does not,
+  // and neither box may blank the other two.
+  const accounts = useCashAccountMovement(chart.data, today);
   const goLive = chart.data?.go_live_on ?? null;
   const notStarted = chart.isSuccess && !goLive;
   const activity = useLatestLedgerEntries(goLive);
@@ -67,9 +72,11 @@ export default function FinanceDashboard() {
   const overdueValue = aging && invoicesOk ? rm(aging.overdue.total) : null;
   const unpaidValue = unpaid && !payables.isError ? rm(unpaid.total) : null;
   const cashOk = !cash.isError && !chart.isError;
+  const accountsOk = !accounts.isError && !chart.isError;
   // Go-live still ahead: no week has begun, so there is nothing to measure — a sentence, never RM 0.00.
-  const startsOn = cash.data && cashOk && cash.data.weeks.length === 0 ? cash.data.goLiveOn : null;
+  const startsOn = goLive && goLive > today ? goLive : null;
   const cashData = cash.data && cashOk && !startsOn ? cash.data : null;
+  const accountRows = accounts.data && accountsOk && !startsOn ? accounts.data : null;
 
   // An issued invoice whose date cannot be read makes the aging unreadable, not zero.
   const agingRead = aging === null && owingRows !== null
@@ -80,6 +87,11 @@ export default function FinanceDashboard() {
     dataUpdatedAt: cash.dataUpdatedAt,
     refetch: () => (chart.isError ? chart.refetch() : cash.refetch()),
   };
+  const accountsRead = {
+    isError: !accountsOk,
+    dataUpdatedAt: accounts.dataUpdatedAt,
+    refetch: () => (chart.isError ? chart.refetch() : accounts.refetch()),
+  };
 
   const owingMissing = <NoFigure source="Invoices" query={invoices} last={owing?.total ?? null} />;
   const overdueMissing = <NoFigure source="Invoices" query={agingRead} last={aging?.overdue.total ?? null} />;
@@ -87,6 +99,9 @@ export default function FinanceDashboard() {
   const cashMissing = notStarted ? <NotStarted />
     : startsOn ? <StartsOn date={startsOn} />
     : <NoFigure source="Cash and bank" query={cashRead} last={cash.data?.net ?? null} />;
+  const accountsMissing = notStarted ? <NotStarted />
+    : startsOn ? <StartsOn date={startsOn} />
+    : <NoFigure source="Cash and bank" query={accountsRead} last={null} />;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -149,7 +164,8 @@ export default function FinanceDashboard() {
 
           <div className="mb-5">
             <Panel title="Cash and bank · Movement since go-live">
-              {cashData ? <AccountMovement cash={cashData} today={today} /> : cashMissing}
+              {accountRows && goLive ? <AccountMovement rows={accountRows} goLiveOn={goLive} today={today} />
+                : accountsMissing}
             </Panel>
           </div>
 
@@ -238,10 +254,10 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
 }
 
 /** Each cash and bank account since go-live; each account opens its lines in the Journal. */
-function AccountMovement({ cash, today }: { cash: CashAndBank; today: string }) {
+function AccountMovement({ rows, goLiveOn, today }: { rows: CashAccountMovement[]; goLiveOn: string; today: string }) {
   const columns: Column<CashAccountMovement>[] = [
     { key: "account", label: "Account", width: 40,
-      cell: (r) => <Link className="underline underline-offset-2" to={ledgerAccountHref(r.code, cash.goLiveOn, today)}>
+      cell: (r) => <Link className="underline underline-offset-2" to={ledgerAccountHref(r.code, goLiveOn, today)}>
         {r.code} {r.name}</Link> },
     { key: "in", label: "Inflow", width: 20, align: "right", numeric: true, cell: (r) => rm(r.moneyIn) },
     { key: "out", label: "Outflow", width: 20, align: "right", numeric: true, cell: (r) => rm(r.moneyOut) },
@@ -249,11 +265,11 @@ function AccountMovement({ cash, today }: { cash: CashAndBank; today: string }) 
   ];
   return <div className="flex flex-col gap-3.5" data-testid="dashboard-account-movement">
     <p className="text-label text-kit-slate-11">
-      Money in and out of each account since {fmtDate(cash.goLiveOn)}, when the ledger started.
+      Money in and out of each account since {fmtDate(goLiveOn)}, when the ledger started.
       Money held before then is not counted.
     </p>
     <DataTable label="Movement since go-live" testId="dashboard-account-movement-table"
-      rowTestId="dashboard-account-movement-row" rows={cash.accounts} columns={columns} rowId={(r) => r.code}
+      rowTestId="dashboard-account-movement-row" rows={rows} columns={columns} rowId={(r) => r.code}
       // Never empty: the read fails when the chart has no cash or bank account.
       empty={null} />
   </div>;

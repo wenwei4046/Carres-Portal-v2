@@ -555,9 +555,12 @@ describe("files", () => {
 
 describe("departments (0540)", () => {
   it("GET /bills?departmentType= keeps the bills with a line in that department", async () => {
+    // The line read is PAGED — one `.range()` per page, short page ends it.
     const eq = vi.fn();
-    const q = { eq, then: (r: (v: unknown) => void) => r({ data: [{ bill_id: BILL_ID }], error: null }) };
+    const range = vi.fn().mockResolvedValue({ data: [{ bill_id: BILL_ID }], error: null });
+    const q = { eq, order: vi.fn(), range };
     eq.mockReturnValue(q);
+    q.order.mockReturnValue(q);
     const sb = {
       rpc: vi.fn().mockResolvedValue({ data: [{ id: BILL_ID }, { id: VOUCHER_ID }], error: null }),
       from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(q) }),
@@ -569,6 +572,7 @@ describe("departments (0540)", () => {
     expect(await res.json()).toEqual({ rows: [{ id: BILL_ID }] });
     expect(sb.from).toHaveBeenCalledWith("supplier_bill_lines");
     expect(eq).toHaveBeenCalledWith("department_type", "OFFICE");
+    expect(range).toHaveBeenCalledWith(0, 999);
   });
 
   it("GET /bills refuses an Office department with an id", async () => {

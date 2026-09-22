@@ -119,15 +119,20 @@ describe("summarizePayments", () => {
   });
 });
 
-describe("requiredPaymentReference (§16, mirrors 0535)", () => {
+describe("requiredPaymentReference (§16, mirrors 0535 + 0551)", () => {
   it("asks a cheque for its number and every card key for its approval code", () => {
     expect(requiredPaymentReference("cheque")).toBe("Cheque number");
     for (const k of ["card", "credit", "Installment", "credit_card", "debit-card"]) {
       expect(requiredPaymentReference(k)).toBe("Approval code");
     }
   });
-  it("leaves cash, bank, online and manager-added methods optional", () => {
-    for (const k of ["cash", "bank", "online", "duitnow_qr", "grab_pay", null]) {
+  it("0551 — a bank transfer and a DuitNow QR payment carry a reference number", () => {
+    for (const k of ["bank", "bank_transfer", "Bank Transfer", "duitnow_qr", "duitnow-qr"]) {
+      expect(requiredPaymentReference(k)).toBe("Reference number");
+    }
+  });
+  it("leaves cash, online, other and manager-added methods optional", () => {
+    for (const k of ["cash", "online", "other", "grab_pay", "", "  ", null, undefined]) {
       expect(requiredPaymentReference(k)).toBeNull();
     }
   });
