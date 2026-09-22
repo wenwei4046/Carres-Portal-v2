@@ -87,6 +87,18 @@ const COLLISION_BASELINE = new Set([
      (payment_collection_owners and its three doors vs Delivery proof/attempt
      evidence), so their relative order is immaterial. */
   "0489",
+  /* 0561 · two lanes wrote the SAME fix for the same break within the hour on
+     2026-09-22 (#1508's `the_voucher_line_guard_survives_a_rebuild`, then
+     #1516's `a_voucher_line_says_what_it_is_for_after_0554`) — each restores
+     payment_voucher_save_draft's line_needs_description guard that 0554 lost.
+     Both are committed, so the rename path is closed (red line 6) and the pair
+     is baselined the way 0417, 0424 and 0489 were. Measured at baselining:
+     NEITHER half is applied (production's tracker stands at 0549), each file
+     defines only payment_voucher_save_draft, and their executable bodies are
+     IDENTICAL once comments and whitespace are set aside — so whichever
+     applies second rewrites the function to the same text, and their order is
+     immaterial. */
+  "0561",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
