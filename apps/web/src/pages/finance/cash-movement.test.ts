@@ -4,7 +4,7 @@ import { accountMovement, cashAccounts, cashWeeks, parseAccountLedger, weeklyCas
 
 const acct = (code: string, parent: string | null, over: Partial<LedgerChart["accounts"][number]> = {}) => ({
   code, name: `Account ${code}`, kind: "ASSET", parent_code: parent, is_control: false, control_for: null,
-  is_active: true, is_header: false, ...over,
+  is_active: true, is_header: false, sort_order: 0, ...over,
 });
 
 /** The 0461 shape: 1100 Cash and bank is a header under 1000 Assets. */

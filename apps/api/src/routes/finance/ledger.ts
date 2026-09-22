@@ -333,8 +333,11 @@ financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
 
 async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgError }> {
   const [accounts, config] = await Promise.all([
+    // 0557: the order Finance dragged, then the code. sort_order is 0 on every
+    // account nobody has dragged, so the tiebreak keeps the by-code order.
     sb.from("gl_accounts")
-      .select("code,name,kind,parent_code,is_control,control_for,is_active")
+      .select("code,name,kind,parent_code,is_control,control_for,is_active,sort_order")
+      .order("sort_order", { ascending: true })
       .order("code", { ascending: true }),
     sb.from("gl_config").select("go_live_on").limit(1).maybeSingle(),
   ]);
@@ -356,6 +359,7 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         control_for: (r.control_for as string | null) ?? null,
         is_active: r.is_active === true,
         is_header: parents.has(String(r.code)),
+        sort_order: Number(r.sort_order ?? 0),
       })),
     },
   };

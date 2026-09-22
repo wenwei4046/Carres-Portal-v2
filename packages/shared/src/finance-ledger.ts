@@ -77,6 +77,10 @@ export interface LedgerAccount {
   is_active: boolean;
   /** A header groups other accounts and can never be posted to (0461, 0468). */
   is_header: boolean;
+  /** Where Finance dragged it among the accounts under the same parent (0557).
+   *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
+   *  the order, never the account number. */
+  sort_order: number;
 }
 
 export interface LedgerChart {
@@ -283,11 +287,11 @@ export const LEDGER_KIND_WORDS: Readonly<Record<string, string>> = {
   EXPENSE: "Expense",
 };
 
-/** The chart as a tree: every account right after its parent, siblings by
- *  code, each with its depth (0 = top). An account whose parent is not in the
- *  list sits at the top. */
+/** The chart as a tree: every account right after its parent, siblings in the
+ *  order Finance dragged them and then by code (0557), each with its depth
+ *  (0 = top). An account whose parent is not in the list sits at the top. */
 export function chartTree(accounts: readonly LedgerAccount[]): Array<LedgerAccount & { depth: number }> {
-  const sorted = [...accounts].sort((x, y) => x.code.localeCompare(y.code));
+  const sorted = [...accounts].sort((x, y) => x.sort_order - y.sort_order || x.code.localeCompare(y.code));
   const codes = new Set(sorted.map((a) => a.code));
   const parentOf = (a: LedgerAccount) => (a.parent_code && codes.has(a.parent_code) ? a.parent_code : null);
   // ponytail: O(n²) over a chart of a few dozen accounts; index by parent if it ever grows past a thousand.
