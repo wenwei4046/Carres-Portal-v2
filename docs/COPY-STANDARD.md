@@ -4042,3 +4042,20 @@ Payables, 18 Sep 2026. Words new to this standard:
   `{bill No} · Supplier invoice {No}` · `Advance` · signature blocks `Prepared By` (left),
   `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
   not yet signed. A draft voucher has no number and no PDF.
+
+
+## Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23
+
+| Meaning | Approved wording | Do not use for this entry |
+|---|---|---|
+| Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
+| Ordinary outright customer sales | `Outright Sales` | `Purchase` |
+| Subscription-owned customer journey | `Subscription` | `Purchase` |
+
+The label does not rename the Sales Order document, its SO number, or the separate Purchasing
+module. Subscription reporting stays separate. Removing old navigation entries does not delete
+historical orders or documents.
+
+`Outright Sales` is also the Admin area's word for the same register, and the word ⌘K prints for
+it: one destination never carries two words. The approved `Monthly overview` composition is not
+part of this entry and is not built.

@@ -176,7 +176,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
   it("every module row carries an icon, its name and a chevron", () => {
     renderAt("/operation");
     for (const [slug, name] of [
-      ["sales", "Sales"],
+      ["sales", "Sales Orders"],
       ["purchasing", "Purchasing"],
       ["warehouse", "Warehouse"],
       ["customer-care", "Customer Care"],
@@ -275,7 +275,7 @@ describe("the accordion", () => {
     expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
     // ...and every other module has hidden its pages.
     expect(screen.queryByTestId("nav-children-sales")).not.toBeInTheDocument();
-    expect(screen.queryByText("Old Orders (temporary)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Outright Sales")).not.toBeInTheDocument();
   });
 
   it("expanding Purchasing collapses Sales", () => {
@@ -367,9 +367,9 @@ describe("the elbow connectors", () => {
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
     expect(rows.length).toBe(2);
     expect(trunks.length).toBe(rows.length - 1);
-    // `Old Orders` is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-old-orders")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-old-orders")).not.toBeInTheDocument();
+    // `Subscription` is last, and nothing hangs below it.
+    expect(screen.getByTestId("nav-elbow-rental")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-trunk-rental")).not.toBeInTheDocument();
     // ...and the row above it DOES carry the line on.
     expect(screen.getByTestId("nav-trunk-orders")).toBeInTheDocument();
   });
@@ -382,7 +382,7 @@ describe("the elbow connectors", () => {
 
   it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
     renderAt("/operation/orders");
-    const elbow = screen.getByTestId("nav-elbow-old-orders");
+    const elbow = screen.getByTestId("nav-elbow-rental");
     // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
     expect(elbow.style.left).toBe("21.5px");
     expect(elbow.style.width).toBe("11px");
@@ -392,7 +392,7 @@ describe("the elbow connectors", () => {
   it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
     renderAt("/operation/orders");
     expect(
-      screen.getByTestId("nav-elbow-old-orders").getAttribute("aria-hidden"),
+      screen.getByTestId("nav-elbow-rental").getAttribute("aria-hidden"),
     ).toBe("true");
   });
 
@@ -435,7 +435,9 @@ describe("badges across the collapse", () => {
   it("a COLLAPSED module shows the sum of its children's work", () => {
     mockBadges = { orders: 3, procurement: 5, serviceNotes: 0, lpRejected: 0 };
     renderAt("/operation");
-    expect(within(module_("sales")).getByTestId("nav-badge-sales").textContent).toBe("3");
+    expect(
+      within(module_("sales")).getByTestId("nav-badge-sales-orders").textContent,
+    ).toBe("3");
     expect(
       within(module_("purchasing")).getByTestId("nav-badge-purchasing").textContent,
     ).toBe("5");
@@ -448,7 +450,7 @@ describe("badges across the collapse", () => {
       module_("sales").querySelector("[data-testid^='nav-badge-']"),
     ).toBeNull();
     expect(
-      within(child("orders")).getByTestId("nav-badge-sales-orders").textContent,
+      within(child("orders")).getByTestId("nav-badge-outright-sales").textContent,
     ).toBe("3");
   });
 
@@ -522,7 +524,7 @@ describe("the active page — governed blue, never flame", () => {
     try {
       renderAt("/operation/orders");
       // Collapsed, the children disappear and the MODULE's one icon remains.
-      const icon = screen.getByTitle("Sales") as HTMLAnchorElement;
+      const icon = screen.getByTitle("Sales Orders") as HTMLAnchorElement;
       expect(icon).toHaveAttribute("href", "/operation/orders");
       expect(icon.className).toContain("bg-kit-blue-3");
       expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
@@ -609,42 +611,111 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
 });
 
 /**
- * ⭐ SALES ORDER PRODUCTION CUTOVER (owner, 2026-08-10).
+ * ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23).
  *
- * The rail carries TWO Orders doors and the difference must be legible from
- * the rail alone. `(temporary)` is load-bearing, not decoration: a legacy
- * surface that looks permanent becomes permanent.
+ *     Sales Orders
+ *     ├─ Outright Sales
+ *     └─ Subscription
+ *
+ * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
+ * COPY-STANDARD "Sales Orders navigation" table. The module row is the parent;
+ * each child names the KIND of customer order it opens. `Purchase` is rejected
+ * by name — it reads as Purchasing.
+ *
+ * Two things this ruling deliberately does NOT do, and both are asserted here:
+ * it does not move an ADDRESS (every existing deep link still lands), and it
+ * does not delete the legacy page whose menu row it removes.
  */
-describe("PortalSidebar — the Sales Order cutover's two doors", () => {
-  it("both doors sit under Sales, each pointing at its own route", () => {
+describe("PortalSidebar — the approved Sales Orders tree", () => {
+  it("is exactly Outright Sales then Subscription, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
-    expect(child("orders")).toHaveAttribute("href", "/operation/orders");
-    expect(child("old-orders")).toHaveAttribute("href", "/operation/old-orders");
-    expect(screen.getByText("Old Orders (temporary)")).toBeInTheDocument();
+    expect(module_("sales")).toHaveTextContent("Sales Orders");
+    const group = screen.getByTestId("nav-children-sales");
+    const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
+    expect(rows.map((r) => r.textContent?.trim())).toEqual([
+      "Outright Sales",
+      "Subscription",
+    ]);
   });
 
-  it("on /operation/orders only Sales Orders is lit", () => {
+  it("keeps both addresses exactly where they were", () => {
+    renderAt("/operation/orders");
+    // The register, its detail and its amendment journey — unmoved.
+    expect(child("orders")).toHaveAttribute("href", "/operation/orders");
+    // The Subscription-owned destination (`docs/rental/MASTER.md`) — unmoved.
+    expect(child("rental")).toHaveAttribute("href", "/operation?tab=rental");
+  });
+
+  it("`Purchase` is never the word for the outright child", () => {
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
+    expect(group.textContent).not.toMatch(/Purchase/);
+  });
+
+  it("on /operation/orders only Outright Sales is lit", () => {
     renderAt("/operation/orders");
     expect(child("orders").className).toContain("bg-kit-blue-3");
-    expect(child("old-orders").className).not.toContain("bg-kit-blue-3");
+    expect(child("rental").className).not.toContain("bg-kit-blue-3");
   });
 
-  it("on /operation/old-orders only the old door is lit", () => {
+  it("on ?tab=rental only Subscription is lit, and it opens the Sales Orders module", () => {
+    renderAt("/operation?tab=rental");
+    expect(child("rental").className).toContain("bg-kit-blue-3");
+    expect(child("orders").className).not.toContain("bg-kit-blue-3");
+    expect(module_("sales").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  /* THE ROW MOVED; IT WAS NOT COPIED. Two rows to one page are two rows the
+     rail would light at once — Law C, a door and never a duplicate. */
+  it("Subscription left Customer Care — it is not in both places", () => {
+    renderAt("/operation?tab=rental");
+    expect(screen.getAllByTestId("nav-child-rental")).toHaveLength(1);
+    expect(screen.queryByText("Rental")).not.toBeInTheDocument();
+  });
+
+  it("Customer Care keeps its own two pages", () => {
+    renderAt("/operation?tab=service-notes");
+    const group = screen.getByTestId("nav-children-customer-care");
+    const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
+    expect(rows.map((r) => r.textContent?.trim())).toEqual([
+      "Service Cases",
+      "Guarantees",
+    ]);
+  });
+
+  /* ⭐ THE MENU ROW IS REMOVED. THE PAGE IS NOT. "Menu removal does not delete
+     orders, history, documents or valid existing deep links." The route test
+     that proves the page still mounts lives in OperationApp.test.tsx; this one
+     proves only that the RAIL no longer offers it. */
+  it("Old Orders has left the rail", () => {
+    renderAt("/operation/orders");
+    expect(screen.queryByText("Old Orders (temporary)")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-child-old-orders")).not.toBeInTheDocument();
+  });
+
+  it("standing on the legacy route still shows the rail, and lights nothing falsely", () => {
     renderAt("/operation/old-orders");
-    expect(child("old-orders").className).toContain("bg-kit-blue-3");
-    expect(child("orders").className).not.toContain("bg-kit-blue-3");
+    // The de-navigated page keeps working; no Sales child claims to be it.
+    expect(module_("sales")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-child-old-orders")).not.toBeInTheDocument();
   });
 
-  it("the old door stays lit on a carried-over kanban slug", () => {
-    renderAt("/operation/old-orders/in_production");
-    expect(child("old-orders").className).toContain("bg-kit-blue-3");
-    expect(child("orders").className).not.toContain("bg-kit-blue-3");
-  });
-
-  it("Delivery Orders is not under Sales (ruling 2026-08-20)", () => {
+  it("Delivery Orders is not under Sales Orders (ruling 2026-08-20)", () => {
     renderAt("/operation/orders");
     const group = screen.getByTestId("nav-children-sales");
     expect(group.querySelector("[data-testid='nav-child-delivery-orders']")).toBeNull();
+  });
+
+  /* ONE DESTINATION, ONE WORD. A principal stands in Operations AND Admin at
+     once; both rows point at `/operation/orders` and light together, so two
+     different words would be the duplicate the ruling names. The Admin area is
+     a shut accordion on an Operations URL, so the word is proved at the model
+     it is read from — see `portal-nav.sales.test.ts` for the whole tree. */
+  it("a principal sees the Sales Orders parent, not a second Sales word", () => {
+    mockRole = "principal";
+    renderAt("/operation/orders");
+    expect(module_("sales")).toHaveTextContent("Sales Orders");
+    expect(child("orders")).toHaveTextContent("Outright Sales");
   });
 });
 

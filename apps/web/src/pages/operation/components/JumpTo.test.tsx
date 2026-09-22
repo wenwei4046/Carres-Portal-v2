@@ -115,9 +115,13 @@ describe("the empty query", () => {
     /* `operation:stock` is the Inventory Register — the 2026-09-01 Blueprint's
      * word for the Warehouse master list (CARD-2026-09-01-warehouse-01-sidebar);
      * same key, same route, the sidebar's own word. */
+    /* `operation:orders` is `Outright Sales` since the 2026-09-23 navigation
+     * ruling — same key, same route, same recent entry, the sidebar's own
+     * word. ⌘K composes from `visibleItems`, so the rail and the jump surface
+     * can never drift into two words for one destination. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
-      "Sales OrdersOperations",
+      "Outright SalesOperations",
       "InventoryOperations",
       // `operation:payments` is the Payments module's `Monitor` since the
       // 2026-09-12 ruling — same key, same recent, the sidebar's own word.
