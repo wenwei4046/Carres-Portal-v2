@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredPaymentReference } from "./order-payments";
 
 /**
  * 0219 — Order Entry configurability (Loo 2026-07-12).
@@ -133,9 +134,16 @@ export function resolvePaymentMethods(
 ): PaymentMethodConfig[] {
   const configured = cfg?.paymentMethods ?? [];
   const src = configured.length > 0 ? configured : DEFAULT_PAYMENT_METHODS;
-  // Whatever the saved config says: a card sale names its bank, and credit /
-  // installment (card, to _customer_payment_post 0535) carry an approval code.
-  return src.filter((m) => m.active).map((m) => m.key !== "credit" && m.key !== "installment" ? m : {
+  // Whatever the saved config says: a card sale names its bank, and every
+  // method the writer refuses without a reference carries one. Since 0551 that
+  // is card / credit / installment / cheque / bank / bank-transfer / DuitNow
+  // QR — asked of `requiredPaymentReference` so this list and the SQL guard
+  // are the same list. A method a manager invents is NOT on it, and the writer
+  // leaves it optional, so a saved `approvalCodeRequired: false` still stands.
+  // Without this, an operator adding "Cheque" in SO Maintenance would leave
+  // the box unticked, the form would accept a blank, and the database would
+  // refuse the payment at the very end.
+  return src.filter((m) => m.active).map((m) => requiredPaymentReference(m.key) === null ? m : {
     ...m, approvalCodeRequired: true,
     followUps: m.key !== "credit" ? m.followUps
       : m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),

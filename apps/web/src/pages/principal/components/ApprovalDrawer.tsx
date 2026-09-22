@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { requiredPaymentReference } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useDecideApproval, useTopupApprove } from "@/lib/queries";
 import { TOAST } from "@/lib/toast-copy";
@@ -58,6 +59,12 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
   const [note, setNote] = useState("");
   const [method, setMethod] = useState<TopupMethod>("bank_transfer");
   const [reference, setReference] = useState("");
+  // §16 (0535/0551) — three of the four top-up methods are matched by their
+  // reference, so Finance types it here rather than hunting for it at
+  // reconciliation. `finance_topup_approve` writes `payments` directly and
+  // does NOT pass through `_customer_payment_post`, so nothing downstream
+  // enforces this: the form is the only gate on this door.
+  const refWord = requiredPaymentReference(method);
   const decide = useDecideApproval(approval.id);
   const topup = useTopupApprove();
   const isPending = approval.status === "pending";
@@ -72,6 +79,10 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
       // handle kind='top_up' (refund/new_dealer/price_change only) — using
       // it here would leave deposit_balance untouched.
       if (isTopup && status === "approved") {
+        if (refWord && !reference.trim()) {
+          toast.error(`Enter the ${refWord.toLowerCase()}`);
+          return;
+        }
         await topup.mutateAsync({
           approvalId: approval.id,
           method,
@@ -204,7 +215,7 @@ export default function ApprovalDrawer({ approval, onClose }: Props) {
                   ))}
                 </select>
                 <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1.5">
-                  Reference (optional)
+                  {refWord ? `${refWord} (required to approve)` : "Reference (optional)"}
                 </div>
                 <input
                   type="text"

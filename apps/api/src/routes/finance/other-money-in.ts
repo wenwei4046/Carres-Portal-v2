@@ -10,7 +10,7 @@ import {
 import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
-import { departmentQuery, keepByDepartment, withLineDepartments } from "../../lib/line-departments";
+import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
 import type { AppEnv } from "../../types";
 
 /**
@@ -127,6 +127,7 @@ financeOtherMoneyInRouter.get("/invoices", requireFinance, async (c) => {
   if (error) return fail(c, error);
   const rows = (data ?? []) as Array<{ invoice_id: string }>;
   const kept = await keepByDepartment(sb, INVOICE_LINES, rows, (r) => r.invoice_id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
   if ("error" in kept) return fail(c, kept.error);
   return c.json(kept.rows);
 });
@@ -216,6 +217,7 @@ financeOtherMoneyInRouter.get("/receipts", requireFinance, async (c) => {
   if (error) return fail(c, error);
   const rows = (data ?? []) as Array<{ receipt_id: string }>;
   const kept = await keepByDepartment(sb, RECEIPT_LINES, rows, (r) => r.receipt_id, f.value);
+  if ("tooMany" in kept) return tooManyDepartmentLines(c);
   if ("error" in kept) return fail(c, kept.error);
   return c.json(kept.rows);
 });

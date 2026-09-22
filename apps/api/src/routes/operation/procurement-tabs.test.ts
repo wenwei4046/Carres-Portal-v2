@@ -98,8 +98,10 @@ describe("GET /api/operation/procurement/:slug", () => {
       delivery_date: string | null;
     }>;
   }) {
-    // Pass A chain
-    const passAEq = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
+    // Pass A chain — PAGED: `.like().eq().order().range()`, one range per page.
+    const passARange = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
+    const passAOrder = vi.fn().mockReturnValue({ range: passARange });
+    const passAEq = vi.fn().mockReturnValue({ order: passAOrder });
     const passALike = vi.fn().mockReturnValue({ eq: passAEq });
     const passASelect = vi.fn().mockReturnValue({ like: passALike });
 
@@ -125,6 +127,7 @@ describe("GET /api/operation/procurement/:slug", () => {
       passASelect,
       passALike,
       passAEq,
+      passARange,
       passBSelect,
       passBIn,
       passBOrder,

@@ -377,6 +377,58 @@ describe("Finance Dashboard", () => {
     }
   });
 
+  /*
+   * TWO WINDOWS, TWO FAILURES. From the first week of December the panel's window (from go-live, and
+   * growing) and the twelve-week window are different reads. The account ledger refuses a read over
+   * 20,000 lines per account, and the panel's window is the one that will meet that cap — so it must
+   * fail alone. The tile and the chart worked before the panel existed and may not go down with it.
+   */
+  const LATER = "2027-03-01T02:00:00Z"; // 10:00 on Mon 1 Mar 2027, Malaysia
+  const RECENT = { entry_no: "JE-202702-0001", entry_date: "2027-02-01", debit: 500, credit: 0 };
+  const windowed = (capped: "since-go-live" | "twelve-weeks") => (url: string) => {
+    const q = new URL(url, "http://portal.test").searchParams;
+    const from = q.get("from")!;
+    if ((from === GO_LIVE) === (capped === "since-go-live")) {
+      throw Object.assign(new Error("too many rows"), { status: 422, body: { code: "too_many_rows" } });
+    }
+    const code = q.get("account")!;
+    const pool = [...(CASH_LINES[code] ?? []), ...(code === "1120" ? [RECENT] : [])];
+    const lines = pool.filter((l) => l.entry_date >= from && l.entry_date <= q.get("to")!);
+    const sum = (k: "debit" | "credit") => lines.reduce((s, l) => s + l[k], 0);
+    return {
+      status: "OK", go_live_on: GO_LIVE, account_code: code,
+      rows: [
+        ...lines.map((l) => ({ row_kind: "LINE", ...l })),
+        { row_kind: "CLOSING", entry_no: null, entry_date: null, debit: sum("debit"), credit: sum("credit") },
+      ],
+    };
+  };
+
+  it("the panel's own read failing leaves the Net cash tile and the Cashflow chart standing", async () => {
+    vi.setSystemTime(new Date(LATER));
+    api.routes[ACCOUNT_LEDGER] = windowed("since-go-live");
+    show(<FinanceDashboard />);
+    expect(await screen.findByTestId("dashboard-net-cash-amount")).toHaveTextContent("RM 500.00");
+    expect(screen.getByTestId("dashboard-cashflow")).toBeInTheDocument();
+    const movement = panel("Cash and bank · Movement since go-live");
+    expect(within(movement).getByText("Could not load Cash and bank")).toBeInTheDocument();
+    expect(movement).not.toHaveTextContent("RM 0.00");
+    expect(screen.queryByTestId("dashboard-account-movement-table")).not.toBeInTheDocument();
+  });
+
+  it("the twelve-week read failing leaves the per-account panel standing", async () => {
+    vi.setSystemTime(new Date(LATER));
+    api.routes[ACCOUNT_LEDGER] = windowed("twelve-weeks");
+    show(<FinanceDashboard />);
+    const movement = panel("Cash and bank · Movement since go-live");
+    expect(await within(movement).findByTestId("dashboard-account-movement-table")).toBeInTheDocument();
+    expect(within(movement).getAllByTestId("dashboard-account-movement-row")).toHaveLength(2);
+    for (const el of [screen.getByTestId("dashboard-net-cash"), panel("Cashflow · Last 12 weeks")]) {
+      expect(within(el).getByText("Could not load Cash and bank")).toBeInTheDocument();
+      expect(el).not.toHaveTextContent("RM 0.00");
+    }
+  });
+
   it("a failed Journal read says Could not load Journal, never an empty list", async () => {
     api.fail.add(ENTRIES);
     show(<FinanceDashboard />);

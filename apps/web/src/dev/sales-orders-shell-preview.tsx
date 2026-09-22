@@ -72,7 +72,7 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     ops_delivery_orders: i % 5 === 0 ? [{ do_number: `DO-20260915-${7000 + i}` }] : [],
     order_lines: [
       { id: `line-${i}-1`, sku: i % 2 ? "CODY-SK" : "B1201S-K", qty: 1, unit_price: 2499, attrs: { category: "mattress" } },
-      ...(i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "PILLOW-LTX", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
+      ...(i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
     ],
     order_addons: [],
   };
@@ -97,7 +97,7 @@ window.fetch = async (input, init) => {
             skus: [
               { id: "s1", modelId: "m-cody", sku: "CODY-SK", variant: "Super King" },
               { id: "s2", modelId: "m-b12", sku: "B1201S-K", variant: "King" },
-              { id: "s3", modelId: "m-pl", sku: "PILLOW-LTX", variant: "Standard" },
+              { id: "s3", modelId: "m-pl", sku: "MEMORY-FOAM-PILLOW-asd", variant: "Standard" },
             ],
             sofaFabrics: [], addons: [], floorConfig: {} }
         : url.includes("/rest/") ? [] : {};

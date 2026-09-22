@@ -46,6 +46,28 @@ describe("resolvePaymentMethods (0219)", () => {
     ] });
     expect(methods.map((m) => m.approvalCodeRequired)).toEqual([true, false]);
   });
+
+  // 0551 — the form and `_customer_payment_post` must name the same methods.
+  // A manager adding Cheque / Bank transfer / DuitNow QR in SO Maintenance
+  // leaves the box unticked; the writer refuses a blank reference either way,
+  // so the operator has to learn it from a database error instead of the form.
+  it("a method the WRITER requires a reference for is required whatever the config says", () => {
+    const off = (key: string, label: string): PaymentMethodConfig =>
+      ({ key, label, sublabel: "", active: true, approvalCodeRequired: false, followUps: [] });
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      off("cheque", "Cheque"), off("bank-transfer", "Bank transfer"), off("duitnow-qr", "DuitNow QR"),
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([true, true, true]);
+  });
+
+  it("cash, online transfer and a manager's own method keep the flag they were saved with", () => {
+    const methods = resolvePaymentMethods({ paymentMethods: [
+      { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "grab-pay", label: "GrabPay", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+      { key: "online", label: "Online transfer", sublabel: "", active: true, approvalCodeRequired: true, followUps: [] },
+    ] });
+    expect(methods.map((m) => m.approvalCodeRequired)).toEqual([false, false, true]);
+  });
 });
 
 describe("resolveFormTab (0219)", () => {
