@@ -30,7 +30,7 @@
 import { myHolidaySet } from "./my-holidays";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { z } from "zod";
-import { addWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
+import { addWorkingDays, countWorkingDays, DEFAULT_OFF_DAYS, subtractWorkingDays } from "./working-days";
 
 /** The categories purchasing can buy. A guarantee or a service has no factory. */
 export const PURCHASING_CATEGORIES = ["sofa", "bedframe", "mattress"] as const;
@@ -276,6 +276,35 @@ export function expectedArrivalOf(
     supplierId: args.supplierId,
     readyDateIso: ready,
     holidays,
+  });
+}
+
+/**
+ * The `{n}` in the PO's printed `PO {n}-Day Delivery Date` (owner ruling
+ * 2026-09-22, PO-PDF-STANDARD §2): the supplier's working days from the PO Date
+ * to the PO Delivery Date — counted on THIS supplier's work week and the
+ * holiday set, by the same working-day functions that stamped the date. It is
+ * never the raw Settings number: every supplier carries a transit day, so a
+ * 13-day production setting prints `14-Day`, which is what the dates say.
+ *
+ * NULL IS A REAL ANSWER: no PO Date or no delivery date → no number, and the
+ * paper prints the plain `PO Delivery Date` label instead of inventing one.
+ */
+export function poDeliveryWorkingDays(
+  settings: Pick<PurchasingSettings, "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    poDateIso: string | null | undefined;
+    deliveryDateIso: string | null | undefined;
+    holidays?: ReadonlySet<string>;
+  },
+): number | null {
+  const from = (args.poDateIso ?? "").slice(0, 10);
+  const to = (args.deliveryDateIso ?? "").slice(0, 10);
+  if (from.length !== 10 || to.length !== 10 || to <= from) return null;
+  return countWorkingDays(from, to, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays: args.holidays ?? myHolidaySet(),
   });
 }
 

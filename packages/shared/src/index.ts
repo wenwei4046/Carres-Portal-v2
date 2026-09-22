@@ -70,6 +70,7 @@ export {
   WEEKDAYS,
   SUNDAY,
   expectedArrivalOf,
+  poDeliveryWorkingDays,
   arrivalFromReadyDate,
   orderByFromDeliveryDate,
   isPurchasingCategory,

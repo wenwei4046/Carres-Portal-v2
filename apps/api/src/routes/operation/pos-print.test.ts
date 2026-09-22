@@ -6,8 +6,8 @@ import { _setJwksForTesting } from "../../middleware/auth";
 
 // 2026-08-02 — the route stopped assembling a priced payload and became a
 // thin door over the money-free `purchasing_po_document` RPC (migration 0307,
-// docs/pdf/PO-PDF-STANDARD.md). These tests mock the RPC + the small so_refs
-// lookup the route adds beside it.
+// docs/pdf/PO-PDF-STANDARD.md). These tests mock the RPC and the three reads
+// behind the two paper facts the route adds beside it (owner 2026-09-22).
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -208,8 +208,20 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     expect(sql).toContain("p.kind = 'ready_date'");
   });
 
-  it("reads the purchase order table for nothing — the RPC is the authority", async () => {
-    const { fromImpl } = mockRpcAndRefs({});
+  it("re-reads NO fact the RPC answered — only the supplier's identity and week, to count what SQL cannot", async () => {
+    const reads: Array<{ table: string; columns: string }> = [];
+    const rpc = vi.fn(() => Promise.resolve({ data: makeDocument(), error: null }));
+    const from = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn((columns: string) => { reads.push({ table, columns }); return chain; }),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: table === "purchase_orders" ? { supplier_id: "sup-1" } : null, error: null })),
+      };
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
     const jwt = await makeJwt("operation");
     await app.fetch(
       new Request(`http://t/api/operation/pos/${PO_ID}/print-data`, {
@@ -217,8 +229,14 @@ describe("GET /api/operation/pos/:id/print-data", () => {
       }),
       env,
     );
-    /* A second read here was a second truth about the same paper. */
-    expect(fromImpl).not.toHaveBeenCalled();
+    /* A second read of so_refs / issuer / destination was a second truth about
+       the same paper (0383). The only reads left are the three inputs of the
+       two paper facts (owner 2026-09-22): nothing else, no other column. */
+    expect(reads.sort((a, b) => a.table.localeCompare(b.table))).toEqual([
+      { table: "purchase_orders", columns: "supplier_id" },
+      { table: "purchasing_supplier_settings", columns: "off_days" },
+      { table: "suppliers", columns: "kind" },
+    ]);
   });
 
   it("200 — the payload is money-free: no price key, no total key, anywhere", async () => {
@@ -441,5 +459,86 @@ describe("GET /api/operation/pos/:id/sends", () => {
     const { seen } = mockSends([]);
     await ask();
     expect(seen).toEqual(["po_sends"]);
+  });
+});
+
+/**
+ * ⭐ THE TWO FACTS THE SQL DOCUMENT CANNOT DERIVE (owner 2026-09-22,
+ * PO-PDF-STANDARD §2): `delivery_working_days` — the n of `PO {n}-Day Delivery
+ * Date`, counted by the shared working-day engine on THIS supplier's week — and
+ * `delivery_method`. Added beside the document; nothing it answered changes.
+ */
+describe("GET /api/operation/pos/:id/print-data — paper facts", () => {
+  function mockTables(tables: Record<string, unknown>, document = makeDocument({ issue_date: "2026-09-21", eta_date: "2026-10-09" })) {
+    const rpc = vi.fn(() => Promise.resolve({ data: document, error: null }));
+    const from = vi.fn((table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(() => Promise.resolve({ data: tables[table] ?? null, error: null })),
+      };
+      return chain;
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    return { rpc, from };
+  }
+
+  async function get(path = "") {
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data${path}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { res, body: (await res.json()) as any };
+  }
+
+  it("counts the supplier's working days PO Date → delivery date, and a delivering supplier reads supplier_delivers", async () => {
+    mockTables({
+      purchase_orders: { supplier_id: "sup-nf" },
+      suppliers: { kind: "factory" },
+      purchasing_supplier_settings: { off_days: [0, 6] },
+    });
+    const { res, body } = await get();
+    expect(res.status).toBe(200);
+    /* Mon 21 Sep → Fri 9 Oct 2026 on a Mon–Fri week, no public holiday between. */
+    expect(body.delivery_working_days).toBe(14);
+    expect(body.delivery_method).toBe("supplier_delivers");
+    /* Nothing the document answered is overwritten. */
+    expect(body.eta_date).toBe("2026-10-09");
+    expect(body.issued_by).toBe("Yee Jin");
+  });
+
+  it("a collection supplier (factory_pickup) reads we_collect", async () => {
+    mockTables({
+      purchase_orders: { supplier_id: "sup-nf" },
+      suppliers: { kind: "factory_pickup" },
+      purchasing_supplier_settings: { off_days: [0, 6] },
+    });
+    const { body } = await get();
+    expect(body.delivery_method).toBe("we_collect");
+  });
+
+  it("no delivery date → no number, never a guessed one", async () => {
+    mockTables(
+      { purchase_orders: { supplier_id: "sup-nf" }, suppliers: { kind: "factory" }, purchasing_supplier_settings: { off_days: [0, 6] } },
+      makeDocument({ issue_date: "2026-09-21", eta_date: null }),
+    );
+    const { body } = await get();
+    expect(body.delivery_working_days).toBeNull();
+  });
+
+  it("a KEPT version reprints exactly what was sent — no paper facts are added to it", async () => {
+    const kept = { ...makeDocument(), version: 1 };
+    const rpc = vi.fn(() => Promise.resolve({ data: kept, error: null }));
+    const from = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const { body } = await get("?version=1");
+    expect(body).not.toHaveProperty("delivery_working_days");
+    expect(body).not.toHaveProperty("delivery_method");
+    expect(from).not.toHaveBeenCalled();
   });
 });

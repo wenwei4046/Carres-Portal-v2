@@ -9,6 +9,7 @@ import {
   normalizeSkuKey,
   reassignPoWarehouseInput,
   officeReceiveInput,
+  poDeliveryWorkingDays,
   recordBalanceDateInput,
   recordReadyDateInput,
   recordSupplierReplyInput,
@@ -1441,6 +1442,8 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 //
 // `purchasing_po_document` is the document authority. A route that overwrites
 // its answer is a second truth about the same paper.
+// It may ADD a fact the SQL cannot derive (`poPaperFacts`: the working-day
+// count and the delivery method) — never overwrite one it answered.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
 // Resume the existing document's send step without issuing another PO.
@@ -1536,8 +1539,50 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
 
-  return c.json(doc as Record<string, unknown>);
+  return c.json({ ...(doc as Record<string, unknown>), ...(await poPaperFacts(sb, poId, doc as PoDocumentDates)) });
 });
+
+type PoDocumentDates = { issue_date?: string | null; eta_date?: string | null };
+
+/**
+ * TWO FACTS THE PAPER PRINTS THAT THE SQL DOCUMENT CANNOT DERIVE (owner rulings
+ * 2026-09-22, PO-PDF-STANDARD §2). Both are ADDED beside the document; neither
+ * overwrites a field `purchasing_po_document` answered.
+ *
+ * - `delivery_working_days` — the `{n}` of `PO {n}-Day Delivery Date`, counted
+ *   by the shared working-day engine (`poDeliveryWorkingDays`) on this
+ *   supplier's work week. The engine is TypeScript; SQL has no copy of it, and
+ *   a second copy would be a second arithmetic (Law D).
+ * - `delivery_method` — `we_collect` when the supplier is a collection supplier
+ *   (`suppliers.kind = 'factory_pickup'`, the same rule Purchasing Settings
+ *   reads), else `supplier_delivers`.
+ *
+ * A KEPT version (`?version=N`) never passes through here: it reprints exactly
+ * what the supplier received.
+ */
+async function poPaperFacts(
+  sb: ReturnType<typeof userClient>,
+  poId: string,
+  doc: PoDocumentDates,
+): Promise<{ delivery_working_days: number | null; delivery_method: "we_collect" | "supplier_delivers" | null }> {
+  const { data: po } = await sb.from("purchase_orders").select("supplier_id").eq("id", poId).maybeSingle();
+  const supplierId = (po as { supplier_id: string | null } | null)?.supplier_id ?? null;
+  if (!supplierId) return { delivery_working_days: null, delivery_method: null };
+  const [supplier, week] = await Promise.all([
+    sb.from("suppliers").select("kind").eq("id", supplierId).maybeSingle(),
+    sb.from("purchasing_supplier_settings").select("off_days").eq("supplier_id", supplierId).maybeSingle(),
+  ]);
+  const offDays = ((week.data as { off_days: number[] | null } | null)?.off_days ?? []).map(Number);
+  const days = poDeliveryWorkingDays(
+    { suppliers: [{ id: supplierId, name: "", categories: [], offDays: offDays.length > 0 ? offDays : null, transitDays: null }] },
+    { supplierId, poDateIso: doc.issue_date, deliveryDateIso: doc.eta_date },
+  );
+  const kind = (supplier.data as { kind: string | null } | null)?.kind ?? null;
+  return {
+    delivery_working_days: days,
+    delivery_method: supplier.error || !supplier.data ? null : kind === "factory_pickup" ? "we_collect" : "supplier_delivers",
+  };
+}
 
 // ----- GET /:id/source-orders -----
 //
