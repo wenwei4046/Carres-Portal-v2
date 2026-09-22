@@ -2603,7 +2603,7 @@ Warehouse submits count                (or Operation enters goods directly)
   "not received". **APPROVED / NOT BUILT (Jess, 2026-09-17):**
   - The person names each exact Unit in both directions (`Received` ↔ `Not received`); the system
     never picks another Unit (today the function picks the newest free or oldest incoming Unit —
-    that behaviour is retired). Received Qty is counted from the named Unit outcomes. Quantity lines
+    that behaviour is retired). Received Qty is counted from the named Unit outcomes — the `Received` ones only; a `Received with issue` Unit is a physical arrival that counts in `Damaged Qty`, never in `Received Qty` (COPY-STANDARD, correction 2026-09-23). Quantity lines
     keep quantity edits.
   - Checks follow what changes. A change to a Unit outcome or to `Goods arrived at` is refused per
     affected Unit that is reserved, on a DO, delivered or on a Supplier Claim (the Claim check is
