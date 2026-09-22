@@ -9,6 +9,7 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  *   22023 → 422 invalid_param
  *   P0001 → 422 with detail code
  *   40001 → 409 conflict (serialization_failure — concurrent_claim guard)
+ *   23505 → 409 conflict (unique_violation — a value another row already has)
  *   else  → 500 rpc_failed
  *
  * 40001 is raised by v3 RPCs that take a SELECT ... FOR UPDATE lock and find
@@ -42,6 +43,29 @@ export function mapPgError(error: { code?: string; message?: string; details?: s
      * there, and buries the real 500s in the noise. */
     case "P0002":
       return { status: 404 as const, body: { error: "not_found", code: "not_found", message: error.message ?? "not found" } };
+    /* 23505 is Postgres's `unique_violation`, and it is the same complaint as
+     * P0002 above with the sign flipped: a value some other row already holds
+     * is the KEYER's mistake, not the system breaking. Measured 2026-09-22 —
+     * only seven route files special-case it (account, catalog, hr-team,
+     * order-payments, ops/issues, pwp-codes, rental); every other unique
+     * constraint in the schema reached the browser as a 500 `rpc_failed`.
+     * Found on the 0543 dealer master: type a `code` another dealer has and
+     * Finance gets HTTP 500 with the raw constraint text in the toast.
+     *
+     * 409 because that is what this codebase already answers for a taken
+     * value (ops/issues.ts:70, rental.ts, catalog.ts's optionPoolDuplicate);
+     * hr-team's 422 is the outlier and is left alone.
+     *
+     * This is the ONE case that does not forward `error.message`. The driver's
+     * text is `duplicate key value violates unique constraint
+     * "dealers_code_unique"` — a constraint name is not a sentence, and the
+     * operator this portal is built for cannot read it. Postgres does carry
+     * the constraint name (and `Key (code)=(JB1) already exists.` in
+     * `details`), but nothing in this repo maps a constraint name to a
+     * sentence, so this is the floor: a route that knows which field the
+     * keyer typed still names it first and only falls through to here. */
+    case "23505":
+      return { status: 409 as const, body: { error: "conflict", code: "already_exists", message: "That value is already used. Change it and save again." } };
     case "22023":
       return { status: 422 as const, body: { error: "invalid_param", code: "invalid_param", message: error.message ?? "invalid param" } };
     case "P0001":
