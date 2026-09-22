@@ -473,7 +473,14 @@ ITEMS                   the SO document's own table (owner ruling 2026-09-21, NO
                         can check page against paper column by column, but draws it in the portal's web style —
                         no black ink header bar (owner: "copied the same black header? … not international"),
                         each item row a soft grey box, the same grey-box treatment as the rest of the page
-PAYMENT                 the payment ledger · Paid · Outstanding · Open this order in Payments →
+PAYMENT                 EXACTLY the PDF's money zone (owner ruling, Jess 2026-09-22: page and PDF tally):
+                        the payment table (Date · Payment received · Approval code · Collected by ·
+                        Amount (RM)) closing on `TOTAL RECEIVED`, then the PDF totals card row for row
+                        (today `Goods total · Tax · Total payable · Paid to date · Balance due`; it follows
+                        the PDF when the SST rows land) · Open this order in Payments →. Voided rows stay,
+                        struck, with the reason. Items and Payment share ONE table style: 12px grey
+                        headers over a 1px line, 13px rows divided by 1px lines, amounts right-aligned in
+                        the same column position, only the closing total bold
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
@@ -492,10 +499,10 @@ and survive as in-card headings; `Block` and `SubHead` render the same string at
 rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
 pins the card list, its order and the placement of every moved field.
 
-**THE ORDER TOTAL IS STATED ONCE.** It sits under the `GOODS` table that produces it, and it is
-`orderMoney({lineSum, addonSum})` — the same value the register and the document read, never a
-re-sum of the printed rows (Law D). `MONEY` therefore carries only the collections facts: the
-ledger, `Paid` and `Outstanding`. A service — stair carry included, which is a stamped
+**THE ORDER TOTAL HAS ONE ARITHMETIC.** Every place it prints — the Items `TOTAL PAYABLE` row and the
+Payment totals card, which the page now repeats because the PDF does (owner ruling 2026-09-22 overwrites
+the 2026-09-11 "stated once" placement) — reads the same `orderMoney({lineSum, addonSum})` value the
+register and the document read, never a re-sum of the printed rows (Law D). A service — stair carry included, which is a stamped
 `STAIR_CARRY` addon — is counted in that total exactly once and is never charged again as a
 separate summary. The stair WORKING LINE on `DELIVERY` explains the charge; it does not levy it.
 
