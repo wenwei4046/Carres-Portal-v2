@@ -37,11 +37,45 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useDecideSalesOrderAmendment,
+  useRecordAmendmentAgreement,
   useSalesOrderAmendment,
   useSalesOrderAmendmentImpact,
   useSubmitSalesOrderAmendment,
   type AmendmentProposal,
+  type CustomerAgreementKind,
 } from "@/lib/queries";
+
+/* ⭐ HOW THE CUSTOMER AGREED — the three kinds 0562 accepts, and the reason
+   there is no fourth (owner ruling 2026-09-22, APPROVED / LOCKED):
+
+     "A signed document or a reference to the relevant customer confirmation
+      (for example, WhatsApp) is acceptable; a new handwritten signature is not
+      required for every amendment. A manager's statement or checkbox saying
+      the customer agreed is not sufficient by itself and cannot substitute for
+      the evidence."
+
+   So every kind demands a REFERENCE that points outside this record, and none
+   of them is a tick box. `Original agreement` is the Staff-correction case —
+   the customer's agreement did not change, so it names the revision whose
+   signed agreement still covers the change instead of asking the customer to
+   agree again. */
+const AGREEMENT_KINDS: ReadonlyArray<{ value: CustomerAgreementKind; label: string; hint: string }> = [
+  {
+    value: "signed_document",
+    label: "Signed document",
+    hint: "The file name of the document the customer signed",
+  },
+  {
+    value: "customer_confirmation",
+    label: "Customer confirmation",
+    hint: "Where the customer's own message can be found — for example WhatsApp, the date and the number",
+  },
+  {
+    value: "original_agreement",
+    label: "Original agreement",
+    hint: "The revision whose signed agreement already covers this — for example Rev 1",
+  },
+];
 
 export interface AmendmentLine {
   id?: string;
@@ -82,6 +116,12 @@ export default function SalesOrderAmendment({
   const impactQ = useSalesOrderAmendmentImpact(amendment?.id ?? null);
   const role = useAuth((s) => s.role);
 
+  /* 0562 · the two facts the approve button answers to. Both come from the
+     server on every read — the screen never decides for itself that a change
+     is agreed, and the database refuses the approval regardless. */
+  const agreementRecorded = !!amendment?.customer_agreement_kind;
+  const agreementCovers = amendment?.customer_agreement_covers_proposal === true;
+
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<AmendmentLine[]>([]);
   const [reason, setReason] = useState("");
@@ -89,12 +129,25 @@ export default function SalesOrderAmendment({
   const [deliveryDate, setDeliveryDate] = useState<string | null>(currentDeliveryDate);
   const [deliveryDateTbd, setDeliveryDateTbd] = useState(currentDeliveryDateTbd);
   const [installmentMonths, setInstallmentMonths] = useState<number | null>(currentInstallmentMonths);
+  /* The basis for the customer's acceptance. Held here, recorded through its
+     own door — a proposal is still written when the evidence is not in yet. */
+  const [agreementKind, setAgreementKind] = useState<CustomerAgreementKind>("customer_confirmation");
+  const [agreementRef, setAgreementRef] = useState("");
+  const [agreementDetail, setAgreementDetail] = useState("");
 
   const submitMut = useSubmitSalesOrderAmendment(orderId, {
     onSuccess: (r) => {
       toast.success(`Proposed from Rev ${r.base_revision}`);
       setOpen(false);
       setReason("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const agreementMut = useRecordAmendmentAgreement(orderId, {
+    onSuccess: () => {
+      toast.success("Customer agreement recorded");
+      setAgreementRef("");
+      setAgreementDetail("");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -190,6 +243,87 @@ export default function SalesOrderAmendment({
             </div>
           )}
 
+          {/* ⭐ THE CUSTOMER AGREEMENT — 0562, owner ruling 2026-09-22.
+              It sits ABOVE the decision, because it is the thing the approver
+              is being asked to check: "Sales records the confirmation basis;
+              the authorised approver checks that it covers the proposed
+              change." */}
+          <div className="mt-3 border-t border-kit-slate-5 pt-2" data-testid="amendment-agreement">
+            <div className="text-label text-base-500">Customer agreement</div>
+            {agreementRecorded ? (
+              <>
+                <p className="text-meta text-base-700 mt-1.5 break-words">
+                  {AGREEMENT_KINDS.find((k) => k.value === amendment.customer_agreement_kind)?.label ??
+                    amendment.customer_agreement_kind}
+                  {" — "}
+                  {amendment.customer_agreement_reference}
+                </p>
+                {amendment.customer_agreement_detail && (
+                  <p className="text-meta text-base-500 mt-1 break-words">
+                    {amendment.customer_agreement_detail}
+                  </p>
+                )}
+                {!agreementCovers && (
+                  <p className="text-body text-danger mt-1.5" data-testid="amendment-agreement-stale">
+                    The proposed change is no longer what the customer agreed to. Record the customer
+                    agreement again before this can be approved.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-body text-base-900 mt-1.5" data-testid="amendment-agreement-missing">
+                Nothing on record shows the customer agreed to this change, so it cannot take effect
+                yet. The proposal is kept.
+              </p>
+            )}
+
+            {/* Sales records it — not the approver. A change of terms after the
+                customer agreed re-opens this form, which is the same rule. */}
+            {(role === "operation" || role === "principal") && (!agreementRecorded || !agreementCovers) && (
+              <div className="mt-2 grid gap-2" data-testid="amendment-agreement-form">
+                <Select
+                  id="amendment-agreement-kind"
+                  label="How did the customer agree?"
+                  value={agreementKind}
+                  onValueChange={(v) => setAgreementKind(v as CustomerAgreementKind)}
+                  options={AGREEMENT_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                />
+                <Input
+                  id="amendment-agreement-reference"
+                  label={AGREEMENT_KINDS.find((k) => k.value === agreementKind)?.hint ?? "Reference"}
+                  value={agreementRef}
+                  onChange={(e) => setAgreementRef(e.target.value)}
+                />
+                <Textarea
+                  id="amendment-agreement-detail"
+                  label="What did the customer agree to? (optional)"
+                  rows={2}
+                  value={agreementDetail}
+                  onChange={(e) => setAgreementDetail(e.target.value)}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="neutral"
+                    disabled={!agreementRef.trim()}
+                    loading={agreementMut.isPending}
+                    data-testid="amendment-agreement-save"
+                    onClick={() =>
+                      agreementMut.mutate({
+                        amendmentId: amendment.id,
+                        kind: agreementKind,
+                        reference: agreementRef.trim(),
+                        detail: agreementDetail.trim() || undefined,
+                      })
+                    }
+                  >
+                    Record customer agreement
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {role === "principal" && !amendment.stale && (
             <div className="mt-3 border-t border-kit-slate-5 pt-3">
               <Textarea
@@ -208,10 +342,16 @@ export default function SalesOrderAmendment({
                 >
                   Reject
                 </Button>
+                {/* ⭐ APPROVE WAITS ON THE CUSTOMER, NOT ON THE APPROVER'S
+                    CONFIDENCE (0562). `Reject` beside it is deliberately NOT
+                    gated: refusing a change needs no customer agreement. The
+                    database refuses this press too — this only stops the
+                    principal walking into a refusal they cannot fix from here. */}
                 <Button
                   variant="primary"
-                  disabled={!decisionReason.trim()}
+                  disabled={!decisionReason.trim() || !agreementRecorded || !agreementCovers}
                   loading={decideMut.isPending}
+                  data-testid="amendment-approve"
                   onClick={() => decideMut.mutate({ amendmentId: amendment.id, decision: "approve", note: decisionReason.trim() })}
                 >
                   Approve and apply

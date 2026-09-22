@@ -4059,3 +4059,32 @@ historical orders or documents.
 `Outright Sales` is also the Admin area's word for the same register, and the word ⌘K prints for
 it: one destination never carries two words. The approved `Monthly overview` composition is not
 part of this entry and is not built.
+
+
+## Customer agreement evidence — owner ruling 2026-09-22 APPROVED / LOCKED · BUILT 2026-09-23
+
+The words the amendment lane prints for the customer's recorded acceptance. Registered here
+because the ruling settled the RULE and not the wording; these are the words the shipped screen
+uses and they are open to owner correction.
+
+| Meaning | Approved wording |
+|---|---|
+| The block heading on a waiting amendment | `Customer agreement` |
+| The picker | `How did the customer agree?` |
+| A document the customer signed | `Signed document` |
+| A traceable reference to the customer's own message | `Customer confirmation` |
+| A Staff correction leaning on the agreement already signed | `Original agreement` |
+| The optional description | `What did the customer agree to? (optional)` |
+| The commit | `Record customer agreement` |
+| Nothing recorded yet | `Nothing on record shows the customer agreed to this change, so it cannot take effect yet. The proposal is kept.` |
+| Recorded, but the terms moved | `The proposed change is no longer what the customer agreed to. Record the customer agreement again before this can be approved.` |
+
+Each kind's field label names what to type, because a blank box called `Reference` teaches nobody:
+`The file name of the document the customer signed` · `Where the customer's own message can be
+found — for example WhatsApp, the date and the number` · `The revision whose signed agreement
+already covers this — for example Rev 1`.
+
+**There is no tick box and there never may be one.** *"A manager's statement or checkbox saying the
+customer agreed is not sufficient by itself and cannot substitute for the evidence."* Every kind
+carries a reference that points at something findable outside the record. `Approve and apply` is
+refused until one is recorded and still covers the proposal; `Reject` never is.
