@@ -1,5 +1,5 @@
 /**
- * Finance Settings → Chart of accounts (migrations 0539, 0550).
+ * Finance Settings → Chart of accounts (migrations 0539, 0550, 0557).
  *
  * Every account in the chart as a tree: each account under its parent,
  * indented by depth. A heading account (one another account names as parent)
@@ -11,6 +11,24 @@
  * One ceiling, and it is the database's, not this screen's: an account named
  * on a document that has left Draft cannot be renumbered yet. That refusal
  * comes back from the frozen-document triggers in the door's own words.
+ *
+ * THE ORDER IS NOT THE NUMBER (0557). The chart carries its own display order
+ * — one integer per account, ordered within its heading, ties broken on the
+ * code — and moving an account changes only that. A move never writes the
+ * number: the two are separate acts, and the number changes only by hand, in
+ * the modal above.
+ *
+ * WHICH IS WHY EVERY COLUMN IS `sortable: false`, AND STAYS THAT WAY. This
+ * grid prints a TREE, not a list. Sorting a column would lift children away
+ * from the parent they are indented under, and would silently replace the
+ * order Finance chose with one the column picked. The order on this screen is
+ * the chart's own order, and the only thing that may change it is a move.
+ *
+ * NOT BUILT: the move control itself. `gl_accounts_reorder` (0557) is the
+ * server half and is complete; there is no screen control wired to it, because
+ * the kit has a drag affordance for COLUMN HEADERS only (DataTable/DataGrid)
+ * and no row-drag component at all. Adding one is a kit decision, not a page
+ * decision. Until it is made, this screen reads the order and never sets it.
  */
 import { useMemo, useState } from "react";
 import { chartTree, ledgerKindWord, type LedgerAccount } from "@carres/shared/finance-ledger";
