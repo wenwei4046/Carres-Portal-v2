@@ -17,25 +17,33 @@
  * The provider is inside the component on purpose — a page must not have to
  * remember to mount one, and Radix nests providers safely.
  */
-import type { ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import * as RadixTooltip from "@radix-ui/react-tooltip";
 import { Z_FLOATING } from "./overlay-layer";
 
-export default function Tooltip({
-  content,
-  children,
-  side = "top",
-}: {
-  /** One line. Never the only place a fact appears. */
-  content: string;
-  /** The thing being explained. Radix attaches the behaviour via `asChild`. */
-  children: ReactNode;
-  side?: "top" | "right" | "bottom" | "left";
-}) {
+/**
+ * ⭐ IT COMPOSES (2026-09-21). Any other props and the ref pass through to the
+ * trigger, so a parent `asChild` trigger — a kit `Popover`, for one — can wrap
+ * a Tooltip and both behaviours land on the SAME element: hover and keyboard
+ * focus show the note, click and Enter open the popover. This is Radix's own
+ * nested-`asChild` pattern; a caller that passes nothing extra is unchanged.
+ */
+const Tooltip = forwardRef<
+  HTMLElement,
+  {
+    /** One line. Never the only place a fact appears. */
+    content: string;
+    /** The thing being explained. Radix attaches the behaviour via `asChild`. */
+    children: ReactNode;
+    side?: "top" | "right" | "bottom" | "left";
+  } & Omit<ComponentPropsWithoutRef<typeof RadixTooltip.Trigger>, "content" | "children" | "asChild">
+>(function Tooltip({ content, children, side = "top", ...triggerProps }, ref) {
   return (
     <RadixTooltip.Provider delayDuration={200}>
       <RadixTooltip.Root>
-        <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
+        <RadixTooltip.Trigger asChild ref={ref as never} {...triggerProps}>
+          {children}
+        </RadixTooltip.Trigger>
         <RadixTooltip.Portal>
           <RadixTooltip.Content
             side={side}
@@ -52,4 +60,6 @@ export default function Tooltip({
       </RadixTooltip.Root>
     </RadixTooltip.Provider>
   );
-}
+});
+
+export default Tooltip;

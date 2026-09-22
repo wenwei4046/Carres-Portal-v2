@@ -566,8 +566,11 @@ div:first-child > .columnsMenuGroup {
   letter-spacing: inherit;
 }
 .sortArrow {
-  font-size: 10px;
-  color: var(--c-burnt);
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  /* The header ink — the arrow is part of the label, not an accent. */
+  color: inherit;
   margin-left: 2px;
 }
 .resizeHandle {
@@ -1371,4 +1374,68 @@ div:first-child > .columnsMenuGroup {
    columns slide under it. */
 .tableGrouped .thInGroup.stickyCell {
   z-index: 3;
+}
+
+/* ⭐ §6.9 — THE EXPANSION CONNECTOR, ANCHORED TO THE CARET CELL (Card 12
+   review, 2026-09-21). Three 1px pieces, each placed by CSS inside the cell it
+   belongs to — never by arithmetic over widths. All hidden unless the row's
+   expansion holds the shared ConnectedSections stack, so every other
+   expansion is unchanged. */
+.expansionDrop,
+.expansionElbow,
+.expansionRun {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+  border-color: theme("colors.kit.slate.6");
+  z-index: 1;
+}
+/* The caret cell is the containing block for its drop (a pinned cell already
+   is, being sticky). */
+.expansionCaretCell:not(.stickyCell) {
+  position: relative;
+}
+/* From beneath the caret to the row's bottom edge. The caret is the `▸` text
+   glyph, about 6.5px tall and centred in its cell, so its lower edge sits ~3px
+   below the middle; the line starts 1px under it (measured, Card 12 walk
+   2026-09-22 — `+7px` assumed a 14px icon and left a 5px gap). */
+.expansionDrop {
+  left: calc(50% - 0.5px);
+  top: calc(50% + 4px);
+  bottom: 0;
+  border-left-width: 1px;
+}
+/* The curve: down the caret column to the join height, then to the cell edge.
+   It starts 2px up, over the parent row's bottom rule and this row's top rule,
+   so it meets the drop with no gap; +1px so its bottom rule lands on the same
+   pixel row as the section's run. */
+.expansionElbow {
+  left: calc(50% - 0.5px);
+  right: 0;
+  top: -2px;
+  height: calc(var(--expansion-join-y) + 3px);
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+  border-bottom-left-radius: 9px;
+}
+/* Straight across any data gutter between the caret and the child. */
+.expansionRun {
+  left: 0;
+  right: 0;
+  top: var(--expansion-join-y);
+  border-top-width: 1px;
+}
+.expansionGutter {
+  position: relative;
+}
+.tr:has(+ .trExpansion [data-connected-sections]) .expansionDrop,
+.trExpansion:has([data-connected-sections]) .expansionElbow,
+.trExpansion:has([data-connected-sections]) .expansionRun {
+  display: block;
+}
+/* The caret column pins, so the piece beneath it pins with it. */
+.trExpansion:has([data-connected-sections]) .expansionGutter[style*="left"] {
+  position: sticky;
+  z-index: 1;
+  background: var(--grid-expansion, var(--c-cream));
 }
