@@ -4,6 +4,7 @@ import {
   departmentRpcArgs,
   ledgerAccountLedgerQuery,
   ledgerAccountRenameInput,
+  ledgerAccountReorderInput,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
   ledgerEntryRef,
@@ -52,6 +53,7 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   GET /entries/:ref       one entry (id or entry number) with its lines
  *   GET /accounts           the chart, and the day the ledger started
  *   PATCH /accounts/:code   rename one account (gl_account_rename, 0539) — the code never changes
+ *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) — the number never changes
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -394,6 +396,33 @@ financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json({ code: data as string });
+});
+
+/**
+ * Move accounts inside one heading (0557). POST, not PATCH on a code: the thing
+ * being changed is the HEADING's order, not any one account. No account code,
+ * name, kind or parent is written — `gl_accounts_reorder` writes sort_order and
+ * nothing else.
+ *
+ * The body carries BOTH orders and this route forwards both untouched. The
+ * database compares `was` against the order stored right now and answers 40001
+ * → 409 when somebody else moved first; the screen shows that sentence and
+ * re-reads the chart.
+ */
+financeLedgerRouter.post("/accounts/reorder", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountReorderInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_accounts_reorder", {
+    p_parent_code: body.data.parentCode,
+    p_was: body.data.was,
+    p_now: body.data.now,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ moved: Number(data ?? 0) });
 });
 
 // ── the trial balance ────────────────────────────────────────────────────────

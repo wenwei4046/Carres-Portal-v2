@@ -15,6 +15,8 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
+import type { LedgerAccountReorderInput } from "@carres/shared";
+
 import { apiFetch } from "@/lib/api";
 
 const BASE = "/api/finance/ledger/money-accounts";
@@ -64,6 +66,24 @@ export function useRenameAccount() {
   return useMutation<{ code: string }, Error, { code: string; name: string }>({
     mutationFn: (v) =>
       apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/**
+ * Move accounts inside one heading (0557). The account NUMBER is untouched —
+ * this writes display order only.
+ *
+ * BOTH ORDERS GO UP: `was` is what the screen read, `now` is what it wants. The
+ * database refuses with 409 when `was` is no longer the stored order, which is
+ * the only thing standing between two draggers and last-write-wins. Passing
+ * `now` as `was` would disable that check without any error to show for it.
+ */
+export function useReorderAccounts() {
+  const qc = useQueryClient();
+  return useMutation<{ moved: number }, Error, LedgerAccountReorderInput>({
+    mutationFn: (v) =>
+      apiFetch("/api/finance/ledger/accounts/reorder", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
