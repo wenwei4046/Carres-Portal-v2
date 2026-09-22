@@ -30,6 +30,8 @@ Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only 
 is owed); preserve their distinct approval and allocation rules.
 Manual Purchase INHERITS the four §6.8 engine capabilities and §6.10's group-local header engine;
 neither page grows a second set and no page writes a local copy of either.
+GRN document review: Purchasing §9.4 owns the approved/not-built composition and quantity
+example; COPY distinguishes accepted Received Qty from Physical arrived Qty.
 Use the current main versions; open PRs and mockups are not a second authority. Resolve older PR
 text against these rules before merging. Never ask Jess to repeat already recorded UI decisions.
 

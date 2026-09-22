@@ -2389,6 +2389,52 @@ overdelivery, price change, cancellation and post-send destination change.
 
 ### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
+**GRN document composition — owner approved 2026-09-23; APPROVED TARGET / NOT BUILT.**
+Keep the reviewed GRN layout, aligned with the PO document family's company letterhead;
+do not redesign the receipt as a PO or use it as Manual Purchase's PO preview. The right
+header identifies `GRN No` and `GOODS RECEIVED NOTE`. Preserve the two information blocks:
+Supplier and `Supplier DO No`; the linked source PO/version where applicable; instructed
+`Supplier Deliver To` and actual `Goods arrived at` as separate facts. `GRN Doc Date`
+is creation time; `Goods Received Date` is physical receipt time. Follow the shared date
+and time-zone dictionary, not the pasted sample's older labels.
+
+The receiving person is the actual person evidenced for this receipt, never today's
+`GRN Duty` holder substituted into historical paper. Do not infer a physical receiver
+from the data-entry actor when those differ; preserve the recorded distinction and
+state missing evidence rather than inventing a person. Exact person-label presentation
+must use COPY; this ruling approves the fact, not a newly invented label.
+
+Keep item and its exact Unit IDs together. Separate accepted `Received Qty`,
+`Damaged Qty`, `Wrong Item Qty` and `Pending Delivery Qty`. `Physical arrived Qty`
+is the physical arrival fact, not another name for accepted quantity. Per-Unit
+`Received with issue` remains a subset of physically received Units and is never
+added to that physical count a second time. Damaged/wrong/extra do not reduce the
+accepted-goods pending requirement or create available stock. Specify whether a
+quantity is this receipt or cumulative when previous receipts exist; one session's
+accepted count must not be substituted for the PO's cumulative accepted count.
+
+Extra goods appear separately with `Extra Qty`; they do not enlarge `Order Qty`,
+accepted PO quantities, or those totals. Use existing `Arrival evidence` and
+`Signed DO photo`. This approval does not introduce `Supplier Code`, `Arrival photos`
+or `Signed Supplier DO`, waive receiving evidence requirements, or approve the pasted
+claim that Carres is more precise than other ERPs. No 10/10 or production claim is made.
+
+**Review fixture only, not business data:** for `PO-2609-0042 V2`, Klang is instructed
+4 King Units (001–004), AL 2 (005–006). A Klang sample GRN shows physical arrival 4,
+accepted 3, damaged 1, and remaining accepted requirement 1 for Klang (no earlier
+Klang receipts in this fixture). AL's 2 are not received by that GRN; if none have
+arrived there, the whole PO still has 3 pending. Name which actual Unit is damaged
+rather than inventing a replacement ID. Remove the unrelated four-pillow order from
+the pasted sample. Any extra-goods demonstration is explicitly extra, not a fabricated
+PO line. Actual off-plan arrivals remain recordable at the evidenced actual site;
+the sample correction does not forbid a real destination exception.
+
+This is a GRN-specific blueprint approval. Manual Purchase and SO Batch continue to
+share the supplier-facing PO template under PO-PDF-STANDARD; their source and approval
+rules stay distinct. No application build, deployment, or historical receipt rewrite
+is authorised by this documentation approval.
+
+
 **Listing UI acceptance — Jess, 2026-09-18 · APPROVED · BUILT 2026-09-18, PRODUCTION VERIFICATION
 OWED.** The Receiving Register proposal is accepted and implemented in
 [PURCHASING — CARD 12](../cards/CARD-2026-09-18-purchasing-12-receiving-register-ui.md).
