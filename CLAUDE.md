@@ -93,7 +93,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
 | Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
 | Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
-| Rental / Subscription | `docs/rental/MASTER.md` | **APPROVED / LOCKED** | Frozen agreement truth plus approved subscription service/visit target |
+| Rental / Subscription | `docs/rental/MASTER.md` | **APPROVED / LOCKED** | Frozen agreement truth plus approved subscription service/visit target; initial Diglant factory holding + Carres-arranged pickup owner-confirmed 2026-09-22 (§4/§5.8), NOT BUILT. Full forecast blueprint remains PROPOSAL / NOT LAW |
 | People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
 | Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
 | Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties and Shared Duty Resolver first; module projections during module delivery; Dashboard last |

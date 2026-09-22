@@ -138,8 +138,19 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   its rent-to-own commercial terms do not automatically govern the new mattress programme.
 - Customer-receipt-based service activation was positively identified in the supplied review;
   its full operational policy remains PROPOSAL / NOT LAW, not blanket approval.
-- **UNKNOWN:** completed mattresses held at Diglant until individual collection versus bulk
-  pickup into Carres storage. No default location or actual receipt may be invented.
+- **OWNER RULING — Jess, 2026-09-22, initial storage model APPROVED / NOT BUILT:**
+  Diglant offered delivery to Carres warehouse or holding goods at its own premises for Carres
+  to arrange Logistics pickup. Jess selects the second option initially: completed mattresses
+  stay at Diglant Klang; Carres arranges pickup. No larger/new Carres warehouse is assumed.
+  Demand volume, required warehouse size and suitable partners are not yet understood; avoid
+  the upfront warehouse investment while learning the new business.
+- NETS currently supports the legacy/traditional business. Diglant is a new business-model
+  partnership; neither NETS nor another legacy partner is automatically appointed to this programme.
+  Legacy Delivery rules remain valid in their scope, not proof of the new programme's partner choice.
+- After approximately 3–6 months of actual operation, Jess will evaluate volume and logistics
+  options before deciding whether to rent another location and manage storage. This is a review
+  horizon, not an automatic warehouse move, lease commitment or scheduled reminder authorization.
+  This confirms storage strategy only; the rest of §5 remains PROPOSAL / NOT LAW.
 
 The complete recommendation below remains subject to owner review. Earlier proposals in another
 worktree/branch are unapproved context only; this file is the sole Rental/Subscription authority.
@@ -167,11 +178,11 @@ Finance 不在此次讨论范围内。没有应用代码、Card、部署、生�
 | RESOLVED FROM AUTHORITY | ERP Architecture §§1、3；Rental §2 | 独立合同所有权、订单履约、一个动作一个 owner；Purchase/Rental 不混单；已签文本保留版本 |
 | RESOLVED FROM AUTHORITY | Purchasing §§5.6、6.2、9.2；Stock §§3–5 | 正式 PO 发出时产生 Unit ID；报告不能生 Unit；采购审批和额外备货规则不被预测绕过 |
 | RESOLVED FROM AUTHORITY | Orders 月度需求／Forecast boundary（约 245–270 行）；COPY Sales Order footer | 当前批准的需求是已确认未交付需求；新预测不混入该表；SO Register 目前排除 Rental |
-| RESOLVED FROM AUTHORITY | Delivery §§1.1、5.3、14.1 | 唯一交接链和倒排日期；东马经 HOUZS，HOUZS 负责后段及客户联系，Carres 接收其到货证据 |
+| RESOLVED FROM AUTHORITY | Delivery §§1.1、5.3、14.1 | 唯一交接链和倒排日期；传统业务东马经 HOUZS。新 Diglant 计划的伙伴尚未指定，不自动继承该任命 |
 | APPROVED TARGET / NOT BUILT | Rental §2；Service Subscription boundary；Guarantee Future Subscription；Purchasing §5.4 | 每年三次清洁、独立 Visit/Upgrade、独立 Claim 政策；外部目的地 Receiving 语义已有目标，不能声称已建成 |
 | BUILT IN SOURCE / 本任务未生产验证 | `apps/api/src/routes/operation/orders.ts:354–364`；`supabase/migrations/0275_rental_makes_a_sales_order.sql:224–250`；`apps/web/src/pages/operation/OperationRental.tsx:1–80` | 已有 Rental→零金额履约 SO 链接、Rental 资产列表；总数查询仍排除 Rental。旧 `RU-` 展示不能成为床垫第二身份 |
 | REAL GAP / CONTRADICTION | 上述规则与 §4 新方向 | 共用 SO 入口/可见范围、预测转采购去重、未提货 Unit 的未来供应关联、工厂起点交接和收货语义需要跨模块批准；不能假装现有 Ready Stock 已支持 |
-| REAL GAP / UNKNOWN | Purchasing §5.7 与 §4；Delivery §14.1 | 45 天的日历及起算凭证未证实；现行 PO 日期是 Settings 的工作日且不加运输天数。不能直接把 45 天塞进该字段。工厂留货还是入仓未定 |
+| REAL GAP / UNKNOWN | Purchasing §5.7 与 §4；Delivery §14.1 | 45 天的日历及起算凭证未证实；现行 PO 日期是 Settings 的工作日且不加运输天数。不能直接把 45 天塞进该字段。初期 Diglant 留货已由 §4 owner ruling 确定；具体伙伴和留货执行条件仍需落实 |
 
 **证据范围：** UI MASTER §§4.1–4.2、6.0、6.7–6.10，COPY 的 SO/Purchasing 词典，
 01 tokens、02 components、03 patterns，Workspace §§2–3 和 Action Flow 约束本节 UI/Work。
@@ -222,12 +233,12 @@ Purchasing request -> existing approval -> official PO -> Carres Unit IDs
            v
 Diglant production -> attach Unit labels -> confirmed ready at Klang
            |
-           +--> storage choice: Diglant holding OR actual Carres receipt [OPEN]
+           +--> Diglant Klang holds completed goods [OWNER CONFIRMED]
            |
 Customer signs -> shared SO + linked Subscription -> supply / eligible Unit allocation
            |
            v
-Carres assigns Logistics -> exact pickup -> route / HOUZS -> customer receipt proof
+Carres assigns Logistics -> exact pickup -> confirmed regional partner route -> customer receipt proof
            |
            v
 Subscription service activation -> cleaning / changes / recovery -> closure
@@ -347,7 +358,7 @@ MOQ/整批限制只有供应条款证据存在才取整，显示额外量；不�
 ```text
 Customer receipt date / forecast fulfilment window
   <- final delivery + access / appointment constraints
-  <- Sabah/Sarawak arrival + HOUZS onward window (where applicable)
+  <- Sabah/Sarawak arrival + selected partner onward window
   <- sea departure / cutoff + port and partner handling + contingency
   <- actual Klang pickup slot + inspection / label readiness
   <- Diglant factory-ready date
@@ -356,10 +367,12 @@ Customer receipt date / forecast fulfilment window
 ```
 
 西马：按实际地区、伙伴提货/派送工作日及容量倒排，Klang Valley 与外州不能共用一个
-随意写死的运输天数。东马：沿用 Delivery §14.1 的 HOUZS 交接与客户联系边界；海运、
-港口、中转、目的地末程用 HOUZS 提供的窗口/确认资料规划，不假装 Carres 调度其内部船次。
+随意写死的运输天数。东马：仍需覆盖海运、港口、中转及末程，以实际选定伙伴提供的
+窗口/确认资料规划，不假装 Carres 调度其内部船次。Delivery §14.1 的 HOUZS 是传统
+业务既有规则，不代表本轮已任命 HOUZS 承接 Diglant；NETS 也不是默认任命。
 海运内部节点只作有来源的观察/预计，不凭猜测制造 DO、收货或每段完成记录。
-Carres 真实交接点、确切 Unit、HOUZS 回复及最终到货证明仍可追踪；换伙伴须另有批准。
+新合作需落实每段交接、客户联系及最终证明责任；Carres 仍 owns Logistics assignment，
+只有真实交接点、确切 Unit、有来源的伙伴回复和到货证明才形成履约事实。
 
 **十二月例子：** 仅假设 45 为日历天且十月十五日当天正式起算，简单日期相加约到
 十一月二十九日才生产完成；不是已确认承诺，起算含首日规则还会影响一天。
@@ -367,7 +380,7 @@ Carres 真实交接点、确切 Unit、HOUZS 回复及最终到货证明仍可�
 所以建议十月十日是准备/审阅节点，真正采购截止按最早需要日期倒推；不能固定为
 「每年十月十五日下单十二月全部没问题」。每月固定报告不能阻止截止更早时提前人工修订。
 
-## 5.8 · Unit、提货与未决存放方式
+## 5.8 · Unit、提货与已确定的初期存放方式
 
 Carres 在正式 PO 发出时产生永久 Unit ID，Diglant 按对应型号/尺寸贴标。打印/贴标
 不证明生产完、收货、拥有权或可交付。标签缺失、重号、型号不符或破损走核查，不能
@@ -380,14 +393,21 @@ Carres 在正式 PO 发出时产生永久 Unit ID，Diglant 按对应型号/尺�
 目标，尚不声称现有 warehouse-origin DO 已支持。拥有权与实际保管方分开，不凭 PO 或
 Diglant 的投资关系推定拥有权转移。
 
-**唯一提交 owner 的经营选择：** 生产完留在 Diglant 按需提货，还是整批提到 Carres 仓库。
-建议以 Diglant 暂存、按客户/路线合并提货为默认方向，但必须有可执行的留货期限、
-分 Unit 盘点/状态回报、提货时段及损坏责任安排；这些尚未证实，不能写成事实。
-优点是减少搬运和仓储，代价是依赖厂家可见性及提货响应。自仓模式便于实际检查和
-快速调货，但增加仓储、搬运与保管责任。东马可按已确认的 HOUZS 集运窗口安排提货，
-不应为等待个别客户无限存放。若 Diglant 不提供可靠留货或服务水平不足，建议改批量入仓。
-这是经营选择，已查 Purchasing §§5.4、5.6，Stock §§3–5，Delivery §§5.3、14.1 仍无答案；
-仓库默认地址不是这个答案。两条分支在本轮均不被静默选定。
+**OWNER RULING / APPROVED / NOT BUILT — 2026-09-22：** 初期成品留在 Diglant Klang，
+由 Carres 安排 Logistics 提货。Diglant 送到 Carres 仓库是其提供的另一选项，当前不采用；
+不为这项新业务预设扩租仓库，也不虚构成品已进 Carres 仓。这里记录实际保管方，
+不凭存放安排推定拥有权、免费存放、保险或无限留货期限。
+
+**执行建议仍是 PROPOSAL / NOT LAW：** 按客户/路线合并提货；落实厂家留货期限、
+Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际合作伙伴。记录「生产完成、
+在 Diglant、未提货」而不是「Carres 仓库现货」。这些细节不重开已决定的初期模式，
+也不能被默认为 Diglant 已同意的条款。
+
+**OWNER RULING：** 运营约 3–6 个月，掌握真实数量及合作条件后，再决定是否租另一处
+场地并自管；不是届时自动搬仓。**建议复盘证据：** 每周平均/峰值留厂床垫数、型号尺寸
+和包装占地、存放天数、提货频率/等待时间、各地区交付表现、破损及物流报价。若考虑
+仓库，再根据真实堆放限制、周转空间及通道估算面积，不凭销量直接猜平方米。
+留货/物流问题先走运营异常解决；转为自仓仍需 Jess 新决定，不能由指标自动触发租仓。
 
 ## 5.9 · 客户、激活、服务、变更到结束
 
@@ -401,7 +421,7 @@ Diglant 的投资关系推定拥有权转移。
 建议一床垫一个可独立追踪的订阅履约资产；多个床垫分别可证明接收和服务，不用 SO
 头部完成一次性激活全部。现有 Rental `active` 字段不能当作已经送达的证据。
 
-激活建议以实际客户接收日为准，证明晚审核不改成审核日；提货、HOUZS 收货、到港都不是
+激活建议以实际客户接收日为准，证明晚审核不改成审核日；提货、伙伴收货、到港都不是
 客户收到。失败、拒收或部分交付保留真实位置与后续 Work，不激活未接收资产。
 这是服务激活建议，不定义或修改账单开始日。
 
@@ -484,7 +504,7 @@ as-of 范围一致，每个合计能钻到底层；退回/重提/取消/修订�
 | 高销量超 forecast / 低销量积压 | 核实未覆盖需求后追加；下期减少建议或经批准调配，不自动撤供应承诺 |
 | 同一床垫被两种业务需要 | 同一 Unit 资格/占用检查；冲突拒绝，不能让各模块各自 reserve |
 | 部分提货/遗失/破损/错发 | 精确 Unit 分结果、现持有人保留、源记录报问题；不能把全 PO 标为完成 |
-| 海运/伙伴延期或证明缺失 | HOUZS 记录回复/末程证据，Delivery 呈风险和后续日期；中转到货不激活 |
+| 海运/伙伴延期或证明缺失 | 实际获指派伙伴记录回复/末程证据，Delivery 呈风险和后续日期；中转到货不激活 |
 | 新型号/数据断档/读源失败 | 经理输入或暂缓定稿；未知不当零，自动建议不能瞎补 |
 | 重试/多人改同一版本 | 旧版提交拒绝并重读；报告、采购转换、提货、激活各事实只记一次 |
 
@@ -501,7 +521,7 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 | 三个月均值作初始建议 | 真实月报显示缺货/活动严重偏置或误差持续超过经理可接受水平，则保持人工并另评方法 |
 | 签约净销量消耗 forecast | owner 明确 KPI 以实际激活计，或签约生效口径不同，则修改 KPI/forecast 定义与桥接，不能偷偷换指标 |
 | 预测净算一次再转额外备货 | 逐 Unit/PO 对账发现重复覆盖、日期不可达或其他业务占用，则阻止转换、修正唯一覆盖来源 |
-| Diglant 留货建议 | Diglant 无法提供可执行留货/盘点/提货条件，或真实履约持续延迟，则选批量入仓 |
+| 提货批次与留货执行建议（初期留厂模式已确认） | 实际等待、积压或损坏证据要求调整批次/伙伴；是否租仓自管由约 3–6 个月复盘后的 owner 决定，不自动切换 |
 | 客户收到后服务激活 | 新计划有效签署条款另有服务开始依据，则改此提案；不能凭旧 `active` 代码定政策 |
 | 共用 SO 入口、独立管理 | 真实员工走查显示共用列表造成类型误判，则调整默认视图；不可因此复制客户订单真相 |
 
@@ -510,10 +530,10 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 🟡 **新员工易混淆：** forecast/KPI/PO/提货/收到五种事实。修复为分栏、带月份、可追源。
 🔴 **不能照当前能力直接执行：** 工厂起点收货/DO、时间口径与未来供应关联。修复为保留
 真实来源、未知日期和禁止虚构收货；未来执行前需在 owning authority 收口。
-🟡 **业务仍未定：** 留货方式及新计划条款。完整蓝图先供 review，本轮只问留货这一项；
+🟡 **业务仍未定：** 新计划条款、实际伙伴和留货执行条件；初期 Diglant 留货已确定。
 不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
 
 **CURRENT MISSION：** 全量推荐已形成，owner review 待完成。不是 PLAN MISSION COMPLETE，
-不是 READY FOR CARD。下一步只审阅/修正本提案与留货选择；批准后覆盖本节为适用正式真相，
+不是 READY FOR CARD。下一步审阅/修正其余提案，不重问已确定的初期留货选择；批准后覆盖本节为适用正式真相，
 并仅同步受影响的 authority seams。当前不改 shared SO 页面、MPR/PO 表单/模板，不发 PDF，
 不启用任何自动化；所有既有 law 和各模块批准/生产验证状态保持其原始作用范围。
