@@ -170,8 +170,8 @@ const goodsTotal = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").
 const serviceTotal = (ls: Line[]) => live(ls).filter((l) => l.kind === "service").reduce((n, l) => n + l.qty * l.unit, 0);
 const total = (ls: Line[]) => goodsTotal(ls) + serviceTotal(ls);
 /* ONE ladder with the Register footer (Law D): the shared goodsCategoryWordOf. A line it cannot name keeps
-   its quantity under the PROPOSED word "Items to check" (not yet in COPY) — never folded into a known kind. */
-const wordOf = (l: Line) => { const w = goodsCategoryWordOf({ sku: skuOf(l), category: CATALOGUE.find((m) => m.sku === l.sku)?.category ?? null }); return w === "Other goods" ? "Items to check" : w; };
+   its quantity, counted apart as "Not in catalog" (COPY-STANDARD SO category footer, owner 2026-09-22) — never folded into a known kind. */
+const wordOf = (l: Line) => { const w = goodsCategoryWordOf({ sku: skuOf(l), category: CATALOGUE.find((m) => m.sku === l.sku)?.category ?? null }); return w === "Other goods" ? "Not in catalog" : w; };
 const qtyText = (ls: Line[]) => {
   const m = new Map<string, number>();
   for (const l of live(ls)) if (l.kind !== "service") m.set(wordOf(l), (m.get(wordOf(l)) ?? 0) + l.qty);

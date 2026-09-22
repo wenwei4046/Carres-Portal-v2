@@ -142,7 +142,7 @@ await p.close();
 console.log("── J · SO-1206 (real): unclassified SKU and per-unit service ×2");
 p = await open("?so=1206");
 t = flat(await form(p));
-ok(t.includes("Qty: Mattress 1 · Bedframe 2 · Pillow 4 · Mattress protector 2 · Items to check 1"), "unclassified M1201F-K keeps its qty under Items to check, not folded into Mattress");
+ok(t.includes("Qty: Mattress 1 · Bedframe 2 · Pillow 4 · Mattress protector 2 · Not in catalog 1"), "unclassified M1201F-K keeps its qty as Not in catalog, not folded into Mattress");
 ok(!t.includes("Other goods"), "no Other goods on the page");
 ok(t.includes("Services: Dispose old mattress ×2 · Dispose old bed frame · Delivery fee"), "per-unit service shows its quantity");
 ok(t.includes("Dispose old mattress Queen ×2") && t.includes("Dispose old bed frame King"), "service rows name the service, detail beneath");
@@ -153,7 +153,7 @@ ok(svc.lines === 3 && svc.qty === 4, `services measured from the Items table: ${
 for (const s of ["Goods amount RM 6,778.00", "Service amount RM 510.00", "Total payable RM 7,288.00", "Paid to date To check", "Balance due To check"]) ok(t.includes(s), `SO-1206 ${s}`);
 ok(t.includes("Payment data to check.") && t.includes("RM 3,644.00 paid, but no payment record exists") && !t.includes("Balance due RM"), "summary/record mismatch: shown as to check, no trusted balance");
 d = flat(await doc(p, 6));
-ok(d.includes("Items to check 1") && d.includes("Dispose old mattress ×2") && /TOTAL PAYABLE 10 /.test(d), "document: same Qty words, service ×2, 10 pieces");
+ok(d.includes("Not in catalog 1") && d.includes("Dispose old mattress ×2") && /TOTAL PAYABLE 10 /.test(d), "document: same Qty words, service ×2, 10 pieces");
 ok(/Paid to date To check/.test(d) && /BALANCE DUE To check/.test(d), "document: paid and balance wait for Payments");
 ok(!/ADD-ON Dispose old mattress ×2/.test(d), "document service row keeps the plain name; ×2 only in the Services summary");
 r = await revs(p); ok(r.includes("Rev 6 · Current") && r.includes("Rev 1–5 were recorded on Mon, 10 Aug 2026"), "Revisions: Rev 6 current, earlier revisions named");

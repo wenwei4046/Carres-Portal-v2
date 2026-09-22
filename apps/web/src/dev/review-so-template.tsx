@@ -473,9 +473,9 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
   /* Owner ruling 2026-09-22: quantities by product kind, services named, never counted as goods. */
   const kindQty = new Map<string, number>();
   for (const l of lines) {
-    /* The Register's ladder (Law D); an unnamed line keeps its qty under the PROPOSED "Items to check". */
+    /* The Register's ladder (Law D); an unnamed line keeps its qty, counted apart as "Not in catalog" (COPY-STANDARD). */
     const w = goodsCategoryWordOf({ sku: l.sku, attrs: (l.attrs ?? null) as Record<string, unknown> | null, category: l.category ?? null });
-    const name = w === "Other goods" ? "Items to check" : w;
+    const name = w === "Other goods" ? "Not in catalog" : w;
     kindQty.set(name, (kindQty.get(name) ?? 0) + Number(l.qty));
   }
   const rank = (k: string) => { const i = (GOODS_CATEGORY_WORDS as readonly string[]).indexOf(k); return i < 0 ? 99 : i; };
