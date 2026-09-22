@@ -39,13 +39,12 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
-- **THE VERSION TRAVELS WITH THE NUMBER, INCLUDING V1** (0378; placement Jess
-  2026-09-22). The word is the dictionary's `V{n}`. **Wherever the PO's
-  identity prints, it prints as `PO-2609-0042 V2`** — the PO DETAILS `PO No`
-  row, every continuation page header and the footer — so every page is
-  self-identifying. The version is never printed on its OWN a second time: no
-  separate `Version` row and no second line under `PURCHASE ORDER` (the page-1
-  hero number alone carries no version; the `PO No` row beside it does). A supplier holding two papers with one
+- **WHERE THE VERSION PRINTS, INCLUDING V1** (0378; placement Jess
+  2026-09-22). The word is the dictionary's `V{n}`. **The version prints in
+  three places: the PO DETAILS `PO No` row (`PO-2609-0042 V2`), every
+  continuation page header and the footer. The page-1 hero number does NOT
+  repeat it** (`PO-2609-0042` alone). No separate `Version` row and no second
+  line under `PURCHASE ORDER`. A supplier holding two papers with one
   number cannot tell which to build from without it, so V1 prints too
   (`Version 1 prints nothing` is only the internal REVISIONS PANEL's rule).
   The version the PDF prints is the version the confirmation records:
@@ -217,3 +216,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
 | 2026-09-22 | Several-Deliver-To pages simplified (owner, on the rendered preview): plain `DELIVER TO` with that location's full name and address — `(1 of 2)` deleted; each location's table keeps its `TOTAL`; the last page adds **`PO TOTAL`** (whole-PO quantity, nothing beside it); page count lives in the footer `Page n of m`. Version wording corrected: the version travels with every printed PO identity (`PO No` row, page headers, footer) and never prints on its own. | Jess |
 | 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
+| 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
