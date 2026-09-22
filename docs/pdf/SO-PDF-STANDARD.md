@@ -230,8 +230,8 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   categories/services present; gifts count in their goods category; there is no `Other goods` (owner
   2026-09-22 — an unclassified line is a catalogue data error). **An unclassified line still keeps its
   quantity (owner, Jess 2026-09-22):** it is never folded into a known category and never silently
-  dropped from the count; its visible word is a COPY proposal (`Items to check`), not yet approved, and
-  the count does not wait for that word. **Services show name and quantity (owner, Jess 2026-09-22):**
+  dropped from the count; it prints apart as `Not in catalog {n}` ({n} = physical quantity; COPY-STANDARD
+  SO category footer — `Items to check` was not adopted). **Services show name and quantity (owner, Jess 2026-09-22):**
   service lines and service quantity are different counts — a service with quantity above 1 prints
   `Dispose old mattress ×2` in the Services line on page and document; the Register totals service
   quantity. Service quantities stay out of the goods count. Do not print the
