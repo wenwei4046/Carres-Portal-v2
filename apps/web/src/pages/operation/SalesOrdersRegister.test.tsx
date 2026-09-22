@@ -407,7 +407,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
    * the filtered result. A footer that under-counts is worse than one that
    * abbreviates: it is a number the operator trusts and cannot reproduce.
    */
-  it("counts an unrecognised line as `Other goods` instead of dropping it, and prints no raw SKU word", () => {
+  it("an unrecognised line prints no `Other goods` and no raw SKU word (owner 2026-09-22)", () => {
     listHookState.data = {
       orders: [
         order({
@@ -426,8 +426,9 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
        prints and the sheet's abbreviation never does. */
     expect(footer).toHaveTextContent("Mattress protector 2");
-    // September 11 review: every counted quantity has a visible category.
-    expect(footer).toHaveTextContent("Other goods 5");
+    /* Owner ruling 2026-09-22: an unclassified line is a catalogue data
+       error, reported for correction — never printed as a kind of goods. */
+    expect(footer).not.toHaveTextContent("Other goods");
     expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Leg");
   });
@@ -538,8 +539,24 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     ]) {
       expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
     }
-    expect(footer).toHaveTextContent("Other goods 5");
+    expect(footer).not.toHaveTextContent("Other goods");
     expect(footer).toHaveTextContent("1 sales order");
+  });
+
+  /* Owner ruling 2026-09-22: services never enter `Qty:`; they print apart. */
+  it("prints services apart as `Services {n}`, never inside Qty:", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499, category: "mattress" }],
+          order_addons: [{ addon_key: "delivery", qty: 2, unit_price: 50 }],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent(/^1 sales order · Qty: Mattress 1 · Services 2$/);
+    expect(footer).not.toHaveTextContent("Service 2");
   });
 
   it("an OLDER Worker that sends no category behaves exactly as before", () => {
@@ -639,7 +656,16 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
        the configuration the 11px slate-11 second fact, and the SKU plain on
        one line — never a scroll box that cuts it. */
     expect(within(row).getByText("Cody").className).not.toContain("font-medium");
-    expect(within(row).getByText("Super King").className).toContain("text-[11px]");
+    const config = within(row).getByText("Super King");
+    expect(config.closest("div")!.className).toContain("text-[11px]");
+    /* Owner review 2026-09-22 (§6.8): ONE two-line geometry. The configuration
+       is one line (the engine's OverflowText: nowrap + … + door), in a fixed
+       14px second line that a row WITHOUT configuration keeps too. */
+    expect(config.closest("div")!.className).toContain("h-[14px]");
+    expect(config.className).toMatch(/overflowText/);
+    const bare = screen.getByTestId("expanded-good-PILLOW-9");
+    const bareSecond = within(bare).getByTestId("so-goods-item").children[1] as HTMLElement;
+    expect(bareSecond.className).toContain("h-[14px]");
     const sku = within(row).getByText("B1201S-K");
     expect(sku.className).not.toContain("font-medium");
     expect(sku.className).not.toContain("overflow-x-auto");

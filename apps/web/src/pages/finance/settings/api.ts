@@ -15,6 +15,8 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
+import type { LedgerAccountReorderInput } from "@carres/shared";
+
 import { apiFetch } from "@/lib/api";
 
 const BASE = "/api/finance/ledger/money-accounts";
@@ -57,13 +59,38 @@ export function useSaveCardRoute() {
   });
 }
 
-/** Rename one chart account (0539). The chart read is `useLedgerChart`; the
- *  ["finance"] refresh re-reads it with everything else. */
-export function useRenameAccount() {
+/** One chart account's name (0539) and, since 0550, its number. The chart read
+ *  is `useLedgerChart`; the ["finance"] refresh re-reads it with everything
+ *  else, which matters far more for a number than for a name — a new number is
+ *  carried to every row that names the account, so any screen holding the old
+ *  one is stale. `newCode` equal to the current number is left out of the body:
+ *  the door reads a missing number as "keep this one". */
+export function useSaveAccount() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, { code: string; name: string }>({
+  return useMutation<{ code: string }, Error, { code: string; name: string; newCode?: string }>({
     mutationFn: (v) =>
-      apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
+      apiFetch(`/api/finance/ledger/accounts/${v.code}`, {
+        method: "PATCH",
+        body: JSON.stringify(v.newCode && v.newCode !== v.code ? { name: v.name, code: v.newCode } : { name: v.name }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/**
+ * Move accounts inside one heading (0557). The account NUMBER is untouched —
+ * this writes display order only.
+ *
+ * BOTH ORDERS GO UP: `was` is what the screen read, `now` is what it wants. The
+ * database refuses with 409 when `was` is no longer the stored order, which is
+ * the only thing standing between two draggers and last-write-wins. Passing
+ * `now` as `was` would disable that check without any error to show for it.
+ */
+export function useReorderAccounts() {
+  const qc = useQueryClient();
+  return useMutation<{ moved: number }, Error, LedgerAccountReorderInput>({
+    mutationFn: (v) =>
+      apiFetch("/api/finance/ledger/accounts/reorder", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }

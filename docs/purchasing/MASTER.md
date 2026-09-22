@@ -889,7 +889,9 @@ summary. Action ownership uses structured avatar metadata.
 - **`Download PDF` HANDS OVER A PDF.** Never a link to the JSON payload behind it: a page that
   shows an API response as if it were a document teaches the operator that the document is
   unreliable.
-- Internal Manual Purchase and Display Request objects have no empty PDF preview.
+- Saved internal Manual Purchase and Display Request objects have no empty PDF preview.
+  Manual Purchase create/returned-request edit uses the explicitly approved internal MPR
+  preview in §9.2; the downstream Issue PO review uses the supplier-facing PO template.
 
 ### 8.3 Two-line fact/action copy
 
@@ -1591,10 +1593,115 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
+**CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; APPROVED / NOT BUILT.**
+Reuse the selected Sales Order form composition, with a 50/50 form and live MPR
+preview at the governed readable desktop width; use the shared stacked layout
+below it. This overrides the former blanket ban on a Manual Purchase split
+preview for creation and returned-request editing only. Ordinary saved-object
+view and the Register retain their separately governed layouts.
+
+The three sections, in the SAME reading order on the form and preview, are:
+
+1. **Request Details** — `Purpose`; its structured Service Case / Staff member /
+   Subsidiary / `What is this for?` field where applicable; optional
+   `Purchase requirement`; the existing explicit `Can stock answer this?` choice
+   (no inferred/default answer); automatic `Requested By` and `Proceed Date`.
+   The requirement stays here, never a separate section or a bottom-of-form question.
+   Proceed Date previews server time and records the actual successful hand-off;
+   it is not a manually backdated document date. Requester is the real individual.
+2. **Delivery** — `Deliver To` from governed destinations, then `Delivery Date`.
+   Complete item/Settings facts provide the request's default arrival date;
+   staff can adjust it and the system never silently overwrites that choice.
+3. **Items** — Catalog search/selection, automatically resolved name, specification
+   and Supplier, editable positive whole `Qty`, optional `Note`, `+ Add line` and
+   `Remove` for unsubmitted lines. Supplier is not an independent first-section
+   choice: a request can contain several Catalog-derived suppliers. Stock reference
+   opens with its governed loading/error/unknown/available meanings and does not
+   silently reserve or subtract stock. Existing concrete-need versus extra-stock
+   rules continue to apply.
+
+The right pane is a live **internal MPR preview**, using the same draft facts and
+section sequence, with total requested goods quantity. Before submission it is
+clearly a draft; it never invents an MPR/PO number, claims approval, or represents
+an issued supplier PO. Supplier-facing documents appear at Issue PO, one preview
+per actual grouped PO, using PO-PDF-STANDARD. Never combine several suppliers on
+one PO. No Payment / Paid to date / Balance due / financial-progress section.
+Use the existing top action placement and governed submission action; typing,
+previewing, printing or downloading never submits a request or sends a PO.
+
+**MPR → PO completion scope — owner approved 2026-09-22; APPROVED / NOT BUILT.**
+The scope is Manual Purchase create/returned-request edit, its internal live MPR
+preview, the concrete Register corrections below, and the MPR-to-PO review/issue
+journey. Subscription is outside this scope. Approval of scope is not production
+verification or approval of unreviewed visual details.
+
+- Preserve the Register's approved column order, group-local headers and shared
+  width registry. Correct confirmed no-PO wording across parent rows, goods,
+  object lineage, filters and exports to `No PO yet`; a failed lineage read is
+  never a no-PO fact. Keep permanent history and truthful partial quantities.
+- Only approved goods with a confirmed live remaining requirement are selectable.
+  Show selected request count, goods quantity and the exact resulting PO count;
+  the preview and actual issue must agree. Unresolved/unsaved stock selections
+  keep their existing named guard. Staff do not calculate the document count.
+- Register `Issue PO` opens `Review Purchase Orders` before creation. The work
+  pane and actual PO draft use the governed 50/50 / stacked composition. Review
+  each resulting document with its Supplier, destination, source MPRs, goods,
+  quantity and dates; changing the selected document changes its PDF preview.
+  Draft review creates no PO number, Unit ID, supplier commitment or sent record.
+- Preserve all FIVE initial grouping facts: Supplier × Category × Deliver To ×
+  Purpose × MPR Delivery Date. Only matching groups combine across requests.
+  Different destinations at initial issue produce different POs. This does not
+  revoke §5.4's permitted later multi-destination revision of the SAME PO.
+- Reuse/adapt the existing SO Batch review capability, not a new parallel issue
+  workspace. **COPY REQUIRED, not ready by renaming:** the measured
+  `so-batch/SoBatchIssueWorkspace.tsx` already renders review/draft/evidence states
+  but calls the SO batch issue endpoint; the MPR entry must retain its own source,
+  approval, remaining-quantity and allocation validation. Existing money gates
+  must not be copied as new financial placement gates.
+- Official issue allocates the real PO identity and, for tracked goods only,
+  exact Unit IDs through the existing authority. Counted-only goods receive no
+  Unit IDs. Preserve exact MPR-to-PO source lineage in both directions. Re-read
+  issued/remaining quantities after issue; a partial request remains in `Need PO`.
+  Errors or retries must never create duplicate demand or a second order.
+- Issued is not sent. Keep the one communication/evidence area, recording the
+  actual version, recipient, channel, actor and time. Leaving an issued document
+  does not delete it or reopen its covered demand. Download/print are not sending.
+- `Purchase requirement` is optional for every purpose and persists on create
+  and returned-request edit. It is distinct from the required Other Purchase
+  `What is this for?`; current `why`-only handling does not implement this target.
+  The MPR preview, saved facts and later review must retain the same requirement.
+
+**Approval boundary — owner selected A, 2026-09-22; APPROVED.**
+Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,
+not price approval or permission to pay. The existing Purchasing Approver duty,
+actual-person/cover and no-self-approval rules continue to govern; its recorded
+holder is Jess. Approval is required before PO issue. Recording a price or waiting
+for financial approval must not add a placement/issue blocker; any required
+financial approval is Jess-only. Do not automatically accept an expense or make
+payment by issuing the PO. A late approval triggers governed Work follow-up; it
+never automatically removes the gate or appoints another approver. Changing
+that operating rule requires a new owner ruling. Price entry on a PO does not
+add an MPR price editor by inference.
+
+**Date boundary — resolved target, owner approved 2026-09-22; NOT BUILT.**
+MPR `Delivery Date` remains the requested arrival date and remains an initial
+PO grouping fact. PO `PO Delivery Date` is calculated from PO Date using the
+recorded applicable Settings working days under §5.7, skipping applicable
+weekends/public holidays, with NO added transit days. Do not copy the MPR date
+into the PO's original date. Preserve both facts and make any mismatch visible
+in review; never silently alter the request or claim a supplier has confirmed it.
+Current issue code's approved-MPR-date handoff is implementation evidence to be
+changed, not an alternative approved calculation. Do not rewrite historical POs.
+
+**Empty PO fact.** Where a request has no linked PO, print `No PO yet`, never a
+blank, a dash, or `Not ordered yet`. Failed/unknown lineage still uses its own
+loading/error state and never asserts that no PO exists.
+
+
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
 Every request requires approval, regardless of purpose or amount; the decision and issue doors
 enforce it. Per-purpose approval configuration is retired. The Register, rail, object rounds and
-the create form below describe the built page; fixture walks cover every state, and the
+the historical create-form implementation below describe the built page; the 2026-09-22 create blueprint above is not built; fixture walks cover every state, and the
 authenticated owner walk remains owed.
 
 **Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
@@ -1712,7 +1819,7 @@ every operator-facing surface; the search still finds it. `MPR` = Manual Purchas
 approved before it becomes one or more POs. `MP` is not used — it is already the Mattress Protector
 SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` values stay searchable.
 `MPR No` and `Proceed Date` pin at canvas ≥768px, `MPR No` alone below; `MPR No` opens the request.
-`PO No` lists every resulting PO (blank before any PO), each opening its own PO; one row remains one
+`PO No` lists every resulting PO (`No PO yet` before any PO), each opening its own PO; one row remains one
 request. Customer and supplier facts use the shared dictionary. Existing groups and sorting stay.
 
 **Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
@@ -1764,7 +1871,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
 - MPR No is the permanent request number; UUID remains an internal key, never the displayed identity.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
-  `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
+  `No PO yet` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
   exact linked PO list. Never a UUID, never a SKU/supplier/date inference, and never the
   Manual Purchase identity — a purchase may have no PO or several.
 - `Items` speaks Catalog human words through the ONE item-label arithmetic
@@ -1787,7 +1894,7 @@ shared implementation; do not introduce a separate Manual Purchase palette or gu
   `Items`, `Supplier Deliver To`, `Requested By`, dates and `PO No` are narrower than the registry
   and the convergence is named there, to be closed in this page's own round. Saved layout key
   `carres.manualPurchase.register.v5`; rail key `carres.manualPurchase.filterRail.v2`.
-- **The create form (D1, Round 2).** Below a 640px form the item search takes a whole row, `Qty` ·
+- **Measured create implementation (D1, Round 2; target superseded by the create blueprint above).** Below a 640px form the item search takes a whole row, `Qty` ·
   `Note` sit under it with their own captions, `Remove` takes its own row, and `Cancel` ·
   `Send for approval` move from the shell header into a bar pinned to the bottom — exactly one pair
   is displayed at any width. The Delivery Date picker's floor is the Purchasing Settings number
@@ -1947,11 +2054,12 @@ the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the r
 person, `Issue PO` — where the PO count is the same document partition the issue door
 groups by (supplier × category × destination × purpose × Manual Delivery Date, merged across
 requests only when every fact matches). One PO has one official supplier-facing Delivery Date;
-different dates therefore report and create different POs. The issued PO saves the approved
-Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
+different MPR dates therefore report and create different POs. The PO original date follows
+the owner-approved §5.7 Settings calculation, independently of this request grouping date.
+The current code that copies the approved MPR date is NOT the approved target. Work ownership and reminders
 stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
 
-**Object detail.** Clicking `MPR No` opens the full-width, one-scroll object on the shared
+**Saved object view (not the create/edit workspace above).** Clicking `MPR No` opens the full-width, one-scroll object on the shared
 Object Header + Summary + Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.

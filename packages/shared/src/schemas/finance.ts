@@ -342,10 +342,40 @@ export const ledgerEntryRef = z.union([
   z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z-]{1,39}$/, 'Use an entry number like JE-202609-0003'),
 ]);
 
-/** Rename one account on Finance Settings → Chart of accounts (0539). The code never changes. */
-export const ledgerAccountRenameInput = z.object({
+/** An account's number: four digits (1210), or three digits, a dash and four
+ *  (100-0001). Both shapes, and the sentence below, are 0550's own — the
+ *  function checks the same thing, so the two must not drift apart. */
+export const ledgerAccountCodeShape = /^(\d{4}|\d{3}-\d{4})$/;
+export const LEDGER_ACCOUNT_CODE_MESSAGE =
+  'A number is four digits, or three digits, a dash and four — 1210 or 100-0001.';
+
+/** Rename or renumber one account on Finance Settings → Chart of accounts
+ *  (0539, renumber added by 0550). `code` left out means the number stays;
+ *  a number that is given cascades to every row that names it. */
+export const ledgerAccountUpdateInput = z.object({
   name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
+  code: z.string().trim().regex(ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE).optional(),
 }).strict();
+
+/**
+ * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
+ *
+ * BOTH ORDERS TRAVEL. `was` is the order the screen READ, `now` is the order it
+ * wants; `gl_accounts_reorder` refuses when `was` is no longer the stored order,
+ * which is what stops a second dragger throwing the first one's move away.
+ * Sending `now` twice would pass that check every time and silently turn it off.
+ *
+ * `parentCode` is null for a top-level account — the chart's roots are siblings
+ * of each other. The refusal sentences are the database's (COPY-STANDARD 0557).
+ */
+export const ledgerAccountReorderInput = z.object({
+  parentCode: z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.').nullable(),
+  was: z.array(z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.'))
+    .min(1, 'Send the order the chart was in before the drag.'),
+  now: z.array(z.string().trim().regex(/^\d{4}$/, 'That account is not in the chart.'))
+    .min(1, 'Send every account under this heading, in the order you want them.'),
+}).strict();
+export type LedgerAccountReorderInput = z.infer<typeof ledgerAccountReorderInput>;
 
 /** A trial balance or a balance sheet as it stood at the end of one day.
  *  Omitted = today in Malaysia. */

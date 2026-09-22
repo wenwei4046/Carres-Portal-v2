@@ -31,7 +31,7 @@ afterAll(() => _setJwksForTesting(null));
 
 type Op = [string, ...unknown[]];
 type Call = { kind: "from" | "rpc"; name: string; args?: unknown; ops: Op[] };
-type Result = { data: unknown; error: { code?: string; message?: string } | null; count?: number | null };
+type Result = { data: unknown; error: { code?: string; message?: string; details?: string } | null; count?: number | null };
 
 function fakeClient(answer: (call: Call) => Result) {
   const calls: Call[] = [];
@@ -90,6 +90,11 @@ const ok = (data: unknown, count?: number | null): Result => ({ data, error: nul
 const fail = (code: string, message = "database said something internal"): Result => ({
   data: null,
   error: { code, message },
+});
+/** A refusal the way a raise ... using detail = '…' reaches PostgREST. */
+const refuse = (code: string, details: string, message: string): Result => ({
+  data: null,
+  error: { code, message, details },
 });
 
 const ENTRY = {
@@ -465,19 +470,75 @@ describe("PATCH /accounts/:code", () => {
       body: JSON.stringify(body),
     }), env);
 
-  it("renames through gl_account_rename with the name trimmed, and never the code", async () => {
+  it("renames through gl_account_update with the name trimmed and the number left alone", async () => {
     const { sb } = fakeClient(() => ok("2130"));
     const res = await patch("/accounts/2130", { name: " Accruals " });
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_account_rename", { p_code: "2130", p_name: "Accruals" });
+    expect(await json(res)).toEqual({ code: "2130" });
+    // p_new_code null is what the function reads as "keep this number".
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "2130", p_name: "Accruals", p_new_code: null });
   });
 
-  it("refuses operation, a bad code and a blank name before the database", async () => {
+  it("renumbers, keeping the name, and answers with the number the account now carries", async () => {
+    const { sb } = fakeClient(() => ok("2140"));
+    const res = await patch("/accounts/2130", { name: "Accruals", code: "2140" });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "2140" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "2130", p_name: "Accruals", p_new_code: "2140" });
+  });
+
+  it("changes the name and the number in one call, and takes the dashed shape", async () => {
+    const { sb } = fakeClient(() => ok("100-0001"));
+    const res = await patch("/accounts/2130", { name: " Accrued expenses ", code: " 100-0001 " });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "100-0001" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", {
+      p_code: "2130", p_name: "Accrued expenses", p_new_code: "100-0001",
+    });
+  });
+
+  it("reaches an account that already carries the dashed shape in its own path", async () => {
+    const { sb } = fakeClient(() => ok("100-0001"));
+    expect((await patch("/accounts/100-0001", { name: "Accruals" })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "100-0001", p_name: "Accruals", p_new_code: null });
+  });
+
+  it("refuses operation, a bad path code and a blank name before the database", async () => {
     expect((await patch("/accounts/2130", { name: "X" }, "operation")).status).toBe(403);
     fakeClient(() => ok("x"));
     expect((await patch("/accounts/abc", { name: "X" })).status).toBe(404);
     expect((await patch("/accounts/2130", { name: "  " })).status).toBe(422);
-    expect((await patch("/accounts/2130", { name: "X", code: "9999" })).status).toBe(422);
+    // A number of the wrong shape never reaches the database.
+    const shape = await patch("/accounts/2130", { name: "X", code: "99" });
+    expect(shape.status).toBe(422);
+    expect((await json(shape)).message).toBe(
+      "A number is four digits, or three digits, a dash and four — 1210 or 100-0001.",
+    );
+    // A field the door does not take is still refused.
+    expect((await patch("/accounts/2130", { name: "X", kind: "ASSET" })).status).toBe(422);
+  });
+
+  // 0550's four refusals, each one reaching the user as its own sentence under
+  // its own tag rather than as raw database text.
+  it.each([
+    ["code_shape", "22023", 422, "A number is four digits, or three digits, a dash and four — 1210 or 100-0001."],
+    ["code_exists", "22023", 422, "An account numbered 2140 is already in the chart."],
+    ["name_exists", "22023", 422, "An account named Accruals is already in the chart."],
+    ["not_finance", "42501", 403, "Only Finance changes the chart of accounts."],
+  ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
+    fakeClient(() => refuse(sqlstate, details as string, message as string));
+    const res = await patch("/accounts/2130", { name: "Accruals", code: "2140" });
+    expect(res.status).toBe(status);
+    const body = await json(res);
+    expect(body.code).toBe(details);
+    expect(body.message).toBe(message);
+  });
+
+  it("keeps a break a break: no tag, no sentence of the database's", async () => {
+    fakeClient(() => fail("XX000", "deadlock detected"));
+    const res = await patch("/accounts/2130", { name: "Accruals" });
+    expect(res.status).toBe(500);
+    expect((await json(res)).code).toBe("rpc_failed");
   });
 });
 

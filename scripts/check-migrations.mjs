@@ -87,6 +87,18 @@ const COLLISION_BASELINE = new Set([
      (payment_collection_owners and its three doors vs Delivery proof/attempt
      evidence), so their relative order is immaterial. */
   "0489",
+  /* 0561 · two lanes wrote the SAME fix for the same break within the hour on
+     2026-09-22 (#1508's `the_voucher_line_guard_survives_a_rebuild`, then
+     #1516's `a_voucher_line_says_what_it_is_for_after_0554`) — each restores
+     payment_voucher_save_draft's line_needs_description guard that 0554 lost.
+     Both are committed, so the rename path is closed (red line 6) and the pair
+     is baselined the way 0417, 0424 and 0489 were. Measured at baselining:
+     NEITHER half is applied (production's tracker stands at 0549), each file
+     defines only payment_voucher_save_draft, and their executable bodies are
+     IDENTICAL once comments and whitespace are set aside — so whichever
+     applies second rewrites the function to the same text, and their order is
+     immaterial. */
+  "0561",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
@@ -203,4 +215,221 @@ for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }
+
+/**
+ * A GUARD THAT FORCES AN ANSWER MUST REFUSE WHITESPACE.
+ *
+ * Measured 2026-09-22: one-argument `btrim()` in Postgres trims the SPACE
+ * character and nothing else (`btrim(E'\t') = ''` is false), so every guard
+ * written as `nullif(btrim(coalesce(x, '')), '') is null`, `btrim(x) = ''` or
+ * `length(btrim(x)) = 0` accepted a single tab or a single line break as a
+ * real answer. 114 of them, across cancel reasons, party names, delivery
+ * numbers, receiver names and evidence paths. `0560` rewrote them all to ask
+ * the only question that is actually being asked: does this value contain any
+ * character that is NOT whitespace — `coalesce(x, '') !~ '[^[:space:]]'`.
+ *
+ * NOTHING FAILED WHEN THEY WERE WRONG, and nothing would fail if a future
+ * rebuild of one of these functions carried the old shape forward instead:
+ * the web forms use JavaScript `.trim()`, which does strip tab and newline, so
+ * only a caller that is not the web form ever reaches the hole. A rule that
+ * lives in the database needs a check that reads the database's own text.
+ *
+ * So: for each function below, find the LAST migration that defines it, read
+ * THAT body, and count. A count, not a presence — most of these functions
+ * guard more than one box, and "contains the string somewhere" would pass with
+ * every door but one reverted. Whole-file matching would be vacuous for the
+ * same reason: `0560` defines 80 functions in one file.
+ *
+ * If you legitimately remove a door (the field stops being required), drop its
+ * row here in the same commit and say so in the PR.
+ */
+const BLANK_ANSWER_DOORS = [
+  ["_payment_voucher_validate", 1],
+  ["_sales_order_proceed", 3],
+  ["_set_order_address_0391_locked_impl", 1],
+  ["_update_order_0391_locked_impl", 1],
+  ["arrival_source_create", 2],
+  ["arrival_source_handover", 2],
+  ["arrival_source_plan", 1],
+  ["commission_reopen_run", 1],
+  ["create_rental_agreement", 2],
+  ["dealer_invite", 3],
+  ["delivery_handover_record", 3],
+  ["delivery_leg_document_mint", 1],
+  ["delivery_payment_approval_decide", 1],
+  ["delivery_payment_approval_request", 1],
+  ["delivery_proof_review", 1],
+  ["delivery_save_partner_driver", 1],
+  ["delivery_save_partner_vehicle", 2],
+  ["delivery_set_partner_details", 1],
+  ["delivery_template_save", 2],
+  ["delivery_trip_document_mint", 1],
+  ["finance_exception_clear", 1],
+  ["finance_exception_open", 1],
+  ["finance_party_create", 1],
+  ["finance_party_update", 1],
+  ["gl_customer_party_for_order", 1],
+  ["gl_money_move_reverse", 1],
+  ["issue_record_action_result", 1],
+  ["office_receive_post", 2],
+  ["operation_abandon_order", 1],
+  ["operation_add_annotation", 1],
+  ["operation_assign_partner_and_dispatch", 2],
+  ["operation_attach_do_and_deliver", 2],
+  ["operation_cancel_po", 1],
+  ["operation_receive_po_with_do", 2],
+  ["operation_receive_threads", 2],
+  ["ops_stock_bind_units", 1],
+  ["other_debtor_invoice_cancel", 1],
+  ["other_receipt_void", 1],
+  ["partner_attach_pod", 2],
+  ["partner_pickup_threads", 1],
+  ["payment_collection_owner_handover", 1],
+  ["payment_invoice_void_replace", 1],
+  ["payment_record_delivery_date_request", 1],
+  ["payment_record_message_sent", 2],
+  ["payment_record_storage_inspection", 4],
+  ["payment_set_bank_account", 1],
+  ["payment_set_collection_timing", 1],
+  ["payment_set_storage_rule", 1],
+  ["payment_storage_close", 1],
+  ["payment_storage_extra_free", 2],
+  ["payment_storage_start", 1],
+  ["payment_template_save", 2],
+  ["payment_void", 1],
+  ["payment_voucher_cancel", 1],
+  ["payment_voucher_reject", 1],
+  ["purchasing_cancel_demand", 1],
+  ["purchasing_decide_request", 1],
+  ["purchasing_po_document", 1],
+  ["purchasing_require_reply_evidence", 3],
+  ["receiving_amend", 4],
+  ["receiving_arrival_post", 3],
+  ["receiving_arrival_void", 1],
+  ["receiving_validate_session_extras", 1],
+  ["receiving_void", 1],
+  ["refund_request", 1],
+  ["rental_approve_agreement", 1],
+  ["sales_order_create_unchecked_0374", 1],
+  ["sales_order_save_revision_unchecked_0354", 1],
+  ["sales_order_submit_attribution", 1],
+  ["sales_order_withdraw_attribution", 1],
+  ["supplier_advance_application_cancel", 1],
+  ["supplier_advance_money_back_cancel", 1],
+  ["supplier_bill_cancel", 1],
+  ["supplier_mark_delivered", 2],
+  ["warehouse_import_holiday_calendar", 2],
+  ["warehouse_receipt_return", 1],
+  ["warehouse_resubmit_receipt", 2],
+  ["warehouse_save_special_date", 1],
+  ["warehouse_set_site_details", 1],
+  ["warehouse_submit_receipt", 2],
+];
+
+/**
+ * A REBUILT FUNCTION MUST CARRY EVERY GUARD IT ALREADY HAD.
+ *
+ * Measured 2026-09-22: `0536_a_voucher_line_says_what_it_is_for.sql` taught
+ * `payment_voucher_save_draft` to refuse a direct line with no description.
+ * Four days later `0540_every_finance_line_carries_a_department.sql` rebuilt
+ * the same function — from `0484`'s body, the one BEFORE 0536 — and the guard
+ * was simply not carried forward. 0540 is the last definition, so 0540 is what
+ * runs, and the database accepted a blank description again for two weeks.
+ *
+ * NOTHING FAILED. The only test of the rule is a web test, and a greyed-out
+ * Save button in `apps/web` was the only thing left enforcing it. A rule that
+ * lives in the database needs a check that reads the database's own text.
+ *
+ * So: for each entry below, find the LAST migration that defines the function
+ * and read THAT definition's body. Whole-file matching would be vacuous here —
+ * 0540 contains `line_needs_description` inside `supplier_bill_save_draft`, a
+ * different function, and would have passed while the voucher guard was gone.
+ *
+ * Add an entry when a guard is restored, not for every guard ever written:
+ * this list is for rules that have already been lost once.
+ */
+const REBUILT_GUARDS = [
+  {
+    fn: "payment_voucher_save_draft",
+    needle: "line_needs_description",
+    story: "0536 wrote it, 0540 dropped it, 0552 put it back",
+  },
+  {
+    fn: "payment_voucher_save_draft",
+    needle: "[^[:space:]]",
+    story:
+      "0536 asked it with one-argument btrim(), which trims the space character only, " +
+      "so a description of one tab or one newline saved; 0552 widened the test",
+  },
+];
+
+/* Every `create [or replace] function <name>(` body in one file. */
+function functionBodies(sql, fn) {
+  const head = new RegExp(`create\\s+(?:or\\s+replace\\s+)?function\\s+(?:public\\.)?${fn}\\s*\\(`, "gi");
+  const bodies = [];
+  for (let m = head.exec(sql); m; m = head.exec(sql)) {
+    const tag = /\bas\s+(\$[A-Za-z_]*\$)/i.exec(sql.slice(m.index, m.index + 4000));
+    if (!tag) continue;
+    const start = m.index + tag.index + tag[0].length;
+    const end = sql.indexOf(tag[1], start);
+    bodies.push(sql.slice(start, end < 0 ? sql.length : end));
+  }
+  return bodies;
+}
+
+/* This rule reads THIS repository's own migration history, so it cannot run
+   against a fixture directory: the gate's regression test writes one-line
+   files that define nothing, and every row below would throw. */
+if (dir === DEFAULT_DIR) {
+  const sources = new Map();
+  for (const file of files) sources.set(file, await readFile(`${dir}/${file}`, "utf8"));
+  for (const [fn, want] of BLANK_ANSWER_DOORS) {
+    let lastFile = null;
+    let lastBody = null;
+    for (const file of files) {
+      const bodies = functionBodies(sources.get(file), fn);
+      if (bodies.length) {
+        lastFile = file;
+        lastBody = bodies[bodies.length - 1];
+      }
+    }
+    if (!lastBody) {
+      throw new Error(`No migration defines ${fn}, so its blank-answer check is stale. Fix the list in this script.`);
+    }
+    const got = lastBody.split("[^[:space:]]").length - 1;
+    if (got < want) {
+      throw new Error(
+        `${lastFile} is the last definition of ${fn} and it asks for a non-blank answer ${got} time(s), not ${want}. ` +
+          `One-argument btrim() trims the space character only, so that guard accepts a tab or a newline as an answer. ` +
+          `Use coalesce(x, '') !~ '[^[:space:]]' (0560).`,
+      );
+    }
+  }
+}
+
+/* This rule reads THIS repository's own migration history, so it is the one
+   check that cannot run against a fixture directory: the gate's regression
+   test writes three one-line files into a temp dir, none of which defines
+   anything, and the loop below would throw "no migration defines it" on every
+   fixture case. `it("the REAL repository passes its own gate")` runs the
+   script with no override, so the rule is still exercised. */
+for (const { fn, needle, story } of dir === DEFAULT_DIR ? REBUILT_GUARDS : []) {
+  let lastFile = null;
+  let lastBody = null;
+  for (const file of files) {
+    const bodies = functionBodies(await readFile(`${dir}/${file}`, "utf8"), fn);
+    if (bodies.length) {
+      lastFile = file;
+      lastBody = bodies[bodies.length - 1];
+    }
+  }
+  if (!lastBody) throw new Error(`No migration defines ${fn}, so its guard check is stale. Fix the list in this script.`);
+  if (!lastBody.includes(needle)) {
+    throw new Error(
+      `${lastFile} is the last definition of ${fn} and its body has lost the guard '${needle}' (${story}). ` +
+        `A rebuilt function must carry forward every guard it already had.`,
+    );
+  }
+}
+
 console.log(`Validated ${files.length} migration filenames and ${changed.length} migration change(s). No migration was applied.`);
