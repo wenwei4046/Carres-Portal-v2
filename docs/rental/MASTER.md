@@ -200,7 +200,7 @@ Finance 不在此次讨论范围内。没有应用代码、Card、部署、生�
 | RESOLVED FROM AUTHORITY | Delivery §§1.1、5.3、14.1 | 唯一交接链和倒排日期；传统业务东马经 HOUZS。新 Diglant 计划短期 NETS 负责 Klang Valley，其他地区伙伴未定，不自动继承 HOUZS 任命 |
 | APPROVED TARGET / NOT BUILT | Rental §2；Service Subscription boundary；Guarantee Future Subscription；Purchasing §5.4 | 每年三次清洁、独立 Visit/Upgrade、独立 Claim 政策；外部目的地 Receiving 语义已有目标，不能声称已建成 |
 | BUILT IN SOURCE / 本任务未生产验证 | `apps/api/src/routes/operation/orders.ts:354–364`；`supabase/migrations/0275_rental_makes_a_sales_order.sql:224–250`；`apps/web/src/pages/operation/OperationRental.tsx:1–80` | 已有 Rental→零金额履约 SO 链接、Rental 资产列表；总数查询仍排除 Rental。旧 `RU-` 展示不能成为床垫第二身份 |
-| REAL GAP / CONTRADICTION | 上述规则与 §4 新方向 | 共用 SO 入口/可见范围、预测转采购去重、未提货 Unit 的未来供应关联、工厂起点交接和收货语义需要跨模块批准；不能假装现有 Ready Stock 已支持 |
+| REAL GAP / CONTRADICTION | 上述规则与 §4 新方向 | 导航已由 2026-09-23 owner 裁定为 Outright Sales/Subscription 分开；具体创建流程、预测转采购去重、未提货 Unit 的未来供应关联、工厂起点交接和收货语义需要跨模块批准；不能假装现有 Ready Stock 已支持 |
 | REAL GAP / UNKNOWN | Purchasing §5.7 与 §4；Delivery §14.1 | 45 天的日历及起算凭证未证实；现行 PO 日期是 Settings 的工作日且不加运输天数。不能直接把 45 天塞进该字段。初期 Diglant 留货已由 §4 owner ruling 确定；具体伙伴和留货执行条件仍需落实 |
 
 **证据范围：** UI MASTER §§4.1–4.2、6.0、6.7–6.10，COPY 的 SO/Purchasing 词典，
@@ -534,10 +534,16 @@ Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际�
 
 **以下未明确批准的细节仍为 PROPOSAL / NOT LAW：**
 
-建议共用 `New Sales Order` 入口，先区分 Purchase / Subscription；Subscription 管理里的
-新建也跳同一入口。一个订单保持一种类型，合同另有身份/签名/版本，SO 承接履约。
-共用 SO 可见 Purchase/Subscription 的架构仍待批准；筛选、行、总数、搜索和导出须同范围，
-不能只加一个按钮就称已完成。保留独立 Subscription 日常管理，不以其他模块报表取代。
+**OWNER-APPROVED TARGET / NOT BUILT — 导航，2026-09-23：** Portal 使用一个
+`Sales Orders` 父入口，下设 `Outright Sales` 与 `Subscription`。后者进入本模块拥有的
+客户流程；原 SO 列表/改单及 Monthly overview 属于 Outright Sales，订阅数量/报表独立。
+`Purchase` 不用于普通销售导航名，避免与 Purchasing 混淆。替换旧独立 SO/legacy 菜单，
+保留历史订单、文件、身份、权限和有效深链；不删除业务记录。此裁定来自 Sales Order
+Review 02 的 owner 确认与提交 `47387909a`，取代本节的混合列表/入口提案；本次仅对齐
+Subscription authority，不导入该任务的其他月报改动。共用父菜单不合并合同或计算。
+
+合同另有身份/签名/版本，SO 承接履约；独立 Subscription 管理不以其他模块报表取代。
+具体创建表单、字段与页面布局仍为提案，导航批准不等于批准整个新业务建设。
 
 准备草案 → 客户接受有效版本并签署 → 满足现行适用授权/放行边界 → 匹配已备供应 →
 精确 Unit/Delivery 履约 → 客户接收证据接受 → 开始该床垫服务（上述已批准目标）。
@@ -569,11 +575,12 @@ Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际�
 使用当前 Shell/Register/Object Detail，禁止新 UI guide；不声称已验证屏幕宽度。
 
 ```text
-Sales
-  Sales Orders                 -> Purchase / Subscription visibility (proposal)
-Subscription
-  Agreements                   -> Contract | Asset & Delivery | Visits | History
-  Forecast proposals           -> Monthly object / manager review / PDF history
+Sales Orders                   [owner-approved navigation]
+  Outright Sales               -> existing order list / amendments / Monthly overview
+  Subscription                 -> Subscription-owned customer journey
+    Agreements                 -> Contract | Asset & Delivery | Visits | History
+    Forecast proposals         -> Monthly object / manager review / PDF history
+                               (inner destinations/layout remain proposals)
 Reports
   Subscription quantities      -> Target / Forecast / Sold / Picked up / Received
 Settings
@@ -646,7 +653,7 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 | 预测净算一次再转额外备货 | 逐 Unit/PO 对账发现重复覆盖、日期不可达或其他业务占用，则阻止转换、修正唯一覆盖来源 |
 | 提货批次与留货执行建议（初期留厂模式已确认） | 实际等待、积压或损坏证据要求调整批次/伙伴；是否租仓自管由约 3–6 个月复盘后的 owner 决定，不自动切换 |
 | 接收日作服务日期／晚审核的日期处理（细节建议） | owner 审阅的新计划条款明确日期处理不同时，调整该细节；客户实际接收且证明被接受的激活条件已批准，不能凭旧 `active` 代码更改 |
-| 共用 SO 入口、独立管理 | 真实员工走查显示共用列表造成类型误判，则调整默认视图；不可因此复制客户订单真相 |
+| Subscription 内部页面/创建表单（细节建议） | 员工走查显示任务不可达或重复录入，则改其内部组成；Sales Orders → Outright Sales / Subscription 导航已批准，不恢复混合数量或重复订单真相 |
 
 🔴 **与现行实现不一致：** Rental 排除和 Incoming 不能现货分配。修复建议已在 5.6/5.9
 明确作为跨模块待审批边界，不能用单页改造绕过。
@@ -664,7 +671,7 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
    以三个月平均作可修改参考；KPI 与预测独立，完整数据不足不自动补零。
 2. §§5.5–5.6：经理审阅来源/日期、改量留因留版；实际订单消耗相应预测，已有供应及
    申请去重；预测 PDF 人工发送，正式采购走既有门。制造 45 天和运输分别规划。
-3. §§5.9–5.10：同一 SO 创建入口区分 Purchase/Subscription，Subscription 独立管理；
+3. §§5.9–5.10：已批准 Sales Orders → Outright Sales / Subscription；待审的是 Subscription 内部组成，
    两个工作目的地为合同与预测提案；Report/Settings/Work 使用已有公共目的地。
    各模块保留唯一记录 owner，相关跳转不生第二表单。具体 screen copy/布局仍待 UI 审阅。
 4. §§5.9–5.11：采用实际客户接收日作为服务日期，证据晚审核保留该日期；建议服务年
