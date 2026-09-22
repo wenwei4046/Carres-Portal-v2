@@ -587,7 +587,7 @@ describe("Sales Order object template contract", () => {
        address (or a billing address) nobody looked at. */
     expect(workspace).toContain("was.customer_address_unknown ? was.customer_address");
     expect(workspace).toContain("was.customer_billing_same ? was.customer_billing");
-    expect(workspace).toContain("customer_billing: billingString(draft, baseline)");
+    expect(workspace).toContain("customer_billing: billingString(d, baseline)");
   });
 
   /* ── THE WRITE BOUNDARY ────────────────────────────────────────────────── */
