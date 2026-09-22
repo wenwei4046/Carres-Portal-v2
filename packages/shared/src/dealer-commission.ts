@@ -16,7 +16,12 @@
  */
 import { z } from "zod";
 
-export const NO_COMMISSION_CATEGORIES = ["service", "guarantee"];
+/**
+ * In the bill, earning nothing. "unmatched" is a line whose SKU has left
+ * product_skus, so it cannot be rated at all (0553) — it used to fall through
+ * to the default rate, which paid commission on renamed service SKUs.
+ */
+export const NO_COMMISSION_CATEGORIES = ["service", "guarantee", "unmatched"];
 
 export interface DcLine { modelId: string | null; category: string | null; value: number }
 export interface DcOrder {
