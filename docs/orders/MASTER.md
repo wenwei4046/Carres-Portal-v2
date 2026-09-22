@@ -557,7 +557,7 @@ DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21)
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
-                        Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF's
+                        Unit (RM) · Disc (RM) · Amount (RM) · closing `TOTAL PAYABLE` row — exactly the PDF's
                         COLUMNS AND WORDS. **The PDF's LOOK is not copied (owner ruling, Jess 2026-09-21,
                         answer "A" over a Shopify-style list):** the page keeps the document's table so staff
                         can check page against paper column by column, but draws it in the portal's web style —
@@ -1762,9 +1762,9 @@ widths, words and the pagination mechanism live there, not here. The Sales Porta
 page render through the one `sales-order-template.tsx`; never a second layout. In short: Carres mark beside the
 legal name and SSM; the SO number with `SALES ORDER` beneath it on the right; `BILL TO` · `SALES ORDER INFO`
 (SO No · SO Doc Date · Proceed Date · Customer Requested / Delivery Date · Sales Location · Salesperson; Access
-removed — it is a Delivery Order fact); the category-banded box table closing on `GOODS TOTAL`, its column bar
-repeated on every goods page; the payment table closing on `TOTAL RECEIVED` (`No payments recorded.` when none);
-`Goods total · Tax · Total payable · Paid to date · BALANCE DUE`; the customer signature box; the five terms from
+removed — it is a Delivery Order fact); the category-banded box table closing on `TOTAL PAYABLE`, its column bar
+repeated on every goods page; the payment table listing its rows with no total row (`No payments recorded.` when none);
+the totals card whose words `docs/pdf/SO-PDF-STANDARD.md` §7 owns; the customer signature box; the five terms from
 `lib/order-terms.ts`; footer `{SO no} · Issued by {creation actor}`. **Open (standard §10):** the API must send
 `issued_by`, `lines[].category` and `lines[].discount`; Proceed Date must read `orders.proceeded_at`, not the
 planned `proceed_date`.
