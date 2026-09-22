@@ -350,8 +350,12 @@ presentation correction. The [release receipt](https://github.com/wenwei4046/Car
 records CI, the exact merged/deployed SHA and authenticated read-only production closure; the
 implementation and fixture measurements alone do not claim deployment.
 Expanded goods has exactly the six columns above: SKU stays separate;
-Item is always last and takes remaining space. All other child tracks have consistent fixed,
-content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
+Item is always last. **Every column is a fixed, content-measured width and the table takes their sum;
+it never stretches to the sheet, and its frame hugs it (owner review 2026-09-22 — `Item` had grown to
+957px):** Category 132 · Unit ID 140 · Deliver To 200 · SKU 210 (longest catalog goods SKU
+`MEMORY-FOAM-PILLOW-asd` 191.3px) · Qty 64 · Item 240 (the purchasing goods table's number; a long
+configuration wraps) = 986px. Nothing is bold: SKU and the item name are plain 13px, the configuration
+is the 11px slate-11 second fact (UI §6.0 rule 5). Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
 The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
 flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
