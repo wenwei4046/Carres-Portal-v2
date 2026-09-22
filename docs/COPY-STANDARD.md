@@ -3864,6 +3864,12 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 | Form | `Account` · `{code} · {kind}` | The rename form's heading, and the line under it. Only the name changes; the code never does. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
 | Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
+| Refusals (database, 0557 — moving an account) | `The chart changed while you were dragging. Open it again and redo the move.` · `Move an account only among the accounts under the same heading.` · `Send every account under this heading, in the order you want them.` · `Send the order the chart was in before the drag.` · `The same account is listed twice.` · `The order has a blank where an account should be.` | Six causes, six sentences — **a refusal may not borrow another refusal's cause.** In order: somebody else moved an account while this screen was open, so this move is refused whole and nothing of theirs is lost · the move crossed into another heading, which is a reparent and a different ruling · the list left an account out, or was empty · the caller sent no before-order to check against · one account twice · a blank where a code should be. `Only Finance changes the chart of accounts.` and `That account is not in the chart.` are reused from 0539, unchanged. |
+
+**The move control is NOT built** (0557). `gl_accounts_reorder` exists and is proved; no screen control is
+wired to it, because the kit's only drag affordance is for COLUMN HEADERS and there is no row-drag
+component. The six sentences above are the server's refusals, recorded here so the wording is settled
+before a control is chosen — **none of them is on a screen today.**
 
 Finance words that never appear on screen. A finance person says the word on the left; the screen
 always says the word on the right. One fact, one word (rule 2).
