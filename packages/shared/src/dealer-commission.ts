@@ -17,9 +17,14 @@
 import { z } from "zod";
 
 /**
- * In the bill, earning nothing. "unmatched" is a line whose SKU has left
- * product_skus, so it cannot be rated at all (0553) — it used to fall through
- * to the default rate, which paid commission on renamed service SKUs.
+ * In the bill, earning nothing.
+ *
+ * "unmatched" is a line whose SKU has left product_skus, so it cannot be rated
+ * at all. Nothing sends that word yet: only migration 0555 would, and 0555 is
+ * written but NOT APPLIED, because taking earnings away from a dealer is the
+ * owner's ruling, not a bug fix. This entry is inert until that ruling lands —
+ * today such a line still arrives with a null category and still takes the
+ * default rate, exactly as it did before.
  */
 export const NO_COMMISSION_CATEGORIES = ["service", "guarantee", "unmatched"];
 

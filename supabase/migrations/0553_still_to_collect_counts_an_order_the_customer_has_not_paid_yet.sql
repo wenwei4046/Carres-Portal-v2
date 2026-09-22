@@ -1,39 +1,66 @@
 -- =============================================================================
 -- 0553_still_to_collect_counts_an_order_the_customer_has_not_paid_yet.sql
 -- =============================================================================
--- WHAT THIS FIXES (two defects in 0544's read; 0544 itself is untouched)
+-- WHAT THIS FIXES (one defect in 0544's read; 0544 itself is untouched)
 --
---   1. "Commission still to collect" was blind to an order nobody has paid.
---      0544:149-151 only returned an order that had at least one live, non
---      storage payment before month end, so an order the dealer sold and the
---      customer has not paid at all was absent from the source entirely. Its
---      commission never reached the "still to collect" column, which is the
---      one column whose whole job is to say what has not been paid yet.
---      "Earned" was right, because earned only ever counts collected money.
+--   "Commission still to collect" was blind to an order nobody has paid.
+--   0544:149-151 only returned an order that had at least one live, non
+--   storage payment before month end, so an order the dealer sold and the
+--   customer has not paid at all was absent from the source entirely. Its
+--   commission never reached the "still to collect" column, which is the
+--   one column whose whole job is to say what has not been paid yet.
+--   "Earned" was right, because earned only ever counts collected money.
 --
---      The order set is now every dealer-channel order placed before month
---      end that is not cancelled. The payment-existence test is gone; the
---      placed_at bound replaces it, because without a bound a past month's
---      report would pull in orders placed after that month ended.
+--   The order set is now every dealer-channel order placed before month end
+--   that is not cancelled. The payment-existence test is gone; a placed_at
+--   bound replaces it, because without a bound a past month's report would
+--   pull in orders placed after that month ended.
 --
---      §7 is untouched: still a read, still nothing owed, posted or stored.
---      An order with no live payment earns 0 and carries its full commission
---      in "still to collect" -- which is a statement about what the CUSTOMER
---      has not paid HQ, not a debt of HQ to the dealer.
+--   §7 is untouched: still a read, still nothing owed, posted or stored.
+--   An order with no live payment earns 0 and carries its full commission
+--   in "still to collect" -- which is a statement about what the CUSTOMER
+--   has not paid HQ, not a debt of HQ to the dealer.
 --
---   2. A line whose SKU is no longer in product_skus left-joined to null, so
---      it missed the service/guarantee exclusion and took the default 25%.
---      A renamed service SKU therefore silently earned commission. There is
---      no other route from order_lines to a model: the sku text is the only
---      link, and attrs carries nothing. So the line cannot be re-resolved --
---      it can only be told apart. Its category now comes back as 'unmatched'
---      instead of null, and packages/shared/src/dealer-commission.ts treats
---      'unmatched' the way it already treats service and guarantee: the line
---      stays in the bill (the customer owes it) and earns nothing.
+-- THE MONTH IS A MALAYSIAN MONTH, NOT THE SESSION'S MONTH
 --
---      This reports LESS commission than today, which is the safe direction
---      for a report that a payout voucher is written from. Making the
---      unrateable line visible on screen is not done here -- see the report.
+--   orders.placed_at is timestamptz and v_end is a date, so a bare
+--   `ord.placed_at < v_end` would compare the stored instant against
+--   midnight IN WHATEVER TimeZone the session happens to carry. Production
+--   runs the database clock on UTC, so an order placed at 1am on 1 October
+--   in Kuala Lumpur is stored as 5pm on 30 September UTC and would be
+--   counted into September -- a whole order's commission in the wrong
+--   month, and the report would disagree with itself between two sessions
+--   reading the same rows. The function sets search_path, not TimeZone.
+--
+--   So the bound reads the day in Malaysia, the way every other date
+--   boundary in this database already does -- 0314, 0426, 0444 and 0453 all
+--   bound a placed_at with `(placed_at at time zone 'Asia/Kuala_Lumpur')
+--   ::date`, and 0475 states the rule: "the database clock is UTC in
+--   production, and a payment at 7am MYT is still yesterday in UTC".
+--
+--   0544 had no such exposure: its only date bound was on
+--   order_payments.paid_on, which is a plain date and carries no zone.
+--   That bound is unchanged here.
+--
+-- WHAT THIS DELIBERATELY DOES NOT CHANGE
+--
+--   A line whose SKU has left product_skus still left-joins to a null
+--   category and still takes the default rate. Telling those lines apart so
+--   they earn nothing is a SECOND, SEPARATE rule change and an open owner
+--   question, so it is not bundled into this bug fix. It sits alone and
+--   UNAPPLIED in 0555, waiting on the owner's ruling. This file leaves
+--   every earned figure exactly where 0544 put it.
+--
+-- AN OPEN OWNER QUESTION THIS FIX MAKES LOUDER (not a defect of this file)
+--
+--   The two money columns have always been measured over different stretches
+--   of time: "Commission earned" counts only what the customer paid DURING
+--   the chosen month, while "Commission still to collect" counts everything
+--   still unpaid on that order SINCE IT WAS PLACED. So the two never have to
+--   add up to an order's full commission, and they do not whenever money came
+--   in an earlier month. This file does not touch either column's arithmetic,
+--   but by returning orders nobody has paid it makes "still to collect" much
+--   bigger next to an unchanged "earned". The owner's ruling is reported.
 --
 -- Nothing else in 0544 changes: no table, no rate, no quota, no RLS, no grant
 --   (create or replace keeps the function's ACL; the grants are restated so
@@ -91,12 +118,8 @@ begin
         'orderId', ord.id, 'so', ord.so, 'dealerId', ord.dealer_id, 'outletId', ord.outlet_id,
         'addons', (select coalesce(sum(a.qty * a.unit_price), 0)
                      from order_addons a where a.order_id = ord.id),
-        -- 'unmatched': the SKU is gone from product_skus, so the line cannot be
-        -- rated. It stays in the bill and earns nothing (dealer-commission.ts).
         'lines', (select coalesce(jsonb_agg(jsonb_build_object(
-                           'modelId', m.id,
-                           'category', coalesce(m.category::text, 'unmatched'),
-                           'value', l.qty * l.unit_price)), '[]'::jsonb)
+                           'modelId', m.id, 'category', m.category, 'value', l.qty * l.unit_price)), '[]'::jsonb)
                     from order_lines l
                     left join product_skus sk on sk.sku = l.sku
                     left join product_models m on m.id = sk.model_id
@@ -108,13 +131,16 @@ begin
         from orders ord
         join dealers d on d.id = ord.dealer_id and d.channel = 'dealer'
        where ord.status <> 'cancelled'
-         and ord.placed_at < v_end), '[]'::jsonb)
+         -- The day the order was placed IN MALAYSIA. See the header: a bare
+         -- timestamptz < date comparison would read the month off the
+         -- session's TimeZone, and production's is UTC.
+         and (ord.placed_at at time zone 'Asia/Kuala_Lumpur')::date < v_end), '[]'::jsonb)
   );
 end
 $fn$;
 
 comment on function public.dealer_commission_source(date) is
-  'The dealer-channel orders a commission month reads: every order placed before the month ends that is not cancelled, whether or not the customer has paid. An unpaid order earns nothing and carries its full commission in "still to collect" (0553). A line whose SKU has left product_skus comes back as category ''unmatched'' and earns nothing.';
+  'The dealer-channel orders a commission month reads: every order whose Malaysian placed-on day falls before the month ends and that is not cancelled, whether or not the customer has paid. An unpaid order earns nothing and carries its full commission in "still to collect" (0553).';
 
 revoke execute on function public.dealer_commission_source(date) from public, anon;
 grant execute on function public.dealer_commission_source(date) to authenticated;
