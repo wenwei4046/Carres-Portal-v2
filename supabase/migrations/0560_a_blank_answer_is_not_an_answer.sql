@@ -62,7 +62,7 @@ begin;
 
 
 -- _payment_voucher_validate(p_voucher_id uuid)
---   0558: length(btrim(coalesce(v_v.payee_name, ''))) = 0
+--   0560: length(btrim(coalesce(v_v.payee_name, ''))) = 0
 CREATE OR REPLACE FUNCTION public._payment_voucher_validate(p_voucher_id uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -154,9 +154,9 @@ end;
 $function$;
 
 -- _sales_order_proceed(p_order_id uuid, p_strict boolean, p_actor_role app_role, p_actor_text text)
---   0558: btrim(v_order.customer_address) = ''
---   0558: btrim(v_order.customer_phone) = ''
---   0558: btrim(v_order.customer_name) = ''
+--   0560: btrim(v_order.customer_address) = ''
+--   0560: btrim(v_order.customer_phone) = ''
+--   0560: btrim(v_order.customer_name) = ''
 CREATE OR REPLACE FUNCTION public._sales_order_proceed(p_order_id uuid, p_strict boolean, p_actor_role app_role, p_actor_text text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -311,7 +311,7 @@ end;
 $function$;
 
 -- _set_order_address_0391_locked_impl(p_order_id uuid, p_address text, p_billing text, p_billing_same boolean, p_parts jsonb)
---   0558: trim(p_address) = ''
+--   0560: trim(p_address) = ''
 CREATE OR REPLACE FUNCTION public._set_order_address_0391_locked_impl(p_order_id uuid, p_address text, p_billing text, p_billing_same boolean, p_parts jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -376,7 +376,7 @@ end;
 $function$;
 
 -- _update_order_0391_locked_impl(p_order_id uuid, p_payload jsonb)
---   0558: coalesce(trim(p_payload->>'customer_name'), '') = ''
+--   0560: coalesce(trim(p_payload->>'customer_name'), '') = ''
 CREATE OR REPLACE FUNCTION public._update_order_0391_locked_impl(p_order_id uuid, p_payload jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -565,8 +565,8 @@ end;
 $function$;
 
 -- arrival_source_create(p_input jsonb)
---   0558: nullif(btrim(p_input->'case_approval'->>'note'),'') is null
---   0558: nullif(btrim(p_input->>'reason'),'') is null
+--   0560: nullif(btrim(p_input->'case_approval'->>'note'),'') is null
+--   0560: nullif(btrim(p_input->>'reason'),'') is null
 CREATE OR REPLACE FUNCTION public.arrival_source_create(p_input jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -654,8 +654,8 @@ begin
 end $function$;
 
 -- arrival_source_handover(p_id uuid, p_input jsonb)
---   0558: nullif(btrim(p_input->>'evidence'),'') is null
---   0558: nullif(btrim(p_input->>'person'),'') is null
+--   0560: nullif(btrim(p_input->>'evidence'),'') is null
+--   0560: nullif(btrim(p_input->>'person'),'') is null
 CREATE OR REPLACE FUNCTION public.arrival_source_handover(p_id uuid, p_input jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -720,7 +720,7 @@ begin
 end $function$;
 
 -- arrival_source_plan(p_id uuid, p_input jsonb, p_cancel boolean)
---   0558: nullif(btrim(p_input->>'reason'),'') is null
+--   0560: nullif(btrim(p_input->>'reason'),'') is null
 CREATE OR REPLACE FUNCTION public.arrival_source_plan(p_id uuid, p_input jsonb, p_cancel boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -750,7 +750,7 @@ begin
 end $function$;
 
 -- commission_reopen_run(p_run_id uuid, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.commission_reopen_run(p_run_id uuid, p_reason text)
  RETURNS void
  LANGUAGE plpgsql
@@ -784,8 +784,8 @@ end;
 $function$;
 
 -- create_rental_agreement(p_plan_id uuid, p_customer_name text, p_customer_phone text, p_customer_email text, p_customer_address text, p_dealer_id uuid, p_salesperson_id uuid, p_start_date date, p_notes text, p_delivery_date date, p_signature_path text, p_signed_name text, p_signed_nric text)
---   0558: nullif(trim(coalesce(p_customer_address, v_customer.address, '')), '') IS NULL
---   0558: coalesce(trim(p_customer_name), '') = ''
+--   0560: nullif(trim(coalesce(p_customer_address, v_customer.address, '')), '') IS NULL
+--   0560: coalesce(trim(p_customer_name), '') = ''
 CREATE OR REPLACE FUNCTION public.create_rental_agreement(p_plan_id uuid, p_customer_name text, p_customer_phone text, p_customer_email text DEFAULT NULL::text, p_customer_address text DEFAULT NULL::text, p_dealer_id uuid DEFAULT NULL::uuid, p_salesperson_id uuid DEFAULT NULL::uuid, p_start_date date DEFAULT NULL::date, p_notes text DEFAULT NULL::text, p_delivery_date date DEFAULT NULL::date, p_signature_path text DEFAULT NULL::text, p_signed_name text DEFAULT NULL::text, p_signed_nric text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1004,9 +1004,9 @@ END;
 $function$;
 
 -- dealer_invite(p_name text, p_region text, p_contact text)
---   0558: btrim(p_contact) = ''
---   0558: btrim(p_region) = ''
---   0558: btrim(p_name) = ''
+--   0560: btrim(p_contact) = ''
+--   0560: btrim(p_region) = ''
+--   0560: btrim(p_name) = ''
 CREATE OR REPLACE FUNCTION public.dealer_invite(p_name text, p_region text, p_contact text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1085,9 +1085,9 @@ end;
 $function$;
 
 -- delivery_handover_record(p_do_id uuid, p_kind text, p_receiver_name text, p_vehicle text, p_goods jsonb, p_note text, p_proof_path text, p_unit_codes text[], p_evidence jsonb)
---   0558: btrim(p_proof_path) = ''
---   0558: btrim(p_receiver_name) = ''
---   0558: coalesce(btrim(v_evd->>'path'),'') = ''
+--   0560: btrim(p_proof_path) = ''
+--   0560: btrim(p_receiver_name) = ''
+--   0560: coalesce(btrim(v_evd->>'path'),'') = ''
 CREATE OR REPLACE FUNCTION public.delivery_handover_record(p_do_id uuid, p_kind text, p_receiver_name text DEFAULT NULL::text, p_vehicle text DEFAULT NULL::text, p_goods jsonb DEFAULT NULL::jsonb, p_note text DEFAULT NULL::text, p_proof_path text DEFAULT NULL::text, p_unit_codes text[] DEFAULT NULL::text[], p_evidence jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1428,7 +1428,7 @@ end;
 $function$;
 
 -- delivery_leg_document_mint(p_order_id uuid, p_leg integer, p_do_number text)
---   0558: nullif(btrim(coalesce(p_do_number, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_do_number, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_leg_document_mint(p_order_id uuid, p_leg integer, p_do_number text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1485,7 +1485,7 @@ end;
 $function$;
 
 -- delivery_payment_approval_decide(p_id uuid, p_decision text, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.delivery_payment_approval_decide(p_id uuid, p_decision text, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1536,7 +1536,7 @@ end;
 $function$;
 
 -- delivery_payment_approval_request(p_order_id uuid, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.delivery_payment_approval_request(p_order_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1587,7 +1587,7 @@ end;
 $function$;
 
 -- delivery_proof_review(p_do_number text, p_attempt_id uuid, p_decision text, p_reason text, p_expected_evidence_at timestamp with time zone, p_idempotency_key uuid)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_proof_review(p_do_number text, p_attempt_id uuid, p_decision text, p_reason text, p_expected_evidence_at timestamp with time zone, p_idempotency_key uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1714,7 +1714,7 @@ end;
 $function$;
 
 -- delivery_save_partner_driver(p_partner_id uuid, p_driver_id uuid, p_name text, p_phone text, p_active boolean)
---   0558: nullif(btrim(coalesce(p_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_save_partner_driver(p_partner_id uuid, p_driver_id uuid, p_name text, p_phone text, p_active boolean)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1752,8 +1752,8 @@ end;
 $function$;
 
 -- delivery_save_partner_vehicle(p_partner_id uuid, p_vehicle_id uuid, p_plate text, p_vehicle_type text, p_capacity text, p_driver_name text, p_driver_phone text, p_active boolean)
---   0558: nullif(btrim(coalesce(p_vehicle_type, '')), '') is null
---   0558: nullif(btrim(coalesce(p_plate, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_vehicle_type, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_plate, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_save_partner_vehicle(p_partner_id uuid, p_vehicle_id uuid, p_plate text, p_vehicle_type text, p_capacity text, p_driver_name text, p_driver_phone text, p_active boolean)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1802,7 +1802,7 @@ end;
 $function$;
 
 -- delivery_set_partner_details(p_partner_id uuid, p_name text, p_active boolean, p_customer_phone text, p_office_contact text, p_address text, p_whatsapp_group_url text)
---   0558: nullif(btrim(coalesce(p_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_set_partner_details(p_partner_id uuid, p_name text, p_active boolean, p_customer_phone text, p_office_contact text, p_address text, p_whatsapp_group_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1843,8 +1843,8 @@ end;
 $function$;
 
 -- delivery_template_save(p_template_key uuid, p_purpose text, p_channel text, p_name text, p_body text)
---   0558: nullif(btrim(coalesce(p_body, '')), '') is null
---   0558: nullif(btrim(coalesce(p_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_body, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_template_save(p_template_key uuid, p_purpose text, p_channel text, p_name text, p_body text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1887,7 +1887,7 @@ end;
 $function$;
 
 -- delivery_trip_document_mint(p_order_id uuid, p_do_number text)
---   0558: nullif(btrim(coalesce(p_do_number, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_do_number, '')), '') is null
 CREATE OR REPLACE FUNCTION public.delivery_trip_document_mint(p_order_id uuid, p_do_number text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1949,7 +1949,7 @@ end;
 $function$;
 
 -- finance_exception_clear(p_id uuid, p_evidence text)
---   0558: btrim(p_evidence) = ''
+--   0560: btrim(p_evidence) = ''
 CREATE OR REPLACE FUNCTION public.finance_exception_clear(p_id uuid, p_evidence text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2000,7 +2000,7 @@ end;
 $function$;
 
 -- finance_exception_open(p_order_id uuid, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.finance_exception_open(p_order_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2041,7 +2041,7 @@ end;
 $function$;
 
 -- finance_party_create(p_name text, p_kind text, p_registration_no text, p_phone text, p_email text, p_address text, p_notes text)
---   0558: length(btrim(coalesce(p_name, ''))) = 0
+--   0560: length(btrim(coalesce(p_name, ''))) = 0
 CREATE OR REPLACE FUNCTION public.finance_party_create(p_name text, p_kind text, p_registration_no text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_email text DEFAULT NULL::text, p_address text DEFAULT NULL::text, p_notes text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -2085,7 +2085,7 @@ end;
 $function$;
 
 -- finance_party_update(p_party_id uuid, p_name text, p_kind text, p_registration_no text, p_phone text, p_email text, p_address text, p_notes text, p_is_active boolean)
---   0558: length(btrim(coalesce(p_name, ''))) = 0
+--   0560: length(btrim(coalesce(p_name, ''))) = 0
 CREATE OR REPLACE FUNCTION public.finance_party_update(p_party_id uuid, p_name text, p_kind text, p_registration_no text, p_phone text, p_email text, p_address text, p_notes text, p_is_active boolean)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -2155,7 +2155,7 @@ end;
 $function$;
 
 -- gl_customer_party_for_order(p_order_id uuid)
---   0558: nullif(btrim(coalesce(v_order.customer_phone, '')), '') is null
+--   0560: nullif(btrim(coalesce(v_order.customer_phone, '')), '') is null
 CREATE OR REPLACE FUNCTION public.gl_customer_party_for_order(p_order_id uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -2206,7 +2206,7 @@ end;
 $function$;
 
 -- gl_money_move_reverse(p_move_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.gl_money_move_reverse(p_move_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -2256,7 +2256,7 @@ end;
 $function$;
 
 -- issue_record_action_result(p_issue_id uuid, p_action_id uuid, p_result_code text, p_result text, p_next_action jsonb)
---   0558: length(btrim(p_result)) < 3
+--   0560: length(btrim(p_result)) < 3
 CREATE OR REPLACE FUNCTION public.issue_record_action_result(p_issue_id uuid, p_action_id uuid, p_result_code text, p_result text, p_next_action jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2325,8 +2325,8 @@ end
 $function$;
 
 -- office_receive_post(p_po_id text, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date, p_actual_site_id uuid, p_arrival_evidence jsonb, p_extra_lines jsonb, p_save_key uuid)
---   0558: length(btrim(coalesce(p_do_file_path, ''))) = 0
---   0558: length(btrim(coalesce(p_do_number, ''))) < 3
+--   0560: length(btrim(coalesce(p_do_file_path, ''))) = 0
+--   0560: length(btrim(coalesce(p_do_number, ''))) < 3
 CREATE OR REPLACE FUNCTION public.office_receive_post(p_po_id text, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date DEFAULT NULL::date, p_actual_site_id uuid DEFAULT NULL::uuid, p_arrival_evidence jsonb DEFAULT NULL::jsonb, p_extra_lines jsonb DEFAULT NULL::jsonb, p_save_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2527,7 +2527,7 @@ end;
 $function$;
 
 -- operation_abandon_order(p_order_id uuid, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.operation_abandon_order(p_order_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2598,7 +2598,7 @@ end;
 $function$;
 
 -- operation_add_annotation(p_order_id uuid, p_content text, p_tag text)
---   0558: length(trim(p_content)) = 0
+--   0560: length(trim(p_content)) = 0
 CREATE OR REPLACE FUNCTION public.operation_add_annotation(p_order_id uuid, p_content text, p_tag text DEFAULT NULL::text)
  RETURNS json
  LANGUAGE plpgsql
@@ -2644,8 +2644,8 @@ END;
 $function$;
 
 -- operation_assign_partner_and_dispatch(p_po_id text, p_partner_id uuid, p_outsource_name text, p_outsource_contact text, p_outsource_zones text, p_warehouse_override_id uuid)
---   0558: length(btrim(coalesce(p_outsource_contact, ''))) = 0
---   0558: length(btrim(coalesce(p_outsource_name, ''))) = 0
+--   0560: length(btrim(coalesce(p_outsource_contact, ''))) = 0
+--   0560: length(btrim(coalesce(p_outsource_name, ''))) = 0
 CREATE OR REPLACE FUNCTION public.operation_assign_partner_and_dispatch(p_po_id text, p_partner_id uuid DEFAULT NULL::uuid, p_outsource_name text DEFAULT NULL::text, p_outsource_contact text DEFAULT NULL::text, p_outsource_zones text DEFAULT NULL::text, p_warehouse_override_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -2789,8 +2789,8 @@ end;
 $function$;
 
 -- operation_attach_do_and_deliver(p_order_id uuid, p_do_number text, p_do_note text, p_signed boolean, p_do_file_path text, p_signature_url text, p_signed_by text)
---   0558: length(btrim(p_do_file_path)) = 0
---   0558: length(btrim(p_do_number)) < 3
+--   0560: length(btrim(p_do_file_path)) = 0
+--   0560: length(btrim(p_do_number)) < 3
 CREATE OR REPLACE FUNCTION public.operation_attach_do_and_deliver(p_order_id uuid, p_do_number text, p_do_note text, p_signed boolean, p_do_file_path text, p_signature_url text DEFAULT NULL::text, p_signed_by text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -3031,7 +3031,7 @@ END;
 $function$;
 
 -- operation_cancel_po(p_po_id text, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.operation_cancel_po(p_po_id text, p_reason text)
  RETURNS purchase_orders
  LANGUAGE plpgsql
@@ -3109,8 +3109,8 @@ end;
 $function$;
 
 -- operation_receive_po_with_do(p_po_id text, p_do_file_path text, p_do_number text, p_lines jsonb, p_actual_site_id uuid)
---   0558: length(btrim(p_do_number)) = 0
---   0558: length(btrim(p_do_file_path)) = 0
+--   0560: length(btrim(p_do_number)) = 0
+--   0560: length(btrim(p_do_file_path)) = 0
 CREATE OR REPLACE FUNCTION public.operation_receive_po_with_do(p_po_id text, p_do_file_path text, p_do_number text, p_lines jsonb, p_actual_site_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -3658,8 +3658,8 @@ end;
 $function$;
 
 -- operation_receive_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
---   0558: btrim(p_do_file_path) = ''
---   0558: length(btrim(p_do_number)) < 3
+--   0560: btrim(p_do_file_path) = ''
+--   0560: length(btrim(p_do_number)) < 3
 CREATE OR REPLACE FUNCTION public.operation_receive_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -3762,7 +3762,7 @@ END;
 $function$;
 
 -- ops_stock_bind_units(p_item_ids uuid[], p_ref text, p_note text)
---   0558: btrim(p_ref) = ''
+--   0560: btrim(p_ref) = ''
 CREATE OR REPLACE FUNCTION public.ops_stock_bind_units(p_item_ids uuid[], p_ref text, p_note text DEFAULT NULL::text)
  RETURNS uuid[]
  LANGUAGE plpgsql
@@ -3802,7 +3802,7 @@ end;
 $function$;
 
 -- other_debtor_invoice_cancel(p_invoice_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.other_debtor_invoice_cancel(p_invoice_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -3868,7 +3868,7 @@ end;
 $function$;
 
 -- other_receipt_void(p_receipt_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.other_receipt_void(p_receipt_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -3912,8 +3912,8 @@ end;
 $function$;
 
 -- partner_attach_pod(p_thread_id uuid, p_pod_path text, p_do_number text, p_do_note text, p_signed boolean, p_signature_url text, p_signed_by text)
---   0558: length(btrim(p_do_number)) < 3
---   0558: btrim(p_pod_path) = ''
+--   0560: length(btrim(p_do_number)) < 3
+--   0560: btrim(p_pod_path) = ''
 CREATE OR REPLACE FUNCTION public.partner_attach_pod(p_thread_id uuid, p_pod_path text, p_do_number text, p_do_note text, p_signed boolean, p_signature_url text DEFAULT NULL::text, p_signed_by text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4003,7 +4003,7 @@ END;
 $function$;
 
 -- partner_pickup_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
---   0558: length(btrim(p_do_number)) < 3
+--   0560: length(btrim(p_do_number)) < 3
 CREATE OR REPLACE FUNCTION public.partner_pickup_threads(p_po_id text, p_thread_ids uuid[], p_do_number text, p_do_file_path text, p_do_note text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4123,7 +4123,7 @@ END;
 $function$;
 
 -- payment_collection_owner_handover(p_order_id uuid, p_new_owner_user_id uuid, p_reason text, p_effective_from date)
---   0558: length(btrim(p_reason)) < 3
+--   0560: length(btrim(p_reason)) < 3
 CREATE OR REPLACE FUNCTION public.payment_collection_owner_handover(p_order_id uuid, p_new_owner_user_id uuid, p_reason text, p_effective_from date DEFAULT NULL::date)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4194,7 +4194,7 @@ end;
 $function$;
 
 -- payment_invoice_void_replace(p_invoice_id uuid, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_invoice_void_replace(p_invoice_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4264,7 +4264,7 @@ end;
 $function$;
 
 -- payment_record_delivery_date_request(p_order_id uuid, p_requested_date date, p_reason_key text, p_reason_detail text, p_terms_acknowledged boolean, p_free_storage_requested boolean, p_evidence_url text)
---   0558: nullif(btrim(coalesce(p_evidence_url, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_evidence_url, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_record_delivery_date_request(p_order_id uuid, p_requested_date date, p_reason_key text, p_reason_detail text, p_terms_acknowledged boolean, p_free_storage_requested boolean, p_evidence_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4325,8 +4325,8 @@ end;
 $function$;
 
 -- payment_record_message_sent(p_order_id uuid, p_invoice_id uuid, p_kind text, p_message_text text, p_template_key text, p_screenshot_url text)
---   0558: nullif(btrim(coalesce(p_screenshot_url, '')), '') is null
---   0558: nullif(btrim(coalesce(p_message_text, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_screenshot_url, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_message_text, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_record_message_sent(p_order_id uuid, p_invoice_id uuid, p_kind text, p_message_text text, p_template_key text, p_screenshot_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4388,10 +4388,10 @@ end;
 $function$;
 
 -- payment_record_storage_inspection(p_case_id uuid, p_inspected_on date, p_location text, p_packaging text, p_condition_note text, p_photo_url text)
---   0558: nullif(btrim(coalesce(p_photo_url, '')), '') is null
---   0558: nullif(btrim(coalesce(p_condition_note, '')), '') is null
---   0558: nullif(btrim(coalesce(p_packaging, '')), '') is null
---   0558: nullif(btrim(coalesce(p_location, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_photo_url, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_condition_note, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_packaging, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_location, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_record_storage_inspection(p_case_id uuid, p_inspected_on date, p_location text, p_packaging text, p_condition_note text, p_photo_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4455,7 +4455,7 @@ end;
 $function$;
 
 -- payment_set_bank_account(p_route_source text, p_bank_name text, p_account_name text, p_account_no text)
---   0558: nullif(btrim(coalesce(p_bank_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_bank_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_set_bank_account(p_route_source text, p_bank_name text, p_account_name text, p_account_no text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4488,7 +4488,7 @@ end;
 $function$;
 
 -- payment_set_collection_timing(p_ask_days_before integer, p_deadline_days_before integer, p_effective_from date, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_set_collection_timing(p_ask_days_before integer, p_deadline_days_before integer, p_effective_from date, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4527,7 +4527,7 @@ end;
 $function$;
 
 -- payment_set_storage_rule(p_product_group text, p_free_days integer, p_charge_amount numeric, p_cycle_days integer, p_operation_limit_day integer, p_waiver_limit_day integer, p_extra_free_allowed boolean, p_inspection_days integer, p_effective_from date, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_set_storage_rule(p_product_group text, p_free_days integer, p_charge_amount numeric, p_cycle_days integer, p_operation_limit_day integer, p_waiver_limit_day integer, p_extra_free_allowed boolean, p_inspection_days integer, p_effective_from date, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4578,7 +4578,7 @@ end;
 $function$;
 
 -- payment_storage_close(p_case_id uuid, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_storage_close(p_case_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4620,8 +4620,8 @@ end;
 $function$;
 
 -- payment_storage_extra_free(p_case_id uuid, p_free_until date, p_reason text, p_evidence_url text)
---   0558: nullif(btrim(coalesce(p_evidence_url, '')), '') is null
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_evidence_url, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_storage_extra_free(p_case_id uuid, p_free_until date, p_reason text, p_evidence_url text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4710,7 +4710,7 @@ end;
 $function$;
 
 -- payment_storage_start(p_order_id uuid, p_product_group text, p_readiness_on date, p_customer_delay_on date, p_witness_note text, p_evidence_url text)
---   0558: nullif(btrim(coalesce(p_witness_note, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_witness_note, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_storage_start(p_order_id uuid, p_product_group text, p_readiness_on date, p_customer_delay_on date, p_witness_note text, p_evidence_url text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4822,8 +4822,8 @@ end;
 $function$;
 
 -- payment_template_save(p_template_key uuid, p_purpose text, p_name text, p_body text)
---   0558: nullif(btrim(coalesce(p_body, '')), '') is null
---   0558: nullif(btrim(coalesce(p_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_body, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_template_save(p_template_key uuid, p_purpose text, p_name text, p_body text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4880,7 +4880,7 @@ end;
 $function$;
 
 -- payment_void(p_payment_id uuid, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.payment_void(p_payment_id uuid, p_reason text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4958,7 +4958,7 @@ end;
 $function$;
 
 -- payment_voucher_cancel(p_voucher_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.payment_voucher_cancel(p_voucher_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5026,7 +5026,7 @@ end;
 $function$;
 
 -- payment_voucher_reject(p_voucher_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.payment_voucher_reject(p_voucher_id uuid, p_reason text)
  RETURNS void
  LANGUAGE plpgsql
@@ -5075,7 +5075,7 @@ end;
 $function$;
 
 -- purchasing_cancel_demand(p_id uuid, p_reason text)
---   0558: btrim(coalesce(p_reason,'')) = ''
+--   0560: btrim(coalesce(p_reason,'')) = ''
 CREATE OR REPLACE FUNCTION public.purchasing_cancel_demand(p_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5120,7 +5120,7 @@ end;
 $function$;
 
 -- purchasing_decide_request(p_id uuid, p_decision text, p_reason text, p_cuts jsonb)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.purchasing_decide_request(p_id uuid, p_decision text, p_reason text DEFAULT NULL::text, p_cuts jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5245,7 +5245,7 @@ end;
 $function$;
 
 -- purchasing_po_document(p_po_id text)
---   0558: length(btrim(v_address)) = 0
+--   0560: length(btrim(v_address)) = 0
 CREATE OR REPLACE FUNCTION public.purchasing_po_document(p_po_id text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5394,9 +5394,9 @@ end;
 $function$;
 
 -- purchasing_require_reply_evidence()
---   0558: nullif(btrim(new.reported_by),'') is null
---   0558: nullif(btrim(new.evidence),'') is null
---   0558: nullif(btrim(new.recipient),'') is null
+--   0560: nullif(btrim(new.reported_by),'') is null
+--   0560: nullif(btrim(new.evidence),'') is null
+--   0560: nullif(btrim(new.recipient),'') is null
 CREATE OR REPLACE FUNCTION public.purchasing_require_reply_evidence()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -5457,10 +5457,10 @@ end;
 $function$;
 
 -- receiving_amend(p_receipt_id uuid, p_reason text, p_changes jsonb, p_save_key uuid)
---   0558: length(btrim(coalesce(v_chg->>'path',''))) < 3
---   0558: length(v_new_do_file) < 3
---   0558: length(v_new_do) < 3
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(v_chg->>'path',''))) < 3
+--   0560: length(v_new_do_file) < 3
+--   0560: length(v_new_do) < 3
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.receiving_amend(p_receipt_id uuid, p_reason text, p_changes jsonb, p_save_key uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5829,9 +5829,9 @@ end;
 $function$;
 
 -- receiving_arrival_post(p_source_id uuid, p_input jsonb)
---   0558: nullif(btrim(p_input->>'do_file_path'),'') is null
---   0558: nullif(btrim(p_input->>'do_number'),'') is null
---   0558: nullif(btrim(p_input->>'handover_person'),'') is null
+--   0560: nullif(btrim(p_input->>'do_file_path'),'') is null
+--   0560: nullif(btrim(p_input->>'do_number'),'') is null
+--   0560: nullif(btrim(p_input->>'handover_person'),'') is null
 CREATE OR REPLACE FUNCTION public.receiving_arrival_post(p_source_id uuid, p_input jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5898,7 +5898,7 @@ begin
 end $function$;
 
 -- receiving_arrival_void(p_receipt_id uuid, p_reason text)
---   0558: nullif(btrim(p_reason),'') is null
+--   0560: nullif(btrim(p_reason),'') is null
 CREATE OR REPLACE FUNCTION public.receiving_arrival_void(p_receipt_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5928,7 +5928,7 @@ begin
 end $function$;
 
 -- receiving_validate_session_extras(p_arrival_evidence jsonb, p_extra_lines jsonb)
---   0558: length(btrim(coalesce(v->>'path',''))) = 0
+--   0560: length(btrim(coalesce(v->>'path',''))) = 0
 CREATE OR REPLACE FUNCTION public.receiving_validate_session_extras(p_arrival_evidence jsonb, p_extra_lines jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5967,7 +5967,7 @@ end;
 $function$;
 
 -- receiving_void(p_receipt_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.receiving_void(p_receipt_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6124,7 +6124,7 @@ end;
 $function$;
 
 -- refund_request(p_order_id uuid, p_amount numeric, p_reason text)
---   0558: btrim(p_reason) = ''
+--   0560: btrim(p_reason) = ''
 CREATE OR REPLACE FUNCTION public.refund_request(p_order_id uuid, p_amount numeric, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6171,7 +6171,7 @@ end;
 $function$;
 
 -- rental_approve_agreement(p_agreement_id uuid, p_note text, p_credit_check text, p_credit_reference text)
---   0558: coalesce(btrim(p_note), '') = ''
+--   0560: coalesce(btrim(p_note), '') = ''
 CREATE OR REPLACE FUNCTION public.rental_approve_agreement(p_agreement_id uuid, p_note text DEFAULT NULL::text, p_credit_check text DEFAULT NULL::text, p_credit_reference text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6322,7 +6322,7 @@ END;
 $function$;
 
 -- sales_order_create_unchecked_0374(p_header jsonb, p_lines jsonb)
---   0558: length(trim(coalesce(p_header->>'customer_name',''))) = 0
+--   0560: length(trim(coalesce(p_header->>'customer_name',''))) = 0
 CREATE OR REPLACE FUNCTION public.sales_order_create_unchecked_0374(p_header jsonb, p_lines jsonb DEFAULT '[]'::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6449,7 +6449,7 @@ begin
 end $function$;
 
 -- sales_order_save_revision_unchecked_0354(p_order_id uuid, p_header jsonb, p_lines jsonb, p_change jsonb)
---   0558: length(trim(coalesce(p_header->>'customer_name',''))) = 0
+--   0560: length(trim(coalesce(p_header->>'customer_name',''))) = 0
 CREATE OR REPLACE FUNCTION public.sales_order_save_revision_unchecked_0354(p_order_id uuid, p_header jsonb DEFAULT '{}'::jsonb, p_lines jsonb DEFAULT NULL::jsonb, p_change jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6718,7 +6718,7 @@ begin
 end $function$;
 
 -- sales_order_submit_attribution(p_order_id uuid, p_changes jsonb, p_reason text)
---   0558: length(trim(coalesce(p_reason,''))) = 0
+--   0560: length(trim(coalesce(p_reason,''))) = 0
 CREATE OR REPLACE FUNCTION public.sales_order_submit_attribution(p_order_id uuid, p_changes jsonb, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6777,7 +6777,7 @@ begin
 end $function$;
 
 -- sales_order_withdraw_attribution(p_request_id uuid, p_reason text)
---   0558: length(trim(coalesce(p_reason,''))) = 0
+--   0560: length(trim(coalesce(p_reason,''))) = 0
 CREATE OR REPLACE FUNCTION public.sales_order_withdraw_attribution(p_request_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6840,7 +6840,7 @@ begin
 end $function$;
 
 -- supplier_advance_application_cancel(p_application_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.supplier_advance_application_cancel(p_application_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -6891,7 +6891,7 @@ end;
 $function$;
 
 -- supplier_advance_money_back_cancel(p_money_back_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.supplier_advance_money_back_cancel(p_money_back_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -6940,7 +6940,7 @@ end;
 $function$;
 
 -- supplier_bill_cancel(p_bill_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.supplier_bill_cancel(p_bill_id uuid, p_reason text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -7004,8 +7004,8 @@ end;
 $function$;
 
 -- supplier_mark_delivered(p_po_id text, p_do_number text, p_do_file_path text, p_do_note text)
---   0558: btrim(p_do_file_path) = ''
---   0558: btrim(p_do_number) = ''
+--   0560: btrim(p_do_file_path) = ''
+--   0560: btrim(p_do_number) = ''
 CREATE OR REPLACE FUNCTION public.supplier_mark_delivered(p_po_id text, p_do_number text, p_do_file_path text, p_do_note text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7099,8 +7099,8 @@ END;
 $function$;
 
 -- warehouse_import_holiday_calendar(p_country text, p_state text, p_source_name text, p_source_reference text, p_verified_at timestamp with time zone, p_dates jsonb)
---   0558: nullif(btrim(coalesce(p_source_reference, '')), '') is null
---   0558: nullif(btrim(coalesce(p_source_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_source_reference, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_source_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.warehouse_import_holiday_calendar(p_country text, p_state text, p_source_name text, p_source_reference text, p_verified_at timestamp with time zone, p_dates jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7181,7 +7181,7 @@ end;
 $function$;
 
 -- warehouse_receipt_return(p_receipt_id uuid, p_reason text)
---   0558: length(btrim(coalesce(p_reason, ''))) = 0
+--   0560: length(btrim(coalesce(p_reason, ''))) = 0
 CREATE OR REPLACE FUNCTION public.warehouse_receipt_return(p_receipt_id uuid, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7220,8 +7220,8 @@ end;
 $function$;
 
 -- warehouse_resubmit_receipt(p_receipt_id uuid, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date, p_arrival_evidence jsonb, p_extra_lines jsonb)
---   0558: length(btrim(coalesce(p_do_file_path, ''))) = 0
---   0558: length(btrim(coalesce(p_do_number, ''))) < 3
+--   0560: length(btrim(coalesce(p_do_file_path, ''))) = 0
+--   0560: length(btrim(coalesce(p_do_number, ''))) < 3
 CREATE OR REPLACE FUNCTION public.warehouse_resubmit_receipt(p_receipt_id uuid, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date DEFAULT NULL::date, p_arrival_evidence jsonb DEFAULT NULL::jsonb, p_extra_lines jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7312,7 +7312,7 @@ end;
 $function$;
 
 -- warehouse_save_special_date(p_id uuid, p_site_id uuid, p_on_date date, p_kind text, p_opens_at time without time zone, p_closes_at time without time zone, p_reason text)
---   0558: nullif(btrim(coalesce(p_reason, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_reason, '')), '') is null
 CREATE OR REPLACE FUNCTION public.warehouse_save_special_date(p_id uuid, p_site_id uuid, p_on_date date, p_kind text, p_opens_at time without time zone, p_closes_at time without time zone, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7393,7 +7393,7 @@ end;
 $function$;
 
 -- warehouse_set_site_details(p_site_id uuid, p_name text, p_address text, p_status text, p_operating_party_id uuid, p_time_zone text, p_key_contact_id uuid, p_contact_number text)
---   0558: nullif(btrim(coalesce(p_name, '')), '') is null
+--   0560: nullif(btrim(coalesce(p_name, '')), '') is null
 CREATE OR REPLACE FUNCTION public.warehouse_set_site_details(p_site_id uuid, p_name text, p_address text, p_status text, p_operating_party_id uuid, p_time_zone text, p_key_contact_id uuid, p_contact_number text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7508,8 +7508,8 @@ end;
 $function$;
 
 -- warehouse_submit_receipt(p_po_id text, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date, p_arrival_evidence jsonb, p_extra_lines jsonb)
---   0558: length(btrim(coalesce(p_do_file_path, ''))) = 0
---   0558: length(btrim(coalesce(p_do_number, ''))) < 3
+--   0560: length(btrim(coalesce(p_do_file_path, ''))) = 0
+--   0560: length(btrim(coalesce(p_do_number, ''))) < 3
 CREATE OR REPLACE FUNCTION public.warehouse_submit_receipt(p_po_id text, p_do_number text, p_do_file_path text, p_note text, p_lines jsonb, p_goods_received_at date DEFAULT NULL::date, p_arrival_evidence jsonb DEFAULT NULL::jsonb, p_extra_lines jsonb DEFAULT NULL::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7601,7 +7601,7 @@ begin
 end;
 $function$;
 
--- 0558 sanity: read the live catalog back and COUNT. Each function below must
+-- 0560 sanity: read the live catalog back and COUNT. Each function below must
 -- carry the non-whitespace test once per door this file fixed in it — a count,
 -- not a presence, because most of these functions guard more than one box and
 -- "contains the string somewhere" would pass with every door but one reverted.
@@ -7702,7 +7702,7 @@ begin
     ) f on true
    where coalesce(f.got, -1) < t.want;
   if v_bad is not null then
-    raise exception '0558 sanity: these functions do not carry the non-whitespace test on every door: %', v_bad;
+    raise exception '0560 sanity: these functions do not carry the non-whitespace test on every door: %', v_bad;
   end if;
 end
 $sanity$;

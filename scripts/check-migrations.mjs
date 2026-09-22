@@ -212,7 +212,7 @@ for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
  * written as `nullif(btrim(coalesce(x, '')), '') is null`, `btrim(x) = ''` or
  * `length(btrim(x)) = 0` accepted a single tab or a single line break as a
  * real answer. 114 of them, across cancel reasons, party names, delivery
- * numbers, receiver names and evidence paths. `0558` rewrote them all to ask
+ * numbers, receiver names and evidence paths. `0560` rewrote them all to ask
  * the only question that is actually being asked: does this value contain any
  * character that is NOT whitespace — `coalesce(x, '') !~ '[^[:space:]]'`.
  *
@@ -226,7 +226,7 @@ for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
  * THAT body, and count. A count, not a presence — most of these functions
  * guard more than one box, and "contains the string somewhere" would pass with
  * every door but one reverted. Whole-file matching would be vacuous for the
- * same reason: `0558` defines 80 functions in one file.
+ * same reason: `0560` defines 80 functions in one file.
  *
  * If you legitimately remove a door (the field stops being required), drop its
  * row here in the same commit and say so in the PR.
@@ -352,7 +352,7 @@ if (dir === DEFAULT_DIR) {
       throw new Error(
         `${lastFile} is the last definition of ${fn} and it asks for a non-blank answer ${got} time(s), not ${want}. ` +
           `One-argument btrim() trims the space character only, so that guard accepts a tab or a newline as an answer. ` +
-          `Use coalesce(x, '') !~ '[^[:space:]]' (0558).`,
+          `Use coalesce(x, '') !~ '[^[:space:]]' (0560).`,
       );
     }
   }
