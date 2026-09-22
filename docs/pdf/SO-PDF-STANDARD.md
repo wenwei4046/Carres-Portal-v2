@@ -218,6 +218,16 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
 - **A goods count counts goods only.** The items table's quantity total is physical
   pieces (gifts included); a Delivery fee or Stair carry is a service and never a
   piece.
+- **Revision/document/signature integrity — owner-approved 2026-09-22; target not built.**
+  Pending amendments do not change the effective formal PDF. Historical printing opens that
+  revision's own retained document, never historical goods combined with current payments,
+  customer data or signature. Missing historical files are stated as missing, not reconstructed
+  as originals. A signature belongs to the actual signed revision and document; an unsigned new
+  revision cannot borrow an old signature. Traceable customer confirmation under Orders MASTER
+  is a separate evidence gate and must never be rendered as a handwritten signature.
+- **Three distinct quantity facts:** `Goods lines`, `Physical pieces` (including gifts) and
+  `Service quantity`. Never merge service quantity into the physical count. The same business
+  arithmetic governs the page and PDF; this does not change the separate SST ruling.
 - BALANCE DUE is never bigger — the grey band and bold carry the emphasis.
 
 ### 7.1 · Legacy notes

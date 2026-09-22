@@ -1616,7 +1616,7 @@ entry, and both were live on Carres screens for months with none.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| Add one more line to the list being typed | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
+| Add one more line to a form (SO object draft exception: see Sales Order amendment words) | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
 | Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
 | Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · Rev {n}`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
 
@@ -2633,10 +2633,23 @@ surface is how a dictionary splits.
 
 ### The Sales Order amendment words
 
+**APPROVED / LOCKED — owner approval 2026-09-22.** For the Sales Order object draft only,
+`Add item` is the approved catalogue action. This explicit surface exception replaces the generic
+`Add line` restriction here; other forms retain `Add line`. `Remove` / `Restore` describe draft
+operations; `Cancelled · Rev {n}` describes approved cancellation. A receiving-state word does not
+automatically become a Sales Order state. These words are approved target copy, not build proof.
+
 | Meaning | Use exactly |
 |---|---|
-| Open the governed customer-change form | **Propose a change to the customer** |
-| Persist the proposal without changing the order | **Record the proposal** |
+| Enter the whole-page Sales Order draft | **Edit** |
+| Submit the governed request without changing the effective order | **Submit amendment request** |
+| Add a catalogue-backed goods row in the SO object draft | **Add item** |
+| Restore a row removed from the unsent SO draft | **Restore** |
+| Compare changed values | **Before** / **After** |
+| Open a complete historical revision | **View version** |
+| Leave historical revision for effective order | **Return to current** |
+| Print that revision's own retained document | **Print this version** |
+| Separate commercial lines, physical goods and services | **Goods lines** / **Physical pieces** / **Service quantity** |
 | A submitted proposal awaiting its authorised decision | **Waiting for management** |
 | Impact heading before a decision | **Before approval** |
 | Decision field | **Management decision reason** |
