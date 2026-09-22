@@ -58,7 +58,7 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   `purchasing_po_document` returns it, the template prints it, and
   `purchasing_confirm_po_sent` refuses a mismatch.
 - **PO DETAILS — rows, in order (Jess, 2026-09-22; dictionary words only):**
-  `PO No` (`PO-… V{n}`) · `PO Date` · **`PO {n}-Day Delivery Date`** (bold
+  `PO No` (`PO-… V{n}`) · `PO Doc Date` · **`PO {n}-Day Delivery Date`** (bold
   value — the supplier's 3-second fact) · `Delivery Method` (`Supplier
   delivers` / `We collect`). `{n}` is exactly the applicable working-day value recorded from Settings
   for this PO, with NO added transit days (Jess, 2026-09-22 correction;
@@ -160,8 +160,8 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
     keep the old document-level fallback.
   - CR/TCF import refs never appear. No database words on paper. No UOM
     column. An item never splits across pages.
-  - A BULK PO (several SOs) closes with the family `TOTAL` row (qty only);
-    a one-customer PO does not.
+  - EVERY PO's table closes with the family `TOTAL` row (qty only) — one
+    layout for every PO, a one-customer PO included.
 - **Consolidation** (business, unchanged): mattress/bedframe group by model,
   quantity summed, owning SOs listed; sofa = one customer order, max 2 sets.
   The §6.2 bedframe one-PO-one-customer ruling and its recorded conflict with
@@ -174,9 +174,9 @@ One drawing per model with module lines: bordered module boxes (no outer union
 outline), back strip on top, chaise deeper toward the viewer, module code +
 that module's fabric under each box, TV marker beneath. Caption: `Top view.
 Back at the top. TV in front.` Why: LHF/RHF words alone get sofas built
-mirror-reversed; the picture is the contract. One set per page remains the
-target for the sofa PO's paging (implement with the long-order pass, matching
-the DO's per-set pages).
+mirror-reversed; the picture is the contract. **One set per page — BUILT
+2026-09-22:** each model's drawing takes a page of its own after the goods
+table, headed `SOFA LAYOUT · {model}`, under the same full header.
 
 ## 4 · Footer & audit
 
@@ -220,8 +220,10 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
 | 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
 | 2026-09-22 | **Several Deliver To on one PO, one page group each** (Jess): sofa PO = one Deliver To; mattress/bedframe may split; a later move keeps the SAME PO number as a new revision — no second PO, no `Moved from`, no new Unit IDs. Each Deliver To starts on a new page of one PDF; every page carries the PO number and revision. The per-line DELIVER TO column and `Multiple destinations` are deleted; five columns everywhere. Same-day entries that read "split" as separate POs are overwritten. | Jess |
-| 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
+| 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Doc Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
 | 2026-09-22 | Several-Deliver-To pages simplified (owner, on the rendered preview): plain `DELIVER TO` with that location's full name and address — `(1 of 2)` deleted; each location's table keeps its `TOTAL`; the last page adds **`PO TOTAL`** (whole-PO quantity, nothing beside it); page count lives in the footer `Page n of m`. Version wording corrected: the version travels with every printed PO identity (`PO No` row, page headers, footer) and never prints on its own. | Jess |
 | 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
 | 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
 | 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO-… V{n}` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
+| 2026-09-22 | **BUILT** (`po-template.tsx`, `GET /print-data`): every rule of 2026-09-21/22 above. The route ADDS `delivery_working_days` (shared `poDeliveryWorkingDays`, the supplier's week + holidays) and `delivery_method` (`suppliers.kind = 'factory_pickup'` → `We collect`) beside the SQL document and overwrites nothing; a kept version (`?version=N`) gets neither and reprints as sent. Every PO closes with `TOTAL`; sofa drawings one set per page. Words never split at a line end (family, SO-PDF-STANDARD §9). No migration. | Jess |
+| 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). APPROVED / NOT BUILT on the live template. | Jess |

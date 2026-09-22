@@ -1032,9 +1032,10 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 
 | Fact | Exact copy |
 |---|---|
-| PO document issue date (not sent-mark date) | `PO Date` |
-| GRN creation date; physical arrival is separately Goods Received Date | `GRN Date` |
-| DO issue date | `DO Date` |
+| PO document issue date (not sent-mark date) | `PO Doc Date` |
+| GRN creation date; physical arrival is separately Goods Received Date | `GRN Doc Date` |
+| DO issue date | `DO Doc Date` |
+| **Every document's own date — owner ruling (Jess, 2026-09-23)** | **`{DOC} Doc Date`** on every Carres document and every screen that names that date: `SO Doc Date` · `PO Doc Date` · `GRN Doc Date` · `DO Doc Date` · `RO Doc Date` · `PR Doc Date` — and every document added later. `PO Date` · `GRN Date` · `DO Date` are RETIRED. |
 | Separate delivery facts | `PO Delivery Date` · `Supplier Confirmed Delivery Date` · `Goods Received Date` |
 | `Supplier Confirmed Delivery Date` with no answer | `Not confirmed` (the dictionary's word for THIS column — its head already says whose date it is) |
 | The supplier moved the date, second line | `Supplier changed from {date}` |
@@ -1307,6 +1308,7 @@ These stock-picker words do not rename every Warehouse screen.
 | Create header fields (owner 2026-09-22) | `Purpose` (replaces `Need for` in this create/edit target) · `Purchase requirement` (optional, inside Request Details) · `Requested By` (automatic, replaces `Raised by` here) · `Proceed Date` (automatic) · `Deliver To` · `Delivery Date`. Preserve the existing purpose-specific field words and explicit stock-intent choice. |
 | Create draft indicator | `Draft` — preview only, not a submitted MPR, approval or issued PO. |
 | Submit · abandon | `Send for approval` · `Cancel` |
+| MPR approval meaning (owner selected A, 2026-09-22) | Request approval decides whether to buy and remains required before PO issue. It is not price/payment approval. Financial approval adds no placement gate; any required financial approval is Jess-only. No new on-screen labels are introduced by this clarification. |
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The create/edit form fields (owner 2026-09-22; APPROVED / NOT BUILT) | `Purpose` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver To` · `Requested By` · `Purchase requirement` (optional) · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
@@ -1829,7 +1831,7 @@ do not take the five-string shape.
 | `Goods Received Date` | field | The Business Date Dictionary's own word — the physical arrival date and time, which is not when the goods were keyed in. Owner correction 2026-09-06: the retired spelling `Goods Received At` may not appear on any Receiving surface, filter, table, export, GRN or report. |
 | `Supplier DO No` | field | **Theirs, not ours.** It has no default and no suggestion; a number we invent is a reference the supplier never issued. |
 | `Signed DO photo` | field | The evidence, named by what it is a photo OF. |
-| `Received Qty` | per-line physical count | What physically arrived in this receiving session; it is distinct from damaged and wrong quantities. |
+| `Received Qty` | per-line GOOD count | **Correction 2026-09-23 — one definition, because three disagreed.** `Received Qty` is the CORRECT, ACCEPTED goods this receiving session takes in: it is what the shipped code counts (`warehouse-receipt.ts`: *"Good units this receipt claims"*), what `Pending Delivery Qty = Order Qty − Received Qty` subtracts, and what Stock makes available. **Damaged and wrong goods are NOT in it** — the earlier wording "per-line physical count … what physically arrived" contradicted its own neighbours (`Correct and accepted quantity posted through Receiving`) and the Warehouse pair below, and is retired. The physical arrival total keeps its own word: **`Physical arrived Qty` = `Received Qty` + `Damaged Qty` + `Wrong Item Qty`**. A per-Unit **`Received with issue`** outcome is a physical arrival that counts in `Damaged Qty`, never in `Received Qty`; `Extra Qty` is outside all of it. |
 | `What kind of wrong?` | per-line picker | Plain words. The claim needs the kind before it can be filed. |
 | `Save Receiving` | the Save button, when nothing is missing | |
 | `Prefilled results are not confirmed. Check the goods before saving.` | active receiving form | Proposed input is not proof of physical verification; owner-approved operator-flow review, 2026-09-16. |
@@ -2496,7 +2498,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | SO goods with order/SKU association but no proven line association (2026-09-11 review) | **`Unit ID link not verified`**; full evidence remains inspectable | Not allocated · silently assigning the same IDs to every matching SKU line |
 | Proven SO line Unit IDs exceed its ordered Qty | **`Unit ID count exceeds order quantity`** | truncating the IDs to fit Qty |
 | SO expansion read fails | **`Could not load goods details`** · **`Retry`** | Not allocated · Not recorded |
-| SO category footer breakdown — Register, object page and document (owner ruling 2026-09-22) | **`Qty:`** before quantities of the goods categories present; gifts count in their actual category; services never in `Qty:` — Register footer `· Services {n}`, object page and document `Services: {names}` | `Other goods` (retired 2026-09-22: an unclassified line is a catalogue data error, reported, never printed) · `Service {n}` inside `Qty:` · Goods lines · Physical pieces · a partial breakdown presented as the complete item count |
+| SO category footer breakdown — Register, object page and document (owner ruling 2026-09-22) | **`Qty:`** before quantities of the goods categories present; gifts count in their actual category; services never in `Qty:` — Register footer `· Services {n}` ({n} = service quantity, not lines), object page and document `Services: {names}` with `×{qty}` after a name whose quantity is above 1 (`Dispose old mattress ×2`, owner 2026-09-22); a goods line with no catalog row is counted apart as `· Not in catalog {n}` (only when n > 0; `{n}` = physical qty; clicking lists SO No · original SKU · product name · qty; owner 2026-09-22 — `Items to check` NOT adopted) and its goods Category cell reads `Not in catalog` — never dropped, never `Other goods` | `Other goods` (retired 2026-09-22: an unclassified line is a catalogue data error, reported, never printed) · `Service {n}` inside `Qty:` · Goods lines · Physical pieces · a partial breakdown presented as the complete item count |
 | Saved SO configuration `gap=KIV` | **`Mattress gap: Confirm later`** — same meaning as the POS configurator | gap KIV |
 | The stair-carry count, when the salesperson named none | **`0`** — the box carries the number it means, and the hint states the range (**`0 to {n}`**) | Auto · All · Default · ⛔ **`Empty = every item`** (the retired hint). Unset means NONE from 2026-08-27: somebody says how many pieces need carrying before the customer is charged for carrying them |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |

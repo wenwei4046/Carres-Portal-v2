@@ -489,7 +489,7 @@ The normal toolbar exposes Search, Export and Columns with labels, wrapping on n
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
 customer names and imported references are not parsed as partial SO numbers.
 Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
-The footer explicitly labels goods category values as `Qty:`; services print apart as `Services {n}`. **No `Other goods` (owner ruling, Jess 2026-09-22: "no such other goods, write clear").** Every product must carry its catalogue category; an order line the system cannot classify is a data error reported for the catalogue to fix, never printed to staff as a kind of goods. Services never enter `Qty:` — the Register footer prints them as a separate `Services {n}`; the object page and document name them (`Services: Delivery fee · Stair carry`). **Register footer BUILT 2026-09-22 ([PR #1518](https://github.com/wenwei4046/Carres-Portal-v2/pull/1518)):** `{n} sales orders · Qty: {goods} · Services {n}`; the shared ladder is untouched (Receiving reads it) and only this footer drops `Service`/`Other goods` from `Qty:`. The one live unclassified line was **SO-1206 `M1201F-K`** — no `product_skus` row at all; the catalogue owes that SKU its category. Object page and document wording follow in their own rounds.
+The footer explicitly labels goods category values as `Qty:`; services print apart as `Services {n}`. **No `Other goods` (owner ruling, Jess 2026-09-22: "no such other goods, write clear").** Every product must carry its catalogue category; an order line the system cannot classify is a data error reported for the catalogue to fix, never printed to staff as a kind of goods. Services never enter `Qty:` — the Register footer prints them as a separate `Services {n}`; the object page and document name them (`Services: Delivery fee · Stair carry`). **Register footer — merged + deployed 2026-09-22 ([PR #1518](https://github.com/wenwei4046/Carres-Portal-v2/pull/1518), `340e5e00`); the live walk found a silent under-count, corrected by [PR #1522](https://github.com/wenwei4046/Carres-Portal-v2/pull/1522) (merged/deployed/live-verified stated there):** `{n} sales orders · Qty: {goods} · Services {n} · Not in catalog {n}` — the last only when a goods line has no catalog row. An unclassified line is never printed as a kind of goods and never vanishes: it is counted apart under the dictionary's `Not in catalog`, and its goods Category cell reads `Not in catalog` (muted). The shared ladder is untouched (Receiving, SO Batch, PO, Delivery Orders read it; their own `Other goods` prints are their rounds). The one live such line is **SO-1206 `M1201F-K`** — no `product_skus` row. Whether it is a wrong order code or a catalogue gap is **undetermined** (owner 2026-09-22: a matching price is not evidence of a typo); no product is added and no data is changed. **OWNER RULING 2026-09-22 (Jess):** keep the approved `Not in catalog {n}` — no `Items to check`. `{n}` is the PHYSICAL QUANTITY of goods lines not matched to the Catalog (never an order or line count); it stays in the quantity reconciliation and is never silently dropped. Clicking it lists the orders, original SKU, product name and qty. No typo inference, no product auto-created. SO Batch and Warehouse Schedule still print `Other goods`: recorded as separate impacts. Object page and document wording follow in their own rounds.
 Default column widths fit the eight-column sample at 1180px without shrinking typography;
 existing saved column layouts are preserved. Destination header padding and spacing adapt on
 narrow screens. Local Edge checks at 1180/390/320px show no document overflow; the narrow grid
@@ -570,7 +570,7 @@ DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21)
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
-                        Unit (RM) · Disc (RM) · Amount (RM) · closing `GOODS TOTAL` row — exactly the PDF's
+                        Unit (RM) · Disc (RM) · Amount (RM) · closing `TOTAL PAYABLE` row — exactly the PDF's
                         COLUMNS AND WORDS. **The PDF's LOOK is not copied (owner ruling, Jess 2026-09-21,
                         answer "A" over a Shopify-style list):** the page keeps the document's table so staff
                         can check page against paper column by column, but draws it in the portal's web style —
@@ -1775,9 +1775,9 @@ widths, words and the pagination mechanism live there, not here. The Sales Porta
 page render through the one `sales-order-template.tsx`; never a second layout. In short: Carres mark beside the
 legal name and SSM; the SO number with `SALES ORDER` beneath it on the right; `BILL TO` · `SALES ORDER INFO`
 (SO No · SO Doc Date · Proceed Date · Customer Requested / Delivery Date · Sales Location · Salesperson; Access
-removed — it is a Delivery Order fact); the category-banded box table closing on `GOODS TOTAL`, its column bar
-repeated on every goods page; the payment table closing on `TOTAL RECEIVED` (`No payments recorded.` when none);
-`Goods total · Tax · Total payable · Paid to date · BALANCE DUE`; the customer signature box; the five terms from
+removed — it is a Delivery Order fact); the category-banded box table closing on `TOTAL PAYABLE`, its column bar
+repeated on every goods page; the payment table listing its rows with no total row (`No payments recorded.` when none);
+the totals card whose words `docs/pdf/SO-PDF-STANDARD.md` §7 owns; the customer signature box; the five terms from
 `lib/order-terms.ts`; footer `{SO no} · Issued by {creation actor}`. **Open (standard §10):** the API must send
 `issued_by`, `lines[].category` and `lines[].discount`; Proceed Date must read `orders.proceeded_at`, not the
 planned `proceed_date`.

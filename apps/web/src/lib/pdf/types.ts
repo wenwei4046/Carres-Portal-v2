@@ -217,6 +217,12 @@ export type PoTemplateData = {
   destination: { name: string; address: string };
   delivery_instructions: string | null;
   eta_date: string | null;
+  /** The `{n}` of `PO {n}-Day Delivery Date` — supplier working days from the
+   *  PO Date to `eta_date`, from the shared engine (`poDeliveryWorkingDays`).
+   *  Absent on a kept version / draft → the plain `PO Delivery Date` label. */
+  delivery_working_days?: number | null;
+  /** `Delivery Method` — collection supplier → `we_collect`. Absent → no row. */
+  delivery_method?: "we_collect" | "supplier_delivers" | null;
   /** PO-level sales-order refs, from the document authority (0383). */
   so_refs?: number[] | null;
   /**

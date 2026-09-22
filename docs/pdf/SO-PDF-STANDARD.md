@@ -228,7 +228,13 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
 - **Category quantity footer — owner-approved 2026-09-22:** use the same breakdown as the page:
   `Qty: Mattress 2 · Accessory 1`, with `Services: Delivery fee · Stair carry` separately. Only show
   categories/services present; gifts count in their goods category; there is no `Other goods` (owner
-  2026-09-22 — an unclassified line is a catalogue data error, never printed). Service quantities remain on the service rows, never in the goods count. Do not print the
+  2026-09-22 — an unclassified line is a catalogue data error). **An unclassified line still keeps its
+  quantity (owner, Jess 2026-09-22):** it is never folded into a known category and never silently
+  dropped from the count; it prints apart as `Not in catalog {n}` ({n} = physical quantity; COPY-STANDARD
+  SO category footer — `Items to check` was not adopted). **Services show name and quantity (owner, Jess 2026-09-22):**
+  service lines and service quantity are different counts — a service with quantity above 1 prints
+  `Dispose old mattress ×2` in the Services line on page and document; the Register totals service
+  quantity. Service quantities stay out of the goods count. Do not print the
   three technical labels Goods lines / Physical pieces / Service quantity. The TOTAL PAYABLE amount
   is unchanged. Preserve distinct internal counting and the separate SST ruling.
 - BALANCE DUE is never bigger — the grey band and bold carry the emphasis.
@@ -348,6 +354,10 @@ payment — not this document's job).
 
 - **Noto Sans SC** (weights 400/500/600/700) — deliberately NOT 2990's Helvetica,
   which cannot print Chinese customer names.
+- **A word never splits at a line end** (family-wide, 2026-09-22). react-pdf's
+  default hyphenation printed `Deliv-` / `ery` and `Ware-` / `house`; the
+  font registration (`fonts/noto.ts`) turns it off so the whole word moves to
+  the next line. Every Carres document inherits it.
 - Footer, fixed every page: `{SO no} · Issued by {name}` · `Computer-generated
   document · No company signature required.` · `Page n of m`. 7.5pt grey. No
   address in the footer.
