@@ -1,6 +1,6 @@
 /**
  * STAGE 1 — the register's catalog, tested as LAW:
- *   · the default row is the owner's EIGHT, in the owner's order
+ *   · the default row is the owner's ELEVEN, in the owner's order (2026-09-21)
  *   · every field sits in one of the card's eight chooser groups
  *   · role defaults: Operations opens money-hidden, Finance money-visible
  *   · the money columns carry a footer sum (AutoCount's power)
@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import type { operationOrderListRow } from "@/lib/queries";
 import { fmtDate } from "@/lib/fmt-date";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   buildRegisterRow,
   DEFAULT_COLUMNS,
@@ -16,8 +17,11 @@ import {
   moneyText,
   MUTED_ABSENCES,
   NO_DATE_YET,
+  NO_DO_YET,
+  NO_PO_YET,
   NOT_RECORDED,
   REGISTER_FIELDS,
+  registerItemsSummary,
   requestedDeliveryOf,
   requestedDeliveryText,
 } from "./sales-order-columns";
@@ -54,51 +58,119 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
     ...over,
   }) as operationOrderListRow;
 
-describe("the default row is the owner's EIGHT, in the owner's order", () => {
-  it("SO Date · SO No · Requested Delivery Date · Customer · Delivery Location · Showroom · PO No · DO No", () => {
+describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-21)", () => {
+  it("Proceed Date · SO Doc Date · SO No · Sales Location · Salesperson · Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
+      "proceeded",
       "ordered",
       "so",
+      "sales_location",
+      "salesperson",
       "customer_delivery",
-      "customer",
       "delivery_location",
-      "showroom",
+      "customer",
+      "items",
       "po_number",
       "do_number",
     ]);
+    expect(DEFAULT_COLUMNS.map((k) => REGISTER_FIELDS.find((f) => f.key === k)!.label)).toEqual([
+      "Proceed Date",
+      "SO Doc Date",
+      "SO No",
+      "Sales Location",
+      "Salesperson",
+      "Customer Requested Delivery Date",
+      "Customer Delivery Location",
+      "Customer",
+      "Items",
+      "PO No",
+      "DO No",
+    ]);
   });
 
-  /* `Showroom` was promoted, not invented — it has been a declaration in this
-     catalog since Stage 1. The register may never grow a writer for it. */
-  it("Showroom READS the Sales-ownership fact the order already carries", () => {
-    const showroom = REGISTER_FIELDS.find((f) => f.key === "showroom")!;
-    expect(showroom.group).toBe("Sales ownership");
-    /* The cell prints the PLACE (owner ruling 2026-08-15): every showroom is
-     * ours and the column already says `Showroom`, so the house name only
-     * clipped the part that identifies the branch. Display only — the outlet's
-     * registered name is untouched, and `Deliver To` deliberately keeps its
-     * `Carres ` because there it separates our warehouse from a partner's. */
-    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
-      "Kelana Jaya",
+  it("Proceed Date is the ACTUAL handoff (proceeded_at), never the planned proceed_date", () => {
+    const f = REGISTER_FIELDS.find((x) => x.key === "proceeded")!;
+    const row = buildRegisterRow(
+      order({ proceeded_at: "2026-08-03T04:00:00Z", proceed_date: "2026-09-30" }),
     );
-    /* A showroom without the prefix is printed as it stands, never stripped
-     * into nothing. */
-    expect(showroom.text(buildRegisterRow(order({ outlets: { name: "Kepong" } })))).toBe("Kepong");
-    expect(showroom.text(buildRegisterRow(order({ outlets: null })))).toBe(NOT_RECORDED);
+    expect(f.text(row)).toBe(fmtDate("2026-08-03T04:00:00Z"));
+    expect(f.iso!(row)).toBe("2026-08-03T04:00:00Z");
   });
 
-  /* An absence is quieter than a fact — the page mutes exactly these two and
-     never `No delivery date`, which heads a governed two-line action. */
-  /* ONE ABSENCE WORD (YH, 2026-08-29). This used to pin TWO — `Not given` for
-     a customer fact, `Not recorded` for a Carres one. Same table, two spellings
-     of empty, and the difference was invisible to the operator reading it. The
-     surviving invariant is that an absence is MUTED and a real value is not;
-     the count of spellings was never the point. */
-  it("mutes the absence word, and only it", () => {
+  /* `Sales Location` (owner ruling 2026-09-21: "showroom is sales location")
+     READS the Sales-ownership facts the order already carries — the outlet,
+     else the dealer, in full, exactly as the SO PDF prints it. */
+  it("Sales Location is the outlet, else the dealer, printed in full", () => {
+    const f = REGISTER_FIELDS.find((x) => x.key === "sales_location")!;
+    expect(f.group).toBe("Sales ownership");
+    expect(f.text(buildRegisterRow(order({ outlets: { name: "Carres Kelana Jaya" } })))).toBe(
+      "Carres Kelana Jaya",
+    );
+    expect(
+      f.text(buildRegisterRow(order({ outlets: null, dealers: { name: "Home Living Sdn Bhd" } }))),
+    ).toBe("Home Living Sdn Bhd");
+    expect(
+      f.text(buildRegisterRow(order({ outlets: { name: "  " }, dealers: { name: "Home Living" } }))),
+    ).toBe("Home Living");
+  });
+
+  /* ⭐ A REQUIRED FACT PRINTS NO ABSENCE WORD (owner ruling 2026-09-21). An
+     empty one is a system error fixed at its source, not a state of the order. */
+  it("the nine required facts never print Not recorded, To be confirmed or No delivery date", () => {
+    const empty = buildRegisterRow(
+      order({
+        proceeded_at: null,
+        outlets: null,
+        dealers: null,
+        salespersons: null,
+        delivery_date: null,
+        delivery_date_tbd: true,
+        customer_address_city: null,
+        customer_address_state: null,
+      }),
+    );
+    const banned = [NOT_RECORDED, NO_DATE_YET, "To be confirmed", "Date to be confirmed"];
+    for (const key of ["proceeded", "sales_location", "salesperson", "customer_delivery", "delivery_location"]) {
+      const text = REGISTER_FIELDS.find((f) => f.key === key)!.text(empty);
+      for (const word of banned) expect(text).not.toContain(word);
+    }
+  });
+
+  it("a document that does not exist yet reads No PO yet · No DO yet", () => {
+    const row = buildRegisterRow(order({ po_numbers: [] }), []);
+    expect(REGISTER_FIELDS.find((f) => f.key === "po_number")!.text(row)).toBe(NO_PO_YET);
+    expect(REGISTER_FIELDS.find((f) => f.key === "do_number")!.text(row)).toBe(NO_DO_YET);
+  });
+
+  it("Items is {first item} + {n} more, named by the catalog, never the SKU when it is known", () => {
+    const o = order({
+      order_lines: [
+        { sku: "CODY-SK", qty: 1, unit_price: 1, attrs: {} },
+        { sku: "PILLOW-1", qty: 2, unit_price: 1, attrs: {} },
+      ] as operationOrderListRow["order_lines"],
+    });
+    expect(registerItemsSummary(o, (sku) => (sku === "CODY-SK" ? "Cody" : undefined))).toBe("Cody + 1 more");
+    expect(registerItemsSummary(order())).toBe("Jager · King");
+  });
+
+  /* An absence is quieter than a fact: the muted set is the dictionary's
+     words for a thing that is not there, and never a required fact. */
+  it("mutes the absence words, and only them", () => {
     expect(MUTED_ABSENCES.has(NOT_RECORDED)).toBe(true);
+    expect(MUTED_ABSENCES.has(NO_PO_YET)).toBe(true);
+    expect(MUTED_ABSENCES.has(NO_DO_YET)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
-    // ONE word now, so ONE muted string (YH, 2026-08-29).
-    expect(MUTED_ABSENCES.size).toBe(1);
+    expect(MUTED_ABSENCES.size).toBe(3);
+  });
+
+  it("every width is a registry entry — the catalog types no pixel number", () => {
+    const registry = new Set(Object.values(REGISTER_FIELD_WIDTH));
+    for (const f of REGISTER_FIELDS) {
+      expect(typeof f.width).toBe("number");
+      expect(registry.has(f.width as never)).toBe(true);
+    }
+    expect(REGISTER_FIELDS.find((f) => f.key === "sales_location")!.width).toBe(REGISTER_FIELD_WIDTH.salesLocation);
+    expect(REGISTER_FIELDS.find((f) => f.key === "salesperson")!.width).toBe(REGISTER_FIELD_WIDTH.salesperson);
   });
 });
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {

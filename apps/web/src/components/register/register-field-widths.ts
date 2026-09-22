@@ -106,6 +106,41 @@ export const REGISTER_FIELD_WIDTH = {
    * supplier reference wraps rather than truncating.
    */
   supplierDoNo: 150,
+
+  /* ── SALES ORDERS' ADDITIONS — measured 2026-09-21 on the Sales Orders
+     Register (SALES ORDERS CARD 12). The Register's default row and its
+     optional catalog read every width from here; none is typed on the page. ── */
+
+  /**
+   * `Sales Location` — where the order was sold: the outlet, else the dealer,
+   * printed in full as the SO PDF prints it. Longest live value
+   * `Carres Kota Damansara`; see orders MASTER Card 12 for the rendered measurement.
+   */
+  salesLocation: 168,
+  /**
+   * `Salesperson` — who SOLD the order. Longest live name `Khoo Aik Yean`
+   * (≈88px at 13px Inter + 16). The header word plus its sort and filter
+   * affordances is the floor, and it is the wider of the two.
+   */
+  salesperson: 120,
+  /** A money figure, `RM 12,345.00`, right-aligned. */
+  amount: 116,
+  /** A short party/name value that is not a customer: Dealer, Channel, Order origin. */
+  partyName: 150,
+  /** A free-text reference or code: Customer reference, Invoice No, Payment method. */
+  reference: 150,
+  /** A phone number, `+60 12-345 6789`. */
+  phone: 132,
+  /** An e-mail address; long ones end in `…` and open whole. */
+  email: 200,
+  /** A full postal address or one of its lines; long ones end in `…`. */
+  address: 240,
+  /** City · State · Building type · Emergency relationship — one place word. */
+  placeWord: 140,
+  /** Postcode · Floor · Lift · Gender · Race — a short code or yes/no. */
+  shortFact: 96,
+  /** A small count with a two-line header: Stair carry items, Instalment months. */
+  smallCount: 120,
 } as const;
 
 export type RegisterFieldWidth = keyof typeof REGISTER_FIELD_WIDTH;

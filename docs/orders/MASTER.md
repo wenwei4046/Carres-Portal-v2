@@ -195,8 +195,8 @@ No deposit · Online order
 
 ## Sales Orders Register — find truth, never assign work
 
-**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
-2026-09-17 date-first pair (`SO Date · SO No`), and the 2026-09-18 default order. The current build still shows the older order until the Sales Orders listing round.
+**THE REGISTER COMPOSITION — OWNER RULING (Jess, 2026-09-21) · BUILT (SALES ORDERS CARD 12, [PR #1497](https://github.com/wenwei4046/Carres-Portal-v2/pull/1497)) · authenticated production walk OWED.** Overwrites the 2026-09-17 date-first pair
+(`SO Date · SO No`), and the 2026-09-18 default order.
 
 ```
 Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Requested Delivery Date | Customer Delivery Location | Customer | Items | PO No | DO No
@@ -230,11 +230,39 @@ Proceed Date | SO Doc Date | SO No | Sales Location | Salesperson | Customer Req
   Every cell is one line. Registry widths are set so most real values fit whole; a value longer than its
   column ends in `…` and opens whole on hover and keyboard focus (engine `overflowText`), and the column can
   be widened. Dates, `SO No`, `PO No` and `DO No` never cut.
-- Widths come from the shared field registry (UI MASTER §6.8); the measured widths of the older order are
-  retired with it and are re-measured in the build round.
+- Widths come from the shared field registry (UI MASTER §6.8) and nowhere else; the catalog
+  (`sales-order-columns.ts`) types no pixel number.
+
+**How it is built (Card 12, 2026-09-21).**
+
+- **Population** is the server's: the page asks `GET /api/operation/orders?stage=proceeded`
+  (every status except `place`) and the `{m}` total is counted the same way. Production on
+  2026-09-22 (test data): 27 proceeded orders stay; Placed orders leave the Register.
+- **Leading three.** At a grid canvas ≥768px `Proceed Date` leads (engine `leadingColumns.before`)
+  and `SO Doc Date · SO No` pin. Below 768px `SO No` leads and pins alone and the two dates follow
+  it, all three still locked (none can be hidden or moved): three locked columns plus the control
+  gutter need ~400px, which put SO No off-screen at 390. Layout key `carres.salesOrders.register.v6.{role}` retires every saved v5 order.
+- **`Items`** and the expansion's **`Item`** read the product name from the catalog (`Cody + 1
+  more`; `Cody` / `Super King`); a SKU the catalog does not know prints as itself.
+- **Measured widths** — rendered portal shell, 13px Inter, 1440 (fixture; the widest governed value
+  + 16px padding): Proceed Date / SO Doc Date `Wed, 28 May 25` 101.5px → **120** (`date`) · SO No
+  `SO-1334` 54.6px → **90** (`soNo`)
+  · Sales Location `Carres Kota Damansara` (longest live, printed in full as the SO PDF prints it)
+  145.4px → **168** (`salesLocation`, new) · Salesperson `Khoo Aik Yean` (longest live) 89.2px; the
+  header word + filter icon is the floor (103px) → **120** (`salesperson`, new) · Customer
+  Requested Delivery Date → **180** (the two-line header sets it) · Customer Delivery Location
+  **176** · Customer **150** · Items `Booqit Hybrid + 1 more` 142.9px → **208** · PO No
+  `PO-20260910-4004` 126.8px / DO No `DO-20260915-7020` 125.1px → **170** (`documentNo`). Row height
+  40px (`rowHeight={40}`, this page only); no page-level sideways scroll at 1440 / 1180 / 820 / 390 or 200% zoom.
+- **Sales Location** is `salesLocationOf` — the outlet, else the dealer, trimmed, in full; the same
+  rule as the SO PDF (`sales-order-template.tsx`). Production 2026-09-22: 0 of 27 proceeded orders
+  lack it, 0 lack a Salesperson, 0 lack a Customer Requested Delivery Date.
+- **Engine behaviours it reads, shipped once for every listing by [PR #1492](https://github.com/wenwei4046/Carres-Portal-v2/pull/1492)**
+  (merged before this page): a cut value shows whole on hover and keyboard focus, and click/Enter opens
+  it to read and select; the §6.9 line starts under the SO row's caret and runs to the goods frame.
 
 **Document absence words and expansion — OWNER RULING (Jess, 2026-09-21): follow the Purchasing design ·
-APPROVED / NOT BUILT.** `PO No` with no Purchase Order reads `No PO yet` (owner preference 2026-09-21,
+BUILT (Card 12).** `PO No` with no Purchase Order reads `No PO yet` (owner preference 2026-09-21,
 kept over SO Batch Purchase's `Not ordered yet`); `DO No` with no Delivery Order
 reads `No DO yet`. Both muted, one line. `Not recorded` is never used here. The goods expansion uses the
 Purchasing reference geometry (UI MASTER §6.8–§6.9): the §6.9 1px connector from the SO row's caret to a
@@ -258,6 +286,8 @@ FILTERS    active search + header filters shown as conditions · one `Clear filt
            (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
            unknown total → `{n} sales orders`, never a guessed `of`
 IDENTITY   Proceed Date · SO Doc Date · SO No lead (2026-09-21); SO No is a door to the order
+FOOTER     `{n} sales orders` unfiltered; `{n} of {m}` only when search, a header filter or the
+           server's row cap narrows the list (Card 12)
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
@@ -323,13 +353,16 @@ Expanded goods has exactly the six columns above: SKU stays separate;
 Item is always last and takes remaining space. All other child tracks have consistent fixed,
 content-measured widths. Every cell has 8px left and right padding; no empty spacing columns.
 Individual Unit IDs and SKUs stay on one line, with full multi-ID evidence in the governed Popover.
-The child begins at the actual SO No column edge, ends at the parent table edge, retains its own
-four-sided border and has 12px space above and below. Sales Orders never selects child items.
-Requested Delivery Date keeps its exact label but renders on two deliberate header lines:
-`Requested` / `Delivery Date`, with accessible sort and filter controls. Dates and SO numbers stay
+The child follows the Purchasing reference (UI MASTER §6.8–§6.9, owner ruling 2026-09-21): it hangs
+flush under its row inside the shared `ConnectedSections` stack, whose 1px line runs to the goods
+table's own four-sided bordered frame and ends there. Sales Orders never selects child items.
+`Customer Requested Delivery Date` and `Customer Delivery Location` render on the shared two-line
+header (`Customer Requested` / `Delivery Date`, `Customer Delivery` / `Location`), with accessible
+sort and filter controls named by the full label. Dates and SO numbers stay
 on one line; Customer and Delivery Location receive usable content widths. Narrow screens use
 the grid's own horizontal scroll and keep normal typography and all main columns/functions.
-Optional and saved layouts remain under the existing key; no silent preference reset. Purchasing's
+Optional columns and saved widths persist per browser under the layout key; the key moved to v6
+with the 2026-09-21 composition so no saved older order returns. Purchasing's
 approved details layout and all data provenance/loading/error/missing states are preserved.
 
 
@@ -347,7 +380,7 @@ projection for allocation counts and excludes counted stock keys from physical U
 The newer Purchasing details table remains unchanged by this takeover.
 Deliver To uses actual `po_line_sources` quantities and the corresponding PO-line destination,
 falling back only to that PO's recorded destination. A current default destination is not an
-order fact. Missing line provenance renders `Not recorded`. Loading, failed reads and verified
+order fact. A line with no PO line yet reads `No PO yet` (owner ruling 2026-09-21). Loading, failed reads and verified
 absence are distinct; failed reads offer Retry and never render `Not allocated`.
 The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
 Server search recognises the displayed `SO-1319` number as well as bare `1319`;
@@ -831,9 +864,8 @@ read only as implementation history.
 
 ## Register
 
-- The default business columns are exactly, in order:
-  `SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
-  (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
+- The default business columns are exactly the eleven of THE REGISTER COMPOSITION (owner ruling
+  2026-09-21, top of this MASTER), led by `Proceed Date | SO Doc Date | SO No`.
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
 - The page has a compact destination header/work toolbar, then breathing room, then one flat
@@ -1346,10 +1378,9 @@ query.**
 
 ### Register
 
-- **The default columns are exactly EIGHT**, in order:
-  `SO Date | SO No | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
-  This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
-  order already carries (`outlets.name`); it has been a declaration in the register's catalog since
+- **The default columns are THE REGISTER COMPOSITION** (owner ruling 2026-09-21, top of this
+  MASTER) — eleven, led by `Proceed Date | SO Doc Date | SO No`. `Sales Location` READS the Sales-ownership fact the
+  order already carries (the word is `Sales Location` since 2026-09-21: `outlets.name`, else `dealers.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
   for it.
 - **An absence is quieter than a fact.** `Not recorded` / `Not given` keep their words — a blank
