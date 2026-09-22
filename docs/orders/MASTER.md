@@ -757,6 +757,35 @@ Recording a communication reference does not authorise contacting customers or e
 This evidence gate neither rewrites historical signatures nor turns a WhatsApp confirmation into a
 signature. Preserve the actual revision/document association and separately identify unsigned versions.
 
+**BUILT 2026-09-23 — migration `0562`, `sales_order_record_amendment_agreement`,
+`POST /api/operation/orders/amendment/:id/agreement`, `SalesOrderAmendment.tsx`.**
+`sales_order_amendments` now carries the kind, the reference, the optional detail, who recorded it,
+when, and the fingerprint of the terms it was recorded against. Three kinds are accepted and no
+fourth is reachable: `signed_document`, `customer_confirmation` and `original_agreement` — the last
+being the Staff-correction case, whose reference must name a revision of this order that exists.
+**Every kind carries a reference; there is no boolean anywhere in the column set, the schema, the
+API or the screen**, which is how "a manager's statement or checkbox … is not sufficient" is made
+structural rather than a matter of discipline.
+
+SUBMIT is unchanged — the request is still written while the evidence is incomplete. REJECT is
+unchanged — refusing a change needs no customer agreement. APPROVE is refused
+(`customer_agreement_required`) until a basis is recorded, and refused again
+(`customer_agreement_stale`) when the recorded basis no longer fingerprints the terms being applied,
+so approval is never silently reused for different terms. A decided amendment's basis cannot be
+rewritten afterwards. The applied history row names the kind and the reference, so the record
+answers what made the change legitimate without a second read.
+
+Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole 565-file chain, 0562
+applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
+ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
+proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered
+approval applies and mints Rev 2; a decided amendment refuses a backdated basis. Screen words are
+registered in COPY-STANDARD § "Customer agreement evidence".
+
+**Still not built in this scope:** whole-page `Edit` with server-chosen `Save` vs
+`Submit amendment request`, catalogue `Add item` / `Remove` / `Restore`, the `Before` / `After`
+review, and version-bound historical documents and signatures.
+
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
 doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling

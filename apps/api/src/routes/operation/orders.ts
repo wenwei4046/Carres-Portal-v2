@@ -2182,6 +2182,7 @@ operationOrdersRouter.post(
 //
 //   GET  /:id/amendment          the live amendment + whether it is STALE
 //   POST /:id/amendment          SUBMIT
+//   POST /amendment/:aid/agreement  the customer's recorded acceptance (0562)
 //   POST /amendment/:aid/apply   the REFUSAL — and that refusal is the point
 //
 // There is no ISSUE door and no ACCEPT door here, deliberately: the signing
@@ -2328,6 +2329,68 @@ operationOrdersRouter.get("/:id/cancel-impact", requireOperation, async (c) => {
   }
   return c.json(data);
 });
+
+/**
+ * ⭐ CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
+ * (`docs/orders/MASTER.md` § "Customer agreement evidence"; enforced in the
+ * database by `0562`).
+ *
+ * "A signed document or a reference to the relevant customer confirmation (for
+ *  example, WhatsApp) is acceptable... A manager's statement or checkbox saying
+ *  the customer agreed is not sufficient by itself."
+ *
+ * So there is no boolean here and there never can be one: a KIND is recorded
+ * and it always carries a REFERENCE that points at something findable outside
+ * this record. `original_agreement` is the Staff-correction case — the customer
+ * agreement did not change, so it names the revision whose signed agreement
+ * still covers it, and the database checks that revision exists.
+ *
+ * Recording a reference reaches nobody: "Recording a communication reference
+ * does not authorise contacting customers or external parties."
+ */
+const amendmentAgreementInput = z.object({
+  kind: z.enum(["signed_document", "customer_confirmation", "original_agreement"]),
+  reference: z
+    .string()
+    .trim()
+    .min(1, "Name the document or message that shows the customer agreed")
+    .max(300),
+  detail: z.string().trim().max(1000).optional(),
+});
+
+/* Operation records the basis — "Sales records the confirmation basis; the
+   authorised approver checks that it covers the proposed change." It is NOT
+   `requirePrincipal`: the approver is the checker, not the recorder. */
+operationOrdersRouter.post(
+  "/amendment/:amendmentId/agreement",
+  requireOperation,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = amendmentAgreementInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: parsed.error.issues[0]?.message ?? "invalid input",
+        },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_record_amendment_agreement", {
+      p_amendment_id: c.req.param("amendmentId"),
+      p_kind: parsed.data.kind,
+      p_reference: parsed.data.reference,
+      p_detail: parsed.data.detail ?? null,
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data, 201);
+  },
+);
 
 const amendmentDecisionInput = z
   .object({

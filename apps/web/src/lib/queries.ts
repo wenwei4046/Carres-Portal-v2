@@ -5873,7 +5873,28 @@ export interface SalesOrderAmendment {
   /** 0354 — the day the CUSTOMER asked, as the operator was told it. Null on
    *  a goods proposal and on every amendment written before the field. */
   customer_asked_on?: string | null;
+  /* ⭐ THE CUSTOMER'S RECORDED ACCEPTANCE — 0562, owner ruling 2026-09-22
+     APPROVED / LOCKED. Null while the basis has not been recorded: "The request
+     may remain recorded while evidence is incomplete; it cannot take effect."
+     There is no boolean here on purpose — a manager's checkbox saying the
+     customer agreed is what the ruling refuses. */
+  customer_agreement_kind?: CustomerAgreementKind | null;
+  customer_agreement_reference?: string | null;
+  customer_agreement_detail?: string | null;
+  customer_agreement_at?: string | null;
+  /** Server-derived: the basis still covers THESE terms. Approve is refused
+   *  when it does not — approval is never silently reused for different terms. */
+  customer_agreement_covers_proposal?: boolean;
 }
+
+/** How the customer's acceptance is evidenced (0562). A signed document, a
+ *  traceable reference to the customer's own confirmation, or — for a Staff
+ *  correction where the agreement did not change — the revision whose signed
+ *  agreement still covers it. */
+export type CustomerAgreementKind =
+  | "signed_document"
+  | "customer_confirmation"
+  | "original_agreement";
 
 export function useSalesOrderAmendment(
   orderId: string | null,
@@ -5972,6 +5993,39 @@ export function useDecideSalesOrderAmendment(
         qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
         qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
       ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * Sales records the basis for the customer's acceptance (0562).
+ *
+ * Separate from SUBMIT on purpose, and that is the ruling, not a convenience:
+ * "The request may remain recorded while evidence is incomplete; it cannot take
+ * effect." A proposal is written the moment Sales has one; the evidence catches
+ * up, and until it does the principal simply cannot approve.
+ */
+export function useRecordAmendmentAgreement(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; customer_agreement_kind: CustomerAgreementKind },
+      ApiError,
+      { amendmentId: string; kind: CustomerAgreementKind; reference: string; detail?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ amendmentId, kind, reference, detail }) =>
+      apiFetch<{ id: string; customer_agreement_kind: CustomerAgreementKind }>(
+        `/api/operation/orders/amendment/${amendmentId}/agreement`,
+        { method: "POST", body: JSON.stringify({ kind, reference, detail }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
