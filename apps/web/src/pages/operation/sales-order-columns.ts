@@ -81,6 +81,14 @@ export const NO_DATE_YET = "No delivery date";
  */
 export const NO_PO_YET = "No PO yet";
 export const NO_DO_YET = "No DO yet";
+/**
+ * ⭐ A LINE WITH NO CATALOG ROW — the dictionary's governed word for that
+ * fact (COPY-STANDARD, `Not in catalog`), never `Other goods` (retired
+ * 2026-09-22). An unclassified line is a catalogue data error: it is shown
+ * where it is (the goods Category cell) and counted apart in the footer, so
+ * it never silently vanishes (owner ruling 2026-09-22).
+ */
+export const NOT_IN_CATALOG = "Not in catalog";
 
 /**
  * `{first item} + {n} more` — the Register's `Items` (COPY-STANDARD, goods
@@ -161,7 +169,7 @@ export function salesLocationOf(o: {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET]);
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED, NO_PO_YET, NO_DO_YET, NOT_IN_CATALOG]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {

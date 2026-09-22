@@ -76,6 +76,7 @@ import {
   MUTED_ABSENCES,
   NO_DO_YET,
   NO_PO_YET,
+  NOT_IN_CATALOG,
   REGISTER_FIELDS,
   type RegisterField,
   type RegisterRow,
@@ -423,7 +424,12 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
-        category: goodsCategoryOf(line),
+        /* The shared ladder says `Other goods` for a line with no catalog row;
+           this page prints the dictionary's `Not in catalog`, muted (owner
+           ruling 2026-09-22). Other pages keep their own word. */
+        ...(goodsCategoryOf(line) === "Other goods"
+          ? { category: NOT_IN_CATALOG, categoryNode: absenceAware(NOT_IN_CATALOG) }
+          : { category: goodsCategoryOf(line) }),
         unitIds: fact?.verifiedUnitIds ?? fact?.unitIds ?? [],
         unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
           <UnitEvidence singleLineCodes ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
@@ -868,11 +874,18 @@ function RegisterResultSummary({
   /** The server's authoritative total; `null` when unknown. */
   total: number | null;
 }) {
+  const navigate = useNavigate();
   const scope = selected.length > 0 ? selected : filtered;
   const counts = new Map<string, number>();
+  /* The lines behind `Not in catalog {n}` — what the click lists. */
+  const uncatalogued: { id: string; so: number; sku: string; name: string; qty: number }[] = [];
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      counts.set(footerWord(line), (counts.get(footerWord(line)) ?? 0) + Number(line.qty || 0));
+      const word = footerWord(line);
+      counts.set(word, (counts.get(word) ?? 0) + Number(line.qty || 0));
+      if (word === "Other goods") {
+        uncatalogued.push({ id: row.id, so: row.so, sku: line.sku, name: lineName(line), qty: Number(line.qty || 0) });
+      }
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
@@ -899,13 +912,68 @@ function RegisterResultSummary({
     (label) => label !== "Service" && label !== "Other goods" && (counts.get(label) ?? 0) > 0,
   ).map((label) => `${label} ${counts.get(label)}`);
   const services = counts.get("Service") ?? 0;
+  /* ⭐ NEVER A SILENT UNDER-COUNT (owner ruling 2026-09-22, Jess): a goods
+     line the ladder cannot name stays out of `Qty:` but is counted apart
+     under the dictionary's `Not in catalog {n}` — {n} is the PHYSICAL
+     QUANTITY, never an order or line count — and only when there is one.
+     Clicking it lists SO No · original SKU · product name · qty. No typo is
+     inferred and nothing is written to the catalogue. */
+  const notInCatalog = counts.get("Other goods") ?? 0;
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */
-  const line = [
+  const head = [
     countWord,
     ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : []),
     ...(services > 0 ? [`Services ${services}`] : []),
   ].join(" · ");
-  return <span className="block truncate" title={line}>{line}</span>;
+  const exception = `${NOT_IN_CATALOG} ${notInCatalog}`;
+  const line = notInCatalog > 0 ? `${head} · ${exception}` : head;
+  if (notInCatalog === 0) return <span className="block truncate" title={line}>{line}</span>;
+  return (
+    <span className="flex min-w-0 items-center" title={line}>
+      <span className="min-w-0 truncate">{head} ·&nbsp;</span>
+      <Popover
+        label={NOT_IN_CATALOG}
+        trigger={
+          <button
+            type="button"
+            data-testid="footer-not-in-catalog"
+            className="flex-none text-kit-blue-11 underline-offset-2 hover:underline"
+          >
+            {exception}
+          </button>
+        }
+      >
+        <table className="text-body" data-testid="not-in-catalog-list">
+          <thead>
+            <tr className="text-left text-label font-semibold text-kit-slate-11">
+              <th className="px-2 py-1">SO No</th>
+              <th className="px-2 py-1">SKU</th>
+              <th className="px-2 py-1">Item</th>
+              <th className="px-2 py-1 text-right">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {uncatalogued.map((u, i) => (
+              <tr key={`${u.id}-${u.sku}-${i}`}>
+                <td className="px-2 py-1">
+                  <button
+                    type="button"
+                    className="text-kit-blue-11 underline-offset-2 hover:underline"
+                    onClick={() => navigate(`/operation/orders/so/${u.id}`)}
+                  >
+                    SO-{u.so}
+                  </button>
+                </td>
+                <td className="whitespace-nowrap px-2 py-1">{u.sku}</td>
+                <td className="px-2 py-1">{u.name}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{u.qty}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Popover>
+    </span>
+  );
 }
