@@ -4056,3 +4056,16 @@ Payables, 18 Sep 2026. Words new to this standard:
 Use existing `SO Doc Date` for sales and `Customer Requested Delivery Date` for delivery/demand.
 Reuse existing `Dealer / Sales Location`, `Region` and `Category` wording; do not create a second
 regional dictionary. Approval of these titles does not approve every experimental prototype label.
+
+
+## Sales Orders navigation — owner approved 2026-09-23 · target not built
+
+| Meaning | Approved wording | Do not use for this entry |
+|---|---|---|
+| Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
+| Ordinary outright customer sales | `Outright Sales` | `Purchase` |
+| Subscription-owned customer journey | `Subscription` | `Purchase` |
+
+The label does not rename the Sales Order document, its SO number, or the separate Purchasing
+module. Order list and Monthly overview sit inside Outright Sales; Subscription reporting stays
+separate. Removing old navigation entries does not delete historical orders or documents.

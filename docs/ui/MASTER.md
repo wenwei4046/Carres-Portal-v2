@@ -606,6 +606,14 @@ behind a chevron that reveals the same name again. **Payments is a module of two
 finance role, which is never a second Payment information architecture.** The existing `PortalSidebar` is the only left navigation surface: 232px
 expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
+**Sales Orders navigation — owner approved 2026-09-23 · target not built.** The existing
+PortalSidebar shows one expandable `Sales Orders` parent with `Outright Sales` and `Subscription`.
+Replace the previous standalone SO/legacy menu entries in this tree; retain existing records and
+valid deep links. No new sidebar dimensions or selection grammar. The owning Orders MASTER's
+“One purpose and one navigation home” governs destination scope; Rental/Subscription retains
+its own business authority. `Purchase` is not the name of the outright-sales child. This ruling
+changes navigation only and does not approve Subscription business implementation.
+
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
 the entire tree without navigating. `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are independent
 full-row accordion headers. More than one group may remain open. The active destination's group

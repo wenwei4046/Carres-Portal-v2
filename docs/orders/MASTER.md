@@ -126,13 +126,27 @@ Sales Orders is the truth/register home of the customer order. It lets an author
 the transaction, read the customer promise and follow every related fact and document. It is not a
 second Purchasing, Warehouse, Delivery, Payment or Work screen.
 
-The Sales module contains exactly:
+**Portal navigation — owner approved 2026-09-23 · APPROVED TARGET / NOT BUILT.**
 
 ```
-SALES
-├─ Sales Orders
-└─ Old Orders (temporary)
+Sales Orders
+├─ Outright Sales
+└─ Subscription
 ```
+
+`Outright Sales` is the existing outright-order register and its governed SO detail/amendment
+journey. `Subscription` opens the Subscription-owned journey governed by `docs/rental/MASTER.md`;
+the shared navigation parent does not merge contracts, transactions, permissions or calculations.
+`Purchase` is rejected for this navigation label because it is confused with Purchasing.
+Replace the previous standalone Sales Orders entry; remove the old/legacy order menu entry from
+this tree. Menu removal does not delete orders, history, documents or valid existing deep links.
+Preserve authorised access to existing records and their canonical identity.
+
+The approved Order list and Monthly overview composition belongs inside Outright Sales; it does
+not mix Subscription quantities. Purchasing remains a separate module. This is a navigation ruling,
+not approval to implement the remaining Subscription proposals, migrate legacy orders or delay the
+independently authorised SO Amendment delivery. Reuse the existing PortalSidebar grammar and role
+visibility; never create a second sidebar or expose unauthorised destinations.
 
 Delivery Orders belongs under Delivery. Purchase Orders, Receiving Sessions, Stock Units and
 Payments stay under their own modules. The Sales Order links to them; it never copies their
