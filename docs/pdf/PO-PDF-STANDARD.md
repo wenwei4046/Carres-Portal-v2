@@ -53,9 +53,10 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 - **PO DETAILS — rows, in order (Jess, 2026-09-22; dictionary words only):**
   `PO No` (`PO-… V{n}`) · `PO Date` · **`PO {n}-Day Delivery Date`** (bold
   value — the supplier's 3-second fact) · `Delivery Method` (`Supplier
-  delivers` / `We collect`). `{n}` is the supplier working days from `PO Date`
-  to that date, from the same server arithmetic that stamped it (production +
-  transit, skipping the supplier's weekends and applicable public holidays):
+  delivers` / `We collect`). `{n}` is exactly the applicable working-day value recorded from Settings
+  for this PO, with NO added transit days (Jess, 2026-09-22 correction;
+  APPROVED / NOT BUILT). Calculate from PO Date using n working days, skipping
+  applicable weekends and public holidays. Example format only:
   `PO 14-Day Delivery Date : Fri, 9 Oct 2026`; Settings at 10 days reads
   `PO 10-Day Delivery Date`. An unknown original prints `PO Delivery Date :
   Not recorded`. **Measured (Noto 8pt):** one line is 31.7mm of label + 22.0mm
@@ -205,4 +206,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-21 | **Unit ID print style**: ink 7.5pt, last three digits bold, consecutive Units as one `first to last` line computed from the codes (gap = new run). Underline refused (blurs into grid hairlines on photo/fax). | Jess |
 | 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
 | 2026-09-22 | **Several Deliver To on one PO, one page group each** (Jess): sofa PO = one Deliver To; mattress/bedframe may split; a later move keeps the SAME PO number as a new revision — no second PO, no `Moved from`, no new Unit IDs. Each Deliver To starts on a new page of one PDF; every page carries the PO number and revision. The per-line DELIVER TO column and `Multiple destinations` are deleted; five columns everywhere. Same-day entries that read "split" as separate POs are overwritten. | Jess |
-| 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = supplier working days PO Date → date, same server arithmetic; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
+| 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |

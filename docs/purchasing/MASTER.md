@@ -494,6 +494,18 @@ does not decide it.
 
 ### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
 
+**PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22), APPROVED / NOT BUILT.**
+The single-PO label is `PO {n}-Day Delivery Date`; the register column remains
+`PO Delivery Date`. `n` is exactly the applicable working-day value from Settings
+recorded for that PO: Settings 14 means 14 working days, Settings 10 means 10.
+**Do not add transit days.** Calculate this target from PO Date using those n
+working days, skipping applicable weekends and public holidays. Label and date
+must use the same recorded setting. Later Settings changes never rewrite an
+existing PO date or an issued PDF. The current birth ETA arithmetic described
+below is implementation evidence, not proof this corrected target is built.
+This ruling changes the PO Delivery Date target; it does not remove separately
+governed transport planning facts or silently rewrite SO safety calculations.
+
 **HOW IT IS ENFORCED — BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
 
 - **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**

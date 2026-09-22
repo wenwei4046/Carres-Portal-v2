@@ -2106,7 +2106,7 @@ resizing remains available.
 | Sales Orders optional catalog: amount 116 · party name 150 · reference 150 · phone 132 · email 200 · address 240 · place word 140 · short fact 96 · small count 120 | — | prototype | Sales Orders, 2026-09-21: the hidden-by-default catalog columns take a registry role instead of a typed number. **Owed:** measurement when a page shows one by default |
 | Customer Delivery Location | 176 | prototype | |
 | Customer Requested Delivery Date | 180 | prototype | **Owed:** SO Batch built 144 off `No delivery date yet` 124px; re-measure against the longest governed absence |
-| PO Delivery Date | 150 | **MEASURED** | PO, built 2026-09-18 |
+| PO Delivery Date | 150 | **MEASURED** | PO column width, built 2026-09-18. Single-PO wording: `PO {n}-Day Delivery Date`; n is the recorded Settings working-day value, no transit added. Calculation correction APPROVED / NOT BUILT; Purchasing §5.7 and COPY own the rule. |
 | Supplier Confirmed Delivery Date | 180 | **MEASURED** | PO, built 2026-09-18, holding `Not confirmed` and the `Supplier changed from {date}` second line |
 | Goods Received Date | 140 | **MEASURED** | PO, built 2026-09-18, holding `{n} receipt dates` and the `Time not recorded` second line |
 | Purpose | 150 | **MEASURED** | Manual Purchase |
