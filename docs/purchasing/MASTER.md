@@ -1889,6 +1889,15 @@ This distinction follows the recorded request intent; do not guess solely from S
 an ambiguous Other Purchase purpose. If intent is absent, show stock read-only and explain the gap;
 no silent netting. This approval does not define a new replenishment forecast or history threshold.
 
+**Diglant Subscription advance-supply boundary — OWNER-APPROVED TARGET / NOT BUILT,
+Jess 2026-09-22.** `../rental/MASTER.md` §4/§5.6 owns the new programme's ruling: an approved
+advance PO may exist before any customer SO. Later customer demand first checks eligible stock
+and evidenced existing PO supply; only verified uncovered demand goes to additional procurement.
+Do not purchase the same covered quantity again when the SO arrives. Expected or unverified supply
+is not Ready Stock. This approves the business boundary, not automatic purchasing, a new forecast
+formula or a second allocation authority. Existing approval/eligibility rules remain; this does
+not change the current page, request form, PO template or confirmed-demand report population.
+
 Stock picker: `☐ · Goods Received Date · Stock Location · Supplier · PO No / Ref No (Unit ID on line two) · Condition`.
 Physical receipt DATE only here; do not discard stored timestamps. Supplier, original PO/reference,
 current location, condition and ownership come from actual stock records. Missing facts stay missing.

@@ -122,7 +122,14 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
 - Diglant is the mattress manufacturer and an investor in Carres. Carres has a monthly
   mattress quantity KPI and forecasts orders to Diglant in advance. Forecast purchasing,
   followed by allocation when customers sign, replaces per-customer shortage purchasing as
-  the proposed primary supply model. Existing Purchasing approval/allocation law still applies.
+  the owner-approved primary supply model. Existing Purchasing approval/allocation law still applies.
+- **OWNER-APPROVED TARGET / NOT BUILT — Jess, 2026-09-22:** advance procurement and customer
+  Sales Orders are separate records arriving at different times. An approved Diglant PO may
+  precede any customer SO. When a customer signs, their SO/Subscription uses existing eligible
+  stock or evidenced PO supply first; only a verified uncovered requirement leads to additional
+  procurement. No duplicate buy per new SO. Unfinished/unverified supply is expected supply,
+  never represented as ready-to-deliver stock. This confirms the business boundary, not a
+  forecast formula, automatic ordering, new allocation writer or full blueprint approval.
 - Manufacturer lead time is 45 days. Carres assigns Logistics to collect at Diglant in Klang
   and deliver across Malaysia, including Sabah/Sarawak. The 45 days must not be treated as
   including final nationwide delivery. Calendar basis/start trigger still require supplier evidence.
@@ -374,11 +381,16 @@ MOQ/整批限制只有供应条款证据存在才取整，显示额外量；不�
 退回或撤回，保留关联并重新核算，不悄悄再生一份。定稿、转申请、发 PO 前都重验版本
 及覆盖。并发/重复点击不生第二申请或 PO。
 
-**客户后来签约：** 先关联 forecast-stock 供应，再按资格绑定实际 Unit。已收合格现货走
-既有精确 Unit 门；未提货/未收货不能在 Ready Stock 冒充可用，建议显示其有来源的预计
-供应关联而非现货 reservation。此关联和 SO 剩余需求的去重须经 Purchasing/Orders/Stock
-共同批准后才可实现。期间不可让 SO Batch 又买一次同一已有 forecast PO 覆盖的需求。
-超额真实需求才走经核实的追加采购；此例外不能恢复逐客户采购作为主模型。
+**OWNER-APPROVED TARGET / NOT BUILT — 客户后来签约，2026-09-22：** 提前 PO 与客户 SO
+分开进入，提前 PO 不必已有客户；SO/Subscription 后来进入时先核对已有库存和已下 PO
+供应，只有经核实的不足部分才追加采购。同一 forecast PO 覆盖的需求不能由 SO Batch
+再买一次。尚在生产或未核实可交付的床垫只显示预计供应，不冒充 Ready Stock。
+
+**PROPOSAL / NOT LAW — 具体衔接：** 先关联有来源的 forecast-stock 供应，再按资格绑定
+实际 Unit。已收合格现货走既有精确 Unit 门；未提货/未收货用预计供应关联而非现货
+reservation。批准的去重业务目标不代表该关联能力已建成；其具体衔接和 SO 剩余需求
+计算仍须遵守 Purchasing/Orders/Stock 的唯一来源、资格检查和既有审批规则。
+
 
 ## 5.7 · 45 天与全国物流日期
 
