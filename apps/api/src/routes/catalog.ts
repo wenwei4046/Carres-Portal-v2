@@ -809,6 +809,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   // Loo 2026-07-11 — the CODE is a free, directly-renameable field (AutoCount
   // style). DB unique(sku) turns a collision into a clean 409 via mapPgError.
+  // 0558 — a renamed code carries itself: an after-update trigger on
+  // product_skus rewrites the old code in every record that names it (order
+  // lines, PO lines, stock, supplier bills...). Nothing to do here.
   if (parsed.data.sku !== undefined) patch.sku = parsed.data.sku;
   // 0375 — supplier's own item code; '' clears to null (a blank is not a code).
   if (parsed.data.supplierCode !== undefined)
