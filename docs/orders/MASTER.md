@@ -205,17 +205,35 @@ Shared measures must retain one owning calculation. This direction does not appr
 formula, target-entry engine, copy or finished layout. The current independent demand preview
 covers only a subset, not the enlarged monthly overview.
 
-**Expanded monthly composition — PROPOSAL / NOT LAW.** Recommend an orders-received summary,
-a due-month delivery view and a six-month model/configuration demand table. Each declares its
-own date basis. SO Doc Date is commercial document date; Proceed Date is handover to Operation;
-neither automatically defines an approved sales/commission KPI. Requested delivery month groups
-customer obligations; actual Delivery events measure work completed in a calendar month. For a
-due-month cohort, delivered and remaining quantities refer to those same obligations, not all
-shipments occurring that month. Show prior outstanding commitments separately. Pending amendments
-do not rewrite effective quantities; cancellations/returns and changed commitments must retain
-traceable treatment. Target attainment appears only with an approved target and metric contract;
-otherwise show actuals without invented targets or percentages. The final layout, metric definitions
-and date wording require integrated review before altering the current approved preview.
+**Monthly reporting measures — owner-approved direction 2026-09-22; not built.**
+- Dealer sales comparison uses SO Doc Date in Malaysian calendar months. Compare each selected
+  Dealer/Sales Location separately plus a total; keep order count, actual goods-category quantities,
+  goods amount, service amount and total payable distinct. Read canonical commercial amounts,
+  not HR commission-basis arithmetic. Sales comparison and Operation intake are different scopes:
+  unsubmitted drafts are not sales, and an accepted sale is not automatically handed to Operation.
+- Operation received uses actual Proceed Date. Summarise handed-over orders and goods quantities
+  for the selected month; never substitute a planned production-start date.
+- Delivery progress uses the cohort whose customer-requested delivery date is in the selected
+  month: required, actually fulfilled and remaining quantities refer to the same cohort. Prior
+  outstanding commitments remain separately traceable. Actual customer delivery events, partials
+  and corrections come from Delivery; evidence review is a separate state, not a second count.
+- Forward demand covers the selected month and next 2/5 months by customer-requested date, with
+  models/configurations visible by default. Coverage and purchase remainder come from their
+  Stock/Purchasing owners. No new procurement calculation or action is admitted here.
+- The server scopes rows, aggregate amounts, drill-downs and exports consistently. This feature
+  grants no new external dealer access and does not give every internal role cross-dealer access.
+- Target attainment requires a governed target/metric contract. No invented target or achievement
+  percentage is approved. Subscription remains excluded; global Dashboard composition is unchanged.
+
+**Remaining historical-report design — PROPOSAL / NOT LAW.** Preserve order-issue evidence and
+trace later amendments/cancellations rather than silently overwriting a closed month's result.
+The exact cross-period adjustment contract requires further review; do not equate the operational
+current-demand projection with a frozen sales or commission statement. Read closed HR commissions
+from their frozen owner records. Proposed overview layout and new display wording remain review
+material. The independent prototype may demonstrate these distinctions with labelled synthetic
+order-issue snapshots, but is not evidence that historical source contracts are implemented.
+Normal review fixtures have required delivery dates; missing-date corruption is not a normal
+workflow and must not occupy the default operator preview.
 
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
