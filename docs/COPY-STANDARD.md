@@ -3881,10 +3881,14 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 | Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
 | Refusals (database, 0557 — moving an account) | `The chart changed while you were dragging. Open it again and redo the move.` · `Move an account only among the accounts under the same heading.` · `Send every account under this heading, in the order you want them.` · `Send the order the chart was in before the drag.` · `The same account is listed twice.` · `The order has a blank where an account should be.` | Six causes, six sentences — **a refusal may not borrow another refusal's cause.** In order: somebody else moved an account while this screen was open, so this move is refused whole and nothing of theirs is lost · the move crossed into another heading, which is a reparent and a different ruling · the list left an account out, or was empty · the caller sent no before-order to check against · one account twice · a blank where a code should be. `Only Finance changes the chart of accounts.` and `That account is not in the chart.` are reused from 0539, unchanged. |
 
-**The move control is NOT built** (0557). `gl_accounts_reorder` exists and is proved; no screen control is
-wired to it, because the kit's only drag affordance is for COLUMN HEADERS and there is no row-drag
-component. The six sentences above are the server's refusals, recorded here so the wording is settled
-before a control is chosen — **none of them is on a screen today.**
+**The move control IS built** (0557, owner ruling: *"for chart of accounts, actual dragging"*). A row on
+Finance -> Settings -> Chart of accounts is dragged among the accounts under its own heading; `rowDrag`
+was added to the shared `DataGrid` for it, using the browser's own drag and drop. The six sentences
+above are the server's refusals and the screen prints them as they come, so their wording is already
+settled. The screen never offers a move across a heading, so `Move an account only among the accounts
+under the same heading.` should not be reachable from this page.
+
+| PROPOSAL - PENDING APPROVAL | `Drag an account to move it. Hold Alt and press the up or down arrow to move it from the keyboard.` | One line above the chart. A drag with no keyboard equal locks out anyone not using a mouse, and a keyboard move nobody is told about is not a control. Plain ASCII throughout; the only punctuation is the full stop. **NOT APPROVED — it is on the screen in this branch and must be approved or replaced before merge.** |
 
 Finance words that never appear on screen. A finance person says the word on the left; the screen
 always says the word on the right. One fact, one word (rule 2).
