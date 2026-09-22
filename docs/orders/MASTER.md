@@ -536,6 +536,26 @@ Proceed Date — EXCEPT three, which print as plain text because they are not th
 order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
 Type order: card title 15px/600 blue (largest) → value 13px dark → label 12px grey (smallest).
 
+**ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
+items stay (existing Class A rule). The one journey is:
+`Edit → Add / Remove (restorable before commit) → Reason for change → review the changes and their
+impact → Save or Submit amendment request → approval takes effect → each owning module handles its part`.
+1. **Submitting changes nothing.** While editing, a removed line is struck through and can be restored.
+   After `Submit amendment request` the current order and its official PDF stay exactly as they were;
+   the new version takes effect only on `Approve and apply`. `Reject` leaves the order unchanged.
+2. **Approval does not "reduce the PO".** Cancelling an SO item after approval hands the supplier
+   commitment to Purchasing, which settles it with the supplier; goods already made, shipped or received
+   are never cancelled as if never ordered. The original PO, Unit IDs and history are never rewritten
+   automatically.
+3. **The reason, the before/after and the impact are shown before submitting** — which item, what
+   quantity, the amount change and the linked PO / Stock Unit / Delivery / Payment consequence — not a
+   bare Remove button.
+4. **A goods count counts goods only.** Delivery fee and Stair carry are services and are never goods
+   pieces (e.g. `2 + 1 + 1 = 4 pcs` beside the RM total, the services priced but not counted).
+5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
+   cancellation mark on the new version, never a substitute for the full old document and its record.
+`Added`, `Removed` and `Undo` on screen remain PROPOSAL words until registered in COPY-STANDARD.
+
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
 doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
