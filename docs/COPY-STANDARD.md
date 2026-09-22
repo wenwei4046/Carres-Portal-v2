@@ -1523,7 +1523,8 @@ MASTER §5.4). There is never a second PO, so there is no `Moved from` / `Split 
 | Screen fields, in order | **`Item`** · **`Current Deliver To`** · **`Qty on this PO`** · **`Qty you can move`** · **`Qty to move`** · **`New Deliver To`** · **`Reason`** |
 | The check before saving | **`Review changes`** |
 | The review's closing row | **`Total — unchanged`** |
-| PDF section-2 heading when one PO has several Deliver To | **`DELIVER TO (1 of 2)`** — `(n of m)` only when m > 1 |
+| PDF section-2 heading on every Deliver To's first page | plain **`DELIVER TO`** + that location's full name and address — never `(1 of 2)`; the page count is the footer's `Page n of m` |
+| PDF closing quantity: one location's table · the whole PO (last page, only when a PO has several Deliver To) | **`TOTAL`** · **`PO TOTAL`** — nothing printed beside `PO TOTAL` (`PO TOTAL · 2 Deliver To` refused as confusing, 2026-09-22) |
 
 Banned here: `Current location` / `Location` (`Location` is a banned synonym of Deliver To) ·
 `New PO` · `Moved from` · `Split from`.
