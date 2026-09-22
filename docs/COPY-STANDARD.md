@@ -2493,7 +2493,7 @@ words and puts the reason after a `·`, exactly as stair carry already qualifies
 | SO goods with order/SKU association but no proven line association (2026-09-11 review) | **`Unit ID link not verified`**; full evidence remains inspectable | Not allocated · silently assigning the same IDs to every matching SKU line |
 | Proven SO line Unit IDs exceed its ordered Qty | **`Unit ID count exceeds order quantity`** | truncating the IDs to fit Qty |
 | SO expansion read fails | **`Could not load goods details`** · **`Retry`** | Not allocated · Not recorded |
-| SO category footer breakdown | **`Qty:`** before category quantities; include **`Other goods`** when counted | a partial breakdown presented as the complete item count |
+| SO category footer breakdown — Register, object page and document | **`Qty:`** before quantities of categories present; gifts count in their actual category; include **`Other goods`** when counted | Goods lines · Physical pieces · a partial breakdown presented as the complete item count |
 | Saved SO configuration `gap=KIV` | **`Mattress gap: Confirm later`** — same meaning as the POS configurator | gap KIV |
 | The stair-carry count, when the salesperson named none | **`0`** — the box carries the number it means, and the hint states the range (**`0 to {n}`**) | Auto · All · Default · ⛔ **`Empty = every item`** (the retired hint). Unset means NONE from 2026-08-27: somebody says how many pieces need carrying before the customer is charged for carrying them |
 | The auto-detected customer type, before a dial-able phone | **`Not known yet`** | — · N/A · Unknown |
@@ -2650,7 +2650,8 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Open a complete historical revision | **View version** |
 | Leave historical revision for effective order | **Return to current** |
 | Print that revision's own retained document | **Print this version** |
-| Separate commercial lines, physical goods and services | **Goods lines** / **Physical pieces** / **Service quantity** |
+| SO quantity footer, on page and document | **`Qty:`** followed by category quantities (e.g. `Mattress 2 · Accessory 1`) |
+| SO services footer, separate from goods quantity | **`Services:`** followed by the actual service names (e.g. `Delivery fee · Stair carry`); billing quantities remain on their service rows |
 | A submitted proposal awaiting its authorised decision | **Waiting for management** |
 | Impact heading before a decision | **Before approval** |
 | Decision field | **Management decision reason** |

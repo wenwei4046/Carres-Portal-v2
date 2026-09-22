@@ -564,12 +564,17 @@ impact → Save or Submit amendment request → approval takes effect → each o
 3. **The reason, the before/after and the impact are shown before submitting** — which item, what
    quantity, the amount change and the linked PO / Stock Unit / Delivery / Payment consequence — not a
    bare Remove button.
-4. **Three counts, never merged:** goods lines (gift lines included) · physical pieces (gifts included;
-   a sofa set counts its real modules) · service quantity. Services are priced but never physical
-   pieces; the stair-carry pieces carried and the service's charged quantity are different facts.
-   Worked sample (SO-1319): 2 goods lines · 3 physical pieces · 2 services · goods RM3,780.00 ·
-   services RM350.00 · Total payable RM4,130.00 · Paid to date RM1,999.50 (the voided RM1,200 excluded) ·
-   Balance due RM2,130.50.
+4. **Quantity presentation — owner-approved 2026-09-22:** reuse the category footer on both
+   page and document: `Qty: Mattress 2 · Accessory 1`, separately `Services: Delivery fee · Stair carry`.
+   List only categories present; include `Other goods` when counted. Gifts count under their actual
+   goods category. Sofa quantities follow real deliverable modules, not sales bundles or packing boxes.
+   Remove the displayed `Goods lines` / `Physical pieces` / `Service quantity` summary. Internally keep
+   line count, physical quantity and service billing quantity distinct; service never inflates goods.
+   Service rows retain their actual billing quantity and amount. Review changed category quantities
+   and each changed service's Before/After rather than three unexplained aggregate counts.
+   Worked sample (SO-1319): Mattress 2 · Accessory 1; Delivery fee + Stair carry; goods RM3,780.00 +
+   services RM350.00 = Total payable RM4,130.00; Paid to date RM1,999.50 (voided RM1,200 excluded);
+   Balance due RM2,130.50. This presentation change does not change the money or separate SST rules.
 5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
 
@@ -584,7 +589,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
 - **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
   visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
   with the edit-mode `Cancel` and `Cancel SO`.
-- **Before submitting** the reason (required) and a `Before` / `After` review show the three counts, the
+- **Before submitting** the reason (required) and a `Before` / `After` review show the category quantities and changed service quantities, the
   amount change and each affected object with its owner: purchase demand, an issued PO or promised
   production (Purchasing settles it with the supplier), received goods and Units (Receiving / Stock),
   DO (Delivery), money and refunds (Payments), and — for Proceed Date — the purchase-release timing, and —
@@ -603,7 +608,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
   used to review a prototype never enter the staff page.
 - The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
   `Restore`, `Before` / `After`, `View version` / `Return to current`, `Print this version`,
-  `Goods lines` / `Physical pieces` / `Service quantity`. `Waiting for management` and
+  `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
   `Before approval` remain the governed waiting state and impact heading.
 
 ### Customer agreement evidence — APPROVED / LOCKED 2026-09-22

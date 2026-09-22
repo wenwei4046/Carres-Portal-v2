@@ -225,9 +225,12 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   as originals. A signature belongs to the actual signed revision and document; an unsigned new
   revision cannot borrow an old signature. Traceable customer confirmation under Orders MASTER
   is a separate evidence gate and must never be rendered as a handwritten signature.
-- **Three distinct quantity facts:** `Goods lines`, `Physical pieces` (including gifts) and
-  `Service quantity`. Never merge service quantity into the physical count. The same business
-  arithmetic governs the page and PDF; this does not change the separate SST ruling.
+- **Category quantity footer — owner-approved 2026-09-22:** use the same breakdown as the page:
+  `Qty: Mattress 2 · Accessory 1`, with `Services: Delivery fee · Stair carry` separately. Only show
+  categories/services present; gifts count in their goods category and Other goods is included when
+  counted. Service quantities remain on the service rows, never in the goods count. Do not print the
+  three technical labels Goods lines / Physical pieces / Service quantity. The TOTAL PAYABLE amount
+  is unchanged. Preserve distinct internal counting and the separate SST ruling.
 - BALANCE DUE is never bigger — the grey band and bold carry the emphasis.
 
 ### 7.1 · Legacy notes
