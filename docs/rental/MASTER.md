@@ -143,8 +143,14 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   PDF generation/download and opening WhatsApp are not evidence of sending.
 - Finance is outside this planning mission. §§1–3's existing Rental law remains untouched;
   its rent-to-own commercial terms do not automatically govern the new mattress programme.
-- Customer-receipt-based service activation was positively identified in the supplied review;
-  its full operational policy remains PROPOSAL / NOT LAW, not blanket approval.
+- **OWNER-APPROVED TARGET / NOT BUILT — Jess, 2026-09-23:** service starts only after the
+  customer's actual receipt and acceptance of its proof; pickup and intermediate arrival do not
+  start it. Subscription centrally shows contract, Unit, delivery progress, cleaning credits and
+  history. Booking does not consume a cleaning visit; accepted completion does. Normal visits
+  remain separate from Service Cases for complaints/failures. Upgrades track old-Unit recovery
+  and new-Unit delivery independently; subscription end and physical recovery are separate facts.
+  This approves that operational lifecycle, not billing timing, new commercial terms or all UI.
+
 - **OWNER RULING — Jess, 2026-09-22, initial storage model APPROVED / NOT BUILT:**
   Diglant offered delivery to Carres warehouse or holding goods at its own premises for Carres
   to arrange Logistics pickup. Jess selects the second option initially: completed mattresses
@@ -163,7 +169,7 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
 - After approximately 3–6 months of actual operation, Jess will evaluate volume and logistics
   options before deciding whether to rent another location and manage storage. This is a review
   horizon, not an automatic warehouse move, lease commitment or scheduled reminder authorization.
-  This confirms storage strategy only; the rest of §5 remains PROPOSAL / NOT LAW.
+  This confirms storage strategy only; §5 is law only where explicitly owner-approved.
 
 The complete recommendation below remains subject to owner review. Earlier proposals in another
 worktree/branch are unapproved context only; this file is the sole Rental/Subscription authority.
@@ -519,19 +525,28 @@ Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际�
 
 ## 5.9 · 客户、激活、服务、变更到结束
 
+**OWNER-APPROVED TARGET / NOT BUILT — Jess，2026-09-23：** 客户实际接收且接收证明被
+接受后，才开始该床垫的服务；提货、中转到货不算。Subscription 集中显示合同、Unit、
+配送进度、清洁次数和历史。清洁预约不扣次数，完成且接受证明后才扣；日常清洁是 Visit，
+投诉/失败等异常才进入 Service Case。升级分别追踪旧 Unit 回收与新 Unit 交付；结束订阅
+与资产实际回收分别记录，单一「完成」不得把未完成义务一起关闭。
+批准范围是上述业务能力和归属，不是具体布局、收费规则、合同条款或全部蓝图。
+
+**以下未明确批准的细节仍为 PROPOSAL / NOT LAW：**
+
 建议共用 `New Sales Order` 入口，先区分 Purchase / Subscription；Subscription 管理里的
 新建也跳同一入口。一个订单保持一种类型，合同另有身份/签名/版本，SO 承接履约。
 共用 SO 可见 Purchase/Subscription 的架构仍待批准；筛选、行、总数、搜索和导出须同范围，
 不能只加一个按钮就称已完成。保留独立 Subscription 日常管理，不以其他模块报表取代。
 
 准备草案 → 客户接受有效版本并签署 → 满足现行适用授权/放行边界 → 匹配已备供应 →
-精确 Unit/Delivery 履约 → 客户接收证据接受 → 建议激活该床垫服务。
+精确 Unit/Delivery 履约 → 客户接收证据接受 → 开始该床垫服务（上述已批准目标）。
 建议一床垫一个可独立追踪的订阅履约资产；多个床垫分别可证明接收和服务，不用 SO
 头部完成一次性激活全部。现有 Rental `active` 字段不能当作已经送达的证据。
 
 激活建议以实际客户接收日为准，证明晚审核不改成审核日；提货、伙伴收货、到港都不是
 客户收到。失败、拒收或部分交付保留真实位置与后续 Work，不激活未接收资产。
-这是服务激活建议，不定义或修改账单开始日。
+服务激活条件已批准；实际日期锚点/晚审核处理仍是本段建议，不定义或修改账单开始日。
 
 保留每年三次第三方清洁的批准目标，建议服务年从有效服务开始日锚定；预约不会耗尽
 次数，接受完成证据才消耗。额外清洁沿用既有 entitlement 路径。日常 Visit 不开 Case，
@@ -630,7 +645,7 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 | 签约净销量消耗 forecast | owner 明确 KPI 以实际激活计，或签约生效口径不同，则修改 KPI/forecast 定义与桥接，不能偷偷换指标 |
 | 预测净算一次再转额外备货 | 逐 Unit/PO 对账发现重复覆盖、日期不可达或其他业务占用，则阻止转换、修正唯一覆盖来源 |
 | 提货批次与留货执行建议（初期留厂模式已确认） | 实际等待、积压或损坏证据要求调整批次/伙伴；是否租仓自管由约 3–6 个月复盘后的 owner 决定，不自动切换 |
-| 客户收到后服务激活 | 新计划有效签署条款另有服务开始依据，则改此提案；不能凭旧 `active` 代码定政策 |
+| 接收日作服务日期／晚审核的日期处理（细节建议） | owner 审阅的新计划条款明确日期处理不同时，调整该细节；客户实际接收且证明被接受的激活条件已批准，不能凭旧 `active` 代码更改 |
 | 共用 SO 入口、独立管理 | 真实员工走查显示共用列表造成类型误判，则调整默认视图；不可因此复制客户订单真相 |
 
 🔴 **与现行实现不一致：** Rental 排除和 Incoming 不能现货分配。修复建议已在 5.6/5.9

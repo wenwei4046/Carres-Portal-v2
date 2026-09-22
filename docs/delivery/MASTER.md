@@ -1627,6 +1627,13 @@ Reuse Delivery's Unit evidence and route-planning ownership without inventing a 
 receipt or claiming the factory-origin route is built. The approximately 3–6 month business review
 is not an automatic move into Carres storage.
 
+**Subscription service-start witness — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-23.**
+Rental §5.9 owns service activation after actual customer receipt and acceptance of its proof.
+Factory pickup or an intermediate partner arrival is not that event. Delivery owns the receipt
+and proof; Subscription reads them without a second completion writer. Upgrade old-Unit recovery
+and new-Unit delivery, and termination versus physical recovery, retain separate results. This
+confirmation does not alter billing rules, DO release gates or claim the full route is built.
+
 ### 14.2 · Loan
 
 Loan is conditional and appears only when a real stock delay and a customer decision create the
