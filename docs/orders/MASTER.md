@@ -270,6 +270,17 @@ location controls remain governed selects; identify Customer Requested Delivery 
 month control. This is SO composition approval, not a global change to other pages or to
 FilterRailSelect single-selection behaviour.
 
+**Review evidence — owner ruling 2026-09-22.** Owner-facing Sales Orders reviews and previews
+must use verified real records and real business cases; do not invent orders, quantities,
+dealers, exceptions or expected outcomes to fill missing evidence. Identify source and verification
+status. Another chat's report is attributed evidence, not this reviewer's independent verification.
+Distinguish real operating records from existing test/import records; repository or database
+existence alone does not make a record a genuine customer transaction. Missing evidence remains
+unverified; no fabricated substitute. Synthetic monthly-preview data is withdrawn from business
+review and its numerical tests prove only fixture behaviour. Existing layout approval is retained,
+but the fixture preview cannot substantiate production quantities, business readiness or ratings.
+This does not authorise editing live records or exposing real customer data through public artifacts.
+
 **Monthly presentation — owner approved 2026-09-22; not implemented/verified.**
 The content header contains `Monthly demand`, the selected month/year range, and
 `Items still to deliver`. Replace ambiguous Earlier/Later headings with
@@ -284,7 +295,7 @@ Category expansion reveals models/configurations; a quantity opens contributing 
 dealer, requested delivery date and remaining quantity. Clickability and keyboard focus must
 be explicit; colour or hover alone is insufficient. Reuse governed kit and token values.
 This approval covers composition and the exact COPY below, not production readiness or a
-claim of complete accessibility. The illustrated figures are fictional, not required defaults.
+claim of complete accessibility. Previously illustrated fictional figures are withdrawn from business review.
 
 **Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
 coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
@@ -304,8 +315,7 @@ ownership; historical deliveries and documents remain unchanged by the reporting
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
-dealer/destination filtering and exact SO drill-down. Fictional sample quantities in the chat are
-examples, not business facts. The operating model and composition above are approved; final
+dealer/destination filtering and exact SO drill-down. Use verified real cases under the review-evidence ruling above. The operating model and composition above are approved; final
 English COPY, kit fit, responsive/keyboard behaviour and cross-module source completeness still
 require design verification. No application implementation, production validation, Card numbering
 or approval of the whole SO Blueprint is implied by this local approval.
