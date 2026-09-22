@@ -1,16 +1,39 @@
 import { chromium } from "/Users/chaichiewlim/Desktop/Carres-Portal-v2/node_modules/.pnpm/playwright@1.59.1/node_modules/playwright/index.mjs";
 const b = await chromium.launch();
-const U = "http://localhost:5299/sales-order-page.html";
+const U = "http://localhost:5311/so-amendment-shell-preview.html";
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log(c ? "PASS" : "FAIL", m); };
-const open = async (q = "", w = 1440) => { const p = await b.newPage({ viewport: { width: w, height: 900 } }); p.errs = []; p.on("pageerror", e => p.errs.push(e.message)); await p.goto(U + q); await p.waitForTimeout(3500); return p; };
+const open = async (q = "", w = 1440) => { const p = await b.newPage({ viewport: { width: w, height: 900 } }); p.errs = []; p.on("pageerror", e => p.errs.push(e.message)); await p.goto(U + q, { timeout: 240000 }); await p.waitForSelector('[data-pane="form"], [data-testid="page-loading"], text=could not be opened', { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(2500); return p; };
 const form = (p) => p.locator('[data-pane="form"]').innerText();
 const doc = (p, rev) => p.evaluate((r) => window.__docText(r), rev);
 const flat = (s) => s.replace(/\s+/g, " ");
 const shot = async (p, n, f = 0) => { await p.locator('[data-pane="form"]').evaluate((el, f) => el.scrollTop = (el.scrollHeight - el.clientHeight) * f, f); await p.waitForTimeout(500); await p.screenshot({ path: `shots/${n}.png` }); };
 const edit = (p) => p.getByRole("button", { name: "Edit" }).click();
 
-console.log("SCOPE: standalone preview verification only — not the production system's revisions, approvals, payments or retained documents.");
+console.log("SCOPE: dev preview inside the REAL Portal shell (fixture network) — not the production system's revisions, approvals, payments or retained documents. Formerly: standalone preview verification only — not the production system's revisions, approvals, payments or retained documents.");
+
+console.log("── S · the REAL shell around the page");
+for (const w of [1440, 1280, 1180, 1024]) {
+  const q = await open("", w);
+  const m = await q.evaluate(() => {
+    const r = (sel) => { const e = document.querySelector(sel); return e ? Math.round(e.getBoundingClientRect().width) : null; };
+    const aside = document.querySelector('aside[aria-label="Sales Order document"]');
+    return { sidebar: r("nav, [data-testid=portal-sidebar]"), main: r("main"), form: r('[data-pane="form"]'), doc: aside ? Math.round(aside.getBoundingClientRect().width) : null,
+      header: !!document.querySelector('[data-testid="sales-order-tabs"]'), identity: document.querySelector('[data-testid="object-identity"]')?.textContent,
+      pageX: document.documentElement.scrollWidth - innerWidth };
+  });
+  console.log(`MEASURE ${w}px shell: main ${m.main}px · form pane ${m.form}px · document pane ${m.doc}px · page sideways ${m.pageX}px`);
+  ok(m.header && m.identity === "SO-1363" && m.pageX === 0, `${w}px: real SalesOrderTabs header inside the shell, no page sideways scroll`);
+  const items = await q.evaluate(() => { const t = document.querySelector('[data-pane="form"] table[aria-label="Items"]'); const box = t.parentElement.getBoundingClientRect(); return { table: Math.round(t.getBoundingClientRect().width), box: Math.round(box.width) }; });
+  console.log(`MEASURE ${w}px Items view: table ${items.table}px in ${items.box}px`);
+  await q.getByRole("button", { name: "Edit" }).click(); await q.waitForTimeout(400);
+  const e = await q.evaluate(() => { const t = document.querySelector('[data-pane="form"] table[aria-label="Items"]'); const box = t.parentElement.getBoundingClientRect(); const qty = document.querySelector("#qty-l3").getBoundingClientRect(); return { table: Math.round(t.getBoundingClientRect().width), box: Math.round(box.width), qty: Math.round(qty.width) }; });
+  console.log(`MEASURE ${w}px Items edit: table ${e.table}px in ${e.box}px · qty input ${e.qty}px`);
+  ok(e.qty >= 56, `${w}px edit: qty input keeps its 56px`);
+  if (w === 1440 || w === 1180) await q.screenshot({ path: `shots/v16-shell-${w}-edit.png` });
+  await q.close();
+}
+
 console.log("── A · view SO-1363 (masked real case): page and document agree");
 let p = await open();
 let t = flat(await form(p));
@@ -31,7 +54,7 @@ ok(d.includes("Rev 1 · Thu, 17 Sep 2026 16:31") && d.includes("Customer (masked
 ok((d.match(/\(masked\)/g) || []).length >= 3, "document prints masked contact details");
 ok(!t.includes("Customer signature") && !t.includes("Signed by"), "no signature card on the page");
 const revs = async (q) => { await q.getByRole("tab", { name: "Revisions" }).click(); await q.waitForTimeout(300); const x = flat(await q.locator("body").innerText()); await q.getByRole("tab", { name: "Order", exact: true }).click(); await q.waitForTimeout(800); return x; };
-await shot(p, "v15-view", 0); await shot(p, "v15-view-bottom", 1);
+await shot(p, "v16-view", 0); await shot(p, "v16-view-bottom", 1);
 await p.close();
 
 console.log("── B · safe correction → Save");
@@ -52,7 +75,7 @@ ok(t.includes("Qty Bedframe 2 · Pillow 2 Bedframe 2 "), "Qty: Bedframe 2 · Pil
 ok(t.includes("Memory Foam Pillow: No PO yet → Purchasing re-counts what to buy"), "real consequence: no PO, demand re-count");
 ok(t.includes("Total payable RM 4,654.00 RM 4,214.00") && t.includes("RM 440.00 paid more than the new total — Payments reviews a refund"), "money: 4,654 → 4,214, refund review 440");
 ok(await p.getByRole("button", { name: /Submit amendment request/ }).count() === 1, "cancelling goods needs approval");
-await shot(p, "v15-remove", 0);
+await shot(p, "v16-remove", 0);
 await p.getByRole("button", { name: "Restore" }).click(); await p.waitForTimeout(400);
 t = flat(await form(p));
 ok(!t.includes("Cancelled") && (await p.getByRole("button", { name: /Submit amendment request|^Save/ }).count()) === 0, "Restore: no change left, no submit button");
@@ -111,7 +134,7 @@ t = flat(await form(p));
 ok(t.includes("Out of date — propose again") && t.includes("Nothing was applied"), "another approved change makes the request out of date");
 ok((await p.getByRole("button", { name: /Approve and apply/ }).count()) === 0, "out-of-date request cannot be approved");
 ok(/Rev 1 \(sent on\)/.test(t) && /Rev 3 \(now\)/.test(t) && t.includes("Thu, 1 Oct"), "shows sent-on, now and proposed values");
-await shot(p, "v15-stale", 0);
+await shot(p, "v16-stale", 0);
 await p.getByRole("button", { name: "Propose this version again" }).click(); await p.waitForTimeout(600);
 ok(await p.locator("#qty-l3").inputValue() === "1" && await p.getByRole("button", { name: /Submit amendment request/ }).count() === 1, "propose again reopens edit with the proposal");
 await p.close();
@@ -134,7 +157,7 @@ ok(d.includes("Items to check 1") && d.includes("Dispose old mattress ×2") && /
 ok(/Paid to date To check/.test(d) && /BALANCE DUE To check/.test(d), "document: paid and balance wait for Payments");
 ok(!/ADD-ON Dispose old mattress ×2/.test(d), "document service row keeps the plain name; ×2 only in the Services summary");
 r = await revs(p); ok(r.includes("Rev 6 · Current") && r.includes("Rev 1–5 were recorded on Mon, 10 Aug 2026"), "Revisions: Rev 6 current, earlier revisions named");
-await shot(p, "v15-1206", 0.62);
+await shot(p, "v16-1206", 0.62);
 await edit(p); await p.getByRole("button", { name: "Remove Memory Foam Pillow" }).click(); await p.waitForTimeout(400);
 t = flat(await form(p));
 ok(t.includes("payment data to check first — no refund or balance is worked out") && !t.includes("Payments reviews a refund"), "a money change on SO-1206 works out no refund or balance");
@@ -149,7 +172,7 @@ ok(t.includes("200.00") && t.includes("4,798.00"), "Disc 200.00 shown; amount 2 
 for (const s of ["Goods amount RM 5,198.00", "Service amount RM 410.00", "Total payable RM 5,608.00", "Paid to date RM 2,000.00", "Balance due RM 3,608.00"]) ok(t.includes(s), `sim ${s}`);
 d = flat(await doc(p, 1));
 ok(d.includes("4,798.00") && d.includes("200.00") && d.includes("Paid to date RM 2,000.00") && /BALANCE DUE RM 3,608.00/.test(d) && !d.includes("1,200.00"), "document: discount, voided RM1,200 excluded, part payment balance");
-await shot(p, "v15-sim", 0.6);
+await shot(p, "v16-sim", 0.6);
 ok(p.errs.length === 0, "no page errors " + JSON.stringify(p.errs));
 await p.close();
 
@@ -170,7 +193,7 @@ await shot(p, "v12-edit-items", 0.55);
 await p.close();
 
 console.log("── G · widths and states");
-for (const w of [1440, 1180, 820, 390]) { const q = await open("", w); const ov = await q.evaluate(() => document.documentElement.scrollWidth - innerWidth); ok(ov === 0 && (await q.locator("canvas").count()) > 0, `${w}px: no page sideways scroll, document shown`); if (w === 390) await q.screenshot({ path: "shots/v11-390.png", fullPage: true }); await q.close(); }
-for (const s of ["loading", "error"]) { const q = await open(`?state=${s}`); ok(s === "loading" ? (await q.locator('[data-testid="page-loading"] [data-testid="kit-loading-skeleton"]').count()) === 2 : (await q.getByRole("button", { name: "Try again" }).count()) === 1 && (await q.locator("body").innerText()).includes("This sales order could not be opened"), `state ${s} renders`); await q.screenshot({ path: `shots/v11-${s}.png` }); await q.close(); }
+for (const w of [1440, 1180, 820, 390]) { const q = await open("", w); const ov = await q.evaluate(() => document.documentElement.scrollWidth - innerWidth); ok(ov === 0 && (await q.locator("canvas").count()) > 0, `${w}px: no page sideways scroll, document shown`); if (w === 390) await q.screenshot({ path: "shots/v16-390.png", fullPage: true }); await q.close(); }
+for (const s of ["loading", "error"]) { const q = await open(`?state=${s}`); ok(s === "loading" ? (await q.locator('[data-testid="page-loading"] [data-testid="kit-loading-skeleton"]').count()) === 2 : (await q.getByRole("button", { name: "Try again" }).count()) === 1 && (await q.locator("body").innerText()).includes("This sales order could not be opened"), `state ${s} renders`); await q.screenshot({ path: `shots/v16-${s}.png` }); await q.close(); }
 console.log(`TOTAL ${pass} passed · ${fail} failed`);
 await b.close();
