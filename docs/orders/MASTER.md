@@ -261,6 +261,22 @@ Expand a category into model, size and purchasing-relevant configuration. Clicki
 quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
 An empty result is not evidence of zero demand when its underlying facts failed to load.
 
+**Monthly presentation — owner approved 2026-09-22; not implemented/verified.**
+The content header contains `Monthly demand`, the selected month/year range, and
+`Undelivered items by requested delivery month`. Replace ambiguous Earlier/Later headings with
+`Before {MMM YYYY}` and `After {MMM YYYY}`, updated with the selected window. These mean outside
+the selected window, not necessarily overdue relative to today. Keep all monthly years explicit.
+Do not repeat default All dealers / All states, gift/service calculation explanations, or the
+instruction to click quantities above/below the table. Existing quantity rules still apply.
+When the rail is collapsed and filters are active, retain a compact active-filter summary.
+Show a concise missing-date or unclassified-product entry only when such errors exist; opening
+it reveals affected orders, SKU where relevant, and quantities. Never silently discard them.
+Category expansion reveals models/configurations; a quantity opens contributing orders with
+dealer, requested delivery date and remaining quantity. Clickability and keyboard focus must
+be explicit; colour or hover alone is insufficient. Reuse governed kit and token values.
+This approval covers composition and the exact COPY below, not production readiness or a
+claim of complete accessibility. The illustrated figures are fictional, not required defaults.
+
 **Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
 coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
 Purchasing calculations; do not create a second demand engine or allocate/purchase from this

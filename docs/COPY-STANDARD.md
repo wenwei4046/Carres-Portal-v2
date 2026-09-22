@@ -11,6 +11,24 @@
 
 ---
 
+## Sales Orders Monthly demand — owner-approved copy, 2026-09-22
+
+Scope: outright-sales Monthly demand only; approval is not implementation evidence.
+
+| Purpose | Approved text / behaviour |
+|---|---|
+| View heading | `Monthly demand` |
+| Date range | `{MMM YYYY} – {MMM YYYY}`; use consistent English month abbreviations, e.g. `Sep 2026 – Feb 2027` |
+| Quantity and date basis | `Undelivered items by requested delivery month` |
+| Before-window column | `Before {MMM YYYY}`; not `Earlier`, and not automatically `Overdue` |
+| After-window column | `After {MMM YYYY}`; not `Later` |
+| Missing requested-date exception | `1 order missing delivery date` / `{n} orders missing delivery date`; only when present, opens affected orders and quantities |
+
+Do not show default `All dealers · All states`, `Gifts included · Services excluded`, or
+`Select a quantity to trace its orders` as persistent explanatory text on this view.
+Retain compact active-filter context when the rail is collapsed. Unclassified-product errors
+remain visible and traceable; no new exact wording for that error is approved by this entry.
+
 ## Why this exists
 
 Every screen the operations team uses must let a no-experience operator do
