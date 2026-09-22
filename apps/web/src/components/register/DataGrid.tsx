@@ -3631,7 +3631,9 @@ function DataGridInner<T>({
  * and the `Popover` answers click, Enter and a touch screen's tap, where it
  * can be read and selected at leisure.
  */
-function OverflowText({ text, label }: { text: string; label: string }) {
+/* Exported (2026-09-22) so the SO goods table's configuration line reuses the
+   engine's ONE cut-value door instead of drawing a second (UI MASTER §6.8). */
+export function OverflowText({ text, label }: { text: string; label: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
   useLayoutEffect(() => {
