@@ -1394,7 +1394,7 @@ REVISED*; registered on execution so no screen respells them):
 |---|---|
 | The panel title | `PO-2041 · Version 2` — **Version 1 prints nothing**: an unrevised PO is just the PO |
 | The door | `Revise` — beside `Print PDF`, an act on the document; only an open PO offers it |
-| Existing form fields (implementation evidence; new create headings above supersede their labels) | `Qty` · `Destination` · `Why` |
+| The form's fields | `Qty` · `Destination` · `Why` |
 | The floor, stated inline where it binds | `{n} received` — grey while honoured, red when the draft breaks it |
 | Save | `Save Version {n}` — the button names the act's product |
 | The disabled Save NAMES its gap (the Receiving button law; first gap wins, the floor first) | `Save — below received` · `Save — nothing changed` · `Save — say why` |
