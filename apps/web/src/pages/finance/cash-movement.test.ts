@@ -1,6 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createElement, type ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LedgerChart } from "@carres/shared/finance-ledger";
-import { accountMovement, cashAccounts, cashWeeks, parseAccountLedger, weeklyCashMovement, type CashLine } from "./cash-movement";
+import {
+  accountMovement, cashAccounts, cashWeeks, parseAccountLedger, useCashAccountMovement, useCashMovement,
+  weeklyCashMovement, weeklyReadFrom, CASH_WEEKS, type CashLine,
+} from "./cash-movement";
+
+/** Every account ledger read, by URL; each answers an empty but well-formed ledger. */
+const api = vi.hoisted(() => ({ urls: [] as string[] }));
+vi.mock("@/lib/api", () => ({
+  apiFetch: async (url: string) => {
+    api.urls.push(url);
+    return {
+      status: "OK", account_code: new URL(url, "http://portal.test").searchParams.get("account"),
+      rows: [{ row_kind: "CLOSING", entry_no: null, entry_date: null, debit: 0, credit: 0 }],
+    };
+  },
+}));
 
 const acct = (code: string, parent: string | null, over: Partial<LedgerChart["accounts"][number]> = {}) => ({
   code, name: `Account ${code}`, kind: "ASSET", parent_code: parent, is_control: false, control_for: null,
@@ -130,5 +148,71 @@ describe("each account since go-live", () => {
       { code: "1120", name: "Account 1120", moneyIn: 200, moneyOut: 50.1, net: 149.9 },
       { code: "1130", name: "Account 1130", moneyIn: 0, moneyOut: 0, net: 0 },
     ]);
+  });
+});
+
+/**
+ * THE READ WINDOW. The tile and the chart read the twelve weeks they show; the
+ * per-account panel reads from go-live. The bound on the first is the point:
+ * the account ledger refuses more than 20,000 lines per account ("Choose a
+ * shorter period for this account"), and nobody can shorten a window the page
+ * computes for them. A window that grows with the ledger's age fails here.
+ */
+describe("the read window", () => {
+  const GO_LIVE = CHART.go_live_on!;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
+  const froms = () => api.urls.map((u) => new URL(u, "http://portal.test").searchParams.get("from")!);
+  const days = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / 86_400_000;
+
+  beforeEach(() => {
+    api.urls.length = 0;
+    client.clear();
+  });
+
+  it("stays twelve weeks for the tile and the chart, however old the ledger gets", async () => {
+    // Two years after go-live: the twelve-week window has long parted from it.
+    const today = "2028-09-11";
+    expect(weeklyReadFrom(cashWeeks(GO_LIVE, today))).not.toBe(GO_LIVE);
+    const { result } = renderHook(() => useCashMovement(CHART, today), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.urls).toHaveLength(4); // one read per posting account under 1100
+    expect(new Set(froms()).size).toBe(1);
+    const from = froms()[0]!;
+    expect(from).not.toBe(GO_LIVE);
+    expect(days(from, today)).toBeLessThanOrEqual(CASH_WEEKS * 7);
+  });
+
+  it("stays at go-live for the per-account panel — movement since the ledger started is what it is for", async () => {
+    const { result } = renderHook(() => useCashAccountMovement(CHART, "2028-09-11"), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(new Set(froms())).toEqual(new Set([GO_LIVE]));
+  });
+
+  it("is one read while the two windows are the same day, and two reads once they part", async () => {
+    // 25 Nov 2026: the twelve weeks still reach back past go-live, so both windows start there.
+    const together = renderHook(() => ({
+      weekly: useCashMovement(CHART, "2026-11-25"), panel: useCashAccountMovement(CHART, "2026-11-25"),
+    }), { wrapper });
+    await waitFor(() => expect(together.result.current.panel.isSuccess).toBe(true));
+    expect(api.urls).toHaveLength(4);
+    expect(new Set(froms())).toEqual(new Set([GO_LIVE]));
+
+    api.urls.length = 0;
+    const parted = renderHook(() => ({
+      weekly: useCashMovement(CHART, "2026-12-14"), panel: useCashAccountMovement(CHART, "2026-12-14"),
+    }), { wrapper });
+    await waitFor(() => expect(parted.result.current.panel.isSuccess).toBe(true));
+    expect(api.urls).toHaveLength(8);
+    expect(new Set(froms()).size).toBe(2);
+  });
+
+  it("reads nothing at all while today is still before go-live", async () => {
+    const { result } = renderHook(() => ({
+      weekly: useCashMovement(CHART, "2026-09-09"), panel: useCashAccountMovement(CHART, "2026-09-09"),
+    }), { wrapper });
+    await waitFor(() => expect(result.current.panel.isSuccess).toBe(true));
+    expect(api.urls).toEqual([]);
+    expect(result.current.weekly.data!.weeks).toEqual([]);
   });
 });
