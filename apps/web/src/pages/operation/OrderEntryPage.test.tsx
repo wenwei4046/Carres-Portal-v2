@@ -140,6 +140,52 @@ describe("OrderEntryPage", () => {
     expect(screen.getByTestId("entry-config-stripe-row")).toHaveTextContent("System managed");
   });
 
+  it("shows the approval code as FIXED for credit/installment even when the saved config says No", () => {
+    // A stored config the runtime overrules: resolvePaymentMethods forces the
+    // approval code (and credit's Bank question) on regardless. Before this
+    // fix the screen read "No" while the POS and the create route demanded it.
+    vi.mocked(useOrderEntryConfig).mockReturnValue({
+      data: {
+        entryConfig: {
+          paymentMethods: [
+            { key: "credit", label: "Credit / Debit", sublabel: "", active: true, approvalCodeRequired: false,
+              followUps: [{ key: "bank", label: "Bank", options: ["Maybank"], required: false }] },
+            { key: "installment", label: "Installment", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+            { key: "cash", label: "Cash", sublabel: "", active: true, approvalCodeRequired: false, followUps: [] },
+          ],
+          formFields: {},
+        } satisfies OrderEntryConfigDto,
+      },
+      isLoading: false,
+      isError: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    render(<OrderEntryPage />);
+
+    expect(screen.getByTestId("payment-method-credit")).toHaveTextContent("Approval code required: Yes");
+    expect(screen.getByTestId("payment-method-installment")).toHaveTextContent("Approval code required: Yes");
+    // Cash is genuinely optional and stays editable.
+    expect(screen.getByTestId("payment-method-cash")).toHaveTextContent("Approval code required: No");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Credit / Debit" }));
+    const approval = screen.getByLabelText("credit approval code required") as HTMLInputElement;
+    expect(approval.checked).toBe(true);
+    expect(approval.disabled).toBe(true);
+    const bankRequired = screen.getByLabelText("credit required information bank required") as HTMLInputElement;
+    expect(bankRequired.checked).toBe(true);
+    expect(bankRequired.disabled).toBe(true);
+
+    // …and the save writes what the till enforces, not the overruled "No".
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const payload = savedPayload();
+    expect(payload.paymentMethods.find((m) => m.key === "credit")).toMatchObject({
+      approvalCodeRequired: true,
+      followUps: [{ key: "bank", required: true }],
+    });
+    expect(payload.paymentMethods.find((m) => m.key === "installment")?.approvalCodeRequired).toBe(true);
+    expect(payload.paymentMethods.find((m) => m.key === "cash")?.approvalCodeRequired).toBe(false);
+  });
+
   it("opens the add flow in the same focused drawer instead of exposing a raw page input", () => {
     render(<OrderEntryPage />);
     expect(screen.queryByLabelText("New method name")).not.toBeInTheDocument();

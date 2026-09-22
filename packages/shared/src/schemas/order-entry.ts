@@ -129,25 +129,49 @@ export const STRIPE_PAYMENT_METHOD: PaymentMethodConfig = {
   followUps: [],
 };
 
+/** A method whose "Approval code required" flag is forced ON no matter what
+ *  the saved config says: the writer refuses it without a reference (§16,
+ *  0535 + 0551), asked of `requiredPaymentReference` so this and the SQL guard
+ *  are the same list. Card / credit / installment carry an approval code
+ *  (non-GHL card settlement is matched BY it, owner ruling 2026-09-21), cheque
+ *  its cheque number, bank / bank-transfer / DuitNow QR a reference number. A
+ *  method a manager invents is NOT on it. Exported so SO Maintenance shows the
+ *  flag as fixed instead of offering a choice the runtime overrules. */
+export function isApprovalCodeForced(methodKey: string): boolean {
+  return requiredPaymentReference(methodKey) !== null;
+}
+
+/** A card sale names the bank that took it, so Credit/Debit's Bank question is
+ *  forced required too — same reason, same "screen must say so" rule. */
+export function isForcedRequiredFollowUp(methodKey: string, followUpKey: string): boolean {
+  return methodKey === "credit" && followUpKey === "bank";
+}
+
+/** The rules the runtime forces over one saved method. Both the POS/server
+ *  path (resolvePaymentMethods) and the settings editor run a method through
+ *  this, so the screen can never display a flag the till then ignores. */
+export function applyForcedPaymentRules(m: PaymentMethodConfig): PaymentMethodConfig {
+  if (!isApprovalCodeForced(m.key)) return m;
+  return {
+    ...m,
+    approvalCodeRequired: true,
+    followUps: m.followUps.map((f) =>
+      isForcedRequiredFollowUp(m.key, f.key) ? { ...f, required: true } : f,
+    ),
+  };
+}
+
 export function resolvePaymentMethods(
   cfg?: { paymentMethods?: PaymentMethodConfig[] | null } | null,
 ): PaymentMethodConfig[] {
   const configured = cfg?.paymentMethods ?? [];
   const src = configured.length > 0 ? configured : DEFAULT_PAYMENT_METHODS;
   // Whatever the saved config says: a card sale names its bank, and every
-  // method the writer refuses without a reference carries one. Since 0551 that
-  // is card / credit / installment / cheque / bank / bank-transfer / DuitNow
-  // QR — asked of `requiredPaymentReference` so this list and the SQL guard
-  // are the same list. A method a manager invents is NOT on it, and the writer
-  // leaves it optional, so a saved `approvalCodeRequired: false` still stands.
-  // Without this, an operator adding "Cheque" in SO Maintenance would leave
-  // the box unticked, the form would accept a blank, and the database would
-  // refuse the payment at the very end.
-  return src.filter((m) => m.active).map((m) => requiredPaymentReference(m.key) === null ? m : {
-    ...m, approvalCodeRequired: true,
-    followUps: m.key !== "credit" ? m.followUps
-      : m.followUps.map((f) => f.key === "bank" ? { ...f, required: true } : f),
-  });
+  // method the writer refuses without a reference carries one (see
+  // isApprovalCodeForced). Without this, an operator adding "Cheque" in SO
+  // Maintenance would leave the box unticked, the form would accept a blank,
+  // and the database would refuse the payment at the very end.
+  return src.filter((m) => m.active).map(applyForcedPaymentRules);
 }
 
 // ---------------------------------------------------------------------------
