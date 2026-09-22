@@ -126,13 +126,37 @@ Sales Orders is the truth/register home of the customer order. It lets an author
 the transaction, read the customer promise and follow every related fact and document. It is not a
 second Purchasing, Warehouse, Delivery, Payment or Work screen.
 
-The Sales module contains exactly:
+**Portal navigation — owner approved 2026-09-23 · BUILT 2026-09-23.**
 
 ```
-SALES
-├─ Sales Orders
-└─ Old Orders (temporary)
+Sales Orders
+├─ Outright Sales
+└─ Subscription
 ```
+
+`Outright Sales` is the existing outright-order register and its governed SO detail/amendment
+journey. `Subscription` opens the Subscription-owned journey governed by `docs/rental/MASTER.md`;
+the shared navigation parent does not merge contracts, transactions, permissions or calculations.
+`Purchase` is rejected for this navigation label because it is confused with Purchasing.
+Replace the previous standalone Sales Orders entry; remove the old/legacy order menu entry from
+this tree. Menu removal does not delete orders, history, documents or valid existing deep links.
+Preserve authorised access to existing records and their canonical identity.
+
+The approved Order list and Monthly overview composition belongs inside Outright Sales; it does
+not mix Subscription quantities. Purchasing remains a separate module. This is a navigation ruling,
+not approval to implement the remaining Subscription proposals, migrate legacy orders or delay the
+independently authorised SO Amendment delivery. Reuse the existing PortalSidebar grammar and role
+visibility; never create a second sidebar or expose unauthorised destinations.
+
+**As built (`portal-nav.ts`, `portal-nav.sales.test.ts`).** Neither address moved: `Outright Sales`
+is `/operation/orders` and `Subscription` is `?tab=rental` — the Rental/Subscription registry that
+row has always opened — so every bookmark, in-page link and ⌘K jump still lands and no permission,
+quantity or report changed. The `Subscription` row MOVED out of Customer Care; a copy would be two
+rail rows lighting for one page. `Old Orders (temporary)` left the rail while
+`/operation/old-orders[/:stage]` stays mounted, so `CaseOrderLink` and every legacy deep link still
+resolve. The Admin area's jump to the same register now says `Outright Sales` too — one destination
+never carries two words. **Still not built and not approved by this ruling:** the `Monthly overview`
+composition, and every inner Subscription destination proposed in the Rental Blueprint.
 
 Delivery Orders belongs under Delivery. Purchase Orders, Receiving Sessions, Stock Units and
 Payments stay under their own modules. The Sales Order links to them; it never copies their

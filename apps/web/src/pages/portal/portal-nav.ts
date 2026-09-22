@@ -31,7 +31,6 @@ import {
   ShieldCheck,
   HandCoins,
   UserCheck,
-  History,
   ListTodo,
   CircleAlert,
   Library,
@@ -144,7 +143,13 @@ export const WAREHOUSE_LANDING_KEY = "wh-arrival-schedule";
 export const PAYMENTS_LANDING_KEY = "payments";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
-  { section: "Sales", label: "Sales", icon: ClipboardList },
+  /* ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23;
+   * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
+   * COPY-STANDARD table "Sales Orders navigation"). The module row is the
+   * customer-order parent and its two destinations are `Outright Sales` and
+   * `Subscription`. It is a NAVIGATION ruling: no contract, transaction,
+   * permission or calculation is merged by the shared parent. */
+  { section: "Sales", label: "Sales Orders", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
@@ -252,17 +257,40 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Workspace" },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
-        // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is now the NEW
+        // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is the NEW
         // Sales Order register (`SalesOrdersRegister`), and it is the OFFICIAL
-        // Sales Orders entry. The old control table moved out to its own
-        // temporary door below.
+        // customer-order entry. The old control table kept a temporary door
+        // beside it until the 2026-09-23 ruling took that row off the rail.
+        //
+        // ⭐ THE WORD IS `Outright Sales` (Jess, owner ruling 2026-09-23). The
+        // module row above now carries `Sales Orders`, so the child says which
+        // KIND of customer order it opens: the ordinary outright sale, as
+        // against `Subscription` beside it. `Purchase` is rejected by name in
+        // COPY-STANDARD — it reads as Purchasing. The ADDRESS is unchanged
+        // (`/operation/orders`), so every bookmark, deep link and in-page link
+        // still lands on the same register, the same detail and the same
+        // governed amendment journey.
         key: "orders",
-        label: "Sales Orders",
+        label: "Outright Sales",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
         section: "Sales",
       },
+      /* ⭐ `Subscription` — THE SECOND CUSTOMER-ORDER DESTINATION (Jess, owner
+       * ruling 2026-09-23). It opens the Subscription-owned journey governed by
+       * `docs/rental/MASTER.md` — the agreements + deployed-unit registry this
+       * row has always pointed at. The row MOVED out of Customer Care; it was
+       * not copied, because two rows to one page are two rows the rail would
+       * light at once (Law C, a door never a duplicate).
+       *
+       * The `?tab=rental` ADDRESS is unchanged, so every existing link and
+       * bookmark still lands, and the page, its permissions, its quantities and
+       * its reporting are untouched: this ruling "changes navigation only and
+       * does not approve Subscription business implementation"
+       * (`docs/ui/MASTER.md`). The inner Subscription destinations proposed in
+       * the Rental Blueprint remain PROPOSAL / NOT LAW and are NOT built here. */
+      { key: "rental", label: "Subscription", icon: Repeat, section: "Sales" },
       // Work (SO V2 CARD 10, owner ruling 2026-08-11) — My Work / Team Work:
       // two filters over the ONE open work set the Card 9 engine composes.
       // Sits directly under the register on the Constitution's own mission —
@@ -276,25 +304,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * second person list. */
       { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
-      // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
-      //
-      // The old Orders control table is NOT deleted and NOT hidden — it keeps
-      // its own separate route because it still carries the Delivery, Payment
-      // and Purchasing work that has not been migrated yet, plus the AutoCount
-      // import (today the ONLY import surface, which is what blocks the final
-      // delete).
-      //
-      // The label says `(temporary)` on purpose: a legacy surface that looks
-      // permanent BECOMES permanent. This item is deleted, not renamed, when
-      // the last box on the cutover map is empty. Its icon is deliberately NOT
-      // ClipboardList — two doors sharing one icon read as the same page.
-      {
-        key: "old-orders",
-        label: "Old Orders (temporary)",
-        icon: History,
-        path: "/operation/old-orders",
-        section: "Sales",
-      },
+      /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
+       * 2026-09-23): "Replace the previous standalone Sales Orders entry;
+       * remove the old/legacy order menu entry from this tree."
+       *
+       * THE MENU ROW IS REMOVED. THE PAGE IS NOT. `/operation/old-orders` and
+       * `/operation/old-orders/:stage` stay mounted in `OperationApp`, so every
+       * order, every history row, every document and every existing deep link
+       * still resolves — including `CaseOrderLink`, which still sends a Service
+       * Case to `/operation/old-orders?order=…`. "Menu removal does not delete
+       * orders, history, documents or valid existing deep links."
+       *
+       * The `History` icon import goes with the row; nothing else used it. */
       /* ⭐ THE FINAL PURCHASING MAP — FOUR NAMED GROUPS, ELEVEN PAGES
        * (Jess, 2026-08-22 — CARD-2026-08-22-purchasing-01-final-sidebar-listing;
        * the approved tree is `docs/purchasing/MASTER.md` §4).
@@ -503,9 +524,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/finance/payments"],
         section: "Payments",
       },
-      // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
-      // the deployed-unit asset registry. Dormant until the POS rental lane.
-      { key: "rental", label: "Rental", icon: Repeat, section: "Customer Care" },
       // Catalog split (Loo 2026-07-25) — Operations carries ONLY the costing
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling
@@ -683,7 +701,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "pos", label: "Catalog", icon: LayoutGrid },
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
-      { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
+      //
+      // ONE DESTINATION, ONE WORD (owner ruling 2026-09-23). A principal stands
+      // in Operations AND Admin at once, so this row and the Operations child
+      // above point at the same page and light together. Two different words on
+      // two rows for one register is the duplicate the ruling names; the
+      // dictionary word for that register is now `Outright Sales`. The address
+      // is unchanged, so the principal's bookmark still lands.
+      { key: "orders", label: "Outright Sales", icon: ClipboardList, path: "/operation/orders" },
       // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
       // principal-level decision, but its only editor lived under Operations
       // Settings. `role === "principal"` already grants edit there (checkDuty
