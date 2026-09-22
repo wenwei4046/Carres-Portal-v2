@@ -521,10 +521,20 @@ second index of facts the map already draws, and it cost three network round-tri
 Orders, Payments, Guarantees) on every open. **The completeness rule that governed it is retired
 with it**; what survives is the rule it existed to serve — *a door, never a duplicate* (Law C).
 
-**PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS.** *"Proceed date shouldn't be editable at SO
-view under operations."* **This overwrites §725-728 below**, which gave Operations a direct writer
-here. The Sales Portal asks for the production start as a REQUIRED question at the point of sale,
-so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker.
+**PROCEED DATE CAN BE EDITED — OWNER RULING (Jess, 2026-09-22): "proceed date can edit".** This
+overwrites the 2026-08-26 read-only rule. On the SO page it is a grey (editable) field like the rest;
+it changes through `Edit` with `Reason for change`, is recorded in History, and — like the other
+contractual facts — goes for approval while a supplier commitment exists. The CREATE door keeps the
+picker.
+
+**THE SO PAGE FIELD STANDARD — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** A grey box
+means "this can be changed with `Edit`" and nothing else ("every grey meaning can edit"; "all can
+edit"). Every fact on the page is a grey box — customer, delivery, SO info, Sales Location ·
+Salesperson · Dealer (approval), Items Code · Qty · Unit (amendment when a supplier commitment exists),
+Proceed Date — EXCEPT three, which print as plain text because they are not this page's to change:
+`SO Doc Date` (the order's birth stamp), the payment rows (Payments owns them; the door is `Open this
+order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
+Type order: card title 15px/600 blue (largest) → value 13px dark → label 12px grey (smallest).
 
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
