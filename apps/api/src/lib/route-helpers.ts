@@ -23,7 +23,9 @@ import type { ZodTypeAny, infer as ZodInfer } from "zod";
  * detail handling here when other routes need it (attach_do, warehouse routes
  * flagged in C3.1 review). Out of scope for C3.1 — wider blast radius.
  */
-export function mapPgError(error: { code?: string; message?: string; details?: string }) {
+export type PgErrorish = { code?: string; message?: string; details?: string };
+
+export function mapPgError(error: PgErrorish) {
   switch (error.code) {
     case "42501":
       return { status: 403 as const, body: { error: "forbidden", code: "forbidden", message: error.message ?? "forbidden" } };
@@ -76,6 +78,57 @@ export async function parseJsonBody<S extends ZodTypeAny>(c: Context, schema: S)
     };
   }
   return { ok: true, data: parsed.data };
+}
+
+/** PostgREST caps a single read at 1000 rows in this project. */
+export const PAGE = 1000;
+
+/**
+ * Read every row of a set-returning read, 1000 at a time, in a fixed order.
+ * Fail closed: an error on any page is an error for the whole read, and a
+ * read longer than `maxPages` is refused rather than cut short.
+ *
+ * `page` MUST order by something unique, or a row can be missed or repeated
+ * between two pages.
+ *
+ * This lived in `routes/finance/ledger.ts` until 2026-09-22. It moved here
+ * because the same unbounded read shipped twice OUTSIDE that file — the
+ * Department filter in `lib/line-departments.ts` (PR #1456) and the Journal's
+ * own department read (PR #1495) — and a second copy of this loop is the
+ * thing that must not happen next.
+ */
+export async function readAllPages<T = Record<string, unknown>>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: PgErrorish | null }>,
+  maxPages = 20,
+): Promise<{ rows: T[] } | { error: PgErrorish } | { tooMany: true }> {
+  const rows: T[] = [];
+  for (let i = 0; i < maxPages; i += 1) {
+    const { data, error } = await page(i * PAGE, (i + 1) * PAGE - 1);
+    if (error) return { error };
+    if (!Array.isArray(data)) return { error: { message: "no rows array" } };
+    rows.push(...(data as T[]));
+    if (data.length < PAGE) return { rows };
+  }
+  return { tooMany: true };
+}
+
+/**
+ * The most ids one read may spell into an `in (…)` URL.
+ *
+ * ponytail: 200 uuids is ~7 kB of query string — the same order of magnitude
+ * as the LINK_SLICE of 100 that `routes/finance/ledger.ts` already calls
+ * "well inside a URL". A filter needing more ids than this cannot name them
+ * all; push it into an RPC that filters inside the database instead.
+ */
+export const IN_URL_MAX = 200;
+
+/**
+ * A read that overran its ceiling. The same answer the account ledger
+ * already gives ("Choose a shorter period for this account."): 422, code
+ * `too_many_rows`, one plain sentence — never a silently shorter list.
+ */
+export function tooManyRows(c: Context, message: string) {
+  return c.json({ error: "invalid_param", code: "too_many_rows", message }, 422);
 }
 
 /** The throwing form, for the ops routes: a bad body is a 400 HTTPException. */

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
-import { fail } from "../../lib/route-helpers";
+import { IN_URL_MAX, fail, readAllPages, tooManyRows } from "../../lib/route-helpers";
 import { todayIsoMYT } from "../../lib/today";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -39,6 +39,9 @@ import type { AppEnv } from "../../types";
  * stock-alerts.ts). Forwarded user JWT → RLS still applies on
  * `purchase_orders` + `purchase_order_lines` + `suppliers`.
  */
+/** The one sentence the category filter refuses an over-long read with. */
+const TOO_MANY_CATEGORY_LINES = "There are too many lines in this category to list here.";
+
 const procurementTabsRouter = new Hono<AppEnv>();
 
 // Inline operation-only guard — fast 403 before any Supabase round-trip.
@@ -208,17 +211,27 @@ procurementTabsRouter.get("/:slug", async (c) => {
   let pos: PoRow[] = [];
   if (category !== null) {
     // Pass A: narrow ids via the lines table directly.
-    const { data: lineRows, error: lineErr } = await sb
+    //
+    // Paged and fail-closed, the same two ceilings the Finance department
+    // filter shipped twice (PRs #1456 / #1495): read once with no `.range()`
+    // this dropped every line past 1000, and a PO whose only matching line
+    // fell off that edge simply vanished from the tab. The id list also goes
+    // straight into Pass B's `.in()` URL, so it is capped rather than spelt
+    // out at any length. Ordered by `id` — paging on a non-unique order can
+    // miss or repeat a row across two pages.
+    const read = await readAllPages<{ po_id: string }>((a, b) => sb
       .from("purchase_order_lines")
       .select(
         "po_id, purchase_orders!inner(suppliers!inner(slug))",
       )
       .like("sku", `${category}:%`)
-      .eq("purchase_orders.suppliers.slug", supplierSlug);
-    if (lineErr) return fail(c, lineErr);
-    const matchedIds = Array.from(
-      new Set(((lineRows ?? []) as Array<{ po_id: string }>).map((r) => r.po_id)),
-    );
+      .eq("purchase_orders.suppliers.slug", supplierSlug)
+      .order("id", { ascending: true })
+      .range(a, b));
+    if ("error" in read) return fail(c, read.error);
+    if (!("rows" in read)) return tooManyRows(c, TOO_MANY_CATEGORY_LINES);
+    const matchedIds = Array.from(new Set(read.rows.map((r) => r.po_id)));
+    if (matchedIds.length > IN_URL_MAX) return tooManyRows(c, TOO_MANY_CATEGORY_LINES);
     if (matchedIds.length === 0) {
       return c.json({ pos: [] });
     }
