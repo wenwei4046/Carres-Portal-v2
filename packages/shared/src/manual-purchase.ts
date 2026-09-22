@@ -64,6 +64,46 @@ export const MANUAL_PURCHASE_WORDS = {
    *  opens the choice, and the act that closes it. */
   change: "Change",
   save: "Save",
+  /**
+   * ── THE CREATE / RETURNED-EDIT WORKSPACE (owner 2026-09-22, COPY-STANDARD
+   * `Create / returned-request edit sections`) ──────────────────────────────
+   *
+   * The form reuses the Sales Order composition: three sections in ONE reading
+   * order, left as the form and right as the live internal MPR preview. The
+   * preview is NOT a supplier Purchase Order — the supplier document is drawn
+   * at `Issue PO`, from PO-PDF-STANDARD, one per actual grouped PO.
+   *
+   * ⛔ `Need for` and `Raised by` stay on the SAVED OBJECT, which was ruled
+   * separately (Card 06 / Card 08) and is not this target: one surface's
+   * rename is not a licence to respell another's stored history.
+   */
+  secCreateRequestDetails: "Request Details",
+  secCreateDelivery: "Delivery",
+  secCreateItems: "Items",
+  /** The create form's word for the purpose — the Register's own column word,
+   *  so the operator meets ONE name for one fact on the two surfaces they use
+   *  in the same minute. */
+  createPurpose: "Purpose",
+  /** The create form's Deliver To, capitalised as the dictionary spells the
+   *  fact (`Deliver To`); the listings say `Supplier Deliver To`. */
+  createDeliverTo: "Deliver To",
+  /** The requester, named on the create form the way the Register names them.
+   *  It is a FACT the server stamps, never a control. */
+  createRequestedBy: "Requested By",
+  /**
+   * ⭐ `Purchase requirement` — OPTIONAL, EVERY PURPOSE (owner 2026-09-22).
+   *
+   * What this purchase actually needs, in the requester's own words. It is NOT
+   * `What is this for?`: that one is `Other Purchase`'s REQUIRED reason for
+   * buying at all (Card 04), and borrowing it would make a routine request
+   * answer a question the ruling says it is never asked.
+   */
+  purchaseRequirement: "Purchase requirement",
+  /** The preview's own state word — a draft is not a submitted MPR, not an
+   *  approval and not an issued PO. */
+  draft: "Draft",
+  /** The preview's quantity line: what this request asks for in total. */
+  previewTotal: "Total",
   needFor: "Need for",
   /**
    * THE TWO VISIBLE DATE MEANINGS (Card 06, owner-corrected 2026-08-29 —
@@ -196,7 +236,11 @@ export const MANUAL_PURCHASE_WORDS = {
   colCustomerRequestedDeliveryDate: "Customer Requested Delivery Date",
   colCustomerDeliveryLocation: "Customer Delivery Location",
   colCustomer: "Customer",
-  colPoDefaultDeliveryDate: "PO Default Delivery Date",
+  /** ⭐ `PO Delivery Date` — the register/column name (owner ruling Jess,
+   *  2026-09-22; COPY-STANDARD). `PO Default Delivery Date` is RETIRED: the
+   *  rows differ, so the head carries no number, and the single-PO fact reads
+   *  `PO {n}-Day Delivery Date` on the paper. */
+  colPoDefaultDeliveryDate: "PO Delivery Date",
   colCategory: "Category",
   colQty: "Qty",
   colItem: "Item",
@@ -218,10 +262,15 @@ export const MANUAL_PURCHASE_WORDS = {
   stockNoneMatches: "No stock on the shelf matches this item.",
   /** The OBJECT's structured `For` fact — never a Register column again. */
   colFor: "For",
-  /** The PO lineage absence — the arithmetic ran and found no PO. The
-   *  Register cell states the bare fact (Card 08 §3.2: `—` is a fact, not
-   *  a button); the object's Purchase Orders section keeps the sentence. */
-  poNone: "—",
+  /** ⭐ THE PO LINEAGE ABSENCE — `No PO yet` (owner ruling 2026-09-21, UI
+   *  MASTER §6.0 rule 3: *a document not made yet: `No PO yet` · `No DO yet`*).
+   *
+   *  The arithmetic RAN and found no purchase order: that is a fact about the
+   *  document, so it is spelt as one. The retired `—` could not tell an
+   *  operator the difference between *no PO exists yet* and *this cell has
+   *  nothing to say*, and the read's own loading and failure states keep their
+   *  separate words — an unread cell never claims a PO does not exist. */
+  poNone: "No PO yet",
   notOrderedYet: "Not ordered yet",
   /** THE TWO WORK ACTION SENTENCES (Card 08 §3.4) — no number, no person's
    *  name, no UUID. The Work row's context line distinguishes the purchase
@@ -1197,26 +1246,57 @@ export function manualPurchaseNotSelectableReason(
  * `Issue {n} PO{s}` must predict what the server creates; the server still
  * recomputes from its own read, which is agreement rather than trust.
  */
-export function manualPurchaseIssueGroupCount(
-  lines: ReadonlyArray<{
-    supplierId: string | null;
-    category: string | null;
-    destinationId: string;
-    purpose: string;
-    /** The line's approved Delivery Date (`required_by`, header fallback);
-     *  null on a historical `Not recorded` request. */
-    deliveryDate: string | null;
-    remainingQty: number;
-  }>,
-): number {
-  const walls = new Set<string>();
+export interface ManualPurchaseIssueLine {
+  supplierId: string | null;
+  category: string | null;
+  destinationId: string;
+  purpose: string;
+  /** The line's approved Delivery Date (`required_by`, header fallback);
+   *  null on a historical `Not recorded` request. */
+  deliveryDate: string | null;
+  remainingQty: number;
+}
+
+/**
+ * ⭐ THE DOCUMENT PARTITION — FIVE FACTS, ONE SPELLING (Law D).
+ *
+ * `Supplier × Category × Deliver To × Purpose × MPR Delivery Date`. The issue
+ * door in `apps/api/src/routes/operation/manual-purchase.ts` builds the same
+ * key from its OWN read, so the count on the toolbar, the draft documents on
+ * the review page and the purchase orders the database creates cannot differ
+ * by construction — the browser's job is to predict, not to decide.
+ *
+ * A line with nothing left to buy is not part of any document.
+ */
+export function manualPurchaseDocumentKey(l: ManualPurchaseIssueLine): string {
+  return `${l.supplierId ?? ""}|${l.category ?? ""}|${l.destinationId}|${l.purpose}|${l.deliveryDate ?? ""}`;
+}
+
+/**
+ * THE SELECTION GROUPED INTO THE DOCUMENTS IT WILL BECOME — the same walls the
+ * count uses, keeping each document's own lines so `Review Purchase Orders`
+ * can draw one draft per actual PO instead of one paper for a mixed batch.
+ * Insertion order is kept: the operator reads them in the order the register
+ * offered them.
+ */
+export function manualPurchaseIssueDocuments<T extends ManualPurchaseIssueLine>(
+  lines: readonly T[],
+): Array<{ key: string; lines: T[] }> {
+  const out = new Map<string, { key: string; lines: T[] }>();
   for (const l of lines) {
     if (l.remainingQty <= 0) continue;
-    walls.add(
-      `${l.supplierId ?? ""}|${l.category ?? ""}|${l.destinationId}|${l.purpose}|${l.deliveryDate ?? ""}`,
-    );
+    const key = manualPurchaseDocumentKey(l);
+    const group = out.get(key) ?? { key, lines: [] };
+    group.lines.push(l);
+    out.set(key, group);
   }
-  return walls.size;
+  return [...out.values()];
+}
+
+export function manualPurchaseIssueGroupCount(
+  lines: ReadonlyArray<ManualPurchaseIssueLine>,
+): number {
+  return manualPurchaseIssueDocuments(lines).length;
 }
 
 /** `1 selected · 1 unit · Issue 1 PO` — pluralised from facts, never guessed. */

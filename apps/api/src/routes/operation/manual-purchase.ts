@@ -8,6 +8,7 @@ import {
   manualPurchaseLineRemainingOf,
   orderByFromDeliveryDate,
   productionWorkingDaysFor,
+  poDeliveryDateOf,
   poSupplierDeliveryDateOf,
   type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
@@ -1677,6 +1678,11 @@ const resubmitBody = z
     destinationId: z.string().uuid(),
     requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     why: z.string().max(1000).nullish(),
+    /* ⭐ `Purchase requirement` (0562, owner 2026-09-22) — OPTIONAL on EVERY
+       purpose, and never a stand-in for `why`: that one is Other Purchase's
+       REQUIRED reason for buying at all, and one field cannot answer two
+       questions without a later reader having to guess which was asked. */
+    purchaseRequirement: z.string().max(2000).nullish(),
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
@@ -1735,6 +1741,9 @@ manualPurchaseRouter.post("/:id/resubmit", requireOperation, async (c) => {
     p_destination_id: b.destinationId,
     p_required_by: b.requiredBy,
     p_why: (b.why ?? "").trim() || null,
+    /* 0562 — REPLACED each round, never coalesced: a requirement the requester
+       deleted must actually go. */
+    p_purchase_requirement: (b.purchaseRequirement ?? "").trim() || null,
     p_for_service_case_id: b.serviceCaseId ?? null,
     p_for_staff_user_id: b.staffUserId ?? null,
     p_for_subsidiary_name: (b.subsidiaryName ?? "").trim() || null,
@@ -1874,6 +1883,9 @@ const headerBody = z
        blocks Send without one, and the door agrees rather than trusts. */
     requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     why: z.string().max(1000).nullish(),
+    /* ⭐ `Purchase requirement` (0562, owner 2026-09-22) — OPTIONAL on EVERY
+       purpose. Not `why`: that one is Other Purchase's required reason. */
+    purchaseRequirement: z.string().max(2000).nullish(),
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
@@ -1947,7 +1959,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   }
   const {
     purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName, lines,
-    fulfilmentIntent,
+    fulfilmentIntent, purchaseRequirement,
   } = parsed.data;
 
   /* ⭐ 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
@@ -1992,6 +2004,11 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
        every Ready Stock line reading `This purchase did not record whether
        stock can answer it` and made the entire allocation unreachable. */
     p_fulfilment_intent: fulfilmentIntent ?? null,
+    /* Named for the same reason as the intent above: PostgREST resolves by the
+       argument NAMES the request carries. 0562 leaves exactly one overload of
+       each door, so a name that goes missing is a refusal, never a silently
+       dropped fact. */
+    p_purchase_requirement: (purchaseRequirement ?? "").trim() || null,
   };
 
   /* ⭐ ONE TRANSACTION FOR ONE ACT (0410). When the caller sends its lines,
@@ -2039,7 +2056,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
           error: "migration_not_applied",
           code: "migration_not_applied",
           message: "This Manual Purchase was not created.",
-          action: "Ask IT to apply migration 0410, then send it again.",
+          action: "Ask IT to apply migration 0562, then send it again.",
         },
         503,
       );
@@ -2415,6 +2432,19 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     ]),
   );
 
+  /* ⭐ THE SETTINGS THE PO's OWN DELIVERY DATE IS COMPUTED FROM (owner
+     correction 2026-09-22). Read ONCE for the whole batch, through the one
+     loader every purchasing surface uses — a second reader of the same numbers
+     is how two screens came to disagree about a 13-day supplier. A failed read
+     is not a guessed date: the POs are then born with none, and the paper says
+     `Not recorded`. */
+  let settings: LoadedPurchasingSettings | null = null;
+  try {
+    settings = await loadPurchasingSettings(sb);
+  } catch (e) {
+    console.error("manual purchase issue — purchasing settings unavailable", (e as Error).message);
+  }
+
   const { data: whRows, error: whErr } = await sb
     .from("warehouses")
     .select("id, name, kind")
@@ -2505,13 +2535,31 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       supplier_id: first.supplierId,
       warehouse_id: warehouse.id as string,
       destination_id: group.destinationId,
-      /* ⭐ THE APPROVED MANUAL DELIVERY DATE BECOMES THE OFFICIAL PO DELIVERY
-         DATE (Card 06 §7). An approved request date must survive into the
-         supplier commitment — never recalculated from the issue day. A
-         historical `Not recorded` request honestly issues with no date; a
-         later supplier change records `Supplier Delivery Date` while the
-         promise ledger preserves the original. */
-      eta_date: group.deliveryDate,
+      /* ⭐ THE PO DELIVERY DATE IS THE SETTINGS DATE — OWNER CORRECTION
+         (Jess, 2026-09-22), replacing Card 06 §7's "the approved Manual
+         Delivery Date becomes the official PO delivery date".
+ 
+         `PO Date + n Settings working days`, with NO transit days added and
+         `n` exactly the recorded Supplier × Category number — the one
+         arithmetic in `poDeliveryDateOf`, so the date and the paper's
+         `PO {n}-Day Delivery Date` label can never disagree.
+ 
+         ⛔ THE MPR's OWN DATE IS A DIFFERENT FACT and stays where it is:
+         `Delivery Date` on the request is when the goods must reach Deliver
+         To, and it still drives `Order By`, the timing rail and the document
+         partition above. What it stopped being is the supplier's printed
+         promise — a request raised for a showroom two months out used to put
+         that far date on the factory's paper as if the factory had agreed it.
+ 
+         A supplier × category with no recorded production number yields NULL:
+         the PO is born with no delivery date and prints `Not recorded`,
+         because an unknown date is recorded as unknown (P1) — never today's
+         planning guess, and never the requester's wish. */
+      eta_date: settings == null ? null : poDeliveryDateOf(settings, {
+        supplierId: first.supplierId,
+        category: first.category,
+        poDateIso: todayIsoMYT(),
+      }),
       procurement_partner_id: kind === "factory_pickup" ? partnerId : null,
       so_refs: null,
       purpose: req.purpose,

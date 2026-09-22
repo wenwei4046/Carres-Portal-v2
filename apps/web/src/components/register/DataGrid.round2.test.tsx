@@ -55,4 +55,31 @@ describe("DataGrid · round 2 engine capabilities", () => {
     expect(screen.getByTestId("grid-group-waiting")).toHaveTextContent("Need approval0");
     expect(screen.getByTestId("grid-group-empty-waiting")).toHaveTextContent("Nothing waiting for approval");
   });
+
+  /**
+   * ⭐ AN EMPTY GROUP DRAWS NO COLUMN HEADER (measured on Manual Purchase,
+   * 2026-09-22).
+   *
+   * `Need PO 0` printed fifteen column heads over nothing, so the operator
+   * read a table that had no rows in it and looked for the missing data. The
+   * engine already refused the header for a COLLAPSED group, for exactly this
+   * reason — a header over no records names columns nobody is reading.
+   */
+  it("an empty group draws its heading and its count, and NO column header", () => {
+    mount({
+      fixedGroups: {
+        groups: [
+          { key: "waiting", label: "Need approval", alwaysOpen: true, emptyLabel: "Nothing waiting for approval" },
+          { key: "done", label: "No purchase needed", alwaysOpen: true },
+        ],
+        groupOf: (r) => (r.done ? "done" : "waiting"),
+      },
+    });
+    /* The empty group has its heading — and no header row under it. */
+    expect(screen.getByTestId("grid-group-waiting")).toBeTruthy();
+    expect(screen.queryByTestId("grid-header-waiting")).toBeNull();
+    /* The group that HAS rows still carries its own header, so the columns are
+       named exactly where they are being read. */
+    expect(screen.getByTestId("grid-header-done")).toBeTruthy();
+  });
 });

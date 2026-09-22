@@ -719,8 +719,11 @@ export default function PurchaseOrdersPage() {
       /* The ORIGINAL planned date, preserved when the supplier replies and
          when Settings later change (0428). A supplier's answer never
          overwrites it and it is never back-filled from one. */
-      label: "PO Default Delivery Date",
-      headerLines: ["PO Default", "Delivery Date"],
+      /* `PO Delivery Date` — the column name (owner ruling Jess, 2026-09-22).
+         `PO Default Delivery Date` is retired; the single-PO fact on the paper
+         reads `PO {n}-Day Delivery Date`. */
+      label: "PO Delivery Date",
+      headerLines: ["PO", "Delivery Date"],
       width: 150,
       sortable: true,
       accessor: (row) => {

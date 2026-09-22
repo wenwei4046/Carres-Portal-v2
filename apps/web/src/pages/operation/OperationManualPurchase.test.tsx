@@ -27,6 +27,14 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => navigate };
 });
 
+/* The review surface renders the PO template. In jsdom the real renderer
+   reaches for the logo asset and the font files; the TEMPLATE has its own
+   suites, and this one is about the journey — so the renderer is stubbed the
+   same way SO Batch's issue suite stubs it. */
+vi.mock("@/lib/pdf/render", () => ({
+  renderPoPdf: vi.fn(async () => new Blob(["%PDF-1.4"], { type: "application/pdf" })),
+}));
+
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -35,7 +43,12 @@ vi.mock("@/lib/api", async () => {
 
 vi.mock("@/lib/auth", () => ({
   useAuth: (sel: (s: unknown) => unknown) =>
-    sel({ role: "operation", session: { user: { email: "siti@carres.com" } } }),
+    sel({
+      role: "operation",
+      /* A real session carries the user's ID; `Requested By` resolves the
+         PERSON from it through the same Staff list the Register reads. */
+      session: { user: { id: "u1", email: "siti@carres.com" } },
+    }),
 }));
 
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
@@ -1110,10 +1123,19 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-send")).toBeDisabled();
   });
 
-  it("`Raised by` is a FACT — the current user, never a control", async () => {
+  it("`Requested By` is a FACT — the real person, never an email and never `(you)`", async () => {
+    /* ⭐ OWNER RULING 2026-09-22: the create form says `Requested By`, and it
+       names the individual. It used to print `siti (you)` — the mailbox half
+       of a login, in a sentence no other surface speaks — while the Register
+       and the object both print the staff name. One fact, one spelling. */
     await openWorkspace();
-    expect(screen.getByTestId("mp-raised-by")).toHaveTextContent("siti (you)");
+    expect(screen.getByTestId("mp-raised-by")).toHaveTextContent("Siti");
+    expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("(you)");
+    expect(screen.getByTestId("mp-raised-by").textContent).not.toContain("@");
     expect(screen.getByTestId("mp-raised-by").querySelector("input")).toBeNull();
+    /* The fact is named on BOTH halves — the form asks it, the preview reads
+       it back — so the query is the plural one on purpose. */
+    expect(screen.getAllByText(MW.createRequestedBy).length).toBe(2);
   });
 
   it("WHAT WE ALREADY HAVE renders per line, and `still needed` is PRINTED", async () => {
@@ -1130,6 +1152,135 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(screen.getByTestId("mp-still-needed-0").textContent).toContain("0");
     expect(block.textContent).toContain("PO-2041");
     expect(block.textContent).toContain("may not be needed");
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE 2026-09-22 CREATE WORKSPACE — the Sales Order composition
+     (`docs/purchasing/MASTER.md` §9.2; COPY-STANDARD create sections)
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  it("draws THREE sections in the governed order, beside a live MPR preview", async () => {
+    await openWorkspace();
+    /* The 50/50 pair, the same `object-two-panes` contract the Sales Order
+       page carries — the form left, the preview right, and the halves bind at
+       1130px through the form's own container query (CSS, not JS). */
+    const panes = screen.getByTestId("object-two-panes");
+    expect(panes).toBeTruthy();
+    expect(screen.getByTestId("mp-create-preview")).toBeTruthy();
+
+    /* ONE reading order, and it is the ruling's: Request Details → Delivery →
+       Items. Blocks are the shared Sales Order `Block`, so the band, the
+       radius and the type come from one stylesheet rather than a copy. */
+    const blocks = [...panes.querySelectorAll("[data-block]")].map((b) =>
+      b.getAttribute("data-block"),
+    );
+    expect(blocks).toEqual([
+      MW.secCreateRequestDetails,
+      MW.secCreateDelivery,
+      MW.secCreateItems,
+    ]);
+    /* The preview repeats the SAME sequence — a second order would make the
+       operator re-find every fact they just typed. */
+    const previewSections = [
+      ...screen.getByTestId("mp-create-preview").querySelectorAll("[data-preview-section]"),
+    ].map((el) => el.getAttribute("data-preview-section"));
+    expect(previewSections).toEqual([
+      MW.secCreateRequestDetails,
+      MW.secCreateDelivery,
+      MW.secCreateItems,
+    ]);
+    /* It is a DRAFT and says so — never an MPR number, never a PO number. */
+    expect(screen.getByTestId("mp-preview-draft").textContent).toBe(MW.draft);
+    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/MPR-\d/);
+    expect(screen.getByTestId("mp-create-preview").textContent).not.toMatch(/PO-\d/);
+  });
+
+  it("the create form says `Purpose`, and the retired `Need for` is gone from it", async () => {
+    await openWorkspace();
+    const form = screen.getByTestId("manual-purchase-create");
+    expect(within(form).getAllByText(MW.createPurpose).length).toBeGreaterThan(0);
+    /* The label above the purpose Select is the dictionary's create word. The
+       saved OBJECT keeps `Need for`, which was ruled separately — this is the
+       create surface only. */
+    const label = form.querySelector('label[for="mp-purpose"]')!;
+    expect(label.textContent).toBe(MW.createPurpose);
+  });
+
+  it("the live preview follows the form — the picked item, its supplier and the total", async () => {
+    await openWorkspace();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    fireEvent.change(document.getElementById("mp-qty-0")!, { target: { value: "3" } });
+    const preview = screen.getByTestId("mp-create-preview");
+    await waitFor(() => expect(preview.textContent).toContain("5539-2NA"));
+    /* Catalog's supplier rides along — the operator never types one, and the
+       preview is where they see WHICH factory this line will go to. */
+    expect(preview.textContent).toContain("Ohana");
+    expect(screen.getByTestId("mp-preview-total").textContent).toBe("3");
+  });
+
+  it("`Purchase requirement` is optional, on every purpose, and rides the wire", async () => {
+    /* ⭐ OWNER RULING 2026-09-22. It is NOT `What is this for?`: that one is
+       Other Purchase's required reason. `Ready Stock` is the default purpose
+       here, so this proves the requirement is asked where the reason is not. */
+    await openWorkspace();
+    expect(screen.queryByTestId("mp-why")).toBeNull();
+    pickDeliveryDate();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    fireEvent.change(screen.getByTestId("mp-requirement"), {
+      target: { value: "Firm feel, king size only" },
+    });
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("mp-send"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.filter(
+          (c) =>
+            (c[1] as RequestInit | undefined)?.method === "POST" &&
+            String(c[0]).endsWith("/purchasing/requests"),
+        ),
+      ).toHaveLength(1),
+    );
+    const post = apiFetch.mock.calls.find(
+      (c) =>
+        (c[1] as RequestInit | undefined)?.method === "POST" &&
+        String(c[0]).endsWith("/purchasing/requests"),
+    )!;
+    const body = JSON.parse(String((post[1] as RequestInit).body)) as {
+      purchaseRequirement?: string | null;
+      why?: string | null;
+    };
+    expect(body.purchaseRequirement).toBe("Firm feel, king size only");
+    /* The reason stays empty — a routine purpose is never asked it. */
+    expect(body.why).toBeNull();
+  });
+
+  it("an EMPTY requirement rides as a real absence, never an empty string", async () => {
+    await openWorkspace();
+    pickDeliveryDate();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("mp-send"));
+    await waitFor(() =>
+      expect(
+        apiFetch.mock.calls.some(
+          (c) =>
+            (c[1] as RequestInit | undefined)?.method === "POST" &&
+            String(c[0]).endsWith("/purchasing/requests"),
+        ),
+      ).toBe(true),
+    );
+    const post = apiFetch.mock.calls.find(
+      (c) =>
+        (c[1] as RequestInit | undefined)?.method === "POST" &&
+        String(c[0]).endsWith("/purchasing/requests"),
+    )!;
+    const body = JSON.parse(String((post[1] as RequestInit).body)) as {
+      purchaseRequirement?: string | null;
+    };
+    expect(body.purchaseRequirement).toBeNull();
   });
 
   /* ⭐ RE-PINNED, NOT DELETED (0410, YH 2026-09-01).
@@ -1625,6 +1776,15 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     await screen.findByTestId("mp-selection-actions");
   }
 
+  /* ⭐ THE DOOR IS CALLED FROM THE REVIEW (owner 2026-09-22), so a refusal is
+     printed on the surface the operator is standing on. `tickReady` then this
+     is the whole journey: tick → review → Issue PO. */
+  async function issueFromReview() {
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    fireEvent.click(await screen.findByTestId("mp-issue-create"));
+    return screen.findByTestId("mp-issue-error");
+  }
+
   it("names a Catalog cost refusal returned by the governed issue API", async () => {
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
@@ -1639,8 +1799,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
       return Promise.resolve(respond(url));
     });
     await tickReady();
-    fireEvent.click(screen.getByTestId("mp-issue-selected"));
-    const err = await screen.findByTestId("mp-issue-selected-error");
+    const err = await issueFromReview();
     /* The hole is named, and NOTHING was issued at RM0. */
     expect(err).toHaveTextContent("X-NEW-K has no transaction cost.");
     expect(err).toHaveTextContent("Set the cost of X-NEW-K in Catalog.");
@@ -1665,8 +1824,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
       return Promise.resolve(respond(url));
     });
     await tickReady();
-    fireEvent.click(screen.getByTestId("mp-issue-selected"));
-    const err = await screen.findByTestId("mp-issue-selected-error");
+    const err = await issueFromReview();
     expect(err).toHaveTextContent("You do not hold PO duty today.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
@@ -1694,11 +1852,11 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
       return Promise.resolve(respond(url));
     });
     await tickReady();
-    fireEvent.click(screen.getByTestId("mp-issue-selected"));
-    const err = await screen.findByTestId("mp-issue-selected-error");
-    /* Message kind ② (UI MASTER §6.7): the refusal lives in the warning band
-       between the toolbar and the table. */
-    expect(screen.getByTestId("grid-warning").contains(err)).toBe(true);
+    const err = await issueFromReview();
+    /* Two lines, fact then act — on the review surface, beside the document
+       they name. The Register's own warning band keeps the refusals the
+       Register itself computes (the collection rule, the 20-request ceiling,
+       an unsaved stock draft). */
     const lines = err;
     expect(lines.children).toHaveLength(2);
     expect(lines.children[0]).toHaveTextContent("One Manual Purchase has not been approved yet.");
@@ -1725,12 +1883,14 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
       return Promise.resolve(respond(url));
     });
     await tickReady();
-    fireEvent.click(screen.getByTestId("mp-issue-selected"));
-    await screen.findByTestId("mp-issue-selected-error");
-    /* Untick — the same emptying the refetch would have caused. */
-    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
-    expect(screen.getByTestId("mp-issue-selected-error")).toHaveTextContent(
-      "One Manual Purchase on this list is no longer there.",
+    const err = await issueFromReview();
+    expect(err).toHaveTextContent("One Manual Purchase on this list is no longer there.");
+    /* ⭐ AND IT STAYS. The refusal that MOST needs reading is this one, and
+       the review keeps both the message and the selection: leaving is the
+       operator's act (`Cancel`), never a tick that empties underneath them. */
+    expect(screen.getByTestId("mp-issue-review")).toBeInTheDocument();
+    expect(screen.getByTestId("mp-issue-error")).toHaveTextContent(
+      "Reload the page, then tick the ones that are left and issue again.",
     );
   });
 });
@@ -1809,7 +1969,7 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
       "Supplier",
       "Supplier Deliver To",
       "PO No",
-      "PO Default Delivery Date",
+      "PO Delivery Date",
     ]);
     for (const banned of [
       "Qty",
@@ -1830,7 +1990,9 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
       "Order By",
       "Delivery Date",
       "Deliver To",
-      "PO Delivery Date",
+      /* `PO Default Delivery Date` is the retired one (owner 2026-09-22); the
+         approved head is `PO Delivery Date`, in the list above. */
+      "PO Default Delivery Date",
     ]) {
       expect(heads(grid), `banned column "${banned}"`).not.toContain(banned);
     }
@@ -1936,7 +2098,11 @@ describe("the fifteen columns, in the approved order (owner ruling 2026-09-18)",
     expect(link).toHaveTextContent("PO-20260818-9001");
     fireEvent.click(link);
     expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-20260818-9001");
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    /* ⭐ THE ABSENCE IS A SENTENCE (owner 2026-09-21, UI MASTER §6.0): a
+       request with no purchase order reads `No PO yet`, not a dash that could
+       mean "nothing to say". */
+    expect(screen.getAllByText(MW.poNone).length).toBeGreaterThan(0);
+    expect(MW.poNone).toBe("No PO yet");
     expect(screen.getByTestId("register-column").textContent).not.toContain("Not ordered yet");
   });
 
@@ -2198,7 +2364,7 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
       "Supplier",
       "Supplier Deliver To",
       "PO No",
-      "PO Default Delivery Date",
+      "PO Delivery Date",
     ]);
     /* SKU LEFT THE COLUMNS AND STAYED ON THE SCREEN — it prints under the
        item, where a person reads a code, and the register still searches it. */
@@ -2270,6 +2436,11 @@ describe("the row expansion — goods, their Status, and their own Ready Stock",
     expect(ticks().map((t) => t.checked)).toEqual([false, true]);
     expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    /* ⭐ REVIEW FIRST (owner 2026-09-22): the register's button opens the
+       documents; nothing is posted until the review's own `Issue PO`. */
+    await screen.findByTestId("mp-issue-review");
+    expect(posted).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("mp-issue-create"));
     await waitFor(() => expect(posted).toHaveLength(1));
     /* ⭐ THE ISSUE CARRIES THE CHOSEN LINES — the tick narrows what is bought
        instead of buying the whole request. */
@@ -2803,10 +2974,114 @@ describe("Card 04 · selection and PO Duty", () => {
     expect(screen.queryByTestId("mp-po-duty")).toBeNull();
   });
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     REVIEW PURCHASE ORDERS — the surface between the tick and the door
+     (owner ruling 2026-09-22; `docs/purchasing/MASTER.md` §9.2)
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  it("⭐ `Issue PO` REVIEWS first — the door is never called from the row", async () => {
+    /* THE DEFECT THIS PINS. One click used to create numbered purchase orders
+       with Unit IDs born under them, with no document ever shown. */
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    const review = await screen.findByTestId("mp-issue-review");
+    // NOTHING was posted by opening the review.
+    expect(
+      apiFetch.mock.calls.filter((c) =>
+        String(c[0]).endsWith("/purchasing/requests/issue"),
+      ),
+    ).toHaveLength(0);
+    // The 50/50 pair: the work on the left, the draft document on the right.
+    expect(within(review).getByTestId("mp-issue-work")).toBeTruthy();
+    expect(within(review).getByTestId("mp-issue-preview")).toBeTruthy();
+    // It says the number does not exist yet, and offers no send or download.
+    expect(review.textContent).toContain(
+      "This is a preview. Issue PO creates the number.",
+    );
+    expect(review.textContent).not.toMatch(/PO-\d/);
+    // The document names its supplier → destination, and the two facts that
+    // split it from the next document.
+    expect(within(review).getByTestId("mp-issue-title").textContent).toContain("→");
+    expect(within(review).getByTestId("mp-issue-facts").textContent).toBeTruthy();
+    /* Cancel leaves with nothing created — and the selection survives, so the
+       operator does not tick twelve rows again. */
+    fireEvent.click(within(review).getByTestId("mp-issue-back"));
+    await waitFor(() => expect(screen.queryByTestId("mp-issue-review")).toBeNull());
+    expect((screen.getByTestId(`mp-select-${REQ2}`) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("the draft PDF is a DRAFT — no number, no version, no issue date, no Unit ID", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
+    vi.mocked(renderPoPdf).mockClear();
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    await screen.findByTestId("mp-issue-review");
+    await waitFor(() => expect(renderPoPdf).toHaveBeenCalled());
+    const data = vi.mocked(renderPoPdf).mock.calls[0]![0] as Record<string, unknown>;
+    expect(data.draft).toBe(true);
+    expect(data.po_number).toBe("DRAFT");
+    expect(data.version).toBe(0);
+    expect(data.issue_date).toBe("");
+    /* The delivery date is the server's to compute at issue (Settings working
+       days) — a browser that guessed it would print a promise nobody made. */
+    expect(data.eta_date).toBeNull();
+    /* A Manual Purchase serves no customer order: the paper's SO NO column is
+       empty by fact, never filled with the MPR's own identity. */
+    expect(data.so_refs).toEqual([]);
+    expect(JSON.stringify(data)).not.toMatch(/U\d-\d{3}-\d{3}/);
+  });
+
+  it("the review draws ONE document per purchase order the door will create", async () => {
+    /* The count in `Issue {n} PO(s)` and the papers on screen come from the
+       same five-fact partition (Law D) — three documents, three drafts. */
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    const review = await screen.findByTestId("mp-issue-review");
+    const count = within(review).getByTestId("mp-issue-count").textContent ?? "";
+    const documents = Number(count.split(" of ")[1]);
+    expect(documents).toBeGreaterThan(0);
+    /* The register's own sentence predicted the same number. */
+    expect(screen.getByTestId("selection-bar").textContent).toContain(
+      `Issue ${documents} PO`,
+    );
+  });
+
+  it("a refused issue keeps the operator on the document, and creates nothing", async () => {
+    await loaded();
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && String(url).endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "cost_required",
+              message: "X-NEW-K has no transaction cost.",
+              action: "Set the cost of X-NEW-K in Catalog.",
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respond(String(url)));
+    });
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    fireEvent.click(await screen.findByTestId("mp-issue-create"));
+    const err = await screen.findByTestId("mp-issue-error");
+    // The server's two lines, on the surface the operator is reading.
+    expect(err).toHaveTextContent("X-NEW-K has no transaction cost.");
+    expect(err).toHaveTextContent("Set the cost of X-NEW-K in Catalog.");
+    // Still on the review — the door is atomic, so nothing was created.
+    expect(screen.getByTestId("mp-issue-review")).toBeInTheDocument();
+  });
+
   it("Issue PO sends only the selected requests and consolidation answer", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
     fireEvent.click(await screen.findByTestId("mp-issue-selected"));
+    /* The review surface stands between the tick and the door. */
+    fireEvent.click(await screen.findByTestId("mp-issue-create"));
     await waitFor(() => {
       const post = apiFetch.mock.calls.find((c) =>
         String(c[0]).endsWith("/purchasing/requests/issue"),
@@ -3503,6 +3778,30 @@ describe("Round 2 · the object's rounds", () => {
     expect(body.requiredBy).toBe("2026-09-12");
     // Nothing new was created: no POST to the create door.
     expect(posts("/purchasing/requests").length).toBe(0);
+  });
+
+  it("R4 · a returned request reopens with its requirement, and the round REPLACES it", async () => {
+    /* ⭐ 0562 · the requirement travels with the edit. Clearing it must be a
+       real edit — a coalesced column could never be emptied again. */
+    await openObject(false, {
+      request: {
+        ...REGISTER.requests[0],
+        purpose: "ready_stock",
+        sent_back_at: "2026-08-21T01:00:00Z",
+        purchase_requirement: "Firm feel, king size only",
+      },
+      canEditAndSendAgain: true,
+    });
+    fireEvent.click(screen.getByTestId("mp-edit-and-send-again"));
+    await screen.findByTestId("manual-purchase-create");
+    expect(screen.getByTestId("mp-requirement")).toHaveValue("Firm feel, king size only");
+    fireEvent.change(screen.getByTestId("mp-requirement"), { target: { value: "" } });
+    await answerStockQuestion();
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("mp-send"));
+    await waitFor(() => expect(posts(`/${REQ1}/resubmit`).length).toBe(1));
+    const body = JSON.parse(String((posts(`/${REQ1}/resubmit`)[0]![1] as RequestInit).body));
+    expect(body.purchaseRequirement).toBeNull();
   });
 
   it("R3 · the requester withdraws after one confirmation; others never see the door", async () => {

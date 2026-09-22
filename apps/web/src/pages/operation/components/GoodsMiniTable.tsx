@@ -188,7 +188,9 @@ const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as co
  */
 const PO_DATE_COLUMN = {
   key: "poDeliveryDate",
-  label: "PO Default Delivery Date",
+  /* `PO Delivery Date` — the column name since the owner ruling of
+     2026-09-22; `PO Default Delivery Date` is retired portal-wide. */
+  label: "PO Delivery Date",
   width: 176,
 } as const;
 

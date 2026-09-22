@@ -280,6 +280,53 @@ export function expectedArrivalOf(
 }
 
 /**
+ * ⭐ THE PO DELIVERY DATE — OWNER RULING (Jess, 2026-09-22), the ONE arithmetic
+ * behind the date a Purchase Order is born with.
+ *
+ * ```
+ * PO Delivery Date = PO Date + n Settings working days
+ * ```
+ *
+ * `n` is EXACTLY the recorded Supplier × Category production number: Settings
+ * 14 means 14, Settings 10 means 10. **No transit days are added** — that is
+ * the correction this function exists for. Weekends and public holidays are
+ * skipped on THIS supplier's own work week, because the number is a promise
+ * the factory makes about its own days.
+ *
+ * ⛔ IT IS NOT `expectedArrivalOf`. That one answers a different question —
+ * when the goods reach Carres, production PLUS the transit leg — and it stays
+ * the arrival-planning arithmetic behind `Order By` and the register's timing
+ * facts. Two questions, two functions, neither one guessing the other's
+ * answer: printing the arrival date under a `PO 14-Day` label was how a
+ * 13-day Settings number came to print `14-Day` on a supplier's paper.
+ *
+ * NULL IS A REAL ANSWER: no production number for this supplier × category,
+ * or no PO Date → no date at all. The paper then prints `PO Delivery Date :
+ * Not recorded` rather than a date nobody chose (P1's rule).
+ *
+ * `poDateIso` is the CALLER's fact — the day the purchase order is raised.
+ */
+export function poDeliveryDateOf(
+  settings: Pick<PurchasingSettings, "productionDays" | "suppliers">,
+  args: {
+    supplierId: string | null | undefined;
+    category: string | null | undefined;
+    poDateIso: string | null | undefined;
+    /** Malaysian public holidays. Omitted → the live Selangor set. */
+    holidays?: ReadonlySet<string>;
+  },
+): string | null {
+  const from = (args.poDateIso ?? "").slice(0, 10);
+  if (from.length !== 10) return null;
+  const production = productionWorkingDaysFor(settings, args.supplierId, args.category);
+  if (production == null) return null;
+  return addWorkingDays(from, production, {
+    offDays: workWeekOffDaysFor(settings, args.supplierId),
+    holidays: args.holidays ?? myHolidaySet(),
+  });
+}
+
+/**
  * The `{n}` in the PO's printed `PO {n}-Day Delivery Date` (owner ruling
  * 2026-09-22, PO-PDF-STANDARD §2): the supplier's working days from the PO Date
  * to the PO Delivery Date — counted on THIS supplier's work week and the

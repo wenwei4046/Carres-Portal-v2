@@ -1,10 +1,14 @@
-/* Local PO/SO detail styling trial. Explicit object scopes keep other shared
+/* Local PO/SO detail styling trial. `.mp-create-style` joins the SAME rule
+   rather than copying it: the Manual Purchase create workspace reuses the
+   Sales Order composition (owner 2026-09-22), and one section band belongs to
+   one stylesheet — a second copy is how two greys start drifting apart.
+ Explicit object scopes keep other shared
    blocks, alert banners, action controls and PDF templates intact. */
-:is(.po-detail-style, .so-detail-style) {
+:is(.po-detail-style, .so-detail-style, .mp-create-style) {
   font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
 }
 
-:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child {
+:is(.po-detail-style, .so-detail-style, .mp-create-style) [data-block] > div:first-child {
   margin: -0.75rem -1rem 0;
   padding: 0.75rem 1rem;
   border-left: 0;
@@ -15,7 +19,7 @@
   color: #26384a;
 }
 
-:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child > h2 {
+:is(.po-detail-style, .so-detail-style, .mp-create-style) [data-block] > div:first-child > h2 {
   font-family: inherit;
   font-weight: 600;
   letter-spacing: 0.04em;

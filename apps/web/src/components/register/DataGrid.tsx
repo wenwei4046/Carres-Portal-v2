@@ -3212,8 +3212,13 @@ function DataGridInner<T>({
                 <thead className={styles.thead}>
                   {renderGridRow(section.group, section.index)}
                   {/* A collapsed group is its heading and its count. A column
-                      header over no records names columns nobody is reading. */}
-                  {!section.group.collapsed && (
+                      header over no records names columns nobody is reading —
+                      and an EMPTY open group is the same picture: measured on
+                      Manual Purchase 2026-09-22, `Need PO 0` drew fifteen
+                      column heads over nothing, so the operator read a table
+                      that had no rows in it. The heading and its count are the
+                      whole truth there. */}
+                  {!section.group.collapsed && section.rows.length > 0 && (
                     <tr data-testid={`grid-header-${section.group.path}`}>{headerCells(true)}</tr>
                   )}
                 </thead>
