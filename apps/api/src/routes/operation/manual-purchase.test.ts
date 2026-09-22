@@ -1922,7 +1922,7 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
      later by somebody wondering why nothing arrived. The test now pins the
      refusal, and pins that NOTHING was written behind it. */
   for (const code of ["PGRST202", "42883"]) {
-    it(`refuses in words when 0410 is not applied yet, and writes nothing (${code})`, async () => {
+    it(`refuses in words when the create migration is not applied yet, and writes nothing (${code})`, async () => {
       const rpc = vi.fn().mockResolvedValue({ data: null, error: { code, message: "not found" } });
       const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
       expect(res.status).toBe(503);
@@ -1930,7 +1930,10 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
       expect(body.code).toBe("migration_not_applied");
       /* It says what happened and who fixes it — never a bare code. */
       expect(body.message).toBeTruthy();
-      expect(body.action).toContain("0410");
+      /* The refusal names the migration THIS build needs (0562 since Card 13),
+         not the one two cards ago — an operator forwarding it to IT must be
+         able to act on the sentence. */
+      expect(body.action).toContain("0562");
       /* ⛔ AND IT DOES NOT QUIETLY TRY THE HEADER-ONLY DOOR. One call, one
          refusal; a second call here would be the dropped-lines bug again. */
       expect(rpc).toHaveBeenCalledTimes(1);
