@@ -889,7 +889,9 @@ summary. Action ownership uses structured avatar metadata.
 - **`Download PDF` HANDS OVER A PDF.** Never a link to the JSON payload behind it: a page that
   shows an API response as if it were a document teaches the operator that the document is
   unreliable.
-- Internal Manual Purchase and Display Request objects have no empty PDF preview.
+- Saved internal Manual Purchase and Display Request objects have no empty PDF preview.
+  Manual Purchase create/returned-request edit uses the explicitly approved internal MPR
+  preview in §9.2; the downstream Issue PO review uses the supplier-facing PO template.
 
 ### 8.3 Two-line fact/action copy
 
@@ -1627,19 +1629,69 @@ one PO. No Payment / Paid to date / Balance due / financial-progress section.
 Use the existing top action placement and governed submission action; typing,
 previewing, printing or downloading never submits a request or sends a PO.
 
-**Approval boundary — explicit unresolved distinction, not a new decision here.**
-Jess has ruled that price/financial approval must not block placing an order and
-any required financial approval is Jess-only. The built MPR request-authorisation
-rule below is a different gate; this layout approval does not abolish it or prove
-it reconciled with that wider placement ruling. Do not invent a financial gate,
-rename the request gate as financial approval, or claim the business conflict is
-resolved. Price entry for placing a PO does not add an MPR price editor by inference.
+**MPR → PO completion scope — owner approved 2026-09-22; APPROVED / NOT BUILT.**
+The scope is Manual Purchase create/returned-request edit, its internal live MPR
+preview, the concrete Register corrections below, and the MPR-to-PO review/issue
+journey. Subscription is outside this scope. Approval of scope is not production
+verification or approval of unreviewed visual details.
 
-**Date boundary.** MPR `Delivery Date` is the requested arrival date, not the
-PO's immutable `PO Delivery Date`. The latter's approved Settings-only working-day
-rule is §5.7 (no added transit days). The existing MPR grouping/approved-date
-handoff below must be reconciled with §5.7 before BUILD; this layout approval does
-not silently change request planning or claim those two dates are identical.
+- Preserve the Register's approved column order, group-local headers and shared
+  width registry. Correct confirmed no-PO wording across parent rows, goods,
+  object lineage, filters and exports to `No PO yet`; a failed lineage read is
+  never a no-PO fact. Keep permanent history and truthful partial quantities.
+- Only approved goods with a confirmed live remaining requirement are selectable.
+  Show selected request count, goods quantity and the exact resulting PO count;
+  the preview and actual issue must agree. Unresolved/unsaved stock selections
+  keep their existing named guard. Staff do not calculate the document count.
+- Register `Issue PO` opens `Review Purchase Orders` before creation. The work
+  pane and actual PO draft use the governed 50/50 / stacked composition. Review
+  each resulting document with its Supplier, destination, source MPRs, goods,
+  quantity and dates; changing the selected document changes its PDF preview.
+  Draft review creates no PO number, Unit ID, supplier commitment or sent record.
+- Preserve all FIVE initial grouping facts: Supplier × Category × Deliver To ×
+  Purpose × MPR Delivery Date. Only matching groups combine across requests.
+  Different destinations at initial issue produce different POs. This does not
+  revoke §5.4's permitted later multi-destination revision of the SAME PO.
+- Reuse/adapt the existing SO Batch review capability, not a new parallel issue
+  workspace. **COPY REQUIRED, not ready by renaming:** the measured
+  `so-batch/SoBatchIssueWorkspace.tsx` already renders review/draft/evidence states
+  but calls the SO batch issue endpoint; the MPR entry must retain its own source,
+  approval, remaining-quantity and allocation validation. Existing money gates
+  must not be copied as new financial placement gates.
+- Official issue allocates the real PO identity and, for tracked goods only,
+  exact Unit IDs through the existing authority. Counted-only goods receive no
+  Unit IDs. Preserve exact MPR-to-PO source lineage in both directions. Re-read
+  issued/remaining quantities after issue; a partial request remains in `Need PO`.
+  Errors or retries must never create duplicate demand or a second order.
+- Issued is not sent. Keep the one communication/evidence area, recording the
+  actual version, recipient, channel, actor and time. Leaving an issued document
+  does not delete it or reopen its covered demand. Download/print are not sending.
+- `Purchase requirement` is optional for every purpose and persists on create
+  and returned-request edit. It is distinct from the required Other Purchase
+  `What is this for?`; current `why`-only handling does not implement this target.
+  The MPR preview, saved facts and later review must retain the same requirement.
+
+**Approval boundary — owner selected A, 2026-09-22; APPROVED.**
+Every MPR keeps request-authorisation approval: the decision is WHETHER TO BUY,
+not price approval or permission to pay. The existing Purchasing Approver duty,
+actual-person/cover and no-self-approval rules continue to govern; its recorded
+holder is Jess. Approval is required before PO issue. Recording a price or waiting
+for financial approval must not add a placement/issue blocker; any required
+financial approval is Jess-only. Do not automatically accept an expense or make
+payment by issuing the PO. A late approval triggers governed Work follow-up; it
+never automatically removes the gate or appoints another approver. Changing
+that operating rule requires a new owner ruling. Price entry on a PO does not
+add an MPR price editor by inference.
+
+**Date boundary — resolved target, owner approved 2026-09-22; NOT BUILT.**
+MPR `Delivery Date` remains the requested arrival date and remains an initial
+PO grouping fact. PO `PO Delivery Date` is calculated from PO Date using the
+recorded applicable Settings working days under §5.7, skipping applicable
+weekends/public holidays, with NO added transit days. Do not copy the MPR date
+into the PO's original date. Preserve both facts and make any mismatch visible
+in review; never silently alter the request or claim a supplier has confirmed it.
+Current issue code's approved-MPR-date handoff is implementation evidence to be
+changed, not an alternative approved calculation. Do not rewrite historical POs.
 
 **Empty PO fact.** Where a request has no linked PO, print `No PO yet`, never a
 blank, a dash, or `Not ordered yet`. Failed/unknown lineage still uses its own
@@ -2002,8 +2054,9 @@ the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the r
 person, `Issue PO` — where the PO count is the same document partition the issue door
 groups by (supplier × category × destination × purpose × Manual Delivery Date, merged across
 requests only when every fact matches). One PO has one official supplier-facing Delivery Date;
-different dates therefore report and create different POs. The issued PO saves the approved
-Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
+different MPR dates therefore report and create different POs. The PO original date follows
+the owner-approved §5.7 Settings calculation, independently of this request grouping date.
+The current code that copies the approved MPR date is NOT the approved target. Work ownership and reminders
 stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
 
 **Saved object view (not the create/edit workspace above).** Clicking `MPR No` opens the full-width, one-scroll object on the shared
