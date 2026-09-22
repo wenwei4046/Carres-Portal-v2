@@ -231,6 +231,13 @@ const REBUILT_GUARDS = [
     needle: "line_needs_description",
     story: "0536 wrote it, 0540 dropped it, 0552 put it back",
   },
+  {
+    fn: "payment_voucher_save_draft",
+    needle: "[^[:space:]]",
+    story:
+      "0536 asked it with one-argument btrim(), which trims the space character only, " +
+      "so a description of one tab or one newline saved; 0552 widened the test",
+  },
 ];
 
 function functionBodies(sql, fn) {

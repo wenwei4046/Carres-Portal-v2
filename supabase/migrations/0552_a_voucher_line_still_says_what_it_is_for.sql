@@ -12,11 +12,22 @@
 --   Nothing failed, because the only test of the rule is a web test and the
 --   only thing still enforcing it is a greyed-out Save button in apps/web.
 --
+--   0536's own test was a space-only test. It read
+--   nullif(btrim(coalesce(...)), '') is null, and one-argument btrim() trims
+--   the space character and nothing else, so a description of one tab or one
+--   newline was words as far as the database was concerned and saved. That
+--   hole is 0536's, not something this file introduced; the first draft of
+--   0552 carried it forward byte for byte. The web form does not reach it
+--   (PaymentVouchers.tsx uses JavaScript .trim(), which does strip tab and
+--   newline), so only a caller that is not the web form could open it.
+--
 -- WHAT THIS CHANGES
 --   payment_voucher_save_draft is 0540's body, exactly — every department
---   column, every other guard — with 0536's five lines put back, marked 0552.
---   Same signature, so create or replace keeps 0540's grants; restated anyway.
---   Voucher lines already saved without a description stay as they are.
+--   column, every other guard — with 0536's five lines put back, marked 0552,
+--   and the blank test widened from "no space characters left" to "no
+--   character that is not whitespace". Same signature, so create or replace
+--   keeps 0540's grants; restated anyway. Voucher lines already saved without
+--   a description stay as they are.
 --
 --   The sanity block at the end reads the live function's source and refuses
 --   to let this migration commit unless the guard is in it. A future rebuild
@@ -185,7 +196,13 @@ begin
         using errcode = 'P0001', detail = 'line_amount_invalid';
     end if;
     -- 0536, restored by 0552: a line says what it is for.
-    if nullif(btrim(coalesce(v_line ->> 'description', '')), '') is null then
+    -- 0536 asked the question with one-argument btrim(), which trims the space
+    -- character and nothing else, so a description of one tab or one newline
+    -- counted as words and saved. This asks the opposite question: is there one
+    -- character here that is not whitespace? A tab, a newline, a carriage
+    -- return, a form feed and a non-breaking space are all refused, and '',
+    -- a missing key and a JSON null all still arrive here as ''.
+    if coalesce(v_line ->> 'description', '') !~ '[^[:space:]]' then
       raise exception 'Line %: say what this payment is for.', v_n
         using errcode = 'P0001', detail = 'line_needs_description';
     end if;
@@ -312,6 +329,9 @@ begin
   if position('line_needs_description' in v_src) = 0
      or position('say what this payment is for' in v_src) = 0 then
     raise exception '0552 sanity: payment_voucher_save_draft has lost the line description guard (0536, dropped by 0540). Carry it forward.';
+  end if;
+  if position('[^[:space:]]' in v_src) = 0 then
+    raise exception '0552 sanity: the line description guard is back to a space-only test. One-argument btrim() lets a tab or a newline through.';
   end if;
 end;
 $sanity$;
