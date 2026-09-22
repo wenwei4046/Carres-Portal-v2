@@ -253,7 +253,13 @@ function functionBodies(sql, fn) {
   return bodies;
 }
 
-for (const { fn, needle, story } of REBUILT_GUARDS) {
+/* This rule reads THIS repository's own migration history, so it is the one
+   check that cannot run against a fixture directory: the gate's regression
+   test writes three one-line files into a temp dir, none of which defines
+   anything, and the loop below would throw "no migration defines it" on every
+   fixture case. `it("the REAL repository passes its own gate")` runs the
+   script with no override, so the rule is still exercised. */
+for (const { fn, needle, story } of dir === DEFAULT_DIR ? REBUILT_GUARDS : []) {
   let lastFile = null;
   let lastBody = null;
   for (const file of files) {
