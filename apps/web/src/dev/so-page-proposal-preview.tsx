@@ -233,6 +233,7 @@ function Page() {
     setVersions((vs) => vs.map((v) => (v.rev === current.rev ? { ...v, signedAt: at } : v)));
     setHistory((h) => [{ title: `Customer signed Rev ${current.rev}`, meta: `${current.form.name} · ${at}`, note: `Signed on the Rev ${current.rev} document` }, ...h]);
   };
+  (window as unknown as { __signCurrent?: () => void }).__signCurrent = signCurrent;
   const reject = () => {
     if (!request) return;
     setRequest({ ...request, status: "rejected", decision });
@@ -609,24 +610,6 @@ function Page() {
           </div>
           {paid > total(ls) && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(paid - total(ls))} needs review</p>}
         </Card>
-        <Card title="Customer signature">
-          {src.signedAt ? (
-            <div className="flex flex-wrap items-end gap-4">
-              <img src={SIGNATURE_PNG} alt={`Customer signature on Rev ${src.rev}`} className="h-16 w-40 rounded-control border border-kit-slate-5 bg-white object-contain" />
-              <span className="text-body text-kit-slate-12">Signed by {src.form.name} · Rev {src.rev} · {src.signedAt}</span>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-body text-kit-slate-12">
-                Rev {src.rev} is not signed.{" "}
-                {(() => { const last = [...versions].reverse().find((v) => v.signedAt && v.rev < src.rev); return last ? `The last signed version is Rev ${last.rev}; its signature stays with Rev ${last.rev} and its document.` : ""; })()}
-              </p>
-              {!readOnly && !editing && src.rev === current.rev && (
-                <Button size="sm" variant="neutral" icon="edit" onClick={signCurrent}>Preview only: customer signs Rev {src.rev}</Button>
-              )}
-            </div>
-          )}
-        </Card>
       </>
     );
   };
@@ -669,7 +652,7 @@ function Page() {
         <li key={v.rev} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
           <div>
             <p className="text-body font-semibold text-kit-slate-12">{v.title}</p>
-            <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta} · {v.signedAt ? `Signed ${v.signedAt}` : "Not signed"}</p>
+            <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta}</p>
             {v.reason && <p className="text-body text-kit-slate-12">Reason for change: {v.reason}</p>}
             <p className="text-meta text-kit-slate-11">{qtyText(v.lines)} · {servicesText(v.lines)} · Total payable RM {money(total(v.lines))}</p>
           </div>
