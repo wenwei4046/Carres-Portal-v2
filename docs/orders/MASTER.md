@@ -204,6 +204,12 @@ use the existing permission-scoped orders handed from Sales to Operation; unsubm
 orders are not silently added. The earlier proposal to default the order list to unfinished orders
 is superseded by the approved list filters below; no default unfinished-only population is introduced.
 
+**Business boundary — owner ruling 2026-09-22.** Sales Orders Order list and Monthly demand
+show outright sales only. Exclude Subscription/rental records from rows, quantities, totals,
+drill-downs and exports. Do not add a Subscription or combined-business filter here. Subscription
+planning belongs to its own module; shared Purchasing, Stock and Delivery ownership is unchanged.
+This presentation boundary does not remove underlying subscription fulfilment documents.
+
 **Time and filters.** The monthly view defaults to the current calendar month plus the next five
 months. Offer three months, six months and a chosen starting month. Always retain separate
 buckets for outstanding demand earlier than the selected first month, later than its final month,
