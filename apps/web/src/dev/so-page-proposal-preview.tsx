@@ -1,12 +1,14 @@
 /**
- * SALES ORDER PAGE — CLICKABLE PROPOSAL (DEV ONLY, PLAN lane, 2026-09-22).
+ * SALES ORDER PAGE — CLICKABLE PROPOSAL (DEV ONLY, 2026-09-22).
  *
- * Owner field standard (orders MASTER, 56177c8b): a grey box means "this can be
- * changed with Edit"; plain text only for SO Doc Date, payment rows and the
- * computed totals. Type order: card title 15px blue > value 13px dark > label
- * 12px grey. Real kit components + the real `renderSalesOrderPdf` template.
- * A grey "Preview controls" strip (not part of the design) flips PO / viewer /
- * page state.
+ * Follows the owner-approved Sales Order editing plan (whole-page draft, server-chosen
+ * Save / Submit amendment request, catalogue items with model configuration,
+ * Remove / Restore, three counts, goods vs services money, version-bound documents and
+ * signatures, customer agreement evidence). Real kit components + the real
+ * `renderSalesOrderPdf` template. No demo toolbar: scenarios are URL links —
+ *   ?po=0            no supplier commitment yet
+ *   ?as=management   the approver's view
+ *   ?state=loading | error
  */
 import { StrictMode, useMemo, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -27,15 +29,45 @@ import "@/index.css";
 (globalThis as { __CARRES_LOGO_SRC__?: string }).__CARRES_LOGO_SRC__ =
   new URL("carres-logo.png", window.location.href).href;
 
-/* ── fixture ─────────────────────────────────────────────────────────── */
-type Line = { id: string; cat: string; sku: string; name: string; config: string; qty: number; unit: number; removed?: boolean; added?: boolean };
-const LINES0: Line[] = [
-  { id: "l1", cat: "mattress", sku: "M1401F-K", name: "Jager", config: "King · Medium", qty: 2, unit: 1890 },
-  { id: "l2", cat: "accessory", sku: "GIFT-PILLOW", name: "Latex pillow", config: "Gift", qty: 1, unit: 0 },
-  { id: "a1", cat: "service", sku: "ADD-ON", name: "Delivery fee", config: "", qty: 1, unit: 250 },
-  { id: "a2", cat: "service", sku: "ADD-ON", name: "Stair carry", config: "", qty: 1, unit: 100 },
+const Q = new URLSearchParams(window.location.search);
+const HAS_PO = Q.get("po") !== "0";
+const APPROVER = Q.get("as") === "management";
+const PAGE_STATE = Q.get("state") ?? "ready";
+
+/* ── catalogue fixture (fictional, not catalogue law) ────────────────── */
+type Kind = "goods" | "gift" | "service";
+type Model = {
+  sku: string; name: string; kind: Kind; unit: number; category: string;
+  options?: { key: string; label: string; values: string[] }[];
+  fixed?: { label: string; value: string }[];
+};
+const CATALOGUE: Model[] = [
+  { sku: "M1401F", name: "Jager mattress", kind: "goods", unit: 1890, category: "mattress",
+    options: [{ key: "size", label: "Size", values: ["Queen", "King", "Super King"] }],
+    fixed: [{ label: "Firmness", value: "Medium (set by the model)" }] },
+  { sku: "BR1201", name: "Bedframe Rio", kind: "goods", unit: 1200, category: "bedframe",
+    options: [{ key: "size", label: "Size", values: ["Queen", "King"] }, { key: "colour", label: "Colour", values: ["Walnut", "Oak", "Grey fabric"] }] },
+  { sku: "CP200", name: "Cloud pillow", kind: "goods", unit: 90, category: "accessory",
+    options: [{ key: "option", label: "Option", values: ["Standard", "Contour"] }] },
 ];
-const NEW_LINE: Line = { id: "n1", cat: "bedframe", sku: "BR1201-Q", name: "Bedframe Rio", config: "Queen", qty: 1, unit: 1200, added: true };
+type Line = {
+  id: string; sku: string; name: string; kind: Kind; qty: number; unit: number;
+  config: Record<string, string>; fixed?: string; note?: string;
+  removed?: boolean; added?: boolean;
+};
+const skuOf = (l: Line) => (l.config.size ? `${l.sku}-${l.config.size === "Super King" ? "SK" : l.config.size[0]}` : l.sku);
+const LINES0: Line[] = [
+  { id: "l1", sku: "M1401F", name: "Jager mattress", kind: "goods", qty: 2, unit: 1890, config: { size: "King" }, fixed: "Medium" },
+  { id: "l2", sku: "GIFT-PILLOW", name: "Latex pillow", kind: "gift", qty: 1, unit: 0, config: {}, note: "Free gift with Jager mattress" },
+  { id: "a1", sku: "DELIVERY", name: "Delivery fee", kind: "service", qty: 1, unit: 250, config: {}, note: "Per trip" },
+  { id: "a2", sku: "STAIR_CARRY", name: "Stair carry", kind: "service", qty: 1, unit: 100, config: {}, note: "Per order" },
+];
+/* What each line is tied to today (fixture). An SO change never rewrites these — their owners decide. */
+const LINKS: Record<string, string> = HAS_PO
+  ? { l1: "PO-150926-0142 · Nice Future · In production · Unit ID U1-000-014, U1-000-015 → Purchasing settles it with the supplier",
+      l2: "Ready stock · Unit ID U2-000-201 reserved → Warehouse keeps the Unit until the change is decided" }
+  : { l1: "Purchase demand only, no PO yet → Purchasing re-counts what to buy",
+      l2: "Ready stock · Unit ID U2-000-201 reserved → Warehouse keeps the Unit until the change is decided" };
 const PAYMENTS = [
   { date: "2026-08-21", method: "DuitNow QR", code: "FT2083020", by: "Bernard", amount: 500, receipt: "RC-210826-0012", voided: false },
   { date: "2026-09-02", method: "Bank transfer", code: "TXN-77120", by: "Shasha", amount: 1499.5, receipt: "RC-020926-0031", voided: false },
@@ -49,32 +81,44 @@ const BASE = {
   building: "Condo", floor: "3", lift: "No lift", stair: "2",
 };
 type Form = typeof BASE;
-/* Contractual facts go for approval while a supplier commitment exists;
-   ownership facts always need management approval. */
-const CONTRACT: (keyof Form)[] = ["proceed", "requested"];
-const OWNERSHIP: (keyof Form)[] = ["location", "salesperson", "dealer"];
-type Amendment = { status: "waiting" | "rejected"; form: Form; lines: Line[]; reason: string; decision?: string; changes: string[] };
-type Row = { title: string; meta: string; note?: string; version?: { form: Form; lines: Line[] } };
-
-const money = (n: number) => n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const day = (iso: string) => fmtDate(iso);
-const NOW = "Tue, 22 Sep 2026 10:05";
-const REV1: Row = { title: "Original order", meta: "Rev 1 · Current · Recorded by Bernard Tan · Fri, 21 Aug 2026 10:02", version: { form: BASE, lines: LINES0 } };
-const HIST1: Row = { title: "Order created", meta: "Bernard Tan · Sales · Fri, 21 Aug 2026 10:02", note: "Deposit RM 500.00 · Showroom order" };
-const uncurrent = (r: Row) => ({ ...r, meta: r.meta.replace(" · Current", "") });
-const LABEL: Partial<Record<keyof Form, string>> = { proceed: "Proceed Date", requested: "Customer Requested Delivery Date", location: "Sales Location", salesperson: "Salesperson", dealer: "Dealer" };
-const liveLines = (ls: Line[]) => ls.filter((l) => !l.removed);
-const sum = (ls: Line[]) => liveLines(ls).reduce((n, l) => n + l.qty * l.unit, 0);
-/** Goods pieces only — a Delivery fee or Stair carry is a service, never a piece of goods. */
-const goodsQty = (ls: Line[]) => liveLines(ls).filter((l) => l.cat !== "service").reduce((n, l) => n + l.qty, 0);
-/* What each goods line is already tied to (fixture). Nothing here is changed by approval —
-   the owning module decides. */
-const LINKS: Record<string, { po: string; poState: string; unit?: string }> = {
-  l1: { po: "PO-150926-0142 · Nice Future", poState: "In production", unit: "U1-000-014, U1-000-015" },
-  l2: { po: "Ready stock", poState: "Reserved", unit: "U2-000-201" },
+const COMMERCIAL: (keyof Form)[] = ["proceed", "requested", "location", "salesperson", "dealer"];
+const LABEL: Record<keyof Form, string> = {
+  proceed: "Proceed Date", requested: "Customer Requested Delivery Date", location: "Sales Location", salesperson: "Salesperson", dealer: "Dealer",
+  name: "Full name", phone: "Phone", email: "Email", race: "Race", gender: "Gender", birthday: "Birthday",
+  emName: "Emergency contact name", emPhone: "Emergency contact phone", emRel: "Relationship", billing: "Billing address",
+  line1: "Address line 1", line2: "Address line 2", postcode: "Postcode", city: "City", state: "State",
+  building: "Building type", floor: "Floor (Max is 3rd Floor)", lift: "Lift available?", stair: "Items needing stair carry",
+};
+const SHORT: Partial<Record<keyof Form, string>> = { emName: "Name", emPhone: "Phone" };
+const IMPACT: Partial<Record<keyof Form, string>> = {
+  proceed: "Purchasing: purchase-demand release timing moves; an issued PO or promised production is not rewritten",
+  requested: "Delivery and Purchasing plan to the new date; a booked delivery is re-arranged by Delivery",
+  location: "People: sales ownership and commission — management decides",
+  salesperson: "People: sales ownership and commission — management decides",
+  dealer: "People: sales ownership and commission — management decides",
 };
 
-/* ── the governed pieces (one style each) ────────────────────────────── */
+/* ── arithmetic: one place, three counts, goods vs services ──────────── */
+const live = (ls: Line[]) => ls.filter((l) => !l.removed);
+const goodsLines = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").length;
+const pieces = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").reduce((n, l) => n + l.qty, 0);
+const serviceQty = (ls: Line[]) => live(ls).filter((l) => l.kind === "service").reduce((n, l) => n + l.qty, 0);
+const goodsTotal = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").reduce((n, l) => n + l.qty * l.unit, 0);
+const serviceTotal = (ls: Line[]) => live(ls).filter((l) => l.kind === "service").reduce((n, l) => n + l.qty * l.unit, 0);
+const total = (ls: Line[]) => goodsTotal(ls) + serviceTotal(ls);
+const PAID = PAYMENTS.filter((p) => !p.voided).reduce((n, p) => n + p.amount, 0);
+const money = (n: number) => n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const day = (iso: string) => fmtDate(iso);
+const configText = (l: Line) => [...Object.values(l.config), l.fixed].filter(Boolean).join(" · ");
+const lineChanged = (l: Line, was?: Line) =>
+  !!l.added || !!l.removed || !was || was.qty !== l.qty || was.unit !== l.unit || JSON.stringify(was.config) !== JSON.stringify(l.config);
+const isDate = (k: keyof Form) => k === "proceed" || k === "requested" || k === "birthday";
+
+type Version = { rev: number; form: Form; lines: Line[]; title: string; meta: string; reason?: string; signed: boolean };
+type Request = { form: Form; lines: Line[]; reason: string; evidence: string; status: "waiting" | "rejected"; decision?: string };
+const NOW = "Tue, 22 Sep 2026 10:05";
+
+/* ── governed pieces, one style each ─────────────────────────────────── */
 function Card({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-control border border-kit-slate-5 bg-white">
@@ -91,166 +135,116 @@ const SubTitle = ({ children }: { children: ReactNode }) => (
 );
 const Label = ({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) =>
   htmlFor ? <label htmlFor={htmlFor} className="text-meta text-kit-slate-11">{children}</label> : <span className="text-meta text-kit-slate-11">{children}</span>;
-/** Grey box = this can be changed with Edit. */
-const GreyBox = ({ children }: { children: ReactNode }) => (
-  <span className="flex min-h-8 items-center rounded-control bg-kit-slate-3 px-3 text-body text-kit-slate-12">{children}</span>
+type Align = "left" | "right" | "center";
+const just = (a: Align) => (a === "right" ? "justify-end" : a === "center" ? "justify-center" : "");
+const GreyBox = ({ children, align = "left" }: { children: ReactNode; align?: Align }) => (
+  <span className={`flex min-h-8 items-center rounded-control bg-kit-slate-3 px-3 text-body text-kit-slate-12 ${just(align)}`}>{children}</span>
 );
-/** Plain = not this page's to change. */
-const Plain = ({ children }: { children: ReactNode }) => (
-  <span className="flex min-h-8 items-center text-body text-kit-slate-12">{children}</span>
+const Plain = ({ children, align = "left" }: { children: ReactNode; align?: Align }) => (
+  <span className={`flex min-h-8 items-center text-body text-kit-slate-12 ${just(align)}`}>{children}</span>
 );
-const Grid = ({ children }: { children: ReactNode }) => (
-  <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">{children}</div>
-);
-const Was = ({ children }: { children: ReactNode }) => (
-  <p className="whitespace-nowrap text-meta text-kit-slate-11">Was: <span className="line-through">{children}</span></p>
-);
+const Grid = ({ children }: { children: ReactNode }) => <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">{children}</div>;
+const th = "whitespace-nowrap px-2 py-1 text-left text-meta font-normal text-kit-slate-11";
+const cellInput = "h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12";
 
 /* ── the page ────────────────────────────────────────────────────────── */
 function Page() {
-  const [hasPo, setHasPo] = useState(true);
-  const [viewer, setViewer] = useState<"operation" | "management">("operation");
-  const [pageState, setPageState] = useState<"ready" | "loading" | "error">("ready");
-
-  const [saved, setSaved] = useState<Form>(BASE);
-  const [savedLines, setSavedLines] = useState<Line[]>(LINES0);
-  const [amendment, setAmendment] = useState<Amendment | null>(null);
-  const [revs, setRevs] = useState<Row[]>([REV1]);
-  const [hist, setHist] = useState<Row[]>([HIST1]);
+  const [versions, setVersions] = useState<Version[]>([
+    { rev: 1, form: BASE, lines: LINES0, title: "Original order", meta: "Recorded by Bernard Tan · Fri, 21 Aug 2026 10:02", signed: true },
+  ]);
+  const current = versions[versions.length - 1];
+  const [request, setRequest] = useState<Request | null>(null);
+  const [history, setHistory] = useState([{ title: "Order created", meta: "Bernard Tan · Sales · Fri, 21 Aug 2026 10:02", note: "Deposit RM 500.00 · Showroom order · signed by the customer" }]);
   const [toast, setToast] = useState<string | null>(null);
-
   const [tab, setTab] = useState("Order");
+  const [viewRev, setViewRev] = useState<number | null>(null);
+
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Form>(BASE);
   const [lines, setLines] = useState<Line[]>(LINES0);
+  const [openConfig, setOpenConfig] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [asked, setAsked] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState("");
   const [decision, setDecision] = useState("");
-  const [openRev, setOpenRev] = useState<string | null>(null);
   const set = (k: keyof Form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const patchLine = (id: string, p: Partial<Line>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...p } : l)));
+  const patch = (id: string, p: Partial<Line>) => setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...p } : l)));
 
-  /* what changed, and which lane it takes */
+  /* what changed; the SYSTEM chooses the action */
   const keys = Object.keys(BASE) as (keyof Form)[];
-  const changedKeys = editing ? keys.filter((k) => form[k] !== saved[k]) : [];
-  const lineChanges = editing
-    ? lines.filter((l) => {
-        const was = savedLines.find((s) => s.id === l.id);
-        return l.added || l.removed || !was || was.sku !== l.sku || was.qty !== l.qty || was.unit !== l.unit;
-      })
-    : [];
-  const needApproval = (k: keyof Form) => OWNERSHIP.includes(k) || (hasPo && CONTRACT.includes(k));
-  const approvalKeys = changedKeys.filter(needApproval);
-  const directKeys = changedKeys.filter((k) => !needApproval(k));
-  const approvalCount = approvalKeys.length + (hasPo ? lineChanges.length : 0);
-  const reasonNeeded = changedKeys.some((k) => CONTRACT.includes(k) || OWNERSHIP.includes(k)) || lineChanges.length > 0;
-  const changes = changedKeys.length + lineChanges.length;
-  const amend = approvalCount > 0;
-  const reasonGap = reasonNeeded && reason.trim() === "";
-  const blockedByOpen = amend && amendment?.status === "waiting";
+  const changedFields = editing ? keys.filter((k) => form[k] !== current.form[k]) : [];
+  const changedLines = editing ? lines.filter((l) => lineChanged(l, current.lines.find((c) => c.id === l.id))) : [];
+  const commercialOf = (f: Form, ls: Line[], base: Version) =>
+    ls.some((l) => lineChanged(l, base.lines.find((b) => b.id === l.id))) || COMMERCIAL.some((k) => f[k] !== base.form[k]);
+  const commercial = editing && commercialOf(form, lines, current);
+  const changes = changedFields.length + changedLines.length;
+  const blockedByOpen = commercial && request?.status === "waiting";
+  const needReason = changes > 0 && reason.trim() === "";
+  const action = commercial ? "Submit amendment request" : "Save";
 
-  const shownForm = editing ? form : saved;
-  const shownLines = editing ? lines : savedLines;
-  const total = sum(shownLines);
-  const paid = PAYMENTS.filter((p) => !p.voided).reduce((n, p) => n + p.amount, 0);
-
-  const flash = (t: string) => { setToast(t); window.setTimeout(() => setToast(null), 4000); };
-  const startEdit = () => { setForm(saved); setLines(savedLines); setReason(""); setAsked(null); setEditing(true); setTab("Order"); };
+  const flash = (t: string) => { setToast(t); window.setTimeout(() => setToast(null), 5000); };
+  const startEdit = () => {
+    setForm(current.form); setLines(current.lines); setReason(""); setAsked(null); setEvidence(""); setOpenConfig(null);
+    setEditing(true); setTab("Order"); setViewRev(null);
+  };
   const commit = () => {
-    const directForm = { ...saved };
-    directKeys.forEach((k) => { directForm[k] = form[k]; });
-    const describe = [
-      ...approvalKeys.map((k) => LABEL[k] ?? k),
-      ...(hasPo ? lineChanges.map((l) => (l.added ? `Added ${l.name}` : l.removed ? `Cancelled ${l.name}` : `${l.name} changed`)) : []),
-    ];
-    if (amend) {
-      setSaved(directForm);
-      if (!hasPo) setSavedLines(liveLines(lines).map(({ added: _a, ...l }) => l));
-      setAmendment({ status: "waiting", form, lines, reason, changes: describe });
-      setHist((h) => [{ title: "Amendment request submitted", meta: `Shasha · Operation · ${NOW}`, note: `${describe.join(" · ")} · waiting for management` }, ...h]);
-      flash(directKeys.length ? "Saved. The other changes are waiting for management." : "Sent for approval.");
+    if (commercial) {
+      setRequest({ form, lines, reason, evidence, status: "waiting" });
+      setHistory((h) => [{ title: "Amendment request submitted", meta: `Shasha · Operation · ${NOW}`, note: `${changes} ${changes === 1 ? "change" : "changes"} · Waiting for management` }, ...h]);
+      flash("Sent for approval. The order stays as it is until management approves.");
     } else {
-      setSaved(form); setSavedLines(liveLines(lines).map(({ added: _a, ...l }) => l));
-      if (reasonNeeded) setRevs((r) => [{ title: "Staff correction", meta: `Rev ${r.length + 1} · Current · Saved by Shasha · ${NOW}`, note: `Reason for change: ${reason}`, version: { form, lines: liveLines(lines) } }, ...r.map(uncurrent)]);
-      setHist((h) => [{ title: "Order changed", meta: `Shasha · Operation · ${NOW}`, note: `${changes} ${changes === 1 ? "change" : "changes"}` }, ...h]);
+      const rev = current.rev + 1;
+      setVersions((v) => [...v, { rev, form, lines: current.lines, title: "Staff correction", meta: `Saved by Shasha · ${NOW}`, reason, signed: false }]);
+      setHistory((h) => [{ title: "Order corrected", meta: `Shasha · Operation · ${NOW}`, note: `Rev ${rev} · ${changedFields.map((k) => LABEL[k]).join(" · ")}` }, ...h]);
       flash("Saved");
     }
     setEditing(false);
   };
   const approve = () => {
-    if (!amendment) return;
-    const n = revs.length + 1;
-    setSaved((s) => { const next = { ...s }; [...CONTRACT, ...OWNERSHIP].forEach((k) => { next[k] = amendment.form[k]; }); return next; });
-    setSavedLines(liveLines(amendment.lines).map(({ added: _a, ...l }) => l));
-    const cancelled = amendment.lines.filter((l) => l.removed).map((l) => `${l.name} · Qty ${l.qty} · Cancelled · Rev ${n}`);
-    setRevs((r) => [{ title: "Customer change", meta: `Rev ${n} · Current · Approved by Jess · Tue, 22 Sep 2026 11:20`, note: [`Reason for change: ${amendment.reason}`, ...cancelled].join("  ·  "), version: { form: amendment.form, lines: liveLines(amendment.lines) } }, ...r.map(uncurrent)]);
-    setHist((h) => [{ title: "Amendment approved and applied", meta: "Jess · Principal · Tue, 22 Sep 2026 11:20", note: `Rev ${n} · Purchasing, Warehouse and Payments each handle their part` }, ...h]);
-    setAmendment(null); setDecision(""); flash("Approved and applied");
+    if (!request) return;
+    const rev = current.rev + 1;
+    const kept = live(request.lines).map(({ added: _a, ...l }) => l);
+    setVersions((v) => [...v, { rev, form: request.form, lines: kept, title: "Customer change", meta: "Approved by Jess · Tue, 22 Sep 2026 11:20", reason: request.reason, signed: false }]);
+    setHistory((h) => [{ title: "Amendment approved and applied", meta: "Jess · Principal · Tue, 22 Sep 2026 11:20", note: `Rev ${rev} · Customer agreement: ${request.evidence}` }, ...h]);
+    setRequest(null); setDecision(""); flash(`Approved and applied · Rev ${rev} is now the order`);
   };
   const reject = () => {
-    if (!amendment) return;
-    setAmendment({ ...amendment, status: "rejected", decision });
-    setHist((h) => [{ title: "Amendment rejected", meta: "Jess · Principal · Tue, 22 Sep 2026 11:40", note: decision }, ...h]);
+    if (!request) return;
+    setRequest({ ...request, status: "rejected", decision });
+    setHistory((h) => [{ title: "Amendment rejected", meta: "Jess · Principal · Tue, 22 Sep 2026 11:40", note: decision }, ...h]);
     setDecision("");
   };
-  const reset = () => {
-    setSaved(BASE); setSavedLines(LINES0); setAmendment(null); setEditing(false); setTab("Order");
-    setRevs([REV1]); setHist([HIST1]); setPageState("ready");
+
+  /* The document pane always shows the EFFECTIVE revision, or the version being viewed. */
+  const docVersion = viewRev ? versions.find((v) => v.rev === viewRev)! : current;
+  const pdfFor = (v: Version): SalesOrderTemplateData => {
+    const ls = live(v.lines);
+    return {
+      so_number: "SO-1319", issue_date: "2026-08-21", order_id: "x", order_code: "SO-1319", status_label: "", channel: "showroom",
+      customer: { name: v.form.name, address: `${v.form.line1}, ${v.form.line2}, ${v.form.postcode} ${v.form.city}, ${v.form.state}`,
+        phone: v.form.phone, email: v.form.email, emergency: `${v.form.emName} · ${v.form.emPhone} · ${v.form.emRel}` },
+      dealer: { name: v.form.dealer, contact: null, address: null, outlet_name: v.form.location, outlet_address: null, salesperson_name: v.form.salesperson, salesperson_phone: null },
+      delivery: { date: v.form.requested, floor: 3, has_lift: false } as SalesOrderTemplateData["delivery"],
+      proceed_date: v.form.proceed,
+      lines: ls.filter((l) => l.kind !== "service").map((l) => ({ sku: skuOf(l), description: `${l.name}${configText(l) ? ` · ${configText(l)}` : ""}`,
+        qty: l.qty, unit_price: l.unit, line_total: l.qty * l.unit, attrs: null, category: CATALOGUE.find((m) => m.sku === l.sku)?.category ?? "accessory" })) as SalesOrderTemplateData["lines"],
+      addons: ls.filter((l) => l.kind === "service").map((l) => ({ label: l.name, sku: "ADD-ON", qty: l.qty, unit_price: l.unit, line_total: l.qty * l.unit })),
+      payments: PAYMENTS.filter((p) => !p.voided).map((p) => ({ label: p.method, reference: p.code, amount: p.amount, date: p.date, approval_code: p.code, collected_by: p.by })),
+      subtotal: total(ls), total: total(ls), paid: PAID, balance_due: total(ls) - PAID, currency: "MYR", issued_by: "Bernard Tan", signed: v.signed,
+    } as SalesOrderTemplateData;
+  };
+  const pdfData = useMemo(() => pdfFor(docVersion), [docVersion]);
+  const showPdf = PAGE_STATE === "ready" && tab === "Order";
+  const { setPane } = usePdfCanvases(showPdf ? `rev-${docVersion.rev}` : null, () => renderSalesOrderPdf(pdfData));
+  const printVersion = async (v: Version) => {
+    const blob = await renderSalesOrderPdf(pdfFor(v));
+    window.open(URL.createObjectURL(blob), "_blank");
   };
 
-  /* the paper: the draft while editing (under UNSAVED), else the saved revision */
-  const docLines = liveLines(shownLines);
-  const docTotal = sum(shownLines);
-  const pdfData = useMemo<SalesOrderTemplateData>(
-    () => ({
-      so_number: "SO-1319", issue_date: "2026-08-21", order_id: "x", order_code: "SO-1319",
-      status_label: "", channel: "showroom",
-      customer: { name: shownForm.name, address: `${shownForm.line1}, ${shownForm.line2}, ${shownForm.postcode} ${shownForm.city}, ${shownForm.state}`,
-        phone: shownForm.phone, email: shownForm.email, emergency: `${shownForm.emName} · ${shownForm.emPhone} · ${shownForm.emRel}` },
-      dealer: { name: shownForm.dealer, contact: null, address: null, outlet_name: shownForm.location, outlet_address: null,
-        salesperson_name: shownForm.salesperson, salesperson_phone: null },
-      delivery: { date: shownForm.requested, floor: 3, has_lift: false } as SalesOrderTemplateData["delivery"],
-      proceed_date: shownForm.proceed,
-      lines: docLines.filter((l) => l.cat !== "service").map((l) => ({ sku: l.sku, description: `${l.name}${l.config ? ` · ${l.config}` : ""}`,
-        qty: l.qty, unit_price: l.unit, line_total: l.qty * l.unit, attrs: null, category: l.cat })) as SalesOrderTemplateData["lines"],
-      addons: docLines.filter((l) => l.cat === "service").map((l) => ({ label: l.name, sku: "ADD-ON", qty: 1, unit_price: l.unit, line_total: l.unit })),
-      payments: PAYMENTS.filter((p) => !p.voided).map((p) => ({ label: p.method, reference: p.code, amount: p.amount, date: p.date, approval_code: p.code, collected_by: p.by })),
-      subtotal: docTotal, total: docTotal, paid, balance_due: docTotal - paid, currency: "MYR",
-      issued_by: "Bernard Tan", signed: false,
-    }) as SalesOrderTemplateData,
-    [shownForm, docLines, docTotal, paid],
-  );
-  const { setPane } = usePdfCanvases(tab === "Order" && pageState === "ready" ? JSON.stringify(pdfData) : null, () => renderSalesOrderPdf(pdfData));
-
-  const controls = (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-kit-slate-6 bg-kit-slate-4 px-4 py-2 text-meta text-kit-slate-11">
-      <span className="font-semibold">Preview controls — not part of the page</span>
-      <label className="flex items-center gap-2">
-        <input id="ctl-po" type="checkbox" checked={hasPo} disabled={editing} onChange={(e) => setHasPo(e.target.checked)} />
-        PO already sent to the supplier
-      </label>
-      <label className="flex items-center gap-2">
-        Looking as
-        <select id="ctl-viewer" className="rounded-control border border-kit-slate-5 bg-white px-1 py-0.5" value={viewer} onChange={(e) => setViewer(e.target.value as typeof viewer)}>
-          <option value="operation">Operation (Shasha)</option>
-          <option value="management">Management (Jess)</option>
-        </select>
-      </label>
-      <label className="flex items-center gap-2">
-        Page
-        <select id="ctl-state" className="rounded-control border border-kit-slate-5 bg-white px-1 py-0.5" value={pageState} onChange={(e) => setPageState(e.target.value as typeof pageState)}>
-          <option value="ready">Loaded</option><option value="loading">Loading</option><option value="error">Could not load</option>
-        </select>
-      </label>
-      <button type="button" className="underline" onClick={reset}>Start again</button>
-    </div>
-  );
-
-  if (pageState !== "ready")
+  if (PAGE_STATE !== "ready")
     return (
       <div className="flex min-h-screen flex-col bg-kit-slate-2">
-        {controls}
-        {pageState === "loading" ? (
+        {PAGE_STATE === "loading" ? (
           <div className="flex flex-col gap-4 p-4 lg:w-1/2" aria-busy="true" aria-label="Opening the sales order">
             <div className="h-9 w-72 animate-pulse rounded-control bg-kit-slate-4" />
             {[0, 1, 2].map((i) => <div key={i} className="h-40 animate-pulse rounded-control border border-kit-slate-5 bg-white" />)}
@@ -258,28 +252,31 @@ function Page() {
         ) : (
           <div className="grid place-items-center gap-3 p-16 text-center">
             <p className="text-strong text-kit-slate-12">This sales order could not be opened</p>
-            <Button variant="neutral" icon="refresh" onClick={() => setPageState("ready")}>Try again</Button>
+            <Button variant="neutral" icon="refresh" onClick={() => window.location.reload()}>Try again</Button>
           </div>
         )}
       </div>
     );
 
+  /* ── header, notice ── */
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-kit-slate-5 bg-white px-4 py-3">
-      <h1 className="text-title text-kit-slate-12 lg:text-page">SO-1319<span className="ml-3 font-normal text-kit-slate-11">{saved.name}</span></h1>
+      <h1 className="text-title text-kit-slate-12 lg:text-page">SO-1319<span className="ml-3 font-normal text-kit-slate-11">{current.form.name}</span></h1>
       <div className="flex flex-wrap items-center gap-2">
         {editing ? (
           <>
             {changes > 0 && <span className="text-body text-kit-slate-11">{changes} {changes === 1 ? "change" : "changes"}</span>}
             <Button variant="neutral" onClick={() => setEditing(false)}>Cancel</Button>
-            <Button variant="primary" disabled={changes === 0 || reasonGap || blockedByOpen} onClick={commit}>
-              {changes === 0 ? "Save — nothing changed" : reasonGap ? `${amend ? "Submit amendment request" : "Save"} — say why` : amend ? "Submit amendment request" : "Save"}
-            </Button>
+            {changes > 0 && (
+              <Button variant="primary" disabled={needReason || blockedByOpen} onClick={commit}>
+                {needReason ? `${action} — say why` : action}
+              </Button>
+            )}
           </>
         ) : (
           <>
             <DropdownMenu label="Print" trigger={<Button variant="neutral" icon="print">Print ▾</Button>}
-              items={[{ key: "p", label: "Print Sales Order", icon: "print", onSelect: () => undefined }, { key: "d", label: "Download PDF", icon: "download", onSelect: () => undefined }]} />
+              items={[{ key: "p", label: "Print Sales Order", icon: "print", onSelect: () => void printVersion(current) }, { key: "d", label: "Download PDF", icon: "download", onSelect: () => void printVersion(current) }]} />
             <Button variant="primary" icon="edit" onClick={startEdit}>Edit</Button>
             <DropdownMenu label="More actions"
               trigger={<Button variant="neutral" icon="overflow" aria-label="More actions" title="More actions" />}
@@ -293,359 +290,352 @@ function Page() {
       </div>
     </div>
   );
-
-  const notice = hasPo && (
+  const notice = HAS_PO && (
     <div className="flex items-start gap-2 border-b border-kit-slate-5 bg-white px-4 py-2 text-body text-kit-slate-12">
       <Icon name="lock" size={16} />
       <span>This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.</span>
     </div>
   );
 
-  const approval = amendment && !editing && (
-    <section className="rounded-control border border-kit-amber-7 bg-kit-amber-2 px-4 py-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-strong text-kit-slate-12">{amendment.status === "rejected" ? "Rejected" : "Waiting for management"}</h2>
-        <span className="text-meta text-kit-slate-11">Submitted by Shasha · {NOW}</span>
-      </div>
-      <ul className="mt-2 space-y-1 text-body text-kit-slate-12">
-        {[...CONTRACT, ...OWNERSHIP].filter((k) => amendment.form[k] !== saved[k]).map((k) => (
-          <li key={k}>{LABEL[k]}: {k === "proceed" || k === "requested" ? `${day(saved[k])} → ${day(amendment.form[k])}` : `${saved[k]} → ${amendment.form[k]}`}</li>
-        ))}
-        {amendment.lines.map((l) => {
-          const was = savedLines.find((s) => s.id === l.id);
-          if (l.added) return <li key={l.id}>Added {l.name} ({l.sku}) · Qty {l.qty} · RM {money(l.qty * l.unit)}</li>;
-          if (l.removed) return <li key={l.id}>Cancelled {l.name} ({l.sku}) · Qty {l.qty} · RM {money(l.qty * l.unit)}</li>;
-          if (was && (was.qty !== l.qty || was.unit !== l.unit || was.sku !== l.sku))
-            return <li key={l.id}>{l.name}: Qty {was.qty} → {l.qty} · Amount RM {money(was.qty * was.unit)} → RM {money(l.qty * l.unit)}</li>;
-          return null;
-        })}
-        <li className="text-kit-slate-11">Reason for change: {amendment.reason}</li>
-      </ul>
-      <div className="mt-3 border-t border-kit-amber-6 pt-3 text-body text-kit-slate-12">
-        <p className="text-meta text-kit-slate-11">Before approval</p>
-        {amendment.lines.filter((l) => LINKS[l.id] && (l.removed || (savedLines.find((s) => s.id === l.id)?.qty ?? 0) > l.qty)).map((l) => (
-          <p key={l.id}>{l.name}: {LINKS[l.id].po} · {LINKS[l.id].poState} — Purchasing settles it with the supplier; made, shipped or received goods are not cancelled automatically</p>
-        ))}
-        <p>Total payable RM {money(sum(savedLines))} → RM {money(sum(amendment.lines))} · Paid to date RM {money(paid)}
-          {paid > sum(amendment.lines) ? ` — RM ${money(paid - sum(amendment.lines))} needs review in Payments` : ""}</p>
-      </div>
-      {amendment.status === "waiting" && viewer === "management" && (
-        <div className="mt-3 flex flex-col gap-3 border-t border-kit-amber-6 pt-3">
-          <div className="flex flex-col gap-1"><Label htmlFor="decision">Management decision reason</Label>
-            <Textarea id="decision" rows={2} value={decision} onChange={(e) => setDecision(e.target.value)} /></div>
-          <div className="flex justify-end gap-2">
-            <Button variant="neutral" disabled={!decision.trim()} onClick={reject}>{decision.trim() ? "Reject" : "Reject — say why"}</Button>
-            <Button variant="primary" onClick={approve}>Approve and apply</Button>
-          </div>
-        </div>
-      )}
-      {amendment.status === "waiting" && viewer === "operation" && (
-        <p className="mt-3 border-t border-kit-amber-6 pt-3 text-meta text-kit-slate-11">Preview: switch “Looking as” to Management to approve or reject.</p>
-      )}
-      {amendment.status === "rejected" && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-kit-amber-6 pt-3">
-          <p className="text-body text-kit-slate-12">Rejected by Jess · Tue, 22 Sep 2026 11:40 — {amendment.decision}</p>
-          <Button variant="neutral" onClick={() => setAmendment(null)}>Close</Button>
-        </div>
-      )}
-    </section>
-  );
-
-  /* one field: label above; grey box in view, kit field in edit, Was: when changed */
-  const F = (k: keyof Form, label: string, kind: "text" | "tel" | "email" | "date" | "lift" = "text") => {
-    const show = kind === "date" ? day(shownForm[k]) : shownForm[k];
-    if (!editing) return <div className="flex min-w-0 flex-col gap-1"><Label>{label}</Label><GreyBox>{show}</GreyBox></div>;
-    const control =
-      kind === "date" ? <DatePicker id={k} value={form[k]} onChange={(v) => set(k)(v ?? saved[k])} />
-      : kind === "lift" ? <Select id={k} value={form[k]} onValueChange={set(k)} options={[{ value: "No lift", label: "No lift" }, { value: "Has lift", label: "Has lift" }]} />
-      : <Input id={k} type={kind} value={form[k]} onChange={(e) => set(k)(e.target.value)} />;
+  /* ── Before / After review (draft, request) ── */
+  const beforeAfter = (f: Form, ls: Line[], base: Version) => {
+    const fieldRows = keys.filter((k) => f[k] !== base.form[k]).map((k) => ({
+      what: LABEL[k], before: isDate(k) ? day(base.form[k]) : base.form[k], after: isDate(k) ? day(f[k]) : f[k],
+    }));
+    const lineRows = ls.filter((l) => lineChanged(l, base.lines.find((b) => b.id === l.id))).map((l) => {
+      const was = base.lines.find((b) => b.id === l.id);
+      return {
+        what: `${l.name} (${skuOf(l)})`,
+        before: l.added || !was ? "—" : `${was.qty} × ${money(was.unit)}${configText(was) ? ` · ${configText(was)}` : ""}`,
+        after: l.removed ? "Cancelled" : `${l.qty} × ${money(l.unit)}${configText(l) ? ` · ${configText(l)}` : " · choose the configuration"}`,
+      };
+    });
+    const rows = [
+      ...fieldRows, ...lineRows,
+      { what: "Goods lines · Physical pieces · Service quantity", before: `${goodsLines(base.lines)} · ${pieces(base.lines)} · ${serviceQty(base.lines)}`, after: `${goodsLines(ls)} · ${pieces(ls)} · ${serviceQty(ls)}` },
+      { what: "Total payable", before: `RM ${money(total(base.lines))}`, after: `RM ${money(total(ls))}` },
+    ];
+    const impacts = [
+      ...keys.filter((k) => f[k] !== base.form[k] && IMPACT[k]).map((k) => `${LABEL[k]}: ${IMPACT[k]}`),
+      ...ls.filter((l) => lineChanged(l, base.lines.find((b) => b.id === l.id)) && LINKS[l.id]).map((l) => `${l.name}: ${LINKS[l.id]}`),
+      ...(ls.some((l) => l.added) ? ["New goods: Purchasing buys them after approval"] : []),
+      ...(ls.some((l) => l.removed && l.id === "l1") && ls.some((l) => l.kind === "gift" && !l.removed) ? ["Free gift: check the gift is still allowed without the cancelled mattress"] : []),
+      ...(total(ls) !== total(base.lines) ? [`Payments: ${total(ls) < PAID ? `RM ${money(PAID - total(ls))} paid more than the new total — Payments reviews a refund` : `balance due becomes RM ${money(Math.max(total(ls) - PAID, 0))}`}`] : []),
+    ];
     return (
-      <div className="flex min-w-0 flex-col gap-1">
-        <Label htmlFor={k}>{label}</Label>
-        {control}
-        {form[k] !== saved[k] && <Was>{kind === "date" ? day(saved[k]) : saved[k]}</Was>}
-      </div>
+      <>
+        <table className="w-full border-collapse text-body">
+          <thead><tr className="border-b border-kit-slate-5"><th className={th} /><th className={th}>Before</th><th className={th}>After</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.what} className="border-b border-kit-slate-5 align-top">
+                <td className="px-2 py-2 text-kit-slate-11">{r.what}</td>
+                <td className="px-2 py-2 text-kit-slate-11">{r.before}</td>
+                <td className="px-2 py-2 font-semibold text-kit-slate-12">{r.after}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {commercialOf(f, ls, base) && impacts.length > 0 && (
+          <>
+            <p className="mt-3 text-meta text-kit-slate-11">Before approval</p>
+            <ul className="mt-1 space-y-1 text-body text-kit-slate-12">{impacts.map((t) => <li key={t}>{t}</li>)}</ul>
+          </>
+        )}
+      </>
     );
   };
 
-  const soInfo = (
-    <Card title="SO info">
-      <Grid>
-        <div className="flex min-w-0 flex-col gap-1"><Label>SO Doc Date</Label><Plain>{day("2026-08-21")}</Plain></div>
-        {F("proceed", "Proceed Date", "date")}
-        {F("requested", "Customer Requested Delivery Date", "date")}
-        {F("location", "Sales Location")}{F("salesperson", "Salesperson")}{F("dealer", "Dealer")}
-      </Grid>
-    </Card>
-  );
-  const customer = (
-    <Card title="Customer" aside={<span className="text-meta text-kit-slate-11">Existing customer · <a className="text-kit-blue-11 hover:underline" href="#customer">3 orders ›</a></span>}>
-      <Grid>
-        {F("name", "Full name")}{F("phone", "Phone", "tel")}{F("email", "Email", "email")}
-        {F("race", "Race")}{F("gender", "Gender")}{F("birthday", "Birthday", "date")}
-      </Grid>
-      <SubTitle>Emergency contact</SubTitle>
-      <Grid>{F("emName", "Name")}{F("emPhone", "Phone", "tel")}{F("emRel", "Relationship")}</Grid>
-      <SubTitle>Billing</SubTitle>
-      <div className="sm:w-2/3">{F("billing", "Billing address")}</div>
-    </Card>
-  );
-  const delivery = (
-    <Card title="Delivery">
-      <Grid>
-        {F("line1", "Address line 1")}{F("line2", "Address line 2")}{F("postcode", "Postcode")}
-        {F("city", "City")}{F("state", "State")}{F("building", "Building type")}
-        {F("floor", "Floor (Max is 3rd Floor)")}{F("lift", "Lift available?", "lift")}{F("stair", "Items needing stair carry")}
-      </Grid>
-    </Card>
-  );
-
-  const cellInput = "h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12";
-  const items = (
-    <Card title="Items">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] border-collapse text-body">
-          <thead>
-            <tr className="border-b border-kit-slate-5 text-left text-meta text-kit-slate-11">
-              <th className="w-8 whitespace-nowrap px-2 py-1 font-normal">#</th>
-              <th className="whitespace-nowrap w-32 px-2 py-1 font-normal">Item Code</th>
-              <th className="px-2 py-1 font-normal">Description</th>
-              <th className="whitespace-nowrap w-16 px-2 py-1 text-center font-normal">Qty</th>
-              <th className="whitespace-nowrap w-28 px-2 py-1 text-right font-normal">Unit (RM)</th>
-              <th className="whitespace-nowrap w-16 px-2 py-1 text-right font-normal">Disc (RM)</th>
-              <th className="whitespace-nowrap w-28 px-2 py-1 text-right font-normal">Amount (RM)</th>
-              {editing && <th className="w-24 px-2 py-1" />}
-            </tr>
-          </thead>
-          <tbody>
-            {shownLines.map((l, i) => {
-              const was = savedLines.find((s) => s.id === l.id);
-              const gone = l.removed;
-              const strike = gone ? "line-through text-kit-slate-11" : "";
-              return (
-                <tr key={l.id} className="border-b border-kit-slate-5 align-top">
-                  <td className={`px-2 py-1 tabular-nums text-kit-slate-11 ${strike}`}><span className="flex min-h-8 items-center">{i + 1}</span></td>
-                  <td className="px-1 py-1">
-                    {editing && !gone ? <input id={`code-${l.id}`} aria-label={`Item Code line ${i + 1}`} className={cellInput} value={l.sku} onChange={(e) => patchLine(l.id, { sku: e.target.value })} />
-                      : <GreyBox><span className={`whitespace-nowrap font-mono text-meta ${strike}`}>{l.sku}</span></GreyBox>}
-                  </td>
-                  <td className="min-w-[140px] px-2 py-1">
-                    <div className={`flex min-h-8 items-center ${strike}`}>{l.name}</div>
-                    {l.config && <div className={`text-meta text-kit-slate-11 ${strike}`}>{l.config}</div>}
-                    {editing && l.added && <div className="text-meta text-kit-blue-11">Added</div>}
-                    {editing && gone && <div className="whitespace-nowrap text-meta text-kit-red-11">Removed</div>}
-                  </td>
-                  <td className="px-1 py-1 text-center">
-                    {editing && !gone ? <input id={`qty-${l.id}`} aria-label={`Qty line ${i + 1}`} type="number" min={1} className={`${cellInput} text-center`} value={l.qty}
-                        onChange={(e) => patchLine(l.id, { qty: Math.max(1, Number(e.target.value) || 1) })} />
-                      : <GreyBox><span className={`w-full text-center tabular-nums ${strike}`}>{l.qty}</span></GreyBox>}
-                    {editing && !gone && was && was.qty !== l.qty && <Was>{was.qty}</Was>}
-                  </td>
-                  <td className="px-1 py-1 text-right">
-                    {editing && !gone ? <input id={`unit-${l.id}`} aria-label={`Unit price line ${i + 1}`} type="number" min={0} step="0.01" className={`${cellInput} text-right`} value={l.unit}
-                        onChange={(e) => patchLine(l.id, { unit: Math.max(0, Number(e.target.value) || 0) })} />
-                      : <GreyBox><span className={`w-full text-right tabular-nums ${strike}`}>{money(l.unit)}</span></GreyBox>}
-                    {editing && !gone && was && was.unit !== l.unit && <Was>{money(was.unit)}</Was>}
-                  </td>
-                  <td className={`px-2 py-1 text-right text-kit-slate-11 ${strike}`}><span className="flex min-h-8 items-center justify-end">—</span></td>
-                  <td className={`px-2 py-1 text-right tabular-nums ${strike}`}>
-                    <span className="flex min-h-8 items-center justify-end">{money(l.qty * l.unit)}</span>
-                    {editing && !gone && was && was.qty * was.unit !== l.qty * l.unit && <Was>{money(was.qty * was.unit)}</Was>}
-                  </td>
-                  {editing && (
-                    <td className="px-1 py-1 text-right">
-                      {gone
-                        ? <Button size="sm" variant="ghost" icon="back" onClick={() => patchLine(l.id, { removed: false })}>Undo</Button>
-                        : l.added
-                          ? <Button size="sm" variant="ghost" icon="delete" onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}>Remove</Button>
-                          : <Button size="sm" variant="ghost" icon="delete" onClick={() => patchLine(l.id, { removed: true })}>Remove</Button>}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="font-semibold text-kit-slate-12">
-              <td colSpan={3} className="px-2 py-2 text-right">TOTAL PAYABLE</td>
-              <td className="px-2 py-2 text-center tabular-nums">{goodsQty(shownLines)} pcs</td>
-              <td colSpan={2} />
-              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
-                RM {money(total)}
-                {editing && total !== sum(savedLines) && <Was>RM {money(sum(savedLines))}</Was>}
-              </td>
-              {editing && <td />}
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      {editing && (
-        <div className="mt-2">
-          <Button variant="ghost" icon="add" disabled={lines.some((l) => l.id === NEW_LINE.id)} onClick={() => setLines((ls) => [...ls, { ...NEW_LINE }])}>Add item</Button>
-        </div>
-      )}
-    </Card>
-  );
-
-  const payment = (
-    <Card title="Payment" aside={<a className="text-meta text-kit-blue-11 hover:underline" href="#payments">Open this order in Payments →</a>}>
-      <p className="mb-2 text-meta text-kit-slate-11">Payment details recorded at sale: 12-month instalment · BANK-REFERENCE · <a className="text-kit-blue-11 hover:underline" href="#slip">View slip</a></p>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] border-collapse text-body">
-          <thead>
-            <tr className="border-b border-kit-slate-5 text-left text-meta text-kit-slate-11">
-              <th className="whitespace-nowrap px-2 py-1 font-normal">Date</th><th className="whitespace-nowrap px-2 py-1 font-normal">Payment received</th>
-              <th className="whitespace-nowrap px-2 py-1 font-normal">Approval code</th><th className="whitespace-nowrap px-2 py-1 font-normal">Collected by</th>
-              <th className="whitespace-nowrap px-2 py-1 text-right font-normal">Amount (RM)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PAYMENTS.map((p) => (
-              <tr key={p.receipt} className={`border-b border-kit-slate-5 align-top ${p.voided ? "text-kit-slate-11" : "text-kit-slate-12"}`}>
-                <td className="whitespace-nowrap px-2 py-2">{day(p.date)}</td>
-                <td className="px-2 py-2">{p.method}
-                  <div className="whitespace-nowrap text-meta"><a className="text-kit-blue-11 hover:underline" href="#receipt">{p.receipt}</a></div>
-                  {p.voided && <div className="text-meta text-kit-red-11">Voided · Keyed on the wrong order</div>}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2 font-mono text-meta">{p.code}</td>
-                <td className="px-2 py-2">{p.by}</td>
-                <td className={`px-2 py-2 text-right tabular-nums ${p.voided ? "line-through" : ""}`}>{money(p.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="text-kit-slate-12">
-            <tr className="border-b border-kit-slate-5 font-semibold">
-              <td colSpan={4} className="px-2 py-2 text-right">TOTAL RECEIVED</td>
-              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(paid)}</td>
-            </tr>
-            {([
-              ["Goods total", `RM ${money(total)}`],
-              ["Tax", "—"],
-              ["Total payable", `RM ${money(total)}`],
-              ["Paid to date", `RM ${money(paid)}`],
-            ] as const).map(([k, v]) => (
-              <tr key={k} className="border-b border-kit-slate-5">
-                <td colSpan={4} className="px-2 py-2 text-right">{k}</td>
-                <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${v === "—" ? "text-kit-slate-11" : ""}`}>{v}</td>
-              </tr>
-            ))}
-            <tr className="font-semibold">
-              <td colSpan={4} className="px-2 py-2 text-right">Balance due</td>
-              <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${total - paid > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total - paid, 0))}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      {paid > total && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(paid - total)} needs review</p>}
-    </Card>
-  );
-
-  const reasonBlock = editing && reasonNeeded && (
+  const review = editing && changes > 0 && (
     <section className="rounded-control border border-kit-blue-6 bg-kit-blue-2 px-4 py-3">
-      <p className="mb-3 text-body text-kit-slate-12">
-        {blockedByOpen
-          ? "An earlier change is still waiting for management. Contact and delivery changes can still be saved."
-          : amend
-            ? `${directKeys.length ? `${directKeys.length} ${directKeys.length === 1 ? "change saves" : "changes save"} now. ` : ""}${approvalCount} ${approvalCount === 1 ? "change goes" : "changes go"} for approval.`
-            : "This change makes a new Revision."}
+      <p className="mb-2 text-body font-semibold text-kit-slate-12">
+        {blockedByOpen ? "An earlier change is still waiting for management." : commercial ? "These changes go for approval. The order stays as it is until approved." : "This correction saves as a new revision."}
       </p>
-      <p className="text-meta text-kit-slate-11">What changes</p>
-      <ul className="mb-3 mt-1 space-y-1 text-body text-kit-slate-12">
-        {changedKeys.filter((k) => LABEL[k]).map((k) => (
-          <li key={k}>{LABEL[k]}: {k === "proceed" || k === "requested" ? `${day(saved[k])} → ${day(form[k])}` : `${saved[k]} → ${form[k]}`}</li>
-        ))}
-        {lineChanges.map((l) => {
-          const was = savedLines.find((x) => x.id === l.id);
-          if (l.added) return <li key={l.id}>Add {l.name} ({l.sku}) · Qty {l.qty} · + RM {money(l.qty * l.unit)}</li>;
-          if (l.removed) return <li key={l.id}>Cancel {l.name} ({l.sku}) · Qty {l.qty} · − RM {money(l.qty * l.unit)}</li>;
-          return <li key={l.id}>{l.name}: Qty {was?.qty} → {l.qty} · RM {money((was?.qty ?? 0) * (was?.unit ?? 0))} → RM {money(l.qty * l.unit)}</li>;
-        })}
-        {lineChanges.length > 0 && <li className="font-semibold">Total payable RM {money(sum(savedLines))} → RM {money(sum(lines))}</li>}
-      </ul>
-      {lineChanges.length > 0 && (
-        <>
-          <p className="text-meta text-kit-slate-11">What it touches</p>
-          <ul className="mb-3 mt-1 space-y-1 text-body text-kit-slate-12">
-            {lineChanges.filter((l) => LINKS[l.id]).map((l) => (
-              <li key={l.id}>{l.name}: {LINKS[l.id].po} · {LINKS[l.id].poState}{LINKS[l.id].unit ? ` · Unit ID ${LINKS[l.id].unit}` : ""} — {LINKS[l.id].po === "Ready stock" ? "Warehouse keeps the Unit until the change is decided" : "Purchasing settles it with the supplier"}</li>
-            ))}
-            {lineChanges.some((l) => l.added) && <li>New goods — Purchasing buys them after the change is decided</li>}
-            <li>Delivery Order: not created yet — nothing to change</li>
-            {sum(lines) < paid && <li>Paid to date RM {money(paid)} is more than the new total — RM {money(paid - sum(lines))} needs review in Payments</li>}
-          </ul>
-        </>
-      )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {beforeAfter(form, lines, current)}
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1"><Label htmlFor="asked">Requested date (from customer)</Label><DatePicker id="asked" value={asked} onChange={setAsked} /></div>
         <div className="flex flex-col gap-1 sm:col-span-2"><Label htmlFor="why">Reason for change *</Label>
-          <Textarea id="why" required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          <Textarea id="why" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        {commercial && (
+          <div className="flex flex-col gap-1 sm:col-span-3"><Label htmlFor="evidence">Customer agreement evidence</Label>
+            <Input id="evidence" placeholder="WhatsApp from the customer, Tue 22 Sep 09:40 — or the signed document" value={evidence} onChange={(e) => setEvidence(e.target.value)} />
+            <span className="text-meta text-kit-slate-11">You can send the request without it, but management cannot approve until it is recorded.</span></div>
+        )}
       </div>
     </section>
   );
 
-  const pending = amendment?.status === "waiting";
+  const requestPanel = request && !editing && (
+    <section className="rounded-control border border-kit-amber-7 bg-kit-amber-2 px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-strong text-kit-slate-12">{request.status === "rejected" ? "Rejected" : "Waiting for management"}</h2>
+        <span className="text-meta text-kit-slate-11">Submitted by Shasha · {NOW}</span>
+      </div>
+      <p className="mb-2 mt-1 text-body text-kit-slate-12">Reason for change: {request.reason}</p>
+      {beforeAfter(request.form, request.lines, current)}
+      <p className="mt-3 text-body text-kit-slate-12">
+        Customer agreement evidence: {request.evidence ? request.evidence : <span className="text-kit-red-11">Not recorded yet — the change cannot take effect</span>}
+      </p>
+      {request.status === "waiting" && APPROVER && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-kit-amber-6 pt-3">
+          <div className="flex flex-col gap-1"><Label htmlFor="decision">Management decision reason</Label>
+            <Textarea id="decision" rows={2} value={decision} onChange={(e) => setDecision(e.target.value)} /></div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="neutral" disabled={!decision.trim()} onClick={reject}>{decision.trim() ? "Reject" : "Reject — say why"}</Button>
+            <Button variant="primary" disabled={!request.evidence} onClick={approve}>{request.evidence ? "Approve and apply" : "Approve and apply — needs customer agreement evidence"}</Button>
+          </div>
+        </div>
+      )}
+      {request.status === "rejected" && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-kit-amber-6 pt-3">
+          <p className="text-body text-kit-slate-12">Rejected by Jess · Tue, 22 Sep 2026 11:40 — {request.decision}. The order is unchanged.</p>
+          <Button variant="neutral" onClick={() => setRequest(null)}>Close</Button>
+        </div>
+      )}
+    </section>
+  );
+
+  /* ── fields: grey = editable, plain = not this page's to change ── */
+  const orderCards = (src: Version, readOnly: boolean) => {
+    const edit = editing && !readOnly;
+    const ls = readOnly ? src.lines : edit ? lines : current.lines;
+    const G = (k: keyof Form, kind: "text" | "tel" | "email" | "date" | "lift" = "text") => {
+      const label = SHORT[k] ?? LABEL[k];
+      if (!edit) return <div className="flex min-w-0 flex-col gap-1"><Label>{label}</Label><GreyBox>{isDate(k) ? day(src.form[k]) : src.form[k]}</GreyBox></div>;
+      const control =
+        kind === "date" ? <DatePicker id={k} value={form[k]} onChange={(v) => set(k)(v ?? current.form[k])} />
+        : kind === "lift" ? <Select id={k} value={form[k]} onValueChange={set(k)} options={[{ value: "No lift", label: "No lift" }, { value: "Has lift", label: "Has lift" }]} />
+        : <Input id={k} type={kind} value={form[k]} onChange={(e) => set(k)(e.target.value)} />;
+      return <div className="flex min-w-0 flex-col gap-1"><Label htmlFor={k}>{label}</Label>{control}</div>;
+    };
+    return (
+      <>
+        <Card title="SO info">
+          <Grid>
+            <div className="flex min-w-0 flex-col gap-1"><Label>SO Doc Date</Label><Plain>{day("2026-08-21")}</Plain></div>
+            {G("proceed", "date")}{G("requested", "date")}{G("location")}{G("salesperson")}{G("dealer")}
+          </Grid>
+        </Card>
+        <Card title="Customer" aside={<span className="text-meta text-kit-slate-11">Existing customer · <a className="text-kit-blue-11 hover:underline" href="#customer">3 orders ›</a></span>}>
+          <Grid>{G("name")}{G("phone", "tel")}{G("email", "email")}{G("race")}{G("gender")}{G("birthday", "date")}</Grid>
+          <SubTitle>Emergency contact</SubTitle>
+          <Grid>{G("emName")}{G("emPhone", "tel")}{G("emRel")}</Grid>
+          <SubTitle>Billing</SubTitle>
+          <div className="sm:w-2/3">{G("billing")}</div>
+        </Card>
+        <Card title="Delivery">
+          <Grid>
+            {G("line1")}{G("line2")}{G("postcode")}{G("city")}{G("state")}{G("building")}
+            {G("floor")}{G("lift", "lift")}{G("stair")}
+          </Grid>
+        </Card>
+        <Card title="Items">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-body">
+              <thead>
+                <tr className="border-b border-kit-slate-5">
+                  <th className={`${th} w-8`}>#</th><th className={`${th} w-28`}>Item Code</th><th className={th}>Description</th>
+                  <th className={`${th} w-20 text-center`}>Qty</th><th className={`${th} w-28 text-right`}>Unit (RM)</th>
+                  <th className={`${th} w-16 text-right`}>Disc (RM)</th><th className={`${th} w-28 text-right`}>Amount (RM)</th>
+                  {edit && <th className={`${th} w-28`} />}
+                </tr>
+              </thead>
+              <tbody>
+                {ls.map((l, i) => {
+                  const was = current.lines.find((c) => c.id === l.id);
+                  const gone = !!l.removed;
+                  const strike = gone ? "line-through text-kit-slate-11" : "";
+                  const model = CATALOGUE.find((m) => m.sku === l.sku);
+                  const canEditGoods = edit && !gone && l.kind === "goods";
+                  const changed = edit && lineChanged(l, was);
+                  return [
+                    <tr key={l.id} className={`${openConfig === l.id && edit ? "" : "border-b border-kit-slate-5"} align-top ${changed && !gone ? "bg-kit-blue-2" : ""}`}>
+                      <td className="px-2 py-1 text-kit-slate-11"><Plain><span className={strike}>{i + 1}</span></Plain></td>
+                      <td className="px-1 py-1">{l.kind === "goods" ? <GreyBox><span className={`whitespace-nowrap ${strike}`}>{skuOf(l)}</span></GreyBox> : <Plain><span className={`whitespace-nowrap ${strike}`}>{skuOf(l)}</span></Plain>}</td>
+                      <td className="min-w-[170px] px-2 py-1">
+                        <div className={`flex min-h-8 items-center ${strike}`}>{l.name}</div>
+                        {configText(l) && <div className={`text-meta text-kit-slate-11 ${strike}`}>{configText(l)}</div>}
+                        {l.note && <div className="text-meta text-kit-slate-11">{l.note}</div>}
+                        {edit && l.added && <div className="text-meta text-kit-blue-11">New line</div>}
+                        {canEditGoods && model?.options && (
+                          <button type="button" className="mt-1 text-meta text-kit-blue-11 hover:underline" aria-expanded={openConfig === l.id}
+                            onClick={() => setOpenConfig(openConfig === l.id ? null : l.id)}>
+                            {openConfig === l.id ? "Close configuration" : "Configure"}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-1 py-1">
+                        {canEditGoods
+                          ? <input id={`qty-${l.id}`} aria-label={`Qty ${l.name}`} type="number" min={1} className={`${cellInput} text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} value={l.qty} onChange={(e) => patch(l.id, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                          : l.kind === "goods" ? <GreyBox align="center"><span className={strike}>{l.qty}</span></GreyBox> : <Plain align="center"><span className={strike}>{l.qty}</span></Plain>}
+                      </td>
+                      <td className="px-1 py-1">
+                        {canEditGoods
+                          ? <input id={`unit-${l.id}`} aria-label={`Unit price ${l.name}`} type="number" min={0} step="0.01" className={`${cellInput} text-right tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} value={l.unit} onChange={(e) => patch(l.id, { unit: Math.max(0, Number(e.target.value) || 0) })} />
+                          : l.kind === "goods" ? <GreyBox align="right"><span className={`tabular-nums ${strike}`}>{money(l.unit)}</span></GreyBox> : <Plain align="right"><span className={`tabular-nums ${strike}`}>{money(l.unit)}</span></Plain>}
+                      </td>
+                      <td className="px-2 py-1 text-kit-slate-11"><Plain align="right"><span className={strike}>—</span></Plain></td>
+                      <td className="px-2 py-1"><Plain align="right"><span className={`tabular-nums ${strike}`}>{money(l.qty * l.unit)}</span></Plain></td>
+                      {edit && (
+                        <td className="px-1 py-1 text-right">
+                          {gone
+                            ? <Button size="sm" variant="ghost" icon="back" onClick={() => patch(l.id, { removed: false })}>Restore</Button>
+                            : <Button size="sm" variant="ghost" icon="delete" onClick={() => (l.added ? setLines((x) => x.filter((y) => y.id !== l.id)) : patch(l.id, { removed: true }))}>Remove</Button>}
+                        </td>
+                      )}
+                    </tr>,
+                    edit && openConfig === l.id && model?.options ? (
+                      <tr key={`${l.id}-cfg`} className="border-b border-kit-slate-5 bg-kit-slate-2">
+                        <td />
+                        <td colSpan={7} className="px-2 py-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            {model.options.map((o) => (
+                              <div key={o.key} className="flex flex-col gap-1">
+                                <Label htmlFor={`${l.id}-${o.key}`}>{o.label}</Label>
+                                <Select id={`${l.id}-${o.key}`} value={l.config[o.key]} placeholder={`Choose ${o.label.toLowerCase()}`}
+                                  onValueChange={(v) => patch(l.id, { config: { ...l.config, [o.key]: v } })}
+                                  options={o.values.map((v) => ({ value: v, label: v }))} />
+                              </div>
+                            ))}
+                            {model.fixed?.map((x) => (
+                              <div key={x.label} className="flex flex-col gap-1"><Label>{x.label}</Label><Plain>{x.value}</Plain></div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null,
+                  ];
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold text-kit-slate-12">
+                  <td colSpan={3} className="px-2 py-2 text-right">TOTAL PAYABLE</td>
+                  <td colSpan={3} />
+                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(total(ls))}</td>
+                  {edit && <td />}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            {edit ? (
+              <DropdownMenu label="Add item" align="start" trigger={<Button variant="ghost" icon="add">Add item</Button>}
+                items={CATALOGUE.map((m) => ({ key: m.sku, label: `${m.name} · RM ${money(m.unit)}`, onSelect: () => {
+                  const id = `n${Date.now()}`;
+                  setLines((x) => [...x, { id, sku: m.sku, name: m.name, kind: "goods", qty: 1, unit: m.unit, config: {}, fixed: m.fixed?.[0]?.value.split(" (")[0], added: true }]);
+                  setOpenConfig(id);
+                } }))} />
+            ) : <span />}
+            <span className="text-meta text-kit-slate-11">Goods lines {goodsLines(ls)} · Physical pieces {pieces(ls)} · Service quantity {serviceQty(ls)}</span>
+          </div>
+        </Card>
+        <Card title="Payment" aside={<a className="text-meta text-kit-blue-11 hover:underline" href="#payments">Open this order in Payments →</a>}>
+          <p className="mb-2 text-meta text-kit-slate-11">Payment details recorded at sale: 12-month instalment · BANK-REFERENCE · <a className="text-kit-blue-11 hover:underline" href="#slip">View slip</a></p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-body">
+              <thead><tr className="border-b border-kit-slate-5">
+                <th className={th}>Date</th><th className={th}>Payment received</th><th className={th}>Approval code</th><th className={th}>Collected by</th><th className={`${th} text-right`}>Amount (RM)</th>
+              </tr></thead>
+              <tbody>
+                {PAYMENTS.map((p) => (
+                  <tr key={p.receipt} className={`border-b border-kit-slate-5 align-top ${p.voided ? "text-kit-slate-11" : "text-kit-slate-12"}`}>
+                    <td className="whitespace-nowrap px-2 py-2">{day(p.date)}</td>
+                    <td className="px-2 py-2">{p.method}
+                      <div className="whitespace-nowrap text-meta"><a className="text-kit-blue-11 hover:underline" href="#receipt">{p.receipt}</a></div>
+                      {p.voided && <div className="text-meta text-kit-red-11">Voided · Keyed on the wrong order · not counted</div>}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2">{p.code}</td>
+                    <td className="px-2 py-2">{p.by}</td>
+                    <td className={`px-2 py-2 text-right tabular-nums ${p.voided ? "line-through" : ""}`}>{money(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="text-kit-slate-12">
+                {([["Goods total", goodsTotal(ls)], ["Services", serviceTotal(ls)], ["Total payable", total(ls)], ["Paid to date", PAID]] as const).map(([k, v]) => (
+                  <tr key={k} className="border-b border-kit-slate-5">
+                    <td colSpan={4} className="px-2 py-2 text-right">{k}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">RM {money(v)}</td>
+                  </tr>
+                ))}
+                <tr className="font-semibold">
+                  <td colSpan={4} className="px-2 py-2 text-right">Balance due</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${total(ls) - PAID > 0 ? "text-kit-red-11" : ""}`}>RM {money(Math.max(total(ls) - PAID, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {PAID > total(ls) && <p className="mt-1 text-right text-meta text-kit-amber-11">RM {money(PAID - total(ls))} needs review</p>}
+        </Card>
+        <Card title="Customer signature">
+          {src.signed ? (
+            <div className="flex flex-wrap items-end gap-4">
+              <svg viewBox="0 0 160 60" className="h-16 w-40 rounded-control border border-kit-slate-5 bg-white" role="img" aria-label="Customer signature">
+                <path d="M10 40 C 25 10, 35 55, 50 30 S 75 15, 85 38 S 110 50, 125 22 L 150 30" fill="none" stroke="#1A1714" strokeWidth="2" />
+              </svg>
+              <span className="text-body text-kit-slate-12">Signed by {src.form.name} · Rev {src.rev} · Fri, 21 Aug 2026 10:02</span>
+            </div>
+          ) : (
+            <p className="text-body text-kit-slate-12">Rev {src.rev} is not signed. The customer signed Rev 1; that signature stays with Rev 1 and its document.</p>
+          )}
+        </Card>
+      </>
+    );
+  };
+
+  const viewing = viewRev ? versions.find((v) => v.rev === viewRev)! : null;
+  const pending = request?.status === "waiting";
   const order = (
     <div className="flex flex-col lg:h-full lg:min-h-0 lg:flex-row">
       <div className="min-w-0 space-y-4 bg-kit-slate-2 px-4 py-4 lg:min-h-0 lg:w-1/2 lg:overflow-auto" data-pane="form">
-        {toast && <p role="status" className="rounded-control border border-kit-green-6 bg-kit-green-2 px-4 py-2 text-body text-kit-green-11">{toast}</p>}
-        {approval}{reasonBlock}{soInfo}{customer}{delivery}{items}{payment}
+        {viewing ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-kit-slate-5 bg-white px-4 py-3">
+            <span className="text-body text-kit-slate-12"><b>Rev {viewing.rev}</b> · {viewing.title} · {viewing.meta}{viewing.rev === current.rev ? " · Current" : ""}</span>
+            <span className="flex flex-wrap gap-2">
+              <Button variant="neutral" icon="print" onClick={() => void printVersion(viewing)}>Print this version</Button>
+              <Button variant="neutral" icon="back" onClick={() => { setViewRev(null); setTab("Revisions"); }}>Return to current</Button>
+            </span>
+          </div>
+        ) : (
+          <>
+            {toast && <p role="status" className="rounded-control border border-kit-green-6 bg-kit-green-2 px-4 py-2 text-body text-kit-green-11">{toast}</p>}
+            {requestPanel}{review}
+          </>
+        )}
+        {orderCards(viewing ?? current, !!viewing)}
       </div>
       <aside className="min-w-0 border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:min-h-0 lg:w-1/2 lg:overflow-auto lg:border-l lg:border-t-0" aria-label="Sales Order document">
-        {pending && !editing && (
-          <div className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-amber-7 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11">
-            ⚠ Amendment pending approval — the document shows the order as it is now
+        {(pending || editing) && !viewing && (
+          <div className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-white px-3 py-2 text-body text-kit-slate-12">
+            The document shows the order as it is now (Rev {current.rev}). {editing ? "Your changes appear in the review on the left." : "It changes only after approval."}
           </div>
         )}
-        <div className="relative mx-auto max-w-[700px]">
-          <div ref={setPane} className="min-h-[400px] overflow-x-auto" />
-          {editing && changes > 0 && (
-            <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden">
-              <span className="rotate-[-24deg] scale-[2.4] text-page tracking-[0.3em] text-base-900/10">UNSAVED</span>
-            </div>
-          )}
-        </div>
+        <div className="mx-auto max-w-[700px]"><div ref={setPane} className="min-h-[400px] overflow-x-auto" /></div>
       </aside>
     </div>
   );
 
-  const record = (rows: Row[]) => (
-    <ol className="mx-auto max-w-3xl divide-y divide-kit-slate-5 rounded-control border border-kit-slate-5 bg-white">
-      {rows.map((r) => (
-        <li key={r.title + r.meta} className="px-4 py-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <p className="text-body font-semibold text-kit-slate-12">{r.title}</p>
-              <p className="text-meta text-kit-slate-11">{r.meta}</p>
-              {r.note && <p className="text-body text-kit-slate-12">{r.note}</p>}
-            </div>
-            {r.version && (
-              <Button size="sm" variant="neutral" icon="open" onClick={() => setOpenRev(openRev === r.meta ? null : r.meta)}>
-                {openRev === r.meta ? "Close this version" : "Open this version"}
-              </Button>
-            )}
+  const revisionsTab = (
+    <ol className="mx-auto my-6 max-w-3xl divide-y divide-kit-slate-5 rounded-control border border-kit-slate-5 bg-white">
+      {[...versions].reverse().map((v) => (
+        <li key={v.rev} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
+          <div>
+            <p className="text-body font-semibold text-kit-slate-12">{v.title}</p>
+            <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta} · {v.signed ? "Signed" : "Not signed"}</p>
+            {v.reason && <p className="text-body text-kit-slate-12">Reason for change: {v.reason}</p>}
+            <p className="text-meta text-kit-slate-11">Goods lines {goodsLines(v.lines)} · Physical pieces {pieces(v.lines)} · Service quantity {serviceQty(v.lines)} · Total payable RM {money(total(v.lines))}</p>
           </div>
-          {r.version && openRev === r.meta && (
-            <div className="mt-3 rounded-control border border-kit-slate-5 p-3 text-body text-kit-slate-12">
-              <p className="text-meta text-kit-slate-11">The complete order as it was in this version · its own PDF prints from here</p>
-              <p className="mt-1">Customer Requested Delivery Date: {day(r.version.form.requested)} · Proceed Date: {day(r.version.form.proceed)} · Sales Location: {r.version.form.location}</p>
-              <table className="mt-2 w-full text-body">
-                <tbody>
-                  {r.version.lines.map((l, i) => (
-                    <tr key={l.id} className="border-t border-kit-slate-5">
-                      <td className="w-8 py-1 text-kit-slate-11">{i + 1}</td><td className="py-1 font-mono text-meta">{l.sku}</td>
-                      <td className="py-1">{l.name}</td><td className="py-1 text-center tabular-nums">{l.qty}</td>
-                      <td className="py-1 text-right tabular-nums">{money(l.qty * l.unit)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t border-kit-slate-5 font-semibold">
-                    <td colSpan={3} className="py-1 text-right">TOTAL PAYABLE</td>
-                    <td className="py-1 text-center tabular-nums">{goodsQty(r.version.lines)} pcs</td>
-                    <td className="py-1 text-right tabular-nums">RM {money(sum(r.version.lines))}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          <Button size="sm" variant="neutral" icon="open" onClick={() => { setViewRev(v.rev); setTab("Order"); }}>View version</Button>
+        </li>
+      ))}
+    </ol>
+  );
+  const historyTab = (
+    <ol className="mx-auto my-6 max-w-3xl divide-y divide-kit-slate-5 rounded-control border border-kit-slate-5 bg-white">
+      {history.map((h) => (
+        <li key={h.title + h.meta} className="px-4 py-3">
+          <p className="text-body font-semibold text-kit-slate-12">{h.title}</p>
+          <p className="text-meta text-kit-slate-11">{h.meta}</p>
+          {h.note && <p className="text-body text-kit-slate-12">{h.note}</p>}
         </li>
       ))}
     </ol>
@@ -653,17 +643,16 @@ function Page() {
 
   return (
     <div className="flex min-h-screen flex-col bg-kit-slate-2 lg:h-screen">
-      {controls}
       {header}
       <div className="border-b border-kit-slate-5 bg-white px-4">
-        <Tabs label="Sales order views" value={tab} onValueChange={(v) => !editing && setTab(v)}
+        <Tabs label="Sales order views" value={tab} onValueChange={(v) => { if (!editing) { setTab(v); setViewRev(null); } }}
           tabs={["Order", "Revisions", "History", "Order Route"].map((v) => ({ value: v, label: v, disabled: editing && v !== "Order" }))} />
       </div>
       {notice}
       <div className="lg:min-h-0 lg:flex-1">
         {tab === "Order" && order}
-        {tab === "Revisions" && <div className="p-6">{record(revs)}</div>}
-        {tab === "History" && <div className="p-6">{record(hist)}</div>}
+        {tab === "Revisions" && <div className="px-4">{revisionsTab}</div>}
+        {tab === "History" && <div className="px-4">{historyTab}</div>}
         {tab === "Order Route" && <p className="p-6 text-body text-kit-slate-11">Order Route is not changed by this proposal.</p>}
       </div>
     </div>
