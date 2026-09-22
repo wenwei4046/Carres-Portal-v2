@@ -71,7 +71,7 @@ const orders = Array.from({ length: 24 }, (_, n) => {
     po_numbers: i % 7 === 0 ? [`PO-20260910-${4000 + i}`, `PO-20260911-${5000 + i}`] : i % 3 ? [`PO-20260910-${4000 + i}`] : [],
     ops_delivery_orders: i % 5 === 0 ? [{ do_number: `DO-20260915-${7000 + i}` }] : [],
     order_lines: [
-      { id: `line-${i}-1`, sku: i % 2 ? "CODY-SK" : "B1201S-K", qty: 1, unit_price: 2499, attrs: { category: "mattress" } },
+      { id: `line-${i}-1`, sku: i % 2 ? "CODY-SK" : "B1201S-K", qty: 1, unit_price: 2499, attrs: { category: "mattress", fabric_code: "BF-10 Charcoal Velvet", colour: "Deep Ocean Blue" } },
       ...(i % 3 === 0 ? [{ id: `line-${i}-2`, sku: "MEMORY-FOAM-PILLOW-asd", qty: 2, unit_price: 99, attrs: { category: "accessory" } }] : []),
     ],
     order_addons: [],
