@@ -467,6 +467,15 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
   /* Physical pieces only — a service is never a piece (approved 2026-09-22). */
   const totalQty = lines.reduce((n, l) => n + Number(l.qty), 0);
   const goodsAmount = lines.reduce((n, l) => n + Number(l.line_total), 0);
+  /* Owner ruling 2026-09-22: quantities by product kind, services named, never counted as goods. */
+  const kindQty = new Map<string, number>();
+  for (const l of lines) {
+    const k = (l.category ?? "other").trim();
+    const name = k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+    kindQty.set(name, (kindQty.get(name) ?? 0) + Number(l.qty));
+  }
+  const qtyLine = `Qty: ${[...kindQty].map(([k, n]) => `${k} ${n}`).join(" · ")}`;
+  const servicesLine = addons.length ? `Services: ${addons.map((a) => a.label).join(" · ")}` : "";
   const serviceAmount = addons.reduce((n, a) => n + Number(a.line_total), 0);
   const totalDiscount = lines.reduce((n, l) => n + (l.discount && l.discount > 0 ? l.discount : 0), 0);
   const totalAmount =
@@ -496,7 +505,7 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
         node: (
           <View key={`band-${gi}`} style={styles.bandRow} minPresenceAhead={30}>
             <Text style={styles.bandText}>
-              {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
+              {group.band} · Qty {group.rows.reduce((n, r) => n + Number(r.line.qty), 0)}
             </Text>
           </View>
         ),
@@ -555,7 +564,7 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
       node: (
         <View key="addon-band" style={styles.bandRow} minPresenceAhead={30}>
           <Text style={styles.bandText}>
-            SERVICE · {addons.length} {addons.length > 1 ? "items" : "item"}
+            SERVICE
           </Text>
         </View>
       ),
@@ -786,6 +795,10 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
           <View style={[styles.bAmount, styles.gridV]}><Text style={[styles.cellAmount, styles.colAmount]}>{money(totalAmount)}</Text></View>
         </View>
         <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: mm(1.5) }}>
+          <Text style={{ fontSize: 7.5, color: "#1A1714" }}>{qtyLine}</Text>
+          <Text style={{ fontSize: 7.5, color: "#1A1714" }}>{servicesLine}</Text>
+        </View>
 
         {/* Vouchers whose trigger line isn't on the doc (defensive) */}
         {orphanVouchers.length > 0 ? (

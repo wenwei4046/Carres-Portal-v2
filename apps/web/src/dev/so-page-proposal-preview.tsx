@@ -112,12 +112,20 @@ const IMPACT: Partial<Record<keyof Form, string>> = {
 
 /* ── arithmetic: one place, three counts, goods vs services ──────────── */
 const live = (ls: Line[]) => ls.filter((l) => !l.removed);
-const goodsLines = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").length;
-const pieces = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").reduce((n, l) => n + l.qty, 0);
-const serviceQty = (ls: Line[]) => live(ls).filter((l) => l.kind === "service").reduce((n, l) => n + l.qty, 0);
 const goodsTotal = (ls: Line[]) => live(ls).filter((l) => l.kind !== "service").reduce((n, l) => n + l.qty * l.unit, 0);
 const serviceTotal = (ls: Line[]) => live(ls).filter((l) => l.kind === "service").reduce((n, l) => n + l.qty * l.unit, 0);
 const total = (ls: Line[]) => goodsTotal(ls) + serviceTotal(ls);
+/* Owner ruling 2026-09-22: quantities by product kind; services named, never counted as goods. */
+const KIND: Record<string, string> = { M1401F: "Mattress", BR1201: "Bedframe", CP200: "Accessory", "GIFT-PILLOW": "Accessory" };
+const qtyText = (ls: Line[]) => {
+  const m = new Map<string, number>();
+  for (const l of live(ls)) if (l.kind !== "service") m.set(KIND[l.sku] ?? "Other goods", (m.get(KIND[l.sku] ?? "Other goods") ?? 0) + l.qty);
+  return m.size ? `Qty: ${[...m].map(([k, n]) => `${k} ${n}`).join(" · ")}` : "Qty: no goods";
+};
+const servicesText = (ls: Line[]) => {
+  const sv = live(ls).filter((l) => l.kind === "service").map((l) => l.name);
+  return sv.length ? `Services: ${sv.join(" · ")}` : "Services: none";
+};
 const PAID = PAYMENTS.filter((p) => !p.voided).reduce((n, p) => n + p.amount, 0);
 const money = (n: number) => n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const day = (iso: string) => fmtDate(iso);
@@ -344,7 +352,8 @@ function Page() {
     });
     const rows = [
       ...fieldRows, ...lineRows,
-      { what: "Goods lines · Physical pieces · Service quantity", before: `${goodsLines(base.lines)} · ${pieces(base.lines)} · ${serviceQty(base.lines)}`, after: `${goodsLines(ls)} · ${pieces(ls)} · ${serviceQty(ls)}` },
+      { what: "Qty", before: qtyText(base.lines).replace("Qty: ", ""), after: qtyText(ls).replace("Qty: ", "") },
+      ...(servicesText(base.lines) !== servicesText(ls) ? [{ what: "Services", before: servicesText(base.lines).replace("Services: ", ""), after: servicesText(ls).replace("Services: ", "") }] : []),
       { what: "Total payable", before: `RM ${money(total(base.lines))}`, after: `RM ${money(total(ls))}` },
     ];
     const impacts = [
@@ -560,7 +569,7 @@ function Page() {
                   setOpenConfig(id);
                 } }))} />
             ) : <span />}
-            <span className="text-meta text-kit-slate-11">Goods lines {goodsLines(ls)} · Physical pieces {pieces(ls)} · Service quantity {serviceQty(ls)}</span>
+            <span className="flex flex-wrap gap-x-6 text-body text-kit-slate-12"><span>{qtyText(ls)}</span><span>{servicesText(ls)}</span></span>
           </div>
         </Card>
         <Card title="Payment" aside={<a className="text-meta text-kit-blue-11 hover:underline" href="#payments">Open this order in Payments →</a>}>
@@ -662,7 +671,7 @@ function Page() {
             <p className="text-body font-semibold text-kit-slate-12">{v.title}</p>
             <p className="text-meta text-kit-slate-11">Rev {v.rev}{v.rev === current.rev ? " · Current" : ""} · {v.meta} · {v.signedAt ? `Signed ${v.signedAt}` : "Not signed"}</p>
             {v.reason && <p className="text-body text-kit-slate-12">Reason for change: {v.reason}</p>}
-            <p className="text-meta text-kit-slate-11">Goods lines {goodsLines(v.lines)} · Physical pieces {pieces(v.lines)} · Service quantity {serviceQty(v.lines)} · Total payable RM {money(total(v.lines))}</p>
+            <p className="text-meta text-kit-slate-11">{qtyText(v.lines)} · {servicesText(v.lines)} · Total payable RM {money(total(v.lines))}</p>
           </div>
           <Button size="sm" variant="neutral" icon="open" onClick={() => { setViewRev(v.rev); setTab("Order"); }}>View version</Button>
         </li>
