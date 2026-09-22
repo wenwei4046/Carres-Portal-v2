@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- 0558 . EVERY DOOR THAT TAKES MONEY ASKS FOR THE REFERENCE
+-- 0559 . EVERY DOOR THAT TAKES MONEY ASKS FOR THE REFERENCE
 --         (owner, 2026-09-22 - "if the usual way has a guard, the other ways
 --          should have the same guard too")
 --
@@ -120,7 +120,7 @@ begin
     raise exception 'approval amount must be positive' using errcode = '22023';
   end if;
 
-  -- 0558: the section 16 reference, before anything is written. The approval
+  -- 0559: the section 16 reference, before anything is written. The approval
   -- stays pending and the deposit balance does not move.
   perform public._payment_reference_guard(p_method::text, p_reference);
 
@@ -166,7 +166,7 @@ language plpgsql security definer set search_path = public, pg_temp
 as $fn$
 declare v_pay payments;
 begin
-  -- 0558: same guard, same sentences.
+  -- 0559: same guard, same sentences.
   perform public._payment_reference_guard(p_method::text, p_reference);
 
   insert into payments (direction, amount, method, reference, paid_at, receipt_url, recorded_by)
@@ -198,7 +198,7 @@ language plpgsql security definer set search_path = public, pg_temp
 as $fn$
 declare v_pay payments;
 begin
-  -- 0558: same guard, same sentences.
+  -- 0559: same guard, same sentences.
   perform public._payment_reference_guard(p_method::text, p_reference);
 
   insert into payments (direction, amount, method, reference, note, paid_at,
@@ -227,29 +227,29 @@ begin
   select prosrc into v_src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = '_payment_reference_guard';
   if v_src is null then
-    raise exception '0558 sanity: the guard is missing';
+    raise exception '0559 sanity: the guard is missing';
   end if;
   -- The four sentences are 0551s, byte for byte.
   if v_src !~ 'a cheque payment needs its cheque number'
      or v_src !~ 'a card payment needs its approval code'
      or v_src !~ 'a bank transfer needs its reference number'
      or v_src !~ 'a DuitNow QR payment needs its reference number' then
-    raise exception '0558 sanity: a refusal sentence does not match 0551';
+    raise exception '0559 sanity: a refusal sentence does not match 0551';
   end if;
   -- Nothing here may ask cash or the dealer deposit for a number.
   if v_src ~ '''cash''' or v_src ~ '''dealer_deposit''' then
-    raise exception '0558 sanity: cash or dealer deposit was given a rule it cannot answer';
+    raise exception '0559 sanity: cash or dealer deposit was given a rule it cannot answer';
   end if;
   -- Every direct-insert door calls the guard.
   foreach v_name in array array['finance_topup_approve','dealer_topup','order_record_payment'] loop
     select prosrc into v_src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = v_name;
     if v_src is null or v_src !~ '_payment_reference_guard' then
-      raise exception '0558 sanity: % does not call the guard', v_name;
+      raise exception '0559 sanity: % does not call the guard', v_name;
     end if;
   end loop;
   if has_function_privilege('anon', 'public._payment_reference_guard(text,text)', 'execute') then
-    raise exception '0558 sanity: anon may execute the guard';
+    raise exception '0559 sanity: anon may execute the guard';
   end if;
 end;
 $sanity$;
