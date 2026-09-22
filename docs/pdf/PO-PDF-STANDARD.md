@@ -78,7 +78,9 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   PO DETAILS (52mm fixed)`. The two ADDRESS blocks size by content
   (Constitution: content decides column width); only the fixed-fact column
   is fixed. **The supplier prints its FULL address** — a formal document
-  names both parties completely. Detail rows read in time order:
+  names both parties completely. **Both party NAMES print bold (600) — the supplier's
+  `Name` and the DELIVER TO `Name` — addresses regular** (owner, 2026-09-22:
+  one weight for one kind of fact). Detail rows read in time order:
   `PO No · PO Date · PO {n}-Day Delivery Date (bold) · Delivery Method`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
   deliver-to-at-section-2). **A PO may carry one or several Deliver To**
@@ -214,3 +216,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | **Several Deliver To on one PO, one page group each** (Jess): sofa PO = one Deliver To; mattress/bedframe may split; a later move keeps the SAME PO number as a new revision — no second PO, no `Moved from`, no new Unit IDs. Each Deliver To starts on a new page of one PDF; every page carries the PO number and revision. The per-line DELIVER TO column and `Multiple destinations` are deleted; five columns everywhere. Same-day entries that read "split" as separate POs are overwritten. | Jess |
 | 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
 | 2026-09-22 | Several-Deliver-To pages simplified (owner, on the rendered preview): plain `DELIVER TO` with that location's full name and address — `(1 of 2)` deleted; each location's table keeps its `TOTAL`; the last page adds **`PO TOTAL`** (whole-PO quantity, nothing beside it); page count lives in the footer `Page n of m`. Version wording corrected: the version travels with every printed PO identity (`PO No` row, page headers, footer) and never prints on its own. | Jess |
+| 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
