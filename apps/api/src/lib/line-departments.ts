@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { departmentFilterQuery, type DepartmentFilter } from "@carres/shared";
+import { readAllPages, tooManyRows } from "./route-helpers";
 import type { AppEnv } from "../types";
 
 /**
@@ -27,22 +28,43 @@ export function departmentQuery(c: Context<AppEnv>): { ok: true; value: Departme
   };
 }
 
-/** Keep the documents with at least one line in the department. */
+/** The one sentence a register refuses a department filter with. */
+export const TOO_MANY_DEPARTMENT_LINES = "There are too many lines in this department to filter here.";
+
+/** Refuse the register rather than answer it with a shorter list. */
+export function tooManyDepartmentLines(c: Context<AppEnv>) {
+  return tooManyRows(c, TOO_MANY_DEPARTMENT_LINES);
+}
+
+/**
+ * Keep the documents with at least one line in the department.
+ *
+ * The lines are read in PAGES and the read FAILS CLOSED. The first version of
+ * this (PR #1456) read them once with no `.range()`: past PostgREST's 1000-row
+ * ceiling the extra lines never came back, so their documents silently fell
+ * off the bills, payment voucher, other-debtor and other-receipt registers.
+ * No error, just a shorter list — the worst possible answer, because nothing
+ * on screen says a document is missing. `{ tooMany: true }` is now the answer
+ * past the ceiling and the register refuses.
+ */
 export async function keepByDepartment<T>(
   sb: SupabaseClient,
   t: LineTable,
   rows: T[],
   idOf: (r: T) => string,
   f: DepartmentFilter,
-): Promise<{ rows: T[] } | { error: { code?: string; message?: string } }> {
-  if (!f.departmentType) return { rows };
-  // ponytail: one read of matching lines (PostgREST max-rows ceiling); a
-  // department filter in each register function if a list outgrows it.
-  let q = sb.from(t.table).select(t.parent).eq("department_type", f.departmentType);
-  if (f.departmentId) q = q.eq("department_id", f.departmentId);
-  const { data, error } = await q;
-  if (error) return { error };
-  const ids = new Set((data ?? []).map((l) => String((l as Record<string, unknown>)[t.parent])));
+): Promise<{ rows: T[] } | { tooMany: true } | { error: { code?: string; message?: string } }> {
+  const { departmentType, departmentId } = f;
+  if (!departmentType) return { rows };
+  // Ordered by `id`, the line table's primary key: paging on a non-unique
+  // order can miss or repeat a row across two pages.
+  const read = await readAllPages<Record<string, unknown>>((from, to) => {
+    let q = sb.from(t.table).select(t.parent).eq("department_type", departmentType);
+    if (departmentId) q = q.eq("department_id", departmentId);
+    return q.order("id", { ascending: true }).range(from, to);
+  });
+  if (!("rows" in read)) return read;
+  const ids = new Set(read.rows.map((l) => String(l[t.parent])));
   return { rows: rows.filter((r) => ids.has(idOf(r))) };
 }
 

@@ -14,7 +14,7 @@ import {
   type ToOrderProposal,
 } from "@carres/shared";
 import { loadPurchasingSettings } from "./purchasing-settings";
-import { mapPgError } from "./route-helpers";
+import { mapPgError, readAllPages } from "./route-helpers";
 import { userClient } from "./supabase";
 import { todayIsoMYT } from "./today";
 
@@ -67,6 +67,9 @@ export function todayIso(): string {
  * NAMED instead of skipped.
  */
 const IN_CHUNK = 40;
+
+/** The one sentence the demand read refuses an over-long open-PO read with. */
+export const TOO_MANY_OPEN_PO_LINES = "There are too many open purchase order lines to plan here.";
 
 export function chunk<T>(xs: readonly T[], n = IN_CHUNK): T[][] {
   const out: T[][] = [];
@@ -812,15 +815,30 @@ export async function loadToOrder(
    */
   const openPoRefs: Record<string, { poId: string; qty: number }[]> = {};
   {
-    const { data: poLines, error: poErr } = await sb
+    // Paged and fail-closed. Read once with no `.range()` this was the same
+    // unbounded read the Finance department filter shipped twice: past 1000
+    // open PO lines the rest never came back, `openPoBySku` under-counted the
+    // cover already on order, and the engine proposed buying goods a supplier
+    // is already making. Ordered by `id` — paging on a non-unique order can
+    // miss or repeat a row across two pages.
+    const read = await readAllPages<Record<string, unknown>>((a, b) => sb
       .from("purchase_order_lines")
       .select("po_id, sku, qty, received_qty, purchase_orders!inner(status)")
-      .eq("purchase_orders.status", "open");
-    if (poErr) {
-      const m = mapPgError(poErr);
+      .eq("purchase_orders.status", "open")
+      .order("id", { ascending: true })
+      .range(a, b));
+    if ("error" in read) {
+      const m = mapPgError(read.error);
       return { ok: false, status: m.status, body: m.body };
     }
-    for (const r of poLines ?? []) {
+    if (!("rows" in read)) {
+      return {
+        ok: false,
+        status: 422,
+        body: { error: "invalid_param", code: "too_many_rows", message: TOO_MANY_OPEN_PO_LINES },
+      };
+    }
+    for (const r of read.rows) {
       const remaining = Number(r.qty ?? 0) - Number(r.received_qty ?? 0);
       if (remaining <= 0) continue;
       const sku = r.sku as string;
