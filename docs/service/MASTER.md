@@ -187,6 +187,14 @@ A higher-model request creates a Subscription Upgrade with the necessary money, 
 delivery and asset records. A related Case may explain why, but never substitutes for those
 transactions.
 
+**Subscription lifecycle confirmation — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-23.**
+Rental §5.9 owns the confirmed programme flow: customer receipt with accepted proof precedes
+service activation; Subscription centrally exposes contract/Unit/delivery/visit/history facts.
+A booking consumes no cleaning credit; accepted completion does. Upgrade recovery and new delivery,
+and subscription end versus physical recovery, stay separately evidenced. Normal visits remain
+outside Service Cases; complaints/failures use the Case boundary above. No billing or new commercial
+policy is approved by this confirmation, and the object layout remains a proposal.
+
 ### CONDITION-GATED CUSTOMER COLLECTION — OWNER-RULED 2026-08-14
 
 **Local implementation note — 2026-09-07, not deployed:** Case links now open exact-Unit return or

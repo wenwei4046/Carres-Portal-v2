@@ -270,6 +270,19 @@ forecast model or automatic purchasing based on speculative orders is approved h
 unreceived orders into confirmed demand. Delivery, Purchasing, Stock and Payments retain all write
 ownership; historical deliveries and documents remain unchanged by the reporting view.
 
+**Diglant Subscription advance-supply boundary — OWNER-APPROVED TARGET / NOT BUILT,
+Jess 2026-09-22.** `../rental/MASTER.md` §4/§5.6 owns the new programme's ruling: an approved
+advance PO may exist before any customer SO. Later customer demand first checks eligible stock
+and evidenced existing PO supply; only verified uncovered demand goes to additional procurement.
+Do not purchase the same covered quantity again when the SO arrives. Expected or unverified supply
+is not Ready Stock. This approves the business boundary, not automatic purchasing, a new forecast
+formula or a second allocation authority. Existing approval/eligibility rules remain; this does
+not change the current page, request form, PO template or confirmed-demand report population. The
+subsequently approved handling matrix in Rental §5.6 distinguishes eligible stock, completed goods
+held at Diglant, production under an existing PO, verified shortage and unknown evidence. Resolve
+unknowns before buying; a timing shortfall is not an automatic quantity purchase; evaluate each SO
+line separately. The operating target is approved, not built; expected supply remains non-Ready Stock.
+
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,

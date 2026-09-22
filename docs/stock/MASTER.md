@@ -129,6 +129,13 @@ event Purchasing uses to create a Consignment Sale Notice. Stock records the own
 consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
 refused delivery emits no sale event.
 
+**Diglant Subscription supply handling — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-22.**
+Rental §5.6 owns the programme's five-case operating matrix. Completed goods held at Diglant and
+production covered by a PO are distinguishable expected supply, not a fabricated warehouse receipt
+or automatic Ready Stock qualification. Unknown evidence is not zero supply. Each customer line
+checks existing coverage before additional procurement; enough quantity arriving late is a timing
+risk, not an automatic new purchase. Preserve the eligibility and exact-Unit authority below.
+
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.

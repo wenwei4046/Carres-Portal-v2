@@ -1612,6 +1612,28 @@ onward journey and the customer contact. Carres' governed facts end at the HOUZS
 arrival proof HOUZS returns. Falsifier: an actual East Malaysia delivery carried by another
 partner, or Carres contacting the East Malaysia customer directly.
 
+**New Diglant Subscription scope — owner clarification, 2026-09-22.** The initial storage
+ruling lives in `../rental/MASTER.md` §4 and §5.8: completed mattresses stay at Diglant Klang;
+Carres arranges Logistics pickup. Jess explicitly selects NETS for short-term Klang Valley
+delivery in this new programme as well as its legacy work. This is not nationwide coverage.
+Other regions' partners, capacity and rates remain to be established; the legacy HOUZS route is
+not automatically an appointment for Diglant. The 100/200/500 monthly KPI scenarios are not actual
+or guaranteed volume; regional actual demand informs later partner selection and volume/rate
+negotiation. Jess confirmed the reporting target: regional actual volume, weekly consolidated
+pickup quantity/frequency, complete transport cost per mattress delivered, and waiting/delay/damage/
+redelivery performance (APPROVED TARGET / NOT BUILT). Rental §5.8 owns this planning/report scope;
+Delivery remains owner of its physical evidence. Preserve the legacy rules above.
+Reuse Delivery's Unit evidence and route-planning ownership without inventing a Carres warehouse
+receipt or claiming the factory-origin route is built. The approximately 3–6 month business review
+is not an automatic move into Carres storage.
+
+**Subscription service-start witness — OWNER-APPROVED TARGET / NOT BUILT, 2026-09-23.**
+Rental §5.9 owns service activation after actual customer receipt and acceptance of its proof.
+Factory pickup or an intermediate partner arrival is not that event. Delivery owns the receipt
+and proof; Subscription reads them without a second completion writer. Upgrade old-Unit recovery
+and new-Unit delivery, and termination versus physical recovery, retain separate results. This
+confirmation does not alter billing rules, DO release gates or claim the full route is built.
+
 ### 14.2 · Loan
 
 Loan is conditional and appears only when a real stock delay and a customer decision create the
