@@ -728,6 +728,14 @@ impact → Save or Submit amendment request → approval takes effect → each o
   document; a missing historical file is stated, never rebuilt from current data. A signature belongs
   to the exact version and document the customer signed; a new unsigned version says it is unsigned and
   never borrows the old signature.
+  **BUILT 2026-09-23, and the boundary is stated rather than implied:** a revision prints from its
+  own immutable snapshot with the payments recorded by that revision's own time, and the customer
+  signature only on the revision the customer signed (Rev 1, the Sales Portal's capture at birth);
+  every later version — including the current one after any revision — prints as unsigned.
+  ⚠️ **RETAINED DOCUMENT FILES ARE NOT STORED YET.** The historical document is re-rendered from
+  the immutable snapshot, not read back from a stored PDF, so a template change alters how an old
+  version LOOKS while its facts stay the version's own. Storing the issued file at approval is the
+  remaining work.
 - **Proposal tooling stays out of the product.** Demo switches, role pickers and page-state selectors
   used to review a prototype never enter the staff page.
 - The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
@@ -735,7 +743,17 @@ impact → Save or Submit amendment request → approval takes effect → each o
   `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
   `Before approval` remain the governed waiting state and impact heading.
 
-### Customer agreement evidence — APPROVED / LOCKED 2026-09-22
+### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0562)
+
+**The gate is in the database.** `sales_order_amendments` carries the evidence note, who recorded
+it, when, and an md5 of the proposal it was recorded against.
+`sales_order_decide_amendment` refuses `approve` with detail `evidence_required` when the note is
+missing OR when the proposal has changed since the evidence was recorded, so evidence can never
+silently cover different terms. Operation/Sales record it with
+`sales_order_record_amendment_evidence`; the page shows the recorded basis and disables
+`Approve and apply` until it covers the live proposal. Recording a communication reference
+authorises no contact with anybody.
+
 
 A change to the customer's actual agreement must have a recorded, traceable basis for that customer's
 acceptance before it takes effect. A signed document or a reference to the relevant customer
@@ -909,11 +927,40 @@ orders from the day it ships.
   hazard, not a field.
 - The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
 
-**Commercial change entry — owner-approved 2026-09-22, target not built.** Whole-page `Edit`
-contains the commercial draft and preserves items, configuration, unit price, services, dates and
-Instalment months. The server selects `Save` or `Submit amendment request` from actual changes and
-permissions. Do not retain a competing proposal modal as the only way to edit those fields. A live
-request remains visible; submission never changes the effective SO or its official document.
+**Commercial change entry — owner-approved 2026-09-22, BUILT 2026-09-23 (migration 0562).**
+Whole-page `Edit` contains the commercial draft and preserves items, configuration, unit price,
+services, dates and Instalment months. The server selects `Save` or `Submit amendment request` from
+actual changes and permissions. Do not retain a competing proposal modal as the only way to edit
+those fields. A live request remains visible; submission never changes the effective SO or its
+official document.
+
+**WHAT SHIPPED, AND WHERE THE RULE LIVES.**
+- `packages/shared/src/sales-order-change.ts` — `classifySalesOrderChange`, ONE rule read twice:
+  the page labels its single commit button with it and `POST /api/operation/orders/:id/changes`
+  decides with it against the STORED order. A mixed change goes to review whole.
+- `Save` covers the permitted correction (contact, address, demographics, billing, entry fields,
+  delivery access before Proceed, a proceed date that was never recorded). Everything else —
+  items, configuration, quantity, price, services, the promised date, a RECORDED proceed date,
+  delivery access after Proceed, Instalment months — is `Submit amendment request`.
+- Approval applies the WHOLE proposal in one transaction: header keys, lines with their
+  configuration (`attrs`), services (`order_addons`) and the plan, as one complete new revision.
+- `sales_order_save_revision` exempts the proceed lock for the approved amendment lane only; a
+  direct save still cannot move a recorded proceed date.
+- Each proposed header value carries the value it was computed from (`base_header`); if any has
+  moved, approval refuses as `amendment_stale` rather than overwriting it silently.
+- `sales_order_withdraw_amendment` closes a live request; `Propose this version again` withdraws
+  an out-of-date one and reopens the draft on the current order.
+
+**NOT BUILT, and named rather than implied:**
+- Sales Location · Salesperson · Dealer keep their existing governed attribution lane (0329);
+  they are not part of the whole-page draft yet.
+- A line that a supplier thread holds still refuses removal here (`line_in_production`); the
+  approved "approval hands the commitment to Purchasing" needs Purchasing's own settlement path.
+- Configuration editing covers size (a sibling catalogue SKU, price re-derived from the catalogue
+  plus the recorded surcharges) and the mattress gap; fabric, specials, legs and divan heights are
+  shown and preserved but not yet editable here.
+- `Fulfilment replacement` is still not a recordable cause; an applied amendment writes
+  `customer_change`.
 
 
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
@@ -1768,7 +1815,7 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 
 ### One page, one state
 
-- **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
+- **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · BUILT 2026-09-23.** Overwrites the
   2026-08-15 "one page, one state" rule (international ERP practice — SAP display/change, Odoo and
   NetSuite Edit/Save — and the 2990 reference). The Order tab opens READ-ONLY. A dark primary `Edit`
   in the page header enters edit mode; edit mode offers `Cancel` and ONE commit button that the SYSTEM
@@ -1796,6 +1843,15 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **Two panes, 50% / 50% — in BOTH states (owner, 2026-09-21: the preview remains).** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
+  **⭐ AND THE DOCUMENT NEVER SQUEEZES THE FORM — OWNER RULING (Jess, 2026-09-23) · BUILT.**
+  *"1440 宽下不能靠隐藏 Amount 或强制收起菜单才能操作"* — at 1440 with the portal menu OPEN the
+  page's own box is 1156px, so a 50/50 split left the form 578px while the editable Items table
+  needs 594px: `Amount (RM)` fell off the edge. The split is now measured on the page's own box:
+  50/50 while each half carries the table (`FORM_MIN_WIDTH` 660), then the form keeps that minimum
+  and the document takes the rest down to `MIN_PDF_WIDTH` (320), then the governed stack, form
+  first. Measured after the change, menu open, every column visible and no page-level sideways
+  scroll: 1920 half · 1536/1440/1366/1280/1180 form-first (form 660) · 1024/820 stacked. At phone
+  width the table scrolls inside its own box with the DataGrid's fade and one step button.
 - **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
   EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN — see
   § THE CURRENT COMPOSITION (2026-09-11), which is the only current card list.** What survives

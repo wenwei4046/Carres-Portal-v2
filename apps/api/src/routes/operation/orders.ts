@@ -37,6 +37,9 @@ import {
   normalizeSkuKey,
   exclusivePoSourceBindings,
   type IncomingLineUnit,
+  classifySalesOrderChange,
+  SALES_ORDER_EDIT_HEADER_KEYS,
+  type SalesOrderChangeSide,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -2432,6 +2435,240 @@ operationOrdersRouter.post(
     return c.json(data);
   },
 );
+
+// ─────────────────────────────────────────────────────────────
+// 0562 · THE WHOLE-PAGE EDIT'S ONE COMMIT (owner rulings 2026-09-21/22,
+// orders/MASTER.md § VIEW FIRST, EDIT ON PURPOSE · § Commercial change entry).
+//
+//   POST /:id/changes                 the page sends its WHOLE draft; the SERVER
+//                                     classifies it against the stored order
+//                                     (the shared `classifySalesOrderChange`)
+//                                     and either SAVES a correction or SUBMITS
+//                                     an amendment request — never the browser.
+//   POST /amendment/:aid/evidence     record the customer's agreement basis
+//   POST /amendment/:aid/withdraw     withdraw a live request
+//
+// A mixed change goes to review WHOLE. Submission changes nothing on the
+// order; the database applies the complete version only on approval, and only
+// with evidence that covers this exact proposal (0562).
+// ─────────────────────────────────────────────────────────────
+const changeLineInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1),
+    unit_price: z.number().min(0),
+    attrs: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict();
+const changeAddonInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    addon_key: z.string().trim().min(1),
+    qty: z.number().int().min(1),
+    unit_price: z.number().min(0),
+    attrs: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict();
+const salesOrderChangesInput = z.object({
+  header: revisionHeaderInput
+    .extend({
+      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      delivery_date_tbd: z.boolean().optional(),
+    })
+    .strict(),
+  lines: z.array(changeLineInput).min(1, "An order needs at least one item"),
+  addons: z.array(changeAddonInput),
+  installment_months: installmentMonthsField.nullable().optional(),
+  reason: z.string().trim().min(1, "Say why this is changing").max(500),
+  customerAskedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  evidenceNote: z.string().trim().max(500).nullable().optional(),
+  /** Proposing again over an OUT-OF-DATE request withdraws that request first. */
+  replaceAmendmentId: z.string().uuid().nullable().optional(),
+});
+
+type StoredOrder = Record<string, unknown> & {
+  status?: string | null;
+  proceed_date?: string | null;
+  installment_months?: number | null;
+  entry_data?: { fields?: Record<string, unknown> } | null;
+};
+
+function headerOf(order: StoredOrder): SalesOrderChangeSide["header"] {
+  const out: SalesOrderChangeSide["header"] = {};
+  for (const k of SALES_ORDER_EDIT_HEADER_KEYS) {
+    out[k] = k === "entry_fields" ? (order.entry_data?.fields ?? {}) : order[k];
+  }
+  return out;
+}
+
+operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = salesOrderChangesInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const body = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* The STORED order is the only base the server trusts — never the browser's
+     idea of what it was. */
+  const [orderRes, linesRes, addonsRes] = await Promise.all([
+    sb.from("orders").select("*").eq("id", id).maybeSingle(),
+    sb.from("order_lines").select("id, sku, qty, unit_price, attrs").eq("order_id", id)
+      .order("created_at", { ascending: true }).order("id", { ascending: true }),
+    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id)
+      .order("id", { ascending: true }),
+  ]);
+  for (const r of [orderRes, linesRes, addonsRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+  const order = orderRes.data as StoredOrder | null;
+  if (!order) return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+
+  const current: SalesOrderChangeSide = {
+    header: headerOf(order),
+    lines: ((linesRes.data ?? []) as SalesOrderChangeSide["lines"]).map((l) => ({ ...l, unit_price: Number(l.unit_price) })),
+    addons: ((addonsRes.data ?? []) as SalesOrderChangeSide["addons"]).map((a) => ({ ...a, unit_price: Number(a.unit_price) })),
+    installment_months: order.installment_months ?? null,
+  };
+  /* A draft line/service without `attrs` keeps the stored configuration. */
+  const storedLine = new Map(current.lines.map((l) => [l.id, l]));
+  const storedAddon = new Map(current.addons.map((a) => [a.id, a]));
+  const draft: SalesOrderChangeSide = {
+    header: body.header as SalesOrderChangeSide["header"],
+    lines: body.lines.map((l) => ({ ...l, attrs: "attrs" in l ? (l.attrs ?? null) : (storedLine.get(l.id)?.attrs ?? null) })),
+    addons: body.addons.map((a) => ({ ...a, attrs: "attrs" in a ? (a.attrs ?? null) : (storedAddon.get(a.id)?.attrs ?? null) })),
+    installment_months: body.installment_months === undefined ? current.installment_months : body.installment_months,
+  };
+  const cls = classifySalesOrderChange(current, draft, {
+    proceeded: order.status === "proceed_order",
+    proceedRecorded: Boolean(order.proceed_date),
+  });
+  if (cls.action === "none") {
+    return c.json({ error: "rule_violation", code: "nothing_changed", message: "Nothing changed" }, 422);
+  }
+
+  if (cls.action === "save") {
+    const header: Record<string, unknown> = {};
+    for (const k of cls.header) header[k] = (body.header as Record<string, unknown>)[k] ?? null;
+    const { data, error } = await sb.rpc("sales_order_save_revision", {
+      p_order_id: id,
+      p_header: header,
+      p_lines: null,
+      p_change: { change_type: "staff_correction", note: body.reason },
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    if (touchesStairInputs(header)) {
+      const restamp = await restampStairCarry(sb, id);
+      if (!restamp.ok) console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
+    return c.json({ action: "saved", ...(data as Record<string, unknown>) }, 201);
+  }
+
+  /* SUBMIT — the whole change, with the base each header value was computed
+     from so a moved value makes the request stale instead of overwritten. */
+  const proposed: Record<string, unknown> = {};
+  const header: Record<string, unknown> = {};
+  const baseHeader: Record<string, unknown> = {};
+  for (const k of cls.header) {
+    const value = (body.header as Record<string, unknown>)[k] ?? null;
+    if (k === "delivery_date" || k === "delivery_date_tbd") {
+      proposed[k] = value;
+      continue;
+    }
+    header[k] = value;
+    baseHeader[k] = current.header[k] ?? null;
+  }
+  if (Object.keys(header).length) {
+    proposed.header = header;
+    proposed.base_header = baseHeader;
+  }
+  if (cls.linesChanged) proposed.lines = draft.lines.map(({ id: lid, ...l }) => (lid ? { id: lid, ...l } : l));
+  if (cls.addonsChanged) proposed.addons = draft.addons.map(({ id: aid, ...a }) => (aid ? { id: aid, ...a } : a));
+  if (cls.installmentChanged) proposed.installment_months = draft.installment_months;
+
+  if (body.replaceAmendmentId) {
+    const live = await sb.rpc("sales_order_amendment_live", { p_order_id: id });
+    const a = (live.data as { amendment?: { id?: string; stale?: boolean } | null } | null)?.amendment;
+    if (a?.id === body.replaceAmendmentId && a.stale) {
+      const w = await sb.rpc("sales_order_withdraw_amendment", {
+        p_amendment_id: a.id,
+        p_reason: "Out of date - proposed again on the current order",
+      });
+      if (w.error) {
+        const m = mapPipelineV2Error(w.error);
+        return c.json(m.body, m.status);
+      }
+    }
+  }
+  const { data, error } = await sb.rpc("sales_order_submit_amendment", {
+    p_order_id: id,
+    p_proposed: proposed,
+    p_reason: body.reason,
+    p_customer_asked_on: body.customerAskedOn ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  const submitted = data as { id: string; base_revision: number };
+  let evidenceRecorded = false;
+  if (body.evidenceNote) {
+    const ev = await sb.rpc("sales_order_record_amendment_evidence", {
+      p_amendment_id: submitted.id,
+      p_note: body.evidenceNote,
+    });
+    evidenceRecorded = !ev.error;
+  }
+  return c.json({ action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, evidenceRecorded }, 201);
+});
+
+const amendmentEvidenceInput = z.object({ note: z.string().trim().min(1, "Name the customer's confirmation").max(500) });
+operationOrdersRouter.post("/amendment/:amendmentId/evidence", requireOperation, async (c) => {
+  const parsed = amendmentEvidenceInput.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_record_amendment_evidence", {
+    p_amendment_id: c.req.param("amendmentId"),
+    p_note: parsed.data.note,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+const amendmentWithdrawInput = z.object({ reason: z.string().trim().min(1, "A withdrawal says why").max(500) });
+operationOrdersRouter.post("/amendment/:amendmentId/withdraw", requireOperation, async (c) => {
+  const parsed = amendmentWithdrawInput.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_withdraw_amendment", {
+    p_amendment_id: c.req.param("amendmentId"),
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
 
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list

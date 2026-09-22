@@ -8,10 +8,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
-const addons = readFileSync(join(here, "SalesOrderAddons.tsx"), "utf8");
-const queries = readFileSync(join(here, "../../lib/queries.ts"), "utf8");
-const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
-const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
+const panels = readFileSync(join(here, "SalesOrderChangePanels.tsx"), "utf8");
+const changeHelpers = readFileSync(join(here, "sales-order-change.ts"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
 const route = readFileSync(
   join(here, "../../../../../packages/shared/src/sales-order-route.ts"),
@@ -49,37 +47,36 @@ describe("Sales Order object template contract", () => {
 
   /* ── ONE PAGE, ONE STATE — owner ruling 2026-08-15 ─────────────────────── */
 
-  it("has retired the whole-page edit mode and strips a stale `?edit=1`", () => {
-    /* There is no Edit button, no edit mode and no edit-only notice — the
-       fields are simply editable. What remains is the redirect for a bookmark
-       that still carries the retired param. */
-    expect(workspace).not.toContain('data-testid="workspace-edit"');
+  it("⭐ VIEW FIRST, EDIT ON PURPOSE (owner 2026-09-21, built 0562) — and still strips a stale `?edit=1`", () => {
+    /* The Order tab opens READ-ONLY; a dark primary `Edit` enters the
+       whole-page draft. The retired `?edit=1` URL state stays retired: the
+       mode is page state, never a bookmarkable parameter. */
+    expect(workspace).toContain('data-testid="workspace-edit"');
+    expect(workspace).toContain("const formLocked = mode === \"object\" && !editing;");
+    expect(workspace).toContain("<fieldset disabled={formLocked}");
     expect(workspace).not.toContain('next.set("edit", "1")');
-    expect(workspace).not.toContain(
-      "Editing operational details only. Commercial changes require an amendment.",
-    );
-    expect(workspace).not.toContain('"Edit operational details"');
     expect(workspace).toContain('if (!params.get("edit")) return');
     expect(workspace).toContain('next.delete("edit")');
     expect(workspace).toContain('type Mode = "object" | "create" | "oldrev"');
   });
 
-  it("shows the save bar only when something changed, and counts the fields", () => {
-    expect(workspace).toContain('data-testid="save-bar"');
-    expect(workspace).toContain("mode === \"object\" && dirty &&");
-    expect(workspace).toContain('⚠ {changedFields.length}');
-    expect(workspace).toContain("Discard");
+  it("gives edit mode ONE commit button, chosen by the SERVER, and refuses to lose a draft", () => {
+    /* `Cancel` and ONE commit whose word comes from the shared classifier —
+       the same function the server runs on commit (Law D). */
+    expect(workspace).toContain("salesOrderCommitWord");
+    expect(workspace).toContain("classifySalesOrderChange");
+    expect(workspace).toContain("{changeReason.trim() ? commitWord : `${commitWord} — say why`}");
+    expect(workspace).toContain('data-testid="change-count"');
+    /* The old always-editable page's save bar is retired with the mode. */
+    expect(workspace).not.toContain('data-testid="save-bar"');
     /* Dirty navigation still refuses safely — a half-typed address must not
        leave by a tab click or a browser close. */
     expect(workspace).toContain('addEventListener("beforeunload"');
     expect(workspace).toContain("Discard unsaved changes?");
     expect(workspace).toContain("if (!confirmDiscard()) return");
     /* ⛔ A REFETCH MAY NEVER CLOBBER AN OPEN EDIT (ui/MASTER.md §6.4 C3). */
-    expect(workspace).toContain("if (dirtyRef.current) return;");
+    expect(workspace).toContain("if (dirtyRef.current || editingRef.current) return;");
     expect(workspace).toContain("const seed = `${orderId}:${detailQ.dataUpdatedAt}`");
-    /* A save makes what was saved the new baseline, so the bar clears without
-       waiting for the round trip and the refetch lands on a clean form. */
-    expect(workspace).toContain("setBaseline(draftRef.current)");
   });
 
   /* `01-design-tokens.md` §2.2 is frozen: blue appears ONCE on a screen. Eight
@@ -92,18 +89,21 @@ describe("Sales Order object template contract", () => {
     expect(workspace.match(/bg-kit-blue-9/g)).toHaveLength(1);
   });
 
-  it("draws two 50/50 panes that scroll separately and stack below 1024px", () => {
+  it("keeps the 50/50 split wherever it fits, and never lets the document squeeze the form", () => {
+    /* Owner rulings: the two panes are 50/50 (2026-09-21) AND the Items table
+       keeps Qty · Unit · Disc · Amount readable without collapsing the portal
+       menu (Jess, 2026-09-23). Measured on the page's own box inside the
+       shell: half while each half carries the table, then the form keeps its
+       minimum and the document takes the rest down to `MIN_PDF_WIDTH`, then
+       the governed stack — form first. */
     expect(workspace).toContain('data-testid="object-two-panes"');
-    expect(workspace).toContain("flex h-full min-h-0 flex-col lg:flex-row");
-    expect(workspace).toContain("lg:w-1/2 lg:overflow-hidden");
-    /* ⭐ THE DOCUMENT PANE SCROLLS AT EVERY WIDTH (2026-09-11). It was
-       `lg:overflow-auto`, so below the split breakpoint — where the panes
-       STACK and the document is at its narrowest — the pane clipped nothing
-       and a page wider than it pushed the PAGE sideways. The 50/50 split and
-       the stacking rule below 1024px are unchanged; only the clipping is. */
-    expect(workspace).toContain("overflow-auto border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0");
-    /* The PAGE does not scroll at desktop widths; the panes do. */
-    expect(workspace).toContain("min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden");
+    expect(workspace).toContain("const FORM_MIN_WIDTH = 660;");
+    expect(workspace).toContain("const MIN_PDF_WIDTH = 320;");
+    expect(workspace).toContain('w >= FORM_MIN_WIDTH * 2 ? "half" : w >= FORM_MIN_WIDTH + MIN_PDF_WIDTH ? "form-first" : "stack"');
+    expect(workspace).toContain("new ResizeObserver(read)");
+    /* The PANE scrolls; the PAGE never does. */
+    expect(workspace).toContain('split === "stack" ? "overflow-auto" : "overflow-hidden"');
+    expect(workspace).toContain("min-h-0 min-w-0 overflow-auto bg-kit-slate-3 px-4 py-4");
   });
 
   /* ── THE PREVIEW IS THE DOCUMENT ───────────────────────────────────────── */
@@ -148,7 +148,10 @@ describe("Sales Order object template contract", () => {
 
   it("keeps a pending amendment out of the document body and on a banner", () => {
     expect(workspace).toContain('data-testid="pending-amendment-banner"');
-    expect(workspace).toContain("⚠ Amendment pending approval: delivery date →");
+    expect(workspace).toContain("⚠ Amendment pending approval");
+    /* The banner names the promised date when the proposal moves it, and says
+       plainly that the document still shows the order as it is now. */
+    expect(workspace).toContain("The document shows the order as it is now.");
     /* The preview always renders the effective revision: the proposal reaches
        the banner from `proposed_snapshot` and never the template data. */
     expect(workspace).toContain("proposed_snapshot");
@@ -163,6 +166,9 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('disabled={mode === "oldrev"}');
     expect(workspace).toContain("<fieldset");
     expect(workspace).toContain("Viewing Rev {viewedRevision.revision} · read-only");
+    /* 0562 — the editable cards carry their own lock so a saved order reads
+       until `Edit`; the outer fieldset still locks a historical version whole. */
+    expect(workspace).toContain('<fieldset disabled={formLocked} className="contents">');
     /* No save bar can exist there — the diff is empty by construction. */
     expect(workspace).toContain('if (mode === "oldrev") return [];');
     /* Selecting an old revision leaves the ledger and opens the SAME complete
@@ -298,19 +304,21 @@ describe("Sales Order object template contract", () => {
      not as a footnote beside the button that commits it. And a LIVE proposal
      is NOT behind the modal: a pending amendment is truth, so it prints beside
      the date it is waiting to move, where somebody reading that date sees it. */
-  it("opens the amend trio from beside Requested Delivery Date, and never hides a live one", () => {
-    expect(workspace).toContain('data-testid="amend-date-open"');
-    expect(workspace).toContain("setAmendDateOpen(true)");
-    expect(workspace).toContain('title="Change delivery date"');
-    expect(workspace).toContain('description="creates a Revision · needs approval"');
-    expect(workspace).toContain("<SalesOrderAmendDeliveryDate");
-    /* The modal closes itself once the proposal is recorded. */
-    expect(workspace).toContain("onDone={() => setAmendDateOpen(false)}");
-    expect(amendDate).toContain("onDone?.()");
-    /* A pending proposal is stated in the CARD, not behind the door. */
-    expect(workspace).toContain('data-testid="amend-date-waiting"');
-    /* And no standing section survives on the card. */
+  it("moves the promised date inside the whole-page Edit, with the live request stated once", () => {
+    /* ⛔ THE AMEND TRIO IS RETIRED (owner 2026-09-21/22, built 0562): a
+       competing date-only modal is exactly the "second form for one act" the
+       Commercial change entry ruling forbids. The date is a field of the one
+       draft; `Requested date (from customer)` and `Reason for change` ride the
+       review, and a live request prints ONCE, at the top of the form. */
+    expect(workspace).not.toContain('data-testid="amend-date-open"');
+    expect(workspace).not.toContain("<SalesOrderAmendDeliveryDate");
+    expect(workspace).not.toContain('data-testid="amend-date-waiting"');
     expect(workspace).not.toContain("<SubHead>Change delivery date</SubHead>");
+    expect(workspace).toContain('<DatePicker id="so-promised" label="Requested Delivery Date"');
+    expect(workspace).toContain("Delivery date to be confirmed");
+    expect(workspace).toContain("<WaitingRequest");
+    expect(panels).toContain("Waiting for management");
+    expect(panels).toContain("Out of date — propose again");
   });
 
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
@@ -569,7 +577,9 @@ describe("Sales Order object template contract", () => {
        still the ONE addressString fact, first letters lifted (Jess's
        "auto capitalized" ask). The contract is that addressString remains the
        single source; the wrapper does not add a second one. */
-    expect(workspace).toContain("customer_address: autoCapitalize(addressString(draft, baseline)");
+    /* 0562 — the payload builder takes the draft it composes, so the SAME
+       pipeline runs on both sides of the comparison. */
+    expect(workspace).toContain("customer_address: autoCapitalize(addressString(d, baseline)");
     expect(workspace).toContain("address: addressString(draft, baseline)");
     expect(workspace).not.toContain('id="so-address" label="Address"');
     /* A CLEAR HAPPENS ONLY WHEN SOMEBODY CLEARS IT — an order that arrived
@@ -603,44 +613,58 @@ describe("Sales Order object template contract", () => {
     }
   });
 
-  it("opens the amend trio with exactly three fields, through the governed lane", () => {
-    expect(amendDate).toContain("Requested date (from customer)");
-    expect(amendDate).toContain("New delivery date");
-    expect(amendDate).toContain('label="Reason for change"');
-    expect(amendDate).toContain("required");
-    expect(amendDate).toContain("useSubmitSalesOrderAmendment");
-    expect(amendDate).toContain("customerAskedOn");
-    expect(workspace).toContain("creates a Revision · needs approval");
-    /* ONE machinery: while a proposal is open this block submits nothing. */
-    expect(amendDate).toContain("if (liveAmendment)");
+  it("carries the governed request fields inside the one draft review", () => {
+    /* The three fields the retired trio owned now ride the whole-page review:
+       the customer's request date, the reason, and — for a commercial change —
+       the customer agreement evidence the database gates approval on. */
+    expect(panels).toContain("Requested date (from customer)");
+    expect(panels).toContain('label="Reason for change"');
+    expect(panels).toContain("required");
+    expect(panels).toContain("Customer agreement evidence");
+    expect(workspace).toContain("useSubmitSalesOrderChanges");
+    expect(workspace).toContain("customerAskedOn: changeAskedOn");
   });
 
-  it("keeps one door for goods, price and the promise", () => {
-    expect(workspace.match(/<SalesOrderAmendment\b/g)).toHaveLength(1);
+  it("keeps ONE door for goods, price, services and the promise — the whole-page draft", () => {
+    /* ⛔ NO COMPETING PROPOSAL MODAL (owner 2026-09-22): "Do not retain a
+       competing proposal modal as the only way to edit those fields." The page
+       holds one draft and one commit; the classification is the server's. */
+    expect(workspace).not.toContain("<SalesOrderAmendment");
+    expect(workspace).not.toContain('data-testid="workspace-propose-change"');
+    expect(workspace).not.toContain("Propose a change to the customer");
+    expect(workspace).toContain('data-testid="edit-items"');
+    expect(workspace).toContain('data-testid="add-item"');
+    expect(workspace).toContain('label="Add service"');
+    expect(workspace).toContain("Restore");
   });
 
-  /* ⭐ THAT DOOR MOVED TO `More actions` — YH, 2026-08-26, following the exact
-     precedent `Report a problem` set on 2026-08-15: a rare act does not hold
-     permanent space on a page read every day.
+  it("gates approval on customer agreement evidence, and never on the page alone", () => {
+    /* § Customer agreement evidence — APPROVED / LOCKED 2026-09-22: the request
+       may be recorded without it; it cannot TAKE EFFECT without it, and the
+       database is the gate (0562 `evidence_required`). The page states the
+       same rule and disables the decision it cannot make. */
+    expect(panels).toContain("Customer agreement evidence");
+    expect(panels).toContain("Not recorded yet — the change cannot take effect.");
+    expect(panels).toContain("evidence_covers_proposal");
+    expect(panels).toContain("disabled={!decision.trim() || !covered || props.busy}");
+    expect(workspace).toContain("useRecordAmendmentEvidence");
+  });
 
-     The strip is gone from `Order info`; the CAPABILITY is not, and that is
-     what this pins. The modal is the only way to change items, unit price or
-     instalment months anywhere on the Sales Order — `Change delivery date`
-     submits a date and nothing else — so a later "remove the button" would
-     silently retire three capabilities. It must fail here first. */
-  it("opens the amendment from More actions, and keeps no idle strip on the card", () => {
-    expect(workspace).toContain('data-testid="workspace-propose-change"');
-    expect(workspace).toContain("Propose a change to the customer");
-    expect(workspace).toContain("inlineTrigger={false}");
-    expect(workspace).toContain("openSignal={amendSignal}");
-    /* A counter, not a boolean — a boolean cannot reopen the modal after a
-       cancel, which is the bug this shape exists to avoid. */
-    expect(workspace).toContain("setAmendSignal((n) => n + 1)");
-    /* The standing sentence that sat beside it is gone for good. */
-    expect(amendment).not.toContain("they change by proposal, not by editing");
-    /* Still MOUNTED on the card, because a LIVE proposal is truth and belongs
-       there — only the rule + padding are conditional on one existing. */
-    expect(workspace).toContain('liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""');
+  it("keeps the items table on the document's own columns, and protects a gift line", () => {
+    for (const column of ["#", "Item Code", "Description", "Qty", "Unit (RM)", "Disc (RM)", "Amount (RM)", "TOTAL PAYABLE"])
+      expect(workspace, `${column} left the draft table`).toContain(column);
+    expect(workspace).toContain("const protectedLine = (l: DraftLine) =>");
+    expect(workspace).toContain("Free item — it follows the item it came with");
+    expect(workspace).toContain("Free item: check it is still allowed without the cancelled item");
+  });
+
+  it("prints a version as it was issued — its own payments, its own signature", () => {
+    /* § Old versions and signatures: a revision prints its own document, and a
+       new unsigned version says so instead of borrowing the old signature. */
+    expect(workspace).toContain("asOf?: { date: string; signed: boolean }");
+    expect(workspace).toContain("const signedRevision = 1;");
+    expect(workspace).toContain("currentRev != null && currentRev > signedRevision ? { ...d, signed: false, signature_url: null } : d");
+    expect(workspace).toContain("signed: viewedRevision.revision === signedRevision");
   });
 
   it("names the governed ownership request and hides it from Operation", () => {
@@ -770,7 +794,7 @@ describe("Sales Order object template contract", () => {
   });
 
   it("puts no Chinese on an operator screen", () => {
-    for (const source of [workspace, header, attribution, amendDate]) {
+    for (const source of [workspace, header, attribution, panels, changeHelpers]) {
       expect(source).not.toMatch(/[一-鿿]/);
     }
   });
@@ -1149,7 +1173,7 @@ describe("Sales Order object page — one form grammar", () => {
        it back to a smear, and on a zero-width pane collapse it to nothing.
        The pane scrolls at EVERY width, not only at `lg`. */
     expect(workspace).not.toContain('canvas.style.maxWidth');
-    expect(workspace).toContain("min-h-0 min-w-0 overflow-auto border-t");
+    expect(workspace).toContain("min-h-0 min-w-0 overflow-auto bg-kit-slate-3");
     /* ⛔ THE SPLIT IS NOT REMOVED. Replacing the permanent 50/50 preview with
        an on-demand comparison is NOT an approved layout change; the pane and
        its Print path stay exactly where they are. */
@@ -1221,36 +1245,20 @@ describe("Sales Order object page — one form grammar", () => {
     }
   });
 
-  it("keeps a service to ONE row, carrying its own doors", () => {
-    /* A service was printed TWICE: as a row in the Goods table, and again in a
-       `Services` list below that repeated its name, its size, its quantity and
-       its price purely so it could hold two buttons. One record, two places —
-       and with a second service on the order the operator had to match them by
-       eye to know which row a `Remove` belonged to.
-       The doors live in the row now. The list is gone. */
-    expect(workspace).toContain("ServiceRowActions");
-    expect(addons).toContain("export function ServiceRowActions(");
-    /* THE LIST AND ITS HEADING: gone from the panel entirely. */
-    expect(addons).not.toContain('<span className="text-label text-base-500">Services</span>');
-    expect(addons).not.toContain("so-addons-empty");
-    /* ⛔ NOT A SEVENTH COLUMN — §0.1 locks the table at six, and the document
-       preview prints from the same six. The header row is unchanged. */
-    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
-      expect(workspace).toContain(`>${label}</th>`);
-    }
-    expect(workspace).not.toContain(">Actions</th>");
-    /* The one act the table cannot perform — adding a service that is not
-       there yet — is what the panel keeps, and the POS-parity attribute rides
-       THAT rather than a hidden span with nothing behind it. */
-    expect(workspace).toContain('data-pos-field="orderAddons"');
-    expect(addons).toContain('data-testid="so-addon-open"');
-    expect(addons).toContain("Add a service");
-    /* ⭐ AND THE TABLE ACTUALLY REFRESHES (YH, 2026-09-01 — "ensure numbers
-       and generated SO are correct"). The table is now the ONLY place a new
-       service appears, so the add path must invalidate the key the office
-       reads. `["orders"]` never reached `["operation","orders",id]` — see
-       `order-addon-invalidation.test.ts` for the prefix proof. */
-    expect(queries).toContain('void qc.invalidateQueries({ queryKey: ["operation", "orders"] });');
+  it("keeps a service to ONE row — read in view, edited in the draft", () => {
+    /* The service prints once, by its catalogue NAME, in the same table as the
+       goods (YH, 2026-09-01). 0562 moves its doors: a service is part of what
+       was bought, so `Remove` / `Restore` and its billing quantity live in the
+       whole-page draft and travel through the governed lane, not a direct
+       write from a read-only row. */
+    expect(workspace).not.toContain("<ServiceRowActions");
+    expect(workspace).toContain('data-testid={`edit-service-${a.addon_key}`}');
+    expect(workspace).toContain("nameOfAddon(a.addon_key)");
+    expect(workspace).toContain('aria-label={`Remove ${nameOfAddon(a.addon_key)}`}');
+    expect(workspace).toContain('aria-label={`Restore ${nameOfAddon(a.addon_key)}`}');
+    /* A per-trip charge and the stamped stair carry keep their quantity. */
+    expect(workspace).toContain("const fixedQtyService = (key: string) =>");
+    expect(workspace).toContain("STAIR_CARRY_ADDON_KEY");
   });
 
   it("puts the salesperson door beside the salesperson, not in a row of its own", () => {

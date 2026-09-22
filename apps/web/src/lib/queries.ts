@@ -5444,7 +5444,7 @@ export interface SalesOrderSnapshotLine {
 export interface SalesOrderSnapshot {
   header: Record<string, unknown>;
   lines: SalesOrderSnapshotLine[];
-  addons: Array<{ addon_key: string; qty: number; unit_price: number | string }>;
+  addons: Array<{ addon_key: string; qty: number; unit_price: number | string; attrs?: Record<string, unknown> | null }>;
 }
 export interface SalesOrderRevisionRow {
   revision: number;
@@ -5896,6 +5896,8 @@ export interface SalesOrderAmendment {
   /** Server-derived: the basis still covers THESE terms. Approve is refused
    *  when it does not — approval is never silently reused for different terms. */
   customer_agreement_covers_proposal?: boolean;
+  /** Who sent the request (0562 · the whole-page lane names the sender). */
+  submitted_by?: string | null;
 }
 
 /** How the customer's acceptance is evidenced (0562). A signed document, a
@@ -6037,6 +6039,69 @@ export function useRecordAmendmentAgreement(
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── 0562 · the whole-page edit's ONE commit ────────────────────────────────
+ * The page sends its whole draft; the SERVER classifies it and either saves a
+ * correction or submits an amendment request (orders/MASTER § VIEW FIRST). */
+export interface SalesOrderChangesInput {
+  header: Record<string, unknown>;
+  lines: Array<{ id?: string; sku: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+  addons: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+  installment_months?: number | null;
+  reason: string;
+  customerAskedOn?: string | null;
+  evidenceNote?: string | null;
+  replaceAmendmentId?: string | null;
+}
+export type SalesOrderChangesResult =
+  | { action: "saved"; revision: number; changed?: string[] }
+  | { action: "submitted"; amendmentId: string; baseRevision: number; evidenceRecorded: boolean };
+
+function invalidateSalesOrder(qc: ReturnType<typeof useQueryClient>, orderId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
+    qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
+    qc.invalidateQueries({ queryKey: ["orders", "sales-order-data", orderId] }),
+  ]);
+}
+
+export function useSubmitSalesOrderChanges(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<SalesOrderChangesResult, ApiError, SalesOrderChangesInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<SalesOrderChangesResult, ApiError, SalesOrderChangesInput>({
+    mutationFn: (input) =>
+      apiFetch<SalesOrderChangesResult>(`/api/operation/orders/${orderId}/changes`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateSalesOrder(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useWithdrawSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { amendmentId: string; reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { amendmentId: string; reason: string }>({
+    mutationFn: ({ amendmentId, reason }) =>
+      apiFetch(`/api/operation/orders/amendment/${amendmentId}/withdraw`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateSalesOrder(qc, orderId);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
