@@ -307,7 +307,7 @@ describe("Purchase Orders Register", () => {
     renderPage();
     const grid = screen.getByTestId("register-grid");
     expect(screen.getByTestId("register-columns")).toHaveTextContent(
-      /^PO Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Default Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
+      /^PO Date \| PO No \| SO No \/ MPR No \| Supplier \| Items \| Supplier Deliver To \| PO Delivery Date \| Supplier Confirmed Delivery Date \| Goods Received Date \| GRN No \| PO Version$/,
     );
     /* `Expected Delivery Date` is retired BY NAME: what we planned and what
        the factory promised are two facts, and one cell holding whichever it
