@@ -473,12 +473,15 @@ ITEMS                   the SO document's own table (owner ruling 2026-09-21, NO
                         can check page against paper column by column, but draws it in the portal's web style —
                         no black ink header bar (owner: "copied the same black header? … not international"),
                         each item row a soft grey box, the same grey-box treatment as the rest of the page
-PAYMENT                 EXACTLY the PDF's money zone (owner ruling, Jess 2026-09-22: page and PDF tally):
+PAYMENT                 the same money zone as the PDF, one arithmetic (owner approval, Jess 2026-09-22):
                         the payment table (Date · Payment received · Approval code · Collected by ·
-                        Amount (RM)) closing on `TOTAL RECEIVED`, then the PDF totals card row for row
-                        (today `Goods total · Tax · Total payable · Paid to date · Balance due`; it follows
-                        the PDF when the SST rows land) · Open this order in Payments →. Voided rows stay,
-                        struck, with the reason. Items and Payment share ONE table style: 12px grey
+                        Amount (RM)) lists the rows only — the duplicate `TOTAL RECEIVED` row is REMOVED
+                        from BOTH page and PDF; paid money is totalled once, as `Paid to date`. The totals
+                        show goods amount · service amount · `Total payable` · `Paid to date` ·
+                        `Balance due` (the goods/service row words are pending COPY review; a combined
+                        total is never labelled `Goods total`; SST rows follow the separate SST ruling).
+                        Voided payments stay, struck, with the reason, and are never counted.
+                        Open this order in Payments →. Items and Payment share ONE table style: 12px grey
                         headers over a 1px line, 13px rows divided by 1px lines, amounts right-aligned in
                         the same column position, only the closing total bold
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
@@ -557,11 +560,46 @@ impact → Save or Submit amendment request → approval takes effect → each o
 3. **The reason, the before/after and the impact are shown before submitting** — which item, what
    quantity, the amount change and the linked PO / Stock Unit / Delivery / Payment consequence — not a
    bare Remove button.
-4. **A goods count counts goods only.** Delivery fee and Stair carry are services and are never goods
-   pieces (e.g. `2 + 1 + 1 = 4 pcs` beside the RM total, the services priced but not counted).
+4. **Three counts, never merged:** goods lines (gift lines included) · physical pieces (gifts included;
+   a sofa set counts its real modules) · service quantity. Services are priced but never physical
+   pieces; the stair-carry pieces carried and the service's charged quantity are different facts.
+   Worked sample (SO-1319): 2 goods lines · 3 physical pieces · 2 services · goods RM3,780.00 ·
+   services RM350.00 · Total payable RM4,130.00 · Paid to date RM1,999.50 (the voided RM1,200 excluded) ·
+   Balance due RM2,130.50.
 5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
-`Added`, `Removed` and `Undo` on screen remain PROPOSAL words until registered in COPY-STANDARD.
+
+**Refined 2026-09-22 (owner approval of the reviewed plan):**
+- **Item contract.** A new line is added with `+ Add line` (COPY-STANDARD's governed word; `Add item` is banned there) and picked from the catalogue; an Item Code is never free text that leaves a
+  mismatched name or configuration. Each line's configuration opens only the fields its model really
+  offers (size, fabric, colour, heights, gap, sofa build …); a field the model fixes (e.g. firmness) is
+  read-only. Gift / PWP / bundle lines keep their eligibility and source — a generic price or qty box
+  never replaces that protection; cancelling a parent item shows the gift consequence.
+- **Services follow their own pricing contract:** per-trip charges show qty 1; per-piece charges keep
+  their real quantity.
+- **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
+  visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
+  with the edit-mode `Cancel` and `Cancel SO`.
+- **Before submitting** the reason (required) and a `Before` / `After` review show the three counts, the
+  amount change and each affected object with its owner: purchase demand, an issued PO or promised
+  production (Purchasing settles it with the supplier), received goods and Units (Receiving / Stock),
+  DO (Delivery), money and refunds (Payments), and — for Proceed Date — the purchase-release timing, and —
+  for Sales Location / Salesperson / Dealer — ownership and commission. Issued PO, receipts, Units, DOs and
+  payments are never rewritten by an SO change.
+- **Decisions.** Pending: the effective SO, its official PDF and its signature are unchanged. Reject:
+  the order is kept, the reason recorded. Approve: a complete new version takes effect and each owner
+  handles its consequence. An applied version is corrected only by a new controlled change, never
+  "rejected" afterwards. A version conflict shows the base, current and proposed values and asks for a
+  new review — never a silent overwrite.
+- **Old versions and signatures.** A revision opens the complete old order and prints its OWN stored
+  document; a missing historical file is stated, never rebuilt from current data. A signature belongs
+  to the exact version and document the customer signed; a new unsigned version says it is unsigned and
+  never borrows the old signature.
+- **Proposal tooling stays out of the product.** Demo switches, role pickers and page-state selectors
+  used to review a prototype never enter the staff page.
+- Other new on-screen words (`Before` / `After`, `View version` / `Return to current`,
+  `Print this version`, `Goods lines` / `Physical pieces` / `Service quantity`) remain PROPOSAL words
+  until the final COPY review; `Waiting for management` and `Before approval` are existing words.
 
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
@@ -1548,9 +1586,14 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
   2026-08-15 "one page, one state" rule (international ERP practice — SAP display/change, Odoo and
   NetSuite Edit/Save — and the 2990 reference). The Order tab opens READ-ONLY. A dark primary `Edit`
-  in the page header enters edit mode; edit mode offers `Cancel` and one commit button:
-  `Submit amendment request` when a supplier commitment makes the change an amendment (the existing
-  governed amendment path), otherwise `Save`. `View` and `Edit` on the Register's context menu open
+  in the page header enters edit mode; edit mode offers `Cancel` and ONE commit button that the SYSTEM
+  chooses — never the employee, and never from "is there a PO" alone (**owner approval, Jess 2026-09-22,
+  overwriting the 2026-09-21 supplier-commitment split**): `Save` only for a permitted correction that
+  changes no commercial commitment; `Submit amendment request` for any change to items, configuration,
+  quantity, price, service, the delivery/proceed promise or protected ownership (Sales Location ·
+  Salesperson · Dealer). A mixed change goes to review whole — nothing is partly saved behind the
+  employee's back. When a linked fact (PO, receipt, Unit, DO, payment) cannot be read, the draft is kept,
+  the error is stated and submitting pauses. `View` and `Edit` on the Register's context menu open
   the read-only and the edit state respectively. Leaving edit mode with unsaved changes still refuses
   safely. Who may press `Edit` is the existing permission; this ruling changes no permission.
   **Amendment notice (owner, 2026-09-21):** while a supplier commitment exists, one lock-icon notice sits

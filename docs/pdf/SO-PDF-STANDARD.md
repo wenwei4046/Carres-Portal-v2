@@ -207,12 +207,17 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   calls `Total payable`; one figure, one name (owner, 2026-09-21: Carres is
   SST-registered, so `Goods total` is retired). Summary-row money carries **RM**
   (`RM 100.00 · RM 8,920.00`); detail cells stay digits-only.
-- **The payments table closes with its own `TOTAL RECEIVED` row**, summed from
-  the rows it printed — the same law as the goods SUBTOTAL (owner, 2026-09-21:
-  "it seem i still need to calculate myself 3240 + 500?"). A customer is never
-  asked to add up a document's own figures. It must read the same as
-  `Paid to date` in the totals card; if a payload ever disagrees, the paper
-  shows the rows' arithmetic, because that is the one the reader can check.
+- **The payments table has NO `TOTAL RECEIVED` row (owner, 2026-09-22 — overwrites
+  2026-09-21).** It printed the same figure as `Paid to date` twice. Paid money is
+  totalled ONCE, as `Paid to date` in the totals card, so the customer still never
+  adds the rows up — the card does it. The page's Payment card follows the same
+  rule, one arithmetic. Voided payments never print and are never counted.
+- **A combined total is never labelled `Goods total`.** Goods and services may be
+  shown apart (words pending COPY review), then `Total payable · Paid to date ·
+  BALANCE DUE`; SST rows follow the separate SST ruling in §7.1.
+- **A goods count counts goods only.** The items table's quantity total is physical
+  pieces (gifts included); a Delivery fee or Stair carry is a service and never a
+  piece.
 - BALANCE DUE is never bigger — the grey band and bold carry the emphasis.
 
 ### 7.1 · Legacy notes
