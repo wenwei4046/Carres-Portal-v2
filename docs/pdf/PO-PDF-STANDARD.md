@@ -39,12 +39,19 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
-- **THE DOCUMENT PRINTS ITS VERSION, INCLUDING V1 — ONCE, BESIDE THE NUMBER**
-  (0378; placement Jess 2026-09-22). The word is the dictionary's `V{n}`: the
-  PO DETAILS row reads `PO No : PO-2609-0042 V2`, and every continuation /
-  destination page header carries the same `PO-2609-0042 V2`. It is NOT
-  printed a second time under `PURCHASE ORDER` or as a separate `Version` row —
-  that repeated one fact three times. A supplier holding two papers with one
+- **EVERY PAGE PRINTS THE SAME FULL HEADER, AND THE NUMBER CARRIES ITS
+  VERSION — INCLUDING V1** (owner, 2026-09-22; overrides, for the PO only,
+  SO-PDF-STANDARD §3's one-line continuation header). Logo · `CARRES SDN.
+  BHD.` · SSM · the registered address · the hero **`PO-2609-0042 V2`** 18/700
+  with `PURCHASE ORDER` beneath — identical on page 1, every continuation page
+  and every Deliver To's pages. Between pages only the Deliver To, the goods
+  and the footer's `Page n of m` change. The same `PO-… V{n}` also prints in
+  the PO DETAILS `PO No` row and the footer. No separate `Version` row and no
+  version printed on its own. **Measured:** the hero with its version is
+  52.9mm, which leaves 112mm beside the 13mm logo — the address's old second
+  line (122.4mm) would run under `PURCHASE ORDER`, so the address prints on
+  THREE lines (71.0 · 60.8 · 61.0mm) and the header reserve is 26mm, not
+  22mm. The dictionary word is `V{n}`. A supplier holding two papers with one
   number cannot tell which to build from without it, so V1 prints too
   (`Version 1 prints nothing` is only the internal REVISIONS PANEL's rule).
   The version the PDF prints is the version the confirmation records:
@@ -77,7 +84,9 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   PO DETAILS (52mm fixed)`. The two ADDRESS blocks size by content
   (Constitution: content decides column width); only the fixed-fact column
   is fixed. **The supplier prints its FULL address** — a formal document
-  names both parties completely. Detail rows read in time order:
+  names both parties completely. **Both party NAMES print bold (600) — the supplier's
+  `Name` and the DELIVER TO `Name` — addresses regular** (owner, 2026-09-22:
+  one weight for one kind of fact). Detail rows read in time order:
   `PO No · PO Date · PO {n}-Day Delivery Date (bold) · Delivery Method`. Three columns give who supplies · where it goes · when it's due, the
   supplier's 3-second sweep in one row (restores the old law's
   deliver-to-at-section-2). **A PO may carry one or several Deliver To**
@@ -91,18 +100,23 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   revision. **Each Deliver To starts on a new page**, and its pages carry
   only its own goods; a destination may run onto further pages when its
   goods need them. The first page of each destination prints section 2 with
-  THAT destination in DELIVER TO, headed `DELIVER TO (1 of 2)` so a reader
-  holding one destination's pages knows another exists. **Every page — first,
-  continuation and every destination — carries the same PO number and
-  revision** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
+  THAT destination's full name and address in DELIVER TO — plain `DELIVER TO`,
+  never `(1 of 2)` (owner, 2026-09-22: location, quantity and page number each
+  say one thing). The footer's `Page 1 of 2` carries the page count. **Every page — first,
+  continuation and every destination — prints the same full header with
+  the same `PO-… V{n}`** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
   (page group 1) + 2 for AL (page group 2); still 6 on one PO — no second PO,
   no `Moved from` line, no new Unit IDs. A one-destination PO prints exactly
-  as before, with no `(1 of 1)`.
+  as before.
 - **Items table**: `# · SO NO · UNIT ID · DESCRIPTION · QTY` — the same five
   columns on every PO and every destination's pages. There is no per-line
   DELIVER TO column: the destination is the page's section 2. `#` numbers run
   on across destinations; each destination's table closes with its own
-  `TOTAL`. **Issued documents are never re-rendered to a newer rule**: a
+  `TOTAL` (Klang `TOTAL 4`, AL `TOTAL 2`), and **the LAST page closes with
+  `PO TOTAL`** — the whole PO's quantity (`PO TOTAL 6`), one figure with
+  nothing beside it (`PO TOTAL · 2 Deliver To` was refused as confusing). A
+  one-destination PO prints only its `TOTAL` — the two would be the same
+  number. **Issued documents are never re-rendered to a newer rule**: a
   revision already sent reprints exactly as the supplier received it.
   - **UNIT ID — the only approved word; `ITEM ID` is retired (owner ruling
     2026-09-07).** The column prints `ops_stock_items.unit_code` for the
@@ -207,3 +221,7 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | **One PO layout**: proposal to move a one-SO PO's `SO No` into PO DETAILS and drop the column REFUSED — every PO keeps the SO NO column (one standard). | Jess |
 | 2026-09-22 | **Several Deliver To on one PO, one page group each** (Jess): sofa PO = one Deliver To; mattress/bedframe may split; a later move keeps the SAME PO number as a new revision — no second PO, no `Moved from`, no new Unit IDs. Each Deliver To starts on a new page of one PDF; every page carries the PO number and revision. The per-line DELIVER TO column and `Multiple destinations` are deleted; five columns everywhere. Same-day entries that read "split" as separate POs are overwritten. | Jess |
 | 2026-09-22 | PO DETAILS in dictionary words: `PO No` (`PO-… V{n}`, version printed ONCE beside the number and on every page header — identity-block and `Version` row retired) · `PO Date` · **`PO {n}-Day Delivery Date`** (n = the recorded Settings working-day value, with no added transit days; e.g. `PO 14-Day Delivery Date : Fri, 9 Oct 2026`) · `Delivery Method`. `PO Default Delivery Date` renamed `PO Delivery Date` portal-wide; `Deliver by` / `Issued` retired on paper. | Jess |
+| 2026-09-22 | Several-Deliver-To pages simplified (owner, on the rendered preview): plain `DELIVER TO` with that location's full name and address — `(1 of 2)` deleted; each location's table keeps its `TOTAL`; the last page adds **`PO TOTAL`** (whole-PO quantity, nothing beside it); page count lives in the footer `Page n of m`. Version wording corrected: the version travels with every printed PO identity (`PO No` row, page headers, footer) and never prints on its own. | Jess |
+| 2026-09-22 | Supplier `Name` prints bold (600), the same weight as the DELIVER TO `Name`; addresses stay regular. | Jess |
+| 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
+| 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO-… V{n}` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |

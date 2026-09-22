@@ -2,9 +2,10 @@ import { Hono, type Context } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
+  ledgerAccountCodeShape,
   ledgerAccountLedgerQuery,
-  ledgerAccountRenameInput,
   ledgerAccountReorderInput,
+  ledgerAccountUpdateInput,
   ledgerAsOfQuery,
   ledgerEntriesQuery,
   ledgerEntryRef,
@@ -34,7 +35,7 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { requireFinance } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { IN_URL_MAX, mapPgError, parseJsonBody, readAllPages, tooManyRows } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import { todayIsoMYT } from "../../lib/delivery-order-issue";
@@ -47,13 +48,18 @@ import financeMoneyAccountsRouter from "./money-accounts";
  * and principal — the HTTP mirror of `gl_may_read()`) and reads through
  * `userClient`, so the ledger's own gates see the signed-in user: RLS on the
  * four `gl_*` tables and `gl_report_guard()` inside every report function.
- * Nothing here writes but the account rename. The ledger is written only by `gl_post` / `gl_reverse`.
+ * Nothing here writes but the one account door. The ledger is written only by `gl_post` / `gl_reverse`.
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
  *   GET /accounts           the chart, and the day the ledger started
- *   PATCH /accounts/:code   rename one account (gl_account_rename, 0539) — the code never changes
- *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) — the number never changes
+ *   PATCH /accounts/:code   one account's name and number (gl_account_update, 0550) — a new
+ *                           number is carried to every row that names it, by `on update cascade`.
+ *                           An account named on a document that has left Draft cannot be
+ *                           renumbered: 0550's own ceiling, refused by the frozen-document
+ *                           triggers as a 422/500, not by anything here.
+ *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) —
+ *                           writes sort_order only; a move never writes the number.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -73,9 +79,6 @@ financeLedgerRouter.route("/money-accounts", financeMoneyAccountsRouter);
 type Sb = ReturnType<typeof userClient>;
 type PgError = { code?: string; message?: string; details?: string };
 type Json = Record<string, unknown>;
-
-/** PostgREST caps a single read at 1000 rows in this project. */
-const PAGE = 1000;
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const numOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -118,26 +121,6 @@ function failed(c: Context<AppEnv>, what: string) {
   return c.json({ error: "rpc_failed", code: "rpc_failed", message: `${what} could not be loaded. Try again.` }, 500);
 }
 
-/**
- * Read every row of a set-returning report, 1000 at a time, in a fixed order.
- * Fail closed: an error on any page is an error for the whole read, and a
- * read longer than `maxPages` is refused rather than cut short.
- */
-async function readAllPages(
-  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: PgError | null }>,
-  maxPages = 20,
-): Promise<{ rows: Json[] } | { error: PgError } | { tooMany: true }> {
-  const rows: Json[] = [];
-  for (let i = 0; i < maxPages; i += 1) {
-    const { data, error } = await page(i * PAGE, (i + 1) * PAGE - 1);
-    if (error) return { error };
-    if (!Array.isArray(data)) return { error: { message: "no rows array" } };
-    rows.push(...(data as Json[]));
-    if (data.length < PAGE) return { rows };
-  }
-  return { tooMany: true };
-}
-
 // ── the Journal ──────────────────────────────────────────────────────────────
 
 /** An entry's own columns — nothing embedded. `reverses` and `reversed_by`
@@ -153,6 +136,9 @@ const ENTRY_COLUMNS =
 
 /** Ids per linked-number read — keeps the `in (…)` list well inside a URL. */
 const LINK_SLICE = 100;
+
+/** The one sentence the Journal refuses a department filter with. */
+const TOO_MANY_DEPARTMENT_ENTRIES = "There are too many entries in this department to list here.";
 
 /**
  * The entry number of every entry these rows point at, through `reverses` or
@@ -210,15 +196,29 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
   // gl_line_departments and not on the line. Read that view ONCE for the
   // entries it matches. Not as an embedded computed relationship: PostgREST
   // rebuilds the whole view per parent row and the read never returns.
-  // ponytail: an unbounded id list, held today by the Journal's own page cap;
-  // push the filter into a register function if one department outgrows a URL.
+  //
+  // TWO ceilings, and the first version of this (PR #1495) had neither. Its
+  // comment claimed the Journal's page cap held the list; that cap bounds the
+  // ENTRIES page, not this read.
+  //   1 · the read itself — unbounded, so past 1000 view rows the entries of
+  //       the lines that never came back silently vanished from the Journal.
+  //       Paged now, and refused rather than cut short.
+  //   2 · the id list — every id is spelt into the `.in()` URL below, so the
+  //       list cannot be chunked (the count and the page come from ONE query)
+  //       and is capped instead.
   let deptEntries: string[] | null = null;
   if (departmentType) {
-    let d = sb.from("gl_line_departments").select("entry_id").eq("department_type", departmentType);
-    if (departmentId) d = d.eq("department_id", departmentId);
-    const got = await d;
-    if (got.error) return ledgerError(c, got.error, "The journal");
-    deptEntries = [...new Set((got.data ?? []).map((r) => String((r as Json).entry_id)))];
+    // `line_id` is the view's unique column: paging on a non-unique order can
+    // miss or repeat a row across two pages.
+    const read = await readAllPages<{ entry_id: string }>((a, b) => {
+      let d = sb.from("gl_line_departments").select("entry_id").eq("department_type", departmentType);
+      if (departmentId) d = d.eq("department_id", departmentId);
+      return d.order("line_id", { ascending: true }).range(a, b);
+    });
+    if ("error" in read) return ledgerError(c, read.error, "The journal");
+    if (!("rows" in read)) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
+    deptEntries = [...new Set(read.rows.map((r) => String(r.entry_id)))];
+    if (deptEntries.length > IN_URL_MAX) return tooManyRows(c, TOO_MANY_DEPARTMENT_ENTRIES);
   }
   let req = sb
     .from("gl_entries")
@@ -382,19 +382,48 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   return c.json(read.chart);
 });
 
+/**
+ * 0550's refusals each carry a DETAIL tag, and the sentence the user must read
+ * is the function's own message — `mapPgError` already answers with that
+ * message and the status the tag deserves:
+ *
+ *   not_finance    42501 → 403   Only Finance changes the chart of accounts.
+ *   account_missing P0002 → 404  That account is not in the chart.
+ *   name_missing   22023 → 422   Type the account name.
+ *   name_too_long  22023 → 422   Keep the name to 60 characters.
+ *   name_exists    22023 → 422   An account named X is already in the chart.
+ *   code_shape     22023 → 422   A number is four digits, or three digits, …
+ *   code_exists    22023 → 422   An account numbered X is already in the chart.
+ *
+ * What is added here is the tag itself, forwarded as `code` — the same
+ * passthrough money-moves.ts and payables.ts do — so the modal can put the
+ * sentence under the field it is about instead of at the foot of the form.
+ * A 500 keeps `rpc_failed`: a tag on a break is not a refusal.
+ */
+function accountError(c: Context<AppEnv>, error: PgError) {
+  const m = mapPgError(error);
+  if (error.details && m.status !== 500) return c.json({ ...m.body, code: error.details }, m.status);
+  return c.json(m.body, m.status);
+}
+
 financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
   const code = c.req.param("code");
-  if (!/^\d{4}$/.test(code)) {
+  // Both shapes 0550 accepts, not just four digits — an account renumbered to
+  // 100-0001 must still be reachable by its own path.
+  if (!ledgerAccountCodeShape.test(code)) {
     return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
   }
-  const body = await parseJsonBody(c, ledgerAccountRenameInput);
+  const body = await parseJsonBody(c, ledgerAccountUpdateInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("gl_account_rename", { p_code: code, p_name: body.data.name });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  // No number given means the number stays; the function reads null as "keep".
+  const { data, error } = await sb.rpc("gl_account_update", {
+    p_code: code,
+    p_name: body.data.name,
+    p_new_code: body.data.code ?? null,
+  });
+  if (error) return accountError(c, error);
+  // The answer is the number the account now carries, which is the new one.
   return c.json({ code: data as string });
 });
 

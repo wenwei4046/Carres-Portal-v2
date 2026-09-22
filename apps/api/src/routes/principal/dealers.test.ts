@@ -594,6 +594,41 @@ describe("0543 — finance keeps the dealer master", () => {
     });
   });
 
+  // The bug this test exists for: dealers_code_unique (0543) raised 23505,
+  // mapPgError had no case for it, and Finance got HTTP 500 `rpc_failed` with
+  // `duplicate key value violates unique constraint "dealers_code_unique"` in
+  // the toast. A code another dealer holds is a 409 that names the code.
+  it("a code another dealer already has is a 409 that names the code", async () => {
+    const { sb } = buildSb({
+      rpcResults: {
+        dealer_save_master: {
+          error: {
+            code: "23505",
+            message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+            details: "Key (code)=(JB1) already exists.",
+          },
+        },
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/principal/dealers/${DEALER_ID}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "JB1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string; code: string; message: string };
+    expect(body.error).toBe("conflict");
+    expect(body.code).toBe("dealer_code_taken");
+    expect(body.message).toContain("JB1");
+    expect(body.message).not.toContain("dealers_code_unique");
+  });
+
   it("finance cannot invite a dealer or change its status", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

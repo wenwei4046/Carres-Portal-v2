@@ -151,7 +151,7 @@ const TABLES = (): Tbl => ({
 /** Records what every table saw, plus every rpc + update call. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const CHAIN = [
-    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit",
+    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit", "range",
   ];
   const updates: { table: string; patch: unknown; id: unknown }[] = [];
   /**

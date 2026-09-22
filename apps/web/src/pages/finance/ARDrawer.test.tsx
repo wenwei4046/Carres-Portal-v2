@@ -135,6 +135,9 @@ describe("ARDrawer", () => {
     render(wrap(drawer()));
     fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
     expect(screen.getByLabelText("Method")).toHaveValue("bank");
+    // 0551 — a bank transfer is matched by its reference number, so the form
+    // will not submit without one.
+    fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "MBB-778812" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
       "/api/finance/payments/order-receipt", expect.anything()));

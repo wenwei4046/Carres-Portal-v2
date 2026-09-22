@@ -1,18 +1,24 @@
 /**
- * Finance Settings → Chart of accounts (migration 0539).
+ * Finance Settings → Chart of accounts (migrations 0539, 0550, 0557).
  *
  * Every account in the chart as a tree: each account under its parent,
  * indented by depth. A heading account (one another account names as parent)
- * is bold; the ledger never posts to it. A row click renames the account, and
- * a row DRAG moves it (0557).
+ * is bold; the ledger never posts to it. A row click opens the account's name
+ * and its number. Since 0550 the number can change: every key that names the
+ * chart cascades, so posted lines follow the account to its new number rather
+ * than being left pointing at nothing.
+ *
+ * One ceiling, and it is the database's, not this screen's: an account named
+ * on a document that has left Draft cannot be renumbered yet. That refusal
+ * comes back from the frozen-document triggers in the door's own words.
+ *
+ * A row DRAG moves the account (0557) — a separate act from the modal above.
  *
  * THE ORDER IS NOT THE NUMBER (0557). The chart carries its own display order
  * — one integer per account, ordered within its heading, ties broken on the
- * code — and moving an account changes only that. The account number is never
- * written by a move: `gl_entry_lines` points at the code (0462), so the number
- * is changed on purpose, by hand, as its own separate act. The old header line
- * here said "the code never changes"; that stopped being the whole truth when
- * the number became editable in its own right (0550, a separate branch).
+ * code — and moving an account changes only that. A move never writes the
+ * number: the two are separate acts, and the number changes only by hand, in
+ * the modal above.
  *
  * WHICH IS WHY EVERY COLUMN IS `sortable: false`, AND STAYS THAT WAY. This
  * grid prints a TREE, not a list. Sorting a column would lift children away
@@ -49,7 +55,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
-import { useRenameAccount, useReorderAccounts } from "./api";
+import { useReorderAccounts, useSaveAccount } from "./api";
 
 type Row = LedgerAccount & { depth: number };
 
@@ -155,19 +161,39 @@ export default function ChartOfAccounts() {
           onMove: move,
         }}
       />
-      {editing && <RenameModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
+      {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
     </ListPageShell>
   );
 }
 
-function RenameModal({ account, onClose }: { account: Row; onClose: () => void }) {
-  const rename = useRenameAccount();
+/**
+ * Which field a refusal is about. The sentence shown is always the door's own
+ * (0550 raises it, the API forwards it) — the `code` tag only says where to put
+ * it, so the copy lives in one place instead of two.
+ */
+function refusalOf(error: unknown): { field: "name" | "code" | null; message: string } {
+  const body = (error as { body?: unknown } | null)?.body;
+  const tag = body && typeof body === "object" ? (body as { code?: unknown }).code : null;
+  const field =
+    tag === "code_shape" || tag === "code_exists" ? "code" as const
+    : tag === "name_exists" || tag === "name_missing" || tag === "name_too_long" ? "name" as const
+    : null;
+  return { field, message: (error as Error).message };
+}
+
+function AccountModal({ account, onClose }: { account: Row; onClose: () => void }) {
+  const save = useSaveAccount();
   const [name, setName] = useState(account.name);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [code, setCode] = useState(account.code);
+  const [refusal, setRefusal] = useState<{ field: "name" | "code" | null; message: string } | null>(null);
   const trimmed = name.trim();
+  const trimmedCode = code.trim();
   const submit = () => {
     setRefusal(null);
-    rename.mutate({ code: account.code, name: trimmed }, { onSuccess: onClose, onError: (e) => setRefusal(e.message) });
+    save.mutate(
+      { code: account.code, name: trimmed, newCode: trimmedCode },
+      { onSuccess: onClose, onError: (e) => setRefusal(refusalOf(e)) },
+    );
   };
   return (
     <Modal
@@ -182,7 +208,7 @@ function RenameModal({ account, onClose }: { account: Row; onClose: () => void }
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={rename.isPending} disabled={!trimmed} onClick={submit}>
+          <Button variant="primary" loading={save.isPending} disabled={!trimmed || !trimmedCode} onClick={submit}>
             Save
           </Button>
         </>
@@ -190,7 +216,10 @@ function RenameModal({ account, onClose }: { account: Row; onClose: () => void }
     >
       <div className="flex flex-col gap-3" data-testid="account-rename-form">
         <Input id="account-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
-        {refusal && <FieldError>{refusal}</FieldError>}
+        {refusal?.field === "name" && <FieldError>{refusal.message}</FieldError>}
+        <Input id="account-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
+        {refusal?.field === "code" && <FieldError>{refusal.message}</FieldError>}
+        {refusal && refusal.field === null && <FieldError>{refusal.message}</FieldError>}
       </div>
     </Modal>
   );

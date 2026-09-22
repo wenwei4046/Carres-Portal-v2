@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { PaymentMethodRegistryRow, PaymentMoneyAccount } from "@carres/shared";
+import { requiredPaymentReference } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
 
 /**
@@ -40,21 +41,36 @@ export interface ManualMethodSpec {
   reference: { label: string; required: boolean } | null;
 }
 
+/**
+ * The reference box a method shows. The LABEL and the REQUIRED flag both come
+ * from `requiredPaymentReference` — the one §16 predicate the SQL writer
+ * mirrors (0535, widened by 0551) — so a form can never ask for a reference
+ * the database does not want, or stay silent about one it refuses without.
+ * A method the writer leaves optional keeps its plain, optional Reference box
+ * so the operator can still record a number nobody insists on.
+ */
+function referenceField(key: string): { label: string; required: boolean } {
+  const needed = requiredPaymentReference(key);
+  return needed ? { label: needed, required: true } : { label: "Reference", required: false };
+}
+
 /** The §16 evidence words for the six governed methods. A method a manager
- *  adds asks for `Payment proof` and an optional Reference. */
+ *  adds asks for `Payment proof` and, unless the writer names a reference for
+ *  its key, an optional Reference. Cash alone shows no reference box at all —
+ *  there is no number on a banknote. */
 const GOVERNED: ManualMethodSpec[] = [
   { value: "bank", label: "Bank transfer", evidence: "Transfer slip",
-    reference: { label: "Reference", required: false } },
+    reference: referenceField("bank") },
   { value: "duitnow_qr", label: "DuitNow QR", evidence: "Payment screenshot",
-    reference: null },
+    reference: referenceField("duitnow_qr") },
   { value: "cheque", label: "Cheque", evidence: "Cheque photo",
-    reference: { label: "Cheque number", required: true } },
+    reference: referenceField("cheque") },
   { value: "cash", label: "Cash", evidence: "Cash collection proof",
     reference: null },
   { value: "credit_card", label: "Credit card", evidence: "Card terminal receipt",
-    reference: { label: "Approval code", required: true } },
+    reference: referenceField("credit_card") },
   { value: "debit_card", label: "Debit card", evidence: "Card terminal receipt",
-    reference: { label: "Approval code", required: true } },
+    reference: referenceField("debit_card") },
 ];
 const GOVERNED_BY_KEY = new Map(GOVERNED.map((m) => [m.value, m]));
 
@@ -73,7 +89,7 @@ function specFor(row: PaymentMethodRegistryRow): ManualMethodSpec {
   return governed
     ? { ...governed, label: row.label }
     : { value: row.method, label: row.label, evidence: "Payment proof",
-        reference: { label: "Reference", required: false } };
+        reference: referenceField(row.method) };
 }
 
 /** The Active methods a form may offer, in the manager's order. Falls back to
@@ -92,7 +108,7 @@ export function manualMethodSpec(
   if (row) return specFor(row);
   return GOVERNED_BY_KEY.get(key)
     ?? { value: key, label: methodLabel(key, rows), evidence: "Payment proof",
-         reference: { label: "Reference", required: false } };
+         reference: referenceField(key) };
 }
 
 /** The name a stored method key reads as: the registry's name, else the

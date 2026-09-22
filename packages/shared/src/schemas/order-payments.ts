@@ -106,12 +106,23 @@ export const recordPaymentInputSchema = z.object({
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 
 /** payment/MASTER.md §16 — the reference a method must carry, or null when
- *  it is optional. Mirrors the check in `_customer_payment_post` (0535): the
- *  key folds like `payment_method_key` (POS `credit` / `installment` are card). */
-export function requiredPaymentReference(method: string | null | undefined): "Approval code" | "Cheque number" | null {
+ *  it is optional. Mirrors the check in `_customer_payment_post` (0535,
+ *  widened by 0551): the key folds like `payment_method_key` (POS `credit` /
+ *  `installment` are card, `bank_transfer` is bank).
+ *
+ *  0551 added bank and DuitNow QR because card settlement for every non-GHL
+ *  acquirer is matched BY the reference — it is a reconciliation key, not
+ *  paperwork. Cash, online, other and a method a manager adds stay optional,
+ *  exactly as the writer leaves them: this list is closed, never "anything
+ *  not cash". THE one predicate — every form asks it, so no screen can drift
+ *  from the database. */
+export function requiredPaymentReference(
+  method: string | null | undefined,
+): "Approval code" | "Cheque number" | "Reference number" | null {
   const k = (method ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (k === "cheque") return "Cheque number";
   if (["card", "credit", "installment", "credit_card", "debit_card"].includes(k)) return "Approval code";
+  if (["bank", "bank_transfer", "duitnow_qr"].includes(k)) return "Reference number";
   return null;
 }
 

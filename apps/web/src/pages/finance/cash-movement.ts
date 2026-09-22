@@ -21,10 +21,16 @@
  * money from the cash drawer to the bank (one entry, in on one cash account
  * and out on another) is neither In nor Out.
  *
- * PER ACCOUNT. The same lines, read from go-live, also give each account its
- * own in, out and net since go-live. There a move between two cash accounts is
- * Out on one and In on the other, so the accounts' figures do not add up to the
- * weekly totals.
+ * PER ACCOUNT. Lines read from go-live give each account its own in, out and
+ * net since go-live. There a move between two cash accounts is Out on one and
+ * In on the other, so the accounts' figures do not add up to the weekly totals.
+ *
+ * TWO WINDOWS, TWO READS, TWO FAILURES. The tile and the chart read only the
+ * twelve weeks they show; the per-account panel reads from go-live. While the
+ * two windows are the same day — they are until the ledger is twelve weeks old
+ * — the query key is the same and React Query makes the request once. Once they
+ * part, one window failing leaves the other's surfaces standing: a panel added
+ * later may not blank a tile and a chart that worked before it.
  */
 import { useQuery } from "@tanstack/react-query";
 import type { LedgerAccount, LedgerChart } from "@carres/shared/finance-ledger";
@@ -191,34 +197,62 @@ export function parseAccountLedger(body: unknown, account: string, from: string,
   return lines;
 }
 
-export interface CashAndBank extends CashMovement {
-  /** Each cash and bank account since go-live, in chart order. */
-  accounts: CashAccountMovement[];
-}
-
-/** The Net cash tile, the Cashflow chart and the per-account panel. Waits for the chart (it names the accounts and go-live). */
-export function useCashMovement(chart: LedgerChart | undefined, today: string) {
-  const goLive = chart?.go_live_on ?? null;
-  const accounts = chart ? cashAccounts(chart) : [];
-  const codes = accounts.map((a) => a.code);
-  const weeks = goLive ? cashWeeks(goLive, today) : [];
-  // From go-live, not from the first of the twelve weeks: the per-account panel covers all of it.
-  // ponytail: one read per account since go-live; an account past the API's 20,000-line cap fails the whole read. Add a server-side per-account sum when one does.
-  const from = weeks.length > 0 ? goLive : null;
-  return useQuery({
-    queryKey: [...ledgerKeys.all(), "cash-movement", goLive ?? "", today, codes.join(",")] as const,
-    enabled: Boolean(chart),
-    queryFn: async (): Promise<CashAndBank> => {
-      if (!goLive) throw new Error("The ledger has no start date yet.");
+/**
+ * One read per cash account over ONE window, flattened. Both hooks below build
+ * their query from this, so while their windows are equal the key is equal and
+ * the request is made once; when the windows differ so do the reads, the cache
+ * entries and the failures.
+ */
+function cashLinesQuery(codes: readonly string[], from: string | null, to: string) {
+  return {
+    queryKey: [...ledgerKeys.all(), "cash-lines", from ?? "", to, codes.join(",")] as const,
+    queryFn: async (): Promise<CashLine[]> => {
       if (codes.length === 0) throw new Error(CASH_FAILED);
       // Nothing has moved yet when today is still before go-live.
-      if (!from) return { ...weeklyCashMovement([], [], goLive), accounts: accountMovement([], accounts) };
+      if (!from) return [];
       const read = await Promise.all(codes.map(async (code) => {
-        const q = new URLSearchParams({ account: code, from, to: today });
-        return parseAccountLedger(await apiFetch<unknown>(`/api/finance/ledger/account-ledger?${q.toString()}`), code, from, today);
+        const q = new URLSearchParams({ account: code, from, to });
+        return parseAccountLedger(await apiFetch<unknown>(`/api/finance/ledger/account-ledger?${q.toString()}`), code, from, to);
       }));
-      const lines = read.flat();
-      return { ...weeklyCashMovement(lines, weeks, goLive), accounts: accountMovement(lines, accounts) };
+      return read.flat();
     },
+  };
+}
+
+/**
+ * Where the tile and the chart start reading: the first week they show, never
+ * go-live. This is the whole bound — twelve weeks of lines at most, however old
+ * the ledger gets. Null while today is still before go-live.
+ */
+export const weeklyReadFrom = (weeks: readonly CashWeek[]): string | null => weeks[0]?.from ?? null;
+
+/** The Net cash tile and the Cashflow chart. Waits for the chart (it names the accounts and go-live). */
+export function useCashMovement(chart: LedgerChart | undefined, today: string) {
+  const goLive = chart?.go_live_on ?? null;
+  const codes = chart ? cashAccounts(chart).map((a) => a.code) : [];
+  const weeks = goLive ? cashWeeks(goLive, today) : [];
+  return useQuery({
+    ...cashLinesQuery(codes, weeklyReadFrom(weeks), today),
+    enabled: Boolean(goLive),
+    select: (lines): CashMovement => weeklyCashMovement(lines, weeks, goLive ?? ""),
+  });
+}
+
+/**
+ * The per-account panel. Its window starts at go-live because movement since
+ * the ledger started is what the panel is FOR; cutting it to twelve weeks would
+ * answer a different question.
+ * ponytail: that window grows forever, so one day an account passes the API's
+ * 20,000-line cap and this read alone fails — the tile and the chart no longer
+ * go with it. Add a server-side per-account sum when one does.
+ */
+export function useCashAccountMovement(chart: LedgerChart | undefined, today: string) {
+  const goLive = chart?.go_live_on ?? null;
+  const accounts = chart ? cashAccounts(chart) : [];
+  const started = goLive !== null && cashWeeks(goLive, today).length > 0;
+  return useQuery({
+    ...cashLinesQuery(accounts.map((a) => a.code), started ? goLive : null, today),
+    enabled: Boolean(goLive),
+    select: (lines): CashAccountMovement[] => accountMovement(lines, accounts),
   });
 }
