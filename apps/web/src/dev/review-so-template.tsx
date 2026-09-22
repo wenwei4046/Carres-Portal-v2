@@ -505,7 +505,7 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
         node: (
           <View key={`band-${gi}`} style={styles.bandRow} minPresenceAhead={30}>
             <Text style={styles.bandText}>
-              {group.band} · Qty {group.rows.reduce((n, r) => n + Number(r.line.qty), 0)}
+              {group.band} · {group.rows.length} {group.rows.length > 1 ? "items" : "item"}
             </Text>
           </View>
         ),
@@ -564,7 +564,7 @@ export function ReviewSalesOrderTemplate(data: ReviewSoData) {
       node: (
         <View key="addon-band" style={styles.bandRow} minPresenceAhead={30}>
           <Text style={styles.bandText}>
-            SERVICE
+            SERVICE · {addons.length} {addons.length > 1 ? "items" : "item"}
           </Text>
         </View>
       ),

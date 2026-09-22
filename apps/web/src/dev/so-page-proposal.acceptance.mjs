@@ -21,7 +21,7 @@ let d = flat(await doc(p, 1));
 ok(d.replace(/ /g, "").includes("REVIEWSAMPLE·Rev1·nottheofficialSalesOrderPDF"), "document stamped REVIEW SAMPLE · Rev 1");
 ok(!d.includes("TOTAL RECEIVED") && !d.includes("GOODS TOTAL"), "document has no TOTAL RECEIVED / GOODS TOTAL");
 ok(/TOTAL PAYABLE 3 /.test(d) && d.includes("Qty: Mattress 2 · Accessory 1") && d.includes("Services: Delivery fee · Stair carry"), "document: total 3 pieces, same Qty line and services as the page");
-ok(d.includes("MATTRESS · Qty 2") && d.includes("ACCESSORY · Qty 1") && !/SERVICE · \d/.test(d), "document bands show Qty, services not counted");
+ok(d.includes("MATTRESS · 1 item") && d.includes("ACCESSORY · 1 item"), "document category bands unchanged (PDF standard §5)");
 ok(d.includes("Goods amount RM 3,780.00") && d.includes("Service amount RM 350.00") && d.includes("Total payable RM 4,130.00"), "document goods / service / total");
 ok(d.includes("Paid to date RM 1,999.50") && /BALANCE DUE RM 2,130.50/.test(d), "document paid and balance (current, printed today)");
 ok(!d.includes("1,200.00"), "voided RM1,200 not on the document");
