@@ -749,7 +749,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         kind: "manual_purchase" as const,
         /* The stored MPR number where the request has one; the governed label
            where it has none. Never a UUID, never an invented number. */
-        reference: facts?.reqNo ?? "Manual Purchase",
+        reference: facts?.reqNo ?? "Manual Purchase Request",
         req_no: facts?.reqNo ?? null,
         request_id: demand.requestId,
         purpose: demand.purpose,
@@ -798,7 +798,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             }]),
             ...(demand ? [{
               kind: "manual_purchase" as const,
-              reference: manualFacts?.reqNo ?? "Manual Purchase",
+              reference: manualFacts?.reqNo ?? "Manual Purchase Request",
               req_no: manualFacts?.reqNo ?? null,
               // A mixed legacy row can carry both ledgers. Preserve its Manual
               // Purchase reference without claiming the full line twice.

@@ -52,7 +52,7 @@ const pos = Array.from({ length: 26 }, (_, n) => {
     eta_date: original, official_delivery_date: original, expected_ready_date: null,
     purpose: "customer_sales", version, placed_at: `2026-09-${day}T02:00:00Z`,
     sources: i % 7 === 0
-      ? [{ kind: "manual_purchase", reference: "Manual Purchase", request_id: `r${i}` }]
+      ? [{ kind: "manual_purchase", reference: "Manual Purchase Request", request_id: `r${i}` }]
       : i % 5 === 0
         ? [{ kind: "sales_order", reference: `SO-${1300 + i}`, order_id: `o${i}` }, { kind: "sales_order", reference: `SO-${1400 + i}`, order_id: `p${i}` }]
         : [{ kind: "sales_order", reference: `SO-${1300 + i}`, order_id: `o${i}` }],

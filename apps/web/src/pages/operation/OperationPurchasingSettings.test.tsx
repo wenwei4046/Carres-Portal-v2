@@ -281,7 +281,7 @@ describe("Purchasing → Settings", () => {
     });
     render(wrap(<OperationPurchasingSettings />));
     expect(
-      screen.getByText("Earliest Delivery Date a Manual Purchase may ask for"),
+      screen.getByText("Earliest Delivery Date a Manual Purchase Request may ask for"),
     ).toBeTruthy();
     const input = screen.getByTestId("manual-purchase-min-delivery-days") as HTMLInputElement;
     expect(input.value).toBe("3");

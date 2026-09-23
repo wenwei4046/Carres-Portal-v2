@@ -80,7 +80,7 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   /* Reachable by direct URL only since 2026-08-22 — no rail row, same word. */
   "purchase-demands": "SO Batch Purchase",
   "to-order": "SO Batch Purchase",
-  "manual-purchase": "Manual Purchase",
+  "manual-purchase": "Manual Purchase Request",
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
   claims: "Supplier Claims",

@@ -913,7 +913,7 @@ export default function OperationManualPurchase() {
     }
     if (ids.length > 20) {
       setIssueError({
-        wrong: "One issue can carry 20 Manual Purchases at most.",
+        wrong: "One issue can carry 20 Manual Purchase Requests at most.",
         todo: `Untick ${ids.length - 20} of them, then issue again.`,
       });
       return;
@@ -1682,13 +1682,13 @@ export default function OperationManualPurchase() {
             storageKey="carres.manualPurchase.register.v6"
             rowKey={(r) => r.id}
             rowTestId={(r) => `mp-row-${r.id}`}
-            exportName="Manual Purchase"
+            exportName="Manual Purchase Request"
             searchPlaceholder={MW.search}
             isLoading={q.isLoading}
             errorState={
               q.isError ? (
                 <EmptyState
-                  title="Manual Purchases could not be loaded"
+                  title="Manual Purchase Requests could not be loaded"
                   action={
                     <Button variant="neutral" onClick={() => void q.refetch()}>
                       {MW.tryAgain}
@@ -2817,7 +2817,7 @@ function CreateRequestWorkspace({
         data-testid="manual-purchase-create"
       >
         <h2 className="mp-create-heading">
-          {editing ? MW.editAndSendAgain : "New Manual Purchase"}
+          {editing ? MW.editAndSendAgain : "New Manual Purchase Request"}
         </h2>
         {/* ⭐ THE SALES ORDER COMPOSITION (owner 2026-09-22): the form on the
             left, the live internal MPR preview on the right, ONE reading order
@@ -3932,8 +3932,8 @@ function ManualPurchaseObject({
               type="button"
               onClick={() => onStep(-1)}
               disabled={position.index <= 1}
-              aria-label="Previous Manual Purchase"
-              title="Previous Manual Purchase in the list"
+              aria-label="Previous Manual Purchase Request"
+              title="Previous Manual Purchase Request in the list"
               className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <ChevronLeft size={16} aria-hidden="true" />
@@ -3945,8 +3945,8 @@ function ManualPurchaseObject({
               type="button"
               onClick={() => onStep(1)}
               disabled={position.index >= position.total}
-              aria-label="Next Manual Purchase"
-              title="Next Manual Purchase in the list"
+              aria-label="Next Manual Purchase Request"
+              title="Next Manual Purchase Request in the list"
               className="grid size-7 place-items-center rounded-full text-base-600 hover:bg-hovertint disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <ChevronRight size={16} aria-hidden="true" />

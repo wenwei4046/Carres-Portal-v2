@@ -18,10 +18,15 @@ import { countWorkingDays, type WorkingDayOptions } from "./working-days";
 
 /** Every visible word on the Manual Purchase surfaces (COPY-STANDARD). */
 export const MANUAL_PURCHASE_WORDS = {
-  page: "Manual Purchase",
+  /* ⭐ THE SCREEN IS `Manual Purchase Request` (owner ruling 2026-09-23,
+     MASTER §6.1 / COPY-STANDARD). The rail said `Manual Purchase` from
+     2026-09-18 until the owner put the request word back: what the operator
+     raises is a REQUEST, and the purchase itself is the PO that answers it.
+     `MPR` (Manual Purchase Request) was always the number's own word. */
+  page: "Manual Purchase Request",
   /** COPY-STANDARD's own governed pair — built by Card 04. */
-  newRequest: "+ Manual Purchase",
-  createTitle: "NEW MANUAL PURCHASE",
+  newRequest: "+ Manual Purchase Request",
+  createTitle: "NEW MANUAL PURCHASE REQUEST",
   send: "Send for approval",
   /** The disabled Send NAMES its gap (the Receiving law: a grey button that
    *  will not say why is banned). The FIRST missing header fact wins, in the
@@ -188,10 +193,10 @@ export const MANUAL_PURCHASE_WORDS = {
   groupNeedPo: "Need PO",
   groupNoPoNeeded: "No PO needed",
   groupNeedApprovalEmpty: "Nothing waiting for approval",
-  noMatch: "No Manual Purchases match these filters",
-  footerOne: "1 Manual Purchase",
-  footerMany: "Manual Purchases",
-  search: "Search Manual Purchases",
+  noMatch: "No Manual Purchase Requests match these filters",
+  footerOne: "1 Manual Purchase Request",
+  footerMany: "Manual Purchase Requests",
+  search: "Search Manual Purchase Requests",
   /**
    * An APPROVED request whose remaining quantity could not be read. It stays
    * in `To buy`, says so, and cannot be ticked — unknown is never zero and
@@ -314,7 +319,7 @@ export const MANUAL_PURCHASE_WORDS = {
    * An absence states what is missing; it never borrows the opposite fact.
    */
   poNotRecorded: "Purchase order not recorded",
-  emptyRegister: "No Manual Purchase yet.",
+  emptyRegister: "No Manual Purchase Request yet.",
   /**
    * THE OBJECT DETAIL (Card 05) — one full-width scroll, six sections in
    * this exact order. The section names print through the Block heading's
@@ -327,10 +332,10 @@ export const MANUAL_PURCHASE_WORDS = {
   secPurchaseOrders: "Purchase Orders",
   secHistory: "History",
   /** The object header's one back destination — the owning Register. */
-  backToRegister: "Manual Purchase",
+  backToRegister: "Manual Purchase Request",
   /** Governed loading / failure states (never a raw error string). */
-  objectLoading: "Opening the Manual Purchase",
-  objectLoadFailed: "This Manual Purchase could not be opened",
+  objectLoading: "Opening the Manual Purchase Request",
+  objectLoadFailed: "This Manual Purchase Request could not be opened",
   tryAgain: "Try again",
   /** The audit-data defect sentence — a person is never invented. */
   staffIdentityNotRecorded: "Staff identity not recorded",
@@ -1174,14 +1179,15 @@ export function manualPurchaseForOf(f: {
 
 /**
  * A PURCHASE ORDER'S VISIBLE MANUAL PURCHASE SOURCE WORDING (Card 08 §3.5):
- * one source prints `Manual Purchase`, several print `{n} Manual Purchases`.
+ * one source prints `Manual Purchase Request`, several print
+ * `{n} Manual Purchase Requests`.
  * The count is DISTINCT source request UUIDs — never a count of labels, and
  * never an MPR number. Zero sources print nothing (null).
  */
 export function manualPurchaseSourceSummary(count: number): string | null {
   if (count <= 0) return null;
   if (count === 1) return MANUAL_PURCHASE_WORDS.page;
-  return `${count} Manual Purchases`;
+  return `${count} Manual Purchase Requests`;
 }
 
 /**

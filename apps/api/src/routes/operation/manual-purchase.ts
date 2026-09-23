@@ -2112,7 +2112,7 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
         {
           error: "migration_not_applied",
           code: "migration_not_applied",
-          message: "This Manual Purchase was not created.",
+          message: "This Manual Purchase Request was not created.",
           action: "Ask IT to apply migration 0562, then send it again.",
         },
         503,

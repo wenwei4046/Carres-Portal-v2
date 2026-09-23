@@ -93,19 +93,49 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
    * on the hero, the PO No row and the footer of EVERY page. It never prints
    * on its own (`Version` row, a second line under PURCHASE ORDER).
    */
-  it("prints PO-… V{n} from the payload, and never a Version row of its own", () => {
-    expect(SRC).toMatch(/`\$\{po_number\} V\$\{version \?\? 1\}`/);
+  it("prints the number with its version from the payload, and never a Version row of its own", () => {
+    expect(SRC).toMatch(/poDocumentNumberOf\(po_number, version\)/);
     expect(SRC).toMatch(/const \{ po_number, version,/);
+    /* The spelling is decided in ONE shared place (Law D), so the template
+       must not carry a second arithmetic for it. */
+    expect(CODE).not.toMatch(/`\$\{po_number\} V/);
     expect(CODE).not.toMatch(/\["Version",/);
     expect(CODE).not.toMatch(/versionLabel/);
     const text = renderedText(PoTemplate(twoLocationV2()));
     expect(text.split("PO-2609-0042 V2").length - 1).toBeGreaterThanOrEqual(3);
   });
 
-  it("never invents a version — a payload without one reads V1", () => {
+  /**
+   * ⭐ OWNER RULING 2026-09-23 (MASTER §6.1) — A NEW NUMBER WEARS `(n)`, AND A
+   * PRE-CUTOVER ONE KEEPS ` V{n}`.
+   *
+   * The second half is the permanence carve-out, and it is proved on the SAME
+   * template: a kept version reprints from `po_version_documents`, whose
+   * payload carries the number the supplier was given, so the old paper comes
+   * back spelt exactly as it was sent. No stored flag, no print-date rule.
+   */
+  it("a NEW-form number prints `PO260924-4827(2)` on every page", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), po_number: "PO260924-4827", po_id: "PO260924-4827" }));
+    expect(text.split("PO260924-4827(2)").length - 1).toBeGreaterThanOrEqual(3);
+    expect(text).not.toContain("PO260924-4827 V2");
+    expect(text).not.toContain("PO260924-4827 (2)");
+  });
+
+  it("⭐ a PRE-CUTOVER number reprints exactly as its supplier received it", () => {
+    const text = renderedText(PoTemplate({ ...twoLocationV2(), po_number: "PO-20260904-4665", po_id: "PO-20260904-4665" }));
+    expect(text).toContain("PO-20260904-4665 V2");
+    expect(text).not.toContain("PO-20260904-4665(2)");
+  });
+
+  it("never invents a version — a payload without one reads version 1", () => {
     expect(CODE).not.toMatch(/version\s*\+\+|version\s*\+\s*1/);
-    const text = renderedText(PoTemplate({ ...twoLocationV2(), version: undefined as unknown as number }));
-    expect(text).toContain("PO-2609-0042 V1");
+    const old = renderedText(PoTemplate({ ...twoLocationV2(), version: undefined as unknown as number }));
+    expect(old).toContain("PO-2609-0042 V1");
+    const now = renderedText(PoTemplate({
+      ...twoLocationV2(), po_number: "PO260924-4827", po_id: "PO260924-4827",
+      version: undefined as unknown as number,
+    }));
+    expect(now).toContain("PO260924-4827(1)");
   });
 
   it("the SAME full header on every page — one fixed header, no one-line continuation", () => {

@@ -52,7 +52,7 @@ const queryData = {
         { kind: "sales_order" as const, reference: "SO-4001" },
         {
           kind: "manual_purchase" as const,
-          reference: "Manual Purchase",
+          reference: "Manual Purchase Request",
           request_id: "request-1",
           purpose: "showroom_display",
           proceed_date: "2026-08-28",
@@ -107,7 +107,7 @@ const queryData = {
             { kind: "sales_order" as const, reference: "SO-4001", qty: 1 },
             {
               kind: "manual_purchase" as const,
-              reference: "Manual Purchase",
+              reference: "Manual Purchase Request",
               qty: 2,
               request_id: "request-1",
               purpose: "showroom_display",
@@ -512,11 +512,11 @@ describe("Purchase Orders Register", () => {
 
     /* A request with no stored number keeps the governed label — and, having
        nothing to open, is a fact rather than a dead control. */
-    po.sources = [{ kind: "manual_purchase", reference: "Manual Purchase", req_no: null, request_id: null }] as typeof sources;
+    po.sources = [{ kind: "manual_purchase", reference: "Manual Purchase Request", req_no: null, request_id: null }] as typeof sources;
     const unnumbered = renderPage();
     const unnumberedRow = screen.getAllByTestId("grid-row-PO-20260828-4827").at(-1)!;
-    expect(unnumberedRow).toHaveTextContent("Manual Purchase");
-    expect(within(unnumberedRow).queryByRole("button", { name: "Manual Purchase" })).toBeNull();
+    expect(unnumberedRow).toHaveTextContent("Manual Purchase Request");
+    expect(within(unnumberedRow).queryByRole("button", { name: "Manual Purchase Request" })).toBeNull();
     unnumbered.unmount();
 
     /* Several: the approved count, and the PO's Order Route, where each one is

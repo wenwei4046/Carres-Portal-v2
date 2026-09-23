@@ -545,10 +545,44 @@ describe("comparePoRisk — the register's default order", () => {
 
 /* ── PO REVISIONS (0364, Jess 2026-08-18) — the version words + derivations ── */
 import {
+  poDocumentNumberOf,
   poReviseSaveGapOf,
   poUnsharedVersionNoticeOf,
   poVersionLabelOf,
 } from "./po-workspace";
+
+/* ── THE NUMBER A SUPPLIER READS (owner ruling 2026-09-23, MASTER §6.1) ──── */
+describe("poDocumentNumberOf — the version marker follows the NUMBER's own form", () => {
+  it("a new-form PO wears `(n)`, with no space", () => {
+    expect(poDocumentNumberOf("PO260924-4827", 1)).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO260924-4827", 2)).toBe("PO260924-4827(2)");
+    expect(poDocumentNumberOf("PO260924-4827", 10)).toBe("PO260924-4827(10)");
+  });
+
+  it("⭐ A PRE-CUTOVER NUMBER KEEPS THE ` V{n}` ITS SUPPLIER ALREADY HOLDS", () => {
+    /* The permanence carve-out, enforced by the spelling rather than by a
+       stored flag: a kept version's payload carries its old number, so a
+       reprint of a 2026-09-22 send still reads exactly as it was sent. */
+    expect(poDocumentNumberOf("PO-20260904-4665", 2)).toBe("PO-20260904-4665 V2");
+    expect(poDocumentNumberOf("PO-2054", 1)).toBe("PO-2054 V1");
+  });
+
+  it("version 1 is PRINTED, never suppressed (0378)", () => {
+    expect(poDocumentNumberOf("PO260924-4827")).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO260924-4827", null)).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO-20260904-4665", null)).toBe("PO-20260904-4665 V1");
+  });
+
+  it("a subscription twin or any other 2–4 letter prefix reads the same way", () => {
+    expect(poDocumentNumberOf("SPO260924-4827", 1)).toBe("SPO260924-4827(1)");
+    expect(poDocumentNumberOf("MPR260924-4827", 3)).toBe("MPR260924-4827(3)");
+  });
+
+  it("an unrecognised shape is never dressed as a new number", () => {
+    expect(poDocumentNumberOf("PO26092-482", 2)).toBe("PO26092-482 V2");
+    expect(poDocumentNumberOf("po260924-4827", 2)).toBe("po260924-4827 V2");
+  });
+});
 
 describe("the version label — Version 1 is just the PO", () => {
   it("says nothing for an unrevised PO", () => {

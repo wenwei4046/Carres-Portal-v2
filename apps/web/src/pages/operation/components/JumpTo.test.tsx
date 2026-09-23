@@ -163,7 +163,7 @@ describe("what typing searches", () => {
       "Purchase Orders",
       "Purchase Returns",
       "SO Batch Purchase",
-      "Manual Purchase",
+      "Manual Purchase Request",
     ]);
   });
 

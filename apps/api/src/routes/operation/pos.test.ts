@@ -277,7 +277,7 @@ describe("GET /api/operation/pos", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pos: Array<{ sources: Array<{ reference: string; req_no: string | null }> }> };
     expect(body.pos[0]?.sources).toEqual([
-      expect.objectContaining({ kind: "manual_purchase", reference: "Manual Purchase", req_no: null }),
+      expect.objectContaining({ kind: "manual_purchase", reference: "Manual Purchase Request", req_no: null }),
     ]);
   });
 
