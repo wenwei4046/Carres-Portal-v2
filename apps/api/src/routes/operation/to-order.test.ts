@@ -1605,13 +1605,61 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     for (const po of batchArgs(sb)) expect(po.destination_id).toBe(AL);
   });
 
-  it("an unknown catalog cost stops the batch rather than inventing RM0", async () => {
+  /**
+   * ⭐ OWNER INSTRUCTION 2026-09-23 — PRICE IS NOT A PLACEMENT GATE ON THIS
+   * LANE EITHER (the gap MASTER §9.2 named after Manual Purchase shipped 0573).
+   *
+   * These three tests keep the two cases apart, because they cost a supplier
+   * different things:
+   *   · NOBODY DECLARED and Catalog has nothing → the order goes out carrying
+   *     the ABSENCE (no cost, no source, no treatment).
+   *   · A DECLARED catalog price that Catalog no longer has → still refused:
+   *     the operator reviewed a figure that is gone, which is not an unknown.
+   *   · A RECORDED price that is not positive → still refused. Filling it with
+   *     RM0 would put a number nobody agreed on a supplier's paper.
+   */
+  it("⭐ an UNPRICED SKU nobody declared is ISSUED, carrying the absence — never RM0", async () => {
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = null;
+    });
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
+    expect(res.status).toBe(200);
+    const lines = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
+      .flatMap((po) => po.lines);
+    const unpriced = lines.find((l) => l.sku === "5539-CNR")!;
+    expect(unpriced.cost).toBeNull();
+    expect(unpriced.cost_source).toBeNull();
+    expect(unpriced.commercial_treatment).toBeNull();
+    expect(unpriced.expected_catalog_cost).toBeNull();
+    /* Its neighbours on the same document keep every commercial fact they had. */
+    const priced = lines.find((l) => l.sku !== "5539-CNR" && l.cost != null)!;
+    expect(priced.cost_source).toBe("catalog");
+    expect(priced.commercial_treatment).toBe("normal");
+  });
+
+  it("⛔ a DECLARED catalog price that Catalog no longer has is still refused", async () => {
     const tables = TABLES();
     (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
       if (r.sku === "5539-CNR") r.cost = null;
     });
     const { sb, demands } = await ready(tables);
     const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; sku?: string };
+    expect(body.code).toBe("cost_required");
+    expect(body.sku).toBe("5539-CNR");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("⛔ a RECORDED zero is not an absence — it stops the batch rather than becoming RM0", async () => {
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = 0;
+    });
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code?: string; sku?: string };
     expect(body.code).toBe("cost_required");
