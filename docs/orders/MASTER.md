@@ -767,6 +767,22 @@ impact → Save or Submit amendment request → approval takes effect → each o
   `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
   `Before approval` remain the governed waiting state and impact heading.
 
+### Sales Order amendment — DELIVERED 2026-09-23, production `abbea07a2`
+
+| | |
+|---|---|
+| PR | #1530, squash-merged as `abbea07a2` |
+| Migrations applied | `0564` (the whole change + the customer-agreement gate) · `0565` (an issued version keeps its document) |
+| Reconciled after applying | all seven function bodies match `md5(prosrc)` of the same files applied to a throwaway PostgreSQL — **zero transcription drift** |
+| In the database now | 6 `customer_agreement_*` columns · both check constraints · `sales_order_revision_documents` · bucket `sales-order-documents` · 2 read policies |
+| Deployed | both Pages projects report `abbea07a2`; the shipped bundle carries `/changes`, `/agreement`, `/document/sign`, and all three document sentences |
+| Rows touched | **none.** 0 agreements recorded, 0 documents stored, and the one open request (`dde58498`, SO-1308, 2026-08-10) was not altered to make anything look clean. |
+
+**⚠️ OWED: the signed-in production walk.** Everything above is either a database
+measurement or an unauthenticated read. A `401` from the Worker proves nothing about routing —
+an unknown path returns `401` too, because authentication runs before the router. The walk
+belongs to whoever holds a session.
+
 ### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0564)
 
 **The gate is in the database.** `sales_order_amendments` carries the customer agreement as a
