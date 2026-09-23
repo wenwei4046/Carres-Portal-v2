@@ -46,7 +46,7 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 - **EVERY PAGE PRINTS THE SAME FULL HEADER, AND THE NUMBER CARRIES ITS
   VERSION — INCLUDING V1** (owner, 2026-09-22; overrides, for the PO only,
   SO-PDF-STANDARD §3's one-line continuation header). Logo · `CARRES SDN.
-  BHD.` · SSM · the registered address · the hero **`PO-2609-0042 V2`** 18/700
+  BHD.` · SSM · the registered address · the hero **`PO-20260922-8987 V2`** 18/700
   with `PURCHASE ORDER` beneath — identical on page 1, every continuation page
   and every Deliver To's pages. Between pages only the Deliver To, the goods
   and the footer's `Page n of m` change. The same `PO-… V{n}` also prints in
@@ -108,7 +108,7 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   never `(1 of 2)` (owner, 2026-09-22: location, quantity and page number each
   say one thing). The footer's `Page 1 of 2` carries the page count. **Every page — first,
   continuation and every destination — prints the same full header with
-  the same `PO-… V{n}`** (`PO-0042 V2`). Example: `PO-0042 V2` = 4 mattresses for Klang
+  the same `PO-… V{n}`** (`PO-20260922-8987 V2`). Example: that PO = 4 mattresses for Klang
   (page group 1) + 2 for AL (page group 2); still 6 on one PO — no second PO,
   no `Moved from` line, no new Unit IDs. A one-destination PO prints exactly
   as before.
@@ -199,8 +199,21 @@ numbers. No signature boxes anywhere — the portal's audit trail is the record.
 
 ## 5 · Numbering
 
-`PO-2044` prints the database id; renumbering to `PREFIX-DDMMYY-NNNN` is a
-clean-start job.
+**`PREFIX-YYYYMMDD-RRRR`, and the paper prints exactly what the database holds.**
+`docs/purchasing/MASTER.md` §6.1 is the law and migration 0381 enforces it:
+`allocate_formal_document_code('PO')` draws `RRRR` at random from that day's
+unused codes, unique across every prefix. Production mints `PO-20260922-8987`
+(measured 2026-09-23). The old `PO-2044` sequence and the never-built
+`PREFIX-DDMMYY-NNNN` proposal are both retired; existing identities are
+permanent and are never renumbered.
+
+🔴 **THE HEADER MEASUREMENT PREDATES THE REAL NUMBER — RE-MEASURE BEFORE THE
+NEXT PO BUILD.** §2's `52.9mm` hero and `26mm` header reserve were measured on
+`PO-2609-0042 V2`, a 13-character number this system cannot produce. The real
+`PO-20260922-8987 V2` is four characters longer, so the hero is wider than the
+figure this standard quotes and the three-line address may not clear it. The
+number is right; the arithmetic around it was never re-run. Render one and
+measure before trusting either figure.
 
 **~~the PO itself never revises~~ — SUPERSEDED (Jess, 2026-08-18; 0364).** A
 sent PO is not overwritten, it is REVISED: the NUMBER is kept and a version is
