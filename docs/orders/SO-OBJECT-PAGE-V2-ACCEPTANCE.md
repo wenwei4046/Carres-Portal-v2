@@ -353,3 +353,40 @@ Both deploys converged on all three governed surfaces (`erp` · `pos` · the pro
 **Unrelated, and staying with their existing owners:** `/api/operation/dashboard` returning an error
 on production · `0561_the_voucher_line_guard_survives_a_rebuild.sql` failing migration replay while
 absent from the baseline · three Finance integration suites red on `main`.
+
+
+---
+
+## 12 · OWNER REVIEW, 2026-09-23 — one real deviation, found after closure
+
+Jess read the shipped page against the ruling and asked what differed. **She was right, and the
+16-item review in §§8–9 missed it**: every contract there read the card's NAMES; none read their
+ORDER, which is exactly the gap the defect lived in.
+
+**🔴 `SO info` read in the wrong order, and disagreed with its own document.**
+
+| | |
+|---|---|
+| Ruled (CARD ORDER AND NAMES, 2026-09-21) | `SO Doc Date · Proceed Date · Customer Requested Delivery Date` / `Sales Location · Salesperson · Dealer` |
+| Shipped | `SO Doc Date · Customer Requested Delivery Date · Proceed Date` / `Dealer · Sales Location · Salesperson` |
+| The document beside it | printed the RULED order all along (`orderDetailRows`) |
+
+The same section carries the sentence *"the left pane and the Sales Order PDF must tally — the same
+card order and the same words on both sides"*. The page and the paper sat side by side on one screen
+disagreeing column by column, which is the one thing that sentence forbids.
+
+**FIXED.** Both rows reordered in all three states (create · view · edit). A contract now reads the
+rendered label positions on the page **and** the row order in `sales-order-template.tsx`, so either
+side drifting breaks it — proved red by swapping the paper's rows instead of the page's.
+
+### Claims checked and NOT confirmed
+
+Raised alongside the review; each was searched for in the governing documents before answering.
+
+| Claim | Verdict |
+|---|---|
+| A disposal/service area is missing under `Delivery` | **NOT A DEVIATION.** A service is part of what was bought, so it lives in `Items`; the `Add service` door moved inside the whole-page Edit (0562), which the MASTER states. On production SO-1365 both disposal services print in `Items`. No ruling puts a service area under `Delivery`. |
+| The PDF still prints `Tax —` and should not | **NO SUCH RULING FOUND.** The MASTER says only that SST follows its own separate ruling and that the invoice owns SST. If removing the row was decided, it is not written down anywhere and needs an owner ruling before it is built. |
+| The SO number should use a new / no-space form | **NO SUCH RULING FOUND.** Nothing in the MASTER or COPY-STANDARD changes `SO-{n}`. Same answer: not written down, so not built. |
+| The PDF says `No payments recorded` while `Paid to date RM 2,999.50` | **HARNESS ARTIFACT, not a product defect.** `src/dev/so-workspace-shell-preview.tsx` stubs the order read with `payments: []` while the fixture's `paid` is 2,999.50, so the template has no rows to print. Production SO-1365 shows the payment row and a matching `Paid to date RM 765.00` (§9). The fixture is worth aligning; the shipped document is not wrong. |
+| `Order Route` cannot be judged from the screenshot | **CORRECT, and never claimed.** §7 already records that this review did not cover it. |

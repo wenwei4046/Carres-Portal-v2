@@ -3046,43 +3046,13 @@ function SalesOrderWorkspaceBody() {
       <Block titleTone="sales-order" title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact own={false} label="SO Doc Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
-          {mode === "create" || editing ? (
-            <div data-pos-field="deliveryDate">
-              <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
-                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
-                error={
-                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
-                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
-                    : undefined
-                }
-                onChange={(iso) => setField("delivery_date", iso)} />
-              {editing && (
-                <div className="mt-2">
-                  <Checkbox id="so-promised-tbd" label="Delivery date to be confirmed"
-                    checked={draft.delivery_date_tbd}
-                    onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div data-pos-field="deliveryDate">
-              <Fact label="Customer Requested Delivery Date" value={
-                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
-                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
-                ) : promisedWord(mode, viewedRevision, order)
-              } />
-              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
-                  The three amend fields were a whole section — first a card,
-                  then a merged subsection — standing open on every order for an
-                  act that happens rarely. They are a MODAL now, opened from the
-                  fact they change, which is where somebody looking at a wrong
-                  date already has their eye.
-                  A LIVE proposal is truth and is NOT hidden behind the modal:
-                  it prints here, under the date it is waiting to move. */}
-              {/* 0562 · the date moves inside the whole-page Edit; a live request
-                  shows once, at the top of the form, never as a second door here. */}
-            </div>
-          )}
+          {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
+              Requested Delivery Date` (CARD ORDER AND NAMES, Jess 2026-09-21).
+              It was built with the last two swapped, and the SALES ORDER PDF
+              printed the ruled order — so the page and the paper beside it
+              disagreed, which is the one thing that section forbids: "the left
+              pane and the Sales Order PDF must tally". Proceed Date is also the
+              earlier fact of the two, so it reads first. */}
           {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
               2026-08-26). This OVERWRITES `docs/orders/MASTER.md` §725-728,
               which gave Operations a direct writer here. The portal asks for
@@ -3131,6 +3101,43 @@ function SalesOrderWorkspaceBody() {
               </span>
             )}
           </div>
+          {mode === "create" || editing ? (
+            <div data-pos-field="deliveryDate">
+              <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
+                error={
+                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
+                    ? `Too soon — earliest is ${fmtDate(earliestPromise)}`
+                    : undefined
+                }
+                onChange={(iso) => setField("delivery_date", iso)} />
+              {editing && (
+                <div className="mt-2">
+                  <Checkbox id="so-promised-tbd" label="Delivery date to be confirmed"
+                    checked={draft.delivery_date_tbd}
+                    onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div data-pos-field="deliveryDate">
+              <Fact label="Customer Requested Delivery Date" value={
+                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
+                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
+                ) : promisedWord(mode, viewedRevision, order)
+              } />
+              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
+                  The three amend fields were a whole section — first a card,
+                  then a merged subsection — standing open on every order for an
+                  act that happens rarely. They are a MODAL now, opened from the
+                  fact they change, which is where somebody looking at a wrong
+                  date already has their eye.
+                  A LIVE proposal is truth and is NOT hidden behind the modal:
+                  it prints here, under the date it is waiting to move. */}
+              {/* 0562 · the date moves inside the whole-page Edit; a live request
+                  shows once, at the top of the form, never as a second door here. */}
+            </div>
+          )}
           {/* ⛔ `Customer reference` IS REMOVED FROM THE PAGE — OWNER RULING
               (Jess, 2026-09-21), `docs/orders/MASTER.md` § "Order view" → CARD
               ORDER AND NAMES. `orders.source_ref` is untouched and the importer
@@ -3165,10 +3172,9 @@ function SalesOrderWorkspaceBody() {
             approve/reject lane exactly as they were. */}
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Select id="so-dealer" label="Dealer"
-              value={draft.dealer_id ?? ""}
-              onValueChange={(v) => setField("dealer_id", v || null)}
-              options={dealerOptions} placeholder="Pick a dealer" />
+            {/* ⭐ AND DEALER READS LAST — the ruled order is `… Sales Location ·
+                Salesperson · Dealer`. It was built Dealer-first, which put the
+                least-used fact in the reader's first cell. */}
             <div data-pos-field="outlet">
               <Select id="so-outlet" label="Sales Location"
                 value={draft.outlet_id ?? "none"}
@@ -3181,11 +3187,14 @@ function SalesOrderWorkspaceBody() {
                 onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
                 options={spOptions} />
             </div>
+            <Select id="so-dealer" label="Dealer"
+              value={draft.dealer_id ?? ""}
+              onValueChange={(v) => setField("dealer_id", v || null)}
+              options={dealerOptions} placeholder="Pick a dealer" />
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
               <div data-pos-field="outlet">
                 <Fact label="Sales Location" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
               </div>
@@ -3213,6 +3222,10 @@ function SalesOrderWorkspaceBody() {
                   </button>
                 )}
               </div>
+            {/* ⭐ AND DEALER READS LAST — the ruled order is `… Sales Location ·
+                Salesperson · Dealer`. It was built Dealer-first, which put the
+                least-used fact in the reader's first cell. */}
+              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
             </div>
             {/* An OLD revision is a photograph — it carries no lane. */}
             {mode !== "oldrev" && orderId && order && (
