@@ -1,7 +1,7 @@
 # SALES ORDERS — CARD 13 · SO page keeps the UI Kit sizes, one gap, one table grammar
 
 Module: Sales Orders · Sequence: 13 · Lane: BUILD / DELIVERY
-Status: IMPLEMENTED — release and production status recorded on the PR.
+Status: **PRODUCTION-VERIFIED 2026-09-24** — PR #1559 squash `9364fc24`; all five surfaces converged on that SHA.
 Owner: Jess, 2026-09-23 — "Card Clarification: KEEP Existing UI Kit Sizes" and the overnight
 BUILD/DELIVERY mission §3 ("SO Page / Shared UI Kit — separate Card").
 Authority: `docs/01-design-tokens.md` §1/§3 · Orders MASTER § "Order view" · UI MASTER §4.1 ·
@@ -68,3 +68,19 @@ carries the service code; control run: red.
   not ruled; this card prints the stored key, identical on page and paper.
 - 🟡 About 30 kit component comments still cite `UI-KIT §n` section numbers of the retired doc;
   only the pointers that send a reader to a missing FILE were repointed.
+
+## Production evidence — 2026-09-24, signed-in read of SO-1365 (820px), no write
+
+| Fact | Production |
+|---|---|
+| Section titles / labels / in-card headings | 15/600/22 · 11/500/14 · 13/600/18 |
+| Items and Payment cells | 13/400/18, padding 8 8 8 8, 1px rule beneath each row — identical |
+| Item Code · Approval code | 13/400/18 Inter |
+| Money | every figure 13px; `Total payable` RM 1,529.00 and `Balance due` RM 764.00 at 600 |
+| Items total = `Total payable` | RM 1,529.00 = Goods 1,399.00 + Services 130.00; Balance 1,529 − 765 paid = 764 |
+| Service Item Code | page `DISPOSE-SOFA` · `DISPOSE-MATTRESS` |
+| Delivery → `Disposal` | `Dispose old sofa (small size) · Dispose old mattress` |
+| Controls · group gaps · sideways scroll | 32px / 32px · 12px everywhere · 0 |
+| SO PDF (Print) | ITEM CODE prints `DISPOSE-SOFA` · `DISPOSE-MATTRESS` (was `ADD-ON`); totals tally with the page |
+
+Not exercised on production: `Add disposal` (it writes a draft; walked in the shell harness instead).
