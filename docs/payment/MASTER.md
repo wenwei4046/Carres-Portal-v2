@@ -446,10 +446,13 @@ Delivery Operations records partner, destination, floor, quantity, carry-up, dis
 disposal/take-out, actual service and evidence. Normal delivery does not wait for quote/price.
 After service, Operation may upload the partner's actual cost and negotiate disputed partner cost.
 
-**SST — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Carres is SST-registered; customer prices are
-SST-inclusive. The auto-issue invoice RPCs must STORE the inclusive SST in `invoices.tax_amount` (today they write
-0); the Sales Invoice and the Sales Order print that stored figure and never compute their own. Rate and any
-correction of already-issued documents are the tax agent's decision.
+**SST — **NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.**** Carres is
+not registered for SST (until Malaysia reintroduces GST). Customer documents show **no tax row and no
+"tax included" / "tax excluded" wording**; `invoices.tax_amount` stays 0. **Measured gap (origin/main
+2026-09-23):** `apps/web/src/lib/pdf/invoice-template.tsx:8-16` still prints the "TAX INVOICE" mode with
+`Subtotal (excl. SST) · SST 8%` rows and `apps/api/src/lib/pdf/types.ts:91-100` documents an 8% inclusive
+split — both must stop showing tax. Document naming (e.g. whether the title stays "Invoice") and any
+e-Invoice obligation are for the accountant to confirm; neither depends on SST registration.
 
 Finance/Commercial authority owns customer invoice total, invoice-value percentage, RM2,000
 boundary, SST, currency, customer-charge calculation, approval and correction. Operation never

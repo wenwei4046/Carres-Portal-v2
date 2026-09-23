@@ -142,13 +142,28 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-| Document | Outright | Subscription |
+| Document | Outright — 4 random digits | Subscription — `S` in front |
 |---|---|---|
-| Order | `SO2609-4827(1)` — `SO` + creation YYMM + **4** random digits | `SUB2609-48271(1)` — `SUB` + creation YYMM + **5** random digits |
-| Delivery document | `DO2609-48271` | `SDO2609-48271` |
+| Order | `SO2609-4827(1)` | `SUB2609-48271(1)` (5 digits; `SSO` is not used) |
+| Delivery document | `DO2609-4827` | `SDO2609-48271` (5) |
+| Invoice / monthly bill | `INV2609-4827` | `SINV2609-482917` (6 — one bill per subscriber per month) |
+| Receipt | `RC2609-4827` | `SRC2609-482917` (6) |
+| Credit note | `CN2609-4827` | `SCN2609-48271` (5) |
+| Customer service case | `CS2609-4827` | `SCS2609-48271` (5) |
+| Loan note | `LN2609-4827` | — (no loan in Subscription) |
 
-- Leading zeros allowed: Outright holds **10,000** SO numbers a month; Subscription **100,000** SUB
-  numbers a month (Subscription is expected to be the high-volume business; owner benchmark
+**Shared by both businesses (not split):** PO `PO260924-4827(1)` (Purchasing MASTER §6.1) · Unit ID
+`U1-000-001` · every internal document (GRN, MPR, TR, RO, DR, CO, CRTN, CSN, PRTN, supplier bill SB,
+PV, ARI, RV, SMB, MM, JE/MJ) keeps its current family format. Supplier Claim changes prefix `SC` →
+**`CLM`** (Claim) so no internal prefix reads like a Subscription `S…` document. Staff rule: **only
+`SUB`, `SDO`, `SINV`, `SRC`, `SCN`, `SCS` mean Subscription** — "starts with S" alone does not
+(`SO`, `SB` are not Subscription). YYMM = month the document is first issued. Invoice / receipt /
+credit-note formats are checked by the accountant before first use (e-Invoice), without changing the
+split. **Measured defect to fix with this:** today's Service Case number `SC`+YYMM+`lpad(seq,2)`
+(`0210:126`) truncates at the 100th case of a month.
+
+- Leading zeros allowed: Outright holds **10,000** numbers a month per 4-digit series; Subscription
+  **100,000** per 5-digit and **1,000,000** per 6-digit series (Subscription is expected to be the high-volume business; owner benchmark
   Coway ≈ 5,000–8,000 orders/month, Cuckoo ≈ 1,000/month — her figures, not measured).
 - `SUB` is the one customer-facing number of a Subscription; it replaces the `RA-` agreement
   number (`RA-` rows are test data). A Subscription customer is never handed a second `SO` number.

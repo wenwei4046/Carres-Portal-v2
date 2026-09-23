@@ -212,8 +212,7 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
 ```
 
 - The items table's closing row is **TOTAL PAYABLE** — the same figure the card
-  calls `Total payable`; one figure, one name (owner, 2026-09-21: Carres is
-  SST-registered, so `Goods total` is retired). Summary-row money carries **RM**
+  calls `Total payable`; one figure, one name (`Goods total` is retired). Summary-row money carries **RM**
   (`RM 100.00 · RM 8,920.00`); detail cells stay digits-only.
 - **The payments table has NO `TOTAL RECEIVED` row (owner, 2026-09-22 — overwrites
   2026-09-21).** It printed the same figure as `Paid to date` twice. Paid money is
@@ -222,7 +221,7 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   rule, one arithmetic. Voided payments never print and are never counted.
 - **A combined total is never labelled `Goods total`.** Goods and services may be
   shown apart (words pending COPY review), then `Total payable · Paid to date ·
-  BALANCE DUE`; SST rows follow the separate SST ruling in §7.1.
+  BALANCE DUE`. No tax row (Carres is not SST-registered — see the Totals card).
 - **A goods count counts goods only.** The items table's quantity total is physical
   pieces (gifts included); a Delivery fee or Stair carry is a service and never a
   piece.
@@ -260,15 +259,10 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   110mm so the left rail holds with the tables, and the box sits at its bottom
   so it finishes level with the totals card. Printed **name only** — no phone,
   BILL TO has it (round 15; international form: signature over printed name).
-- **Totals card — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Carres is SST-registered and its
-  prices are SST-inclusive, so the tax is real and is shown, in the SAME three-row shape the Sales Invoice uses:
-  `Total excluding SST · SST 8% · Total payable · Paid to date · BALANCE DUE`.
-  Example: `RM 5,583.33 · RM 446.67 · RM 6,030.00 · RM 3,740.00 · RM 2,290.00`. The SST figure is **computed
-  once and stored** (`invoices.tax_amount`, by the auto-issue RPCs) and every document READS it — the SO never
-  re-computes it. Order of work: ① the invoice RPCs (`0098`/`0229` descendants, which today write
-  `tax_amount = 0`) store the inclusive SST; ② the Sales Invoice prints that stored figure; ③ this card follows.
-  Until ① lands the card keeps its current rows. The 8% rate is the code's (`tax_amount = total × 0.08 ÷ 1.08`);
-  the rate itself and any correction of documents already issued with SST RM 0.00 are the tax agent's decision.
+- **Totals card — **NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.**** Carres is not
+  registered for SST and will not be unless Malaysia reintroduces GST. The document shows **no tax row and
+  no "tax included" / "tax excluded" wording**: `Total payable · Paid to date · BALANCE DUE`. `tax_amount`
+  stays 0. If Carres ever registers for a consumption tax, the owner re-rules this card first.
 - Company signs nothing — the footer sentence says so.
 - Terms 8pt grey, numbered from an array so gated clauses renumber themselves.
 

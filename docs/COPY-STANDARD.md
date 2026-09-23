@@ -3246,7 +3246,7 @@ vocabulary, and the two files may not disagree.
 | Who the customer calls | **`Salesperson`** | `Agent` — Houzs prints both for one person |
 | Who made the document | **`Issued by {name}`** (footer) | `Printed by` — a reprint would name a different person |
 | No payments on file | **`No payments recorded.`** | a vanished block |
-| The Sales Order totals (owner ruling 2026-09-21 · NOT BUILT) | **`Total excluding SST · SST 8% · Total payable · Paid to date · BALANCE DUE`** — the Sales Invoice's shape | `Tax —` (Carres IS SST-registered) · `Goods total` |
+| The Sales Order totals (owner ruling 2026-09-23 — Carres is NOT SST-registered) | **`Total payable · Paid to date · BALANCE DUE`** — no tax row | `Total excluding SST` · `SST 8%` · `Tax —` · `incl. SST` · `excl. SST` · `Goods total` |
 | Items table closing row | **`TOTAL PAYABLE`** — the same figure as `Total payable` | `GOODS TOTAL` (retired 2026-09-21) · `Subtotal` |
 | What the customer owes in all | **`Total payable`** | `Total` alone · `Grand total` |
 
@@ -3256,11 +3256,9 @@ is `salespersons.name`; `Issued by` is the `audit_log` actor for the creation
 so two sources. One field feeding both is the Houzs `Agent: Luis Teo /
 Salesperson: Luis Teo` defect.
 
-**`Tax —` is the one place a dash is LAW, not laziness.** It is a money row in a
-money card: the customer must read that the tax line exists and is nil. Verified
-2026-09-21: the POS computes no tax, `order-money.ts` carries no tax term, and
-migrations 0098/0229 insert `tax_amount = 0`. If Carres ever registers for SST,
-this row stops being a dash and the SENTENCE in the standard changes first.
+**No tax words on customer documents** (owner, 2026-09-23): Carres is not SST-registered, so no tax
+row, no dash for tax and no "tax included / excluded" claim appears. If Malaysia reintroduces GST and
+Carres registers, the owner re-rules this sentence first.
 
 **Floor and lift are DELIVERY ORDER words, not Sales Order words** (owner,
 2026-09-21). A document states a charge only where it prints the fact behind it.

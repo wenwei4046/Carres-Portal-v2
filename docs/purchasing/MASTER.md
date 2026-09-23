@@ -633,7 +633,7 @@ permanent and are NOT renumbered.**
 | `PO` | Purchase Order |
 | `MPR` | Manual Purchase Request |
 | `GRN` | Goods Receipt |
-| `SC` | Supplier Claim |
+| `CLM` | Supplier Claim (was `SC`; owner ruling 2026-09-23 — `S…` prefixes read as Subscription) |
 | `PRTN` | Purchase Return |
 | `RO` | Repair Order |
 | `DR` | Display Request |
