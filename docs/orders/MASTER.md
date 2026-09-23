@@ -159,8 +159,12 @@ the earlier five-digit SO ruling).** The two businesses must be told apart by th
 - Amendment never changes the base number or its original year/month, including amendments made
   in a later month. The encoded month is the creation month — not delivery, receipt,
   warranty-start or amendment month; use the actual governed dates for those purposes.
-- **Unit ID stays ONE shared series for both businesses** — one physical item has one identity;
-  its format is not decided by this ruling.
+- **Unit ID stays ONE shared series for both businesses** — one physical item has one identity.
+  **Owner ruling 2026-09-23: keep `U1-000-001` and its sequential allocation** (Purchasing MASTER
+  §6.2). Accepted trade-off: a sequential Unit ID can reveal the scale of Unit allocation (not
+  order volume, sales or current stock). Revisit only with a proven scan-first workflow; a random
+  start with consecutive blocks per PO was considered and rejected (range fragmentation,
+  non-PO sources, and a range never replaces checking the physical pieces).
 
 **Acceptance boundary / limitations.** Capacity is finite and must be monitored before exhaustion;
 the monthly limits are not a verified forecast or an unlimited guarantee. Fixed random references
@@ -170,7 +174,7 @@ does not authorize sending order numbers to suppliers.
 
 **Scope boundary.** This approval covers the Outright/Subscription order numbers, their delivery-document
 prefixes and the revision presentation (DO detail: `docs/delivery/MASTER.md` §3.1). PO, GRN,
-Service Case, INV/RC (accountant first) and the Unit ID format require their own capacity and
+Service Case, INV/RC (accountant first) require their own capacity and
 governing-business-rule review. It does not approve revision, rescheduling, voiding or correction
 workflows of other documents. This is approved target truth, not shipped behavior, whole-blueprint
 approval or authorization for application code, production writes, migration or cutover in this
