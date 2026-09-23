@@ -607,7 +607,12 @@ PO260924-4827(2)     the same PO after one revision
   (`purchasing_issue_pos_batch`'s caller) and `manualPurchaseIssueDocuments` at once — and the
   request/demand rows need a business fact to partition by, which does not exist yet. A supplier
   serving both businesses receives separate POs.
-- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for the PO only. The other prefixes below keep
+- **Permanence:** existing `PO-…` numbers (e.g. `PO-20260904-4665`, `PO-2054`) keep their form forever
+  and are never renumbered — they live in supplier hands, `po_sends`, GRNs and Claim lineage. Register
+  and search match BOTH shapes while pre-cutover POs exist. The new form and `(n)` change the
+  ALLOCATOR (0381 mints `PREFIX-YYYYMMDD-RRRR`), so they need a migration; the `(n)` comes from the
+  PO's own version, never from the code pool.
+- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only. The other prefixes below keep
   the family rule that follows until each is ruled.
 
 **Family rule for the other formal documents (unchanged until each is ruled):**

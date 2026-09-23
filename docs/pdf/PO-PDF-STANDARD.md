@@ -55,7 +55,9 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   52.9mm, which leaves 112mm beside the 13mm logo — the address's old second
   line (122.4mm) would run under `PURCHASE ORDER`, so the address prints on
   THREE lines (71.0 · 60.8 · 61.0mm) and the header reserve is 26mm, not
-  22mm. The dictionary form is `(n)` (owner 2026-09-23; was `V{n}`). A supplier holding two papers with one
+  22mm. The dictionary form is `(n)` (owner 2026-09-23; was `V{n}`) for the live template and documents
+  issued after cutover. **A document already sent reprints exactly as the supplier received it** —
+  a frozen `po_version_documents` payload that printed `V2` still prints `V2`. A supplier holding two papers with one
   number cannot tell which to build from without it, so `(1)` prints too
   (`Version 1 prints nothing` is only the internal REVISIONS PANEL's rule).
   The version the PDF prints is the version the confirmation records:
