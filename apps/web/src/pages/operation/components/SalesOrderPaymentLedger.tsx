@@ -122,14 +122,23 @@ export default function PaymentLedger({ orderId, saved }: {
     <>{capture}<div className="overflow-x-auto">
       <table className="w-full text-body" data-testid="so-payments">
         <thead>
+          {/* ⭐ THE APPROVED PAYMENT TABLE — OWNER APPROVAL (Jess, 2026-09-22),
+              `docs/orders/MASTER.md` § "Order view" → PAYMENT:
+              `Date · Payment received · Approval code · Collected by · Amount (RM)`,
+              in that order, sharing ONE table grammar with `Items` — 12px grey
+              headers over a 1px line, 13px rows divided by 1px lines, amounts
+              right-aligned, and the amount column last.
+              ⛔ NO EVIDENCE IS DISCARDED. The receipt number and the slip are
+              the PROOF of the approval code, so they ride under it rather than
+              occupying two columns the ruling does not list — the same
+              "detail beneath its fact" grammar `Items` uses for a line's
+              configuration. Nothing is hidden and no read is removed. */}
           <tr className="text-label text-base-500">
             <th className="py-2 pr-4 text-left font-medium align-top whitespace-nowrap">Date</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Method</th>
-            <th className="py-2 pr-4 text-right font-medium align-top whitespace-nowrap">Amount</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Reference</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Receipt</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Slip</th>
-            <th className="py-2 text-left font-medium align-top">Recorded by</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Payment received</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Approval code</th>
+            <th className="py-2 pr-4 text-left font-medium align-top">Collected by</th>
+            <th className="py-2 text-right font-medium align-top whitespace-nowrap">Amount (RM)</th>
           </tr>
         </thead>
         <tbody>
@@ -147,31 +156,39 @@ export default function PaymentLedger({ orderId, saved }: {
                   <div>{payMethodWord(p.method)}</div>
                   {kind && <div className="mt-0.5 text-meta text-base-600">{kind}</div>}
                 </td>
-                <td className={`py-2 pr-4 align-top text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
-                  {fmtMoney(Number(p.amount ?? 0))}
+                <td className="py-2 pr-4 align-top font-mono text-meta">
+                  <div>{p.reference || "Not recorded"}</div>
+                  {/* the proof of that code, beneath it */}
+                  <div className="mt-0.5 font-sans text-meta text-base-500">
+                    Receipt {p.receipt_no || "not recorded"}
+                    {" · "}
+                    {/* ⭐ AN ABSENT SLIP IS NAMED, NOT LEFT BLANK. Riding under
+                        the approval code does not make the slip optional to
+                        state: a missing control and a missing fact would read
+                        the same, which is the one thing a blank may never do. */}
+                    {p.receipt_url ? (
+                      <button
+                        type="button"
+                        onClick={() => void viewSlip(p)}
+                        className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                      >
+                        View slip
+                      </button>
+                    ) : (
+                      "Slip not recorded"
+                    )}
+                  </div>
                 </td>
-                <td className="py-2 pr-4 align-top font-mono text-meta">{p.reference || "Not recorded"}</td>
-                <td className="py-2 pr-4 align-top font-mono text-meta">{p.receipt_no || "Not recorded"}</td>
                 <td className="py-2 pr-4 align-top">
-                  {p.receipt_url ? (
-                    <button
-                      type="button"
-                      onClick={() => void viewSlip(p)}
-                      className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                    >
-                      View slip
-                    </button>
-                  ) : (
-                    <span className="text-meta text-base-500">Not recorded</span>
-                  )}
-                </td>
-                <td className="py-2 align-top">
                   <div>{p.recorded_by_name || "Not recorded"}</div>
                   {!live && (
                     <div className="mt-0.5 text-meta font-medium text-danger">
                       Voided{p.void_reason ? ` · ${p.void_reason}` : ""}
                     </div>
                   )}
+                </td>
+                <td className={`py-2 align-top text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
+                  {fmtMoney(Number(p.amount ?? 0))}
                 </td>
               </tr>
             );

@@ -32,7 +32,11 @@ const ID = "11111111-1111-1111-1111-111111111111";
 
 const ORDER = {
   id: ID, so: 1319, status: "proceed_order", operation_stage: "proceed_order",
-  customer_name: "Customer (masked)", customer_phone: "(masked)",
+  /* A DIAL-ABLE placeholder, not a real number: the customer-type probe is
+     disabled below 8 digits, so "(masked)" left the `· {n} orders ›` door
+     (ruling 2026-09-21) invisible in the walk. `0100000000` is the same
+     invented number the PDF fixture already uses. */
+  customer_name: "Customer (masked)", customer_phone: "0100000000",
   customer_email: "(masked)",
   customer_address_line1: "(masked)", customer_address_line2: "(masked)",
   customer_address_city: "Petaling Jaya", customer_address_state: "Selangor",
@@ -147,6 +151,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       delivery_date: "2026-09-24",
     });
   if (url.includes("/api/operation/workspace-duties")) return json({ duties: [] });
+  /* The probe behind the customer-type chip and its orders door. */
+  if (url.includes("/api/orders/customer-type"))
+    return json({ existing: STATE !== "newcustomer", matches: STATE !== "newcustomer" ? 4 : 0 });
   if (url.includes("/api/outlets")) return json({ outlets: [{ id: "o1", name: "PJ Showroom" }] });
   if (url.includes("/api/operation/dealers")) return json({ dealers: [{ id: "d1", name: "Carres HQ" }] });
   if (url.includes("/api/operation/staff") || url.includes("salespersons"))

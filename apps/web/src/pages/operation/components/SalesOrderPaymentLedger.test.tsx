@@ -66,7 +66,11 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.getByText("Deposit")).toBeTruthy();
 
     expect(screen.getByText("TXN-77120")).toBeTruthy();
-    expect(screen.getByText("RC-020926-0031")).toBeTruthy();
+    /* ⭐ NO EVIDENCE IS DISCARDED BY THE APPROVED FIVE COLUMNS (Jess,
+       2026-09-22). The receipt number and the slip lost their own columns and
+       ride beneath the approval code they prove — so the assertion reads the
+       number inside its line, and still fails if the number stops printing. */
+    expect(screen.getByText(/Receipt RC-020926-0031/)).toBeTruthy();
     expect(screen.getByText("Shasha")).toBeTruthy();
     expect(screen.getByText("View slip")).toBeTruthy();
   });
@@ -86,8 +90,14 @@ describe("the Sales Order payment ledger", () => {
   it("names an absent reference, receipt, slip and recorder rather than leaving a blank", () => {
     useOrderPayments.mockReturnValue({ data: { payments: [ROWS[1]] }, isLoading: false, isError: false });
     render(<PaymentLedger orderId="o1" />);
-    /* A BLANK MAY NEVER CARRY TWO MEANINGS — four empty cells on this row. */
-    expect(screen.getAllByText("Not recorded")).toHaveLength(4);
+    /* A BLANK MAY NEVER CARRY TWO MEANINGS. Four facts are absent on this row
+       and all four are still named — the approval code and the recorder in
+       their own cells, the receipt and the slip on the proof line beneath the
+       approval code, where the approved five columns put them. */
+    expect(screen.getAllByText("Not recorded")).toHaveLength(2);
+    expect(screen.getByText(/Receipt not recorded/)).toBeTruthy();
+    expect(screen.getByText(/Slip not recorded/)).toBeTruthy();
+    expect(screen.queryByText("View slip")).toBeNull();
   });
 
   it("reports an empty transaction list without claiming the order has never been paid", () => {
