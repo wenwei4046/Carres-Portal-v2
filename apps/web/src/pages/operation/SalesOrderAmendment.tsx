@@ -26,6 +26,7 @@
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AgreementForm, AgreementOnRecord } from "./customer-agreement";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Modal from "@/components/kit/Modal";
@@ -37,11 +38,13 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useDecideSalesOrderAmendment,
+  useRecordAmendmentAgreement,
   useSalesOrderAmendment,
   useSalesOrderAmendmentImpact,
   useSubmitSalesOrderAmendment,
   type AmendmentProposal,
 } from "@/lib/queries";
+
 
 export interface AmendmentLine {
   id?: string;
@@ -82,6 +85,12 @@ export default function SalesOrderAmendment({
   const impactQ = useSalesOrderAmendmentImpact(amendment?.id ?? null);
   const role = useAuth((s) => s.role);
 
+  /* 0562 · the two facts the approve button answers to. Both come from the
+     server on every read — the screen never decides for itself that a change
+     is agreed, and the database refuses the approval regardless. */
+  const agreementRecorded = !!amendment?.customer_agreement_kind;
+  const agreementCovers = amendment?.customer_agreement_covers_proposal === true;
+
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<AmendmentLine[]>([]);
   const [reason, setReason] = useState("");
@@ -89,6 +98,9 @@ export default function SalesOrderAmendment({
   const [deliveryDate, setDeliveryDate] = useState<string | null>(currentDeliveryDate);
   const [deliveryDateTbd, setDeliveryDateTbd] = useState(currentDeliveryDateTbd);
   const [installmentMonths, setInstallmentMonths] = useState<number | null>(currentInstallmentMonths);
+  /* The basis for the customer's acceptance, recorded through its own door —
+     a proposal is still written when the evidence is not in yet. The FORM owns
+     the three fields; this screen owns only the act. */
 
   const submitMut = useSubmitSalesOrderAmendment(orderId, {
     onSuccess: (r) => {
@@ -96,6 +108,10 @@ export default function SalesOrderAmendment({
       setOpen(false);
       setReason("");
     },
+    onError: (e) => toast.error(e.message),
+  });
+  const agreementMut = useRecordAmendmentAgreement(orderId, {
+    onSuccess: () => toast.success("Customer agreement recorded"),
     onError: (e) => toast.error(e.message),
   });
   const decideMut = useDecideSalesOrderAmendment(orderId, {
@@ -190,6 +206,33 @@ export default function SalesOrderAmendment({
             </div>
           )}
 
+          {/* ⭐ THE CUSTOMER AGREEMENT — 0562, owner ruling 2026-09-22.
+              It sits ABOVE the decision, because it is the thing the approver
+              is being asked to check: "Sales records the confirmation basis;
+              the authorised approver checks that it covers the proposed
+              change." */}
+          <div className="mt-3 border-t border-kit-slate-5 pt-2" data-testid="amendment-agreement">
+            <div className="text-label text-base-500">Customer agreement</div>
+            <AgreementOnRecord
+              kind={amendment.customer_agreement_kind}
+              reference={amendment.customer_agreement_reference}
+              detail={amendment.customer_agreement_detail}
+              coversProposal={agreementRecorded ? agreementCovers : undefined}
+            />
+
+            {/* Sales records it — not the approver. A change of terms after the
+                customer agreed re-opens this form, which is the same rule. */}
+            {(role === "operation" || role === "principal") && (!agreementRecorded || !agreementCovers) && (
+              <div data-testid="amendment-agreement-form">
+                <AgreementForm
+                  idPrefix="amendment-agreement"
+                  busy={agreementMut.isPending}
+                  onRecord={(a) => agreementMut.mutate({ amendmentId: amendment.id, ...a })}
+                />
+              </div>
+            )}
+          </div>
+
           {role === "principal" && !amendment.stale && (
             <div className="mt-3 border-t border-kit-slate-5 pt-3">
               <Textarea
@@ -208,10 +251,16 @@ export default function SalesOrderAmendment({
                 >
                   Reject
                 </Button>
+                {/* ⭐ APPROVE WAITS ON THE CUSTOMER, NOT ON THE APPROVER'S
+                    CONFIDENCE (0562). `Reject` beside it is deliberately NOT
+                    gated: refusing a change needs no customer agreement. The
+                    database refuses this press too — this only stops the
+                    principal walking into a refusal they cannot fix from here. */}
                 <Button
                   variant="primary"
-                  disabled={!decisionReason.trim()}
+                  disabled={!decisionReason.trim() || !agreementRecorded || !agreementCovers}
                   loading={decideMut.isPending}
+                  data-testid="amendment-approve"
                   onClick={() => decideMut.mutate({ amendmentId: amendment.id, decision: "approve", note: decisionReason.trim() })}
                 >
                   Approve and apply

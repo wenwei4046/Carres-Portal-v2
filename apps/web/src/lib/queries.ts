@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import {
   keepPreviousData,
   useMutation,
@@ -5444,7 +5445,7 @@ export interface SalesOrderSnapshotLine {
 export interface SalesOrderSnapshot {
   header: Record<string, unknown>;
   lines: SalesOrderSnapshotLine[];
-  addons: Array<{ addon_key: string; qty: number; unit_price: number | string }>;
+  addons: Array<{ addon_key: string; qty: number; unit_price: number | string; attrs?: Record<string, unknown> | null }>;
 }
 export interface SalesOrderRevisionRow {
   revision: number;
@@ -5462,6 +5463,54 @@ export interface SalesOrderRevisionRow {
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
   note?: string | null;
+  /** 0565 — the object key of the PDF this version was ISSUED as. NULL on every
+   *  version minted before retention existed: that is the legacy case the page
+   *  draws as a reconstruction and says so. */
+  document_path?: string | null;
+  document_stored_at?: string | null;
+}
+
+/** 0565 — keep the sheet a version was issued as. Three steps, and the browser
+ *  never names the path: the API mints a signed URL for a key it chooses, the
+ *  bytes go there, and the database records it once and never again. */
+export async function storeIssuedSalesOrderDocument(
+  orderId: string,
+  revision: number,
+  pdf: Blob,
+): Promise<{ stored: boolean; reason?: string }> {
+  try {
+    const sign = await apiFetch<{ token: string; path: string; bucket: string }>(
+      `/api/operation/orders/${orderId}/revisions/${revision}/document/sign`,
+      { method: "POST" },
+    );
+    const up = await supabase.storage.from(sign.bucket).uploadToSignedUrl(sign.path, sign.token, pdf);
+    if (up.error) throw up.error;
+    await apiFetch(`/api/operation/orders/${orderId}/revisions/${revision}/document`, {
+      method: "POST",
+      body: JSON.stringify({ path: sign.path, bytes: pdf.size }),
+    });
+    return { stored: true };
+  } catch (e) {
+    /* ⛔ NEVER FAILS THE VERSION. The revision is already minted and is business
+       truth; keeping its paper is a separate act. A failure leaves the version
+       with no document, which is the reconstruction case the page already
+       draws honestly. */
+    return { stored: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 0565 — the signed URL of a version's ISSUED document, or `stored: false`
+ *  when no file was ever kept for it. */
+export function useIssuedSalesOrderDocument(orderId: string | null, revision: number | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "revisions", revision ?? 0, "document"] as const,
+    queryFn: () =>
+      apiFetch<{ stored: boolean; url: string | null }>(
+        `/api/operation/orders/${orderId}/revisions/${revision}/document`,
+      ),
+    enabled: !!orderId && !!revision,
+    staleTime: 30 * 60 * 1000,
+  });
 }
 
 export function useSalesOrderRevisions(
@@ -5884,7 +5933,30 @@ export interface SalesOrderAmendment {
   /** 0354 — the day the CUSTOMER asked, as the operator was told it. Null on
    *  a goods proposal and on every amendment written before the field. */
   customer_asked_on?: string | null;
+  /* ⭐ THE CUSTOMER'S RECORDED ACCEPTANCE — 0562, owner ruling 2026-09-22
+     APPROVED / LOCKED. Null while the basis has not been recorded: "The request
+     may remain recorded while evidence is incomplete; it cannot take effect."
+     There is no boolean here on purpose — a manager's checkbox saying the
+     customer agreed is what the ruling refuses. */
+  customer_agreement_kind?: CustomerAgreementKind | null;
+  customer_agreement_reference?: string | null;
+  customer_agreement_detail?: string | null;
+  customer_agreement_at?: string | null;
+  /** Server-derived: the basis still covers THESE terms. Approve is refused
+   *  when it does not — approval is never silently reused for different terms. */
+  customer_agreement_covers_proposal?: boolean;
+  /** Who sent the request (0562 · the whole-page lane names the sender). */
+  submitted_by?: string | null;
 }
+
+/** How the customer's acceptance is evidenced (0562). A signed document, a
+ *  traceable reference to the customer's own confirmation, or — for a Staff
+ *  correction where the agreement did not change — the revision whose signed
+ *  agreement still covers it. */
+export type CustomerAgreementKind =
+  | "signed_document"
+  | "customer_confirmation"
+  | "original_agreement";
 
 export function useSalesOrderAmendment(
   orderId: string | null,
@@ -5983,6 +6055,103 @@ export function useDecideSalesOrderAmendment(
         qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
         qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
       ]);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/**
+ * Sales records the basis for the customer's acceptance (0562).
+ *
+ * Separate from SUBMIT on purpose, and that is the ruling, not a convenience:
+ * "The request may remain recorded while evidence is incomplete; it cannot take
+ * effect." A proposal is written the moment Sales has one; the evidence catches
+ * up, and until it does the principal simply cannot approve.
+ */
+export function useRecordAmendmentAgreement(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<
+      { id: string; customer_agreement_kind: CustomerAgreementKind },
+      ApiError,
+      { amendmentId: string; kind: CustomerAgreementKind; reference: string; detail?: string }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ amendmentId, kind, reference, detail }) =>
+      apiFetch<{ id: string; customer_agreement_kind: CustomerAgreementKind }>(
+        `/api/operation/orders/amendment/${amendmentId}/agreement`,
+        { method: "POST", body: JSON.stringify({ kind, reference, detail }) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId), "amendment"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/* ─── 0562 · the whole-page edit's ONE commit ────────────────────────────────
+ * The page sends its whole draft; the SERVER classifies it and either saves a
+ * correction or submits an amendment request (orders/MASTER § VIEW FIRST). */
+export interface SalesOrderChangesInput {
+  header: Record<string, unknown>;
+  lines: Array<{ id?: string; sku: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+  addons: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+  installment_months?: number | null;
+  reason: string;
+  customerAskedOn?: string | null;
+  /** 0564 — the governed agreement, recorded with the request in one act. */
+  agreement?: { kind: CustomerAgreementKind; reference: string; detail?: string };
+  replaceAmendmentId?: string | null;
+}
+export type SalesOrderChangesResult =
+  | { action: "saved"; revision: number; changed?: string[] }
+  | { action: "submitted"; amendmentId: string; baseRevision: number; agreementRecorded: boolean };
+
+function invalidateSalesOrder(qc: ReturnType<typeof useQueryClient>, orderId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: [...qk.operation.order(orderId)] }),
+    qc.invalidateQueries({ queryKey: ["operation", "sales-order-amendment"] }),
+    qc.invalidateQueries({ queryKey: ["orders", "sales-order-data", orderId] }),
+  ]);
+}
+
+export function useSubmitSalesOrderChanges(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<SalesOrderChangesResult, ApiError, SalesOrderChangesInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<SalesOrderChangesResult, ApiError, SalesOrderChangesInput>({
+    mutationFn: (input) =>
+      apiFetch<SalesOrderChangesResult>(`/api/operation/orders/${orderId}/changes`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateSalesOrder(qc, orderId);
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useWithdrawSalesOrderAmendment(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { amendmentId: string; reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { amendmentId: string; reason: string }>({
+    mutationFn: ({ amendmentId, reason }) =>
+      apiFetch(`/api/operation/orders/amendment/${amendmentId}/withdraw`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await invalidateSalesOrder(qc, orderId);
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

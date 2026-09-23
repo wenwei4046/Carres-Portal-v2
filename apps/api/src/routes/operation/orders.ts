@@ -37,6 +37,9 @@ import {
   normalizeSkuKey,
   exclusivePoSourceBindings,
   type IncomingLineUnit,
+  classifySalesOrderChange,
+  SALES_ORDER_EDIT_HEADER_KEYS,
+  type SalesOrderChangeSide,
 } from "@carres/shared";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
@@ -1186,13 +1189,35 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
     change_type: string | null;
     note: string | null;
   }>;
+  /* 0565 · the file each version was ISSUED as — a row BESIDE the version,
+     because `sales_order_revisions` is immutable. A version with no row here
+     never had a file stored, which is precisely the reconstruction case. */
+  /* ⛔ AND A FAILURE HERE NEVER TAKES THE VERSION LIST WITH IT. The versions are
+     the record; which of them kept a PDF is a second fact about them. If this
+     read fails, every version simply reports no stored file — the honest
+     reconstruction case — instead of the list refusing to load at all. */
+  const docByRevision = new Map<number, { path: string; stored_at: string }>();
+  try {
+    const docs = await sb
+      .from("sales_order_revision_documents")
+      .select("revision, path, stored_at")
+      .eq("order_id", id);
+    for (const d of (docs.data ?? []) as Array<{ revision: number; path: string; stored_at: string }>) {
+      docByRevision.set(d.revision, { path: d.path, stored_at: d.stored_at });
+    }
+  } catch (e) {
+    console.error("revision documents unreadable", { orderId: id, reason: e instanceof Error ? e.message : String(e) });
+  }
   const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
   const revisions = rows.map((r) => {
     const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    const doc = docByRevision.get(r.revision) ?? null;
     return {
       ...r,
       created_by_name,
       actor_kind: actorKindOf(r.created_by, created_by_name),
+      document_path: doc?.path ?? null,
+      document_stored_at: doc?.stored_at ?? null,
     };
   });
   return c.json({ revisions });
@@ -2182,6 +2207,7 @@ operationOrdersRouter.post(
 //
 //   GET  /:id/amendment          the live amendment + whether it is STALE
 //   POST /:id/amendment          SUBMIT
+//   POST /amendment/:aid/agreement  the customer's recorded acceptance (0562)
 //   POST /amendment/:aid/apply   the REFUSAL — and that refusal is the point
 //
 // There is no ISSUE door and no ACCEPT door here, deliberately: the signing
@@ -2329,6 +2355,196 @@ operationOrdersRouter.get("/:id/cancel-impact", requireOperation, async (c) => {
   return c.json(data);
 });
 
+/**
+ * ⭐ CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
+ * (`docs/orders/MASTER.md` § "Customer agreement evidence"; enforced in the
+ * database by `0562`).
+ *
+ * "A signed document or a reference to the relevant customer confirmation (for
+ *  example, WhatsApp) is acceptable... A manager's statement or checkbox saying
+ *  the customer agreed is not sufficient by itself."
+ *
+ * So there is no boolean here and there never can be one: a KIND is recorded
+ * and it always carries a REFERENCE that points at something findable outside
+ * this record. `original_agreement` is the Staff-correction case — the customer
+ * agreement did not change, so it names the revision whose signed agreement
+ * still covers it, and the database checks that revision exists.
+ *
+ * Recording a reference reaches nobody: "Recording a communication reference
+ * does not authorise contacting customers or external parties."
+ */
+const amendmentAgreementInput = z.object({
+  kind: z.enum(["signed_document", "customer_confirmation", "original_agreement"]),
+  reference: z
+    .string()
+    .trim()
+    .min(1, "Name the document or message that shows the customer agreed")
+    .max(300),
+  detail: z.string().trim().max(1000).optional(),
+});
+
+/* Operation records the basis — "Sales records the confirmation basis; the
+   authorised approver checks that it covers the proposed change." It is NOT
+   `requirePrincipal`: the approver is the checker, not the recorder. */
+operationOrdersRouter.post(
+  "/amendment/:amendmentId/agreement",
+  requireOperation,
+  async (c) => {
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = amendmentAgreementInput.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: parsed.error.issues[0]?.message ?? "invalid input",
+        },
+        422,
+      );
+    }
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("sales_order_record_amendment_agreement", {
+      p_amendment_id: c.req.param("amendmentId"),
+      p_kind: parsed.data.kind,
+      p_reference: parsed.data.reference,
+      p_detail: parsed.data.detail ?? null,
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(data, 201);
+  },
+);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT
+ *
+ * "Legacy PDFs that were never stored: use the approved reconstructed-copy
+ *  notice. Newly issued versions after this release: preserve their original
+ *  issued PDFs as required. A warning does not replace this capability."
+ *  — owner, 2026-09-23.
+ *
+ *   POST /:id/revisions/:revision/document/sign   mint a signed upload URL
+ *   POST /:id/revisions/:revision/document        record what was stored
+ *   GET  /:id/revisions/:revision/document        a signed URL to read it
+ *
+ * ⭐ THE BROWSER NEVER NAMES THE PATH. This does, from the order and the
+ * revision, so a document cannot be filed under a version it does not belong
+ * to — and the database checks the same shape again when it records it.
+ * Rendering is WASM and the Worker cannot do it, which is why the bytes come
+ * from the browser at all.
+ * ───────────────────────────────────────────────────────────────────────── */
+const SALES_ORDER_DOCUMENTS_BUCKET = "sales-order-documents";
+const salesOrderDocumentKey = (orderId: string, revision: number) =>
+  `sales-orders/${orderId}/rev-${revision}.pdf`;
+
+const revisionParam = (raw: string | undefined) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+operationOrdersRouter.post("/:id/revisions/:revision/document/sign", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  /* A version that already keeps its document is never re-issued: what the
+     customer was shown does not change afterwards. */
+  const version = await sb
+    .from("sales_order_revisions")
+    .select("revision")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (version.error) {
+    const m = mapPgError(version.error);
+    return c.json(m.body, m.status);
+  }
+  if (!version.data) {
+    return c.json({ error: "not_found", code: "not_found", message: "Version not found" }, 404);
+  }
+  const existing = await sb
+    .from("sales_order_revision_documents")
+    .select("path")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (existing.error) {
+    const m = mapPgError(existing.error);
+    return c.json(m.body, m.status);
+  }
+  if (existing.data) {
+    return c.json(
+      { error: "rule_violation", code: "document_already_stored", message: "This version already keeps its issued document" },
+      422,
+    );
+  }
+  const { data, error } = await sb.storage
+    .from(SALES_ORDER_DOCUMENTS_BUCKET)
+    .createSignedUploadUrl(salesOrderDocumentKey(id, revision));
+  if (error) {
+    return c.json({ error: "storage_error", code: "storage_error", message: error.message }, 502);
+  }
+  return c.json({ token: data.token, path: data.path, bucket: SALES_ORDER_DOCUMENTS_BUCKET });
+});
+
+const revisionDocumentInput = z.object({ path: z.string().trim().min(1).max(500), bytes: z.number().int().min(0).optional() });
+
+operationOrdersRouter.post("/:id/revisions/:revision/document", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const parsed = revisionDocumentInput.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_record_revision_document", {
+    p_order_id: id,
+    p_revision: revision,
+    p_path: parsed.data.path,
+    p_bytes: parsed.data.bytes ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+operationOrdersRouter.get("/:id/revisions/:revision/document", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const row = await sb
+    .from("sales_order_revision_documents")
+    .select("path")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (row.error) {
+    const m = mapPgError(row.error);
+    return c.json(m.body, m.status);
+  }
+  const path = (row.data as { path: string } | null)?.path ?? null;
+  /* ⛔ ABSENT IS NOT AN ERROR — it is the legacy case, and the page draws the
+     reconstruction with its notice. Say which it is, plainly. */
+  if (!path) return c.json({ stored: false, url: null });
+  const { data, error } = await sb.storage.from(SALES_ORDER_DOCUMENTS_BUCKET).createSignedUrl(path, 3600);
+  if (error) {
+    return c.json({ error: "storage_error", code: "storage_error", message: error.message }, 502);
+  }
+  return c.json({ stored: true, url: data.signedUrl });
+});
+
 const amendmentDecisionInput = z
   .object({
     decision: z.enum(["approve", "reject"]),
@@ -2357,8 +2573,9 @@ operationOrdersRouter.post(
       );
     }
     const sb = userClient(c.env, c.var.auth.jwt);
+    const amendmentId = c.req.param("amendmentId");
     const { data, error } = await sb.rpc("sales_order_decide_amendment", {
-      p_amendment_id: c.req.param("amendmentId"),
+      p_amendment_id: amendmentId,
       p_decision: parsed.data.decision,
       p_note: parsed.data.note ?? null,
     });
@@ -2366,9 +2583,260 @@ operationOrdersRouter.post(
       const m = mapPipelineV2Error(error);
       return c.json(m.body, m.status);
     }
+    /* 0562 · THE STAIR FEE IS PRICED FROM WHAT THE ORDER NOW SAYS. Until this
+       card, an approved amendment could not move the three delivery inputs and
+       carried no quantities the fee is priced from, so the stamp could not go
+       stale here. It can now — an approved change moves floor, lift, stair
+       count and line quantities in one complete version. The same re-stamp the
+       office save runs reads the SAVED row back and runs the ONE arithmetic
+       (Law D); it writes nothing when the number has not moved, and it never
+       fails the decision that already succeeded. */
+    /* ⛔ AND IT NEVER FAILS A DECISION THAT ALREADY SUCCEEDED. The amendment is
+       applied and its revision is minted before this runs; a throw here would
+       tell the principal their approval failed when it did not. The re-stamp
+       helper makes that promise for itself, so the READ that finds the order
+       has to make it too - caught here rather than merely intended. */
+    if ((data as { status?: string } | null)?.status === "applied") {
+      try {
+        const owner = await sb.from("sales_order_amendments").select("order_id").eq("id", amendmentId).maybeSingle();
+        const orderId = (owner.data as { order_id?: string } | null)?.order_id;
+        if (!orderId) throw new Error(owner.error?.message ?? "amendment owner unreadable");
+        const restamp = await restampStairCarry(sb, orderId);
+        if (!restamp.ok) throw new Error(restamp.reason);
+      } catch (e) {
+        console.error("stair carry re-stamp skipped", { amendmentId, reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
     return c.json(data);
   },
 );
+
+// ─────────────────────────────────────────────────────────────
+// 0562 · THE WHOLE-PAGE EDIT'S ONE COMMIT (owner rulings 2026-09-21/22,
+// orders/MASTER.md § VIEW FIRST, EDIT ON PURPOSE · § Commercial change entry).
+//
+//   POST /:id/changes                 the page sends its WHOLE draft; the SERVER
+//                                     classifies it against the stored order
+//                                     (the shared `classifySalesOrderChange`)
+//                                     and either SAVES a correction or SUBMITS
+//                                     an amendment request — never the browser.
+//   POST /amendment/:aid/agreement    the customer's recorded acceptance (above)
+//   POST /amendment/:aid/withdraw     withdraw a live request
+//
+// A mixed change goes to review WHOLE. Submission changes nothing on the
+// order; the database applies the complete version only on approval, and only
+// with a recorded customer agreement that still covers these exact terms (0564).
+// ─────────────────────────────────────────────────────────────
+const changeLineInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    sku: z.string().trim().min(1),
+    qty: z.number().int().min(1),
+    unit_price: z.number().min(0),
+    attrs: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict();
+const changeAddonInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    addon_key: z.string().trim().min(1),
+    qty: z.number().int().min(1),
+    unit_price: z.number().min(0),
+    attrs: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict();
+const salesOrderChangesInput = z.object({
+  header: revisionHeaderInput
+    .extend({
+      delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      delivery_date_tbd: z.boolean().optional(),
+    })
+    .strict(),
+  lines: z.array(changeLineInput).min(1, "An order needs at least one item"),
+  addons: z.array(changeAddonInput),
+  installment_months: installmentMonthsField.nullable().optional(),
+  /* The approved word, not a new sentence: COPY-STANDARD § "The Sales Order
+     amendment words" carries `Reason for change`. */
+  reason: z.string().trim().min(1, "Reason for change").max(500),
+  customerAskedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  /* 0564 · The agreement may be recorded with the request in one act. It is the
+     SAME governed shape the standalone door takes - a kind that always names a
+     pointer - because a free sentence is the manager's assertion the ruling
+     refuses. */
+  agreement: amendmentAgreementInput.optional(),
+  /** Proposing again over an OUT-OF-DATE request withdraws that request first. */
+  replaceAmendmentId: z.string().uuid().nullable().optional(),
+});
+
+type StoredOrder = Record<string, unknown> & {
+  status?: string | null;
+  proceed_date?: string | null;
+  installment_months?: number | null;
+  entry_data?: { fields?: Record<string, unknown> } | null;
+};
+
+function headerOf(order: StoredOrder): SalesOrderChangeSide["header"] {
+  const out: SalesOrderChangeSide["header"] = {};
+  for (const k of SALES_ORDER_EDIT_HEADER_KEYS) {
+    out[k] = k === "entry_fields" ? (order.entry_data?.fields ?? {}) : order[k];
+  }
+  return out;
+}
+
+operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = salesOrderChangesInput.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" },
+      422,
+    );
+  }
+  const body = parsed.data;
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* The STORED order is the only base the server trusts — never the browser's
+     idea of what it was. */
+  const [orderRes, linesRes, addonsRes] = await Promise.all([
+    sb.from("orders").select("*").eq("id", id).maybeSingle(),
+    sb.from("order_lines").select("id, sku, qty, unit_price, attrs").eq("order_id", id)
+      .order("created_at", { ascending: true }).order("id", { ascending: true }),
+    sb.from("order_addons").select("id, addon_key, qty, unit_price, attrs").eq("order_id", id)
+      .order("id", { ascending: true }),
+  ]);
+  for (const r of [orderRes, linesRes, addonsRes]) {
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+  }
+  const order = orderRes.data as StoredOrder | null;
+  if (!order) return c.json({ error: "not_found", code: "not_found", message: "Order not found" }, 404);
+
+  const current: SalesOrderChangeSide = {
+    header: headerOf(order),
+    lines: ((linesRes.data ?? []) as SalesOrderChangeSide["lines"]).map((l) => ({ ...l, unit_price: Number(l.unit_price) })),
+    addons: ((addonsRes.data ?? []) as SalesOrderChangeSide["addons"]).map((a) => ({ ...a, unit_price: Number(a.unit_price) })),
+    installment_months: order.installment_months ?? null,
+  };
+  /* A draft line/service without `attrs` keeps the stored configuration. */
+  const storedLine = new Map(current.lines.map((l) => [l.id, l]));
+  const storedAddon = new Map(current.addons.map((a) => [a.id, a]));
+  const draft: SalesOrderChangeSide = {
+    header: body.header as SalesOrderChangeSide["header"],
+    lines: body.lines.map((l) => ({ ...l, attrs: "attrs" in l ? (l.attrs ?? null) : (storedLine.get(l.id)?.attrs ?? null) })),
+    addons: body.addons.map((a) => ({ ...a, attrs: "attrs" in a ? (a.attrs ?? null) : (storedAddon.get(a.id)?.attrs ?? null) })),
+    installment_months: body.installment_months === undefined ? current.installment_months : body.installment_months,
+  };
+  const cls = classifySalesOrderChange(current, draft, {
+    proceeded: order.status === "proceed_order",
+    proceedRecorded: Boolean(order.proceed_date),
+  });
+  if (cls.action === "none") {
+    return c.json({ error: "rule_violation", code: "nothing_changed", message: "Nothing changed" }, 422);
+  }
+
+  if (cls.action === "save") {
+    const header: Record<string, unknown> = {};
+    for (const k of cls.header) header[k] = (body.header as Record<string, unknown>)[k] ?? null;
+    const { data, error } = await sb.rpc("sales_order_save_revision", {
+      p_order_id: id,
+      p_header: header,
+      p_lines: null,
+      p_change: { change_type: "staff_correction", note: body.reason },
+    });
+    if (error) {
+      const m = mapPipelineV2Error(error);
+      return c.json(m.body, m.status);
+    }
+    if (touchesStairInputs(header)) {
+      const restamp = await restampStairCarry(sb, id);
+      if (!restamp.ok) console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
+    return c.json({ action: "saved", ...(data as Record<string, unknown>) }, 201);
+  }
+
+  /* SUBMIT — the whole change, with the base each header value was computed
+     from so a moved value makes the request stale instead of overwritten. */
+  const proposed: Record<string, unknown> = {};
+  const header: Record<string, unknown> = {};
+  const baseHeader: Record<string, unknown> = {};
+  for (const k of cls.header) {
+    const value = (body.header as Record<string, unknown>)[k] ?? null;
+    if (k === "delivery_date" || k === "delivery_date_tbd") {
+      proposed[k] = value;
+      continue;
+    }
+    header[k] = value;
+    baseHeader[k] = current.header[k] ?? null;
+  }
+  if (Object.keys(header).length) {
+    proposed.header = header;
+    proposed.base_header = baseHeader;
+  }
+  if (cls.linesChanged) proposed.lines = draft.lines.map(({ id: lid, ...l }) => (lid ? { id: lid, ...l } : l));
+  if (cls.addonsChanged) proposed.addons = draft.addons.map(({ id: aid, ...a }) => (aid ? { id: aid, ...a } : a));
+  if (cls.installmentChanged) proposed.installment_months = draft.installment_months;
+
+  if (body.replaceAmendmentId) {
+    const live = await sb.rpc("sales_order_amendment_live", { p_order_id: id });
+    const a = (live.data as { amendment?: { id?: string; stale?: boolean } | null } | null)?.amendment;
+    if (a?.id === body.replaceAmendmentId && a.stale) {
+      const w = await sb.rpc("sales_order_withdraw_amendment", {
+        p_amendment_id: a.id,
+        p_reason: "Out of date - proposed again on the current order",
+      });
+      if (w.error) {
+        const m = mapPipelineV2Error(w.error);
+        return c.json(m.body, m.status);
+      }
+    }
+  }
+  const { data, error } = await sb.rpc("sales_order_submit_amendment", {
+    p_order_id: id,
+    p_proposed: proposed,
+    p_reason: body.reason,
+    p_customer_asked_on: body.customerAskedOn ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  const submitted = data as { id: string; base_revision: number };
+  let agreementRecorded = false;
+  if (body.agreement) {
+    const ag = await sb.rpc("sales_order_record_amendment_agreement", {
+      p_amendment_id: submitted.id,
+      p_kind: body.agreement.kind,
+      p_reference: body.agreement.reference,
+      p_detail: body.agreement.detail ?? null,
+    });
+    /* The REQUEST survives a refused agreement - "the request may remain
+       recorded while evidence is incomplete; it cannot take effect". The page
+       is told which it got and offers the door again. */
+    agreementRecorded = !ag.error;
+  }
+  return c.json({ action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, agreementRecorded }, 201);
+});
+
+const amendmentWithdrawInput = z.object({ reason: z.string().trim().min(1, "A withdrawal says why").max(500) });
+operationOrdersRouter.post("/amendment/:amendmentId/withdraw", requireOperation, async (c) => {
+  const parsed = amendmentWithdrawInput.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_withdraw_amendment", {
+    p_amendment_id: c.req.param("amendmentId"),
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
 
 // GET /reference/dealers — id + name for the create form's dealer picker.
 // RLS-scoped read (internal roles read dealers — the same embed the list

@@ -2664,6 +2664,9 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Positive decision that atomically creates the next revision | **Approve and apply** |
 | Re-propose a complete historical version as a new governed change | **Propose this version again** |
 | Stale proposal state/action | **Out of date — propose again** |
+| The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
+| Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date | **Delivery date to be confirmed** |
 | Empty immutable-version view | **No revisions recorded** |
@@ -4042,3 +4045,80 @@ Payables, 18 Sep 2026. Words new to this standard:
   `{bill No} · Supplier invoice {No}` · `Advance` · signature blocks `Prepared By` (left),
   `Checked By` and `Approved By` (right), each with the recorded name and date, or `Date:` when
   not yet signed. A draft voucher has no number and no PDF.
+
+
+## Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23
+
+| Meaning | Approved wording | Do not use for this entry |
+|---|---|---|
+| Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
+| Ordinary outright customer sales | `Outright Sales` | `Purchase` |
+| Subscription-owned customer journey | `Subscription` | `Purchase` |
+
+The label does not rename the Sales Order document, its SO number, or the separate Purchasing
+module. Subscription reporting stays separate. Removing old navigation entries does not delete
+historical orders or documents.
+
+`Outright Sales` is also the Admin area's word for the same register, and the word ⌘K prints for
+it: one destination never carries two words. The approved `Monthly overview` composition is not
+part of this entry and is not built.
+
+
+## An old version's own sentences — owner ruling 2026-09-23
+
+**TWO SENTENCES ARE APPROVED VERBATIM AND ARE NOT OPEN TO RE-WORDING.** They are the only words in
+this section that appear on the CUSTOMER DOCUMENT as well as the page, and they print identically on
+both — a statement that lives only on screen is not made at all by the time a printed sheet reaches
+a customer.
+
+| Meaning | Approved wording | Status |
+|---|---|---|
+| The sheet is reconstructed, not the file issued at the time | **`Reconstructed copy — original issued document unavailable.`** | **APPROVED 2026-09-23 · document + page** |
+| A signature exists but its version is not recorded | **`Signature version not recorded.`** | **APPROVED 2026-09-23 · document + page** |
+| A capture that cannot be placed in time | `One payment has no date, so it is not counted in this version.` | PROPOSAL · page only |
+
+**Three rules that are NOT open to re-wording:**
+
+1. Neither surface may call an old version **unsigned**. The record cannot place the signature on a
+   version, so *signed* and *unsigned* are both claims the data does not support.
+2. On the document, the signature sentence **REPLACES the signing box** — it never sits beside it.
+   An empty dashed box under a `Customer Signature` caption is byte-for-byte what a genuinely
+   unsigned document prints, so leaving one made exactly the claim rule 1 forbids.
+3. A stored original document, where one exists, is served as the file it is. It never passes
+   through the reconstruction path and never carries either sentence.
+
+## Customer agreement evidence — screen wording · ⚠️ PROPOSAL / NOT LAW
+
+**The RULE is APPROVED / LOCKED (owner ruling 2026-09-22, `docs/orders/MASTER.md`
+§ "Customer agreement evidence"). THE WORDS BELOW ARE NOT.** They were written by the chat that
+built the gate, they ship behind the approved rule so the capability is usable, and they are
+**proposed for owner review — being written in this file does not approve them.** Adding wording to
+the dictionary is how a proposal is recorded, never how it becomes law.
+
+Approved wording is reused wherever it already exists: the decision controls stay
+**`Management decision reason`** · **`Reject`** · **`Approve and apply`**, the waiting state stays
+**`Waiting for management`** and the impact heading stays **`Before approval`** — all from
+§ "The Sales Order amendment words" above. Nothing in that approved table is re-spelled here.
+
+| Meaning | Proposed wording | Status |
+|---|---|---|
+| The block heading on a waiting amendment | `Customer agreement` | PROPOSAL |
+| The picker | `How did the customer agree?` | PROPOSAL |
+| A document the customer signed | `Signed document` | PROPOSAL |
+| A traceable reference to the customer's own message | `Customer confirmation` | PROPOSAL |
+| A Staff correction leaning on the agreement already signed | `Original agreement` | PROPOSAL |
+| The optional description | `What did the customer agree to? (optional)` | PROPOSAL |
+| The commit | `Record customer agreement` | PROPOSAL |
+| Nothing recorded yet | `Nothing on record shows the customer agreed to this change, so it cannot take effect yet. The proposal is kept.` | PROPOSAL |
+| Recorded, but the terms moved | `The proposed change is no longer what the customer agreed to. Record the customer agreement again before this can be approved.` | PROPOSAL |
+
+Each kind's field label names what to type, because a blank box called `Reference` teaches nobody:
+`The file name of the document the customer signed` · `Where the customer's own message can be
+found — for example WhatsApp, the date and the number` · `The revision whose signed agreement
+already covers this — for example Rev 1`. **All three are PROPOSAL.**
+
+**What IS approved, and is not open to re-wording:** there is no tick box and there never may be
+one. *"A manager's statement or checkbox saying the customer agreed is not sufficient by itself and
+cannot substitute for the evidence."* Every kind carries a reference that points at something
+findable outside the record. `Approve and apply` is refused until one is recorded and still covers
+the proposal; `Reject` never is.
