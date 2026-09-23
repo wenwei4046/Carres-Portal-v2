@@ -534,7 +534,10 @@ function draftTemplateData(
 /** An OLD revision's PDF renders FROM THAT SNAPSHOT — printable. The names
  *  the snapshot stored at mint time are what print; the payments ledger is
  *  live money and rides from the base. */
-function snapshotTemplateData(
+/* Exported for `SalesOrderWorkspace.historical-document.test.ts` — the
+   signature rule is a business guarantee about a CUSTOMER DOCUMENT, so it
+   is proved by calling the builder, not by grepping this file. */
+export function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
   /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
@@ -620,8 +623,45 @@ function snapshotTemplateData(
     paid,
     balance_due: subtotal - paid,
     currency: base?.currency ?? "MYR",
-    signed: base?.signed ?? false,
-    signature_url: base?.signature_url ?? null,
+    /* ⭐ A HISTORICAL VERSION NEVER BORROWS TODAY'S SIGNATURE — APPROVED /
+       LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md` § "Old versions
+       and signatures"):
+
+         "A signature belongs to the exact version and document the customer
+          signed; a new unsigned version says it is unsigned and never borrows
+          the old signature."
+
+       This read `base?.signed` and `base?.signature_url` — the ORDER's current
+       eSign PNG — so every revision printed the same signature under a
+       different set of goods, prices and dates. A customer could be shown Rev 2
+       carrying the mark they put on Rev 1.
+
+       ⛔ AND IT IS NOT REPLACED BY A GUESS. `sales_order_snapshot` stores no
+       signature fact (measured 2026-09-23 against the live function: header
+       carries so · status · parties · customer · delivery · proceed ·
+       instalment · placed_at · entry_fields, and nothing about signing), and
+       `orders` has `signature_url` with NO capture timestamp — only
+       `pod_signed_at`, which is Delivery's proof of delivery, a different act.
+       So which revision a stored signature covers is genuinely unprovable from
+       what is recorded today: an UNKNOWN, not a thing to infer from revision
+       order. The safe half of the rule is the half that is enforceable, so a
+       historical version prints UNSIGNED — the template's existing empty
+       signature box, no new words on a customer document — and never a
+       signature the record cannot place.
+
+       FALSIFIER: store the signing fact in the snapshot (or add a capture
+       timestamp to `orders`) and a revision can print the signature it really
+       carries. That is a schema change and is named as an open gap in the
+       Orders MASTER, not smuggled in here. */
+    signed: false,
+    signature_url: null,
+    /* ⚠️ MEASURED GAP, DELIBERATELY NOT CHANGED HERE. `payments` and `paid`
+       still ride from the live base, so a historical version's `Balance due`
+       is THIS version's goods total minus TODAY's money — an arithmetic that
+       never described any real moment (ownership Law D). Payments owns the
+       money and the snapshot stores none of it, so the honest fix is a stored
+       historical position, not a second arithmetic invented on this page.
+       Recorded as an open gap in the Orders MASTER. */
   } as SalesOrderTemplateData;
 }
 
