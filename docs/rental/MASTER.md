@@ -135,6 +135,20 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   including final nationwide delivery. Calendar basis/start trigger still require supplier evidence.
 - One Carres-issued Unit ID identifies each physical mattress; Diglant attaches those labels.
   A direct route must never fabricate a Carres warehouse receipt.
+- **OWNER-APPROVED CONCEPT / NOT BUILT — 2026-09-23:** Jess confirmed “yes, so that we can
+  control our stock”, relayed by main advisor task `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb`.
+  Carres supplies unique Unit numbers grouped by supplier, PO line, model and size batch;
+  Diglant is intended to attach them during production. These remain the company-wide permanent
+  Unit IDs, not a separate supplier numbering system. At pickup the driver should use the Carres
+  DO and scan actual eligible matching mattresses, avoiding advance selection of particular
+  interchangeable physical serials that requires customer-specific searching. The same ID follows
+  the mattress through subsequent journeys. Diglant's label capability is **not supplier-confirmed**;
+  physical/packaging copies of the same ID and CSV/PDF exchange remain implementation proposals.
+  **CURRENT-AUTHORITY CONFLICT / workflow approval and validation required:** Delivery MASTER
+  §§3–4 issue/scope rules snapshot exact Units before pickup (0424/0491); Outbound proves their
+  handover. Desired scan-at-pickup selection is not existing scan-time binding and does not approve
+  bypassing issue/freeze, eligibility, allocation or unique-claim gates. The owning modules must
+  reconcile and approve that workflow separately; this concept is not a technical gate override.
 - Go-live starts empty. Early forecasts are manager-entered; automatic suggestions may begin
   only after three months of genuine sales, never imported/test transactions.
 - The requested review scope is a fixed-day monthly proposal by model/size, manager revision
@@ -569,6 +583,14 @@ Subscription authority，不导入该任务的其他月报改动。共用父菜�
 开所属异常，不从下拉状态捏造回收、销毁或客户同意。已提交对象不破坏性删除；改单留
 接受版本和所有下游影响。新计划条款未批准时，不允许以本蓝图直接开始销售。
 
+**Dealer display / repair / damage / return traceability — explanatory PROPOSAL / NOT LAW,
+2026-09-23:** 原供应商、PO 和 PO line 来源保留；当前持有人、位置及状态分别追踪。
+每次交接保留来源/目的地、实际 actor、时间及证据，未接受收货仍为在途。
+同一实物维修或退回保留永久 ID（实物替换按既有 Stock/Purchasing 规则用新 ID）；
+退回后检查合格才可用。丢失只显示最后确认位置，不捏造实际所在。展示调拨及维修/退回
+移动不是销售，不增加销量；Stock、Service、Delivery 保留原记录所有权。
+这些是对 owner 新问题的解释建议，并非新生命周期已获批准或当前系统已有完整支持。
+
 ## 5.10 · 页面、员工一天与权限
 
 以下是 **IA/字段建议，尚未批准的 screen copy**；获批后才同步 COPY/共享 authority。
@@ -663,12 +685,27 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 🟡 **业务仍未定：** 新计划条款、Klang Valley 以外伙伴和留货执行条件；初期 Diglant 留货已确定。
 不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
 
-**CURRENT MISSION — 2026-09-23 consolidated review:** 已批准的留厂/NETS、按真实区域量
+**CURRENT MISSION — Portal readiness PLAN；owner-approved planning direction，2026-09-23：**
+来源：主顾问任务 `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb` 转达 Jess 最新 “ye”，
+明确只批准规划方向，不批准 BUILD。先规划经理手动录入每月数量 KPI 与可追溯的采购建议，
+再依次核实客户供应分配、Diglant 工厂提货、既有 Delivery 的衔接；Subscription / Outright
+的数量、渠道与供应占用隔离同步核实。KPI、forecast、实际订单和供应仍是不同事实，
+不得把目标直接当采购量。自动统计预测后置；满三个月真实历史只是原有最低门槛，
+不是届时自动启用的授权。具体公式、报告日、页面和采购转换细节仍保留各自待审状态。
+
+五个准备日以实际 Portal 能展示及操作什么、最小必要缺口与依赖为核查重点；会议脚本、
+排练和展示 mockup 不属于当前任务。先检查现有 Stock Plan、Purchasing、Stock、Orders
+及 Delivery 能力是否可复用；按当前认证操作证据、历史验收、源码证据分别记录，
+没有当前实测就标未验证。区分功能缺口与纯展示缺口，不把部署成功当业务闭环可用，
+不承诺五天内完成所有新增功能。此规划顺序不构成 READY、Card、完整蓝图批准或建设授权。
+
+已批准的留厂/NETS、按真实区域量
 谈物流、提前 PO 与后到 SO、五种供应处理、接收后服务/清洁/回收边界均不重问。
 剩余运营建议一次审阅，引用上文唯一详细定义，不新增平行规则：
 
-1. §§5.4–5.5：月 10 日内部草案、滚动至少三个月；前三个完整真实月经理录入，之后
-   以三个月平均作可修改参考；KPI 与预测独立，完整数据不足不自动补零。
+1. §§5.4–5.5：月 10 日内部草案、滚动至少三个月仍待审；当前优先经理手动数量输入。
+   自动统计预测后置，三个月平均仅为后续可修改参考的提案；KPI 与预测独立，
+   完整数据不足不自动补零。
 2. §§5.5–5.6：经理审阅来源/日期、改量留因留版；实际订单消耗相应预测，已有供应及
    申请去重；预测 PDF 人工发送，正式采购走既有门。制造 45 天和运输分别规划。
 3. §§5.9–5.10：已批准 Sales Orders → Outright Sales / Subscription；待审的是 Subscription 内部组成，
@@ -685,6 +722,6 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 **明确排除：** Finance 设计、租仓承诺、外部联络/保量承诺、自动发送/自动下单、实时
 自动化、应用建设、Card、部署和生产数据更改；本次不触碰 SO 页面或 MPR/PO 表单模板。
 
-这次整体审阅仅批准呈现的运营设计，不把未呈现的 UI 细节/条款或整份文档自动升为 law。
+本次 “ye” 仅批准上述规划方向，不把待审运营设计、UI 细节/条款或整份文档自动升为 law。
 批准后按范围更新唯一 authority；有未知依赖的能力继续明确标记，不假称 READY。
 当前全模块仍未达到 PLAN MISSION COMPLETE；不再让 owner 通过逐句 “yes” 才获得下一步。
