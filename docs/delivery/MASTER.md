@@ -173,8 +173,8 @@ leg's arrangement carries its partner and its agreed day and the order's money a
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
-- **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET /
-  NOT BUILT.** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
+- **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
+  (migration `0575`, PR_PLACEHOLDER).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
   issue **`SDO2609-48271`** (five, 100,000 a month): prefix + two-digit year + two-digit month of
   **issue** + `-` + random digits (leading zeros allowed). The two businesses are
   told apart by the prefix; the document model, gates and team are one. Fixed width — the system
@@ -184,15 +184,28 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   rebooked or failed-then-redelivered trip is a NEW document with a NEW number (no `-B` letter).
   Old `DO-DDMMYY-NNNN` numbers are test data (clean start). Order side: `docs/orders/MASTER.md`
   → *order numbers by business*.
-- **🔴 P0 FACT, measured 2026-09-23 on origin/main `855c305c4` — must be gone before Outright go-live,
-  whatever the format.** Today `docNumber` seeds the tail on the ORDER id (`FNV mod 10⁴`), and the
-  collision check reads only the SAME order's numbers (`apps/api/src/lib/delivery-order-issue.ts:163-178`).
-  Two different orders can therefore produce the same `DO-DDMMYY-NNNN` on one day, and the
-  materialiser silently skips an existing number (`0356:120-122`): the second order wears the first
-  order's DO and has **no document row of its own**; the split-trip mint returns the other order's
-  row (`0542`). Because the tail is deterministic, retrying fails identically all day. Expected
-  frequency at 30 DOs/day ≈ 13 days a year. **Acceptance:** two orders issued the same day always
-  get different numbers and each owns its row; a conflicting number is REFUSED, never skipped.
+- **How the number is made — BUILT (0575).** ONE allocator, `delivery_document_number_draw(order)`
+  (gated: internal staff or the service role), draws from the DO/SDO pool
+  `delivery_document_numbers` — its own table, never 0381's `formal_document_codes`. The prefix
+  comes from the order's business (`orders.source_system = 'rental'` → `SDO`, five digits;
+  otherwise `DO`, four), the period is the Malaysia YYMM of the draw, a clash is redrawn inside the
+  allocator, every drawn number stays in the pool forever, and a used-up month REFUSES
+  (`delivery_order_numbers_used_up`) rather than widening. Every issuing path draws from it: the
+  whole-order mint, the split-trip door (0542), the leg door (0491), the attach door when an order
+  has no number, and the legacy dispatch backstop (0476's `'DO-' || lpad(so, 6)` is gone). The
+  browser never builds a number (the DOAttachModal fallback from TODAY's date is removed). The
+  money gate, the issue gates and the exact-Unit freeze are unchanged.
+- **The P0 is FIXED (0575).** Measured 2026-09-23 on `855c305c4`: the tail was `FNV(order id) mod
+  10⁴`, the clash check read only the same order's numbers, and the materialiser silently skipped
+  an existing number (`0356:120-122`), so a second order could wear the first order's DO with no
+  document row of its own. Now the materialiser REFUSES a number another order owns (23505,
+  `delivery_order_number_taken`) and only the same order re-stating its own number is a no-op.
+  Evidence: `apps/api/src/test/delivery-order-number-0575.integration.test.ts` (9 cases on the
+  replayed chain) FAILED against the chain without 0575 — the second order's write was accepted
+  silently — and passes with it; `delivery-order-issue.test.ts` fails against the unfixed module
+  and passes after. One known limit, unchanged by 0575: the dispatch backstop writes the number in
+  a BEFORE trigger, which does not fire the column-scoped materialiser, so that legacy path still
+  creates no document row (its number is owned in the pool).
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
   facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·

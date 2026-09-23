@@ -32,10 +32,15 @@ describe("DOAttachModal — the delivery order number is not typed (C7)", () => 
     expect(SRC).not.toContain("suggestDoNumber");
   });
 
-  it("uses the number already on the order, else the LOCKED scheme with a stable seed", () => {
+  it("uses the number already on the order, and never builds one in the browser (0575)", () => {
     expect(SRC).toMatch(/order\.do_number/);
-    expect(SRC).toMatch(/docNumber\(/);
-    expect(SRC).toMatch(/seed:\s*order\.id/);
+    // The old fallback: `docNumber({ prefix: "DO", date: appTodayIso(), seed: order.id })`
+    // — a number from TODAY's date, which a reprint on another day could not
+    // reproduce and which never checked another order's numbers. The server
+    // draws a missing number from the one allocator instead.
+    expect(SRC).not.toMatch(/docNumber\(/);
+    expect(SRC).not.toMatch(/appTodayIso/);
+    expect(SRC).toMatch(/\.\.\.\(doNumber \? \{ doNumber \} : \{\}\)/);
   });
 
   it("stops gating the submit on a typed number's length", () => {
