@@ -731,13 +731,24 @@ impact → Save or Submit amendment request → approval takes effect → each o
   **PARTLY BUILT 2026-09-23, and the two halves are not the same claim.**
   🔴 **THE STORED FILE IS NOT STORED, SO WHAT IS SHOWN IS A REBUILD.** The rule says a revision
   prints its OWN stored document and a missing file is STATED, never rebuilt from current data.
-  No issued PDF is retained, so the panel rebuilds the sheet from the version's own saved facts
-  and the page SAYS SO in words — *"Rebuilt from this version's saved facts. The document issued
-  at the time is not stored."* — beside the version chip and again when it is printed. Stating the
-  absence is the half of the rule that can be kept today; retaining the issued file is the other
-  half and is the remaining work. Until it exists, a printed rebuild and an issued document cannot
-  be told apart once they leave the screen.
-  🔴 **WHICH VERSION THE SIGNATURE COVERS IS UNKNOWN — NOT "UNSIGNED".** An earlier draft of this
+  No issued PDF is retained, so the panel rebuilds the sheet from the version's own saved facts,
+  and BOTH the page AND THE DOCUMENT ITSELF say so in the owner-approved words (2026-09-23,
+  verbatim, not open to re-wording): *"Reconstructed copy — original issued document
+  unavailable."* It prints at the top of the sheet, above `Bill To`, so the reader knows what they
+  are holding before they read a figure — measured at x=41.4 y=731.7 on A4 in
+  `sales-order-template.rebuilt.test.tsx`, which extracts the text from the finished PDF with
+  pdfjs rather than asserting that a field was passed.
+  **A printed rebuild and an issued document can now be told apart once they leave the screen** —
+  which was the open risk until this shipped. Retaining the issued file is still the other half of
+  the rule and remains the outstanding work; a stored original, when one exists, is served as the
+  file it is and never passes through this path.
+  🟡 **WHICH VERSION THE SIGNATURE COVERS IS UNKNOWN — NOT "UNSIGNED", AND THE DOCUMENT NOW SAYS
+  SO.** On the sheet the owner-approved *"Signature version not recorded."* (2026-09-23) **replaces
+  the signing box** rather than sitting beside it — an empty dashed box under a `Customer
+  Signature` caption is byte-for-byte what a genuinely unsigned document prints, so leaving one
+  made exactly the claim this rule forbids. Measured at x=34.0 y=385.3, on the box's own ground, so
+  the caption below it does not move. A genuinely unsigned order still prints the empty box, and a
+  signature the document is entitled to show still prints. An earlier draft of this
   section asserted the customer signed Rev 1. Nothing records that: `sales_order_snapshot` stores
   no signing fact and `orders.signature_url` carries no capture timestamp. So a historical version
   does not REPRODUCE a mark it cannot attribute, and it does not claim the version was unsigned

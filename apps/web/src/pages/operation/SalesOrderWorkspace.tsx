@@ -711,6 +711,15 @@ export function snapshotTemplateData(
        carries. Named as open work in the Orders MASTER. */
     signed: false,
     signature_url: null,
+    /* ⭐ AND THE DOCUMENT SAYS BOTH THINGS ITSELF — owner ruling 2026-09-23,
+       wording approved verbatim.
+       The two sentences below were on the PAGE only; a PDF is printed,
+       downloaded and handed to a customer, so a statement that lives on screen
+       is not made at all by the time it matters. `signature_unknown` uses the
+       SAME condition as the `oldrev-signature-unknown` page notice — one fact,
+       one test, so the screen and the paper cannot drift. */
+    rebuilt_notice: "Reconstructed copy — original issued document unavailable.",
+    signature_unknown: Boolean(base?.signature_url),
     /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
        snapshot stores none, so this reads the SAME payments ledger Payments
        owns with the SAME arithmetic (sum of the rows) over the rows dated then
@@ -1658,7 +1667,7 @@ function SalesOrderWorkspaceBody() {
        version's saved facts. The sentence is on the PAGE, never added to the
        customer document. ⚠️ build wording 2026-09-23, owner confirmation owed. */
     if (mode === "oldrev") {
-      toast.message("Rebuilt from this version's saved facts — not the document issued at the time");
+      toast.message("Reconstructed copy — original issued document unavailable.");
     }
     window.open(printable, "_blank");
   };
@@ -2850,17 +2859,19 @@ function SalesOrderWorkspaceBody() {
               version's own saved facts. Saying so is the half of the rule that
               can be kept today; storing the file is the other half and is named
               as open work in the Orders MASTER.
-              ⚠️ build wording 2026-09-23, owner confirmation owed. */}
+              ⭐ OWNER-APPROVED WORDING 2026-09-23, verbatim and not open to
+              re-wording. The page prints the SAME sentence the document prints,
+              so a reader who sees it on screen and a customer who receives the
+              PDF are told the same thing. */}
           <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
-            Rebuilt from this version's saved facts. The document issued at the time is not stored.
+            Reconstructed copy — original issued document unavailable.
           </p>
           {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
               untouched: it stays on the order and still prints on the current
               document. */}
           {base?.signature_url && (
             <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
-              This order carries a customer signature. Which version it was given on is not
-              recorded, so it is not shown here.
+              Signature version not recorded.
             </p>
           )}
           {(base?.payments ?? []).some((pm) => !pm.date) && (

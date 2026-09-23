@@ -4064,24 +4064,28 @@ it: one destination never carries two words. The approved `Monthly overview` com
 part of this entry and is not built.
 
 
-## An old version's own sentences · ⚠️ PROPOSAL / NOT LAW
+## An old version's own sentences — owner ruling 2026-09-23
 
-Written by the chat that built the historical view, shipping behind approved rules so the
-capability is usable, and **proposed for owner review — being written here does not approve them.**
-All three are on the PAGE. **No word is added to the customer document**, which is why the
-signature sentence exists at all: the document asserts nothing, so the page has to say what is
-known and what is not.
+**TWO SENTENCES ARE APPROVED VERBATIM AND ARE NOT OPEN TO RE-WORDING.** They are the only words in
+this section that appear on the CUSTOMER DOCUMENT as well as the page, and they print identically on
+both — a statement that lives only on screen is not made at all by the time a printed sheet reaches
+a customer.
 
-| Meaning | Proposed wording | Status |
+| Meaning | Approved wording | Status |
 |---|---|---|
-| The sheet is rebuilt, not the file issued then | `Rebuilt from this version's saved facts. The document issued at the time is not stored.` | PROPOSAL |
-| The same, when it is printed | `Rebuilt from this version's saved facts — not the document issued at the time` | PROPOSAL |
-| A signature exists but its version is not recorded | `This order carries a customer signature. Which version it was given on is not recorded, so it is not shown here.` | PROPOSAL |
-| A capture that cannot be placed in time | `One payment has no date, so it is not counted in this version.` | PROPOSAL |
+| The sheet is reconstructed, not the file issued at the time | **`Reconstructed copy — original issued document unavailable.`** | **APPROVED 2026-09-23 · document + page** |
+| A signature exists but its version is not recorded | **`Signature version not recorded.`** | **APPROVED 2026-09-23 · document + page** |
+| A capture that cannot be placed in time | `One payment has no date, so it is not counted in this version.` | PROPOSAL · page only |
 
-**What is NOT open to re-wording:** the page may not say an old version is *unsigned*. The record
-cannot place the signature on a version, so both *signed* and *unsigned* are claims the data does
-not support.
+**Three rules that are NOT open to re-wording:**
+
+1. Neither surface may call an old version **unsigned**. The record cannot place the signature on a
+   version, so *signed* and *unsigned* are both claims the data does not support.
+2. On the document, the signature sentence **REPLACES the signing box** — it never sits beside it.
+   An empty dashed box under a `Customer Signature` caption is byte-for-byte what a genuinely
+   unsigned document prints, so leaving one made exactly the claim rule 1 forbids.
+3. A stored original document, where one exists, is served as the file it is. It never passes
+   through the reconstruction path and never carries either sentence.
 
 ## Customer agreement evidence — screen wording · ⚠️ PROPOSAL / NOT LAW
 

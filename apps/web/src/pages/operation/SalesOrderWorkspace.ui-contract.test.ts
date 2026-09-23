@@ -678,11 +678,15 @@ describe("Sales Order object template contract", () => {
   it("says a historical version is REBUILT, because the issued file is not stored", () => {
     /* § Retained documents: "a missing historical file is STATED, never rebuilt
        from current data." No file is retained, so the half that can be kept is
-       saying so — beside the version chip AND when it is printed, so a sheet
-       that leaves the screen was at least announced for what it is. */
+       saying so — beside the version chip, when it is printed, AND on the sheet
+       itself, in the one owner-approved sentence (2026-09-23). The earlier build
+       wording is deliberately gone: two sentences for one fact is how the page
+       and the document start disagreeing. */
     expect(workspace).toContain('data-testid="oldrev-rebuilt"');
-    expect(workspace).toContain("The document issued at the time is not stored");
-    expect(workspace).toContain("Rebuilt from this version's saved facts — not the document issued at the time");
+    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
+    expect(workspace).not.toContain("The document issued at the time is not stored");
+    /* The DOCUMENT is told by the builder, not by a second copy of the string. */
+    expect(workspace).toContain("rebuilt_notice:");
   });
 
   it("calls the signature UNKNOWN on an old version, never absent, and keeps the evidence", () => {
@@ -691,8 +695,15 @@ describe("Sales Order object template contract", () => {
        still prints on the CURRENT document; only the page says the unknown, and
        only when there is a signature to be unknown about. */
     expect(workspace).toContain('data-testid="oldrev-signature-unknown"');
-    expect(workspace).toContain("Which version it was given on is not");
+    /* ⭐ OWNER-APPROVED WORDING 2026-09-23, verbatim on BOTH surfaces. The page
+       prints the same sentence the document prints, so a reader on screen and a
+       customer holding the PDF are told the same thing. */
+    expect(workspace).toContain("Signature version not recorded.");
+    expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
     expect(workspace).toContain("{base?.signature_url && (");
+    /* ...and the document is told by the SAME condition the page notice uses,
+       so the two cannot drift apart. */
+    expect(workspace).toContain("signature_unknown: Boolean(base?.signature_url)");
     /* The live document is NOT stripped: no rule may turn today's signed order
        into an unsigned one. */
     expect(workspace).not.toContain("signed: false, signature_url: null }");
