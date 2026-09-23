@@ -27,7 +27,6 @@ import {
   manualPurchaseHistoryRecord,
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
-  manualPurchaseIssueGroupCount,
   manualPurchaseNeedStatusOf,
   MANUAL_PURCHASE_NEED_STATUS_WORDS,
   poSafetyDaysWord,
@@ -116,9 +115,12 @@ import {
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
 import ManualPurchaseDraftPreview from "./ManualPurchaseDraftPreview";
-import ManualPurchaseIssueWorkspace, {
-  type ManualPurchaseIssueLineView,
-} from "./ManualPurchaseIssueWorkspace";
+import {
+  manualPurchaseReviewDocuments,
+  manualPurchaseSelectedWalls,
+} from "./manual-purchase-review";
+import SoBatchIssueWorkspace from "./so-batch/SoBatchIssueWorkspace";
+import type { IssuedPo } from "./components/PoIssueEvidence";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { Block } from "./SalesOrderWorkspace";
@@ -316,8 +318,16 @@ function decisionFactsOf(r: PurchaseRequestRow) {
 
 function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
   const destName = new Map(data.destinations.map((d) => [d.id, d.name]));
+  /* The two addresses the supplier's paper prints — read here so the draft on
+     `Review Purchase Orders` is the document, not a summary of it. */
+  const destAddress = new Map(
+    data.destinations.map((d) => [d.id, d.address ?? null]),
+  );
   const userName = new Map(data.users.map((u) => [u.id, u.name ?? ""]));
   const supplierName = new Map(data.suppliers.map((s) => [s.id, s.name]));
+  const supplierAddress = new Map(
+    data.suppliers.map((s) => [s.id, s.address ?? null]),
+  );
   const poNo = new Map(data.pos.map((p) => [p.id, p.po_no]));
   const poFacts = new Map(data.pos.map((p) => [p.id, p]));
   const caseNo = new Map(data.serviceCases.map((sc) => [sc.id, sc.case_no]));
@@ -478,12 +488,21 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       transitDaysMissing: live.some((l) => l.transit_days_missing === true),
       issueWalls: live.map((l) => ({
         demandId: l.id,
+        requestNo: r.req_no,
+        purchaseRequirement: r.purchase_requirement ?? null,
+        note: l.remark ?? null,
         supplierId: l.supplier_id,
         supplierName: l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
+        supplierAddress: l.supplier_id ? (supplierAddress.get(l.supplier_id) ?? null) : null,
         category: (l.category as string | null | undefined) ?? null,
         destinationId: l.destination_id ?? r.destination_id,
         destinationName:
           destName.get(l.destination_id ?? r.destination_id) ?? "",
+        destinationAddress:
+          destAddress.get(l.destination_id ?? r.destination_id) ?? null,
+        /* The PO Delivery Date the issue door will stamp, as the SERVER
+           projected it (`poDeliveryDate` on the line) — never computed here. */
+        poDeliveryDate: l.po_delivery_date ?? null,
         purpose: r.purpose,
         purposeLabel: purposeLabelOf(r.purpose),
         deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,
@@ -825,10 +844,18 @@ export default function OperationManualPurchase() {
     () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
     [filtered, selected, selectable],
   );
-  const selectionUnits = selectedRows.reduce((n, r) => n + r.remainingQty, 0);
-  const selectionPos = manualPurchaseIssueGroupCount(
-    selectedRows.flatMap((r) => r.issueWalls),
-  );
+  /**
+   * ⭐ ONE LIST FEEDS THE SENTENCE, THE REVIEW AND THE WIRE (owner instruction
+   * 2026-09-23). The toolbar used to count every open line of every selected
+   * request while the wire sometimes carried a narrowed set — so a mixed
+   * selection (one request whole, another narrowed) both COUNTED and BOUGHT
+   * goods the operator had unticked. `manualPurchaseSelectedWalls` resolves
+   * the exact lines once; everything downstream derives from it.
+   */
+  const selectedWalls = manualPurchaseSelectedWalls(selectedRows, goodsChoice);
+  const selectedDocuments = manualPurchaseReviewDocuments(selectedWalls);
+  const selectionUnits = selectedWalls.reduce((n, w) => n + w.remainingQty, 0);
+  const selectionPos = selectedDocuments.length;
 
   /**
    * ⭐ REVIEW BEFORE ISSUE (owner ruling 2026-09-22). `Issue PO` used to call
@@ -841,9 +868,8 @@ export default function OperationManualPurchase() {
    * receives is the one the checks above already validated.
    */
   const [review, setReview] = useState<null | {
-    lines: ManualPurchaseIssueLineView[];
-    requestCount: number;
-    payload: { requestIds: string[]; together: boolean; demandIds?: string[] };
+    documents: ReturnType<typeof manualPurchaseReviewDocuments>;
+    payload: { requestIds: string[]; together: boolean; demandIds: string[] };
   }>(null);
 
   async function issueSelected() {
@@ -895,27 +921,17 @@ export default function OperationManualPurchase() {
     /* The chosen LINES, when the operator narrowed any of the selected
        requests in its expansion. The server recomputes every quantity from
        its own read, so this can only narrow the issue, never widen it. */
-    const chosenDemandIds = selectedRows.flatMap((r) => {
-      const picked = goodsChoice.get(r.id);
-      return picked ? [...picked] : [];
-    });
-    const narrowed =
-      chosenDemandIds.length > 0 && selectedRows.every((r) => goodsChoice.has(r.id))
-        ? new Set(chosenDemandIds)
-        : null;
-    /* The documents the operator is about to create, from the SAME walls the
-       toolbar counted — narrowed to the exact lines the wire will carry, so
-       the review cannot show goods the request does not ask for. */
+    /* ⭐ THE WIRE IS ALWAYS EXPLICIT (owner instruction 2026-09-23). It used
+       to send `demandIds` only when EVERY selected request had been narrowed,
+       and `undefined` otherwise — which told the door "buy everything still
+       open", including the goods the operator had just unticked on one of the
+       requests. The exact lines are named every time, from the same list the
+       toolbar counted and the review will draw. */
+    const demandIds = selectedWalls.map((w) => w.demandId);
+    if (demandIds.length === 0) return;
     setReview({
-      requestCount: ids.length,
-      lines: selectedRows.flatMap((r) =>
-        r.issueWalls.filter((w) => narrowed == null || narrowed.has(w.demandId)),
-      ),
-      payload: {
-        requestIds: ids,
-        together: true,
-        ...(narrowed ? { demandIds: [...narrowed] } : {}),
-      },
+      documents: selectedDocuments,
+      payload: { requestIds: ids, together: true, demandIds },
     });
   }
 
@@ -927,13 +943,17 @@ export default function OperationManualPurchase() {
    * and that surface prints them in the same governed grammar. The door is
    * atomic, so a refusal created nothing and the selection is still intact.
    */
-  async function issueReviewed() {
-    if (!review) return;
-    await issue.mutateAsync(review.payload);
-    setReview(null);
-    setSelected(new Set());
-    setGoodsChoice(new Map());
+  async function issueReviewed(): Promise<{ pos: IssuedPo[] }> {
+    if (!review) return { pos: [] };
+    /* The refusal is NOT swallowed: the operator is standing on the review
+       surface, which prints the server's two lines beside the document they
+       name. The door is atomic, so a refusal created nothing. */
+    const created = await issue.mutateAsync(review.payload);
     void q.refetch();
+    /* The issued documents, in the shape the shared evidence step reads — so
+       `Confirm PO sent to supplier` follows an MPR issue exactly as it
+       follows an SO Batch one. Issue is still not send. */
+    return { pos: created.pos ?? [] };
   }
 
   const openRequest = useCallback((r: RequestRegisterRow) => setMode({ detail: r.id }), []);
@@ -1489,11 +1509,22 @@ export default function OperationManualPurchase() {
           the object does, so `Cancel` restores the whole selection rather than
           making the operator tick twelve rows again. */}
       {review != null ? (
-        <ManualPurchaseIssueWorkspace
-          lines={review.lines}
-          requestCount={review.requestCount}
+        <SoBatchIssueWorkspace
+          documents={review.documents}
+          destinations={q.data?.destinations ?? []}
           onBack={() => setReview(null)}
+          onDone={() => {
+            setReview(null);
+            setSelected(new Set());
+            setGoodsChoice(new Map());
+            void q.refetch();
+          }}
+          /* Manual Purchase keeps its OWN issue authority: the MPR approval,
+             the remaining-quantity check and the source validation all live
+             behind its own door, and this surface only hands the operator's
+             decision to it. */
           onIssue={issueReviewed}
+          backLabel={MW.page}
         />
       ) : null}
       <div

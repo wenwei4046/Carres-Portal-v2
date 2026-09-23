@@ -1452,8 +1452,9 @@ rule from the Sales Order entrance.
 | Context | Words |
 |---|---|
 | Review title | `Review Purchase Orders` |
+| ⭐ ONE SURFACE, TWO LANES (owner instruction 2026-09-23) | The same review checks an SO Batch document and a Manual Purchase document. Its `Source` column prints whichever source the line HAS: `SO-{n}` for a Sales Order line, the request's `MPR No` for a Manual Purchase line — one column, one meaning, never a second word for either. The requester's `Purchase requirement` prints under the item where one was recorded. `Back to buying` keeps its word on SO Batch; from Manual Purchase the way out reads `Manual Purchase`, the list it came from. |
 | Factory-pickup collection fact | `{partner} collects from {supplier} and delivers to {destination}.` |
-| Missing Catalog cost | `{sku} has no transaction cost.` · `Set the cost of {sku} in Catalog.` |
+| Missing Catalog cost — RETIRED as a refusal (owner instruction 2026-09-23) | A SKU with no recorded price is ISSUED, carrying no commercial claim; price and financial approval add no placement gate (migration 0573). The words survive for the SO Batch lane, whose own door still asks for a price and owes the same convergence. Never tell an operator to "set the cost" before a Manual Purchase can be ordered. |
 | Missing supplier collection rule | `{supplier} collection is not configured.` · `Set its collector and destination in Purchasing Settings.` |
 | Deliver To differs from the governed collection rule | `{supplier} must be collected to {destination}.` · `Set Deliver To to {destination}, then issue again.` — the act names the purchase, not Settings: Settings holds the collection agreement and changes rarely, the purchase is today's work |
 

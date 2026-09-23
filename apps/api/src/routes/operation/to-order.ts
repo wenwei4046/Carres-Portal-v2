@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   composeDocumentLines,
   documentPartitionKey,
-  expectedArrivalOf,
+  poDeliveryDateOf,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
   stockMatchKey,
@@ -708,12 +708,23 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
       supplier_id: group.proposal.supplierId,
       warehouse_id: warehouse.id,
       destination_id: group.destinationId,
-      /* The frozen estimate, from the ONE arithmetic (`expectedArrivalOf`).
-         A PO being born starts its clock today. */
-      eta_date: expectedArrivalOf(res.data.settings, {
+      /* ⭐ THE PO's OWN DELIVERY DATE — `PO Date + n Settings working days`,
+         NO transit added (owner correction 2026-09-22, converged across both
+         buying doors on 2026-09-23). `expectedArrivalOf` answers a DIFFERENT
+         question — when the goods reach Carres, production PLUS the transit
+         leg — and it stays the arrival-planning arithmetic behind `Order By`
+         and the register's timing facts. Printing the arrival under a
+         `PO {n}-Day` label was how a 13-day Settings number came to promise
+         14 days on a supplier's paper.
+ 
+         ⛔ WHAT THIS DOES NOT TOUCH: the customer arrival projection
+         (`purchasing_project_line_etas`, which reads supplier dates and not
+         this one) and every PO already issued — `official_delivery_date` is
+         stamped once at birth and no UPDATE may move it (0428). */
+      eta_date: poDeliveryDateOf(res.data.settings, {
         supplierId: group.proposal.supplierId,
         category: group.proposal.category,
-        fromIso: todayIso(),
+        poDateIso: todayIso(),
       }),
       procurement_partner_id: partnerId,
       so_refs: soRefs,

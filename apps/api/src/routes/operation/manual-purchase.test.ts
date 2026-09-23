@@ -125,10 +125,7 @@ function makeSb(rpc: ReturnType<typeof vi.fn>, mayIssue = true) {
         case "purchase_demands":
           return tableStub(LINES, { filterInBy: "request_id" });
         case "product_skus":
-          return tableStub([
-            { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
-            { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
-          ]);
+          return tableStub(SKUS);
         case "suppliers":
           return tableStub([{ id: SUP, kind: "own_logistics" }]);
         case "warehouses":
@@ -145,6 +142,19 @@ function makeSb(rpc: ReturnType<typeof vi.fn>, mayIssue = true) {
     }),
   } as unknown as ReturnType<typeof userClient>;
 }
+
+/** Catalog's own rows. `cost` is a fixture a test may empty: a SKU with no
+ *  recorded price is ISSUED, carrying no commercial claim (owner instruction
+ *  2026-09-23). */
+const SKUS: Array<{
+  sku: string;
+  supplier_id: string;
+  cost: number | null;
+  product_models: { category: string };
+}> = [
+  { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+  { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+];
 
 /** ⭐ THE PRICES THE OPERATOR REVIEWED (0380). Every issue declares them now;
  *  there is no "let the server read Catalog" path left. */
@@ -221,6 +231,83 @@ describe("POST /purchasing/requests/issue — the reason rides to the authority"
     expect(res.status).toBe(200);
     const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
     expect(pos).toHaveLength(2);
+  });
+
+  it("⭐ A LINE WITH NO RECORDED PRICE IS ISSUED, CARRYING NO COMMERCIAL CLAIM", async () => {
+    /**
+     * ⛔ THE GATE THIS REPLACES (owner instruction 2026-09-23). A SKU whose
+     * Catalog price was not set refused the whole issue with `cost_required`,
+     * so goods that were needed — and a purchase the approver had already
+     * decided to make — could not be ordered until somebody typed a number.
+     * Price and financial approval are NOT placement gates.
+     *
+     * The line goes out stating the ABSENCE: no cost, no cost source, no
+     * treatment. `normal` would claim a number nobody recorded.
+     */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const priced = SKUS[0]!.cost;
+    SKUS[0]!.cost = null;
+    try {
+      const res = await issue(
+        { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+        rpc,
+      );
+      expect(res.status).toBe(200);
+      const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+      const lines = pos[0].lines as Array<Record<string, unknown>>;
+      const unpriced = lines.find((l) => l.sku === "5539-2NA")!;
+      expect(unpriced.cost).toBeNull();
+      expect(unpriced.cost_source).toBeNull();
+      expect(unpriced.commercial_treatment).toBeNull();
+      expect(unpriced.expected_catalog_cost).toBeNull();
+      /* And the SKU that IS priced keeps every existing rule. */
+      const stillPriced = lines.find((l) => l.sku === "5539-CNR")!;
+      expect(stillPriced.cost).toBe(400);
+      expect(stillPriced.commercial_treatment).toBe("normal");
+    } finally {
+      SKUS[0]!.cost = priced;
+    }
+  });
+
+  it("no production number, no PO date — and the purchase order is still raised", async () => {
+    /* The PO's own delivery date rests on the Settings production number. With
+       none recorded the document is born with NO date and the paper prints the
+       governed absence; a guessed date would be read downstream as a
+       measurement (P1's law). The goods matter more than the estimate, so the
+       order still goes out. */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      productionDays: [],
+    } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect(pos.every((po) => po.eta_date === null)).toBe(true);
+  });
+
+  it("answers with the issued documents in the shape the shared review reads", async () => {
+    /* `Review Purchase Orders` is ONE surface for both buying lanes, and the
+       evidence step after an issue reads `pos` — so this door answers with the
+       same array the SO Batch door answers with. Issue is still not send. */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      poIds: string[];
+      pos: Array<Record<string, unknown>>;
+    };
+    expect(body.poIds).toEqual(["PO-9001"]);
+    expect(body.pos).toHaveLength(1);
+    expect(body.pos[0]).toEqual(
+      expect.objectContaining({ id: "PO-9001", supplierId: SUP }),
+    );
   });
 
   it("an undecided approval-required request is refused before anything is built", async () => {

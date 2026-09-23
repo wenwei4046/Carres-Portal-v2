@@ -4742,6 +4742,15 @@ export interface PurchaseRequestLineRow {
   /** Derived by the server from the linked PO's posted receipt (the
    *  Observation Law) — never a button anywhere. */
   received?: boolean;
+  /**
+   * ⭐ THE PO DELIVERY DATE THIS LINE WOULD BE ISSUED WITH (owner instruction
+   * 2026-09-23) — `PO Date + n Settings working days` for this line's supplier
+   * and category, computed by the SERVER with `poDeliveryDateOf` so the draft
+   * paper shows the date the document will actually carry. Absent, or null
+   * when no production number is recorded: the draft then prints the governed
+   * absence rather than a guess.
+   */
+  po_delivery_date?: string | null;
   /** The CATALOG's category for this line's SKU (`product_models.category`,
    *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
    *  `null` when Catalog has no category for the SKU. */
@@ -4813,7 +4822,13 @@ export interface ManualPurchaseRegisterPayload {
     delivery_city?: string | null;
     delivery_state?: string | null;
   }>;
-  destinations: Array<{ id: string; name: string }>;
+  /**
+   * The governed destinations, with the ADDRESS the supplier's paper prints
+   * (owner instruction 2026-09-23). The draft on `Review Purchase Orders`
+   * renders the real PO template, so a destination without its address is a
+   * preview of a different document.
+   */
+  destinations: Array<{ id: string; name: string; address?: string | null }>;
   /** The governed standing Deliver To (MASTER §5.4) — null means none is set. */
   defaultDestinationId?: string | null;
   /** The factory-collection rule per collected supplier, from Purchasing
@@ -4821,7 +4836,17 @@ export interface ManualPurchaseRegisterPayload {
    *  Deliver To to it; the Register refuses an issue that disagrees with it
    *  before the server does. */
   supplierCollections?: PurchasingSupplierCollectionSetting[];
-  suppliers: Array<{ id: string; name: string; kind?: string | null }>;
+  /** The suppliers Purchasing may buy from, with the ADDRESS the PO prints
+   *  and the doors the evidence step reaches them through. */
+  suppliers: Array<{
+    id: string;
+    name: string;
+    kind?: string | null;
+    address?: string | null;
+    whatsappGroupUrl?: string | null;
+    contactEmail?: string | null;
+    contact?: string | null;
+  }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
    *  `purchasing_approver` Duty holder(s) by name, falling back to
@@ -4954,7 +4979,23 @@ export function useIssuePurchaseRequests() {
       requestIds: string[];
       together: boolean;
     }) =>
-      apiFetch<{ poIds: string[]; documents: number }>(
+      apiFetch<{
+        poIds: string[];
+        documents: number;
+        /* The issued documents in the shape the shared review's evidence step
+           reads (owner instruction 2026-09-23). Absent from an older Worker:
+           the surface then offers no doors rather than inventing any. */
+        pos?: Array<{
+          id: string;
+          supplierId: string;
+          supplierName: string | null;
+          destinationId: string;
+          destination: string | null;
+          whatsappGroupUrl?: string | null;
+          contactEmail?: string | null;
+          contact?: string | null;
+        }>;
+      }>(
         "/api/operation/purchasing/requests/issue",
         { method: "POST", body: JSON.stringify(input) },
       ),

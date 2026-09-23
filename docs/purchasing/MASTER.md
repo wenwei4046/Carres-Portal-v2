@@ -494,9 +494,15 @@ does not decide it.
 
 ### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
 
-**PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22). BUILT for the Manual
-Purchase issue door in CARD 13 (`poDeliveryDateOf`); the SO Batch door still owes
-the same convergence — see §9.2's named gap.**
+**PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22). BUILT on BOTH issue doors
+(`poDeliveryDateOf`): Manual Purchase in CARD 13, SO Batch Purchase in CARD 13-B
+(2026-09-23). Neither door adds transit days any more. What the convergence did
+NOT touch, deliberately: the customer arrival projection
+(`purchasing_project_line_etas`, which reads supplier replies, not this date) and
+every PO already issued — `official_delivery_date` is stamped once at birth and no
+UPDATE may move it (0428). A missing production number withholds the date rather
+than guessing one; in the SO Batch lane that absence cannot even reach the door,
+because a demand without it never becomes ready to order.**
 The single-PO label is `PO {n}-Day Delivery Date`; the register column remains
 `PO Delivery Date`. `n` is exactly the applicable working-day value from Settings
 recorded for that PO: Settings 14 means 14 working days, Settings 10 means 10.
@@ -1725,6 +1731,52 @@ changed, not an alternative approved calculation. Do not rewrite historical POs.
 `No PO yet`, never a blank, a dash, or `Not ordered yet`. Failed/unknown lineage
 still uses its own loading/error state and never asserts that no PO exists.
 `manualPurchasePoSummary([])` is the one place the word lives.
+
+**PRICE IS NOT A PLACEMENT GATE — owner instruction 2026-09-23, BUILT (CARD 13-B,
+migration 0573).** A purchase order may be issued for a line whose Catalog price is NOT
+RECORDED. The line goes on the document stating the absence — no cost, no cost source, no
+commercial treatment — which is the one state `purchase_order_lines`' own CHECK keeps for
+it; `normal` would claim a number nobody recorded and `free_of_charge` a decision nobody
+made. Recording the price later is Finance's own act, not a re-issue: the number and the
+document do not change.
+
+- What is deliberately UNCHANGED: the MPR's own necessity approval (every request still
+  needs it, 0522 + owner selection A), the `free_of_charge` reason rule, the
+  commercial-approval path for a price that IS recorded, and every table constraint.
+- Half a commercial fact still refuses by name: a cost with no treatment, or a treatment
+  with no cost, raises `cost_required` / `commercial_treatment_required` exactly as before.
+- 🟡 **NAMED GAP — the SO Batch door still refuses `cost_required`**
+  (`apps/api/src/routes/operation/to-order.ts`). 0573 makes the database accept an absent
+  price from either lane; that lane's API still demands one and owes the same convergence.
+  It is not changed here because its commercial review surface declares prices per
+  document, which is a different journey from Manual Purchase's.
+
+**ONE REVIEW SURFACE FOR BOTH BUYING LANES — owner instruction 2026-09-23, BUILT
+(CARD 13-B).** `Review Purchase Orders` is `so-batch/SoBatchIssueWorkspace`, used by SO
+Batch Purchase AND Manual Purchase (Law C: a door, never a duplicate). CARD 13's own
+`ManualPurchaseIssueWorkspace` is DELETED — it was a second implementation of one surface.
+
+- The lanes do not share an AUTHORITY, and the surface does not pretend they do: it takes
+  the lane's own `onIssue`, so Manual Purchase's door keeps the MPR approval, the
+  remaining-quantity check and the source validation.
+- `manual-purchase-review.ts` turns the selection into that surface's documents through the
+  shared five-fact partition. A line's Source column prints its `MPR No`, and the
+  requester's `Purchase requirement` shows under the item.
+- The draft paper carries the facts the SERVER resolved: the supplier's address, the
+  destination's address and the PO Delivery Date the door will stamp (`po_delivery_date` on
+  the register's own line read). A preview missing those three is a preview of a different
+  document. The browser computes no date and invents no address.
+- After issuing, the shared evidence step follows for both lanes: the Manual Purchase door
+  now answers with the same `pos` array (number, parties, the supplier's own doors). Issue
+  is still not send.
+
+🔴 **A MIXED SELECTION USED TO OVER-ISSUE — FIXED (CARD 13-B).** The wire carried the
+chosen lines only when EVERY selected request had been narrowed; otherwise it sent nothing
+and the door bought everything still open. One request ticked whole beside another narrowed
+to one of its goods therefore BOUGHT the unticked goods, and `Issue {n} PO(s)` counted them.
+`manualPurchaseSelectedWalls` resolves the exact lines once, and the sentence, the documents
+and the wire are all derived from that one list. The wire now NAMES its demand ids every
+time; an explicitly emptied choice is never widened back into "all of them".
 
 **REVIEW PURCHASE ORDERS BEFORE ISSUE — BUILT (CARD 13), owner ruling 2026-09-22.**
 `Issue PO` on the Register opens the same 50/50 review surface SO Batch Purchase
