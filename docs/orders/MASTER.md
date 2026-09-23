@@ -139,11 +139,11 @@ amendment preserves that number. Search by the base reference must make its vers
 without requiring the parentheses. This is approved target presentation, not a claim of shipped
 behavior. Historical issued PDFs remain preserved.
 
-**RULING / APPROVED — SO base format, 2026-09-23.** Jess approved `SOYYMM-NNNNN`,
-for example `SO2609-48271`: year and month of original order creation plus a fixed five-digit
-random decimal suffix. Leading zeros are allowed (`00000` through `99999`), providing 100,000
-possible SO references per calendar month. Display the original as `SO2609-48271(1)` and the
-second version as `SO2609-48271(2)`. Amendment never changes the base reference or its original
+**RULING / APPROVED — SO base format, 2026-09-23.** Jess approved `SOYYMM-NNNN`,
+for example `SO2609-4827`: year and month of original order creation plus a fixed four-digit
+random decimal suffix. Leading zeros are allowed (`0000` through `9999`), providing 10,000
+possible SO references per calendar month. Display the original as `SO2609-4827(1)` and the
+second version as `SO2609-4827(2)`. Amendment never changes the base reference or its original
 year/month, including amendments made in a later month. The encoded month is not the delivery,
 receipt, warranty-start, or amendment month; use the actual governed dates for those purposes.
 
@@ -154,7 +154,7 @@ order numbers and historical issued documents. Search by the base reference make
 available without requiring a revision suffix.
 
 **Acceptance boundary / limitations.** Capacity is finite and must be monitored before exhaustion;
-100,000 per month is not a verified forecast or an unlimited guarantee. Fixed random references
+10,000 per month is not a verified forecast or an unlimited guarantee. Fixed random references
 conceal a running counter, not every inference from transaction activity, and are never
 authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
 does not authorize sending SO numbers to suppliers.
@@ -168,7 +168,10 @@ production writes, migration or cutover in this PLAN lane.
 
 **RULING / APPROVED REQUIREMENT — business-identifiable numbering, 2026-09-23.** Jess requires
 Outright and Subscription business document numbers to be visibly distinguishable at a glance.
-The approved SO format remains the Outright target. Exact Subscription prefixes and the scope
+The approved SO format remains the Outright target. Jess subsequently specified four random
+digits for lower-volume Outright and five for higher-volume Subscription. This changes Outright
+SO and DO capacity to 10,000 references per family per month, including leading zeros; monitor
+each family separately, since DO volume may exceed SO volume. Exact Subscription prefixes and the scope
 across shared document families remain to be approved; do not treat the earlier DO format as
 approval for indistinguishable numbering across both businesses. This requirement does not
 create a second physical Unit identity, rename existing documents or authorize implementation.

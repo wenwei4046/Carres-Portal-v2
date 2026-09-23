@@ -4215,9 +4215,9 @@ the proposal; `Reject` never is.
 
 ## SO document identity and revision — owner approved 2026-09-23
 
-The approved target SO reference is `SOYYMM-NNNNN` (original creation year/month, five fixed
+The approved target SO reference is `SOYYMM-NNNN` (original creation year/month, four fixed
 random decimal digits, including leading zeros). Display its revision immediately afterwards,
-without a space: `SO2609-48271(1)`, `SO2609-48271(2)`. The original shows `(1)`; the revision
+without a space: `SO2609-4827(1)`, `SO2609-4827(2)`. The original shows `(1)`; the revision
 suffix is not part of the permanent base reference. Do not display `Rev 1`, `V1` or `-1` as
 the SO revision suffix. Within a cancelled-line status, retain the cancellation word and use
 `Cancelled · ({n})` for the revision reference. This records approved target copy, not shipped

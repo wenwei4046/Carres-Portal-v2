@@ -173,19 +173,19 @@ leg's arrangement carries its partner and its agreed day and the order's money a
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
-- **Numbering — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23:** `DOYYMM-NNNNN`,
-  for example `DO2609-48271`. Use the original DO issue year/month and five fixed random decimal
-  digits, allowing leading zeros (`00000`–`99999`). Allocate independently of SO and other document
+- **Numbering — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23:** `DOYYMM-NNNN`,
+  for example `DO2609-4827`. Use the original DO issue year/month and four fixed random decimal
+  digits, allowing leading zeros (`0000`–`9999`). Allocate independently of SO and other document
   families; matching suffixes imply no relationship. Authoritative source links carry lineage.
   Enforce uniqueness across distinct DOs and do not reuse void numbers. A retry, refresh or
   reprint returns the SAME number; a rebooked trip is a NEW document on its own issue date under
   the existing lifecycle below. This numbering ruling adds no new void or rebooking policy.
-  Preserve all existing DO numbers and historical documents. Capacity is 100,000 DO numbers per
+  Preserve all existing DO numbers and historical documents. Capacity is 10,000 DO numbers per
   issue month, not a guarantee that every future volume fits; monitor headroom before exhaustion
   and do not silently increase length based on volume. This scoped PLAN approval authorizes no
   application changes, production migration or cutover.
 - **Business distinction — APPROVED REQUIREMENT, 2026-09-23:** Outright and Subscription DO
-  references must be visibly distinguishable. `DOYYMM-NNNNN` remains the Outright target;
+  references must be visibly distinguishable. `DOYYMM-NNNN` remains the Outright target;
   the Subscription prefix is pending approval. Shared delivery ownership and physical Unit
   identities remain unchanged; no legacy DO renumbering is authorized.
 - **Measured implementation gap:** the existing order-id-derived four-digit daily number can
