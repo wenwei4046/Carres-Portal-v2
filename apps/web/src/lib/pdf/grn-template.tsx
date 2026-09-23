@@ -90,7 +90,9 @@ const styles = StyleSheet.create({
   th: { fontSize: 6.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(6) },
   colCat: { width: mm(20) },
-  colQty: { width: QTY_W, textAlign: "right", paddingRight: mm(1) },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5) — five quantity columns included.
+  colQty: { width: QTY_W, textAlign: "center" },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 7, color: GREY, width: mm(6), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
@@ -99,7 +101,7 @@ const styles = StyleSheet.create({
   descSku: { fontSize: 7, color: GREY, marginTop: mm(0.6), lineHeight: 1.15 },
   unitLine: { fontSize: 6.8, color: GREY, marginTop: mm(0.5), paddingLeft: mm(2), lineHeight: 1.25 },
   cellCat: { fontSize: 7, color: GREY, width: mm(20), lineHeight: 1.3 },
-  cellQty: { fontSize: 7.5, width: QTY_W, textAlign: "right", paddingRight: mm(1), lineHeight: 1 },
+  cellQty: { fontSize: 7.5, width: QTY_W, textAlign: "center", lineHeight: 1 },
 
   // ── evidence + extra goods ──
   noteBlock: { marginTop: mm(3), paddingHorizontal: mm(4) },
@@ -126,6 +128,7 @@ const styles = StyleSheet.create({
 export function GrnTemplate(data: GrnTemplateData) {
   const {
     grn_no,
+    grn_doc_date,
     source,
     supplier,
     supplier_do_no,
@@ -142,9 +145,15 @@ export function GrnTemplate(data: GrnTemplateData) {
   } = data;
 
   const detailRows: Array<[string, string | null]> = [
+    // This document's OWN date leads, as `SO Doc Date` and `PO Doc Date` do on
+    // their papers (DOCUMENT-KIT.md §4). `Goods received on` further down is a
+    // different question — when the goods physically arrived.
+    ["GRN Doc Date", niceDate(grn_doc_date)],
     [source.is_consignment ? "CO No" : "PO No", source.po_number],
     ["Supplier", supplier.name],
-    ["Supplier DO No.", supplier_do_no],
+    // No full stop: every other number label in the family is bare
+    // (`PO No` · `DO No` · `SO No` · `GRN Doc Date`).
+    ["Supplier DO No", supplier_do_no],
     ["Deliver To", deliver_to],
     ["Goods arrived at", goods_arrived_at],
     ["Goods received on", niceDate(goods_received_on)],

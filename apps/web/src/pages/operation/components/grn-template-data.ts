@@ -109,6 +109,7 @@ export function grnTemplateDataOf(
 
   return {
     grn_no: receivingDisplayNo(r),
+    grn_doc_date: r.posted_at ?? null,
     status_label: warehouseReceiptStatusLabel(r.status),
     source: {
       po_number: r.po_id ?? "",

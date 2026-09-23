@@ -78,7 +78,9 @@ const styles = StyleSheet.create({
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(27) },
-  colQty: { width: mm(10), textAlign: "right" },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). Money stays right-aligned.
+  colQty: { width: mm(10), textAlign: "center" },
   colPrice: { width: mm(25), textAlign: "right" },
   colDisc: { width: mm(24), textAlign: "right" },
   colAmount: { width: mm(25), textAlign: "right" },
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   cellCode: { fontSize: 7.5, width: mm(27), paddingRight: mm(2), lineHeight: 1 },
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
-  cellQty: { fontSize: 7, width: mm(10), textAlign: "right", lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(10), textAlign: "center", lineHeight: 1 },
   cellMoney: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   cellAmount: { fontSize: 7, fontWeight: 700, textAlign: "right", lineHeight: 1 },
 
@@ -296,7 +298,7 @@ export function InvoiceTemplate(data: InvoiceTemplateData) {
                   <View style={styles.desc}>
                     <Text style={styles.descMain}>{line.description}</Text>
                   </View>
-                  <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                  <Text style={styles.cellQty}>
                     {line.qty}
                   </Text>
                   <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>

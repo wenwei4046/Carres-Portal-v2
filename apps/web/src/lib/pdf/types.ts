@@ -272,6 +272,12 @@ export type PoTemplateData = {
  */
 export type GrnTemplateData = {
   grn_no: string;
+  /** ISO — the date THIS document was created, i.e. when the numbered GRN was
+   *  posted (`warehouse_receipts.posted_at`). Every Carres document prints its
+   *  own `{DOC} Doc Date` (owner 2026-09-23, DOCUMENT-KIT.md §4), and it is NOT
+   *  `goods_received_on`: goods can arrive on Friday and be counted into a
+   *  numbered GRN on Monday. Null while the receipt is not yet posted. */
+  grn_doc_date: string | null;
   /** `Valid` | `Cancelled` — the document status words. */
   status_label: string;
   /** The linked source document — a PO, or a CO when consignment. */

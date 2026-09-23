@@ -91,8 +91,13 @@ FOOTER   fixed on every page: {doc no} · {audit actor} | the legal sentence |
    consecutive Units collapse to `first to last`, COMPUTED from the codes, and
    a gap starts a new line. Never a range that hides a gap.
 5. **A quantity is a count: centred, one weight.** Money is right-aligned.
-   *(Owner 2026-09-22. 🔴 GAP: the PO obeys this; the SO, DO and Invoice still
-   print QTY right-aligned and bold — fix with their next build.)*
+   *(Owner 2026-09-22. CLOSED 2026-09-23 — every goods document obeys it:
+   PO · Sales Order · Delivery Order · GRN · Tax Invoice / Payment Request.
+   The GRN was missing from the original gap list and was right-aligned too;
+   its five quantity columns are centred with the rest. Bold belongs to the
+   TOTAL row alone — `Qty > 1 prints bold` is retired, and
+   `quantity-is-a-count.test.ts` fails the build if right-alignment or a bold
+   body quantity returns.)*
 6. **A column prints only when it has something to say.** Order and Received
    always print; Damaged · Wrong Item · Extra · Pending appear only when a row
    carries a number. When none do, ONE line says so — absence is a sentence,

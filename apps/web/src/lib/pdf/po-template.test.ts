@@ -116,11 +116,15 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   });
 
   it("carries the dictionary's words, and not the retired ones", () => {
-    for (const s of ["PO Date", "Delivery Method", "PO TOTAL", "TOTAL", "Unit ID", "SO No",
+    for (const s of ["PO Doc Date", "Delivery Method", "PO TOTAL", "TOTAL", "Unit ID", "SO No",
       "Computer-generated document · No signature required.", "Top view. Back at the top. TV in front."]) {
       expect(SRC, s).toContain(s);
     }
-    for (const retired of ["Deliver by", "Issued\"", "PO Doc Date", "Supplier Default", "Multiple destinations"]) {
+    // `PO Date` joined this list on 2026-09-23: every document's own date reads
+    // `{DOC} Doc Date` (owner ruling; DOCUMENT-KIT.md §4). It swapped places
+    // with `PO Doc Date`, which the 2026-09-22 text had wrongly called retired
+    // while its own row order printed it.
+    for (const retired of ["Deliver by", "Issued\"", "\"PO Date\"", "Supplier Default", "Multiple destinations"]) {
       expect(CODE, retired).not.toContain(retired);
     }
     // `(1 of 2)` on a Deliver To heading is retired; the footer's `Page n of m` stays.

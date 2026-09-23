@@ -290,7 +290,7 @@ export function PoTemplate(data: PoTemplateData) {
     data.delivery_method === "we_collect" ? "We collect" : data.delivery_method === "supplier_delivers" ? "Supplier delivers" : null;
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", draft ? "Assigned when issued" : poId],
-    ["PO Date", draft ? null : poPrintDate(issue_date)],
+    ["PO Doc Date", draft ? null : poPrintDate(issue_date)],
     [daysLabel, deliveryValue, true],
     ["Delivery Method", methodValue],
   ];

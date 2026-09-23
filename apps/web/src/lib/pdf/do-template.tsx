@@ -91,7 +91,10 @@ const styles = StyleSheet.create({
   colCode: { width: mm(30) },
   colUnit: { width: mm(26) },
   colPo: { width: mm(22) },
-  colQty: { width: mm(18), textAlign: "right", paddingRight: mm(5) },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). The 5mm right inset went with the
+  // right-alignment it existed to soften.
+  colQty: { width: mm(18), textAlign: "center" },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -109,7 +112,7 @@ const styles = StyleSheet.create({
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
   cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
   cellPo: { fontSize: 7, color: GREY, width: mm(22), lineHeight: 1.3 },
-  cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(18), textAlign: "center", lineHeight: 1 },
 
   // ── sofa layout drawing (ported from po-template — direction contract) ──
   layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
@@ -380,7 +383,7 @@ export function DoTemplate(data: DoTemplateData) {
                     <Text style={styles.cellPo}>
                       {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
                     </Text>
-                    <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                    <Text style={styles.cellQty}>
                       {line.qty}
                     </Text>
                   </View>
