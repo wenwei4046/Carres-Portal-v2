@@ -585,17 +585,20 @@ answer exists for that version.
 
 ### 6.1 Formal document numbers
 
-**PO — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23.** New POs use `POYYMMDD-NNNN`,
+**PO — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23.** Outright POs use `POYYMMDD-NNNN`; Subscription POs use `SPOYYMMDD-NNNN`,
 for example `PO260924-4827(1)`: original Malaysia issue date (year/month/day) plus four fixed random decimal digits,
 including leading zeros. The original displays `(1)`, subsequent approved revisions `(2)`, etc.,
 immediately after the base reference without a space. Amendment preserves the base reference and
-original date. Outright and Subscription share one PO numbering family; line-level source links
-and existing supplier/destination/category grouping rules still decide what may share a PO.
-PO has its own independent daily pool of 10,000 references (`0000`–`9999`), not shared with
+original date. Outright and Subscription are separate purchasing groups: one PO belongs to one
+business only, even when both buy from the same supplier. Preserve line-level source links; apply
+existing supplier/destination/category grouping rules within each business group. Do not assign
+unclassified shared replenishment arbitrarily to a business; its ownership remains a planning gap.
+PO and SPO each have an independent daily pool of 10,000 references (`0000`–`9999`), not shared with
 GRN, bills, vouchers or other document families; enforce uniqueness, never reuse void
 numbers and monitor capacity internally without automatic digit-length changes. Preserve existing
 PO numbers and issued historical PDFs. This is numbering/display approval only, not application
-implementation, cutover or a change to amendment/business grouping rules.
+implementation, cutover or a change to amendment rules. Business separation is the approved
+grouping change; other purchasing conditions remain in force.
 
 **Other Purchasing document families retain the existing rule below unless separately re-ruled.**
 

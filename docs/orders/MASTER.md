@@ -173,6 +173,12 @@ are Outright `SOYYMM-NNNN` (four random digits), Subscription agreement `SUBYYMM
 no space; subsequent approved versions show `(2)`, etc. Subscription is governed by
 `docs/rental/MASTER.md`; both delivery families by `docs/delivery/MASTER.md` §3.1.
 With leading zeros, SO capacity is 10,000 per month; SUB, DO and SDO each have 100,000 per month.
+**Owner clarification: two business groups, not just two customer-document prefixes.** Outright
+and Subscription business documents must be separately identifiable, including procurement:
+`POYYMMDD-NNNN` for Outright and `SPOYYMMDD-NNNN` for Subscription. Never mix the businesses
+in one PO. Remaining document-family prefixes, shared operational records and finance treatment
+need one consolidated proposal; prior assistant suggestions to share all purchasing/finance
+numbers are not approved authority. Shared Unit identity remains the owner's explicit exception.
 Allocate each family independently. Capacity notifications are internal only and never trigger
 automatic length changes, including at a month boundary. No 3,000-document threshold has been
 approved. Shared physical Unit identity, existing document numbers and historical documents

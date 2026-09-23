@@ -11,8 +11,10 @@ original creation year/month and five fixed random decimal digits, including lea
 Show the version immediately after the base reference without a space: `(1)` for the original,
 `(2)` for the second approved version, etc. Amendment preserves the base reference and its
 original month; this display ruling adds no new amendment approval or eligibility workflow.
+Subscription procurement uses `SPOYYMMDD-NNNN`, independently numbered from Outright PO;
+a purchase order belongs to one business only (Purchasing MASTER §6.1).
 Subscription deliveries use `SDOYYMM-NNNNN`, governed by `docs/delivery/MASTER.md` §3.1.
-Each prefix has an independent 100,000-reference monthly pool, with enforced uniqueness and
+SUB and SDO each have an independent 100,000-reference monthly pool, with enforced uniqueness and
 no reuse of void references. Capacity alerts are internal; no automatic length increase or
 3,000-document threshold is approved. Preserve existing RA identities and issued documents.
 The subscription agreement remains separate from an Outright SO. Shared physical Units retain
