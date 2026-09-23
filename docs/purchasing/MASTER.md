@@ -65,7 +65,7 @@ ERP Architecture, Service MASTER and claim wording in the Copy Standard.
 There are not two genuine Carres operating models.
 
 - A Sales Order creates a system purchase demand only for the uncovered quantity.
-- A person starts a non-SO buy in `Manual Purchase`; approval creates the same governed purchase
+- A person starts a non-SO buy in `Manual Purchase Request`; approval creates the same governed purchase
   demand truth.
 - There is no `Emergency`, `Urgent` or `Unknown` Manual Purchase purpose, question, queue or special
   PO door. Manual Purchase carries `Proceed Date` and `Delivery Date`: Proceed Date is the actual
@@ -76,7 +76,7 @@ There are not two genuine Carres operating models.
   cannot mark goods as ordered.
 - `purchase_demand` remains the canonical line-level need and coverage remainder, but it is not a
   staff destination and has no separate sidebar page.
-- `SO Batch Purchase` and `Manual Purchase` are the two operator doors. `Purchase Orders` is the
+- `SO Batch Purchase` and `Manual Purchase Request` are the two operator doors. `Purchase Orders` is the
   formal supplier commitment register.
 
 Therefore the Manual Purchase relationship, demand truth and PO ownership are **RESOLVED FROM
@@ -149,7 +149,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 | Major capability | CURRENT CARRES | 2990 / MATURE ERP LESSON | Decision | RECOMMENDED CARRES BUSINESS FLOW | OPERATOR JOURNEY | UI / PAGE / OBJECT PLACEMENT | CROSS-MODULE CONNECTION |
 |---|---|---|---|---|---|---|---|
 | SO buying | Staff rely on Sales messages and personal memory | 2990 computes SO/MRP need and groups supplier lines | **ADAPT + IMPROVE** | SO uncovered quantity becomes demand; stock/PO coverage reduces it; ready lines batch by supplier | Open dated work, fix named blockers, set/split `Supplier Deliver To`, issue | `SO Batch Purchase` Register + row inspector + issue surface | Sales Order source; Stock coverage; Delivery required-arrival date |
-| Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create Manual Purchase; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
+| Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create a Manual Purchase Request; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase Request` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
 | Purchase demand | Staff may confuse “need” with a document to send | 2990 recomputes need; mature ERP keeps requisition/demand separate from PO | **KEEP + RELOCATE** | One hidden canonical line record stores required, covered, ordered and remaining quantity | Staff see demand facts through the correct work door; never create/send a demand document | No sidebar page; read in SO Batch, Manual Purchase, PO and Order Route | Source object creates/reduces/cancels demand; PO allocation covers it |
 | Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Goods Receipt, Stock, Finance read-only |
 | Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
@@ -244,7 +244,7 @@ exists.
 
 ### 5.2 Two input doors
 
-`SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase` is conscious
+`SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase Request` is conscious
 internal intent under the owner-approved purpose vocabulary (rulings 2026-08-28 Card 03 /
 2026-08-29 Card 04) — exactly `Ready Stock` · `Showroom Display` · `Service Case` ·
 `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase`, with Management included
@@ -656,6 +656,16 @@ by the number's tail with no `split_part` left in it.
   `PO260924-4827(1)` **57.5mm**, `PO260924-4827(10)` 61.2mm. The new form is 10.4mm NARROWER, so
   the left column grows from 97.1mm to 107.5mm and the company name row (87.6mm) keeps 19.9mm
   instead of 9.5mm.
+- 🟡 **THE FOUR-DIGIT WIDTH IS HARD IN THREE PLACES, NOT ONE** (found by the Sales Orders lane
+  reviewing 0574, 2026-09-23). 0574 made the SHAPE one decision; the WIDTH is still spread:
+  the table's `check (code ~ '^\d{4}$')` (0381), `formal_document_code_text` knowing only `PO`
+  (0574), and — the one that bites — `allocate_formal_document_code` itself still drawing
+  `lpad((floor(random() * 10000))::int::text, 4, '0')`. That draw is ONE function serving every
+  prefix, so widening it for a five-digit prefix silently re-shapes `PO` too and the table's own
+  CHECK then rejects what it drew. **A wider prefix needs the width to become PER-PREFIX, exactly
+  as the key did in 0574 — never a bigger constant.** This matters the moment the approved
+  pool-shaped `DO2609-48271` lands; `docs/carry-forwards.md`'s `do-number-collision` entry carries
+  the same warning with the symptom-to-place map.
 - 🔴 **OWED: the authenticated walk** — a real PO issued after 0574, wearing the new number, with
   its pool row claimed and the printed paper read end to end. A green test suite and a converged
   SHA prove the code shipped, not that a supplier can read the paper.
@@ -2020,8 +2030,9 @@ Issue PO disabled until verified; unknown never means zero or complete.
 Pending and sent-back requests remain in `Need approval`; a stock-reference count of zero
 needed does not bypass approval. Partial purchasing stays in `Need PO` while approved demand
 remains. Search and filters cover all groups and expand a group containing a match. Footer
-shows one total, including collapsed rows: `{n} Manual Purchases`, `1 Manual Purchase`, or
-`{n} of {m} Manual Purchases` after filtering. Group counts use the same request population.
+shows one total, including collapsed rows: `{n} Manual Purchase Requests`,
+`1 Manual Purchase Request`, or `{n} of {m} Manual Purchase Requests` after filtering
+(screen renamed by the owner 2026-09-23; BUILT in CARD 14). Group counts use the same request population.
 Use earliest Order By first for pending/buying work, undated `Not planned` after dated rows,
 then newest Proceed Date; the lower history group uses newest Proceed Date. Header sorting
 acts within groups. Search, column filters and export retain accurate source values.
@@ -2049,7 +2060,7 @@ SKU code. Historical `MPR-…` values stay as they are; historical `REQ-####` va
 `PO No` lists every resulting PO (`No PO yet` before any PO), each opening its own PO; one row remains one
 request. Customer and supplier facts use the shared dictionary. Existing groups and sorting stay.
 
-**Customer columns on a Manual Purchase — build note.** Manual Purchases serve the governed purposes
+**Customer columns on a Manual Purchase Request — build note.** Manual Purchase Requests serve the governed purposes
 (`Ready Stock`, `Showroom Display`, `Service Case`, …); most have no customer. Those rows show the
 customer columns blank, never an invented customer; a customer appears only where the purpose's
 structured record names one.
@@ -2305,11 +2316,11 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
 
 - **Object Header** — the shared object identity header (the Sales Order / Delivery Order
-  implementation, Law C): one back destination `Manual Purchase` that restores the complete
+  implementation, Law C): one back destination `Manual Purchase Request` that restores the complete
   Register state the operator left (the grid stays mounted underneath — rail filters, search,
   column filters, sort, scroll and expansion survive); the business heading
   `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context
-  (MPR No is visible; no UUID, and a browser title of `Manual Purchase — Carres`);
+  (MPR No is visible; no UUID, and a browser title of `Manual Purchase Request — Carres`);
   one derived
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
@@ -2405,7 +2416,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
   current PO version has confirmed-sent evidence. The action sentence carries no MPR, no
   person's name and no UUID; the row's context line distinguishes the purchase through its
-  business facts — `Manual Purchase · {Need for} · {For} · {supplier}` — while the Work
+  business facts — `Manual Purchase Request · {Need for} · {For} · {supplier}` — while the Work
   record stays distinct through its structured request UUID. Both deep-link the exact
   source (`?tab=manual-purchase&mp={uuid}`). Central Work retains these identities;
   the Register groups do not create a second task queue or manual Done action.
@@ -2422,7 +2433,7 @@ Object Header + Summary + Sections + History template. No tabs, no drawer, no sp
   a missing cron was never what was wrong.** `eta_date` is OUR production-plus-transit
   prediction (`expectedArrivalOf`), never a supplier-confirmed date and never a shipping date.
 
-**Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
+**Journey:** `+ Manual Purchase Request` → choose plain-language purpose → name the purpose's
 structured For object → enter goods/quantity/destination → system previews Proceed Date and
 defaults Delivery Date from Settings → Send records actual Proceed Date → approval → approved
 demand goes to PO Duty by Order By.
@@ -2482,7 +2493,7 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   **MPR is the Manual Purchase's visible identity again (owner ruling 2026-09-18, which overwrites
   Card 08 §3.5's 2026-09-04 retirement):** the request's own stored `purchase_requests.req_no`
   (`MPRYYMMDD-NNNN`, §6.1 / migration 0359) is READ and printed. A request with no stored number
-  keeps the governed label `Manual Purchase` and opens nothing — never a UUID, never a minted
+  keeps the governed label `Manual Purchase Request` and opens nothing — never a UUID, never a minted
   number. Manual sources still dedupe by request identity, never by label.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
 - **The three delivery-date columns are three columns, and one is NEVER filled in from another**
@@ -4417,7 +4428,7 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
+| Manual Purchase Request awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase Request · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
 | Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue PO` (same business context; distinct by request UUID) | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
 | Supplier has not confirmed the PO date | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka to confirm the PO delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact sent PO version |

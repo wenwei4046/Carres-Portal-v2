@@ -1216,7 +1216,7 @@ Manual Purchase uses its own request groups and remainder arithmetic.
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
-`PURPOSE` (Manual Purchase), `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
+`PURPOSE` (Manual Purchase Request), `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
 2026-09-11; `PRODUCT`, `SUPPLIER` and `REGION` on SO Batch Purchase too). The `All …` word is the
 control's first option and its clear; every governed value stays present as an option; the
 count rides in the option text (`Ohana · 4`). `ORDER TIMING` and
