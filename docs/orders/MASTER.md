@@ -132,7 +132,7 @@ application code, or another module's identity rules. Existing implementation re
 not proof that the privacy requirement is satisfied.
 
 **RULING / APPROVED — revision presentation, 2026-09-23.** Display the revision as a
-parenthesized number separated from the base SO reference by a space: `<SO reference> (1)` for
+parenthesized number immediately after the base SO reference, with no intervening space: `<SO reference>(1)` for
 the original, `(2)` for the second version, and so on. Do not use `Rev`, `V`, or a hyphen suffix
 for this presentation. The parenthesized revision is not part of the permanent order number;
 amendment preserves that number. Search by the base reference must make its versions available
@@ -142,8 +142,8 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — SO base format, 2026-09-23.** Jess approved `SOYYMM-NNNNN`,
 for example `SO2609-48271`: year and month of original order creation plus a fixed five-digit
 random decimal suffix. Leading zeros are allowed (`00000` through `99999`), providing 100,000
-possible SO references per calendar month. Display the original as `SO2609-48271 (1)` and the
-second version as `SO2609-48271 (2)`. Amendment never changes the base reference or its original
+possible SO references per calendar month. Display the original as `SO2609-48271(1)` and the
+second version as `SO2609-48271(2)`. Amendment never changes the base reference or its original
 year/month, including amendments made in a later month. The encoded month is not the delivery,
 receipt, warranty-start, or amendment month; use the actual governed dates for those purposes.
 
