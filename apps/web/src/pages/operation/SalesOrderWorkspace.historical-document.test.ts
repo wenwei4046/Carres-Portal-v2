@@ -100,16 +100,35 @@ describe("a historical Sales Order version's document", () => {
     expect(doc.so_number).toBe("SO-1319");
   });
 
-  /* ⚠️ MEASURED GAP, ASSERTED AS IT IS RATHER THAN AS IT SHOULD BE. The money
-     still rides from the live base, so `balance_due` is this version's goods
-     minus TODAY's payments — a figure that described no real moment. Payments
-     owns the money and the snapshot stores none, so the honest fix is a stored
-     historical position, not a second arithmetic on this page. This test pins
-     the CURRENT behaviour so the day it is fixed, it is fixed deliberately and
-     this expectation changes with it. */
-  it("KNOWN GAP: the money still comes from today, not from the version", () => {
+  /* ⭐ THE MONEY IS THE MONEY THAT HAD ARRIVED BY THEN — consolidated
+     2026-09-23. The builder still prints today's `paid` when nobody names a
+     moment (below), because a live document IS today. The page names the
+     version's own date, and then the same payments ledger is read with the
+     same arithmetic over the rows that had arrived by then: no invented
+     number, and never a receipt from after the version existed.
+     ⚠️ NAMED LIMIT, pinned here so the day it is closed it is closed
+     deliberately: a payment VOIDED or corrected later still reads as it reads
+     today. The real fix is a stored historical position (a schema change). */
+  it("with no moment named, prints today's money — a live document is today", () => {
     const doc = snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE);
     expect(doc.paid).toBe(1999.5);
     expect(doc.balance_due).toBe(4030 - 1999.5);
+  });
+
+  it("as at the version's own date, counts only the receipts that had arrived", () => {
+    const base = {
+      ...SIGNED_BASE,
+      paid: 1999.5,
+      payments: [
+        { date: "2026-08-02", amount: 999.5, method: "Transfer" },
+        { date: "2026-09-20", amount: 1000, method: "Transfer" },
+      ],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    const asAt = snapshotTemplateData(REV2_SNAPSHOT, base, undefined, { date: "2026-08-10" });
+    expect(asAt.paid).toBe(999.5);
+    expect(asAt.balance_due).toBe(4030 - 999.5);
+    const today = snapshotTemplateData(REV2_SNAPSHOT, base);
+    expect(today.paid).toBe(1999.5);
   });
 });
