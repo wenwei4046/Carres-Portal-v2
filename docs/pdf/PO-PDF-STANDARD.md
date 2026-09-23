@@ -46,7 +46,7 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 - **EVERY PAGE PRINTS THE SAME FULL HEADER, AND THE NUMBER CARRIES ITS
   VERSION — INCLUDING (1)** (owner, 2026-09-22; overrides, for the PO only,
   SO-PDF-STANDARD §3's one-line continuation header). Logo · `CARRES SDN.
-  BHD.` · SSM · the registered address · the hero **`PO2609-48271(2)`** 18/700
+  BHD.` · SSM · the registered address · the hero **`PO260924-4827(2)`** 18/700
   with `PURCHASE ORDER` beneath — identical on page 1, every continuation page
   and every Deliver To's pages. Between pages only the Deliver To, the goods
   and the footer's `Page n of m` change. The same `{PO reference}({n})` also prints in
@@ -111,7 +111,7 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   never `(1 of 2)` (owner, 2026-09-22: location, quantity and page number each
   say one thing). The footer's `Page 1 of 2` carries the page count. **Every page — first,
   continuation and every destination — prints the same full header with
-  the same `{PO reference}({n})`** (`PO2609-48271(2)`). Example: that PO = 4 mattresses for Klang
+  the same `{PO reference}({n})`** (`PO260924-4827(2)`). Example: that PO = 4 mattresses for Klang
   (page group 1) + 2 for AL (page group 2); still 6 on one PO — no second PO,
   no `Moved from` line, no new Unit IDs. A one-destination PO prints exactly
   as before.

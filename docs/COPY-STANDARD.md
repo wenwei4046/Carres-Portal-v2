@@ -4226,8 +4226,8 @@ in `docs/orders/MASTER.md`, External numbering privacy.
 
 ## PO number and version — owner approved 2026-09-23
 
-New PO target identity is `POYYMM-NNNNN`, including leading zeros. Display the original as
-`PO2609-48271(1)` and the second version as `PO2609-48271(2)`, with no space. Use this full
+New PO target identity is `POYYMMDD-NNNN`, including leading zeros. Display the original as
+`PO260924-4827(1)` and the second version as `PO260924-4827(2)`, with no space. Use this full
 identity wherever the document number and version appear together; a version-only reference
 may read `PO ({n})`. No separate V/Version suffix and no suppression of original `(1)`.
 Preserve historical issued documents. Scope and numbering capacity are governed by Purchasing

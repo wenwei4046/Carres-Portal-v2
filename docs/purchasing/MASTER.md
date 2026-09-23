@@ -261,7 +261,7 @@ vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (J
 overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
 (`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
 reused. It names the request, not a supplier document: the supplier still receives only the PO
-(approved target `POYYMM-NNNNN`; existing issued numbers remain unchanged), and one request may become several POs. Consignment Orders, Repair Orders and
+(approved target `POYYMMDD-NNNN`; existing issued numbers remain unchanged), and one request may become several POs. Consignment Orders, Repair Orders and
 other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
 `MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
 the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
@@ -366,9 +366,9 @@ Reason              [ ... ]
                            [Review changes]
 ```
 
-`Review changes` shows the result before anything is saved — example `PO2609-48271`, (1) → (2):
+`Review changes` shows the result before anything is saved — example `PO260924-4827`, (1) → (2):
 
-| PO2609-48271(2) | Deliver To | Qty |
+| PO260924-4827(2) | Deliver To | Qty |
 |---|---|---:|
 | Forte Mattress · King | Carres Klang Warehouse | 4 |
 | Forte Mattress · King | AL Sungai Buloh | 2 |
@@ -585,13 +585,14 @@ answer exists for that version.
 
 ### 6.1 Formal document numbers
 
-**PO — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23.** New POs use `POYYMM-NNNNN`,
-for example `PO2609-48271(1)`: original issue year/month plus five fixed random decimal digits,
+**PO — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23.** New POs use `POYYMMDD-NNNN`,
+for example `PO260924-4827(1)`: original Malaysia issue date (year/month/day) plus four fixed random decimal digits,
 including leading zeros. The original displays `(1)`, subsequent approved revisions `(2)`, etc.,
 immediately after the base reference without a space. Amendment preserves the base reference and
-original month. Outright and Subscription share one PO numbering family; line-level source links
+original date. Outright and Subscription share one PO numbering family; line-level source links
 and existing supplier/destination/category grouping rules still decide what may share a PO.
-The independent monthly pool holds 100,000 references; enforce uniqueness, never reuse void
+PO has its own independent daily pool of 10,000 references (`0000`–`9999`), not shared with
+GRN, bills, vouchers or other document families; enforce uniqueness, never reuse void
 numbers and monitor capacity internally without automatic digit-length changes. Preserve existing
 PO numbers and issued historical PDFs. This is numbering/display approval only, not application
 implementation, cutover or a change to amendment/business grouping rules.
