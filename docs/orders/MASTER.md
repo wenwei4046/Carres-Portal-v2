@@ -743,7 +743,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
   `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
   `Before approval` remain the governed waiting state and impact heading.
 
-### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0562)
+### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0564)
 
 **The gate is in the database.** `sales_order_amendments` carries the evidence note, who recorded
 it, when, and an md5 of the proposal it was recorded against.
@@ -775,7 +775,7 @@ Recording a communication reference does not authorise contacting customers or e
 This evidence gate neither rewrites historical signatures nor turns a WhatsApp confirmation into a
 signature. Preserve the actual revision/document association and separately identify unsigned versions.
 
-**BUILT 2026-09-23 — migration `0562`, `sales_order_record_amendment_agreement`,
+**BUILT 2026-09-23 — migration `0564`, `sales_order_record_amendment_agreement`,
 `POST /api/operation/orders/amendment/:id/agreement`, `SalesOrderAmendment.tsx`.**
 `sales_order_amendments` now carries the kind, the reference, the optional detail, who recorded it,
 when, and the fingerprint of the terms it was recorded against. Three kinds are accepted and no
@@ -793,7 +793,7 @@ so approval is never silently reused for different terms. A decided amendment's 
 rewritten afterwards. The applied history row names the kind and the reference, so the record
 answers what made the change legitimate without a second read.
 
-Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole 565-file chain, 0562
+Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole chain, 0564
 applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
 ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
 proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered
@@ -927,7 +927,7 @@ orders from the day it ships.
   hazard, not a field.
 - The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
 
-**Commercial change entry — owner-approved 2026-09-22, BUILT 2026-09-23 (migration 0562).**
+**Commercial change entry — owner-approved 2026-09-22, BUILT 2026-09-23 (migration 0564).**
 Whole-page `Edit` contains the commercial draft and preserves items, configuration, unit price,
 services, dates and Instalment months. The server selects `Save` or `Submit amendment request` from
 actual changes and permissions. Do not retain a competing proposal modal as the only way to edit

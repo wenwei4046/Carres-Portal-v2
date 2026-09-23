@@ -2471,12 +2471,12 @@ operationOrdersRouter.post(
 //                                     (the shared `classifySalesOrderChange`)
 //                                     and either SAVES a correction or SUBMITS
 //                                     an amendment request — never the browser.
-//   POST /amendment/:aid/evidence     record the customer's agreement basis
+//   POST /amendment/:aid/agreement    the customer's recorded acceptance (above)
 //   POST /amendment/:aid/withdraw     withdraw a live request
 //
 // A mixed change goes to review WHOLE. Submission changes nothing on the
 // order; the database applies the complete version only on approval, and only
-// with evidence that covers this exact proposal (0562).
+// with a recorded customer agreement that still covers these exact terms (0564).
 // ─────────────────────────────────────────────────────────────
 const changeLineInput = z
   .object({
@@ -2508,7 +2508,11 @@ const salesOrderChangesInput = z.object({
   installment_months: installmentMonthsField.nullable().optional(),
   reason: z.string().trim().min(1, "Say why this is changing").max(500),
   customerAskedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  evidenceNote: z.string().trim().max(500).nullable().optional(),
+  /* 0564 · The agreement may be recorded with the request in one act. It is the
+     SAME governed shape the standalone door takes - a kind that always names a
+     pointer - because a free sentence is the manager's assertion the ruling
+     refuses. */
+  agreement: amendmentAgreementInput.optional(),
   /** Proposing again over an OUT-OF-DATE request withdraws that request first. */
   replaceAmendmentId: z.string().uuid().nullable().optional(),
 });
@@ -2649,33 +2653,20 @@ operationOrdersRouter.post("/:id/changes", requireOperation, async (c) => {
     return c.json(m.body, m.status);
   }
   const submitted = data as { id: string; base_revision: number };
-  let evidenceRecorded = false;
-  if (body.evidenceNote) {
-    const ev = await sb.rpc("sales_order_record_amendment_evidence", {
+  let agreementRecorded = false;
+  if (body.agreement) {
+    const ag = await sb.rpc("sales_order_record_amendment_agreement", {
       p_amendment_id: submitted.id,
-      p_note: body.evidenceNote,
+      p_kind: body.agreement.kind,
+      p_reference: body.agreement.reference,
+      p_detail: body.agreement.detail ?? null,
     });
-    evidenceRecorded = !ev.error;
+    /* The REQUEST survives a refused agreement - "the request may remain
+       recorded while evidence is incomplete; it cannot take effect". The page
+       is told which it got and offers the door again. */
+    agreementRecorded = !ag.error;
   }
-  return c.json({ action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, evidenceRecorded }, 201);
-});
-
-const amendmentEvidenceInput = z.object({ note: z.string().trim().min(1, "Name the customer's confirmation").max(500) });
-operationOrdersRouter.post("/amendment/:amendmentId/evidence", requireOperation, async (c) => {
-  const parsed = amendmentEvidenceInput.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) {
-    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("sales_order_record_amendment_evidence", {
-    p_amendment_id: c.req.param("amendmentId"),
-    p_note: parsed.data.note,
-  });
-  if (error) {
-    const m = mapPipelineV2Error(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
+  return c.json({ action: "submitted", amendmentId: submitted.id, baseRevision: submitted.base_revision, agreementRecorded }, 201);
 });
 
 const amendmentWithdrawInput = z.object({ reason: z.string().trim().min(1, "A withdrawal says why").max(500) });

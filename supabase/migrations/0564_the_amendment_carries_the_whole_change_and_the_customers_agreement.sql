@@ -1,106 +1,247 @@
--- ---------------------------------------------------------------------------
--- 0562 . THE WHOLE-PAGE EDIT HAS ONE GOVERNED LANE, AND IT CARRIES THE WHOLE
---        CHANGE (owner rulings 2026-09-21 / 2026-09-22, orders/MASTER.md
---        § VIEW FIRST, EDIT ON PURPOSE · § Commercial change entry ·
---        § Customer agreement evidence — APPROVED / LOCKED)
+-- 0564_the_amendment_carries_the_whole_change_and_the_customers_agreement
 --
--- WHAT WAS MISSING (measured on pg_proc.prosrc, 2026-09-23)
---   . No customer-agreement evidence anywhere. An amendment could be approved
---     with nothing recorded about the customer's acceptance.
---   . The amendment carried only lines(sku, qty, price), the delivery date and
---     the instalment plan. It could not carry a line's configuration (the
---     writer never wrote `attrs`), a service (order_addons), the proceed date
---     or the whole-page header a mixed change brings with it.
---   . A recorded proceed date could not move even by approved amendment (0391),
---     contradicting "proceed date can edit" (Jess, 2026-09-22).
---   . A stale request could only sit there: nothing could withdraw it, so the
---     one-live-request index blocked every new proposal on that order.
+-- CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
+-- (`docs/orders/MASTER.md` § "Customer agreement evidence").
 --
--- WHAT CHANGES
---   1. sales_order_amendments gains the evidence columns. Evidence is bound to
---      the exact proposal it covers by an md5 of `proposed_snapshot`: change
---      the proposal and the evidence no longer covers it.
---   2. sales_order_record_amendment_evidence — Sales/Operation records the
---      confirmation basis (a signed document, a WhatsApp reference). A
---      recorded reference authorises no contact with anybody.
---   3. sales_order_withdraw_amendment — a live request can be withdrawn with a
---      reason (status `withdrawn`, which the table has always allowed).
---   4. sales_order_decide_amendment — APPROVE now REFUSES without evidence that
---      covers this exact proposal (detail `evidence_required`), refuses when a
---      header value the proposal was computed from has moved (`amendment_stale`),
---      and applies the whole proposal: header keys, lines WITH configuration,
---      services and the instalment plan, in ONE new complete revision.
---   5. sales_order_save_revision — the proceed lock is exempted for the
---      approved amendment lane only (the 0420 transaction-local setting).
---   6. sales_order_save_revision_unchecked_0354 — writes `attrs` when a line
---      names it. Rebuilt from the LIVE body (0560, md5 f4d012cd…); the only
---      difference is the two line statements.
---   7. sales_order_amendment_live — returns the evidence and the proposal's base.
+--   "A change to the customer's actual agreement must have a recorded,
+--    traceable basis for that customer's acceptance before it takes effect.
+--    A signed document or a reference to the relevant customer confirmation
+--    (for example, WhatsApp) is acceptable; a new handwritten signature is not
+--    required for every amendment. A manager's statement or checkbox saying
+--    the customer agreed is not sufficient by itself and cannot substitute for
+--    the evidence."
 --
--- NOT CHANGED: who may submit (operation, principal) and who may decide
--- (principal) · the contractual hash · the impact read · attribution (0329
--- keeps its own lane) · the one-live-request index · any RLS policy.
--- Section 6: no existing row is read, written or backfilled by this file.
--- No secret. No row count asserted.
--- ---------------------------------------------------------------------------
+-- MEASURED BEFORE THIS MIGRATION (2026-09-23, production schema):
+-- `sales_order_amendments` carried id · order_id · base_revision ·
+-- base_contractual_hash · proposed_snapshot · reason · status · submitted_by ·
+-- submitted_at · applied_at · created_at · decided_by · decided_at ·
+-- decision_note · decision_impact · customer_asked_on. There was NO column
+-- naming the customer's acceptance, and `sales_order_decide_amendment` asked
+-- for none. A principal could approve and apply a new price, a new quantity
+-- or a new promised date with nothing on the record saying the customer had
+-- ever agreed to it. That is the gap this closes.
+--
+-- ---- HOW THIS FILE CAME TO BE 0564 ----------------------------------------
+--
+-- Two chats built the Amendment at once. `0562` was taken in the meantime by
+-- PURCHASING CARD 13 (`0562_a_manual_purchase_says_what_it_needs`, APPLIED to
+-- production 2026-09-22), and CARD 13 also holds an unapplied `0563`. Both
+-- Amendment drafts were numbered 0562 and both rewrote
+-- `sales_order_decide_amendment`, so applying them in sequence would have made
+-- the second silently revert the first. They are ONE file here, under the next
+-- free number, and nothing is applied twice.
+--
+--   FROM THE AGREEMENT DRAFT (kept whole): the governed KINDS and their
+--   constraints, the terms fingerprint, the record door, the approver's read
+--   and the gate itself. A kind always demands a pointer outside this table,
+--   which is what stops a manager's assertion from counting as evidence.
+--
+--   FROM THE WHOLE-PAGE DRAFT: the amendment now carries the whole change -
+--   the header it was computed from (so a value that moved reads stale instead
+--   of being overwritten), a line's configuration, the complete service set,
+--   the instalment plan and the proceed date - plus a withdraw door so a stale
+--   request stops blocking the next proposal.
+--
+-- ---- WHAT IS ENFORCED, AND WHERE ------------------------------------------
+--
+--   SUBMIT   unchanged. "The request may remain recorded while evidence is
+--            incomplete; it cannot take effect." A proposal is still born the
+--            moment Sales writes it, evidence or no evidence.
+--   RECORD   a new door. Sales records the confirmation basis, and may replace
+--            it while the amendment is still open.
+--   REJECT   unchanged. Refusing a change needs no customer agreement.
+--   APPROVE  REFUSED unless evidence exists AND still covers the exact terms
+--            being approved.
+--
+-- ---- WHY THE HASH ---------------------------------------------------------
+--
+-- "Evidence must remain traceable to the proposal it supports. Following
+--  conflict review or a changed proposal, verify that the evidence still
+--  covers the resulting terms; do not silently reuse approval for different
+--  terms."
+--
+-- So the basis is stored WITH a fingerprint of the terms it was recorded
+-- against, and approve compares that fingerprint against the proposal it is
+-- about to apply. Today no door edits `proposed_snapshot` after submit, so the
+-- comparison always passes for honest use — it is written now so the rule is
+-- STRUCTURAL rather than incidental, and a future proposal-edit door cannot
+-- quietly inherit an approval the customer gave to different terms. `jsonb`
+-- normalises object key order, so equal proposals fingerprint equal.
+--
+-- ---- WHAT THIS DELIBERATELY DOES NOT DO -----------------------------------
+--
+-- It does not rewrite a historical signature, and it does not turn a WhatsApp
+-- confirmation into a signature: the KIND is recorded and stays distinguishable
+-- forever. It does not contact anybody — "Recording a communication reference
+-- does not authorise contacting customers or external parties." It adds no
+-- checkbox that a manager can tick to mean the customer agreed: the three
+-- accepted kinds all demand a reference that points at something outside this
+-- table, and a manager's own assertion is not one of them.
+--
+-- No row count is asserted. No existing row is modified. Every column added is
+-- nullable, so every amendment already open stays readable and rejectable; it
+-- simply cannot be APPROVED until its basis is recorded, which is the ruling.
 
 begin;
 
+-- ---------------------------------------------------------------------
+-- 1. The record of the customer's acceptance
+-- ---------------------------------------------------------------------
+
 alter table public.sales_order_amendments
-  add column if not exists evidence_note text,
-  add column if not exists evidence_recorded_by uuid references auth.users(id),
-  add column if not exists evidence_recorded_at timestamptz,
-  add column if not exists evidence_proposal_hash text;
+  add column if not exists customer_agreement_kind      text,
+  add column if not exists customer_agreement_reference text,
+  add column if not exists customer_agreement_detail    text,
+  add column if not exists customer_agreement_covers    text,
+  add column if not exists customer_agreement_by        uuid,
+  add column if not exists customer_agreement_at        timestamptz;
 
-comment on column public.sales_order_amendments.evidence_note is
-  '0562 · the traceable basis for the customer''s acceptance (signed document or a confirmation reference). A statement that the customer agreed is not evidence.';
-comment on column public.sales_order_amendments.evidence_proposal_hash is
-  '0562 · md5(proposed_snapshot::text) when the evidence was recorded. Evidence covers only the proposal it was recorded against.';
+comment on column public.sales_order_amendments.customer_agreement_kind is
+  '0564 - HOW the customer''s acceptance is evidenced: signed_document (a document the customer signed), customer_confirmation (a traceable reference to the customer''s own confirmation, e.g. a WhatsApp message) or original_agreement (a Staff correction where the agreement did not change, pointing back at the order''s existing signed agreement). A manager''s assertion is not a kind.';
+comment on column public.sales_order_amendments.customer_agreement_reference is
+  '0564 - the traceable pointer the kind demands. It must identify something outside this table that can be found again.';
+comment on column public.sales_order_amendments.customer_agreement_covers is
+  '0564 - fingerprint of the proposed terms this basis was recorded against. Approve refuses when it no longer matches the proposal being applied, so approval is never silently reused for different terms.';
 
--- ── 2 · record the customer's agreement against THIS proposal ─────────────
-create or replace function public.sales_order_record_amendment_evidence(
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'amendments_agreement_kind_is_governed'
+  ) then
+    alter table public.sales_order_amendments
+      add constraint amendments_agreement_kind_is_governed
+      check (customer_agreement_kind is null
+             or customer_agreement_kind in
+                ('signed_document','customer_confirmation','original_agreement'));
+  end if;
+  -- A kind without its pointer is the checkbox the ruling refuses.
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'amendments_agreement_names_its_evidence'
+  ) then
+    alter table public.sales_order_amendments
+      add constraint amendments_agreement_names_its_evidence
+      check (customer_agreement_kind is null
+             or nullif(btrim(coalesce(customer_agreement_reference,'')),'') is not null);
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 2. The fingerprint of a set of proposed terms
+-- ---------------------------------------------------------------------
+
+create or replace function public.sales_order_amendment_terms_hash(p_proposed jsonb)
+returns text
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select md5(coalesce(p_proposed, '{}'::jsonb)::text)
+$$;
+
+comment on function public.sales_order_amendment_terms_hash(jsonb) is
+  '0564 - the fingerprint customer-agreement evidence is bound to. jsonb normalises object key order, so equal terms hash equal.';
+
+-- ---------------------------------------------------------------------
+-- 3. Sales records the confirmation basis
+-- ---------------------------------------------------------------------
+
+create or replace function public.sales_order_record_amendment_agreement(
   p_amendment_id uuid,
-  p_note text
+  p_kind         text,
+  p_reference    text,
+  p_detail       text default null
 )
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_role text := public.app_role();
   v_a    sales_order_amendments%rowtype;
-  v_note text := nullif(btrim(coalesce(p_note,'')), '');
+  v_ref  text := nullif(btrim(coalesce(p_reference,'')), '');
+  v_det  text := nullif(btrim(coalesce(p_detail,'')), '');
   v_hash text;
 begin
+  -- The same door Sales already submits through. The APPROVER does not record
+  -- the customer's agreement: "Sales records the confirmation basis; the
+  -- authorised approver checks that it covers the proposed change." The
+  -- principal keeps access because the principal is every internal role's
+  -- superset everywhere else in this schema, not because approving grants it.
   if (v_role is null or v_role not in ('operation','principal')) then
     raise exception 'Operation/Principal only' using errcode = '42501';
   end if;
-  if v_note is null then
-    raise exception 'Name the customer''s confirmation - a signed document or a message reference'
-      using errcode = '22023', detail = 'evidence_note_required';
+
+  if p_kind not in ('signed_document','customer_confirmation','original_agreement') then
+    raise exception 'Record how the customer agreed'
+      using errcode = '22023', detail = 'agreement_kind_invalid';
   end if;
-  if length(v_note) > 500 then
-    raise exception 'Keep the evidence reference under 500 characters'
-      using errcode = '22023', detail = 'evidence_note_too_long';
+  if v_ref is null then
+    raise exception 'Name the document or message that shows the customer agreed'
+      using errcode = '22023', detail = 'agreement_reference_required';
   end if;
-  select * into v_a from sales_order_amendments where id = p_amendment_id for update;
-  if not found then raise exception 'Amendment not found' using errcode = 'P0002'; end if;
-  if v_a.status not in ('submitted','issued','accepted') then
-    raise exception 'Amendment is already %', v_a.status using errcode = '22023', detail = 'already_decided';
+
+  select * into v_a from public.sales_order_amendments
+   where id = p_amendment_id for update;
+  if not found then
+    raise exception 'Amendment not found' using errcode = 'P0002';
   end if;
-  v_hash := md5(v_a.proposed_snapshot::text);
-  update sales_order_amendments
-     set evidence_note = v_note, evidence_recorded_by = auth.uid(),
-         evidence_recorded_at = now(), evidence_proposal_hash = v_hash
+  -- A decided amendment's basis is history. It is not re-written afterwards.
+  if v_a.status not in ('draft','submitted','issued','accepted') then
+    raise exception 'Amendment is already %', v_a.status
+      using errcode = '22023', detail = 'already_decided';
+  end if;
+
+  /* A Staff correction leans on the agreement the customer ALREADY gave, so
+     its pointer must name a revision of THIS order — not a free sentence.
+     "For Staff correction, where the actual customer agreement has not
+     changed, reference the original agreement evidence instead of asking the
+     customer to agree again." */
+  if p_kind = 'original_agreement'
+     and not exists (
+       select 1 from public.sales_order_revisions
+        where order_id = v_a.order_id
+          and revision = nullif(regexp_replace(v_ref, '\D', '', 'g'), '')::int
+     ) then
+    raise exception 'Name the revision whose signed agreement still covers this change'
+      using errcode = '22023', detail = 'agreement_revision_not_found';
+  end if;
+
+  v_hash := public.sales_order_amendment_terms_hash(v_a.proposed_snapshot);
+
+  update public.sales_order_amendments
+     set customer_agreement_kind      = p_kind,
+         customer_agreement_reference = v_ref,
+         customer_agreement_detail    = v_det,
+         customer_agreement_covers    = v_hash,
+         customer_agreement_by        = auth.uid(),
+         customer_agreement_at        = now()
    where id = v_a.id;
-  insert into order_history(order_id, text, by_role, by_user_id, metadata)
-  values (v_a.order_id, 'Customer agreement recorded - ' || v_note, v_role::app_role, auth.uid(),
-          jsonb_build_object('kind','amendment_evidence','amendment_id',v_a.id,
-                             'evidence',v_note,'proposal_hash',v_hash));
-  return jsonb_build_object('id', v_a.id, 'evidence_note', v_note,
-                            'evidence_recorded_at', now(), 'evidence_proposal_hash', v_hash);
+
+  /* The record is a business fact, so it is written where the business reads
+     facts. It names the KIND and the POINTER and nothing about the customer
+     beyond what Sales typed — this door reaches nobody. */
+  insert into public.order_history(order_id, text, by_role, by_user_id, metadata)
+  values (v_a.order_id,
+          'Customer agreement recorded - ' || p_kind || ' - ' || v_ref,
+          v_role::app_role, auth.uid(),
+          jsonb_build_object('kind','amendment_agreement_recorded',
+                             'amendment_id', v_a.id,
+                             'agreement_kind', p_kind,
+                             'agreement_reference', v_ref,
+                             'covers', v_hash));
+
+  return jsonb_build_object('id', v_a.id, 'customer_agreement_kind', p_kind,
+                            'customer_agreement_reference', v_ref,
+                            'customer_agreement_covers', v_hash);
 end $$;
+
+revoke all on function public.sales_order_record_amendment_agreement(uuid,text,text,text)
+  from public, anon;
+grant execute on function public.sales_order_record_amendment_agreement(uuid,text,text,text)
+  to authenticated;
 
 -- ── 3 · withdraw a live request ─────────────────────────────────────────────
 create or replace function public.sales_order_withdraw_amendment(
@@ -197,12 +338,30 @@ begin
     return jsonb_build_object('id',v_a.id,'status','rejected');
   end if;
 
+  -- ── 0564 · THE CUSTOMER AGREEMENT GATE ──────────────────────────────────
+  -- APPROVED / LOCKED 2026-09-22. Everything below this point CHANGES the
+  -- customer's order, so the customer's acceptance has to be on the record
+  -- first, and it has to be the acceptance of THESE terms.
+  --
+  -- Re-computed here rather than read from `customer_agreement_covers` alone:
+  -- the stored fingerprint says what the basis was recorded against, and this
+  -- comparison is what proves it is still true of the proposal being applied.
+  if v_a.customer_agreement_kind is null then
+    raise exception 'Record how the customer agreed before this change takes effect'
+      using errcode = '22023', detail = 'customer_agreement_required';
+  end if;
+  if v_a.customer_agreement_covers
+     is distinct from public.sales_order_amendment_terms_hash(v_a.proposed_snapshot) then
+    raise exception 'The recorded customer agreement does not cover these terms - record it again'
+      using errcode = '22023', detail = 'customer_agreement_stale';
+  end if;
+
   if (v_impact->>'stale')::boolean then
     raise exception 'The order changed after this amendment was proposed'
       using errcode = '22023', detail = 'amendment_stale';
   end if;
 
-  -- 0562 · THE BASE OF EVERY PROPOSED HEADER VALUE MUST STILL BE TRUE. The
+  -- 0564 · THE BASE OF EVERY PROPOSED HEADER VALUE MUST STILL BE TRUE. The
   -- contractual hash covers goods, services, the promise and the plan; a
   -- whole-page proposal can also carry the proceed date, delivery access and
   -- customer facts. Each carries the value it was computed from, and a value
@@ -223,15 +382,6 @@ begin
     end loop;
   end if;
 
-  -- 0562 · CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED 2026-09-22. The
-  -- request may exist without it; it cannot take effect without it, and
-  -- evidence recorded against a different proposal does not cover this one.
-  if nullif(btrim(coalesce(v_a.evidence_note,'')),'') is null
-     or v_a.evidence_proposal_hash is distinct from md5(v_a.proposed_snapshot::text) then
-    raise exception 'Record the customer''s agreement for this change before it takes effect'
-      using errcode = '22023', detail = 'evidence_required';
-  end if;
-
   if v_a.proposed_snapshot ? 'delivery_date' then
     v_header := v_header || jsonb_build_object('delivery_date',v_a.proposed_snapshot->'delivery_date');
   end if;
@@ -248,7 +398,7 @@ begin
     v_changed := v_changed || '"installment_months"'::jsonb;
   end if;
 
-  -- 0562 · SERVICES ARE PART OF WHAT WAS BOUGHT (CLASS A, order_addons). The
+  -- 0564 · SERVICES ARE PART OF WHAT WAS BOUGHT (CLASS A, order_addons). The
   -- proposal carries the complete service set: kept rows by id, new rows
   -- without one; a row it no longer names is removed.
   if jsonb_typeof(v_a.proposed_snapshot->'addons') = 'array' then
@@ -356,7 +506,8 @@ begin
     v_role::app_role,auth.uid(),
     jsonb_build_object('kind','amendment_applied','amendment_id',v_a.id,
                        'reason',coalesce(v_a.reason,v_note),'decision_note',v_note,
-                       'evidence',v_a.evidence_note,
+                       'agreement_kind',v_a.customer_agreement_kind,
+                       'agreement_reference',v_a.customer_agreement_reference,
                        'revision',(v_result->'revision'),'impact',v_impact));
   return jsonb_build_object('id',v_a.id,'status','applied','revision',v_result->'revision',
                             'changed',v_result->'changed');
@@ -388,7 +539,7 @@ declare
 begin
   -- 0391 · THE PROCEED LOCK. Runs before anything is written, so a refused
   -- save changes nothing.
-  -- 0562 · EXEMPTED FOR THE APPROVED AMENDMENT ONLY (owner ruling, Jess
+  -- 0564 · EXEMPTED FOR THE APPROVED AMENDMENT ONLY (owner ruling, Jess
   -- 2026-09-22: "proceed date can edit" — through Edit, a reason and the
   -- governed approval path). A direct save still cannot move a recorded date.
   if p_header ? 'proceed_date' and not v_amending then
@@ -664,7 +815,7 @@ begin
       end if;
       if v_line ? 'id' and nullif(v_line->>'id','') is not null then
         v_id := (v_line->>'id')::uuid;
-        -- 0562 · A LINE'S CONFIGURATION TRAVELS WITH IT. `attrs` is written only
+        -- 0564 · A LINE'S CONFIGURATION TRAVELS WITH IT. `attrs` is written only
         -- when the caller names it; a payload without the key leaves the stored
         -- configuration exactly as it was (the office Save never sends lines).
         update order_lines
@@ -765,7 +916,11 @@ begin
                             'correction_work_raised', v_work);
 end $function$;
 
--- ── 7 · the live read carries the evidence and the proposal's base ────────
+-- ---------------------------------------------------------------------
+-- 4. The approver reads the basis it is being asked to check
+-- ---------------------------------------------------------------------
+-- 0334's body with the evidence added. Nothing else is retyped or reordered.
+
 create or replace function public.sales_order_amendment_live(p_order_id uuid)
 returns jsonb
 language plpgsql
@@ -800,16 +955,25 @@ begin
     'stale', v_now is distinct from v_a.base_contractual_hash,
     'proposed_snapshot', v_a.proposed_snapshot,
     'submitted_at', v_a.submitted_at,
-    'submitted_by', v_a.submitted_by,
-    'evidence_note', v_a.evidence_note,
-    'evidence_recorded_at', v_a.evidence_recorded_at,
-    'evidence_covers_proposal',
-      v_a.evidence_note is not null and v_a.evidence_proposal_hash = md5(v_a.proposed_snapshot::text)));
+    -- 0564 · what the approver must check before approving.
+    'customer_agreement_kind', v_a.customer_agreement_kind,
+    'customer_agreement_reference', v_a.customer_agreement_reference,
+    'customer_agreement_detail', v_a.customer_agreement_detail,
+    'customer_agreement_at', v_a.customer_agreement_at,
+    /* Derived, never stored twice: the basis covers these terms only while its
+       fingerprint still matches them. The screen reads this; the decide door
+       re-computes it rather than trusting it. */
+    'customer_agreement_covers_proposal',
+      v_a.customer_agreement_kind is not null
+      and v_a.customer_agreement_covers
+          is not distinct from public.sales_order_amendment_terms_hash(v_a.proposed_snapshot)));
 end $$;
 
-revoke all on function public.sales_order_record_amendment_evidence(uuid, text) from public, anon;
+comment on function public.sales_order_amendment_live(uuid) is
+  '0334 live-amendment read; 0562 adds the recorded customer-agreement basis and whether it still covers the proposed terms.';
+
+
 revoke all on function public.sales_order_withdraw_amendment(uuid, text) from public, anon;
-grant execute on function public.sales_order_record_amendment_evidence(uuid, text) to authenticated;
 grant execute on function public.sales_order_withdraw_amendment(uuid, text) to authenticated;
 
 commit;

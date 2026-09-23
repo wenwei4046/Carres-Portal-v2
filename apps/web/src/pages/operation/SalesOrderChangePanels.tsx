@@ -20,11 +20,11 @@
 import { useState } from "react";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
-import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import { fmtDate } from "@/lib/fmt-date";
 import type { SalesOrderAmendment } from "@/lib/queries";
 import type { DiffRow } from "./sales-order-change";
+import { AgreementForm, AgreementOnRecord, type RecordedAgreement } from "./customer-agreement";
 
 function DiffTable({ rows, label }: { rows: DiffRow[]; label: string }) {
   return (
@@ -74,8 +74,11 @@ export function DraftReview(props: {
   onReason: (v: string) => void;
   askedOn: string | null;
   onAskedOn: (v: string | null) => void;
-  evidence: string;
-  onEvidence: (v: string) => void;
+  /* 0564 · the governed agreement, carried to the server with the request. A
+     free sentence is the manager's assertion the ruling refuses, so this is
+     the SAME triple the standalone door takes. */
+  agreement: RecordedAgreement | null;
+  onAgreement: (a: RecordedAgreement | null) => void;
 }) {
   return (
     <section
@@ -99,14 +102,13 @@ export function DraftReview(props: {
             onChange={(e) => props.onReason(e.target.value)} />
         </div>
         {props.commercial && (
-          <div className="sm:col-span-3">
-            <Input
-              id="so-change-evidence"
-              label="Customer agreement evidence"
-              hint="You can send the request without it, but management cannot approve until it is recorded."
-              value={props.evidence}
-              onChange={(e) => props.onEvidence(e.target.value)}
-            />
+          <div className="sm:col-span-3 border-t border-kit-blue-6 pt-3">
+            <p className="text-label text-kit-slate-11">Customer agreement</p>
+            <p className="mt-1 text-meta text-kit-slate-11">
+              You can send the request without it, but management cannot approve until it is
+              recorded.
+            </p>
+            <AgreementForm idPrefix="so-change-agreement" value={props.agreement} onChange={props.onAgreement} />
           </div>
         )}
       </div>
@@ -120,14 +122,16 @@ export function WaitingRequest(props: {
   consequences: string[];
   canDecide: boolean;
   busy: boolean;
-  onRecordEvidence: (note: string) => void;
+  onRecordAgreement: (a: RecordedAgreement) => void;
   onDecide: (decision: "approve" | "reject", note: string) => void;
   onProposeAgain: () => void;
 }) {
   const a = props.amendment;
-  const [evidence, setEvidence] = useState("");
   const [decision, setDecision] = useState("");
-  const covered = Boolean(a.evidence_covers_proposal);
+  /* Both facts come from the SERVER on every read. The screen never decides
+     for itself that a change is agreed, and the database refuses regardless. */
+  const recorded = Boolean(a.customer_agreement_kind);
+  const covered = a.customer_agreement_covers_proposal === true;
   return (
     <section
       className="rounded-card border border-kit-amber-6 bg-kit-amber-3 px-4 py-3"
@@ -159,27 +163,20 @@ export function WaitingRequest(props: {
         <>
           <DiffTable rows={props.rows} label="Before and after" />
           <Consequences items={props.consequences} />
-          <div className="mt-3 border-t border-kit-amber-6 pt-3">
-            {covered ? (
-              <p className="text-body text-kit-slate-12" data-testid="evidence-recorded">
-                Customer agreement evidence: {a.evidence_note}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <div className="flex-1">
-                  <Input
-                    id="so-request-evidence"
-                    label="Customer agreement evidence"
-                    hint={a.evidence_note ? "The recorded evidence was for an earlier version of this request." : "Not recorded yet — the change cannot take effect."}
-                    value={evidence}
-                    onChange={(e) => setEvidence(e.target.value)}
-                  />
-                </div>
-                <Button variant="neutral" disabled={!evidence.trim() || props.busy}
-                  onClick={() => props.onRecordEvidence(evidence.trim())} data-testid="record-evidence">
-                  Save
-                </Button>
-              </div>
+          <div className="mt-3 border-t border-kit-amber-6 pt-3" data-testid="amendment-agreement">
+            <p className="text-label text-kit-slate-11">Customer agreement</p>
+            <AgreementOnRecord
+              kind={a.customer_agreement_kind}
+              reference={a.customer_agreement_reference}
+              detail={a.customer_agreement_detail}
+              coversProposal={recorded ? covered : undefined}
+            />
+            {(!recorded || !covered) && (
+              <AgreementForm
+                idPrefix="so-request-agreement"
+                busy={props.busy}
+                onRecord={props.onRecordAgreement}
+              />
             )}
           </div>
           {props.canDecide && (
@@ -191,7 +188,7 @@ export function WaitingRequest(props: {
                   onClick={() => props.onDecide("reject", decision.trim())} data-testid="decide-reject">
                   Reject
                 </Button>
-                <Button variant="primary" disabled={!decision.trim() || !covered || props.busy}
+                <Button variant="primary" disabled={!decision.trim() || !recorded || !covered || props.busy}
                   onClick={() => props.onDecide("approve", decision.trim())} data-testid="decide-approve">
                   Approve and apply
                 </Button>

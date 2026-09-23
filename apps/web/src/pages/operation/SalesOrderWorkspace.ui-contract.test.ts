@@ -616,11 +616,11 @@ describe("Sales Order object template contract", () => {
   it("carries the governed request fields inside the one draft review", () => {
     /* The three fields the retired trio owned now ride the whole-page review:
        the customer's request date, the reason, and — for a commercial change —
-       the customer agreement evidence the database gates approval on. */
+       the customer agreement the database gates approval on. */
     expect(panels).toContain("Requested date (from customer)");
     expect(panels).toContain('label="Reason for change"');
     expect(panels).toContain("required");
-    expect(panels).toContain("Customer agreement evidence");
+    expect(panels).toContain("Customer agreement");
     expect(workspace).toContain("useSubmitSalesOrderChanges");
     expect(workspace).toContain("customerAskedOn: changeAskedOn");
   });
@@ -641,13 +641,13 @@ describe("Sales Order object template contract", () => {
   it("gates approval on customer agreement evidence, and never on the page alone", () => {
     /* § Customer agreement evidence — APPROVED / LOCKED 2026-09-22: the request
        may be recorded without it; it cannot TAKE EFFECT without it, and the
-       database is the gate (0562 `evidence_required`). The page states the
+       database is the gate (0564 `customer_agreement_required`). The page states the
        same rule and disables the decision it cannot make. */
-    expect(panels).toContain("Customer agreement evidence");
+    expect(panels).toContain("Customer agreement");
     expect(panels).toContain("Not recorded yet — the change cannot take effect.");
-    expect(panels).toContain("evidence_covers_proposal");
+    expect(panels).toContain("customer_agreement_covers_proposal");
     expect(panels).toContain("disabled={!decision.trim() || !covered || props.busy}");
-    expect(workspace).toContain("useRecordAmendmentEvidence");
+    expect(workspace).toContain("useRecordAmendmentAgreement");
   });
 
   it("keeps the items table on the document's own columns, and protects a gift line", () => {

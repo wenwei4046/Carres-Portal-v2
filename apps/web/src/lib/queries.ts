@@ -6054,12 +6054,13 @@ export interface SalesOrderChangesInput {
   installment_months?: number | null;
   reason: string;
   customerAskedOn?: string | null;
-  evidenceNote?: string | null;
+  /** 0564 — the governed agreement, recorded with the request in one act. */
+  agreement?: { kind: CustomerAgreementKind; reference: string; detail?: string };
   replaceAmendmentId?: string | null;
 }
 export type SalesOrderChangesResult =
   | { action: "saved"; revision: number; changed?: string[] }
-  | { action: "submitted"; amendmentId: string; baseRevision: number; evidenceRecorded: boolean };
+  | { action: "submitted"; amendmentId: string; baseRevision: number; agreementRecorded: boolean };
 
 function invalidateSalesOrder(qc: ReturnType<typeof useQueryClient>, orderId: string) {
   return Promise.all([

@@ -45,7 +45,7 @@ const ORDER = {
   placed_at: "2026-08-21T02:00:00Z", delivery_date: "2026-09-24",
   delivery_date_tbd: false, proceed_date: "2026-08-26",
   source_ref: ["CR-2207", "TCF-8891"], source_system: "native",
-  paid: STATE === "evidence-zero" ? 0 : STATE === "saved" ? 1250 : 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
+  paid: STATE === "agreement-zero" ? 0 : STATE === "saved" ? 1250 : 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
   dealers: { name: "Carres HQ" }, outlets: { name: "PJ Showroom" },
   salespersons: { name: "Bernard" },
   installment_months: 12, payment_method: "installment",
@@ -82,7 +82,7 @@ const PAYMENTS = [
     voided_at: "2026-08-20T06:00:00Z", void_reason: "Keyed on the wrong order" },
 ];
 
-/* The preview's own amendment lane, so a walk can submit, record evidence and decide. */
+/* The preview's own amendment lane, so a walk can submit, record the customer agreement and decide. */
 const LIVE: { amendment: Record<string, unknown> | null } = { amendment: null };
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -91,7 +91,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
   if (url.includes(`/payments`)) {
-    if (["empty", "saved", "evidence-zero"].includes(STATE)) return json({ payments: [] });
+    if (["empty", "saved", "agreement-zero"].includes(STATE)) return json({ payments: [] });
     if (STATE === "forbidden") return json({ error: "Operation or principal only" }, 403);
     return json({ payments: PAYMENTS });
   }
@@ -110,13 +110,19 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         ? { lines: JSON.parse(String(init?.body)).lines, addons: JSON.parse(String(init?.body)).addons }
         : {},
       submitted_at: new Date().toISOString(), customer_asked_on: null,
-      evidence_note: JSON.parse(String(init?.body ?? "{}")).evidenceNote ?? null,
-      evidence_covers_proposal: Boolean(JSON.parse(String(init?.body ?? "{}")).evidenceNote),
+      customer_agreement_kind: JSON.parse(String(init?.body ?? "{}")).agreement?.kind ?? null,
+      customer_agreement_reference: JSON.parse(String(init?.body ?? "{}")).agreement?.reference ?? null,
+      customer_agreement_covers_proposal: Boolean(JSON.parse(String(init?.body ?? "{}")).agreement),
     };
-    return json({ action: "submitted", amendmentId: LIVE.amendment.id, baseRevision: 1, evidenceRecorded: Boolean(LIVE.amendment.evidence_note) }, 201);
+    return json({ action: "submitted", amendmentId: LIVE.amendment.id, baseRevision: 1, agreementRecorded: Boolean(LIVE.amendment.customer_agreement_kind) }, 201);
   }
-  if (url.includes("/evidence")) {
-    if (LIVE.amendment) { LIVE.amendment.evidence_note = JSON.parse(String(init?.body ?? "{}")).note; LIVE.amendment.evidence_covers_proposal = true; }
+  if (url.includes("/agreement")) {
+    if (LIVE.amendment) {
+      const b = JSON.parse(String(init?.body ?? "{}"));
+      LIVE.amendment.customer_agreement_kind = b.kind;
+      LIVE.amendment.customer_agreement_reference = b.reference;
+      LIVE.amendment.customer_agreement_covers_proposal = true;
+    }
     return json({ ok: true });
   }
   if (url.includes("/decide")) { LIVE.amendment = null; return json({ id: "a", status: "applied", revision: 2 }); }

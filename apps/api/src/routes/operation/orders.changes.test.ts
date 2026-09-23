@@ -108,7 +108,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     const res = await post({ header: header(), lines: l, addons: addons(), reason: "Customer keeps one pillow" });
     expect(res.status).toBe(201);
     const out = await bodyOf(res);
-    expect(out).toMatchObject({ action: "submitted", amendmentId: AMEND, evidenceRecorded: false });
+    expect(out).toMatchObject({ action: "submitted", amendmentId: AMEND, agreementRecorded: false });
     const call = rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")!;
     const proposed = (call[1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed.lines).toEqual([
@@ -123,15 +123,17 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
     const rpc = mockDb((name) => ({ data: name === "sales_order_submit_amendment" ? { id: AMEND, base_revision: 1 } : {}, error: null }));
     const res = await post({
       header: header({ customer_phone: "0199999999", proceed_date: "2026-09-20" }), lines: lines(), addons: [], reason: "Customer call",
-      evidenceNote: "WhatsApp 22 Sep 09:40",
+      agreement: { kind: "customer_confirmation", reference: "WhatsApp 22 Sep 09:40" },
     });
     expect(res.status).toBe(201);
-    expect((await bodyOf(res)).evidenceRecorded).toBe(true);
+    expect((await bodyOf(res)).agreementRecorded).toBe(true);
     const proposed = (rpc.mock.calls.find(([n]) => n === "sales_order_submit_amendment")![1] as { p_proposed: Record<string, unknown> }).p_proposed;
     expect(proposed.header).toEqual({ customer_phone: "0199999999", proceed_date: "2026-09-20" });
     expect(proposed.base_header).toEqual({ customer_phone: "0100000000", proceed_date: "2026-09-17" });
     expect(proposed.addons).toEqual([]);
-    expect(rpc).toHaveBeenCalledWith("sales_order_record_amendment_evidence", { p_amendment_id: AMEND, p_note: "WhatsApp 22 Sep 09:40" });
+    expect(rpc).toHaveBeenCalledWith("sales_order_record_amendment_agreement", {
+      p_amendment_id: AMEND, p_kind: "customer_confirmation", p_reference: "WhatsApp 22 Sep 09:40", p_detail: null,
+    });
     expect(rpc).not.toHaveBeenCalledWith("sales_order_save_revision", expect.anything());
   });
 
@@ -173,16 +175,7 @@ describe("POST /api/operation/orders/:id/changes — the server chooses the comm
   });
 });
 
-describe("evidence and withdraw doors", () => {
-  it("records evidence through the RPC", async () => {
-    const rpc = mockDb(() => ({ data: { id: AMEND, evidence_note: "WhatsApp" }, error: null }));
-    const jwt = await signTestJwt("11111111-1111-1111-1111-000000000999", { email: "o@carres.com", app_metadata: { role: "operation" } });
-    const res = await app.fetch(new Request(`http://t/api/operation/orders/amendment/${AMEND}/evidence`, {
-      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ note: "WhatsApp" }),
-    }), env);
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("sales_order_record_amendment_evidence", { p_amendment_id: AMEND, p_note: "WhatsApp" });
-  });
+describe("the withdraw door", () => {
   it("withdraw requires a reason", async () => {
     mockDb(() => ({ data: null, error: null }));
     const jwt = await signTestJwt("11111111-1111-1111-1111-000000000999", { email: "o@carres.com", app_metadata: { role: "operation" } });

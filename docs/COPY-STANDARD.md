@@ -2664,8 +2664,8 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Positive decision that atomically creates the next revision | **Approve and apply** |
 | Re-propose a complete historical version as a new governed change | **Propose this version again** |
 | Stale proposal state/action | **Out of date — propose again** |
-| The customer's recorded basis for a commercial change (0562) | **Customer agreement evidence** — the MASTER's own heading; its missing state reads `Not recorded yet — the change cannot take effect.` ⚠️ build wording 2026-09-23, owner confirmation owed |
-| Add a catalogue service to the SO object draft (0562) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
+| Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date | **Delivery date to be confirmed** |

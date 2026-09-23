@@ -125,7 +125,7 @@ import {
   useSalespersons,
   useDecideSalesOrderAmendment,
   useOrderPayments,
-  useRecordAmendmentEvidence,
+  useRecordAmendmentAgreement,
   useSubmitSalesOrderChanges,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
@@ -135,6 +135,7 @@ import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
+import type { RecordedAgreement } from "./customer-agreement";
 import { configWords, diffRows, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
@@ -1387,7 +1388,7 @@ function SalesOrderWorkspaceBody() {
   editingRef.current = editing;
   const [changeReason, setChangeReason] = useState("");
   const [changeAskedOn, setChangeAskedOn] = useState<string | null>(null);
-  const [changeEvidence, setChangeEvidence] = useState("");
+  const [changeAgreement, setChangeAgreement] = useState<RecordedAgreement | null>(null);
   /** Proposing again over an out-of-date request withdraws it first (server). */
   const [replaceAmendmentId, setReplaceAmendmentId] = useState<string | null>(null);
   const role = useAuth((st) => st.role);
@@ -1887,7 +1888,7 @@ function SalesOrderWorkspaceBody() {
     if (seed) setDraft(seed);
     setChangeReason("");
     setChangeAskedOn(null);
-    setChangeEvidence("");
+    setChangeAgreement(null);
     setReplaceAmendmentId(replaceId ?? null);
     setEditing(true);
     setObjectView("Order");
@@ -1903,7 +1904,7 @@ function SalesOrderWorkspaceBody() {
       if (r.action === "saved") toast.success(`Saved · Rev ${r.revision}`);
       else {
         toast.success("Sent for approval. The order stays as it is until management approves.");
-        if (changeEvidence.trim() && !r.evidenceRecorded) toast.error("The customer agreement evidence was not saved — add it on the request.");
+        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded — record it on the request.");
       }
       setDraft(baseline);
       setEditing(false);
@@ -1927,7 +1928,7 @@ function SalesOrderWorkspaceBody() {
       installment_months: draft.installment_months,
       reason: changeReason.trim(),
       customerAskedOn: changeAskedOn,
-      evidenceNote: changeEvidence.trim() || null,
+      agreement: changeAgreement ?? undefined,
       replaceAmendmentId,
     });
   };
@@ -1940,8 +1941,8 @@ function SalesOrderWorkspaceBody() {
     },
     onError: (e) => toast.error(e.message),
   });
-  const evidenceMut = useRecordAmendmentEvidence(orderId ?? "", {
-    onSuccess: () => toast.success("Customer agreement evidence saved"),
+  const agreementMut = useRecordAmendmentAgreement(orderId ?? "", {
+    onSuccess: () => toast.success("Customer agreement recorded"),
     onError: (e) => toast.error(e.message),
   });
 
@@ -2806,8 +2807,8 @@ function SalesOrderWorkspaceBody() {
           onReason={setChangeReason}
           askedOn={changeAskedOn}
           onAskedOn={setChangeAskedOn}
-          evidence={changeEvidence}
-          onEvidence={setChangeEvidence}
+          agreement={changeAgreement}
+          onAgreement={setChangeAgreement}
         />
       )}
       {mode === "object" && !editing && liveAmendment && requestView && (
@@ -2816,8 +2817,8 @@ function SalesOrderWorkspaceBody() {
           rows={requestView.rows}
           consequences={requestView.consequences}
           canDecide={role === "principal"}
-          busy={decideMut.isPending || evidenceMut.isPending}
-          onRecordEvidence={(note) => evidenceMut.mutate({ amendmentId: liveAmendment.id, note })}
+          busy={decideMut.isPending || agreementMut.isPending}
+          onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
           onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
           onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
         />
