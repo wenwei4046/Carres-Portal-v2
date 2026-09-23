@@ -76,8 +76,12 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   last line (the SO's two-line-label rule). Label gutter **23mm** (widest
   one-line label `Delivery Method` 21.4mm; widest value `:  Supplier
   delivers` 24.2mm; 23 + 24.2 = 47.2mm ≤ 52). Retired on paper:
-  `Deliver by` · `Issued` · `Version` row · `PO Doc Date` · `Supplier Default
-  Delivery Date` · `Delivery method`. **No SO No row** — a bulk PO can
+  `Deliver by` · `Issued` · `Version` row · **`PO Date`** · `Supplier Default
+  Delivery Date` · `Delivery method`. *(This list read `PO Doc Date` until
+  2026-09-23 and contradicted the row order three lines above it, which has
+  always said `PO Doc Date`. The owner's 2026-09-23 ruling settles it: every
+  document's own date reads `{DOC} Doc Date`, so `PO Doc Date` is the word that
+  prints and `PO Date` is the one that is retired.)* **No SO No row** — a bulk PO can
   carry dozens; the table's SO NO column is the one home. **ONE layout for
   every PO (Jess, 2026-09-22):** a one-SO purchase order (every sofa PO) keeps
   the SO NO column too — lifting its single SO into PO DETAILS was proposed
