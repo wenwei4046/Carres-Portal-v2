@@ -174,7 +174,7 @@ gate holds, numbered on the order and the leg; the customer leg's number mirrors
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
 - **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
-  (migration `0575`, PR_PLACEHOLDER).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
+  (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
   issue **`SDO2609-48271`** (five, 100,000 a month): prefix + two-digit year + two-digit month of
   **issue** + `-` + random digits (leading zeros allowed). The two businesses are
   told apart by the prefix; the document model, gates and team are one. Fixed width — the system
