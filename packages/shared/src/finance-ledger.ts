@@ -90,7 +90,29 @@ export interface LedgerChart {
    *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
    *  GET /accounts only; absent elsewhere. */
   rule_headings?: string[];
+  /** Which account does each job, role -> code (0570 `gl_account_roles_read`).
+   *  A screen that needs "the bank charges account" reads it here, never
+   *  writes the number. Sent by GET /accounts only. */
+  roles?: Record<string, string>;
+  /** Every money account (0570 reads `gl_money_accounts`), wherever it sits in
+   *  the chart. Sent by GET /accounts only. */
+  money_accounts?: string[];
 }
+
+/** The account that does a job, from the chart's roles; undefined when the
+ *  chart is still loading, the role read failed, or no account holds it. */
+export function roleAccount(chart: LedgerChart | undefined, role: string): LedgerAccount | undefined {
+  const code = chart?.roles?.[role];
+  return code === undefined ? undefined : chart?.accounts.find((a) => a.code === code);
+}
+
+/** An account's number: four digits (1210), or AutoCount's form: three
+ *  digits, a dash, then a digit or capital letter and three digits (100-0001,
+ *  900-A001). ASCII only. The shape, and the sentence below, are 0570's own:
+ *  gl_account_update checks the same thing, so the two must not drift apart. */
+export const ledgerAccountCodeShape = /^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$/;
+export const LEDGER_ACCOUNT_CODE_MESSAGE =
+  "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.";
 
 export interface TrialBalanceAccountRow {
   account_code: string;

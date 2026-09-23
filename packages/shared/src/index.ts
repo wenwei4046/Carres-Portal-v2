@@ -609,7 +609,7 @@ export {
 export {
   ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
   ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
-  ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountMoveInput,
+  ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountCodeInput, ledgerAccountMoveInput,
   type LedgerAccountReorderInput, type LedgerAccountMoveInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";

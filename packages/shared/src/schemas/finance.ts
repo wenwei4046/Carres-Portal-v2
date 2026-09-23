@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { departmentFilterFields, departmentFilterMessage, departmentFilterOk } from '../department';
 import { paymentMethodKeySchema } from './order-payments';
+import { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE } from '../finance-ledger';
 
 /**
  * Phase 5 — HQ Finance role inputs.
@@ -342,19 +343,24 @@ export const ledgerEntryRef = z.union([
   z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z-]{1,39}$/, 'Use an entry number like JE-202609-0003'),
 ]);
 
-/** An account's number: four digits (1210), or three digits, a dash and four
- *  (100-0001). Both shapes, and the sentence below, are 0550's own — the
- *  function checks the same thing, so the two must not drift apart. */
-export const ledgerAccountCodeShape = /^(\d{4}|\d{3}-\d{4})$/;
-export const LEDGER_ACCOUNT_CODE_MESSAGE =
-  'A number is four digits, or three digits, a dash and four — 1210 or 100-0001.';
+// The shape and its sentence live in finance-ledger.ts, which imports nothing,
+// so order-payments.ts can use them without an import cycle through this file.
+export { ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE };
+
+/** A number as typed: the letter may be lower case (900-a001) and is stored in
+ *  capitals, as gl_account_update does. The check runs BEFORE the capitals, so
+ *  a non-ASCII letter that JavaScript would turn into A-Z (the dotless i) is
+ *  still refused. */
+export const ledgerAccountCodeInput = z.string().trim()
+  .regex(/^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$/, LEDGER_ACCOUNT_CODE_MESSAGE)
+  .transform((c) => c.toUpperCase());
 
 /** Rename or renumber one account on Finance Settings → Chart of accounts
  *  (0539, renumber added by 0550). `code` left out means the number stays;
  *  a number that is given cascades to every row that names it. */
 export const ledgerAccountUpdateInput = z.object({
   name: z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.'),
-  code: z.string().trim().regex(ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE).optional(),
+  code: ledgerAccountCodeInput.optional(),
 }).strict();
 
 /**
@@ -368,8 +374,8 @@ export const ledgerAccountUpdateInput = z.object({
  * `parentCode` is null for a top-level account — the chart's roots are siblings
  * of each other. The refusal sentences are the database's (COPY-STANDARD 0557).
  */
-/* A code in a move or reorder body. Both shapes 0550/0570 accept, so an account
-   renumbered to 100-0001 can still be dragged. */
+/* A code in a move or reorder body. Both shapes 0570 accepts, so an account
+   renumbered to 100-0001 or 900-A001 can still be dragged. */
 const chartCode = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.');
 
 export const ledgerAccountReorderInput = z.object({

@@ -32,14 +32,14 @@ const account = (code: string, name: string, extra: Record<string, unknown> = {}
   is_active: true, is_header: false, ...extra,
 });
 const CHART = { go_live_on: "2026-09-10", accounts: [
-  account("1100", "Cash and bank", { is_header: true }),
-  account("1120", "Bank — current account", { parent_code: "1100" }),
-  account("1210", "Trade receivables — customers", { is_control: true, control_for: "CUSTOMER" }),
-  account("1230", "Advances to suppliers"),
-  account("2310", "SST payable", { kind: "LIABILITY", is_active: false }),
-  account("3300", "Opening balance equity", { kind: "EQUITY" }),
-  account("6100", "Rent", { kind: "EXPENSE" }),
-] };
+  account("310-0000", "Cash and bank", { is_header: true }),
+  account("310-1000", "Bank — current account", { parent_code: "310-0000" }),
+  account("300-0000", "Trade receivables — customers", { is_control: true, control_for: "CUSTOMER" }),
+  account("340-A001", "Advances to suppliers"),
+  account("430-0001", "SST payable", { kind: "LIABILITY", is_active: false }),
+  account("151-0000", "Opening balance equity", { kind: "EQUITY" }),
+  account("900-S002", "Rent", { kind: "EXPENSE" }),
+], roles: { SUPPLIER_ADVANCE: "340-A001" } };
 
 const ROW = {
   id: "e1", entry_no: "JE-202609-0003", entry_date: "2026-09-10", source_type: "SALES_INVOICE",
@@ -52,9 +52,9 @@ const RECORDED_ROW = {
   source_doc_no: "MJ-202609-0001", narration: "Opening bank balance", total_debit: 12500.5, total_credit: 12500.5,
 };
 const RECORDED_DETAIL = { entry: RECORDED_ROW, related: [], lines: [
-  { line_no: 1, account_code: "1120", account_name: "Bank — current account", debit: 12500.5, credit: 0,
+  { line_no: 1, account_code: "310-1000", account_name: "Bank — current account", debit: 12500.5, credit: 0,
     party_type: null, party_id: null, party_name: null, memo: "Test bank statement" },
-  { line_no: 2, account_code: "3300", account_name: "Opening balance equity", debit: 0, credit: 12500.5,
+  { line_no: 2, account_code: "151-0000", account_name: "Opening balance equity", debit: 0, credit: 12500.5,
     party_type: null, party_id: null, party_name: null, memo: null },
 ] };
 
@@ -100,13 +100,13 @@ function narrate(text: string) {
   fireEvent.change(screen.getByLabelText(/^Narration/), { target: { value: text } });
 }
 
-/** Dr 1120 Bank / Cr 3300 Opening balance equity — how an opening bank balance goes in. */
+/** Dr 310-1000 Bank / Cr 151-0000 Opening balance equity — how an opening bank balance goes in. */
 async function fillOpeningBalance(credit = "12500.50") {
   await screen.findByTestId("manual-journal-form");
-  await pick(1, "1120 Bank — current account");
+  await pick(1, "310-1000 Bank — current account");
   type(1, "Debit", "12,500.50");
   type(1, "Memo", "Test bank statement");
-  await pick(2, "3300 Opening balance equity");
+  await pick(2, "151-0000 Opening balance equity");
   type(2, "Credit", credit);
   narrate("Opening bank balance");
 }
@@ -156,12 +156,12 @@ describe("the New journal entry door", () => {
 });
 
 describe("the form", () => {
-  it("offers only accounts a journal may use — no heading, retired or customer/supplier account", async () => {
+  it("offers only accounts a journal may use — no heading, retired or customer/supplier account, nor the supplier-advance account the role names", async () => {
     show("/finance/ledger?entry=new");
     await screen.findByTestId("manual-journal-form");
     fireEvent.keyDown(within(line(1)).getByLabelText("Account"), { key: "Enter" });
     const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
-    expect(options).toEqual(["1120 Bank — current account", "3300 Opening balance equity", "6100 Rent"]);
+    expect(options).toEqual(["310-1000 Bank — current account", "151-0000 Opening balance equity", "900-S002 Rent"]);
   });
 
   it("keeps Record journal entry disabled, naming the gap, until debits equal credits", async () => {
@@ -197,9 +197,9 @@ describe("the form", () => {
     narrate("Correction of a test entry");
     type(1, "Debit", "10");
     expect(screen.getByRole("button", { name: "Record journal entry — choose an account on line 1" })).toBeDisabled();
-    await pick(1, "6100 Rent");
+    await pick(1, "900-S002 Rent");
     expect(screen.getByRole("button", { name: "Record journal entry — add a second line" })).toBeDisabled();
-    await pick(2, "1120 Bank — current account");
+    await pick(2, "310-1000 Bank — current account");
     expect(screen.getByRole("button", { name: "Record journal entry — type a debit or a credit on line 2" })).toBeDisabled();
   });
 
@@ -234,8 +234,8 @@ describe("recording", () => {
       entry_date: "2026-09-15",
       narration: "Opening bank balance",
       lines: [
-        { account_code: "1120", debit: 12500.5, credit: null, memo: "Test bank statement" },
-        { account_code: "3300", debit: null, credit: 12500.5, memo: null },
+        { account_code: "310-1000", debit: 12500.5, credit: null, memo: "Test bank statement" },
+        { account_code: "151-0000", debit: null, credit: 12500.5, memo: null },
       ],
       requestKey: expect.stringMatching(UUID),
     });
@@ -294,9 +294,9 @@ describe("recording", () => {
     show("/finance/ledger?entry=new");
     await screen.findByTestId("manual-journal-form");
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
-    await pick(1, "1120 Bank — current account");
+    await pick(1, "310-1000 Bank — current account");
     type(1, "Debit", "100");
-    await pick(3, "6100 Rent");
+    await pick(3, "900-S002 Rent");
     type(3, "Credit", "100");
     narrate("Correction of a test entry");
     const why = "Line 2 names an account that is no longer in use.";
@@ -310,7 +310,7 @@ describe("recording", () => {
     expect(await screen.findByTestId("journal-refusal")).toHaveTextContent(why);
     const post = api.fetch.mock.calls.find(([u]) => u === "/api/finance/manual-journals");
     const sent = JSON.parse(String((post?.[1] as RequestInit).body)) as { lines: { account_code: string }[] };
-    expect(sent.lines.map((l) => l.account_code)).toEqual(["1120", "6100"]);
+    expect(sent.lines.map((l) => l.account_code)).toEqual(["310-1000", "900-S002"]);
     expect(within(line(2)).getByLabelText("Credit")).toHaveValue("100");
     expect(screen.queryByTestId("journal-line-3")).not.toBeInTheDocument();
   });

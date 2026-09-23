@@ -478,6 +478,30 @@ describe("GET /accounts", () => {
     expect(body.accounts).toHaveLength(3);
     expect(body.rule_headings).toEqual([]);
   });
+
+  it("names which account does each job and which accounts hold money (0570), so no screen writes a number", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) =>
+      call.name === "gl_account_roles_read" ? ok({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" })
+      : call.name === "gl_money_accounts" ? ok([{ account_code: "320-0000" }, { account_code: "310-A001" }])
+      : answer(call));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_roles_read");
+    expect(body.roles).toEqual({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" });
+    expect(body.money_accounts).toEqual(["320-0000", "310-A001"]);
+  });
+
+  it("still serves the chart when the roles or the money accounts cannot be read", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) =>
+      call.name === "gl_account_roles_read" || call.name === "gl_money_accounts" ? fail("42501") : answer(call));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.roles).toEqual({});
+    expect(body.money_accounts).toEqual([]);
+  });
 });
 
 describe("PATCH /accounts/:code", () => {
@@ -515,6 +539,27 @@ describe("PATCH /accounts/:code", () => {
     });
   });
 
+  it("takes AutoCount's letter form, and sends a lower-case letter in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A001"));
+    const res = await patch("/accounts/6900", { name: "Advertisement", code: " 900-a001 " });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "6900", p_name: "Advertisement", p_new_code: "900-A001" });
+    expect((await patch("/accounts/900-A001", { name: "Advertisement" })).status).toBe(200);
+  });
+
+  it.each(["900-AA01", "90-A001", "900-A0011", "900-ı001", "900-İ001", "٩٠٠-A001", "９０００"])(
+    "refuses %s before the database",
+    async (code) => {
+      const { sb } = fakeClient(() => ok("x"));
+      const res = await patch("/accounts/6900", { name: "X", code });
+      expect(res.status).toBe(422);
+      expect((await json(res)).message).toBe(
+        "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
+      );
+      expect(sb.rpc).not.toHaveBeenCalled();
+    },
+  );
+
   it("reaches an account that already carries the dashed shape in its own path", async () => {
     const { sb } = fakeClient(() => ok("100-0001"));
     expect((await patch("/accounts/100-0001", { name: "Accruals" })).status).toBe(200);
@@ -530,7 +575,7 @@ describe("PATCH /accounts/:code", () => {
     const shape = await patch("/accounts/2130", { name: "X", code: "99" });
     expect(shape.status).toBe(422);
     expect((await json(shape)).message).toBe(
-      "A number is four digits, or three digits, a dash and four — 1210 or 100-0001.",
+      "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
     );
     // A field the door does not take is still refused.
     expect((await patch("/accounts/2130", { name: "X", kind: "ASSET" })).status).toBe(422);
@@ -539,7 +584,7 @@ describe("PATCH /accounts/:code", () => {
   // 0550's four refusals, each one reaching the user as its own sentence under
   // its own tag rather than as raw database text.
   it.each([
-    ["code_shape", "22023", 422, "A number is four digits, or three digits, a dash and four — 1210 or 100-0001."],
+    ["code_shape", "22023", 422, "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001."],
     ["code_exists", "22023", 422, "An account numbered 2140 is already in the chart."],
     ["name_exists", "22023", 422, "An account named Accruals is already in the chart."],
     ["not_finance", "42501", 403, "Only Finance changes the chart of accounts."],

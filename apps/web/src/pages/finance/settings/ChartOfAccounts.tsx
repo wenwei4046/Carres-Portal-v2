@@ -55,7 +55,8 @@
  * rather than left on screen as a lie.
  */
 import { useEffect, useMemo, useState } from "react";
-import { chartTree, ledgerKindWord, type LedgerAccount } from "@carres/shared/finance-ledger";
+import { chartTree, ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount } from "@carres/shared/finance-ledger";
+import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
@@ -259,8 +260,15 @@ function AccountModal({ account, onClose }: { account: Row; onClose: () => void 
   const trimmedCode = code.trim();
   const submit = () => {
     setRefusal(null);
+    // 0570's shape, checked here too so the sentence sits under the Number
+    // field; a lower-case letter (900-a001) goes up in capitals, as stored.
+    const shaped = ledgerAccountCodeInput.safeParse(trimmedCode);
+    if (!shaped.success) {
+      setRefusal({ field: "code", message: LEDGER_ACCOUNT_CODE_MESSAGE });
+      return;
+    }
     save.mutate(
-      { code: account.code, name: trimmed, newCode: trimmedCode },
+      { code: account.code, name: trimmed, newCode: shaped.data },
       { onSuccess: onClose, onError: (e) => setRefusal(refusalOf(e)) },
     );
   };

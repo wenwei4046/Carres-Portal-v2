@@ -380,13 +380,28 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [read, rules] = await Promise.all([readChart(sb), sb.rpc("gl_rule_headings")]);
+  const [read, rules, roles, money] = await Promise.all([
+    readChart(sb),
+    sb.rpc("gl_rule_headings"),
+    sb.rpc("gl_account_roles_read"),
+    sb.from("gl_money_accounts").select("account_code"),
+  ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   // 0570: the headings no account moves into or out of, so the chart screen
   // never offers that drop. If this read fails the chart still loads: the
   // screen then offers the drop and gl_account_move refuses it in its own words.
   const ruleHeadings = !rules.error && Array.isArray(rules.data) ? rules.data.map(String) : [];
-  return c.json({ ...read.chart, rule_headings: ruleHeadings });
+  // 0570: which account does each job (role -> code), and which accounts hold
+  // money. Screens read these instead of writing a number. If a read fails the
+  // chart still loads; a screen that needs the missing answer says so.
+  const roleMap: Record<string, string> = {};
+  if (!roles.error && roles.data && typeof roles.data === "object" && !Array.isArray(roles.data)) {
+    for (const [k, v] of Object.entries(roles.data as Record<string, unknown>)) roleMap[k] = String(v);
+  }
+  const moneyAccounts = !money.error && Array.isArray(money.data)
+    ? (money.data as Json[]).map((r) => String(r.account_code))
+    : [];
+  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts });
 });
 
 /**
@@ -399,7 +414,7 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
  *   name_missing   22023 → 422   Type the account name.
  *   name_too_long  22023 → 422   Keep the name to 60 characters.
  *   name_exists    22023 → 422   An account named X is already in the chart.
- *   code_shape     22023 → 422   A number is four digits, or three digits, …
+ *   code_shape     22023 → 422   A number is four digits, like 1210, or AutoCount's …
  *   code_exists    22023 → 422   An account numbered X is already in the chart.
  *
  * What is added here is the tag itself, forwarded as `code` — the same
@@ -415,8 +430,8 @@ function accountError(c: Context<AppEnv>, error: PgError) {
 
 financeLedgerRouter.patch("/accounts/:code", requireFinance, async (c) => {
   const code = c.req.param("code");
-  // Both shapes 0550 accepts, not just four digits — an account renumbered to
-  // 100-0001 must still be reachable by its own path.
+  // Both shapes 0570 accepts, not just four digits: an account renumbered to
+  // 100-0001 or 900-A001 must still be reachable by its own path.
   if (!ledgerAccountCodeShape.test(code)) {
     return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
   }

@@ -172,9 +172,11 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
 
   const accountOptions = useMemo(
     () => (chart.data?.accounts ?? [])
-      /* 1230 Advances to suppliers is written only by the Advance flow; the
-       * database refuses it on a manual journal line too (0510). */
-      .filter((a: LedgerAccount) => a.is_active && !a.is_header && !a.is_control && a.code !== "1230")
+      /* The supplier-advance account is written only by the Advance flow; the
+       * database refuses it on a manual journal line too (0510). 0570: which
+       * account that is comes from the chart's roles, never a number here. */
+      .filter((a: LedgerAccount) => a.is_active && !a.is_header && !a.is_control
+        && a.code !== chart.data?.roles?.SUPPLIER_ADVANCE)
       .map((a) => ({ value: a.code, label: `${a.code} ${a.name}` })),
     [chart.data],
   );

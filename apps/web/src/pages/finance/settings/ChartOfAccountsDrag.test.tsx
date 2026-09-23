@@ -61,7 +61,7 @@ vi.mock("@/lib/api", () => ({
         go_live_on: "2026-09-10",
         accounts: net.chart.map((a) => ({ ...a, is_header: net.chart.some((c) => c.parent_code === a.code) })),
         // 0570 gl_rule_headings: the customer-money heading below.
-        rule_headings: ["2250"],
+        rule_headings: ["403-0000"],
       };
     }
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -109,28 +109,28 @@ const acc = (code: string, name: string, parent_code: string | null, kind = "LIA
 });
 /* One heading with three children, and a second heading of the same kind right
    below them: the keyboard has to step OVER it, and a drop may land ON it.
-   2210 is the only account under 2200, so it may never leave. 2250 is a
+   402-B001 is the only account under 402-0000, so it may never leave. 403-0000 is a
    heading money rules read (`rule_headings`): nothing moves into or out of
-   it. 2400 is a posting account beside the headings under 2000. The asset
+   it. 404-0000 is a posting account beside the headings under 400-0000. The asset
    branch is a heading of another kind, which a drop may never reach. */
 const CHART = [
-  acc("1000", "Assets", null, "ASSET"),
-  acc("1100", "Cash and bank", "1000", "ASSET"),
-  acc("1110", "Cash on hand", "1100", "ASSET"),
-  acc("2000", "Liabilities", null),
-  acc("2100", "Payables", "2000"),
-  acc("2110", "Trade payables", "2100"),
-  acc("2120", "Deposits held", "2100"),
-  acc("2130", "Accrued expenses", "2100"),
-  acc("2200", "Borrowings", "2000"),
-  acc("2210", "Bank loan", "2200"),
-  acc("2250", "Customer money held", "2000"),
-  acc("2260", "Customer deposits held", "2250"),
-  acc("2270", "Advance deposits held", "2250"),
-  acc("2400", "Director's account", "2000"),
+  acc("300-0000", "Assets", null, "ASSET"),
+  acc("310-0000", "Cash and bank", "300-0000", "ASSET"),
+  acc("310-C001", "Cash on hand", "310-0000", "ASSET"),
+  acc("400-0000", "Liabilities", null),
+  acc("401-0000", "Payables", "400-0000"),
+  acc("401-A001", "Trade payables", "401-0000"),
+  acc("401-D001", "Deposits held", "401-0000"),
+  acc("401-E001", "Accrued expenses", "401-0000"),
+  acc("402-0000", "Borrowings", "400-0000"),
+  acc("402-B001", "Bank loan", "402-0000"),
+  acc("403-0000", "Customer money held", "400-0000"),
+  acc("403-C001", "Customer deposits held", "403-0000"),
+  acc("403-D001", "Advance deposits held", "403-0000"),
+  acc("404-0000", "Director's account", "400-0000"),
 ];
-const ASSETS = ["1000", "1100", "1110"];
-const BORROWINGS = ["2200", "2210", "2250", "2260", "2270", "2400"];
+const ASSETS = ["300-0000", "310-0000", "310-C001"];
+const BORROWINGS = ["402-0000", "402-B001", "403-0000", "403-C001", "403-D001", "404-0000"];
 
 beforeEach(() => {
   net.posts = [];
@@ -171,10 +171,10 @@ function drag(from: string, onto: string) {
 }
 
 async function ready() {
-  await waitFor(() => expect(row("2110")).toBeTruthy());
+  await waitFor(() => expect(row("401-A001")).toBeTruthy());
 }
 
-const START = [...ASSETS, "2000", "2100", "2110", "2120", "2130", ...BORROWINGS];
+const START = [...ASSETS, "400-0000", "401-0000", "401-A001", "401-D001", "401-E001", ...BORROWINGS];
 
 /** Nothing was sent and nothing moved on screen. The request goes out a tick
     after the drop, so this waits before it looks. */
@@ -189,37 +189,37 @@ describe("Chart of accounts — a real row drag", () => {
   it("drags an account down: the order changes and the number does not", async () => {
     show();
     await ready();
-    expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2120", "2130", ...BORROWINGS]);
+    expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-D001", "401-E001", ...BORROWINGS]);
 
-    drag("2110", "2130");
+    drag("401-A001", "401-E001");
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
     expect(net.posts[0]).toEqual({
-      parentCode: "2100",
+      parentCode: "401-0000",
       // The order it READ, not the order it wants. These two being the same
       // array is what silently disables the two-dragger check.
-      was: ["2110", "2120", "2130"],
-      now: ["2120", "2130", "2110"],
+      was: ["401-A001", "401-D001", "401-E001"],
+      now: ["401-D001", "401-E001", "401-A001"],
     });
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2120", "2130", "2110", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-D001", "401-E001", "401-A001", ...BORROWINGS]),
     );
     // THE NUMBER IS UNTOUCHED: the same codes, still on the same names.
     expect([...codesOnScreen()].sort()).toEqual(CHART.map((a) => a.code).sort());
-    expect(row("2110").textContent).toContain("2110");
-    expect(row("2110").textContent).toContain("Trade payables");
+    expect(row("401-A001").textContent).toContain("401-A001");
+    expect(row("401-A001").textContent).toContain("Trade payables");
   });
 
   it("drags an account to the top of its heading", async () => {
     show();
     await ready();
 
-    drag("2130", "2110");
+    drag("401-E001", "401-A001");
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
-    expect(net.posts[0]!.now).toEqual(["2130", "2110", "2120"]);
+    expect(net.posts[0]!.now).toEqual(["401-E001", "401-A001", "401-D001"]);
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2130", "2110", "2120", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-E001", "401-A001", "401-D001", ...BORROWINGS]),
     );
   });
 
@@ -229,7 +229,7 @@ describe("Chart of accounts — a real row drag", () => {
     await ready();
     const readsBefore = net.reads;
 
-    drag("2110", "2130");
+    drag("401-A001", "401-E001");
 
     expect(await screen.findByTestId("chart-refusal")).toHaveTextContent(
       "The chart changed while you were dragging. Open it again and redo the move.",
@@ -237,7 +237,7 @@ describe("Chart of accounts — a real row drag", () => {
     // The optimistic order is gone, and the chart was asked for again.
     await waitFor(() => expect(net.reads).toBeGreaterThan(readsBefore));
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2120", "2130", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-D001", "401-E001", ...BORROWINGS]),
     );
   });
 
@@ -245,21 +245,21 @@ describe("Chart of accounts — a real row drag", () => {
     show();
     await ready();
 
-    const tr = row("2110");
+    const tr = row("401-A001");
     tr.focus();
     fireEvent.keyDown(tr, { key: "ArrowDown", altKey: true });
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
     expect(net.posts[0]).toEqual({
-      parentCode: "2100",
-      was: ["2110", "2120", "2130"],
-      now: ["2120", "2110", "2130"],
+      parentCode: "401-0000",
+      was: ["401-A001", "401-D001", "401-E001"],
+      now: ["401-D001", "401-A001", "401-E001"],
     });
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2120", "2110", "2130", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-D001", "401-A001", "401-E001", ...BORROWINGS]),
     );
     // Plain ArrowDown is still plain row navigation, not a move.
-    fireEvent.keyDown(row("2110"), { key: "ArrowDown" });
+    fireEvent.keyDown(row("401-A001"), { key: "ArrowDown" });
     expect(net.posts).toHaveLength(1);
   });
 
@@ -267,9 +267,9 @@ describe("Chart of accounts — a real row drag", () => {
     show();
     await ready();
 
-    const tr = row("2130");
+    const tr = row("401-E001");
     tr.focus();
-    // The next row down is 2200, a heading of the same kind that a DROP may
+    // The next row down is 402-0000, a heading of the same kind that a DROP may
     // land on (0570). Alt + arrow is not a drop: it stays among siblings, and
     // there is no sibling below, so nothing is sent.
     fireEvent.keyDown(tr, { key: "ArrowDown", altKey: true });
@@ -283,26 +283,26 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    drag("2120", "2200");
+    drag("401-D001", "402-0000");
 
     await waitFor(() => expect(net.moves).toHaveLength(1));
     expect(net.posts).toHaveLength(0);
     expect(net.moves[0]).toEqual({
-      code: "2120",
-      toParentCode: "2200",
+      code: "401-D001",
+      toParentCode: "402-0000",
       // Each heading sends the order it READ and the order it WANTS. Never the
       // same array twice: that would switch the two-dragger check off.
-      from: { was: ["2110", "2120", "2130"], now: ["2110", "2130"] },
-      to: { was: ["2210"], now: ["2210", "2120"] },
+      from: { was: ["401-A001", "401-D001", "401-E001"], now: ["401-A001", "401-E001"] },
+      to: { was: ["402-B001"], now: ["402-B001", "401-D001"] },
     });
-    // It now sits LAST under 2200, no longer under 2100.
+    // It now sits LAST under 402-0000, no longer under 401-0000.
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120", "2250", "2260", "2270", "2400"]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-E001", "402-0000", "402-B001", "401-D001", "403-0000", "403-C001", "403-D001", "404-0000"]),
     );
     // Same number, same name.
-    expect(row("2120").textContent).toContain("2120 Deposits held");
-    expect(net.chart.find((a) => a.code === "2120")).toMatchObject({
-      code: "2120", name: "Deposits held", parent_code: "2200", sort_order: 2,
+    expect(row("401-D001").textContent).toContain("401-D001 Deposits held");
+    expect(net.chart.find((a) => a.code === "401-D001")).toMatchObject({
+      code: "401-D001", name: "Deposits held", parent_code: "402-0000", sort_order: 2,
     });
   });
 
@@ -310,8 +310,8 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 2210 is a posting account under another heading.
-    drag("2120", "2210");
+    // 402-B001 is a posting account under another heading.
+    drag("401-D001", "402-B001");
 
     await nothingHappened();
   });
@@ -320,8 +320,8 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 1100 Cash and bank is an asset heading; 2120 is a liability.
-    drag("2120", "1100");
+    // 310-0000 Cash and bank is an asset heading; 401-D001 is a liability.
+    drag("401-D001", "310-0000");
 
     await nothingHappened();
   });
@@ -330,26 +330,26 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 2100 and 2200 are headings side by side under 2000.
-    drag("2100", "2200");
+    // 401-0000 and 402-0000 are headings side by side under 400-0000.
+    drag("401-0000", "402-0000");
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
     expect(net.moves).toHaveLength(0);
     expect(net.posts[0]).toEqual({
-      parentCode: "2000",
-      was: ["2100", "2200", "2250", "2400"],
-      now: ["2200", "2100", "2250", "2400"],
+      parentCode: "400-0000",
+      was: ["401-0000", "402-0000", "403-0000", "404-0000"],
+      now: ["402-0000", "401-0000", "403-0000", "404-0000"],
     });
-    // Still under 2000, with its own accounts.
-    expect(net.chart.find((a) => a.code === "2100")).toMatchObject({ parent_code: "2000" });
-    expect(net.chart.filter((a) => a.parent_code === "2100").map((a) => a.code)).toEqual(["2110", "2120", "2130"]);
+    // Still under 400-0000, with its own accounts.
+    expect(net.chart.find((a) => a.code === "401-0000")).toMatchObject({ parent_code: "400-0000" });
+    expect(net.chart.filter((a) => a.parent_code === "401-0000").map((a) => a.code)).toEqual(["401-A001", "401-D001", "401-E001"]);
   });
 
   it("offers a heading no heading to go under in its row menu", async () => {
     show();
     await ready();
 
-    const tr = row("2100");
+    const tr = row("401-0000");
     tr.focus();
     fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
 
@@ -363,7 +363,7 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    drag("2120", "2250");
+    drag("401-D001", "403-0000");
 
     await nothingHappened();
   });
@@ -372,8 +372,8 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 2260 has a sibling, so only the heading's rule stops it.
-    drag("2260", "2200");
+    // 403-C001 has a sibling, so only the heading's rule stops it.
+    drag("403-C001", "402-0000");
 
     await nothingHappened();
   });
@@ -382,8 +382,8 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 2210 is the only account under 2200.
-    drag("2210", "2100");
+    // 402-B001 is the only account under 402-0000.
+    drag("402-B001", "401-0000");
 
     await nothingHappened();
   });
@@ -392,19 +392,19 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    // 2400 and 2200 are both under 2000.
-    drag("2400", "2200");
+    // 404-0000 and 402-0000 are both under 400-0000.
+    drag("404-0000", "402-0000");
 
     await waitFor(() => expect(net.moves).toHaveLength(1));
     expect(net.posts).toHaveLength(0);
     expect(net.moves[0]).toEqual({
-      code: "2400",
-      toParentCode: "2200",
-      from: { was: ["2100", "2200", "2250", "2400"], now: ["2100", "2200", "2250"] },
-      to: { was: ["2210"], now: ["2210", "2400"] },
+      code: "404-0000",
+      toParentCode: "402-0000",
+      from: { was: ["401-0000", "402-0000", "403-0000", "404-0000"], now: ["401-0000", "402-0000", "403-0000"] },
+      to: { was: ["402-B001"], now: ["402-B001", "404-0000"] },
     });
-    expect(net.chart.find((a) => a.code === "2400")).toMatchObject({
-      code: "2400", name: "Director's account", parent_code: "2200",
+    expect(net.chart.find((a) => a.code === "404-0000")).toMatchObject({
+      code: "404-0000", name: "Director's account", parent_code: "402-0000",
     });
   });
 
@@ -412,16 +412,16 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    const tr = row("2400");
+    const tr = row("404-0000");
     tr.focus();
     fireEvent.keyDown(tr, { key: "ArrowUp", altKey: true });
 
     await waitFor(() => expect(net.posts).toHaveLength(1));
     expect(net.moves).toHaveLength(0);
     expect(net.posts[0]).toEqual({
-      parentCode: "2000",
-      was: ["2100", "2200", "2250", "2400"],
-      now: ["2100", "2200", "2400", "2250"],
+      parentCode: "400-0000",
+      was: ["401-0000", "402-0000", "403-0000", "404-0000"],
+      now: ["401-0000", "402-0000", "404-0000", "403-0000"],
     });
   });
 
@@ -429,22 +429,22 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     show();
     await ready();
 
-    const tr = row("2120");
+    const tr = row("401-D001");
     tr.focus();
     fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
 
     const menu = await screen.findByRole("menu");
     // Same kind, not the heading it is under already, no asset heading.
     expect(within(menu).getAllByRole("menuitem").map((b) => b.textContent)).toEqual([
-      "Move under 2000 Liabilities",
-      "Move under 2200 Borrowings",
+      "Move under 400-0000 Liabilities",
+      "Move under 402-0000 Borrowings",
     ]);
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Move under 2200 Borrowings" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Move under 402-0000 Borrowings" }));
 
     await waitFor(() => expect(net.moves).toHaveLength(1));
-    expect(net.moves[0]).toMatchObject({ code: "2120", toParentCode: "2200" });
+    expect(net.moves[0]).toMatchObject({ code: "401-D001", toParentCode: "402-0000" });
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120", "2250", "2260", "2270", "2400"]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-E001", "402-0000", "402-B001", "401-D001", "403-0000", "403-C001", "403-D001", "404-0000"]),
     );
   });
 
@@ -454,14 +454,14 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     await ready();
     const readsBefore = net.reads;
 
-    drag("2120", "2200");
+    drag("401-D001", "402-0000");
 
     expect(await screen.findByTestId("chart-refusal")).toHaveTextContent(
       "The chart changed while you were dragging. Open it again and redo the move.",
     );
     await waitFor(() => expect(net.reads).toBeGreaterThan(readsBefore));
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2120", "2130", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "401-0000", "401-A001", "401-D001", "401-E001", ...BORROWINGS]),
     );
   });
 });
@@ -471,20 +471,102 @@ describe("Chart of accounts — a heading's name and number (0570)", () => {
     show();
     await ready();
 
-    fireEvent.click(screen.getByText("2100 Payables"));
+    fireEvent.click(screen.getByText("401-0000 Payables"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText(/Number/), { target: { value: "210-0000" } });
+    // Typed in lower case: the letter goes up in capitals, as the database stores it.
+    fireEvent.change(within(dialog).getByLabelText(/Number/), { target: { value: "400-l000" } });
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Trade and other payables" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(net.patches).toHaveLength(1));
     expect(net.patches[0]).toEqual({
-      path: "/api/finance/ledger/accounts/2100",
-      body: { name: "Trade and other payables", code: "210-0000" },
+      path: "/api/finance/ledger/accounts/401-0000",
+      body: { name: "Trade and other payables", code: "400-L000" },
     });
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "210-0000", "2110", "2120", "2130", ...BORROWINGS]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "400-0000", "400-L000", "401-A001", "401-D001", "401-E001", ...BORROWINGS]),
     );
-    expect(row("210-0000").textContent).toContain("210-0000 Trade and other payables");
+    expect(row("400-L000").textContent).toContain("400-L000 Trade and other payables");
   });
+});
+
+/* AutoCount nests headings three deep, and its numbers do not follow the tree:
+   410-0010 sits under 401-0000, and 411-0000 is a heading under 410-0000. The
+   screen reads parent_code only, so the tree is right whatever order the
+   numbers sort in. */
+const THREE_DEEP = [
+  acc("499-0000", "Liabilities", null),
+  acc("401-0000", "Payables", "499-0000"),
+  acc("400-0000", "Trade creditors", "401-0000"),
+  acc("410-0010", "Accrued expenses", "401-0000"),
+  acc("410-0000", "Accruals", "499-0000"),
+  acc("410-0060", "Accrued commission", "410-0000"),
+  acc("411-0000", "Accruals - salaries", "410-0000"),
+  acc("410-0011", "Accrued salaries - sales", "411-0000"),
+];
+
+describe("Chart of accounts: headings three deep (0570)", () => {
+  beforeEach(() => {
+    net.chart = THREE_DEEP.map((a) => ({ ...a }));
+  });
+
+  it("shows each account under its own heading, indented by depth, not by number", async () => {
+    show();
+    await waitFor(() => expect(row("410-0011")).toBeTruthy());
+    expect(codesOnScreen()).toEqual([
+      "499-0000", "401-0000", "400-0000", "410-0010", "410-0000", "410-0060", "411-0000", "410-0011",
+    ]);
+    const indent = (code: string) => (row(code).querySelector("span[style]") as HTMLElement).style.paddingLeft;
+    expect([indent("499-0000"), indent("410-0000"), indent("411-0000"), indent("410-0011")]).toEqual(["0px", "20px", "40px", "60px"]);
+  });
+
+  it("moves an account under the third-level heading", async () => {
+    show();
+    await waitFor(() => expect(row("410-0011")).toBeTruthy());
+    drag("410-0010", "411-0000");
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    expect(net.moves[0]).toEqual({
+      code: "410-0010",
+      toParentCode: "411-0000",
+      from: { was: ["400-0000", "410-0010"], now: ["400-0000"] },
+      to: { was: ["410-0011"], now: ["410-0011", "410-0010"] },
+    });
+    await waitFor(() => expect(codesOnScreen()).toEqual([
+      "499-0000", "401-0000", "400-0000", "410-0000", "410-0060", "411-0000", "410-0011", "410-0010",
+    ]));
+  });
+
+  it("renumbers the middle heading to a letter code, and the level below follows", async () => {
+    show();
+    await waitFor(() => expect(row("410-0011")).toBeTruthy());
+    fireEvent.click(screen.getByText("411-0000 Accruals - salaries"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/Number/), { target: { value: "411-a000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.patches).toHaveLength(1));
+    expect(net.patches[0]).toEqual({
+      path: "/api/finance/ledger/accounts/411-0000",
+      body: { name: "Accruals - salaries", code: "411-A000" },
+    });
+    await waitFor(() => expect(codesOnScreen()).toEqual([
+      "499-0000", "401-0000", "400-0000", "410-0010", "410-0000", "410-0060", "411-A000", "410-0011",
+    ]));
+    expect(net.chart.find((a) => a.code === "410-0011")).toMatchObject({ parent_code: "411-A000" });
+  });
+
+  it.each(["900-AA01", "90-A001", "900-A0011", "900-\u0130001", "\uFF19\uFF10\uFF10-A001", "900-\u0131001"])(
+    "refuses %s under the Number field without sending it",
+    async (typed) => {
+      show();
+      await waitFor(() => expect(row("410-0011")).toBeTruthy());
+      fireEvent.click(screen.getByText("410-0060 Accrued commission"));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText(/Number/), { target: { value: typed } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      expect(await within(dialog).findByText(
+        "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
+      )).toBeInTheDocument();
+      expect(net.patches).toHaveLength(0);
+    },
+  );
 });

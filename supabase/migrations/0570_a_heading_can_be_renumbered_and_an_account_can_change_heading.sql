@@ -36,7 +36,10 @@
 -- 2 · gl_account_update(code, name, new_code): 0550's door, one door for an
 --     account and a heading alike. The name checks are gl_account_rename's,
 --     carried from pg_proc on a 0561 clone; the blank-name test is 0560's form.
---     The number's shape is checked with [0-9], never \d. gl_account_rename is
+--     The number's shape is checked with [0-9], never \d: four digits (1210),
+--     or AutoCount's three digits, a dash, a digit or capital letter and three
+--     digits (100-0001, 900-A001). It is stored in upper case: 900-a001 is
+--     kept as 900-A001. gl_account_rename is
 --     dropped, as 0550 did: nothing calls it since PR 1504.
 --     Around the number change it sets two transaction-local settings,
 --     carres.gl_renumber_from / carres.gl_renumber_to, and clears them after.
@@ -79,16 +82,35 @@
 --         heading becomes a posting account and could never become a heading
 --         again once posted to.
 --     gl_rule_headings() hands the screen those two heading numbers so it
---     never offers the drop.
+--     never offers the drop. gl_account_roles_read() hands the screens every
+--     role's account, so no screen writes 4900, 6500, 1230, 2110, 2120 or
+--     5100: GET /api/finance/ledger/accounts serves both.
 --
--- 5 · Five account numbers written inside function bodies become roles in
---     gl_account_roles (0554's table), because a renumber cannot reach text:
+-- 5 · Account numbers written inside function bodies are read by role
+--     (gl_account_roles, 0554's table), because a renumber cannot reach text.
+--     Five new roles:
 --       '1100' in gl_money_account_add (where a new bank account is hung),
 --       '2200' and '1300' in fin_money_in_account_problem (which headings hold
 --       customer money and stock), and '3200' / '3300' in the same function.
---     Both bodies are pg_proc's text on a 0561 clone with only the literal
---     swapped. The 1121-1129 / 1131-1139 code ranges in gl_money_account_add are
---     NOT changed: how a new bank account is numbered is the owner's call.
+--     Three refusal sentences named an account by number; they now print the
+--     role's own number and name (existing roles, same wording around it):
+--       '6500' and '4900' in _gl_money_move_check, '1230' in gl_manual_journal.
+--     A NEW MONEY ACCOUNT'S NUMBER follows the heading's own number (YH,
+--     23 Sep: follow the AutoCount chart, where banks sit under CASH AT BANK
+--     310-0000 as 310-1000, 310-2000 ..). A heading NNN-0000 gives NNN-K000
+--     for the smallest free K in 1..9; a heading HH00 gives the smallest free
+--     number in HH01..HH99. The 1121-1129 / 1131-1139 ranges are gone.
+--     ASSUMPTION: a bank and a holding account follow the same rule, because
+--     AutoCount has no GHL, AhaPay or Online holding account; the owner may
+--     give holdings their own heading later.
+--     Every body is pg_proc's text on a 0561 or 0563 clone with only those
+--     lines changed. The sanity block refuses the file if any of those
+--     numbers is still written inside one of the five bodies.
+--
+-- THE DASHBOARD'S CASH (web, not SQL): the Net cash tile and the Cashflow
+-- chart add up every account in gl_money_accounts wherever it sits in the
+-- chart, not the accounts under one heading. In AutoCount CASH IN HAND
+-- 320-0000 is not under CASH AT BANK 310-0000.
 --
 -- REPORTS: gl_profit_and_loss and gl_balance_sheet group by the live
 -- parent_code (`coalesce(a.parent_code, a.code) as hdr`); gl_trial_balance does
@@ -168,6 +190,12 @@ declare
   v_name text := btrim(coalesce(p_name, ''));
   v_code text := btrim(coalesce(p_new_code, p_code));
 begin
+  -- 0570: the number is stored in upper case, so 900-a001 is kept as 900-A001.
+  -- The shape is checked first, on the typed text with [A-Za-z], because
+  -- upper() turns some non-ASCII letters into ASCII ones.
+  if v_code ~ '^([0-9]{4}|[0-9]{3}-[0-9A-Za-z][0-9]{3})$' then
+    v_code := upper(v_code);
+  end if;
   if v_role is null or v_role not in ('finance','principal') then
     raise exception 'Only Finance changes the chart of accounts.'
       using errcode = '42501', detail = 'not_finance';
@@ -191,8 +219,10 @@ begin
       using errcode = '22023', detail = 'name_exists';
   end if;
   -- [0-9], not \d: \d can take a non-ASCII digit on some collations.
-  if v_code !~ '^([0-9]{4}|[0-9]{3}-[0-9]{4})$' then
-    raise exception 'A number is four digits, or three digits, a dash and four — 1210 or 100-0001.'
+  -- Today's four digits, or AutoCount's: three digits, a dash, then a digit
+  -- or a capital letter and three digits (310-1000, 900-A001).
+  if v_code !~ '^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$' then
+    raise exception 'A number is four digits, like 1210, or AutoCount''s form, like 100-0001 or 900-A001.'
       using errcode = '22023', detail = 'code_shape';
   end if;
   if v_code <> p_code and exists (select 1 from public.gl_accounts a where a.code = v_code) then
@@ -822,6 +852,31 @@ comment on function public.gl_rule_headings() is
 revoke all on function public.gl_rule_headings() from public, anon;
 grant execute on function public.gl_rule_headings() to authenticated;
 
+-- Every role and the account it names, for the screens: a screen that needs
+-- 4900 Other income or 6500 Bank and payment charges reads it here, by role,
+-- so a renumber reaches it. gl_account_roles has RLS on and no policy, and
+-- gl_account_for is not granted to authenticated, so this is the one read.
+create or replace function public.gl_account_roles_read()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  if not public.gl_may_read() then
+    raise exception 'The chart is for Finance.'
+      using errcode = '42501', detail = 'not_finance';
+  end if;
+  return coalesce((select jsonb_object_agg(r.role, r.account_code) from public.gl_account_roles r), '{}'::jsonb);
+end;
+$fn$;
+
+comment on function public.gl_account_roles_read() is
+  '0570: every gl_account_roles row as {role: account code}, for the screens. Finance readers only (gl_may_read).';
+revoke all on function public.gl_account_roles_read() from public, anon;
+grant execute on function public.gl_account_roles_read() to authenticated;
+
 create or replace function public.gl_account_move(
   p_code      text,
   p_to_parent text,
@@ -978,7 +1033,9 @@ insert into public.gl_account_roles (role, account_code) values
   ('RETAINED_EARNINGS',       '3200'),   -- written only by the year-end close
   ('OPENING_BALANCE_EQUITY',  '3300');   -- written only by the opening balances
 
--- pg_proc on a 0561 clone. Only '1100' changed.
+-- pg_proc on a 0561 clone. '1100' is read from the role, and the new number
+-- follows the heading's own number instead of the 1121-1129 / 1131-1139
+-- ranges (see section 5 at the top). Every other line is unchanged.
 CREATE OR REPLACE FUNCTION public.gl_money_account_add(p_name text, p_kind text)
  RETURNS text
  LANGUAGE plpgsql
@@ -989,6 +1046,7 @@ declare
   v_role text := public.app_role()::text;
   v_name text;
   v_code text;
+  v_head public.gl_accounts%rowtype;
 begin
   if v_role is null or v_role not in ('finance','principal') then
     raise exception 'Only Finance changes the money accounts.'
@@ -1002,19 +1060,35 @@ begin
   perform pg_advisory_xact_lock(hashtext('gl_money_account_add'));
   v_name := public._gl_money_account_name(p_name, null);
 
-  select min(c.code) into v_code
-    from (select ((case p_kind when 'BANK' then 1121 else 1131 end) + g)::text as code
-            from generate_series(0, 8) g) c
-   where not exists (select 1 from public.gl_accounts a where a.code = c.code);
+  -- 0570: the heading is read from gl_account_roles, and the number follows
+  -- the heading's own number, never a range written here. A heading like
+  -- 310-0000 gives 310-1000, 310-2000 .. 310-9000 (AutoCount's banks under
+  -- CASH AT BANK); a heading like 1100 gives 1101 .. 1199. The smallest free
+  -- one is taken, for a bank and a holding account alike.
+  select a.* into v_head from public.gl_accounts a
+   where a.code = public.gl_account_for('MONEY_ACCOUNTS_HEADING');
+  if v_head.code ~ '^[0-9]{3}-0000$' then
+    select min(c.code) into v_code
+      from (select left(v_head.code, 4) || k::text || '000' as code
+              from generate_series(1, 9) k) c
+     where not exists (select 1 from public.gl_accounts a where a.code = c.code);
+  elsif v_head.code ~ '^[0-9]{2}00$' then
+    select min(c.code) into v_code
+      from (select left(v_head.code, 2) || lpad(k::text, 2, '0') as code
+              from generate_series(1, 99) k) c
+     where not exists (select 1 from public.gl_accounts a where a.code = c.code);
+  else
+    raise exception 'A new account is numbered from its heading, and % % does not end in 00 or -0000.',
+      coalesce(v_head.code, 'The money accounts heading'), coalesce(v_head.name, '')
+      using errcode = 'P0001', detail = 'heading_shape';
+  end if;
   if v_code is null then
-    raise exception 'Codes % are all used. Take an account out of use, or ask for a new range.',
-      case p_kind when 'BANK' then '1121 to 1129' else '1131 to 1139' end
+    raise exception 'There is no free number left under % %.', v_head.code, v_head.name
       using errcode = 'P0001', detail = 'no_code_left';
   end if;
 
-  -- 0570: the heading is read from gl_account_roles, not written here.
   insert into public.gl_accounts (code, name, kind, parent_code, is_control, is_active, control_for)
-  values (v_code, v_name, 'ASSET', public.gl_account_for('MONEY_ACCOUNTS_HEADING'), false, true, null);
+  values (v_code, v_name, 'ASSET', v_head.code, false, true, null);
   insert into public.gl_money_accounts (account_code, money_kind, created_by, updated_by)
   values (v_code, p_kind, auth.uid(), auth.uid());
   return v_code;
@@ -1097,6 +1171,207 @@ begin
 end;
 $function$;
 
+-- pg_proc on a 0563 clone. Only the two refusal sentences changed: they name
+-- the account by its role's own number and name instead of '6500' and '4900'.
+-- The wording around the account is 0537's, unchanged (0554 kept it).
+CREATE OR REPLACE FUNCTION public._gl_money_move_check(p_kind text, p_from text, p_to text, p_amount numeric, p_fee numeric, p_date date)
+ RETURNS void
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_from_kind text;
+  v_to_kind   text;
+  v_named     text;
+begin
+  -- 0537: two more kinds.
+  if p_kind is null or p_kind not in ('TRANSFER','CARD_PAYOUT','BANK_CHARGE','BANK_CREDIT') then
+    raise exception 'Choose a bank transfer, a card payout, a bank charge or a bank credit.'
+      using errcode = '22023', detail = 'kind_missing';
+  end if;
+  if p_date is null then
+    raise exception 'Choose the date the money moved.'
+      using errcode = '22023', detail = 'date_missing';
+  end if;
+  perform public.fin_refuse_before_go_live(p_date, 'This money move');
+
+  if p_amount is null or p_amount <= 0 or p_amount <> round(p_amount, 2) then
+    raise exception 'The amount must be more than RM 0.00, in sen at most.'
+      using errcode = '22023', detail = 'amount_invalid';
+  end if;
+  if p_fee is null or p_fee < 0 or p_fee <> round(p_fee, 2) then
+    raise exception 'The fee must be RM 0.00 or more, in sen at most.'
+      using errcode = '22023', detail = 'fee_invalid';
+  end if;
+  -- 0537: only a card payout has a fee.
+  if p_kind <> 'CARD_PAYOUT' and p_fee <> 0 then
+    raise exception 'Only a card payout has a fee. Record a bank charge as its own money move.'
+      using errcode = '22023', detail = 'fee_on_transfer';
+  end if;
+  if p_from is not distinct from p_to then
+    raise exception 'The money must move between two different accounts.'
+      using errcode = '22023', detail = 'same_account';
+  end if;
+
+  -- 'in' is every in-use CASH, BANK and HOLDING leaf (0512); the kind narrows it.
+  select m.money_kind into v_from_kind from public.gl_money_accounts m
+   where m.account_code = p_from and public.gl_money_account_ok(p_from, 'in');
+  select m.money_kind into v_to_kind from public.gl_money_accounts m
+   where m.account_code = p_to and public.gl_money_account_ok(p_to, 'in');
+
+  if p_kind = 'TRANSFER' then
+    if v_from_kind is null or v_from_kind not in ('CASH','BANK') then
+      raise exception 'Paid from must be a cash or bank account in use.'
+        using errcode = '22023', detail = 'from_account_refused';
+    end if;
+    if v_to_kind is null or v_to_kind not in ('CASH','BANK') then
+      raise exception 'Paid into must be a cash or bank account in use.'
+        using errcode = '22023', detail = 'to_account_refused';
+    end if;
+  -- 0537: a bank charge leaves a bank for BANK_AND_PAYMENT_CHARGES; a bank credit reaches a bank from OTHER_INCOME.
+  elsif p_kind = 'BANK_CHARGE' then
+    if v_from_kind is distinct from 'BANK' then
+      raise exception 'A bank charge is taken from a bank account in use.'
+        using errcode = '22023', detail = 'from_account_refused';
+    end if;
+    if p_to is distinct from public.gl_account_for('BANK_AND_PAYMENT_CHARGES') then
+      -- 0570: the account's own number and name, read by its role.
+      select a.code || ' ' || a.name into v_named from public.gl_accounts a
+       where a.code = public.gl_account_for('BANK_AND_PAYMENT_CHARGES');
+      raise exception 'A bank charge goes to %.', v_named
+        using errcode = '22023', detail = 'to_account_refused';
+    end if;
+  elsif p_kind = 'BANK_CREDIT' then
+    if p_from is distinct from public.gl_account_for('OTHER_INCOME') then
+      -- 0570: the account's own number and name, read by its role.
+      select a.code || ' ' || a.name into v_named from public.gl_accounts a
+       where a.code = public.gl_account_for('OTHER_INCOME');
+      raise exception 'A bank credit comes from %.', v_named
+        using errcode = '22023', detail = 'from_account_refused';
+    end if;
+    if v_to_kind is distinct from 'BANK' then
+      raise exception 'A bank credit goes into a bank account in use.'
+        using errcode = '22023', detail = 'to_account_refused';
+    end if;
+  else
+    if v_from_kind is distinct from 'HOLDING' then
+      raise exception 'A card payout comes from a card or online holding account in use.'
+        using errcode = '22023', detail = 'from_account_refused';
+    end if;
+    if v_to_kind is distinct from 'BANK' then
+      raise exception 'A card payout goes into a bank account in use.'
+        using errcode = '22023', detail = 'to_account_refused';
+    end if;
+  end if;
+end;
+$function$;
+
+-- pg_proc on a 0563 clone. Only the refusal sentence changed: it names the
+-- account by its role's own number and name instead of '1230'.
+CREATE OR REPLACE FUNCTION public.gl_manual_journal(p_entry_date date, p_narration text, p_lines jsonb, p_request_key uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_role    app_role;
+  v_uid     uuid;
+  v_elem    jsonb;
+  v_idx     int := 0;
+  v_code    text;
+  v_control boolean;
+  v_doc_no  text;
+  v_id      uuid;
+  v_seen    public.gl_manual_journal_requests%rowtype;
+  v_seen_no text;
+begin
+  v_role := public.app_role();
+  if not coalesce(public.is_principal(), false) then
+    raise exception 'gl_manual_journal refused: role % may not raise a manual journal — principal only', coalesce(v_role::text,'none')
+      using errcode = '42501', detail = 'gl_manual_journal_forbidden';
+  end if;
+  v_uid := auth.uid();
+
+  -- A resend carries the same key. The lock queues it behind the first call,
+  -- and it then finds what the first call recorded.
+  if p_request_key is not null then
+    perform pg_advisory_xact_lock(hashtextextended('gl_manual_journal:' || p_request_key::text, 0));
+    select r.* into v_seen from public.gl_manual_journal_requests r
+     where r.request_key = p_request_key;
+    if found then
+      -- The same key must carry the same entry. A key sent again with another
+      -- date, narration or lines is not a resend: say so, and never hand back
+      -- an entry that is not what the person typed.
+      if v_seen.entry_date is distinct from p_entry_date
+         or v_seen.narration is distinct from btrim(coalesce(p_narration, ''))
+         or v_seen.lines is distinct from p_lines
+         or v_seen.created_by is distinct from v_uid then
+        select e.entry_no into v_seen_no from public.gl_entries e where e.id = v_seen.entry_id;
+        raise exception 'gl_manual_journal refused: this request was already recorded as % with different details', coalesce(v_seen_no, v_seen.entry_id::text)
+          using errcode = 'P0001', detail = 'idempotency_mismatch';
+      end if;
+      return v_seen.entry_id;
+    end if;
+  end if;
+
+  if p_entry_date is null then
+    raise exception 'gl_manual_journal refused: entry_date is required — a blank date is never replaced with today'
+      using errcode = '22023', detail = 'gl_manual_journal_entry_date_null';
+  end if;
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' then
+    raise exception 'gl_manual_journal refused: p_lines must be a JSON array, got %', coalesce(jsonb_typeof(p_lines),'null')
+      using errcode = '22023', detail = 'gl_manual_journal_lines_not_array';
+  end if;
+  if nullif(btrim(coalesce(p_narration,'')), '') is null then
+    raise exception 'gl_manual_journal refused: a narration is required — a manual journal with no explanation is unauditable'
+      using errcode = '22023', detail = 'gl_manual_journal_narration_blank';
+  end if;
+
+  -- Control accounts belong to their subsidiary documents, not to a keyboard.
+  for v_elem in select value from jsonb_array_elements(p_lines) loop
+    v_idx := v_idx + 1;
+    if jsonb_typeof(v_elem) <> 'object' then
+      raise exception 'gl_manual_journal refused: line % is a %, expected an object', v_idx, jsonb_typeof(v_elem)
+        using errcode = '22023', detail = 'gl_manual_journal_line_not_object';
+    end if;
+    v_code := btrim(coalesce(v_elem->>'account_code',''));
+    select a.is_control into v_control from public.gl_accounts a where a.code = v_code;
+    if found and v_control then
+      raise exception 'gl_manual_journal refused: line % names control account % — AR and AP move only through their own documents', v_idx, v_code
+        using errcode = '22023', detail = 'gl_manual_journal_control_account';
+    end if;
+    -- 0510: the supplier advance account is written only by the Advance flow.
+    -- 0570: its number and name are the account's own, read by its role.
+    if v_code = public.gl_account_for('SUPPLIER_ADVANCE') then
+      raise exception 'gl_manual_journal refused: line % names account % %, which is kept by its own documents', v_idx,
+        v_code, (select a.name from public.gl_accounts a where a.code = v_code)
+        using errcode = '22023', detail = 'gl_manual_journal_control_account';
+    end if;
+  end loop;
+
+  v_doc_no := public.gl_next_doc_no('MJ', p_entry_date);
+
+  v_id := public.gl_post('MANUAL', v_doc_no, p_entry_date, p_narration, p_lines);
+
+  insert into audit_log (role, actor_text, action, ref)
+  values (v_role,
+          (select name from app_users where id = v_uid),
+          format('Manual journal posted · %s · %s', v_doc_no, btrim(p_narration)),
+          v_doc_no);
+
+  if p_request_key is not null then
+    insert into public.gl_manual_journal_requests
+      (request_key, entry_id, entry_date, narration, lines, created_by)
+    values
+      (p_request_key, v_id, p_entry_date, btrim(p_narration), p_lines, v_uid);
+  end if;
+
+  return v_id;
+end;
+$function$;
+
 -- ── sanity ───────────────────────────────────────────────────────────────────
 do $sanity$
 declare
@@ -1174,10 +1449,42 @@ begin
     raise exception '0570 sanity: a heading role is missing';
   end if;
 
-  -- No heading literal is left in the two rebuilt bodies.
-  if pg_get_functiondef('public.fin_money_in_account_problem(text, text)'::regprocedure) ~ '''(1300|2200|3200|3300)'''
-     or pg_get_functiondef('public.gl_money_account_add(text, text)'::regprocedure) ~ '''1100''' then
-    raise exception '0570 sanity: an account number is still written inside a body';
+  if has_function_privilege('anon', 'public.gl_account_roles_read()', 'execute')
+     or not has_function_privilege('authenticated', 'public.gl_account_roles_read()', 'execute') then
+    raise exception '0570 sanity: the grants on gl_account_roles_read are wrong';
+  end if;
+
+  -- No account number is written inside the five rebuilt bodies, comments
+  -- left out: not one of the numbers they used to carry, and not one of the
+  -- chart's numbers as they stand when this runs.
+  select string_agg(distinct format('%s (%s)', f.fn::regprocedure, n.code), ', ') into v_bad
+    from (values ('public.gl_money_account_add(text, text)'),
+                 ('public.fin_money_in_account_problem(text, text)'),
+                 ('public._gl_money_move_check(text, text, text, numeric, numeric, date)'),
+                 ('public.gl_manual_journal(date, text, jsonb, uuid)'),
+                 ('public.gl_account_update(text, text, text)')) as f(fn)
+    cross join lateral (select regexp_replace(p.prosrc, '--[^\n]*', '', 'g') as body
+                          from pg_proc p where p.oid = f.fn::regprocedure) b
+    join (select a.code from public.gl_accounts a
+          union
+          select unnest(array['1100','1121','1129','1131','1139','1230','1300',
+                              '2200','3200','3300','4900','6500'])) n
+      on b.body ~ ('(^|[^0-9A-Za-z-])' || n.code || '([^0-9A-Za-z-]|$)')
+   -- the shape sentence's own examples, which name no account
+   where not (f.fn = 'public.gl_account_update(text, text, text)' and n.code = '1210');
+  if v_bad is not null then
+    raise exception '0570 sanity: an account number is still written inside a body: %', v_bad;
+  end if;
+
+  -- The number's shape, in the door: today's four digits or AutoCount's.
+  if position('''^([0-9]{4}|[0-9]{3}-[0-9A-Z][0-9]{3})$''' in
+              pg_get_functiondef('public.gl_account_update(text, text, text)'::regprocedure)) = 0 then
+    raise exception '0570 sanity: gl_account_update does not check AutoCount''s number shape';
+  end if;
+  -- 0560's blank test survives in the door.
+  if position('coalesce(p_name, '''') !~ ''[^[:space:]]''' in
+              pg_get_functiondef('public.gl_account_update(text, text, text)'::regprocedure)) = 0 then
+    raise exception '0570 sanity: gl_account_update lost 0560''s blank-name test';
   end if;
 end $sanity$;
 
