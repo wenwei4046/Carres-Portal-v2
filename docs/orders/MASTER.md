@@ -120,6 +120,33 @@ This is the current owner-approved Sales Order operating model and UI authority.
 older Sales Order placement, route-copy and action-presentation wording wherever they conflict.
 The implementation record that follows is evidence, not a competing target.
 
+## External numbering privacy — owner requirements 2026-09-23
+
+**RULING / APPROVED REQUIREMENTS; format and implementation NOT APPROVED.** Jess requires
+customers and other outside parties not to infer Carres' order count from document numbers, and
+requires the shortest practical readable numbers. A sequential external SO reference is therefore
+not an acceptable future recommendation merely because its integer capacity is sufficient.
+Check the whole outward document/reference surface, not only the SO heading. This requirement
+does not authorize changing existing numbers, issued documents, database sequences, permissions,
+application code, or another module's identity rules. Existing implementation remains evidence,
+not proof that the privacy requirement is satisfied.
+
+**PROPOSAL / NOT LAW:** a new outward SO reference such as `SO-K7M4Q`, with five randomly allocated
+characters from 32 unambiguous uppercase/digit symbols (excluding I, O, 0 and 1), no date and no
+running counter. Its 33,554,432-code space covers the illustrative ten-year 1,000-orders/day
+scenario (365 days/year: 3,650,000 orders, not a business forecast). Four characters provide only
+1,048,576 codes and fail that scenario. Randomness alone does not prevent collisions: allocation
+must be atomic with uniqueness enforcement and retry; repeated submission must identify the same
+business request. Record links remain authoritative IDs. Preserve historical issued identities and
+documents. Exact format, cutover, staff display and each other document family's treatment require
+review of the complete recommendation; this proposal authorizes no build.
+
+**Falsifier:** revise the proposal if confirmed lifetime issuance, offline/multi-system allocation,
+external integrations, or operator reading trials exceed its capacity or make five mixed characters
+unusable. It conceals the running counter, not every possible inference from transaction activity;
+it is never an authorization secret. Reconcile §9's message-reference rules in the concrete cutover,
+without treating a new SO display code as permission to send SO numbers to suppliers.
+
 ## One purpose and one navigation home
 
 Sales Orders is the truth/register home of the customer order. It lets an authorised employee find
