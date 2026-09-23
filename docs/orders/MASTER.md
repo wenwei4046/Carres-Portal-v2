@@ -1765,6 +1765,34 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   Tabs stay `Order | Revisions | History | Order Route`. Rejected from 2990: an
   overall status pill (a Sales Order has no overall status), `Relationship Map` (Order Route is that view)
   and a standalone `Cancel SO` button.
+
+  **⚠️ PROTECTED OWNERSHIP IS NOT YET IN THIS LANE — MEASURED 2026-09-23, TARGET UNCHANGED.**
+  The ruling above stands exactly as approved: a change to `Sales Location` · `Salesperson` · `Dealer`
+  belongs to `Submit amendment request`. **The implementation does not do that yet, and this entry
+  exists so nobody reads the ruling as a description of the code.**
+
+  ```
+  APPROVED TARGET   the three ownership facts travel with the rest of the whole-page edit,
+                    through ONE commit the system chooses, into ONE amendment request.
+  BUILT TODAY       they are deliberately EXCLUDED from `classifySalesOrderChange`
+                    (`packages/shared/src/sales-order-change.ts`, stated in its own header
+                    comment) and keep the separate governed attribution lane (0329):
+                    submit → approve/reject → apply, with its own approver (GATE 3) and its
+                    own withdraw door. The whole-page SAVE door REFUSES a change carrying any
+                    of the four attribution fields before the database is asked.
+  ```
+
+  **Nothing is missing and nothing is ungoverned.** The capability exists, the approval is real, and
+  `apps/api/src/routes/operation/attribution-lane.test.ts` covers submit · approve · apply · withdraw ·
+  the permission boundary · and the save door's refusal of each field. What differs is the LANE, and
+  therefore what the operator experiences: changing a salesperson is a second request with a second
+  approval, instead of riding the one amendment the ruling describes.
+
+  **THE REMAINING DIFFERENCE, stated so it cannot be lost:** folding 0329 into the amendment lane —
+  one commit, one request, one approval, one applied revision, with the attribution approver's GATE 3
+  right preserved. It is a **design change, not a missing check**, so it is not done inside a test or
+  evidence card. It needs its own owner decision before it is built; until then this entry is the
+  honest record and the 2026-09-22 ruling remains the target, not a claim about today.
 - **Two panes, 50% / 50% — in BOTH states (owner, 2026-09-21: the preview remains).** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.

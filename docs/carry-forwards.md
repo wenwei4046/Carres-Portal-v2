@@ -1,3 +1,51 @@
+## `so-amendment-integration-tests-skip-in-ci` — EVIDENCE THAT PASSES LOCALLY AND IS NEVER RUN BY CI, opened 2026-09-23
+
+**🟡 The Sales Order amendment lane's strongest evidence does not run on any pull request.**
+`apps/api/src/test/amendment-lane-0564.integration.test.ts` (15 cases) and every sibling under
+`apps/api/src/test/*.integration.test.ts` open with
+`describe.skipIf(!URL || !LOCAL)` on `CARRES_TEST_DATABASE_URL`. CI sets no such variable, so the
+whole file is reported **SKIPPED**.
+
+**Why that is worse than having no test.** A summary line reads `172 passed | 8 skipped` and a
+reader takes the file as covered. It was: until 2026-09-23 these cases had **never been executed
+anywhere** — not locally, not in CI — and nobody knew, because skipping is silent. Run for real
+against a throwaway cluster that morning, all of them passed; but that is a fact about one laptop on
+one day, and the next change to `sales_order_decide_amendment`, `sales_order_submit_amendment` or
+`sales_order_save_revision` can break every one of them and merge green.
+
+**What runs them today, in full:**
+
+```
+LC_ALL=C node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json --keep
+CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> \
+  npx vitest run src/test          # from apps/api
+```
+
+The replay harness runs `initdb -U postgres`, so the role is **`postgres`**, never `$(whoami)`.
+
+**The fix is a CI decision, not a test change.** Give the `verify` workflow a Postgres service,
+replay the migration chain into it once, export `CARRES_TEST_DATABASE_URL`, and the existing
+`skipIf` turns itself off with no test edited. The guard must stay — it is what keeps these files
+from ever pointing at production — so the work is supplying a local database in CI, not removing the
+gate. Budget it against the replay: 570 files, ~14s on a laptop.
+
+**Known before starting:** the chain is not clean on `main`. Six migrations fail replay; five are on
+`scripts/migration-replay-baseline.json` and one, `0561_the_voucher_line_guard_survives_a_rebuild.sql`,
+is **not** — a syntax error, unrelated to Sales Orders and with its own owner. And three Finance
+integration suites (`finance-approver-role`, `advances-to-suppliers-1230`, `money-moves`) are red on
+`main` against the same database, also with their owner. **Turning this gate on turns those reds on
+too**, so either they land first or the first run is scoped to the suites that pass.
+
+**Why it was reported and not fixed:** the Sales Order scope that surfaced it was closed as evidence
+with no application change, and rewiring the shared CI workflow from inside it would widen a closed
+card into everyone else's build. **Closes when a pull request runs
+`apps/api/src/test/amendment-lane-0564.integration.test.ts` and its result is PASSED, not SKIPPED.**
+
+**Falsifier:** a CI run that reports those cases as executed today — then the gap was already closed
+and this entry goes.
+
+---
+
 ## `stock-register-pglite-timeout` — AN INTERMITTENT TEST WITH A KNOWN ONE-LINE FIX, opened 2026-09-14
 
 **🟡 `apps/api/src/routes/ops/stock-register.test.ts:181` flakes**, and the mechanism is known, so

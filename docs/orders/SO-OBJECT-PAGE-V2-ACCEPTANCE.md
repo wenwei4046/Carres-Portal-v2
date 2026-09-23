@@ -321,3 +321,35 @@ assuming the fixture's.
 5. **Not covered anywhere, and not claimed:** a real customer order was never amended, approved or
    rejected to demonstrate any of this. Every transaction-changing scenario ran on the throwaway
    database, inside one rolled-back transaction.
+
+---
+
+## 11 · SCOPE CLOSED, 2026-09-23 — and where the two open items now live
+
+The delivered Sales Order page and Amendment scope is **closed**. Nothing in §§1–10 is reopened, and
+no check recorded there is repeated.
+
+| Delivered | SHA | Record |
+|---|---|---|
+| 16 page/PDF corrections | `87a83b729` | §8 local · §9 production, signed in |
+| Amendment evidence reconciled, four unasserted rules closed | `0ac659425` | §10 |
+
+Both deploys converged on all three governed surfaces (`erp` · `pos` · the production Worker).
+
+**The two items this scope does NOT close are now owned elsewhere, not by this file:**
+
+1. **Protected ownership still uses the separate approval route.** Recorded in
+   `docs/orders/MASTER.md` § *VIEW FIRST, EDIT ON PURPOSE* → **PROTECTED OWNERSHIP IS NOT YET IN THIS
+   LANE**. The 2026-09-22 ruling is unchanged and remains the approved target; the entry states the
+   measured difference and names what folding 0329 into the amendment lane would take. **It needs an
+   owner decision before it is built** — it is a design change, not a missing check, and this
+   evidence scope had no authority to make it.
+2. **The integration evidence is skipped by CI.** Recorded as
+   `so-amendment-integration-tests-skip-in-ci` in `docs/carry-forwards.md`, with the exact reproduce
+   command, the CI shape that would turn the existing `skipIf` off without editing a test, and the
+   two unrelated reds that come with it. **Locally executed and PASSED on 2026-09-23; SKIPPED on every
+   pull request.** Both statements stay together wherever this is quoted.
+
+**Unrelated, and staying with their existing owners:** `/api/operation/dashboard` returning an error
+on production · `0561_the_voucher_line_guard_survives_a_rebuild.sql` failing migration replay while
+absent from the baseline · three Finance integration suites red on `main`.
