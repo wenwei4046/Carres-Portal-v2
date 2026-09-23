@@ -126,6 +126,8 @@ import {
   useDecideSalesOrderAmendment,
   useOrderPayments,
   useRecordAmendmentAgreement,
+  useIssuedSalesOrderDocument,
+  storeIssuedSalesOrderDocument,
   useSubmitSalesOrderChanges,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
@@ -1627,7 +1629,20 @@ function SalesOrderWorkspaceBody() {
     [mode, draft, baseline, base, refs, stair?.fee, addonNameByKey, currentRev],
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
+  /* ⭐ 0565 · THE STORED FILE WINS. A version issued after retention exists
+     keeps its own PDF, and that file — not a rebuild of it — is what this page
+     shows and prints. Only a version that never had one falls back to the
+     reconstruction, which is the legacy case the notice is for. */
+  const issuedDoc = useIssuedSalesOrderDocument(
+    mode === "oldrev" ? (orderId ?? null) : null,
+    mode === "oldrev" ? (viewedRevision?.revision ?? null) : null,
+  );
+  const storedDocumentUrl = mode === "oldrev" && issuedDoc.data?.stored ? (issuedDoc.data.url ?? null) : null;
+  const isReconstruction = mode === "oldrev" && issuedDoc.isFetched && !issuedDoc.data?.stored;
+
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
+    /* A stored file is shown as itself; nothing is rebuilt for it. */
+    if (mode === "oldrev" && storedDocumentUrl) return null;
     if (mode === "oldrev" && viewedRevision)
       return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
         addonNameByKey.get(key) ?? key,
@@ -1653,6 +1668,12 @@ function SalesOrderWorkspaceBody() {
     url: null,
   });
   const openPrint = async () => {
+    /* ⭐ 0565 · A VERSION THAT KEPT ITS DOCUMENT PRINTS THAT DOCUMENT. Not a
+       re-render of it — the actual file the customer was issued. */
+    if (storedDocumentUrl) {
+      window.open(storedDocumentUrl, "_blank");
+      return;
+    }
     if (!printData) return;
     if (printableRef.current.data !== printData || !printableRef.current.url) {
       if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
@@ -1662,11 +1683,10 @@ function SalesOrderWorkspaceBody() {
     const printable = printableRef.current.url;
     if (!printable) return;
     if (dirty) toast.message("You have unsaved changes — printing the saved version");
-    /* ⭐ A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT. The
-       file issued at the time is not stored, so this sheet is rebuilt from the
-       version's saved facts. The sentence is on the PAGE, never added to the
-       customer document. ⚠️ build wording 2026-09-23, owner confirmation owed. */
-    if (mode === "oldrev") {
+    /* A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT — and
+       this branch is only reached when no file was ever stored for the
+       version, which is the legacy case the notice exists for. */
+    if (isReconstruction) {
       toast.message("Reconstructed copy — original issued document unavailable.");
     }
     window.open(printable, "_blank");
@@ -1963,6 +1983,34 @@ function SalesOrderWorkspaceBody() {
     setEditing(false);
     setReplaceAmendmentId(null);
   };
+  /* ⭐ 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT — owner ruling 2026-09-23:
+     "Newly issued versions after this release: preserve their original issued
+     PDFs as required. A warning does not replace this capability."
+
+     The moment a version is minted, the CURRENT document IS that version, so
+     the sheet stored is the one the order actually issues — rendered from the
+     saved truth that has just been refetched, never from the draft. It is
+     stored once and the database refuses a second file for the same version.
+
+     ⛔ IT NEVER FAILS THE VERSION. The revision is already minted and is
+     business truth; keeping its paper is a separate act. If the render or the
+     upload fails, the version simply has no document and the page draws the
+     reconstruction with its notice — the legacy case, honestly. */
+  const keepIssuedDocument = async (revision: number | null | undefined) => {
+    if (!orderId || !revision) return;
+    try {
+      const fresh = await baseQ.refetch();
+      const issued = fresh.data ?? null;
+      if (!issued) return;
+      const blob = await renderSalesOrderPdf(issued);
+      const out = await storeIssuedSalesOrderDocument(orderId, revision, blob);
+      if (!out.stored) console.error("issued document not kept", { orderId, revision, reason: out.reason });
+      void revisionsQ.refetch();
+    } catch (e) {
+      console.error("issued document not kept", { orderId, revision, reason: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
   const changesMut = useSubmitSalesOrderChanges(orderId ?? "", {
     onSuccess: (r) => {
       if (r.action === "saved") toast.success(`Saved · Rev ${r.revision}`);
@@ -1977,6 +2025,8 @@ function SalesOrderWorkspaceBody() {
       void baseQ.refetch();
       void detailQ.refetch();
       void amendmentQ.refetch();
+      /* A correction mints a version; that version keeps the sheet it issued. */
+      if (r.action === "saved") void keepIssuedDocument(r.revision);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -2002,6 +2052,9 @@ function SalesOrderWorkspaceBody() {
       void revisionsQ.refetch();
       void baseQ.refetch();
       void detailQ.refetch();
+      /* An approved amendment mints a version the same way, and it keeps its
+         document the same way. A rejection mints nothing. */
+      if (r.status === "applied") void keepIssuedDocument(Number(r.revision));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -2852,29 +2905,35 @@ function SalesOrderWorkspaceBody() {
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
           </span>
-          {/* ⭐ WHAT THIS IS, SAID PLAINLY — APPROVED / LOCKED 2026-09-22:
-              "a revision prints its OWN stored document; a missing historical
-              file is STATED, never rebuilt from current data." The issued file
-              is not stored yet, so what the panel draws is REBUILT from the
-              version's own saved facts. Saying so is the half of the rule that
-              can be kept today; storing the file is the other half and is named
-              as open work in the Orders MASTER.
-              ⭐ OWNER-APPROVED WORDING 2026-09-23, verbatim and not open to
-              re-wording. The page prints the SAME sentence the document prints,
-              so a reader who sees it on screen and a customer who receives the
-              PDF are told the same thing. */}
-          <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
-            Reconstructed copy — original issued document unavailable.
-          </p>
+          {/* ⭐ TWO CASES, AND ONLY ONE OF THEM IS A RECONSTRUCTION — owner
+              ruling 2026-09-23: "Legacy PDFs that were never stored: use the
+              approved reconstructed-copy notice. Newly issued versions after
+              this release: preserve their original issued PDFs as required. A
+              warning does not replace this capability."
+
+              So a version issued since `0565` shows THE FILE IT WAS ISSUED AS,
+              and says so. Only a version that never had one is rebuilt, and it
+              carries the approved notice — verbatim, the same sentence the
+              rebuilt sheet itself prints, so screen and paper agree. */}
+          {storedDocumentUrl && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-issued-document">
+              The document this version was issued as.
+            </p>
+          )}
+          {isReconstruction && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
+              Reconstructed copy — original issued document unavailable.
+            </p>
+          )}
           {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
               untouched: it stays on the order and still prints on the current
               document. */}
-          {base?.signature_url && (
+          {isReconstruction && base?.signature_url && (
             <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
               Signature version not recorded.
             </p>
           )}
-          {(base?.payments ?? []).some((pm) => !pm.date) && (
+          {isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (
             <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
               One payment has no date, so it is not counted in this version.
             </p>
@@ -4069,7 +4128,21 @@ function SalesOrderWorkspaceBody() {
                   </div>
                 )}
                 <div className="relative mx-auto max-w-[700px]">
-                  <div ref={setPane} data-testid="pdf-pane" />
+                  {/* ⭐ 0565 · THE STORED FILE IS SHOWN AS ITSELF. Not
+                      re-rendered, not re-typeset: the bytes the customer was
+                      issued, in the browser's own viewer. Nothing rebuilt can
+                      appear in this branch, which is the point of it. */}
+                  {storedDocumentUrl ? (
+                    <object
+                      data={storedDocumentUrl}
+                      type="application/pdf"
+                      data-testid="issued-document-pane"
+                      aria-label={`The document Rev ${viewedRevision?.revision ?? ""} was issued as`}
+                      className="h-[860px] w-full rounded-card border border-kit-slate-5 bg-white"
+                    />
+                  ) : (
+                    <div ref={setPane} data-testid="pdf-pane" />
+                  )}
                   {/* The watermark is PREVIEW chrome, painted over the paper and
                       never into it — Print must produce the document, not a
                       picture of this screen. */}

@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import {
   keepPreviousData,
   useMutation,
@@ -5462,6 +5463,54 @@ export interface SalesOrderRevisionRow {
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
   note?: string | null;
+  /** 0565 — the object key of the PDF this version was ISSUED as. NULL on every
+   *  version minted before retention existed: that is the legacy case the page
+   *  draws as a reconstruction and says so. */
+  document_path?: string | null;
+  document_stored_at?: string | null;
+}
+
+/** 0565 — keep the sheet a version was issued as. Three steps, and the browser
+ *  never names the path: the API mints a signed URL for a key it chooses, the
+ *  bytes go there, and the database records it once and never again. */
+export async function storeIssuedSalesOrderDocument(
+  orderId: string,
+  revision: number,
+  pdf: Blob,
+): Promise<{ stored: boolean; reason?: string }> {
+  try {
+    const sign = await apiFetch<{ token: string; path: string; bucket: string }>(
+      `/api/operation/orders/${orderId}/revisions/${revision}/document/sign`,
+      { method: "POST" },
+    );
+    const up = await supabase.storage.from(sign.bucket).uploadToSignedUrl(sign.path, sign.token, pdf);
+    if (up.error) throw up.error;
+    await apiFetch(`/api/operation/orders/${orderId}/revisions/${revision}/document`, {
+      method: "POST",
+      body: JSON.stringify({ path: sign.path, bytes: pdf.size }),
+    });
+    return { stored: true };
+  } catch (e) {
+    /* ⛔ NEVER FAILS THE VERSION. The revision is already minted and is business
+       truth; keeping its paper is a separate act. A failure leaves the version
+       with no document, which is the reconstruction case the page already
+       draws honestly. */
+    return { stored: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 0565 — the signed URL of a version's ISSUED document, or `stored: false`
+ *  when no file was ever kept for it. */
+export function useIssuedSalesOrderDocument(orderId: string | null, revision: number | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "revisions", revision ?? 0, "document"] as const,
+    queryFn: () =>
+      apiFetch<{ stored: boolean; url: string | null }>(
+        `/api/operation/orders/${orderId}/revisions/${revision}/document`,
+      ),
+    enabled: !!orderId && !!revision,
+    staleTime: 30 * 60 * 1000,
+  });
 }
 
 export function useSalesOrderRevisions(

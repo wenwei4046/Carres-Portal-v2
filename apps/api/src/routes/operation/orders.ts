@@ -1189,13 +1189,29 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
     change_type: string | null;
     note: string | null;
   }>;
+  /* 0565 · the file each version was ISSUED as — a row BESIDE the version,
+     because `sales_order_revisions` is immutable. A version with no row here
+     never had a file stored, which is precisely the reconstruction case. */
+  const docs = await sb
+    .from("sales_order_revision_documents")
+    .select("revision, path, stored_at")
+    .eq("order_id", id);
+  const docByRevision = new Map<number, { path: string; stored_at: string }>(
+    ((docs.data ?? []) as Array<{ revision: number; path: string; stored_at: string }>).map((d) => [
+      d.revision,
+      { path: d.path, stored_at: d.stored_at },
+    ]),
+  );
   const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
   const revisions = rows.map((r) => {
     const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
+    const doc = docByRevision.get(r.revision) ?? null;
     return {
       ...r,
       created_by_name,
       actor_kind: actorKindOf(r.created_by, created_by_name),
+      document_path: doc?.path ?? null,
+      document_stored_at: doc?.stored_at ?? null,
     };
   });
   return c.json({ revisions });
@@ -2394,6 +2410,134 @@ operationOrdersRouter.post(
     return c.json(data, 201);
   },
 );
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT
+ *
+ * "Legacy PDFs that were never stored: use the approved reconstructed-copy
+ *  notice. Newly issued versions after this release: preserve their original
+ *  issued PDFs as required. A warning does not replace this capability."
+ *  — owner, 2026-09-23.
+ *
+ *   POST /:id/revisions/:revision/document/sign   mint a signed upload URL
+ *   POST /:id/revisions/:revision/document        record what was stored
+ *   GET  /:id/revisions/:revision/document        a signed URL to read it
+ *
+ * ⭐ THE BROWSER NEVER NAMES THE PATH. This does, from the order and the
+ * revision, so a document cannot be filed under a version it does not belong
+ * to — and the database checks the same shape again when it records it.
+ * Rendering is WASM and the Worker cannot do it, which is why the bytes come
+ * from the browser at all.
+ * ───────────────────────────────────────────────────────────────────────── */
+const SALES_ORDER_DOCUMENTS_BUCKET = "sales-order-documents";
+const salesOrderDocumentKey = (orderId: string, revision: number) =>
+  `sales-orders/${orderId}/rev-${revision}.pdf`;
+
+const revisionParam = (raw: string | undefined) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+operationOrdersRouter.post("/:id/revisions/:revision/document/sign", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  /* A version that already keeps its document is never re-issued: what the
+     customer was shown does not change afterwards. */
+  const version = await sb
+    .from("sales_order_revisions")
+    .select("revision")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (version.error) {
+    const m = mapPgError(version.error);
+    return c.json(m.body, m.status);
+  }
+  if (!version.data) {
+    return c.json({ error: "not_found", code: "not_found", message: "Version not found" }, 404);
+  }
+  const existing = await sb
+    .from("sales_order_revision_documents")
+    .select("path")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (existing.error) {
+    const m = mapPgError(existing.error);
+    return c.json(m.body, m.status);
+  }
+  if (existing.data) {
+    return c.json(
+      { error: "rule_violation", code: "document_already_stored", message: "This version already keeps its issued document" },
+      422,
+    );
+  }
+  const { data, error } = await sb.storage
+    .from(SALES_ORDER_DOCUMENTS_BUCKET)
+    .createSignedUploadUrl(salesOrderDocumentKey(id, revision));
+  if (error) {
+    return c.json({ error: "storage_error", code: "storage_error", message: error.message }, 502);
+  }
+  return c.json({ token: data.token, path: data.path, bucket: SALES_ORDER_DOCUMENTS_BUCKET });
+});
+
+const revisionDocumentInput = z.object({ path: z.string().trim().min(1).max(500), bytes: z.number().int().min(0).optional() });
+
+operationOrdersRouter.post("/:id/revisions/:revision/document", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const parsed = revisionDocumentInput.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_record_revision_document", {
+    p_order_id: id,
+    p_revision: revision,
+    p_path: parsed.data.path,
+    p_bytes: parsed.data.bytes ?? null,
+  });
+  if (error) {
+    const m = mapPipelineV2Error(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data, 201);
+});
+
+operationOrdersRouter.get("/:id/revisions/:revision/document", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  const revision = revisionParam(c.req.param("revision"));
+  if (!revision) {
+    return c.json({ error: "invalid_input", code: "invalid_param", message: "A version is numbered from 1" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const row = await sb
+    .from("sales_order_revision_documents")
+    .select("path")
+    .eq("order_id", id)
+    .eq("revision", revision)
+    .maybeSingle();
+  if (row.error) {
+    const m = mapPgError(row.error);
+    return c.json(m.body, m.status);
+  }
+  const path = (row.data as { path: string } | null)?.path ?? null;
+  /* ⛔ ABSENT IS NOT AN ERROR — it is the legacy case, and the page draws the
+     reconstruction with its notice. Say which it is, plainly. */
+  if (!path) return c.json({ stored: false, url: null });
+  const { data, error } = await sb.storage.from(SALES_ORDER_DOCUMENTS_BUCKET).createSignedUrl(path, 3600);
+  if (error) {
+    return c.json({ error: "storage_error", code: "storage_error", message: error.message }, 502);
+  }
+  return c.json({ stored: true, url: data.signedUrl });
+});
 
 const amendmentDecisionInput = z
   .object({

@@ -120,6 +120,16 @@ describe.skipIf(!URL || !LOCAL)("0564 · the amendment carries the whole change,
     installment_months: 12,
   });
 
+  /** Mints a version the way the product does, and returns its number. */
+  async function mintRevision(): Promise<number> {
+    await actAs(U.operation);
+    /* Inside its own savepoint: a refusal here (a live request already exists)
+       must not poison the transaction every later case runs in. */
+    await attempt("select public.sales_order_submit_amendment($1,'{\"delivery_date\":\"2026-12-01\"}'::jsonb,'mint a version',null)", [orderId]);
+    const r = await one("select max(revision) as r from sales_order_revisions where order_id=$1", [orderId]);
+    return Number(r.r);
+  }
+
   async function submit(p: unknown = proposal()) {
     await actAs(U.operation);
     const r = await one("select public.sales_order_submit_amendment($1,$2::jsonb,$3,null) as a", [orderId, JSON.stringify(p), "Customer called"]);
@@ -238,5 +248,48 @@ describe.skipIf(!URL || !LOCAL)("0564 · the amendment carries the whole change,
     await actAs(U.principal);
     const r = await attempt("select public.sales_order_decide_amendment($1,'reject','Not this time')", [a.id]);
     expect(r.ok).toBe(true);
+  });
+
+  /* ── 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT ───────────────────────── */
+  it("records the file a version was issued as — once, and never again", async () => {
+    await actAs(U.operation);
+    /* Self-sufficient: mint a version here rather than leaning on the order
+       the cases above left behind, so this proves the recorder and nothing else. */
+    const n = await mintRevision();
+    const key = `sales-orders/${orderId}/rev-${n}.pdf`;
+    const first = await attempt("select public.sales_order_record_revision_document($1,$2,$3,$4)", [orderId, n, key, 51234]);
+    expect(first.ok ? "ok" : `refused: ${(first as { detail: string }).detail}`).toBe("ok");
+    /* ⭐ BESIDE THE VERSION, NEVER ON IT. `sales_order_revisions` is immutable
+       (`sales_order_revisions_no_rewrite`), which is how the first draft of
+       0565 was caught: it tried to add a column to that row. */
+    const row = await one("select path, stored_at, bytes from sales_order_revision_documents where order_id=$1 and revision=$2", [orderId, n]);
+    expect(row.path).toBe(key);
+    expect(row.stored_at).toBeTruthy();
+    expect(row.bytes).toBe(51234);
+    /* ⭐ IMMUTABLE. What the customer was shown does not change afterwards. */
+    const again = await attempt("select public.sales_order_record_revision_document($1,$2,$3,null)", [orderId, n, key]);
+    expect(again).toMatchObject({ ok: false, detail: "document_already_stored" });
+  });
+
+  it("refuses a path that belongs to another version, so a file cannot be misfiled", async () => {
+    await actAs(U.operation);
+    const n = await mintRevision();
+    expect(await attempt("select public.sales_order_record_revision_document($1,$2,$3,null)", [orderId, n, `sales-orders/${orderId}/rev-99.pdf`]))
+      .toMatchObject({ ok: false, detail: "document_path_mismatch" });
+    expect(await attempt("select public.sales_order_record_revision_document($1,$2,'   ',null)", [orderId, n]))
+      .toMatchObject({ ok: false, detail: "document_path_required" });
+  });
+
+  it("a legacy version keeps NULL — which is what makes it the reconstruction case", async () => {
+    /* Rev 1 was minted long before any document was kept — exactly the shape
+       of every version that existed before this release. */
+    const row = await one(
+      `select (select count(*)::int from sales_order_revisions where order_id=$1)                    as versions,
+              (select count(*)::int from sales_order_revision_documents where order_id=$1)           as kept,
+              (select count(*)::int from sales_order_revision_documents where order_id=$1 and revision=1) as rev1_kept`,
+      [orderId],
+    );
+    expect(row.versions).toBeGreaterThan(row.kept);   // some version kept nothing
+    expect(row.rev1_kept).toBe(0);                    // and the original is one of them
   });
 });

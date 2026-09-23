@@ -857,21 +857,44 @@ timestamp** — `pod_signed_at` is Delivery's proof of delivery, a different act
 **Falsifier / the fix when it is wanted:** store the signing fact in the snapshot, or add a
 capture timestamp to `orders`.
 
-### Retained documents — the rule is not met yet, and the page says so
+### Retained documents — BUILT 2026-09-23 (0565), and the notice is the legacy case only
 
 The approved rule is that a revision prints its OWN stored document and that a missing historical
-file is **stated, never rebuilt from current data**. No issued PDF is retained today, so:
+file is **stated, never rebuilt from current data**. Owner correction, 2026-09-23:
 
-- what the panel draws for an old revision is a **REBUILD** from that version's immutable
-  snapshot, and the page says exactly that beside the version chip and again on print;
-- its money is the one payments ledger read as at that version's day — the snapshot stores no
-  money, so any figure on a historical sheet is necessarily read from current records;
-- **a printed rebuild cannot be told from an issued document once it leaves the screen.** That is
-  the residual risk of keeping `Print this version` before files are retained, and it is the
-  owner's call whether printing waits for retention.
+> "Legacy PDFs that were never stored: use the approved reconstructed-copy notice. Newly issued
+>  versions after this release: preserve their original issued PDFs as required. **A warning does
+>  not replace this capability.**"
 
-Guarded by `SalesOrderWorkspace.historical-document.test.ts`, whose control was run red against
-the old borrowing behaviour before the fix was kept.
+**A version issued from `0565` onward keeps the file it was issued as.** The moment a version is
+minted — by a correction or by an approved amendment — the page renders the document the order is
+issuing at that instant and stores it. Reading that version afterwards shows **that file**, not a
+re-render of it, and printing opens the same bytes.
+
+| | |
+|---|---|
+| where the file lives | bucket `sales-order-documents`, key `sales-orders/{order_id}/rev-{n}.pdf` |
+| where the record lives | `sales_order_revision_documents` — one row per version, **beside** the revision |
+| why beside, not on | `sales_order_revisions` is immutable (`sales_order_revisions_no_rewrite`). The first draft of 0565 added a column to that row and the throwaway replay refused it. |
+| written how often | **once.** `(order_id, revision)` is the primary key; a second attempt is `document_already_stored`; there is no UPDATE or DELETE path in the RPC, the policies or the bucket. |
+| who names the path | the API, from the order and the version. The browser never names it, and the database checks the same shape again (`document_path_mismatch`). |
+| who may read it | `operation · principal · finance · hr · bd`. No dealer, supplier or partner — the sheet carries the customer's name, address and the money. |
+
+**A failed store never blocks a version.** Minting a version is business truth; keeping its paper
+is a separate act. If the render or the upload fails, nothing is recorded and that version falls
+back to the reconstruction — honestly labelled, which is the same place a legacy version sits.
+
+**LEGACY — every version minted before this release.** No file was ever stored for it, so the page
+rebuilds it from the version's own immutable snapshot and says so, on screen and on the sheet:
+*"Reconstructed copy — original issued document unavailable."* Its money is the money DATED on or
+before that version's day, read from the one payments ledger with the one arithmetic; a capture
+with no date is excluded and said. Named limits: dates are day-grained, so an afternoon receipt
+counts toward a morning version; and a payment voided later leaves every view, so an old
+reconstruction under-reports rather than over-reports.
+
+Guarded by `SalesOrderWorkspace.historical-document.test.ts`, `sales-order-template.rebuilt.test.tsx`,
+`orders.revision-document.test.ts` (7 door cases) and three cases in `amendment-lane-0564.integration.test.ts`
+proved against a real PostgreSQL.
 
 ### Many goods use groups, not one endless horizontal row
 

@@ -113,14 +113,16 @@ describe("Sales Order object template contract", () => {
 
   it("renders the real document through the SAME renderer Print uses", () => {
     expect(workspace).toContain('data-testid="pdf-pane"');
-    /* ONE RENDERER, TWO PURPOSES. The pane paints the bytes of the PREVIEW
-       blob; Print opens a blob built from the SAVED data. Both go through
+    /* ONE RENDERER, THREE PURPOSES. The pane paints the bytes of the PREVIEW
+       blob; Print opens a blob built from the SAVED data; and 0565 keeps the
+       sheet a new version was ISSUED as. All three go through
        `renderSalesOrderPdf` — a second lookalike renderer is the failure this
        asserts against, and a page-local template call would show up here as a
-       third name rather than a second call. */
-    expect(workspace.match(/renderSalesOrderPdf\(/g)).toHaveLength(2);
+       different name rather than another call of this one. */
+    expect(workspace.match(/renderSalesOrderPdf\(/g)).toHaveLength(3);
     expect(workspace).toContain("const blob = await renderSalesOrderPdf(data)");
     expect(workspace).toContain("const blob = await renderSalesOrderPdf(printData)");
+    expect(workspace).toContain("const blob = await renderSalesOrderPdf(issued)");
     expect(render).toContain("return toBlob(SalesOrderTemplate(data))");
     /* The paper is centred at a fixed maximum width. */
     expect(workspace).toContain('className="relative mx-auto max-w-[700px]"');
@@ -675,18 +677,35 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("(base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)");
   });
 
-  it("says a historical version is REBUILT, because the issued file is not stored", () => {
-    /* § Retained documents: "a missing historical file is STATED, never rebuilt
-       from current data." No file is retained, so the half that can be kept is
-       saying so — beside the version chip, when it is printed, AND on the sheet
-       itself, in the one owner-approved sentence (2026-09-23). The earlier build
-       wording is deliberately gone: two sentences for one fact is how the page
-       and the document start disagreeing. */
+  it("shows the file a version was ISSUED as, and reconstructs only when there is none", () => {
+    /* § Retained documents, owner ruling 2026-09-23: "Legacy PDFs that were
+       never stored: use the approved reconstructed-copy notice. Newly issued
+       versions after this release: preserve their original issued PDFs as
+       required. A warning does not replace this capability."
+
+       So the notice is NOT the capability. A version issued since 0565 keeps
+       its own PDF and the page shows THAT FILE — not a re-render of it — while
+       only a version that never had one is rebuilt and carries the notice. */
+    expect(workspace).toContain("useIssuedSalesOrderDocument");
+    expect(workspace).toContain("storeIssuedSalesOrderDocument");
+    expect(workspace).toContain('data-testid="issued-document-pane"');
+    expect(workspace).toContain('data-testid="oldrev-issued-document"');
+    /* The rebuild is skipped entirely when a file exists — a stored document is
+       shown as itself, never redrawn from the snapshot beside it. */
+    expect(workspace).toContain('if (mode === "oldrev" && storedDocumentUrl) return null;');
+    /* Both minting doors keep the sheet: a correction and an approved change. */
+    expect(workspace).toContain('if (r.action === "saved") void keepIssuedDocument(r.revision);');
+    expect(workspace).toContain('if (r.status === "applied") void keepIssuedDocument(Number(r.revision));');
+  });
+
+  it("carries the approved reconstruction notice ONLY on a version with no stored file", () => {
     expect(workspace).toContain('data-testid="oldrev-rebuilt"');
     expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
-    expect(workspace).not.toContain("The document issued at the time is not stored");
-    /* The DOCUMENT is told by the builder, not by a second copy of the string. */
-    expect(workspace).toContain("rebuilt_notice:");
+    /* Every one of the three notices is gated on the legacy case. A version
+       that kept its document must not be told it is a reconstruction. */
+    expect(workspace).toContain("{isReconstruction && (");
+    expect(workspace).toContain("{isReconstruction && base?.signature_url && (");
+    expect(workspace).toContain("{isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (");
   });
 
   it("calls the signature UNKNOWN on an old version, never absent, and keeps the evidence", () => {
@@ -700,7 +719,7 @@ describe("Sales Order object template contract", () => {
        customer holding the PDF are told the same thing. */
     expect(workspace).toContain("Signature version not recorded.");
     expect(workspace).toContain("Reconstructed copy — original issued document unavailable.");
-    expect(workspace).toContain("{base?.signature_url && (");
+    expect(workspace).toContain("{isReconstruction && base?.signature_url && (");
     /* ...and the document is told by the SAME condition the page notice uses,
        so the two cannot drift apart. */
     expect(workspace).toContain("signature_unknown: Boolean(base?.signature_url)");
