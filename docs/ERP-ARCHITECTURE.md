@@ -961,7 +961,7 @@ trip RECORD either, but the legs are **Delivery Journey legs, not stock movement
 ruling 2026-09-01, overwriting the 2026-08-06 "a warehouse-to-warehouse leg is a stock
 movement" half): a Singapore SO's KL → JB-partner-warehouse leg and its JB → customer leg each
 carry their own Logistics, DO/scope, dates, handover and exact-Unit reconciliation
-(`../delivery/MASTER.md` §1.1, §8; `../stock/MASTER.md` §5). Stock still owns each Unit's
+(`delivery/MASTER.md` §1.1, §8; `stock/MASTER.md` §5). Stock still owns each Unit's
 current `Where`/`Who has it` along the way; an internal reposition that serves no customer
 Journey remains Stock's Transfer.
 
