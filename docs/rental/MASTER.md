@@ -5,6 +5,12 @@
 
 ---
 
+**RULING / APPROVED REQUIREMENT — business-identifiable numbering, 2026-09-23.** Subscription
+business document numbers must be visibly distinguishable from Outright numbers. Exact prefixes
+and affected shared document families are not yet approved. A subscription agreement remains
+separate from a sales order; shared physical Units retain one identity across both businesses.
+No renumbering of existing documents or production implementation is authorized by this PLAN ruling.
+
 # §1 · Overview
 
 ### MISSION

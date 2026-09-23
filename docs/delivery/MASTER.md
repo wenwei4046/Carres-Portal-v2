@@ -184,6 +184,10 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
   issue month, not a guarantee that every future volume fits; monitor headroom before exhaustion
   and do not silently increase length based on volume. This scoped PLAN approval authorizes no
   application changes, production migration or cutover.
+- **Business distinction — APPROVED REQUIREMENT, 2026-09-23:** Outright and Subscription DO
+  references must be visibly distinguishable. `DOYYMM-NNNNN` remains the Outright target;
+  the Subscription prefix is pending approval. Shared delivery ownership and physical Unit
+  identities remain unchanged; no legacy DO renumbering is authorized.
 - **Measured implementation gap:** the existing order-id-derived four-digit daily number can
   collide across different orders. Source review found that the whole-order materializer can skip
   creation when that number already exists; this is a static code finding, not a reproduced live

@@ -166,6 +166,13 @@ correction workflows. Unit IDs, INV and RC remain outside this change. This is a
 truth, not shipped behavior, whole-blueprint approval or authorization for application code,
 production writes, migration or cutover in this PLAN lane.
 
+**RULING / APPROVED REQUIREMENT — business-identifiable numbering, 2026-09-23.** Jess requires
+Outright and Subscription business document numbers to be visibly distinguishable at a glance.
+The approved SO format remains the Outright target. Exact Subscription prefixes and the scope
+across shared document families remain to be approved; do not treat the earlier DO format as
+approval for indistinguishable numbering across both businesses. This requirement does not
+create a second physical Unit identity, rename existing documents or authorize implementation.
+
 ## One purpose and one navigation home
 
 Sales Orders is the truth/register home of the customer order. It lets an authorised employee find
