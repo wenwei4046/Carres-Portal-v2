@@ -151,11 +151,18 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   [Orders MASTER — External numbering privacy](../orders/MASTER.md#external-numbering-privacy--owner-requirements-2026-09-23),
   whose later owner-approved complete document-numbering table defines distinct business document
   families with shared permanent Unit identity. Do not duplicate that format table here or describe
-  all formats/business series as unapproved. **Source verified 2026-09-23:** branch
-  `codex/so-numbering-privacy-plan`, commit `5172f35e2f7d667df936514f8cab53e520c2fe24`,
-  Orders MASTER lines 123–213; PR #1544 is CLOSED, not merged, and the fetched main does not
-  contain this section. This reference identifies approved branch-only planning truth, not main
-  publication or implemented numbering. Preserve existing identifiers until authorized cutover;
+  all formats/business series as unapproved. **Current source verified 2026-09-23:** active
+  [PR #1545](https://github.com/wenwei4046/Carres-Portal-v2/pull/1545), branch
+  `docs/so-do-numbering-rulings`, commit `12de6cc2990947cbc4b5db61cc022f9f96498bca`,
+  Orders MASTER “External numbering privacy”. PR #1545 is OPEN, not merged; closed PR #1544
+  is not the active source. This identifies approved branch-only planning truth, not main
+  publication or implemented numbering. Document suffix digits are random decimal digits,
+  including leading zeros, not a sequence; `(1)` denotes document revision. Permanent Unit
+  sequential allocation is the explicit approved exception under Purchasing §6.2; the owner
+  accepts disclosure of Unit-allocation scale, not sales/order volume or current stock.
+  Subscription exposes one customer-facing agreement/order reference under the Orders ruling,
+  not an additional customer-facing SO number; internal record links remain distinct.
+  Preserve existing identifiers until authorized cutover;
   the separate scan/official-DO issue/freeze dependency below remains unresolved.
   Diglant receives these company-wide Unit numbers and is intended to attach labels during
   production. No early customer-specific search for interchangeable eligible mattresses is required.
