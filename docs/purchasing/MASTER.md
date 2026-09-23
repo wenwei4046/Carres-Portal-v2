@@ -268,10 +268,11 @@ to Manual Purchase in existing implementation descriptions identify the current
 screen, not a competing approved future name. The proposed standalone name Purchase
 Request and `PR` / `SPR` or `REQ` / `SREQ` future prefixes remain withdrawn.
 `MP` remains Mattress Protector; `PR` remains Purchase Return.
-This correction changes the name only, not the prefixes, date pattern, separator
-or digit length. It grants no application implementation or live cutover. Approval
-of the wider numbering table is recorded separately by its planning owner; an
-ellipsis in that table does not define the missing identifier format.
+The final approved formats are `MPRYYMMDD-NNNN` and `SMPRYYMMDD-NNNN`, e.g.
+`MPR260924-4827` / `SMPR260924-4827`: original document date plus four fixed random
+decimal digits, with leading zeros. Each prefix has its own daily 10,000-reference pool;
+monitor capacity, enforce uniqueness and never reuse void references. This grants no
+application implementation or live cutover. The complete approved table is in Orders MASTER.
 
 Each Manual Purchase Request has a permanent identity and may lead to several POs; the
 supplier still receives the PO, not the internal request. Approval, allocation and
@@ -654,7 +655,7 @@ permanent and are NOT renumbered.**
 
 Internal records still use invisible permanent technical IDs. Manual Purchase Request uses
 `MPR` for Outright and the approved/not-built target `SMPR` for Subscription (§5.2).
-The approved screen name is Manual Purchase Request; a complete identifier format is not defined by this name correction.
+The approved screen name is Manual Purchase Request; full approved formats are defined in §5.2.
 Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable. The
 visible Purchase Return prefix is `PR` (0548), not `PRTN`; its identity is unchanged.
 

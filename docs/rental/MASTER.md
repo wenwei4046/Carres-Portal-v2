@@ -25,7 +25,9 @@ receipt `SRCYYMM-NNNNNN`, credit note `SCNYYMM-NNNNN`, Service Case `SCSYYMM-NNN
 `SLNYYMM-NNNNN` and goods receipt `SGRNYYMMDD-NNNN`. Other Subscription prefixes and remaining
 format/ownership gaps are governed by the complete approved table in Orders MASTER, External
 numbering privacy. Financial formats retain accounting/e-invoice validation before live use.
-Manual Purchase Request is the approved screen name; SMPR remains its prefix, full format pending.
+Manual Purchase Request is the approved screen name; `SMPRYYMMDD-NNNN` is the approved
+format: original document date plus four random digits including leading zeros, independent
+daily 10,000-reference pool.
 
 # §1 · Overview
 
