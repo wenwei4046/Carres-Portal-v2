@@ -17,6 +17,15 @@ control types, special schedules and business behavior; no page-local appearance
 > money gate; Workspace owns people/duties; Payment never creates a second owner, calendar,
 > product category or delivery fact.
 
+**Numbering — APPROVED TARGET / NOT BUILT, owner 2026-09-23.** Outright invoice/receipt/credit
+note: `INVYYMM-NNNN`, `RCYYMM-NNNN`, `CNYYMM-NNNN`. Subscription: `SINVYYMM-NNNNNN`,
+`SRCYYMM-NNNNNN`, `SCNYYMM-NNNNN`. Fixed random suffixes allow leading zeros and independent
+monthly pools. Existing allocation code and historical document examples below are implementation
+evidence, not the new target. Financial formats require accounting/e-invoice validation before
+live use. Preserve issued numbers and documents. Credit notes are not proof of cash refunds.
+The complete approved numbering table and remaining limitations are in Orders MASTER,
+External numbering privacy. No production cutover is authorized by this PLAN approval.
+
 ## 1 · Mission and ownership
 
 Payment is **customer Money In**: what the customer paid, what is still needed, and what the

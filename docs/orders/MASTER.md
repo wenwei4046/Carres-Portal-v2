@@ -159,30 +159,64 @@ conceal a running counter, not every inference from transaction activity, and ar
 authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
 does not authorize sending SO numbers to suppliers.
 
-**Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering is separately approved in `docs/delivery/MASTER.md` §3.1; PO numbering is approved in `docs/purchasing/MASTER.md` §6.1.
-GRN and Service Case numbering require their own capacity and governing-business-rule review
-before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
-correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
-truth, not shipped behavior, whole-blueprint approval or authorization for application code,
-production writes, migration or cutover in this PLAN lane.
+**RULING / APPROVED TARGET — complete document-numbering review table, Jess 2026-09-23.**
+Jess approved the complete English review table, with one correction: the screen name is
+**Manual Purchase Request**, not Manual Purchase. MPR means Manual Purchase Request;
+SMPR means Subscription Manual Purchase Request. MP remains Mattress Protector and PR
+remains Purchase Return. Outright and Subscription have distinct document families throughout;
+Unit identity is the explicit shared exception. This replaces earlier common-document proposals.
 
-**RULING / APPROVED — business-identifiable numbering, 2026-09-23.** The final approved targets
-are Outright `SOYYMM-NNNN` (four random digits), Subscription agreement `SUBYYMM-NNNNN`
-(five), Outright delivery `DOYYMM-NNNNN` (five), and Subscription delivery `SDOYYMM-NNNNN`
-(five). Original SO and SUB versions display `(1)` immediately after the base reference, with
-no space; subsequent approved versions show `(2)`, etc. Subscription is governed by
-`docs/rental/MASTER.md`; both delivery families by `docs/delivery/MASTER.md` §3.1.
-With leading zeros, SO capacity is 10,000 per month; SUB, DO and SDO each have 100,000 per month.
-**Owner clarification: two business groups, not just two customer-document prefixes.** Outright
-and Subscription business documents must be separately identifiable, including procurement:
-`POYYMMDD-NNNN` for Outright and `SPOYYMMDD-NNNN` for Subscription. Never mix the businesses
-in one PO. Remaining document-family prefixes, shared operational records and finance treatment
-need one consolidated proposal; prior assistant suggestions to share all purchasing/finance
-numbers are not approved authority. Shared Unit identity remains the owner's explicit exception.
-Allocate each family independently. Capacity notifications are internal only and never trigger
-automatic length changes, including at a month boundary. No 3,000-document threshold has been
-approved. Shared physical Unit identity, existing document numbers and historical documents
-remain unchanged. This is scoped target approval, not implementation or cutover authorization.
+| Document | Outright | Subscription |
+|---|---|---|
+| Sales Order / Subscription Agreement | `SOYYMM-NNNN(1)` | `SUBYYMM-NNNNN(1)` |
+| Delivery Order | `DOYYMM-NNNN` | `SDOYYMM-NNNNN` |
+| Manual Purchase Request | `MPR…` | `SMPR…` |
+| Purchase Order | `POYYMMDD-NNNN(1)` | `SPOYYMMDD-NNNN(1)` |
+| Goods Receipt Note | `GRNYYMMDD-NNNN` | `SGRNYYMMDD-NNNN` |
+| Customer invoice / monthly bill | `INVYYMM-NNNN` | `SINVYYMM-NNNNNN` |
+| Customer receipt | `RCYYMM-NNNN` | `SRCYYMM-NNNNNN` |
+| Credit note | `CNYYMM-NNNN` | `SCNYYMM-NNNNN` |
+| Customer Service Case | `CSYYMM-NNNN` | `SCSYYMM-NNNNN` |
+| Loan note | `LNYYMM-NNNN` | `SLNYYMM-NNNNN` |
+| Stock Transfer | `TR…` | `STR…` |
+| Supplier Claim | `CLM…` | `SCLM…` |
+| Purchase Return | `PR…` | `SPR…` |
+| Repair Order | `RO…` | `SRO…` |
+| Display Request | `DR…` | `SDR…` |
+| Consignment Order | `CO…` | `SCO…` |
+| Consignment Return | `CRTN…` | `SCRTN…` |
+| Consignment Sale Notice | `CSN…` | `SCSN…` |
+| Supplier Bill | `SB…` | `SSB…` |
+| Payment Voucher | `PV…` | `SPV…` |
+| Other Receivable Invoice | `ARI…` | `SARI…` |
+| Other Receipt Voucher | `RV…` | `SRV…` |
+| Supplier Money Back | `SMB…` | `SSMB…` |
+| Internal Money Movement | `MM…` | `SMM…` |
+| Journal Entry | `JE…` | `SJE…` |
+| Manual Journal | `MJ…` | `SMJ…` |
+| Physical Unit ID | `U1-000-001` | Shared; no S prefix |
+
+`N` is a random decimal digit, with leading zeros. Each prefix has its own independent pool:
+four digits = 10,000 per encoded period, five = 100,000, six = 1,000,000. Date-only PO/SPO and
+GRN/SGRN pools reset by date; the displayed monthly formats use monthly pools. These are finite
+capacities, not forecasts. Monitor headroom internally; no automatic digit-length change or
+3,000-document alert threshold is approved. Enforce uniqueness and never reuse void identities.
+For DO use original issue month, not scheduled delivery month; GRN uses actual receipt posting
+date. One receipt can contain many Units; split receipts get distinct GRNs, not new Unit IDs.
+
+**Scope of this approval:** explicit formats above are approved targets, not implemented facts.
+An ellipsis approves only the prefix and business separation: date pattern and suffix length
+remain unspecified. Financial numbering retains accounting/e-invoice validation before live use.
+Cross-business transfers and company-wide transactions still require an ownership rule before
+finalizing their use of these prefixes. No new documents are mandated for workflows that do not
+need them. No whole-module completion, engineering implementation or live cutover is authorized.
+
+SO, SUB and PO/SPO original versions display `(1)` without a space; approved later versions
+show `(2)`, etc. Amendments preserve base identity and original date; other document revision
+workflows are unchanged. One PO belongs to one business under existing purchasing grouping
+conditions. Source links carry relationships; matching random tails have no meaning. A credit
+note adjusts the amount owed and is not proof of a cash refund. Preserve existing document
+numbers, historical issued PDFs and physical labels; Units retain their lifelong shared identity.
 
 ## One purpose and one navigation home
 

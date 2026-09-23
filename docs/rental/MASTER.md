@@ -20,6 +20,13 @@ no reuse of void references. Capacity alerts are internal; no automatic length i
 The subscription agreement remains separate from an Outright SO. Shared physical Units retain
 one identity across businesses. This ruling authorizes no production implementation or cutover.
 
+**Additional numbering — APPROVED TARGET, 2026-09-23:** Subscription invoice `SINVYYMM-NNNNNN`,
+receipt `SRCYYMM-NNNNNN`, credit note `SCNYYMM-NNNNN`, Service Case `SCSYYMM-NNNNN`, loan note
+`SLNYYMM-NNNNN` and goods receipt `SGRNYYMMDD-NNNN`. Other Subscription prefixes and remaining
+format/ownership gaps are governed by the complete approved table in Orders MASTER, External
+numbering privacy. Financial formats retain accounting/e-invoice validation before live use.
+Manual Purchase Request is the approved screen name; SMPR remains its prefix, full format pending.
+
 # §1 · Overview
 
 ### MISSION
