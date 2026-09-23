@@ -53,16 +53,16 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *
  *   GET /entries            the Journal, one page, newest first
  *   GET /entries/:ref       one entry (id or entry number) with its lines
- *   GET /accounts           the chart, and the day the ledger started
+ *   GET /accounts           the chart, the day the ledger started, and the headings no
+ *                           account moves into or out of (gl_rule_headings, 0570)
  *   PATCH /accounts/:code   one account's name and number (gl_account_update, 0550) — a new
  *                           number is carried to every row that names it, by `on update cascade`.
- *                           An account named on a document that has left Draft cannot be
- *                           renumbered: 0550's own ceiling, refused by the frozen-document
- *                           triggers as a 422/500, not by anything here.
+ *                           Since 0570 that includes a document that has left Draft: its
+ *                           frozen trigger lets the number through and nothing else.
  *   POST  /accounts/reorder move accounts within one heading (gl_accounts_reorder, 0557) —
  *                           writes sort_order only; a move never writes the number.
- *   POST  /accounts/move    put one account under another heading (gl_account_move, 0570) —
- *                           writes parent and order; never the number or the name.
+ *   POST  /accounts/move    put one posting account under another heading (gl_account_move,
+ *                           0570) — writes parent and order; never the number or the name.
  *   GET /trial-balance      every account as it stood at the end of a day
  *   GET /account-ledger     one account, line by line
  *   GET /health             gl_ledger_health, always eleven rows
@@ -380,9 +380,13 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const read = await readChart(sb);
+  const [read, rules] = await Promise.all([readChart(sb), sb.rpc("gl_rule_headings")]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
-  return c.json(read.chart);
+  // 0570: the headings no account moves into or out of, so the chart screen
+  // never offers that drop. If this read fails the chart still loads: the
+  // screen then offers the drop and gl_account_move refuses it in its own words.
+  const ruleHeadings = !rules.error && Array.isArray(rules.data) ? rules.data.map(String) : [];
+  return c.json({ ...read.chart, rule_headings: ruleHeadings });
 });
 
 /**
@@ -458,7 +462,7 @@ financeLedgerRouter.post("/accounts/reorder", requireFinance, async (c) => {
 });
 
 /**
- * Put one account under another heading (0570). Both before/after pairs are
+ * Put one posting account under another heading (0570). Both before/after pairs are
  * forwarded untouched: the database refuses with 409 when either `was` is no
  * longer the stored order under its heading. Refusal tags go up as `code`, the
  * same way the PATCH above sends them.

@@ -17,6 +17,12 @@
  * once silently overwrite each other. So the test asserts `was` is the BEFORE
  * order, not the after one. A move under another heading (0570) sends that
  * pair once for EACH heading.
+ *
+ * 0570 also pins what the screen must never offer, because the database would
+ * refuse it: a heading moving under another heading, a move into or out of a
+ * heading the chart read names in `rule_headings`, and the last account
+ * leaving its heading. A drop on a sibling HEADING puts the account under it;
+ * Alt + arrow beside that heading still only reorders.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -54,6 +60,8 @@ vi.mock("@/lib/api", () => ({
       return {
         go_live_on: "2026-09-10",
         accounts: net.chart.map((a) => ({ ...a, is_header: net.chart.some((c) => c.parent_code === a.code) })),
+        // 0570 gl_rule_headings: the customer-money heading below.
+        rule_headings: ["2250"],
       };
     }
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -101,7 +109,10 @@ const acc = (code: string, name: string, parent_code: string | null, kind = "LIA
 });
 /* One heading with three children, and a second heading of the same kind right
    below them: the keyboard has to step OVER it, and a drop may land ON it.
-   The asset branch is a heading of another kind, which a drop may never reach. */
+   2210 is the only account under 2200, so it may never leave. 2250 is a
+   heading money rules read (`rule_headings`): nothing moves into or out of
+   it. 2400 is a posting account beside the headings under 2000. The asset
+   branch is a heading of another kind, which a drop may never reach. */
 const CHART = [
   acc("1000", "Assets", null, "ASSET"),
   acc("1100", "Cash and bank", "1000", "ASSET"),
@@ -113,9 +124,13 @@ const CHART = [
   acc("2130", "Accrued expenses", "2100"),
   acc("2200", "Borrowings", "2000"),
   acc("2210", "Bank loan", "2200"),
+  acc("2250", "Customer money held", "2000"),
+  acc("2260", "Customer deposits held", "2250"),
+  acc("2270", "Advance deposits held", "2250"),
+  acc("2400", "Director's account", "2000"),
 ];
 const ASSETS = ["1000", "1100", "1110"];
-const BORROWINGS = ["2200", "2210"];
+const BORROWINGS = ["2200", "2210", "2250", "2260", "2270", "2400"];
 
 beforeEach(() => {
   net.posts = [];
@@ -282,7 +297,7 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     });
     // It now sits LAST under 2200, no longer under 2100.
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120"]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120", "2250", "2260", "2270", "2400"]),
     );
     // Same number, same name.
     expect(row("2120").textContent).toContain("2120 Deposits held");
@@ -311,14 +326,103 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     await nothingHappened();
   });
 
-  it("never offers a heading under anything inside it", async () => {
+  it("never puts a heading under another heading: a drop beside it only changes its place", async () => {
     show();
     await ready();
 
-    // 2100 sits inside 2000.
-    drag("2000", "2100");
+    // 2100 and 2200 are headings side by side under 2000.
+    drag("2100", "2200");
+
+    await waitFor(() => expect(net.posts).toHaveLength(1));
+    expect(net.moves).toHaveLength(0);
+    expect(net.posts[0]).toEqual({
+      parentCode: "2000",
+      was: ["2100", "2200", "2250", "2400"],
+      now: ["2200", "2100", "2250", "2400"],
+    });
+    // Still under 2000, with its own accounts.
+    expect(net.chart.find((a) => a.code === "2100")).toMatchObject({ parent_code: "2000" });
+    expect(net.chart.filter((a) => a.parent_code === "2100").map((a) => a.code)).toEqual(["2110", "2120", "2130"]);
+  });
+
+  it("offers a heading no heading to go under in its row menu", async () => {
+    show();
+    await ready();
+
+    const tr = row("2100");
+    tr.focus();
+    fireEvent.keyDown(tr, { key: "F10", shiftKey: true });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryAllByRole("menuitem").map((b) => b.textContent)).not.toContainEqual(
+      expect.stringMatching(/^Move under/),
+    );
+  });
+
+  it("never moves an account into a heading whose accounts decide how money may be recorded", async () => {
+    show();
+    await ready();
+
+    drag("2120", "2250");
 
     await nothingHappened();
+  });
+
+  it("never moves an account out of that heading", async () => {
+    show();
+    await ready();
+
+    // 2260 has a sibling, so only the heading's rule stops it.
+    drag("2260", "2200");
+
+    await nothingHappened();
+  });
+
+  it("never moves the last account out of its heading", async () => {
+    show();
+    await ready();
+
+    // 2210 is the only account under 2200.
+    drag("2210", "2100");
+
+    await nothingHappened();
+  });
+
+  it("drops a posting account on a heading BESIDE it: it goes under that heading", async () => {
+    show();
+    await ready();
+
+    // 2400 and 2200 are both under 2000.
+    drag("2400", "2200");
+
+    await waitFor(() => expect(net.moves).toHaveLength(1));
+    expect(net.posts).toHaveLength(0);
+    expect(net.moves[0]).toEqual({
+      code: "2400",
+      toParentCode: "2200",
+      from: { was: ["2100", "2200", "2250", "2400"], now: ["2100", "2200", "2250"] },
+      to: { was: ["2210"], now: ["2210", "2400"] },
+    });
+    expect(net.chart.find((a) => a.code === "2400")).toMatchObject({
+      code: "2400", name: "Director's account", parent_code: "2200",
+    });
+  });
+
+  it("steps a posting account past a heading beside it with Alt + arrow: its place changes, its heading does not", async () => {
+    show();
+    await ready();
+
+    const tr = row("2400");
+    tr.focus();
+    fireEvent.keyDown(tr, { key: "ArrowUp", altKey: true });
+
+    await waitFor(() => expect(net.posts).toHaveLength(1));
+    expect(net.moves).toHaveLength(0);
+    expect(net.posts[0]).toEqual({
+      parentCode: "2000",
+      was: ["2100", "2200", "2250", "2400"],
+      now: ["2100", "2200", "2400", "2250"],
+    });
   });
 
   it("from the keyboard: Shift+F10 lists the headings it may go under, and choosing one moves it", async () => {
@@ -340,7 +444,7 @@ describe("Chart of accounts — an account under another heading (0570)", () => 
     await waitFor(() => expect(net.moves).toHaveLength(1));
     expect(net.moves[0]).toMatchObject({ code: "2120", toParentCode: "2200" });
     await waitFor(() =>
-      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120"]),
+      expect(codesOnScreen()).toEqual([...ASSETS, "2000", "2100", "2110", "2130", "2200", "2210", "2120", "2250", "2260", "2270", "2400"]),
     );
   });
 

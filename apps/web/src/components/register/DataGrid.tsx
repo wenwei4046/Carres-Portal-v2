@@ -241,6 +241,11 @@ export type DataGridProps<T> = {
     canStep?: (dragged: T, target: T) => boolean;
     /** Put `dragged` where `target` is. The page persists it. */
     onMove: (dragged: T, target: T) => void;
+    /** Alt + ArrowUp / ArrowDown's own move, when a keyboard step means
+        something narrower than a drop on the same row (0570: a drop on a
+        heading puts the account under it; a step beside it only reorders).
+        Absent = `onMove`. */
+    onStep?: (dragged: T, target: T) => void;
   };
   searchPlaceholder?: string;
   /** Human filename stem for the "Export Excel" button, e.g. "Purchase Orders".
@@ -2343,7 +2348,7 @@ function DataGridInner<T>({
                 e.preventDefault();
                 pendingRowFocus.current = key;
                 setActiveRowKey(key);
-                rowDrag.onMove(row, cand.row);
+                (rowDrag.onStep ?? rowDrag.onMove)(row, cand.row);
                 return;
               }
               return;

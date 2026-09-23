@@ -86,6 +86,10 @@ export interface LedgerAccount {
 export interface LedgerChart {
   go_live_on: string | null;
   accounts: LedgerAccount[];
+  /** The headings no account moves into or out of, because their accounts
+   *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
+   *  GET /accounts only; absent elsewhere. */
+  rule_headings?: string[];
 }
 
 export interface TrialBalanceAccountRow {

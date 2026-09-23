@@ -384,15 +384,15 @@ export type LedgerAccountReorderInput = z.infer<typeof ledgerAccountReorderInput
  *
  * Two before/after pairs travel, one per heading: `from` is the heading it
  * leaves, `to` the heading it joins. `gl_account_move` refuses when either
- * `was` is no longer the stored order. `from.now` is empty when the account
- * was the heading's last one.
+ * `was` is no longer the stored order. The last account under a heading never
+ * leaves it, so `from.now` always names at least one account.
  */
 export const ledgerAccountMoveInput = z.object({
   code: chartCode,
   toParentCode: chartCode,
   from: z.object({
     was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),
-    now: z.array(chartCode),
+    now: z.array(chartCode).min(1, 'Send every account under this heading, in the order you want them.'),
   }).strict(),
   to: z.object({
     was: z.array(chartCode).min(1, 'Send the order the chart was in before the drag.'),

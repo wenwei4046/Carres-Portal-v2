@@ -460,6 +460,24 @@ describe("GET /accounts", () => {
     expect(body.go_live_on).toBe("2026-09-01");
     expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([["1000", true], ["1210", false], ["4100", false]]);
   });
+
+  it("names the headings no account moves into or out of (0570 gl_rule_headings)", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) => (call.name === "gl_rule_headings" ? ok(["2200", "1300"]) : answer(call)));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_rule_headings");
+    expect(body.rule_headings).toEqual(["2200", "1300"]);
+  });
+
+  it("still serves the chart when that list cannot be read; the move door refuses on its own", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) => (call.name === "gl_rule_headings" ? fail("42883") : answer(call)));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.rule_headings).toEqual([]);
+  });
 });
 
 describe("PATCH /accounts/:code", () => {
@@ -572,21 +590,18 @@ describe("POST /accounts/move and /accounts/reorder", () => {
     });
   });
 
-  it("takes an empty after-order for a heading the account was the last one under", async () => {
-    const { sb } = fakeClient(() => ok("1310"));
-    const res = await post("/accounts/move", {
+  it("refuses operation, a missing before-order, an emptied heading and an extra field before the database", async () => {
+    expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post("/accounts/move", { ...MOVE, to: { was: [], now: ["5200"] } })).status).toBe(422);
+    // The last account under a heading never leaves it (0570), so an empty
+    // after-order for the heading it leaves never reaches the database.
+    const emptied = await post("/accounts/move", {
       code: "1310", toParentCode: "1200",
       from: { was: ["1310"], now: [] },
       to: { was: ["1210"], now: ["1210", "1310"] },
     });
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("gl_account_move", expect.objectContaining({ p_from_now: [] }));
-  });
-
-  it("refuses operation, a missing before-order and an extra field before the database", async () => {
-    expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
-    const { sb } = fakeClient(() => ok("x"));
-    expect((await post("/accounts/move", { ...MOVE, to: { was: [], now: ["5200"] } })).status).toBe(422);
+    expect(emptied.status).toBe(422);
     expect((await post("/accounts/move", { ...MOVE, name: "Freight" })).status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
@@ -595,7 +610,9 @@ describe("POST /accounts/move and /accounts/reorder", () => {
     ["order_stale", "40001", 409, "The chart changed while you were dragging. Open it again and redo the move."],
     ["move_onto_account", "22023", 422, "6500 Bank and payment charges is not a heading. Move the account under a heading."],
     ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
-    ["move_into_itself", "22023", 422, "A heading cannot move under itself or under anything inside it."],
+    ["move_heading", "22023", 422, "2100 Payables is a heading. A heading stays where it is; drag it among the headings beside it to change its place."],
+    ["move_rule_heading", "22023", 422, "2200 Customer money held decides how money may be recorded, not only where an account prints. No account moves into or out of it."],
+    ["move_last_child", "22023", 422, "2310 SST payable is the last account under 2300 Taxes. Move another account under that heading first."],
   ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
     fakeClient(() => refuse(sqlstate, details as string, message as string));
     const res = await post("/accounts/move", MOVE);
