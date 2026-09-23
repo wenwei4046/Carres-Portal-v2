@@ -153,7 +153,9 @@ const styles = StyleSheet.create({
   th: { fontSize: 7.5, fontWeight: 700, color: "#FFFFFF", letterSpacing: 0.2, textTransform: "uppercase" },
   colNo: { width: mm(7) },
   colCode: { width: mm(27) },
-  colQty: { textAlign: "right" },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). Money stays right-aligned.
+  colQty: { textAlign: "center" },
   colPrice: { textAlign: "right" },
   colDisc: { textAlign: "right" },
   colAmount: { textAlign: "right" },
@@ -199,7 +201,7 @@ const styles = StyleSheet.create({
   desc: { flex: 1, paddingLeft: mm(1.5), paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
-  cellQty: { fontSize: 7, textAlign: "right", lineHeight: 1 },
+  cellQty: { fontSize: 7, textAlign: "center", lineHeight: 1 },
   cellMoney: { fontSize: 7, textAlign: "right", lineHeight: 1 },
   // The line's own amount anchors the row (international convention: the
   // rightmost figure is the one the reader scans down).
@@ -516,7 +518,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               ))}
             </View>
             <View style={[styles.bQty, styles.gridV]}>
-              <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{line.qty}</Text>
+              <Text style={styles.cellQty}>{line.qty}</Text>
             </View>
             <View style={[styles.bPrice, styles.gridV]}>
               <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(line.unit_price)}</Text>
@@ -559,7 +561,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
               {addonSub ? <Text style={styles.descSub}>{addonSub}</Text> : null}
             </View>
             <View style={[styles.bQty, styles.gridV]}>
-              <Text style={a.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>{a.qty}</Text>
+              <Text style={styles.cellQty}>{a.qty}</Text>
             </View>
             <View style={[styles.bPrice, styles.gridV]}>
               <Text style={[styles.cellMoney, styles.colPrice]}>{moneyDigits(a.unit_price)}</Text>

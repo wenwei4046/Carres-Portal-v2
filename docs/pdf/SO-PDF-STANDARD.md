@@ -159,7 +159,10 @@ names, no caps labels, no size bouncing (round 8: "not like you up and down").
 - A numeric cell's `Text` carries NO width — the wrapper `View` owns it. A Text
   with its own width overflowed the padded box and killed `textAlign: right`.
 - Header labels never wrap (round 16): `DISC (RM)`, not `DISCOUNT (RM)`.
-- `Qty > 1` prints **bold**.
+- **A quantity is a COUNT: centred, one weight** (owner 2026-09-22;
+  DOCUMENT-KIT.md §3 rule 5). The old `Qty > 1` prints **bold** rule is
+  RETIRED — it made one column carry two weights, and bold belongs to the
+  TOTAL row. Money stays right-aligned.
 - Discount is data-driven: no schema field carries it today (verified 2026-08-09);
   cells print `—` until the portal sends figures. The column STAYS (owner ruling).
 - The table CLOSES with a `TOTAL` row between two ink rules (round 24):

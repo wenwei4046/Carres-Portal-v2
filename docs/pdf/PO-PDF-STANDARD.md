@@ -207,13 +207,31 @@ unused codes, unique across every prefix. Production mints `PO-20260922-8987`
 `PREFIX-DDMMYY-NNNN` proposal are both retired; existing identities are
 permanent and are never renumbered.
 
-🔴 **THE HEADER MEASUREMENT PREDATES THE REAL NUMBER — RE-MEASURE BEFORE THE
-NEXT PO BUILD.** §2's `52.9mm` hero and `26mm` header reserve were measured on
-`PO-2609-0042 V2`, a 13-character number this system cannot produce. The real
-`PO-20260922-8987 V2` is four characters longer, so the hero is wider than the
-figure this standard quotes and the three-line address may not clear it. The
-number is right; the arithmetic around it was never re-run. Render one and
-measure before trusting either figure.
+**THE HEADER, MEASURED ON THE REAL NUMBER — 2026-09-23.** §2's `52.9mm` hero was
+measured on `PO-2609-0042 V2`, a number this system cannot produce. Re-measured
+against the actual Noto Sans SC 700 file at 18pt, the real hero
+`PO-20260922-8987 V2` is **67.9mm** — fifteen millimetres wider. The header still
+holds, and here is the whole arithmetic so nobody has to guess again:
+
+```
+content                                        186.0mm
+− hero `PO-20260922-8987 V2`   18/700           67.9
+− headerLeft paddingRight                        4.0
+− logo                                          13.0
+− logo → name gap                                4.0
+= the left column's real width                  97.1mm
+
+  `CARRES SDN. BHD.` 14/700 + SSM 8pt           87.6   fits, 9.5mm spare
+  address line 1                    8pt         70.6   fits
+  address line 2 · 3                8pt         60.5   fits
+```
+
+**9.5mm is the whole margin, and the widest thing in it is the company name row,
+not the address.** A longer legal name, a second registration number or a fourth
+address line spends it. The draft hero without a version is 58.8mm and
+`PURCHASE ORDER` beneath is 27.5mm, so neither is the binding constraint. The
+26mm header RESERVE is a height and is unaffected. Re-run the measurement
+against the font whenever the company block or the number shape changes.
 
 **~~the PO itself never revises~~ — SUPERSEDED (Jess, 2026-08-18; 0364).** A
 sent PO is not overwritten, it is REVISED: the NUMBER is kept and a version is
@@ -243,4 +261,5 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | Version placement stated without contradiction: PO DETAILS `PO No` row · continuation page headers · footer; the page-1 hero number does not repeat it. Matches the approved preview; no layout change. | Jess |
 | 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO-… V{n}` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
 | 2026-09-22 | **BUILT** (`po-template.tsx`, `GET /print-data`): every rule of 2026-09-21/22 above. The route ADDS `delivery_working_days` (shared `poDeliveryWorkingDays`, the supplier's week + holidays) and `delivery_method` (`suppliers.kind = 'factory_pickup'` → `We collect`) beside the SQL document and overwrites nothing; a kept version (`?version=N`) gets neither and reprints as sent. Every PO closes with `TOTAL`; sofa drawings one set per page. Words never split at a line end (family, SO-PDF-STANDARD §9). No migration. | Jess |
-| 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). APPROVED / NOT BUILT on the live template. | Jess |
+| 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). **BUILT** on the live template the same day. | Jess |
+| 2026-09-23 | Header re-measured on the REAL number: `PO-20260922-8987 V2` is 67.9mm, not the 52.9mm §2 quoted for a number the allocator cannot mint. The left column is 97.1mm and its widest content — the company name row at 87.6mm, not the address — leaves 9.5mm. No layout change; the figures are now true. | measured |
