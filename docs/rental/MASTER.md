@@ -5,6 +5,132 @@
 
 ---
 
+# Subscription / Diglant — owner direction 2026-09-22 · PLAN / NOT BUILT
+
+**OWNER-CONFIRMED BUSINESS DIRECTION.** Jess confirmed Subscription as a separate business
+module/line from outright sales. Diglant is the mattress supplier exclusively for Subscription
+and is also an investor. The business has monthly quantity KPI/forecasts used to plan how many
+subscriptions to sell and how much stock to order from Diglant. The reported stock supply lead
+time is 45 days. Carres appoints logistics to collect at Diglant and deliver to customers;
+Diglant can print and attach Carres Unit ID labels. Other operating processes should reuse the
+current portal flow; Subscription needs its own additional after-sales detail. The owner requests
+a whole-portal consequence audit and complete recommendation, not a local SO filter-only change.
+This confirms direction, not unspecified commercial terms, kit design, implementation or cutover.
+
+**SCOPE AND AUTHORITY.** This MASTER remains the current Rental/Subscription authority; do not
+create a competing Subscription MASTER. Preserve existing agreements and their signed terms.
+Existing rental pricing, supplier splits, settlement, credit, billing anchors and ownership rules
+are not automatically new Diglant contractual terms. The investor relationship confers no system
+access, approval exemption, settlement formula or right to see unrelated supplier/customer data.
+Unit IDs remain allocated by the Carres authority, never independently invented by the printer.
+No supplier contact, account invite, purchase commitment or live data change is authorised here.
+
+**OPEN CONTRACT EVIDENCE.** The 45-day quantity is confirmed; calendar versus working days,
+start trigger, endpoint (ready for pickup versus delivered to a destination), included transit,
+capacity/minimum batch commitments and calendar must be established before promised dates or
+Order By can be computed. Existing Purchasing Safety days and production/transit calendar rules
+must be reconciled, not silently replaced by browser date subtraction. KPI measurement event
+(signed, approved, activated/delivered, net of cancellation) and monthly sales-to-delivery mapping
+also need an explicit definition. Do not label all as current SO delivery-month quantities.
+
+**RECOMMENDED ARCHITECTURE — PROPOSAL / NOT LAW.**
+- Subscription owns plan/contract, its versioned monthly targets and forecasts, asset connection,
+  recurring billing and service entitlement context. Maintain separate target, forecast total,
+  confirmed subscriptions, actual delivery/activation and remaining customer commitments.
+- Purchasing consumes approved supply planning needs through its one authority; it owns stock/PO
+  coverage, purchase remainder, supplier promise and issuance. Sales Orders Order list and Monthly demand exclude Subscription by explicit owner ruling
+  on 2026-09-22. Subscription presents its own demand; shared execution and underlying fulfilment
+  documents remain intact without manufacturing sales revenue.
+- Forecast orders and actual orders must not be summed twice. Actual matched demand consumes the
+  same model/size/period forecast; excess actuals remain visible, and planning keeps version/basis
+  history. KPI is not automatically a PO. Shared stock/PO allocations cannot cover both business
+  lines at once. Forecast buying before a named SO is a gap to check against Manual Purchase's
+  approved purposes and approvals, not permission to invent a new ungoverned buying door.
+- Stock retains identity, ownership, location, custody and history. Direct supplier-to-customer
+  movement records actual supplier handover/inspection and customer receipt, never fictional Carres
+  warehouse arrival. Delivery retains logistics assignment, pickup, partial/failed delivery and proof.
+- Routine entitled cleaning remains a Visit; complaints/exceptions remain Service Cases. Upgrade,
+  exchange, return, termination, asset recovery and entitled care link contract, physical asset,
+  billing consequences and original evidence. Existing subscription service rulings remain authority.
+- Dashboard/Reports read shared metrics; Work reads owning-module obligations; Finance/AP and People
+  retain settlement and commission ownership. No duplicate billing or investor-only write authority.
+
+**AUDIT STATUS.** Initial authority/source pass only, not whole-portal or production verification.
+Read ERP Architecture, Rental/Subscription, SO, Purchasing, Stock, Delivery, Payment, Guarantee,
+Service, Workspace and Issue Tracker boundaries; inspected shared rental calculations and rental
+route references. Existing code includes recurring schedule and supplier/commission splitting;
+this is code evidence, not proof the new investor arrangement fits or operates in production.
+Next audit must trace Catalog/plan eligibility, POS approvals, contract and document history,
+forecast revisions/consumption, supplier calendars, purchase coverage, custody handover, fulfilment,
+billing failures/settlement, visits/cases, upgrades/termination/recovery, Finance/AP/People,
+permissions, Work/notifications, reporting/export and migration of existing agreements.
+Outstanding verified gaps include missing Catalog MASTER,
+45-day calendar/endpoint ambiguity, forecast-based stock planning admission, and no measured
+end-to-end Diglant supplier-pickup flow. No completion or build-readiness claim is made.
+
+## Recommended Subscription / Diglant portal blueprint — PROPOSAL / NOT LAW
+
+**Two commercial businesses, shared execution.** Subscription is a separate business/contract
+surface, not another supplier filter and not a second warehouse, PO engine or Delivery engine.
+Business type is structurally linked from contract to fulfilment/demand; supplier alone must not
+be used to infer commercial type. Catalog restricts Diglant's subscription models to eligible
+plans and captures model/size/identity mode; opening data errors are reported, not Other goods.
+
+| Surface / owner | Recommended operator journey and boundary |
+|---|---|
+| Subscription Plans / Settings | Maintain eligible Diglant models, contract/benefit versions, terms, fee schedule and effective dates. Preserve prior agreements. No assumed reuse of old financial percentages. |
+| Monthly plan in Subscription | Management sees six monthly sales KPI columns and separately versioned forecast, approved agreements, delivered/activated quantity and cancellations. Define KPI event explicitly; dispatch month is not sales-credit month. Maintain revision reason, actor and approval history. |
+| POS / agreement | Select Subscription, plan and model, customer, requested delivery, signed terms and required approval. Do not mix outright and subscription lines. Pending/rejected applications are visible pipeline, not firm procurement demand or active assets. |
+| SO / Monthly demand | OWNER RULING 2026-09-22: Subscription is not shown here. Keep outright-only rows, quantities, totals, drill-downs and exports; no combined-business selector. Subscription demand is presented in Subscription. Existing rental exclusion is consistent with this boundary, not a gap to reverse. Preserve underlying zero-priced fulfilment documents and shared execution. |
+| Purchasing planning | Match firm demand against the appropriate model/size/period forecast, then net eligible unallocated stock and dated incoming supply once. A monthly KPI alone cannot issue a PO. Forecast procurement needs governed approval, plan-version link and an existing/approved buying purpose. Demand passed its Order By is a risk, never a backdated PO. |
+| Supplier / PO | Issue to Diglant using normal PO duty, permissions, document revisions, supplier promise and response evidence. Unit IDs generated by Carres on the authorised source event; send only relevant label/Unit/model information. Investor role does not bypass approvals or disclose unrelated records. |
+| Supplier handover / Receiving | Verify the issued IDs, goods, quantities and condition at the actual handover. Label printed / label attached / goods ready / goods collected are different facts. Missing/wrong labels cannot invent Units. Verify how existing receipt/GRN acceptance supports supplier-site handover before adding any event. |
+| Stock / Warehouse | Track actual location at Diglant, logistics custody and customer custody, without fake warehouse receipts. Ownership is a distinct contractual fact. Forecast stock, assigned stock, quarantine, returned and replacement assets retain provenance and cannot be counted twice. |
+| Delivery | Assign partner, source Diglant, target customer, pickup readiness and appointment. Read valid release evidence; do not assume the outright-payment release gate suits subscription credit approval. Partial/failed collection or delivery preserves actual Unit custody, exception evidence and rescheduling history. |
+| Subscription billing / Payments / Finance | Contract owns schedule; existing writer records each collection once. Separate customer recurring receipts, supplier procurement liability and any investor/commercial settlement. Audit failed payments, retries, arrears, correction, early termination/settlement and permissions; no invented investment share or automated refund. |
+| Entitlements / Visits / Service | Routine included cleaning books a Visit against the correct contract-year entitlement; accepted completion consumes entitlement. Missed/poor work, defects and disputes open/link Service Cases. Customer-requested upgrade follows quote/acceptance, contract/fee change and asset exchange; complaints link rather than duplicate those writers. |
+| Returns / recovery | Termination or upgrade produces controlled collection; inspect returned Unit before reuse, repair, quarantine or retirement. No automatic availability, entitlement restart or asset renumbering. Original signatures and delivery/collection evidence remain version-bound. |
+| People / Reports / Work / Issue Tracker | People owns commission calculation; reporting reads KPI event, forecast version and actual results. Work derives next action from owning facts. Issue Tracker explains delay, fault/cost and learning; never replaces the operative case/claim. Investor report scope and access must be authorised separately. |
+
+**Forecast example (illustrative, one model/size and one delivery-planning month).** Sales KPI may
+be 120, while the approved supply forecast is 100. If 40 confirmed undelivered orders are matched
+within that forecast, residual forecast is 60, not another 100. Planning demand is 40 + 60 = 100;
+eligible stock 20 plus timely open PO supply 50 leaves planned uncovered quantity 30. KPI 120 is
+not added. The example assumes no earlier competing reservations, overdue carryover or safety
+stock; actual shared planning must account for them, changes and time-phased receipts. Recurring
+monthly payments never create another physical mattress demand. Replacement/upgrade demand is
+separately reasoned and must not masquerade as a new subscription sale or count twice in KPI.
+
+**45-day planning.** First establish the supplier's calendar, start event and delivery/ready
+endpoint. Then use the one existing backwards/forwards calendar engine. Retain customer-requested
+date, required stock/ready date, Order By and supplier-confirmed date as different facts. A single
+monthly bucket is insufficient for a delivery on day 1 versus day 30; exact dated requirements
+underpin the month total. Review forecast changes inside the committed lead-time window against
+actual cancellability/capacity, never silently rewrite an issued PO. No fixed 45-day formula is
+approved before the contract boundary is clear.
+
+**Minimum review scenarios.** Forecast followed by actual customer order without double buying;
+actual exceeds forecast; cancellation after supplier commitment; partial/late supply; stock at
+supplier versus in transit; duplicate/reprinted/wrong labels; pickup failure and partial delivery;
+credit rejected/pending; recurring payment failure without duplicated billing; cleaning scheduled
+but not completed; complaint versus routine care; upgrade, termination and recovered asset reuse;
+current terms changed after signature; dealer/investor access; all views/counts/exports consistent.
+These are acceptance boundaries, not implementation Cards or evidence of passing tests.
+
+**Reference-to-Carres decisions.** Microsoft Dynamics forecast reduction supplies the principle
+that actual transactions consume forecast (https://learn.microsoft.com/en-us/dynamics365/supply-chain/master-planning/reduction-keys).
+ADAPT that principle, reject blindly adding KPI/forecast/orders. Odoo subscription renewal/upsell
+separation (https://www.odoo.com/documentation/18.0/applications/sales/subscriptions/renewals.html)
+informs distinct contract lifecycle actions; do not copy its accounting/asset assumptions. Local
+Carres ownership, calendar, consent and history rules prevail. 2990's subscription/forecast
+capabilities have not been inspected in this pass and are not claimed as evidence.
+
+**Completion limits.** This is a whole-portal consequence recommendation, not a completed
+production audit. Source evidence proves the rental exclusion and existing rental math, not full
+Diglant readiness. Contract/calendar/KPI semantics, supplier-site handover fit, investor settlement,
+new-asset ownership and real permission/finance paths remain unresolved. The prior 8/10 SO preview
+score is not a score for this enlarged business. Do not hand the enlarged scope to BUILD as ready.
+
 # §1 · Overview
 
 ### MISSION

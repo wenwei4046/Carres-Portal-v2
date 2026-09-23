@@ -219,6 +219,63 @@ No deposit · Online order
 
 ## Monthly demand — owner approved 2026-09-22 · APPROVED TARGET / NOT BUILT
 
+**Monthly overview scope — owner direction 2026-09-22; expanded design pending review.**
+Sales Orders is the outright-sales operational monthly reading surface: orders received,
+commercial quantities/amounts, fulfilment progress and forward physical demand. A remaining-demand
+matrix alone does not fulfil that mission. It stays separate from the one global Dashboard,
+which admits selected authoritative management facts and links to owning detail rather than copying
+this report. No Subscription population, company-wide finance or personal Work queue belongs here.
+Shared measures must retain one owning calculation. This direction does not approve a new KPI
+formula, target-entry engine, copy or finished layout. The current independent demand preview
+covers only a subset, not the enlarged monthly overview.
+
+**Portal composition — owner approved 2026-09-22; independent preview only.**
+Order list remains the order-finding surface. Monthly overview uses the governed Tabs to switch
+Dealer sales / Delivery progress / Monthly demand, one main table at a time; Operation received
+is a compact summary in Delivery progress. Reuse the standard ModuleHeader/Shell, FilterRail,
+Tabs and governed table interactions. Do not compose this as a PDF or four vertically stacked
+reports. Preview global utility controls may be omitted to avoid connecting to live services;
+that isolation is not a proposal to remove production portal navigation.
+Month and Region use governed selection controls. Dealer/Sales Location and Category keep approved
+clickable multi-selection; no rail Clear filters. Region adapts the Purchasing grouping: Klang
+Valley combines Kuala Lumpur, Selangor, Putrajaya; other states retain their names. Actual order
+address remains Customer Delivery Location. Region is not a dealer's own location. Dealer and
+Region persist between the three tabs; Category resets on tab change and scopes all numbers in
+the active table. With Category selected, Dealer sales hides whole-order service amount and total
+payable rather than allocating them to selected goods; its source-order detail does the same.
+New view names and headings are owner-approved as this report's scope; no cross-portal rewrite
+is authorised. A shared shell alone is not evidence of full production integration.
+
+**Monthly reporting measures — owner-approved direction 2026-09-22; not built.**
+- Dealer sales comparison uses SO Doc Date in Malaysian calendar months. Compare each selected
+  Dealer/Sales Location separately plus a total; keep order count, actual goods-category quantities,
+  goods amount, service amount and total payable distinct. Read canonical commercial amounts,
+  not HR commission-basis arithmetic. Sales comparison and Operation intake are different scopes:
+  unsubmitted drafts are not sales, and an accepted sale is not automatically handed to Operation.
+- Operation received uses actual Proceed Date. Summarise handed-over orders and goods quantities
+  for the selected month; never substitute a planned production-start date.
+- Delivery progress uses the cohort whose customer-requested delivery date is in the selected
+  month: required, actually fulfilled and remaining quantities refer to the same cohort. Prior
+  outstanding commitments remain separately traceable. Actual customer delivery events, partials
+  and corrections come from Delivery; evidence review is a separate state, not a second count.
+- Forward demand covers the selected month and next 2/5 months by customer-requested date, with
+  models/configurations visible by default. Coverage and purchase remainder come from their
+  Stock/Purchasing owners. No new procurement calculation or action is admitted here.
+- The server scopes rows, aggregate amounts, drill-downs and exports consistently. This feature
+  grants no new external dealer access and does not give every internal role cross-dealer access.
+- Target attainment requires a governed target/metric contract. No invented target or achievement
+  percentage is approved. Subscription remains excluded; global Dashboard composition is unchanged.
+
+**Remaining historical-report design — PROPOSAL / NOT LAW.** Preserve order-issue evidence and
+trace later amendments/cancellations rather than silently overwriting a closed month's result.
+The exact cross-period adjustment contract requires further review; do not equate the operational
+current-demand projection with a frozen sales or commission statement. Read closed HR commissions
+from their frozen owner records. Proposed overview layout and new display wording remain review
+material. The independent prototype may demonstrate these distinctions with labelled synthetic
+order-issue snapshots, but is not evidence that historical source contracts are implemented.
+Normal review fixtures have required delivery dates; missing-date corruption is not a normal
+workflow and must not occupy the default operator preview.
+
 **Purpose and placement.** Jess approved a six-month view of the quantities still owed on
 accepted Sales Orders, for Operation to plan stock, purchasing and supplier capacity. Sales Orders
 provides two views: the existing order list and monthly demand. This is confirmed order demand,
@@ -227,6 +284,12 @@ monthly view does not replace the flat Register with month/status groups or chan
 use the existing permission-scoped orders handed from Sales to Operation; unsubmitted/Placed
 orders are not silently added. The earlier proposal to default the order list to unfinished orders
 is superseded by the approved list filters below; no default unfinished-only population is introduced.
+
+**Business boundary — owner ruling 2026-09-22.** Sales Orders Order list and Monthly demand
+show outright sales only. Exclude Subscription/rental records from rows, quantities, totals,
+drill-downs and exports. Do not add a Subscription or combined-business filter here. Subscription
+planning belongs to its own module; shared Purchasing, Stock and Delivery ownership is unchanged.
+This presentation boundary does not remove underlying subscription fulfilment documents.
 
 **Time and filters.** The monthly view defaults to the current calendar month plus the next five
 months. Offer three months, six months and a chosen starting month. Always retain separate
@@ -279,6 +342,42 @@ Expand a category into model, size and purchasing-relevant configuration. Clicki
 quantity exposes the contributing SOs and dealers under exactly the same filters and permissions.
 An empty result is not evidence of zero demand when its underlying facts failed to load.
 
+**Rail interaction — owner approved 2026-09-22; preview target.**
+Use existing FilterRailRow buttons for dealer and category facets, not checkboxes. Click a full
+row to select; click again to deselect; multiple selected rows stay highlighted. View navigation
+remains mutually exclusive. Keep shared row geometry, wrapping and pressed-state semantics.
+Remove dealer counts and their all-dates explanatory sentence from this SO preview. Date and
+location controls remain governed selects; identify Customer Requested Delivery Date at the
+month control. This is SO composition approval, not a global change to other pages or to
+FilterRailSelect single-selection behaviour.
+
+**Review evidence — owner ruling 2026-09-22.** Proposals and independent review prototypes
+may use clearly labelled fictional data to demonstrate layout, interactions and proposed scenarios.
+Keep arithmetic consistent and distinguish simulated behaviour from implemented or production-verified
+behaviour. Do not present fictional orders, quantities, dealers or exceptions as actual business
+facts or use fixture tests to substantiate production readiness. Actual audits and defect claims
+require traceable evidence; identify its source and verification status. Another chat's report is
+attributed evidence, not this reviewer's independent verification. Distinguish existing test/import
+records from genuine customer transactions. Missing real evidence remains unverified. The synthetic
+monthly preview may continue as a design proposal; its ratings concern design, not verified live
+operation. This does not authorise editing live records or exposing customer data in public artifacts.
+
+**Monthly presentation — owner approved 2026-09-22; not implemented/verified.**
+The content header contains `Monthly demand`, the selected month/year range, and
+`Items still to deliver`. Replace ambiguous Earlier/Later headings with
+`Before {MMM YYYY}` and `After {MMM YYYY}`, updated with the selected window. These mean outside
+the selected window, not necessarily overdue relative to today. Keep all monthly years explicit.
+Do not repeat default All dealers / All states, gift/service calculation explanations, or the
+instruction to click quantities above/below the table. Existing quantity rules still apply.
+When the rail is collapsed and filters are active, retain a compact active-filter summary.
+Show a concise missing-date or unclassified-product entry only when such errors exist; opening
+it reveals affected orders, SKU where relevant, and quantities. Never silently discard them.
+Category expansion reveals models/configurations; a quantity opens contributing orders with
+dealer, requested delivery date and remaining quantity. Clickability and keyboard focus must
+be explicit; colour or hover alone is insufficient. Reuse governed kit and token values.
+This approval covers composition and the exact COPY below, not production readiness or a
+claim of complete accessibility. Illustrative figures are labelled fictional and are not required defaults or live facts.
+
 **Selected-month coverage.** Below the matrix, expose remaining customer demand, allocated stock
 coverage, valid PO coverage and remaining purchase requirement. Read the owning Stock and
 Purchasing calculations; do not create a second demand engine or allocate/purchase from this
@@ -310,8 +409,7 @@ line separately. The operating target is approved, not built; expected supply re
 **Acceptance boundary and remaining design work.** Review must demonstrate a month/year boundary,
 previously due outstanding goods, demand beyond six months, undated demand, partial delivery,
 gifts, applied cancellation, pending amendment, stock/PO receipt without double counting,
-dealer/destination filtering and exact SO drill-down. Fictional sample quantities in the chat are
-examples, not business facts. The operating model and composition above are approved; final
+dealer/destination filtering and exact SO drill-down. Use labelled proposal scenarios or verified real cases, distinguishing them under the review-evidence ruling above. The operating model and composition above are approved; final
 English COPY, kit fit, responsive/keyboard behaviour and cross-module source completeness still
 require design verification. No application implementation, production validation, Card numbering
 or approval of the whole SO Blueprint is implied by this local approval.

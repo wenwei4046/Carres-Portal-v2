@@ -11,6 +11,38 @@
 
 ---
 
+## Sales Orders monthly overview — owner approved 2026-09-22
+
+Portal views: `Order list` / `Monthly overview`. Monthly overview tabs: `Dealer sales` /
+`Delivery progress` / `Monthly demand`. `Operation received` is the Proceed Date summary.
+Filters: `Month`, `Future demand` (3/6 months), `Dealer / Sales Location`, `Region`, `Category`.
+`Region` uses Klang Valley / state grouping defined in Orders MASTER; `Customer Delivery Location`
+remains the actual customer's address. Do not invent `Demand product category` or confuse the
+Region with a dealer address. Dealer comparison columns: `Dealer / Sales Location`, `Orders`,
+`Qty`, `Goods amount`, `Service amount`, `Total payable`. Selected-category scope omits the last
+two whole-order amounts rather than inventing an allocation. Delivery comparison columns:
+`Dealer / Sales Location`, `Category`, `Required`, `Delivered`, `Still to deliver`.
+This is approved display scope, not evidence that the report or historical calculations are built.
+
+## Sales Orders Monthly demand — owner-approved copy, 2026-09-22
+
+Scope: outright-sales Monthly demand only; approval is not implementation evidence.
+
+| Purpose | Approved text / behaviour |
+|---|---|
+| View heading | `Monthly demand` |
+| Date range | `{MMM YYYY} – {MMM YYYY}`; use consistent English month abbreviations, e.g. `Sep 2026 – Feb 2027` |
+| Quantity basis | `Items still to deliver` |
+| Month control date basis | `Customer Requested Delivery Date` (existing governed field name) |
+| Before-window column | `Before {MMM YYYY}`; not `Earlier`, and not automatically `Overdue` |
+| After-window column | `After {MMM YYYY}`; not `Later` |
+| Missing requested-date exception | `1 order missing delivery date` / `{n} orders missing delivery date`; only when present, opens affected orders and quantities |
+
+Do not show default `All dealers · All states`, `Gifts included · Services excluded`, or
+`Select a quantity to trace its orders` as persistent explanatory text on this view.
+Retain compact active-filter context when the rail is collapsed. Unclassified-product errors
+remain visible and traceable; no new exact wording for that error is approved by this entry.
+
 ## Why this exists
 
 Every screen the operations team uses must let a no-experience operator do
