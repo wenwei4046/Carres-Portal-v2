@@ -159,7 +159,8 @@ conceal a running counter, not every inference from transaction activity, and ar
 authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
 does not authorize sending SO numbers to suppliers.
 
-**Scope boundary.** This approval covers SO numbering and its revision presentation only. PO, DO,
+**Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering
+was approved separately the same day (`docs/delivery/MASTER.md` §3.1). PO,
 GRN, RA and Service Case numbering require their own capacity and governing-business-rule review
 before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
 correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
@@ -750,7 +751,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
    Worked sample (SO-1319): Mattress 2 · Accessory 1; Delivery fee + Stair carry; goods RM3,780.00 +
    services RM350.00 = Total payable RM4,130.00; Paid to date RM1,999.50 (voided RM1,200 excluded);
    Balance due RM2,130.50. This presentation change does not change the money or separate SST rules.
-5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
+5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · ({n})` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
 
 **Refined 2026-09-22 (owner approval of the reviewed plan):**
@@ -762,7 +763,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
 - **Services follow their own pricing contract:** per-trip charges show qty 1; per-piece charges keep
   their real quantity.
 - **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
-  visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
+  visible); after approval the line reads `Cancelled · ({n})`. `Cancel item` is rejected — it collides
   with the edit-mode `Cancel` and `Cancel SO`.
 - **Before submitting** the reason (required) and a `Before` / `After` review show the category quantities and changed service quantities, the
   amount change and each affected object with its owner: purchase demand, an issued PO or promised
@@ -1193,9 +1194,9 @@ read only as implementation history.
   cancelled. A placed PO does not force cancel/reorder; it changes a simple edit into a governed
   Amendment with explicit downstream impact handling. `Staff correction`, `Customer change` and
   `Fulfilment replacement` are different causes and may not be collapsed.
-- Rev 1 is permanently the original SO. A pending or rejected amendment is not a Revision. Every
-  approved, applied amendment creates Rev 2/3/4… and preserves the complete historical version and
-  its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
+- Version `(1)` is permanently the original SO. A pending or rejected amendment is not a Revision.
+  Every approved, applied amendment creates `(2)`/`(3)`/`(4)`… on the same SO number and preserves
+  the complete historical version and its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
   separate views and concepts.**
 - Amendment impact is computed before approval across supplier/PO commitments, Unit/warehouse
   allocation, Receiving, payment/commercial difference, delivery commitment, Work, permissions and
@@ -1371,7 +1372,7 @@ The status word is the owning module's own translation — no internal enum reac
 | Split quantity | one fork per Purchase Order, each in its own column |
 | Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
 | Service lines | no goods fork; a linked case appears on the strip only |
-| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · Rev {n}`, **no chain and no gate edge** |
+| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
 | Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
 

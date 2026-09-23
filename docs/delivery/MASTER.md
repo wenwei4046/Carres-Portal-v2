@@ -173,9 +173,24 @@ leg's arrangement carries its partner and its agreed day and the order's money a
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
-- **Numbering** stays the locked `DO-DDMMYY-NNNN` scheme (`docNumber`, seeded on the order id):
-  a retry, refresh or reprint returns the SAME number; a rebooked trip is a NEW document on its
-  own issue date.
+- **DO number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET / NOT BUILT.**
+  `DO` + two-digit year + two-digit month of **issue** + `-` + **exactly five random digits**,
+  e.g. `DO2609-48271`. Leading zeros allowed: 100,000 DO numbers per month. Fixed width — never
+  grows automatically. Drawn independently of the SO number (a shared tail means nothing); the
+  link to the SO/trip is the record link. **Unique across every order; never reused**; a voided DO
+  keeps its number forever. A retry, refresh or reprint returns the SAME stored number; a
+  rebooked or failed-then-redelivered trip is a NEW DO with a NEW number (no `-B` letter). Old
+  `DO-DDMMYY-NNNN` numbers are test data (clean start). Same appearance as the SO ruling
+  (`docs/orders/MASTER.md` → *SO number*).
+- **🔴 P0 FACT, measured 2026-09-23 on origin/main `855c305c4` — must be gone before Outright go-live,
+  whatever the format.** Today `docNumber` seeds the tail on the ORDER id (`FNV mod 10⁴`), and the
+  collision check reads only the SAME order's numbers (`apps/api/src/lib/delivery-order-issue.ts:163-178`).
+  Two different orders can therefore produce the same `DO-DDMMYY-NNNN` on one day, and the
+  materialiser silently skips an existing number (`0356:120-122`): the second order wears the first
+  order's DO and has **no document row of its own**; the split-trip mint returns the other order's
+  row (`0542`). Because the tail is deterministic, retrying fails identically all day. Expected
+  frequency at 30 DOs/day ≈ 13 days a year. **Acceptance:** two orders issued the same day always
+  get different numbers and each owns its row; a conflicting number is REFUSED, never skipped.
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
   facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
