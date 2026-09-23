@@ -8,9 +8,13 @@
  * suggestions (a likely typed-wrong code, or the same amount 3 to 7 days
  * apart): staff approve a suggestion or adjust the match by hand.
  *
- * A day whose rows are all matched is approved by filling the card payout
- * form (0529) with the card company's net and fee. That form prepares a money
- * move; the ledger moves only when the finance approver approves it.
+ * A day whose rows are all matched is approved in the card payout form
+ * (0529): the card company's net, fee and the reference are fixed, staff give
+ * the date the bank received it and the accounts. The database prepares that
+ * day's one money move and links it to the day; the ledger moves only when
+ * the finance approver approves it. GHL's file has no settlement date, so a
+ * GHL day is its sale date and its paid-out date comes from the statement
+ * date in the file name, or is typed by staff.
  *
  * Built from the kit pieces Money moves uses.
  */
@@ -40,7 +44,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
 import { MoneyMoveForm } from "../money-moves/MoneyMovesPage";
 import { LoadFailed } from "../other-money-in/parts";
-import { useCardSettlement, useImportCardFile, useMatchCardRow } from "./api";
+import { useCardSettlement, useImportCardFile, useMatchCardRow, usePrepareCardPayout } from "./api";
 
 const MATCHED_WORD: Record<CardMatchHow, string> = {
   approval_code: "Matched by approval code",
@@ -68,6 +72,10 @@ function dayStatus(d: CardSettlementDay) {
 const machine = (d: Pick<CardSettlementDay, "acquirer" | "group_key">) =>
   d.acquirer === "MAYBANK" ? `All machines · ${d.group_key}` : d.group_key;
 
+const paidOut = (d: CardSettlementDay) => (d.payout_date ? fmtDate(d.payout_date) : "Not in the file");
+/** Only a GHL day is a sale date; a Public Bank or Maybank day holds the sales of several dates. */
+const saleDate = (d: CardSettlementDay) => (d.acquirer === "GHL" ? fmtDate(d.day_date) : "");
+
 const paymentWords = (p: CardSettlementPayment | undefined) =>
   p
     ? `${rm(Number(p.amount))} · ${fmtDate(p.paid_on)} · ${p.receipt_no ?? "Receipt number missing"} · ${
@@ -83,6 +91,7 @@ export default function CardSettlementPage() {
   const [acquirer, setAcquirer] = useState<CardAcquirer | undefined>();
   const [adjusting, setAdjusting] = useState<CardSettlementRow | null>(null);
   const [paying, setPaying] = useState<CardSettlementDay | null>(null);
+  const prepareDay = usePrepareCardPayout(paying);
 
   const rowsOf = useMemo(() => {
     const m = new Map<string, CardSettlementRow[]>();
@@ -98,10 +107,19 @@ export default function CardSettlementPage() {
         key: "date",
         label: "Paid out",
         width: 120,
-        accessor: (d) => fmtDate(d.payout_date),
+        accessor: paidOut,
         dateValue: (d) => d.payout_date,
         filterType: "date",
-        exportValue: (d) => fmtDate(d.payout_date),
+        exportValue: paidOut,
+      },
+      {
+        key: "sale",
+        label: "Sale date",
+        width: 120,
+        accessor: saleDate,
+        dateValue: (d) => (d.acquirer === "GHL" ? d.day_date : null),
+        filterType: "date",
+        exportValue: saleDate,
       },
       { key: "machine", label: "Machine", width: 220, accessor: machine, searchValue: machine },
       { key: "rows", label: "Sales", width: 80, align: "right", accessor: (d) => String(d.row_count), numberValue: (d) => d.row_count },
@@ -247,6 +265,7 @@ export default function CardSettlementPage() {
       {paying && (
         <MoneyMoveForm
           onClose={() => setPaying(null)}
+          prepareDay={prepareDay}
           initial={{ kind: "CARD_PAYOUT", date: paying.payout_date, amount: Number(paying.net), fee: dayFee(paying), reference: paying.reference }}
         />
       )}

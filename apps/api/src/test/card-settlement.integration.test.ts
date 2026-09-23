@@ -56,7 +56,7 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     P[key] = r.rows[0].id;
   }
   function importFile(acquirer: CardAcquirer, name: string, content: string) {
-    const parsed = parseCardFile(acquirer, content);
+    const parsed = parseCardFile(acquirer, content, name);
     if (!parsed.ok) throw new Error(parsed.message);
     return attempt("select public.card_settlement_import($1, $2, $3, $4::jsonb, $5::jsonb) as r", [
       acquirer, name, content, JSON.stringify(parsed.rows), JSON.stringify(parsed.published),
@@ -70,6 +70,13 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
   };
   const match = (line: string, payment: string | null) =>
     attempt("select public.card_settlement_match($1, $2) as r", [line, payment]);
+  const pbbDay = (r: CardSettlementReview) => r.days.find((d) => d.acquirer === "PBB" && d.group_key === "900000000001 / 90000001")!;
+  let holding = "";
+  let bank = "";
+  const prepareDay = (d: { acquirer: string; day_date: string; group_key: string }, key: string | null = null, moveDate: string | null = d.day_date) =>
+    attempt("select public.card_settlement_payout_prepare($1, $2::date, $3, $4::date, $5, $6, null, $7::uuid) as r", [
+      d.acquirer, d.day_date, d.group_key, moveDate, holding, bank, key,
+    ]);
   const ledgerRows = async () => Number((await q("select (select count(*) from gl_entries) + (select count(*) from gl_entry_lines) as n")).rows[0].n);
   let ledgerAtStart = 0;
 
@@ -133,9 +140,13 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     await pay("ghl6", 700, plus(D, 6), null);
     await pay("mb1", 150, D, "M1N2P3");
     await pay("mb2", 50, D, "Q4R5S6");
+    await pay("ghlTwin", 120, D, null);
+    await pay("coded", 333, D, "Z9Z9Z9");
     await pay("cash", 99, D, null, "cash");
     await pay("voided", 98, D, null);
     await q("update order_payments set voided_at = now(), voided_by = $2, void_reason = 'IT' where id = $1", [P.voided, U.finance]);
+    holding = (await q("select account_code from gl_money_accounts where money_kind = 'HOLDING' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
+    bank = (await q("select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
     ledgerAtStart = await ledgerRows();
   }, 30000);
 
@@ -183,12 +194,13 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
 
   it("GHL: same day matches; 2 days apart is suggested; 5 days is found only when nothing is inside 3; 9 days is not found", async () => {
     await actAs(U.finance);
-    const made = await importFile("GHL", "ghl.csv", ghl());
+    // the statement date in the file name is the paid-out date
+    const made = await importFile("GHL", `StatementOfAccountDetails${plus(D, 1)}_1.csv`, ghl());
     console.log("GHL import:", JSON.stringify((made as { value: unknown }).value));
     expect(made).toMatchObject({ ok: true, value: { rows: 5, imported: 5, matched: 1 } });
 
     const r = await review();
-    expect(rowOf(r, "GHL", 300)).toMatchObject({ payment_id: P.ghlSameDay, matched_how: "amount_and_date" });
+    expect(rowOf(r, "GHL", 300)).toMatchObject({ payment_id: P.ghlSameDay, matched_how: "amount_and_date", txn_date: D, day_date: D, payout_date: plus(D, 1) });
     const two = rowOf(r, "GHL", 420).suggestions;
     const five = rowOf(r, "GHL", 510).suggestions;
     const nine = rowOf(r, "GHL", 640).suggestions;
@@ -200,11 +212,48 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     expect(oneAndSix).toEqual([{ payment_id: P.ghl1, how: "amount_near_date", days_apart: 1 }]);
   });
 
+  it("GHL: two rows of one amount on one day and one payment: neither is matched at once, both are suggested", async () => {
+    await actAs(U.finance);
+    const at = `${D} 11:00:00.0`;
+    const twins = ghlFile([
+      { at, amount: "120.00", fee: "1.56", net: "118.44", tid: "TESTTERM02", txId: "7101" },
+      { at, amount: "120.00", fee: "1.56", net: "118.44", tid: "TESTTERM02", txId: "7102" },
+    ]);
+    expect(await importFile("GHL", "ghl-twins.csv", twins)).toMatchObject({ ok: true, value: { imported: 2, matched: 0 } });
+    const rows = (await review()).rows.filter((x) => x.group_key === "TESTTERM02");
+    expect(rows.map((x) => [x.payment_id, x.suggestions])).toEqual([
+      [null, [{ payment_id: P.ghlTwin, how: "amount_and_date", days_apart: 0 }]],
+      [null, [{ payment_id: P.ghlTwin, how: "amount_and_date", days_apart: 0 }]],
+    ]);
+    // a renamed GHL file carries no paid-out date; its day is the sale date
+    expect(rows[0]).toMatchObject({ payout_date: null, day_date: D });
+  });
+
+  it("a Public Bank row wins its coded payment back from a GHL row that took it automatically", async () => {
+    await actAs(U.finance);
+    const g = ghlFile([{ at: `${D} 12:00:00.0`, amount: "333.00", fee: "4.33", net: "328.67", tid: "TESTTERM03", txId: "7201" }]);
+    expect(await importFile("GHL", "ghl-333.csv", g)).toMatchObject({ ok: true, value: { matched: 1 } });
+    const p = pbbFile([{ sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), amt: "333.00", net: "329.67", mid: "900000000002", tid: "90000002", code: "Z9Z9Z9", trace: "000301" }]);
+    const made = await importFile("PBB", "pbb-333.csv", p);
+    console.log("coded row after a GHL auto-match:", JSON.stringify((made as { value: unknown }).value));
+    expect(made).toMatchObject({ ok: true, value: { matched: 1, released: 1 } });
+    const r = await review();
+    expect(rowOf(r, "PBB", 333)).toMatchObject({ payment_id: P.coded, matched_how: "approval_code" });
+    expect(rowOf(r, "GHL", 333)).toMatchObject({ payment_id: null, matched_how: null });
+  });
+
+  it("a tab-only terminal is blank and refused by the database", async () => {
+    await actAs(U.finance);
+    const row = { line_no: 2, raw_line: "tab", fields: { tx_code_true: "PAYMENT" }, txn_date: D, payout_date: null, terminal_id: "\t", amount: 55, net_amount: 54.28 };
+    expect(await attempt("select public.card_settlement_import('GHL', 'tab.csv', 'tab', $1::jsonb) as r", [JSON.stringify([row])]))
+      .toMatchObject({ ok: false, detail: "row_unreadable" });
+  });
+
   it("Maybank: both codes match and the payout is the one per merchant", async () => {
     await actAs(U.finance);
     expect(await importFile("MAYBANK", "t41.csv", maybank())).toMatchObject({ ok: true, value: { rows: 2, imported: 2, matched: 2 } });
     const day = (await review()).days.find((d) => d.acquirer === "MAYBANK")!;
-    expect(day).toMatchObject({ group_key: "900000000009", payout_date: plus(D, 1), row_count: 2, matched_count: 2 });
+    expect(day).toMatchObject({ group_key: "900000000009", payout_date: plus(D, 1), day_date: plus(D, 1), row_count: 2, matched_count: 2 });
     expect([Number(day.gross), Number(day.net), dayFee(day), Number(day.recorded)]).toEqual([200, 198, 2, 200]);
   });
 
@@ -249,6 +298,8 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
 
     await actAs(U.finance);
     expect(await match(typo.id, P.typo)).toMatchObject({ ok: true, value: { matched_how: "suggestion" } });
+    // the same payment saved again keeps how it was matched
+    expect(await match(typo.id, P.typo)).toMatchObject({ ok: true, value: { matched_how: "suggestion" } });
     expect(await match(swap.id, P.swap)).toMatchObject({ ok: true, value: { matched_how: "suggestion" } });
     expect(await match(none.id, P.exact)).toMatchObject({ ok: false, detail: "payment_taken" });
     expect(await match(none.id, P.cash)).toMatchObject({ ok: false, detail: "not_card_payment" });
@@ -263,30 +314,63 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     expect(typed).toBe("K7M8N0");
 
     r = await review();
-    const day = r.days.find((d) => d.acquirer === "PBB")!;
+    const day = pbbDay(r);
     console.log("PBB day after matching:", JSON.stringify(day));
     expect(day).toMatchObject({ group_key: "900000000001 / 90000001", row_count: 4, matched_count: 4, payout_status: null });
     expect(dayMayApprove(day)).toBe(true);
   });
 
-  it("approving a day fills the card payout form and writes no ledger row; the prepared payout shows on the day", async () => {
+  it("Approve day prepares the day's one payout and writes no ledger row; a second press is refused; the matches are then fixed", async () => {
     await actAs(U.finance);
     expect(await ledgerRows()).toBe(ledgerAtStart);
-    const day = (await review()).days.find((d) => d.acquirer === "PBB")!;
+    const day = pbbDay(await review());
     expect([Number(day.gross), Number(day.net), dayFee(day)]).toEqual([485, 480.15, 4.85]);
-    // what the filled form submits when staff press Prepare (0529, unchanged)
-    const holding = (await q("select account_code from gl_money_accounts where money_kind = 'HOLDING' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
-    const bank = (await q("select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
-    const made = await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, $4, $5, $6) as id", [
-      day.payout_date, holding, bank, Number(day.net), dayFee(day), day.reference,
-    ]);
+    const key = uid("aa1");
+    const made = await prepareDay(day, key);
+    console.log("first press:", JSON.stringify(made));
     expect(made.ok).toBe(true);
-    const after = (await review()).days.find((d) => d.acquirer === "PBB")!;
+    // the same press sent again returns the same move; another press is refused
+    expect(await prepareDay(day, key)).toEqual(made);
+    expect(await prepareDay(day, uid("aa2"))).toMatchObject({ ok: false, detail: "payout_exists", message: "The payout for this day is already prepared." });
+    const moves = (await q("select m.amount, m.fee, m.reference from card_settlement_payouts cp join gl_money_moves m on m.id = cp.move_id")).rows;
+    expect(moves).toEqual([{ amount: "480.15", fee: "4.85", reference: day.reference }]);
+
+    const after = pbbDay(await review());
     console.log("PBB day after the payout is prepared:", JSON.stringify({ reference: after.reference, payout_status: after.payout_status, payout_move_no: after.payout_move_no }));
     expect(after.payout_status).toBe("prepared");
     expect(dayMayApprove(after)).toBe(false);
+    const line = rowOf(await review(), "PBB", 100);
+    expect(await match(line.id, null)).toMatchObject({ ok: false, detail: "day_paid" });
+
     const ledger = await ledgerRows();
     console.log("ledger rows at start:", ledgerAtStart, "after imports, matches and the prepared payout:", ledger);
     expect(ledger).toBe(ledgerAtStart);
+  });
+
+  it("a cancelled payout frees the day: the match can change and the day can be prepared again", async () => {
+    await actAs(U.finance);
+    const moveId = (await q("select move_id from card_settlement_payouts where released_at is null and group_key = '900000000001 / 90000001'")).rows[0].move_id;
+    expect(await attempt("select public.gl_money_move_reverse($1, 'IT wrong bank') as r", [moveId])).toMatchObject({ ok: true });
+    const day = pbbDay(await review());
+    expect(day.payout_status).toBeNull();
+    expect(dayMayApprove(day)).toBe(true);
+    const line = rowOf(await review(), "PBB", 100);
+    expect(await match(line.id, P.exact)).toMatchObject({ ok: true });
+    expect(await prepareDay(day, uid("aa3"))).toMatchObject({ ok: true });
+    expect((await q("select count(*)::int as n from card_settlement_payouts where group_key = '900000000001 / 90000001' and released_at is null")).rows[0].n).toBe(1);
+  });
+
+  it("a GHL day with no paid-out date takes the date the bank received it", async () => {
+    await actAs(U.finance);
+    await pay("ghlTwin2", 120, D, null);
+    const twins = (await review()).rows.filter((x) => x.group_key === "TESTTERM02");
+    expect(await match(twins[0].id, P.ghlTwin)).toMatchObject({ ok: true });
+    expect(await match(twins[1].id, P.ghlTwin2)).toMatchObject({ ok: true });
+    const day = (await review()).days.find((d) => d.group_key === "TESTTERM02")!;
+    expect(day).toMatchObject({ acquirer: "GHL", day_date: D, payout_date: null });
+    const noDate = await prepareDay(day, null, null);
+    console.log("GHL day prepared with no date:", JSON.stringify(noDate));
+    expect(noDate).toMatchObject({ ok: false, detail: "date_missing" });
+    expect(await prepareDay(day, null, plus(D, 1))).toMatchObject({ ok: true });
   });
 });

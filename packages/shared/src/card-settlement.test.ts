@@ -40,7 +40,20 @@ describe("parseCardFile — GHL", () => {
   it("reads the date, terminal, amount and net; no approval code", () => {
     const r = parseCardFile("GHL", ghlFile([{ at: "2026-09-03 14:05:11.0", amount: "300.0000", fee: "3.9000", net: "296.1000", tid: "TESTTERM01", txId: "5001" }]));
     if (!r.ok) throw new Error(r.message);
-    expect(r.rows[0]).toMatchObject({ txn_date: "2026-09-03", payout_date: "2026-09-03", terminal_id: "TESTTERM01", approval_code: null, amount: 300, net_amount: 296.1 });
+    expect(r.rows[0]).toMatchObject({ txn_date: "2026-09-03", payout_date: null, terminal_id: "TESTTERM01", approval_code: null, amount: 300, net_amount: 296.1 });
+  });
+
+  it("takes the paid-out date from the statement date in the file name, never from the sale date", () => {
+    const text = ghlFile([{ at: "2026-09-16 14:05:11.0", amount: "300.00", fee: "3.90", net: "296.10", tid: "T1", txId: "5001" }]);
+    const named = parseCardFile("GHL", text, "StatementOfAccountDetails2026-09-17_149125.csv");
+    if (!named.ok) throw new Error(named.message);
+    expect(named.rows[0]).toMatchObject({ txn_date: "2026-09-16", payout_date: "2026-09-17" });
+    const renamed = parseCardFile("GHL", text, "ghl.csv");
+    if (!renamed.ok) throw new Error(renamed.message);
+    expect(renamed.rows[0].payout_date).toBeNull();
+    const impossible = parseCardFile("GHL", text, "StatementOfAccountDetails2026-02-30_1.csv");
+    if (!impossible.ok) throw new Error(impossible.message);
+    expect(impossible.rows[0].payout_date).toBeNull();
   });
 
   it("refuses anything but a payment", () => {
@@ -101,7 +114,7 @@ describe("parseCardFile — Maybank T41", () => {
 });
 
 describe("day helpers", () => {
-  const day = { acquirer: "PBB" as const, payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, reference: "r", payout_status: null, payout_move_no: null };
+  const day = { acquirer: "PBB" as const, day_date: "2026-09-02", payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, reference: "r", payout_status: null, payout_move_no: null };
   it("a day may fill the payout form only when every row is matched and no payout exists", () => {
     expect(dayMayApprove(day)).toBe(true);
     expect(dayMayApprove({ ...day, matched_count: 1 })).toBe(false);

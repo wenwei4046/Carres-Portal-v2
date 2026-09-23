@@ -48,6 +48,7 @@ describe("/api/finance/card-settlement", () => {
     ["GET", "", undefined],
     ["POST", "/import", { acquirer: "PBB", fileName: "a.csv", content: pbbFile([sale]) }],
     ["POST", `/rows/${LINE_ID}/match`, { paymentId: PAY_ID }],
+    ["POST", "/days/payout", {}],
   ])("%s %s refuses operation before the database", async (method, path, body) => {
     const sb = stubRpc({ data: null, error: null });
     expect((await call(method, path, body, "operation")).status).toBe(403);
@@ -73,6 +74,41 @@ describe("/api/finance/card-settlement", () => {
     expect(args).toMatchObject({ p_acquirer: "PBB", p_file_name: "sept.csv", p_content: content, p_published: null });
     expect(args.p_rows).toHaveLength(1);
     expect(args.p_rows[0]).toMatchObject({ approval_code: "A1B2C3", amount: 100, net_amount: 99 });
+  });
+
+  it("a GHL file's paid-out date is its statement date from the file name, or nothing", async () => {
+    const content = ghlFile([{ at: "2026-09-16 10:00:00.0", amount: "300.00", fee: "3.90", net: "296.10", tid: "T1", txId: "1" }]);
+    const sb = stubRpc({ data: { file_id: "f", rows: 1, imported: 1, matched: 0 }, error: null });
+    await call("POST", "/import", { acquirer: "GHL", fileName: "StatementOfAccountDetails2026-09-17_1.csv", content });
+    expect(sb.rpc.mock.calls[0][1].p_rows[0]).toMatchObject({ txn_date: "2026-09-16", payout_date: "2026-09-17" });
+    await call("POST", "/import", { acquirer: "GHL", fileName: "ghl.csv", content });
+    expect(sb.rpc.mock.calls[1][1].p_rows[0]).toMatchObject({ txn_date: "2026-09-16", payout_date: null });
+  });
+
+  it("Approve day calls the one payout door with the day and the staff's accounts and date", async () => {
+    const sb = stubRpc({ data: { move_id: "m", move_no: "MM-1" }, error: null });
+    const key = "44444444-4444-4444-8444-444444444444";
+    const res = await call("POST", "/days/payout", {
+      acquirer: "GHL", dayDate: "2026-09-16", groupKey: "T1", moveDate: "2026-09-17",
+      fromAccountCode: "H", toAccountCode: "B", note: null, idempotencyKey: key,
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("card_settlement_payout_prepare", {
+      p_acquirer: "GHL", p_day_date: "2026-09-16", p_group_key: "T1", p_move_date: "2026-09-17",
+      p_from_account_code: "H", p_to_account_code: "B", p_note: null, p_idempotency_key: key,
+    });
+  });
+
+  it("Approve day without a date is refused before the database; a second payout keeps the database's sentence", async () => {
+    const sb = stubRpc({ data: null, error: { code: "22023", message: "The payout for this day is already prepared.", details: "payout_exists" } });
+    const day = { acquirer: "PBB", dayDate: "2026-09-18", groupKey: "M / T", fromAccountCode: "H", toAccountCode: "B", idempotencyKey: PAY_ID };
+    const noDate = await call("POST", "/days/payout", { ...day, moveDate: "" });
+    expect(noDate.status).toBe(422);
+    expect(await noDate.json()).toMatchObject({ message: "Choose a date." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+    const twice = await call("POST", "/days/payout", { ...day, moveDate: "2026-09-18" });
+    expect(twice.status).toBe(422);
+    expect(await twice.json()).toMatchObject({ code: "payout_exists", message: "The payout for this day is already prepared." });
   });
 
   it("refuses a reversal before the database, in one sentence", async () => {

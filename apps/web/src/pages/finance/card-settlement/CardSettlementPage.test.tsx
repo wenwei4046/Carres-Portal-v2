@@ -26,6 +26,7 @@ vi.mock("sonner", () => ({ toast }));
 const PAY = { exact: "p0000000-0000-4000-8000-000000000001", typo: "p0000000-0000-4000-8000-000000000002", other: "p0000000-0000-4000-8000-000000000003" };
 const day = (over: Partial<CardSettlementDay>): CardSettlementDay => ({
   acquirer: "PBB",
+  day_date: "2026-09-18",
   payout_date: "2026-09-18",
   group_key: "900000000001 / 90000001",
   row_count: 3,
@@ -45,6 +46,7 @@ const line = (over: Partial<CardSettlementRow>): CardSettlementRow => ({
   line_no: 2,
   txn_date: "2026-09-17",
   payout_date: "2026-09-18",
+  day_date: "2026-09-18",
   group_key: "900000000001 / 90000001",
   merchant_id: "900000000001",
   terminal_id: "90000001",
@@ -162,17 +164,55 @@ describe("Card settlement", () => {
     ]));
   });
 
-  it("Approve day fills the card payout form and posts nothing", async () => {
+  it("Approve day fills the card payout form with the file's figures, read only, and prepares through the day's door", async () => {
+    net.routes["POST /api/finance/card-settlement/days/payout"] = { move_id: "m", move_no: "MM-1" };
     show();
     await screen.findByText("All machines · 900000000009");
     fireEvent.click(screen.getAllByTitle("Check the sales")[1]!);
     const mb = await screen.findByTestId("card-day-MAYBANK|2026-09-18|900000000009");
     fireEvent.click(within(mb).getByRole("button", { name: "Approve day" }));
     const form = await screen.findByTestId("money-move-form");
-    expect(within(form).getByRole("combobox", { name: /Kind/ })).toHaveTextContent("Card payout");
+    const kind = within(form).getByRole("combobox", { name: /Kind/ });
+    expect(kind).toHaveTextContent("Card payout");
+    expect(kind).toBeDisabled();
     expect(within(form).getByLabelText(/^Paid into the bank/)).toHaveValue("198.00");
+    expect(within(form).getByLabelText(/^Paid into the bank/)).toHaveAttribute("readonly");
     expect(within(form).getByLabelText(/^Card company fee/)).toHaveValue("2.00");
-    expect(within(form).getByLabelText(/^Reference/)).toHaveValue("Card settlement MAYBANK 900000000009 2026-09-18");
+    expect(within(form).getByLabelText(/^Card company fee/)).toHaveAttribute("readonly");
+    const ref = within(form).getByLabelText(/^Reference/);
+    expect(ref).toHaveValue("Card settlement MAYBANK 900000000009 2026-09-18");
+    expect(ref).toHaveAttribute("readonly");
+    expect(within(form).getByText(/^Date the bank received it/)).toBeInTheDocument();
+    expect(posts()).toEqual([]);
+
+    fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /Test Card/ }));
+    fireEvent.keyDown(within(form).getByRole("combobox", { name: /^Paid into/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /Test Bank/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0]).toMatchObject({
+      key: "POST /api/finance/card-settlement/days/payout",
+      body: { acquirer: "MAYBANK", dayDate: "2026-09-18", groupKey: "900000000009", moveDate: "2026-09-18", fromAccountCode: "1131", toAccountCode: "1123", note: null },
+    });
+  });
+
+  it("a GHL day shows its sale date and no paid-out date; the payout form asks for the date the bank received it", async () => {
+    const ghlDay = day({
+      acquirer: "GHL", day_date: "2026-09-16", payout_date: null, group_key: "TESTTERM01", row_count: 1, matched_count: 1,
+      gross: 300, net: 296.1, recorded: 300, reference: "Card settlement GHL TESTTERM01 2026-09-16",
+    });
+    net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [ghlDay], rows: [] };
+    show();
+    const cell = await screen.findByText("Not in the file");
+    expect(cell.closest('[role="row"]') ?? document.body).toHaveTextContent(fmtDate("2026-09-16"));
+    fireEvent.click(screen.getAllByTitle("Check the sales")[0]!);
+    const d = await screen.findByTestId("card-day-GHL|2026-09-16|TESTTERM01");
+    fireEvent.click(within(d).getByRole("button", { name: "Approve day" }));
+    const form = await screen.findByTestId("money-move-form");
+    expect(within(form).getByText(/^Date the bank received it/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
+    expect(await within(form).findByTestId("money-move-refusal")).toHaveTextContent("Choose a date.");
     expect(posts()).toEqual([]);
   });
 

@@ -3,7 +3,10 @@
  * rows. Every row keeps its whole line and every column; nothing is dropped.
  *
  *   · Public Bank  one row per sale, net (Sett_amt) per row, MID and TID per row.
- *   · GHL          one row per sale, net per row, terminal per row, no approval code.
+ *   · GHL          one row per sale, net per row, terminal per row, no approval code,
+ *                  no settlement date. The statement date is read from the name
+ *                  the file downloads as (StatementOfAccountDetailsYYYY-MM-DD…);
+ *                  a renamed file has no paid-out date. The sale date is never used as one.
  *   · Maybank T41  sale rows with no net; the net is printed once per merchant
  *                  in the summary block, so it is read from the TOTAL line there.
  *   · Hong Leong   a secured PDF. Not read here.
@@ -24,7 +27,8 @@ export interface CardFileRow {
   raw_line: string;
   fields: Record<string, string>;
   txn_date: string;
-  payout_date: string;
+  /** Null only for GHL when the file name carries no statement date. */
+  payout_date: string | null;
   merchant_id: string | null;
   terminal_id: string | null;
   approval_code: string | null;
@@ -155,7 +159,14 @@ function publicBank(text: string): CardFileParse {
   });
 }
 
-function ghl(text: string): CardFileParse {
+/** GHL's statement date, from the name its file downloads as. */
+function ghlStatementDate(fileName: string | undefined): string | null {
+  const m = /StatementOfAccountDetails(\d{4})-(\d{2})-(\d{2})/i.exec(fileName ?? "");
+  return m ? isoDate(+m[1], +m[2], +m[3]) : null;
+}
+
+function ghl(text: string, fileName: string | undefined): CardFileParse {
+  const statement = ghlStatementDate(fileName);
   const need = ["tx_create_date", "tx_code_true", "terminal_id", "currency_code", "tx_amount", "merchant_mdr_amount", "net_amount"];
   return tabular("GHL", text, need, (f, n) => {
     const amount = money(f.tx_amount);
@@ -165,7 +176,7 @@ function ghl(text: string): CardFileParse {
     const tid = blankToNull(f.terminal_id);
     if (amount === null || net === null || !txn || !tid || f.currency_code.trim() !== "MYR") return unreadable(n);
     return {
-      txn_date: txn, payout_date: txn, merchant_id: null, terminal_id: tid,
+      txn_date: txn, payout_date: statement, merchant_id: null, terminal_id: tid,
       approval_code: null, card_no: null, amount, net_amount: net,
     };
   });
@@ -247,9 +258,9 @@ function maybank(text: string): CardFileParse {
 }
 
 /** Read one card company's file. A refused file says why in one sentence. */
-export function parseCardFile(acquirer: CardAcquirer, text: string): CardFileParse {
+export function parseCardFile(acquirer: CardAcquirer, text: string, fileName?: string): CardFileParse {
   if (acquirer === "PBB") return publicBank(text);
-  if (acquirer === "GHL") return ghl(text);
+  if (acquirer === "GHL") return ghl(text, fileName);
   return maybank(text);
 }
 
@@ -259,9 +270,15 @@ export type CardMatchHow = "approval_code" | "amount_and_date" | "suggestion" | 
 export type CardSuggestionHow = "approval_code" | "code_other_amount" | "code_near" | "amount_and_date" | "amount_near_date";
 export type CardPayoutStatus = "prepared" | "approved";
 
+/**
+ * One payout: a machine's (Maybank: a merchant's) day. `day_date` is the
+ * payout date for Public Bank and Maybank and the sale date for GHL, whose file
+ * has no settlement date; `payout_date` is null when it is not known.
+ */
 export interface CardSettlementDay {
   acquirer: CardAcquirer;
-  payout_date: string;
+  day_date: string;
+  payout_date: string | null;
   group_key: string;
   row_count: number;
   matched_count: number;
@@ -279,7 +296,8 @@ export interface CardSettlementRow {
   acquirer: CardAcquirer;
   line_no: number;
   txn_date: string;
-  payout_date: string;
+  payout_date: string | null;
+  day_date: string;
   group_key: string;
   merchant_id: string | null;
   terminal_id: string | null;
@@ -310,8 +328,8 @@ export interface CardSettlementReview {
 }
 
 /** The rows of one day. */
-export const dayKey = (r: Pick<CardSettlementDay, "acquirer" | "payout_date" | "group_key">) =>
-  `${r.acquirer}|${r.payout_date}|${r.group_key}`;
+export const dayKey = (r: Pick<CardSettlementDay, "acquirer" | "day_date" | "group_key">) =>
+  `${r.acquirer}|${r.day_date}|${r.group_key}`;
 
 /** A day may fill the card payout form once every row is matched and no payout is prepared yet. */
 export function dayMayApprove(d: CardSettlementDay): boolean {

@@ -12,6 +12,7 @@
  * because it has six fields and no lines.
  */
 import { useMemo, useState } from "react";
+import type { UseMutationResult } from "@tanstack/react-query";
 import {
   MONEY_MOVE_KIND_WORD,
   MONEY_MOVE_KINDS,
@@ -20,6 +21,7 @@ import {
   moneyMoveGross,
   moneyMoveInput,
   moveAccounts,
+  type MoneyMoveInput,
   type MoneyMoveKind,
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
@@ -235,19 +237,35 @@ export default function MoneyMovesPage() {
 /** What a caller already knows; staff still choose the accounts and press Prepare. */
 export interface MoneyMoveFormInitial {
   kind: MoneyMoveKind;
-  date: string;
+  /** Null: staff type it (a GHL day, whose file has no settlement date). */
+  date: string | null;
   amount: number;
   fee: number;
   reference: string;
 }
 
-/** 0572 — Card settlement opens this form filled from a matched day. */
-export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initial?: MoneyMoveFormInitial }) {
+/**
+ * 0572 — Card settlement opens this form filled from a matched day and passes
+ * its own `prepareDay`: the kind, amount, fee and reference are the file's and
+ * cannot be changed here; staff give the date the bank received it and the
+ * accounts.
+ */
+export function MoneyMoveForm({
+  onClose,
+  initial,
+  prepareDay,
+}: {
+  onClose: () => void;
+  initial?: MoneyMoveFormInitial;
+  prepareDay?: UseMutationResult<unknown, Error, MoneyMoveInput>;
+}) {
   const accounts = useMoneyAccounts();
-  const prepare = usePrepareMoneyMove();
+  const prepareMove = usePrepareMoneyMove();
+  const prepare = prepareDay ?? prepareMove;
+  const fixed = prepareDay !== undefined;
   const [key] = useState(() => crypto.randomUUID());
   const [kind, setKind] = useState<MoneyMoveKind>(initial?.kind ?? "TRANSFER");
-  const [date, setDate] = useState<string | null>(initial?.date ?? appTodayIso());
+  const [date, setDate] = useState<string | null>(initial ? initial.date : appTodayIso());
   const [fromCode, setFromCode] = useState<string | undefined>();
   const [toCode, setToCode] = useState<string | undefined>();
   const [amount, setAmount] = useState(initial ? initial.amount.toFixed(2) : "");
@@ -321,6 +339,7 @@ export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initi
           label="Kind"
           required
           value={kind}
+          disabled={fixed}
           onValueChange={(v) => {
             setKind(v as MoneyMoveKind);
             setFromCode(undefined);
@@ -328,7 +347,7 @@ export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initi
           }}
           options={MONEY_MOVE_KINDS.map((k) => ({ value: k, label: MONEY_MOVE_KIND_WORD[k] }))}
         />
-        <DatePicker id="move-date" label="Date" required value={date} onChange={setDate} />
+        <DatePicker id="move-date" label={fixed ? "Date the bank received it" : "Date"} required value={date} onChange={setDate} />
         {!fixedFrom && (
           <Select
             id="move-from"
@@ -371,6 +390,7 @@ export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initi
           label={kind === "CARD_PAYOUT" ? "Paid into the bank (RM)" : "Amount (RM)"}
           required
           inputMode="decimal"
+          readOnly={fixed}
           hint={
             kind === "BANK_CHARGE"
               ? "Goes to 6500 Bank and payment charges."
@@ -386,12 +406,13 @@ export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initi
             id="move-fee"
             label="Card company fee (RM)"
             inputMode="decimal"
+            readOnly={fixed}
             value={fee}
             hint={gross !== null ? `${rm(gross)} leaves ${fromCode ?? "the holding account"}` : undefined}
             onChange={(e) => setFee(e.target.value)}
           />
         )}
-        <Input id="move-reference" label="Reference" maxLength={120} value={reference} onChange={(e) => setReference(e.target.value)} />
+        <Input id="move-reference" label="Reference" maxLength={120} readOnly={fixed} value={reference} onChange={(e) => setReference(e.target.value)} />
         <Textarea id="move-note" label="Note" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
         {accounts.isError && <p role="alert">The accounts could not be loaded. Try again.</p>}
         {refusal && (
