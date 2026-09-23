@@ -283,6 +283,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   signCaption: { fontSize: 6.5, color: GREY, lineHeight: 1 },
+  /* The rebuilt notice reads as a stamp on the sheet, not as body copy: it is
+     the first thing above BILL TO and it is not competing with a figure. */
+  rebuiltNotice: {
+    borderWidth: 0.6,
+    borderColor: "#787878",
+    borderStyle: "dashed",
+    paddingVertical: mm(1.6),
+    paddingHorizontal: mm(2.4),
+    marginBottom: mm(3),
+  },
+  rebuiltNoticeText: { fontSize: 7.5, color: "#3F3F3F", lineHeight: 1.2 },
+  /* Occupies the signing box's own ground so the block below it does not move;
+     `signBox` is mm(20) tall and this replaces it, so the caption still sits
+     where the reader expects a signature to have been. */
+  signUnknown: {
+    width: mm(72),
+    height: mm(20),
+    fontSize: 7.5,
+    color: "#3F3F3F",
+    lineHeight: 1.2,
+    paddingTop: mm(8),
+  },
   contLine: { fontSize: 6.5, color: GREY, paddingTop: mm(1.2), paddingLeft: mm(2) },
   signImage: { width: mm(55), height: mm(14), objectFit: "contain" },
   signLabel: { fontSize: 7.5, color: GREY, letterSpacing: 0.8, textTransform: "uppercase", marginTop: mm(1) },
@@ -413,6 +435,8 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
     expected_deposit,
     signed,
     signature_url,
+    rebuilt_notice,
+    signature_unknown,
   } = data;
   const payments = data.payments ?? [];
   const vouchers = data.vouchers ?? [];
@@ -675,6 +699,30 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           }
         />
 
+        {/* ⭐ A REBUILT SHEET SAYS SO ON THE PAPER — owner ruling 2026-09-23,
+            wording approved verbatim and NOT open to re-wording.
+
+            "Preserve original historical documents. A reconstructed PDF must
+             not be presented as the original issued document."
+
+            The page already said this; a PDF is printed, downloaded and handed
+            to a customer, so a statement that lives only on screen is not made
+            at all by the time it matters. It sits at the very top of the body,
+            above BILL TO, because the reader has to know what they are holding
+            before they read a single figure.
+
+            ⛔ THE CURRENT DOCUMENT NEVER RENDERS THIS. `rebuilt_notice` is
+            optional and only the historical-version builder sets it, so every
+            existing caller's output is byte-unchanged — proven by
+            `sales-order-template.rebuilt.test.tsx`, which renders BOTH paths
+            rather than asserting on the fields. A stored original, when one
+            exists, is served as the file it is and never passes through here. */}
+        {rebuilt_notice ? (
+          <View style={styles.rebuiltNotice} wrap={false}>
+            <Text style={styles.rebuiltNoticeText}>{rebuilt_notice}</Text>
+          </View>
+        ) : null}
+
         {/* ── BILL TO · ORDER DETAILS (frameless, first page only) ── */}
         <View style={styles.cards}>
           <View style={{ flex: 1, paddingRight: mm(6) }}>
@@ -870,9 +918,30 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             dashed signature box to the totals card's exact height (round 27) */}
         <View style={styles.totalsZone} wrap={false}>
           <View style={styles.signCol}>
-            <View style={styles.signBox}>
-              {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
-            </View>
+            {/* ⭐ UNKNOWN IS NOT UNSIGNED — owner ruling 2026-09-23.
+
+                "Preserve signatures in PDFs only where their version
+                 association is established. Unknown association must not be
+                 labelled 'unsigned.'"
+
+                An EMPTY dashed box under a `Customer Signature` caption is
+                byte-for-byte what a genuinely unsigned document prints, so
+                leaving it empty made exactly the claim the ruling forbids. The
+                owner ruled the notice REPLACES the box rather than sitting
+                beside it, so there is no empty box left to be misread.
+
+                Three states, and only three:
+                  signature reproduced   the version it belongs to is known
+                  notice, no box         the order HAS a signature that cannot
+                                         be placed on this version
+                  empty box              genuinely unsigned, unchanged */}
+            {signature_unknown ? (
+              <Text style={styles.signUnknown}>Signature version not recorded.</Text>
+            ) : (
+              <View style={styles.signBox}>
+                {signed && signature_url ? <Image src={signature_url} style={styles.signImage} /> : null}
+              </View>
+            )}
             <Text style={[styles.signCaption, { marginTop: mm(1.4) }]}>
               Customer Signature · {displayCustomerName(customer.name)}
             </Text>

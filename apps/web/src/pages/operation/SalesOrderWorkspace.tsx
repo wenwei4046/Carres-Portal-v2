@@ -53,7 +53,13 @@ import * as pdfjs from "pdfjs-dist";
 import { toast } from "sonner";
 import {
   BUILDING_TYPE_OPTIONS,
+  classifySalesOrderChange,
+  INSTALMENT_MONTHS,
+  isLivePayment,
+  SALES_ORDER_EDIT_HEADER_KEYS,
+  salesOrderCommitWord,
   STAIR_CARRY_ADDON_KEY,
+  type SalesOrderChangeSide,
   composeEmergencyContact,
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
@@ -90,7 +96,6 @@ import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import { UnitEvidence } from "./components/GoodsMiniTable";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
-import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -98,7 +103,6 @@ import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
-import SalesOrderAddons, { ServiceRowActions } from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -119,17 +123,23 @@ import {
   useSalesOrderRouteFacts,
   useSalesOrderIdByNumber,
   useSalespersons,
-  useSaveSalesOrderRevision,
+  useDecideSalesOrderAmendment,
+  useOrderPayments,
+  useRecordAmendmentAgreement,
+  useIssuedSalesOrderDocument,
+  storeIssuedSalesOrderDocument,
+  useSubmitSalesOrderChanges,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
-  type AmendmentProposal,
 } from "@/lib/queries";
 import { workspaceDutyActor } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
-import SalesOrderAmendDeliveryDate from "./SalesOrderAmendDeliveryDate";
-import SalesOrderAmendment from "./SalesOrderAmendment";
+import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
+import type { RecordedAgreement } from "./customer-agreement";
+import { configWords, diffRows, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
@@ -155,6 +165,21 @@ interface DraftLine {
   /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
    *  payload Create-PO reads. Carried so a COPY does not strip it (0374). */
   attrs?: Record<string, unknown>;
+  /** 0562 — struck through in the whole-page edit; leaves only when the change takes effect. */
+  removed?: boolean;
+  /** 0562 — added in this edit, not yet on the order. */
+  added?: boolean;
+}
+/** 0562 — a service row in the whole-page edit. */
+interface DraftAddon {
+  key: string;
+  id?: string;
+  addon_key: string;
+  qty: number;
+  unit_price: number;
+  attrs?: Record<string, unknown> | null;
+  removed?: boolean;
+  added?: boolean;
 }
 interface Draft {
   customer_name: string;
@@ -192,6 +217,9 @@ interface Draft {
   /** 0219 — the operator's own configured fields, keyed by config key. */
   custom: Record<string, string>;
   lines: DraftLine[];
+  /** 0562 — services and the instalment plan ride the one draft too. */
+  addons: DraftAddon[];
+  installment_months: number | null;
 }
 
 let draftKeySeq = 0;
@@ -228,6 +256,8 @@ const EMPTY_DRAFT: Draft = {
   delivery_stair_items: null,
   custom: {},
   lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }],
+  addons: [],
+  installment_months: null,
 };
 
 /** The one place the three emergency fields become the one stored string. */
@@ -290,6 +320,9 @@ export function contentWidthOf(node: HTMLElement): number {
 
 /** A sales order below this is unreadable; it scrolls in the pane instead. */
 const MIN_PDF_WIDTH = 320;
+/** 0562 — the form pane never gets narrower than the editable Items table
+ *  (# · Item Code · Description · Qty · Unit · Disc · Amount) plus its chrome. */
+const FORM_MIN_WIDTH = 660;
 
 function usePdfCanvases(data: SalesOrderTemplateData | null) {
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -434,10 +467,11 @@ function draftTemplateData(
   refs: Refs,
   /** The quoted stair carry, or 0. See the addon note below. */
   stairFee = 0,
+  addonLabel: (key: string) => string = (key) => key,
 ): SalesOrderTemplateData {
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
   const lines = draft.lines
-    .filter((l) => l.sku.trim().length > 0)
+    .filter((l) => l.sku.trim().length > 0 && !l.removed)
     .map((l) => {
       const known = baseBySku.get(l.sku.trim());
       return {
@@ -465,8 +499,24 @@ function draftTemplateData(
 
      Only in the draft: once saved, `base.addons` carries the real row and
      adding this too would print the charge twice. */
-  const addons =
-    base?.addons ??
+  /* 0562 — services edited in the whole-page draft show on the draft paper;
+     an untouched service list keeps the server's own labelled rows. */
+  const servicesEdited =
+    Boolean(base) &&
+    JSON.stringify(draft.addons.map(({ key: _k, ...a }) => a)) !==
+      JSON.stringify(baseline.addons.map(({ key: _k, ...a }) => a));
+  const addons = servicesEdited
+    ? draft.addons
+        .filter((a) => !a.removed)
+        .map((a) => ({
+          label: addonLabel(a.addon_key),
+          sku: a.addon_key,
+          qty: a.qty,
+          unit_price: a.unit_price,
+          line_total: a.qty * a.unit_price,
+          attrs: a.attrs ?? null,
+        }))
+    : base?.addons ??
     (stairFee > 0
       ? [
           {
@@ -534,7 +584,10 @@ function draftTemplateData(
 /** An OLD revision's PDF renders FROM THAT SNAPSHOT — printable. The names
  *  the snapshot stored at mint time are what print; the payments ledger is
  *  live money and rides from the base. */
-function snapshotTemplateData(
+/* Exported for `SalesOrderWorkspace.historical-document.test.ts` — the
+   signature rule is a business guarantee about a CUSTOMER DOCUMENT, so it
+   is proved by calling the builder, not by grepping this file. */
+export function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
   /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
@@ -544,6 +597,10 @@ function snapshotTemplateData(
    *  which is what this printed before, so a slow catalog degrades to the old
    *  behaviour instead of printing a blank line on a document. */
   addonLabel: (key: string) => string = (key) => key,
+  /** 0562 — A VERSION PRINTS AS IT WAS ISSUED: only the payments recorded by
+   *  that version's own time, and the customer signature only on the version
+   *  the customer actually signed (orders/MASTER § Old versions and signatures). */
+  asOf?: { date: string },
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -579,7 +636,17 @@ function snapshotTemplateData(
   }));
   const subtotal =
     lines.reduce((s, l) => s + l.line_total, 0) + addons.reduce((s, a) => s + a.line_total, 0);
-  const paid = base?.paid ?? 0;
+  /* ⛔ A RECEIPT NOBODY CAN PLACE IN TIME IS NOT COUNTED IN AN AS-AT VIEW.
+     `order_payments.paid_on` is `date NOT NULL`, so the ledger path always has
+     a day — but the FALLBACK path synthesises ONE row from `placed_at`, and
+     that row carries the whole at-sale amount. With `placed_at` null it has no
+     date at all, and including it would make a Rev 1 document assert the entire
+     deposit had already arrived. Including it is the one choice that misstates,
+     and it misstates in the exact direction this filter exists to prevent. */
+  const payments = asOf
+    ? (base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)
+    : (base?.payments ?? []);
+  const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
   return {
     so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "—"),
@@ -612,7 +679,7 @@ function snapshotTemplateData(
     },
     lines,
     addons,
-    payments: base?.payments ?? [],
+    payments,
     vouchers: [],
     subtotal,
     tax_amount: 0,
@@ -620,8 +687,58 @@ function snapshotTemplateData(
     paid,
     balance_due: subtotal - paid,
     currency: base?.currency ?? "MYR",
-    signed: base?.signed ?? false,
-    signature_url: base?.signature_url ?? null,
+    /* ⭐ A SIGNATURE IS NOT REPRODUCED ON A VERSION IT CANNOT BE ATTRIBUTED TO —
+       and that is NOT the same as saying this version is unsigned.
+       APPROVED / LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md`
+       § "Old versions and signatures"): "A signature belongs to the exact
+       version and document the customer signed."
+
+       This read `base?.signed` and `base?.signature_url` — the ORDER's current
+       eSign PNG — so every revision printed the same mark under a different set
+       of goods, prices and dates. A customer could be shown Rev 2 carrying the
+       signature they put on Rev 1. That is the defect.
+
+       ⛔ AND THE OPPOSITE CLAIM IS ALSO UNPROVEN. Which revision a stored
+       signature covers is UNKNOWN: `sales_order_snapshot` records no signing
+       fact and `orders.signature_url` has no capture timestamp (`pod_signed_at`
+       is Delivery's, a different act). So this version is not "unsigned" — the
+       record simply cannot place the signature. The document therefore makes NO
+       claim either way: the mark is not reproduced here, the customer's
+       signature evidence is untouched on the order and still prints on the
+       CURRENT document, and the PAGE states the unknown in words (a customer
+       document gains no new words without the owner).
+
+       FALSIFIER: store the signing fact in the snapshot, or timestamp the
+       capture on `orders`, and a revision can print the signature it really
+       carries. Named as open work in the Orders MASTER. */
+    signed: false,
+    signature_url: null,
+    /* ⭐ AND THE DOCUMENT SAYS BOTH THINGS ITSELF — owner ruling 2026-09-23,
+       wording approved verbatim.
+       The two sentences below were on the PAGE only; a PDF is printed,
+       downloaded and handed to a customer, so a statement that lives on screen
+       is not made at all by the time it matters. `signature_unknown` uses the
+       SAME condition as the `oldrev-signature-unknown` page notice — one fact,
+       one test, so the screen and the paper cannot drift. */
+    rebuilt_notice: "Reconstructed copy — original issued document unavailable.",
+    signature_unknown: Boolean(base?.signature_url),
+    /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
+       snapshot stores none, so this reads the SAME payments ledger Payments
+       owns with the SAME arithmetic (sum of the rows) over the rows dated then
+       or earlier. It invents no number, and it never shows a receipt DATED
+       after this version's day — which printing today's `paid` on a Rev 1
+       document did.
+       ⚠️ TWO NAMED LIMITS, stated as they behave rather than as one would wish:
+       · SAME DAY. `paid_on` is a DATE, so a receipt taken in the afternoon
+         counts toward a version minted that morning. `paid_on` is the business
+         fact and `created_at` is merely when someone typed it, so the day is
+         the right grain and the limit is real.
+       · A LATER VOID UNDER-REPORTS. The read filters `voided_at is null`, so a
+         payment voided afterwards disappears from EVERY view, this one
+         included: an old document shows the money still recognised today, not
+         the money recognised then.
+       Both close the same way — a stored historical position, a schema change,
+       named in the Orders MASTER, not a second arithmetic invented here. */
   } as SalesOrderTemplateData;
 }
 
@@ -668,10 +785,20 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
     custom,
     lines: (snap.lines ?? []).map((l) => ({
       key: nextKey(),
+      ...(l.id ? { id: String(l.id) } : {}),
       sku: l.sku,
       qty: Number(l.qty),
       unit_price: Number(l.unit_price),
+      ...(l.attrs ? { attrs: l.attrs as Record<string, unknown> } : {}),
     })),
+    addons: (snap.addons ?? []).map((a) => ({
+      key: nextKey(),
+      addon_key: String(a.addon_key),
+      qty: Number(a.qty),
+      unit_price: Number(a.unit_price),
+      attrs: (a.attrs as Record<string, unknown> | null) ?? null,
+    })),
+    installment_months: h["installment_months"] == null ? null : Number(h["installment_months"]),
   };
 }
 
@@ -1050,17 +1177,12 @@ function SalesOrderWorkspaceBody() {
   const isNew = location.pathname.endsWith("/so/new");
   const showRoute = params.get("route") === "1" && !isNew;
   const [viewRev, setViewRev] = useState<number | null>(null);
-  const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
-  /* Bumped by `More actions → Propose a change to the customer`. A counter, not
-     a boolean, so the menu item still works after the modal was cancelled. */
-  const [amendSignal, setAmendSignal] = useState(0);
   /* The `Change salesperson` door lives beside the Salesperson it changes; the
      modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
   const [attributionSignal, setAttributionSignal] = useState(0);
   const canChangeSalesOwnership = useCanChangeSalesOwnership();
-  const [amendDateOpen, setAmendDateOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
   /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
@@ -1214,7 +1336,7 @@ function SalesOrderWorkspaceBody() {
        screen. `dirtyRef` is read, not depended on, so this stays one effect. */
     const seed = `${orderId}:${detailQ.dataUpdatedAt}`;
     if (!order || draftSeed === seed) return;
-    if (dirtyRef.current) return;
+    if (dirtyRef.current || editingRef.current) return;
     const bag = order as unknown as Record<string, unknown>;
     const str = (k: string) => (bag[k] == null ? "" : String(bag[k]));
     const entryFields =
@@ -1265,6 +1387,15 @@ function SalesOrderWorkspaceBody() {
         unit_price: Number(l.unit_price),
         ...(l.attrs ? { attrs: l.attrs } : {}),
       })),
+      addons: (detailQ.data?.addons ?? []).map((a) => ({
+        key: nextKey(),
+        id: a.id,
+        addon_key: a.addon_key,
+        qty: Number(a.qty),
+        unit_price: Number(a.unit_price),
+        attrs: (a.attrs as Record<string, unknown> | null) ?? null,
+      })),
+      installment_months: (order as { installment_months?: number | null }).installment_months ?? null,
     };
     setDraft(next);
     setBaseline(next);
@@ -1298,6 +1429,11 @@ function SalesOrderWorkspaceBody() {
         if (JSON.stringify(draft.custom) !== JSON.stringify(baseline.custom)) changed.push("custom");
         continue;
       }
+      if (k === "addons") {
+        if (JSON.stringify(draft.addons.map(({ key: _k, ...a }) => a))
+          !== JSON.stringify(baseline.addons.map(({ key: _k, ...a }) => a))) changed.push("addons");
+        continue;
+      }
       if (draft[k] !== baseline[k]) changed.push(k);
     }
     return changed;
@@ -1306,6 +1442,20 @@ function SalesOrderWorkspaceBody() {
   /* Read by the seeding effect without becoming one of its dependencies. */
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  /* ⭐ VIEW FIRST, EDIT ON PURPOSE — owner ruling (Jess, 2026-09-21), built 0562.
+     The Order tab opens READ-ONLY; `Edit` enters the whole-page draft; the
+     draft carries customer, delivery, dates, items, services and the plan. */
+  const [editing, setEditing] = useState(false);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const [changeReason, setChangeReason] = useState("");
+  const [changeAskedOn, setChangeAskedOn] = useState<string | null>(null);
+  const [changeAgreement, setChangeAgreement] = useState<RecordedAgreement | null>(null);
+  /** Proposing again over an out-of-date request withdraws it first (server). */
+  const [replaceAmendmentId, setReplaceAmendmentId] = useState<string | null>(null);
+  const role = useAuth((st) => st.role);
+  /** A saved order's cards are read-only until `Edit` (oldrev keeps its own lock). */
+  const formLocked = mode === "object" && !editing;
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -1444,17 +1594,59 @@ function SalesOrderWorkspaceBody() {
     draft.delivery_floor,
   ]);
 
+  /* 0562 · A SIGNATURE BELONGS TO THE VERSION THE CUSTOMER SIGNED. The Sales
+     Portal captures it at birth, so it is Rev 1's; a later version is unsigned
+     and says so instead of borrowing it (orders/MASTER § Old versions and
+     signatures). */
+  /* 0562 · THE FORM IS NEVER SQUEEZED BY THE DOCUMENT (Jess, 2026-09-23). The
+     approved 50/50 holds whenever each half can carry the Items table; with
+     less room the form keeps its minimum and the document takes the rest down to
+     MIN_PDF_WIDTH; with less than both they stack, form first. Measured on the
+     page's own box inside the Portal shell, never the window. */
+  const splitHostRef = useRef<HTMLDivElement | null>(null);
+  const [split, setSplit] = useState<"half" | "form-first" | "stack">("half");
+  useEffect(() => {
+    const el = splitHostRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const read = () => {
+      const w = el.clientWidth;
+      setSplit(w >= FORM_MIN_WIDTH * 2 ? "half" : w >= FORM_MIN_WIDTH + MIN_PDF_WIDTH ? "form-first" : "stack");
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+    /* Re-attached when the node the split lives in can have changed. */
+  }, [mode, objectView, showRoute, isNew, order?.id]);
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
-    () => (mode === "oldrev" ? null : draftTemplateData(draft, baseline, base, refs, stair?.fee ?? 0)),
-    [mode, draft, baseline, base, refs, stair?.fee],
+    () =>
+      mode === "oldrev"
+        ? null
+        : (draftTemplateData(draft, baseline, base, refs, stair?.fee ?? 0, (key) => addonNameByKey.get(key) ?? key)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mode, draft, baseline, base, refs, stair?.fee, addonNameByKey, currentRev],
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
+  /* ⭐ 0565 · THE STORED FILE WINS. A version issued after retention exists
+     keeps its own PDF, and that file — not a rebuild of it — is what this page
+     shows and prints. Only a version that never had one falls back to the
+     reconstruction, which is the legacy case the notice is for. */
+  const issuedDoc = useIssuedSalesOrderDocument(
+    mode === "oldrev" ? (orderId ?? null) : null,
+    mode === "oldrev" ? (viewedRevision?.revision ?? null) : null,
+  );
+  const storedDocumentUrl = mode === "oldrev" && issuedDoc.data?.stored ? (issuedDoc.data.url ?? null) : null;
+  const isReconstruction = mode === "oldrev" && issuedDoc.isFetched && !issuedDoc.data?.stored;
+
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
+    /* A stored file is shown as itself; nothing is rebuilt for it. */
+    if (mode === "oldrev" && storedDocumentUrl) return null;
     if (mode === "oldrev" && viewedRevision)
       return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
         addonNameByKey.get(key) ?? key,
+        { date: viewedRevision.created_at.slice(0, 10) },
       );
     return debouncedDraftData;
   }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
@@ -1476,6 +1668,12 @@ function SalesOrderWorkspaceBody() {
     url: null,
   });
   const openPrint = async () => {
+    /* ⭐ 0565 · A VERSION THAT KEPT ITS DOCUMENT PRINTS THAT DOCUMENT. Not a
+       re-render of it — the actual file the customer was issued. */
+    if (storedDocumentUrl) {
+      window.open(storedDocumentUrl, "_blank");
+      return;
+    }
     if (!printData) return;
     if (printableRef.current.data !== printData || !printableRef.current.url) {
       if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
@@ -1485,6 +1683,12 @@ function SalesOrderWorkspaceBody() {
     const printable = printableRef.current.url;
     if (!printable) return;
     if (dirty) toast.message("You have unsaved changes — printing the saved version");
+    /* A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT — and
+       this branch is only reached when no file was ever stored for the
+       version, which is the legacy case the notice exists for. */
+    if (isReconstruction) {
+      toast.message("Reconstructed copy — original issued document unavailable.");
+    }
     window.open(printable, "_blank");
   };
   useEffect(
@@ -1494,20 +1698,9 @@ function SalesOrderWorkspaceBody() {
     [],
   );
 
-  /* ── Writes — ONE page-level Save; every write mints a revision. ── */
-  const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
-    onSuccess: (r) => {
-      toast.success(`Saved · Rev ${r.revision}`);
-      /* The saved values ARE the new baseline, so the bar clears immediately
-         rather than after the round trip. The refetch that follows lands on a
-         clean form and reseeds it from what the database actually stored. */
-      setBaseline(draftRef.current);
-      void revisionsQ.refetch();
-      void baseQ.refetch();
-      void detailQ.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  /* ── Writes — ONE commit, and the SERVER chooses it (0562). The direct
+     `POST /save` door is gone from this page: `POST /changes` classifies the
+     whole draft and either saves the correction or submits the request. ── */
   const createMut = useCreateSalesOrder({
     onSuccess: (r) => {
       toast.success(`SO-${r.so} created · Rev 1`);
@@ -1516,37 +1709,44 @@ function SalesOrderWorkspaceBody() {
     onError: (e) => toast.error(e.message),
   });
 
-  const entryFieldsPayload = (): Record<string, string | null> => {
+  const entryFieldsPayloadOf = (d: Draft): Record<string, string | null> => {
     const out: Record<string, string | null> = {
-      building_type: draft.building_type.trim() || null,
+      building_type: d.building_type.trim() || null,
     };
-    for (const [k, v] of Object.entries(draft.custom)) out[k] = v.trim() || null;
+    for (const [k, v] of Object.entries(d.custom)) out[k] = v.trim() || null;
     return out;
   };
 
-  const safeCorrectionPayload = (): Record<string, unknown> => ({
-    customer_name: autoCapitalize(draft.customer_name.trim()),
-    customer_phone: draft.customer_phone.trim() || null,
-    customer_email: draft.customer_email.trim() || null,
-    customer_race: draft.customer_race.trim() || null,
-    customer_gender: draft.customer_gender.trim() || null,
-    customer_birthday: draft.customer_birthday || null,
-    customer_address: autoCapitalize(addressString(draft, baseline).trim()) || null,
-    customer_address_line1: autoCapitalize(draft.customer_address_line1.trim()) || null,
-    customer_address_line2: autoCapitalize(draft.customer_address_line2.trim()) || null,
-    customer_address_city: draft.customer_address_city.trim() || null,
-    customer_address_state: draft.customer_address_state.trim() || null,
-    customer_address_postcode: draft.customer_address_postcode.trim() || null,
-    customer_address_unknown: draft.customer_address_unknown,
-    customer_emergency: emergencyString(draft) || null,
-    customer_billing: billingString(draft, baseline).trim() || null,
-    customer_billing_same: draft.customer_billing_same,
-    proceed_date: draft.proceed_date,
-    delivery_floor: draft.delivery_floor,
-    delivery_has_lift: draft.delivery_has_lift,
-    delivery_stair_items: draft.delivery_stair_items,
-    entry_fields: entryFieldsPayload(),
+  /* ⭐ THE SAME PIPELINE ON BOTH SIDES (0562). The payload normalises — it
+     capitalises and it composes the address from the structured parts — so
+     comparing a normalised DRAFT against the RAW stored row reported every
+     normalisation as an operator change ("7 changes" for one phone edit,
+     measured 2026-09-23). Both sides run through this one function; the server
+     still compares against the stored row, which is what actually gets saved. */
+  const headerPayloadOf = (d: Draft): Record<string, unknown> => ({
+    customer_name: autoCapitalize(d.customer_name.trim()),
+    customer_phone: d.customer_phone.trim() || null,
+    customer_email: d.customer_email.trim() || null,
+    customer_race: d.customer_race.trim() || null,
+    customer_gender: d.customer_gender.trim() || null,
+    customer_birthday: d.customer_birthday || null,
+    customer_address: autoCapitalize(addressString(d, baseline).trim()) || null,
+    customer_address_line1: autoCapitalize(d.customer_address_line1.trim()) || null,
+    customer_address_line2: autoCapitalize(d.customer_address_line2.trim()) || null,
+    customer_address_city: d.customer_address_city.trim() || null,
+    customer_address_state: d.customer_address_state.trim() || null,
+    customer_address_postcode: d.customer_address_postcode.trim() || null,
+    customer_address_unknown: d.customer_address_unknown,
+    customer_emergency: emergencyString(d) || null,
+    customer_billing: billingString(d, baseline).trim() || null,
+    customer_billing_same: d.customer_billing_same,
+    proceed_date: d.proceed_date,
+    delivery_floor: d.delivery_floor,
+    delivery_has_lift: d.delivery_has_lift,
+    delivery_stair_items: d.delivery_stair_items,
+    entry_fields: entryFieldsPayloadOf(d),
   });
+  const safeCorrectionPayload = (): Record<string, unknown> => headerPayloadOf(draft);
 
   const createHeaderPayload = (): Record<string, unknown> => ({
     ...safeCorrectionPayload(),
@@ -1614,11 +1814,6 @@ function SalesOrderWorkspaceBody() {
     return null;
   };
 
-  const onSave = () => {
-    const err = validateDraft(false);
-    if (err) return void toast.error(err);
-    saveMut.mutate({ header: safeCorrectionPayload() });
-  };
   const onCreate = () => {
     const err = validateDraft(true);
     if (err) return void toast.error(err);
@@ -1633,6 +1828,355 @@ function SalesOrderWorkspaceBody() {
       lines: draftLinesPayload(),
     });
   };
+
+  /* ══ 0562 · THE WHOLE-PAGE EDIT ════════════════════════════════════════════
+   * The SERVER chooses Save or Submit amendment request (POST /changes runs the
+   * shared `classifySalesOrderChange`); this page runs the SAME function only to
+   * label the one button, so the label and the outcome cannot disagree. */
+  const storedHeader = useMemo((): SalesOrderChangeSide["header"] => {
+    const bagOf = (order ?? {}) as unknown as Record<string, unknown>;
+    const out: SalesOrderChangeSide["header"] = {};
+    for (const k of SALES_ORDER_EDIT_HEADER_KEYS) {
+      out[k] = k === "entry_fields"
+        ? ((order as { entry_data?: { fields?: Record<string, unknown> } | null } | undefined)?.entry_data?.fields ?? {})
+        : bagOf[k];
+    }
+    return out;
+  }, [order]);
+  const draftHeader = (): Record<string, unknown> => ({
+    ...safeCorrectionPayload(),
+    delivery_date: draft.delivery_date,
+    delivery_date_tbd: draft.delivery_date_tbd,
+  });
+  const liveLines = (d: Draft) =>
+    d.lines
+      .filter((l) => !l.removed && l.sku.trim())
+      .map((l) => ({ ...(l.id ? { id: l.id } : {}), sku: l.sku.trim(), qty: l.qty, unit_price: l.unit_price, attrs: l.attrs ?? null }));
+  const liveAddons = (d: Draft) =>
+    d.addons
+      .filter((a) => !a.removed)
+      .map((a) => ({ ...(a.id ? { id: a.id } : {}), addon_key: a.addon_key, qty: a.qty, unit_price: a.unit_price, attrs: a.attrs ?? null }));
+  const changeClass = useMemo(() => {
+    if (mode !== "object" || !editing || !order) return null;
+    const current: SalesOrderChangeSide = {
+      header: {
+        ...(headerPayloadOf(baseline) as SalesOrderChangeSide["header"]),
+        delivery_date: baseline.delivery_date,
+        delivery_date_tbd: baseline.delivery_date_tbd,
+      },
+      lines: liveLines(baseline),
+      addons: liveAddons(baseline),
+      installment_months: baseline.installment_months,
+    };
+    const next: SalesOrderChangeSide = {
+      header: draftHeader() as SalesOrderChangeSide["header"],
+      lines: liveLines(draft),
+      addons: liveAddons(draft),
+      installment_months: draft.installment_months,
+    };
+    return classifySalesOrderChange(current, next, {
+      proceeded: order.status === "proceed_order",
+      proceedRecorded: Boolean(order.proceed_date),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, editing, order, draft, baseline, storedHeader]);
+  /* The count is what the REVIEW lists — one number, one source, so the header
+     and the Before/After can never disagree (the summary rows are not changes). */
+  const SUMMARY_ROWS = new Set(["Qty", "Services", "Total payable"]);
+  const commitWord = salesOrderCommitWord(changeClass?.action ?? "save");
+
+  /* What the draft starts elsewhere — read from facts this page already holds;
+     never a second arithmetic for money it cannot verify. */
+  const orderPaymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
+  const nameOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.label || sku, [catalogBySku]);
+  const nameOfAddon = useCallback((key: string) => addonNameByKey.get(key) ?? key, [addonNameByKey]);
+  const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
+  const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
+    const out: string[] = [];
+    const poSkus = new Set((detailQ.data?.pos ?? []).flatMap((po) => po.lines.map((l) => l.sku)));
+    const unitsOf = new Map((goodsTruthQ.data?.lines ?? []).map((l) => [l.lineId, (l.verifiedUnitIds ?? l.unitIds ?? []) as string[]]));
+    for (const l of after.lines) {
+      const was = baseline.lines.find((b) => b.id && b.id === l.id);
+      const changed = l.added || l.removed || !was || was.qty !== l.qty || was.sku !== l.sku ||
+        JSON.stringify(was.attrs ?? null) !== JSON.stringify(l.attrs ?? null);
+      if (!changed) continue;
+      const name = nameOfSku(l.sku);
+      if (l.added) out.push(`${name}: new goods — Purchasing buys them after approval`);
+      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier — Purchasing settles it with the supplier`);
+      else out.push(`${name}: no PO yet — Purchasing re-counts what to buy`);
+      const units = l.id ? unitsOf.get(l.id) ?? [] : [];
+      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved — Warehouse keeps the Unit until the change is decided`);
+    }
+    if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
+      out.push("Free item: check it is still allowed without the cancelled item");
+    if (after.header["proceed_date"] !== undefined && after.header["proceed_date"] !== (order?.proceed_date ?? null))
+      out.push("Proceed Date: Purchasing's release timing moves");
+    if (after.header["delivery_date"] !== undefined && after.header["delivery_date"] !== (order?.delivery_date ?? null))
+      out.push("Requested Delivery Date: Delivery and Purchasing plan to the new date");
+    const before = baseline.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
+      + baseline.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0);
+    const next = after.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
+      + after.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0);
+    if (Math.round(before * 100) !== Math.round(next * 100)) {
+      const paid = Number(order?.paid ?? 0);
+      const rows = orderPaymentsQ.data?.payments ?? null;
+      /* ⛔ A SUMMARY WITH NO RECORDS BEHIND IT IS NOT A PAID FIGURE (Payments
+         MASTER; owner 2026-09-22): no refund or balance is worked out from it. */
+      const verified = rows != null && (paid === 0 || rows.some((r) => isLivePayment(r)));
+      if (!verified) out.push("Payments: payment data to check first — no refund or balance is worked out");
+      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total — Payments reviews a refund`);
+      else out.push(`Payments: balance due becomes ${fmtMoney(next - paid)}`);
+    }
+    return out;
+  };
+  const HEADER_LABEL: Record<string, string> = {
+    customer_name: "Full name", customer_phone: "Phone", customer_email: "Email", customer_race: "Race",
+    customer_gender: "Gender", customer_birthday: "Birthday", customer_address: "Delivery address",
+    customer_address_line1: "Address line 1", customer_address_line2: "Address line 2", customer_address_city: "City",
+    customer_address_state: "State", customer_address_postcode: "Postcode", customer_address_unknown: "Address not given yet",
+    customer_emergency: "Emergency contact", customer_billing: "Billing address", customer_billing_same: "Billing address same as delivery",
+    entry_fields: "Other details", delivery_floor: "Floor", delivery_has_lift: "Lift available?",
+    delivery_stair_items: "Items needing stair carry", proceed_date: "Proceed Date",
+    delivery_date: "Requested Delivery Date", delivery_date_tbd: "Delivery date to be confirmed",
+  };
+  const factWord = (k: string, v: unknown): string => {
+    if (v == null || v === "") return "";
+    if (k === "proceed_date" || k === "delivery_date" || k === "customer_birthday") return fmtDate(String(v));
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (k === "entry_fields" && typeof v === "object") return Object.values(v as Record<string, unknown>).filter(Boolean).join(" · ");
+    return String(v);
+  };
+  const draftRows = changeClass
+    ? diffRows({
+        header: [
+          ...changeClass.header.map((k) => ({
+            label: HEADER_LABEL[k] ?? k,
+            before: factWord(k, (headerPayloadOf(baseline) as Record<string, unknown>)[k] ?? (k === "delivery_date" ? baseline.delivery_date : k === "delivery_date_tbd" ? baseline.delivery_date_tbd : null)),
+            after: factWord(k, (draftHeader() as Record<string, unknown>)[k]),
+          })),
+          ...(changeClass.installmentChanged
+            ? [{ label: "Instalment months", before: String(baseline.installment_months ?? "None"), after: String(draft.installment_months ?? "None") }]
+            : []),
+        ],
+        before: { lines: baseline.lines as EditLine[], addons: baseline.addons as EditAddon[] },
+        after: { lines: draft.lines as EditLine[], addons: draft.addons as EditAddon[] },
+        nameOfSku,
+        nameOfAddon,
+        categoryOf: categoryOfSku,
+      })
+    : [];
+
+  const changeCount = draftRows.filter((r) => !SUMMARY_ROWS.has(r.what)).length;
+
+  const startEdit = (seed?: Draft, replaceId?: string | null) => {
+    if (seed) setDraft(seed);
+    setChangeReason("");
+    setChangeAskedOn(null);
+    setChangeAgreement(null);
+    setReplaceAmendmentId(replaceId ?? null);
+    setEditing(true);
+    setObjectView("Order");
+  };
+  const cancelEdit = () => {
+    if (!confirmDiscard()) return;
+    setDraft(baseline);
+    setEditing(false);
+    setReplaceAmendmentId(null);
+  };
+  /* ⭐ 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT — owner ruling 2026-09-23:
+     "Newly issued versions after this release: preserve their original issued
+     PDFs as required. A warning does not replace this capability."
+
+     The moment a version is minted, the CURRENT document IS that version, so
+     the sheet stored is the one the order actually issues — rendered from the
+     saved truth that has just been refetched, never from the draft. It is
+     stored once and the database refuses a second file for the same version.
+
+     ⛔ IT NEVER FAILS THE VERSION. The revision is already minted and is
+     business truth; keeping its paper is a separate act. If the render or the
+     upload fails, the version simply has no document and the page draws the
+     reconstruction with its notice — the legacy case, honestly. */
+  const keepIssuedDocument = async (revision: number | null | undefined) => {
+    if (!orderId || !revision) return;
+    try {
+      const fresh = await baseQ.refetch();
+      const issued = fresh.data ?? null;
+      if (!issued) return;
+      const blob = await renderSalesOrderPdf(issued);
+      const out = await storeIssuedSalesOrderDocument(orderId, revision, blob);
+      if (!out.stored) console.error("issued document not kept", { orderId, revision, reason: out.reason });
+      void revisionsQ.refetch();
+    } catch (e) {
+      console.error("issued document not kept", { orderId, revision, reason: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const changesMut = useSubmitSalesOrderChanges(orderId ?? "", {
+    onSuccess: (r) => {
+      if (r.action === "saved") toast.success(`Saved · Rev ${r.revision}`);
+      else {
+        toast.success("Sent for approval. The order stays as it is until management approves.");
+        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded — record it on the request.");
+      }
+      setDraft(baseline);
+      setEditing(false);
+      setReplaceAmendmentId(null);
+      void revisionsQ.refetch();
+      void baseQ.refetch();
+      void detailQ.refetch();
+      void amendmentQ.refetch();
+      /* A correction mints a version; that version keeps the sheet it issued. */
+      if (r.action === "saved") void keepIssuedDocument(r.revision);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const onCommit = () => {
+    if (!changeClass || changeClass.action === "none") return;
+    const err = validateDraft(false);
+    if (err) return void toast.error(err);
+    if (!changeReason.trim()) return void toast.error("Reason for change");
+    changesMut.mutate({
+      header: draftHeader(),
+      lines: liveLines(draft),
+      addons: liveAddons(draft),
+      installment_months: draft.installment_months,
+      reason: changeReason.trim(),
+      customerAskedOn: changeAskedOn,
+      agreement: changeAgreement ?? undefined,
+      replaceAmendmentId,
+    });
+  };
+  const decideMut = useDecideSalesOrderAmendment(orderId ?? "", {
+    onSuccess: (r) => {
+      toast.success(r.status === "applied" ? `Approved and applied · Rev ${r.revision}` : "Rejected. The order is unchanged.");
+      void revisionsQ.refetch();
+      void baseQ.refetch();
+      void detailQ.refetch();
+      /* An approved amendment mints a version the same way, and it keeps its
+         document the same way. A rejection mints nothing. */
+      if (r.status === "applied") void keepIssuedDocument(Number(r.revision));
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const agreementMut = useRecordAmendmentAgreement(orderId ?? "", {
+    onSuccess: () => toast.success("Customer agreement recorded"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  /* ── The live request: what it proposes against the version it was sent on. ── */
+  type Proposal = {
+    header?: Record<string, unknown>;
+    lines?: Array<{ id?: string; sku: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+    addons?: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+    delivery_date?: string | null;
+    delivery_date_tbd?: boolean;
+    installment_months?: number | null;
+  };
+  const proposalOf = (a: typeof liveAmendment) => ((a?.proposed_snapshot ?? {}) as Proposal);
+  const withProposal = (baseDraft: Draft, p: Proposal): Draft => {
+    const next: Draft = { ...baseDraft };
+    const h = p.header ?? {};
+    const str = (k: string) => (h[k] == null ? "" : String(h[k]));
+    const simple: Array<[string, keyof Draft]> = [
+      ["customer_name", "customer_name"], ["customer_phone", "customer_phone"], ["customer_email", "customer_email"],
+      ["customer_race", "customer_race"], ["customer_gender", "customer_gender"],
+      ["customer_address", "customer_address"], ["customer_address_line1", "customer_address_line1"],
+      ["customer_address_line2", "customer_address_line2"], ["customer_address_city", "customer_address_city"],
+      ["customer_address_state", "customer_address_state"], ["customer_address_postcode", "customer_address_postcode"],
+      ["customer_billing", "customer_billing"],
+    ];
+    for (const [k, f] of simple) if (k in h) (next as unknown as Record<string, unknown>)[f] = str(k);
+    if ("customer_birthday" in h) next.customer_birthday = str("customer_birthday") || null;
+    if ("customer_address_unknown" in h) next.customer_address_unknown = Boolean(h["customer_address_unknown"]);
+    if ("customer_billing_same" in h) next.customer_billing_same = h["customer_billing_same"] !== false;
+    if ("delivery_floor" in h) next.delivery_floor = Number(h["delivery_floor"] ?? 1);
+    if ("delivery_has_lift" in h) next.delivery_has_lift = Boolean(h["delivery_has_lift"]);
+    if ("delivery_stair_items" in h) next.delivery_stair_items = h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]);
+    if ("proceed_date" in h) next.proceed_date = str("proceed_date") || null;
+    if ("customer_emergency" in h) {
+      const e = parseEmergencyContact(str("customer_emergency"));
+      next.emergency_name = e.name; next.emergency_phone = e.phone; next.emergency_relationship = e.relationship;
+    }
+    if ("entry_fields" in h && h["entry_fields"] && typeof h["entry_fields"] === "object") {
+      const f = h["entry_fields"] as Record<string, unknown>;
+      if ("building_type" in f) next.building_type = f["building_type"] == null ? "" : String(f["building_type"]);
+      const custom = { ...next.custom };
+      for (const [k, v] of Object.entries(f)) if (k !== "building_type") custom[k] = v == null ? "" : String(v);
+      next.custom = custom;
+    }
+    if ("delivery_date" in p) next.delivery_date = p.delivery_date ?? null;
+    if ("delivery_date_tbd" in p) next.delivery_date_tbd = Boolean(p.delivery_date_tbd);
+    if ("installment_months" in p) next.installment_months = p.installment_months ?? null;
+    if (p.lines) {
+      const kept = new Set(p.lines.filter((l) => l.id).map((l) => l.id));
+      next.lines = [
+        ...baseDraft.lines.map((l) => {
+          const hit = p.lines!.find((x) => x.id && x.id === l.id);
+          return hit ? { ...l, sku: hit.sku, qty: hit.qty, unit_price: Number(hit.unit_price), attrs: hit.attrs ?? undefined }
+            : kept.has(l.id) ? l : { ...l, removed: true };
+        }),
+        ...p.lines.filter((l) => !l.id).map((l) => ({ key: nextKey(), sku: l.sku, qty: l.qty, unit_price: Number(l.unit_price), attrs: l.attrs ?? undefined, added: true })),
+      ];
+    }
+    if (p.addons) {
+      /* Pair by row id; a proposal or snapshot without ids falls back to the
+         service key, so an untouched service does not read as cancelled-and-added. */
+      const unmatched = [...p.addons];
+      const take = (a: DraftAddon) => {
+        let i = unmatched.findIndex((x) => x.id && x.id === a.id);
+        if (i < 0 && !a.id) i = unmatched.findIndex((x) => !x.id && x.addon_key === a.addon_key);
+        if (i < 0) i = unmatched.findIndex((x) => x.addon_key === a.addon_key && !x.id);
+        return i < 0 ? undefined : unmatched.splice(i, 1)[0];
+      };
+      const kept = baseDraft.addons.map((a) => {
+        const hit = take(a);
+        return hit ? { ...a, qty: hit.qty, unit_price: Number(hit.unit_price), attrs: hit.attrs ?? a.attrs } : { ...a, removed: true };
+      });
+      next.addons = [
+        ...kept,
+        ...unmatched.map((a) => ({ key: nextKey(), ...(a.id ? { id: a.id } : {}), addon_key: a.addon_key, qty: a.qty, unit_price: Number(a.unit_price), attrs: a.attrs ?? null, added: true })),
+      ];
+    }
+    return next;
+  };
+  const requestView = useMemo(() => {
+    if (!liveAmendment || mode !== "object") return null;
+    const baseRow = revisions.find((r) => r.revision === liveAmendment.base_revision);
+    const before = baseRow ? draftFromSnapshot(baseRow.snapshot) : baseline;
+    /* A snapshot's services carry no row id; pair them with today's rows by key
+       so an unchanged service does not read as changed. */
+    const idsByKey = new Map<string, string[]>();
+    for (const a of detailQ.data?.addons ?? []) idsByKey.set(a.addon_key, [...(idsByKey.get(a.addon_key) ?? []), a.id]);
+    before.addons = before.addons.map((a) => {
+      const ids = idsByKey.get(a.addon_key) ?? [];
+      const id = ids.shift();
+      if (ids.length) idsByKey.set(a.addon_key, ids); else idsByKey.delete(a.addon_key);
+      return id ? { ...a, id } : a;
+    });
+    const p = proposalOf(liveAmendment);
+    const after = withProposal(before, p);
+    const headerKeys = [...Object.keys(p.header ?? {}), ...(["delivery_date", "delivery_date_tbd"] as const).filter((k) => k in p)];
+    const beforeHeader = (baseRow?.snapshot.header ?? {}) as Record<string, unknown>;
+    const rows = diffRows({
+      header: [
+        ...headerKeys.map((k) => ({
+          label: HEADER_LABEL[k] ?? k,
+          before: factWord(k, beforeHeader[k]),
+          after: factWord(k, k in (p.header ?? {}) ? (p.header ?? {})[k] : (p as Record<string, unknown>)[k]),
+        })),
+        ...("installment_months" in p
+          ? [{ label: "Instalment months", before: String(before.installment_months ?? "None"), after: String(p.installment_months ?? "None") }]
+          : []),
+      ],
+      before: { lines: before.lines as EditLine[], addons: before.addons as EditAddon[] },
+      after: { lines: after.lines as EditLine[], addons: after.addons as EditAddon[] },
+      nameOfSku,
+      nameOfAddon,
+      categoryOf: categoryOfSku,
+    });
+    return { rows, consequences: consequencesFor({ lines: after.lines, addons: after.addons, header: { ...(p.header ?? {}), ...("delivery_date" in p ? { delivery_date: p.delivery_date } : {}) } }) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveAmendment, revisions, baseline, mode, detailQ.data, catalogBySku, addonNameByKey, orderPaymentsQ.data, goodsTruthQ.data]);
 
   const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -1946,45 +2490,34 @@ function SalesOrderWorkspaceBody() {
           ? "Existing customer"
           : "New customer";
 
+  const liveBlocksCommercial =
+    Boolean(liveAmendment && !liveAmendment.stale) && changeClass?.action === "submit" && !replaceAmendmentId;
+  const canEditOrder = mode === "object" && objectView === "Order" && !showRoute && Boolean(order) && order?.status !== "cancelled";
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "object" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
-        <details className="relative">
-          <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
-          <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
-            {/* ⭐ ONE IMPLEMENTATION, TWO DOORS — owner ruling 2026-08-15. Copy
-                already ships on the register's right-click menu and seeds the
-                authoritative create form; the object page reaches the SAME
-                route rather than growing a second copy path (Law C: a door,
-                never a duplicate). */}
-            {/* A problem is RARE and it leaves this object for Service — it
-                belongs with the other rare acts, not as a permanent card on a
-                page the operator reads every day (owner ruling 2026-08-15). */}
-            <button
-              type="button"
-              onClick={() => setProblemOpen(true)}
-              data-testid="workspace-report-problem"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+      {canEditOrder && editing && (
+        <>
+          {changeCount > 0 && (
+            <span className="text-body text-base-600" data-testid="change-count">
+              {changeCount} {changeCount === 1 ? "change" : "changes"}
+            </span>
+          )}
+          <Button size="sm" variant="neutral" onClick={cancelEdit} data-testid="workspace-cancel">
+            Cancel
+          </Button>
+          {changeCount > 0 && (
+            <Button
+              size="sm"
+              variant="primary"
+              loading={changesMut.isPending}
+              disabled={!changeReason.trim() || liveBlocksCommercial}
+              onClick={onCommit}
+              data-testid="workspace-save"
             >
-              Report a problem
-            </button>
-            {/* ⭐ THE AMENDMENT DOOR MADE THE SAME JOURNEY (YH, 2026-08-26).
-                It was a standing strip at the foot of `Order info`; proposing a
-                contractual change is rarer than reading an order, and this is
-                where this page already keeps its rare acts. The strip is gone;
-                the capability — items, unit price, instalment months — is not,
-                and `Change delivery date` still handles the date on the card. */}
-            <button
-              type="button"
-              onClick={() => setAmendSignal((n) => n + 1)}
-              data-testid="workspace-propose-change"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
-            >
-              Propose a change to the customer
-            </button>
-            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
-          </div>
-        </details>
+              {changeReason.trim() ? commitWord : `${commitWord} — say why`}
+            </Button>
+          )}
+        </>
       )}
       {mode === "create" && (
         <>
@@ -2016,18 +2549,44 @@ function SalesOrderWorkspaceBody() {
           }}
           data-testid="workspace-back-to-current"
         >
-          Back to current
+          Return to current
         </Button>
       )}
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={!printData}
-        onClick={() => void openPrint()}
-        data-testid="workspace-print"
-      >
-        <Printer size={14} /> Print ▾
-      </Button>
+      {!editing && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!printData}
+          onClick={() => void openPrint()}
+          data-testid="workspace-print"
+        >
+          <Printer size={14} /> {mode === "oldrev" ? "Print this version" : "Print ▾"}
+        </Button>
+      )}
+      {canEditOrder && !editing && (
+        <Button size="sm" variant="primary" onClick={() => startEdit(baseline)} data-testid="workspace-edit">
+          Edit
+        </Button>
+      )}
+      {canEditOrder && !editing && (
+        <details className="relative">
+          {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
+              name and tooltip are `More actions`. The retired `Propose a change to
+              the customer` door is gone: the whole-page Edit carries that change. */}
+          <summary className="btn-ghost cursor-pointer list-none px-2 text-body" aria-label="More actions" title="More actions">⋮</summary>
+          <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setProblemOpen(true)}
+              data-testid="workspace-report-problem"
+              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+            >
+              Report a problem
+            </button>
+            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
+          </div>
+        </details>
+      )}
     </span>
   );
 
@@ -2050,6 +2609,281 @@ function SalesOrderWorkspaceBody() {
     !(order?.customer_address ?? "").trim();
 
 
+  /* ── 0562 · THE ITEMS TABLE WHILE EDITING — the document's own columns
+     (orders/MASTER § ITEMS: # · Item Code · Description · Qty · Unit (RM) ·
+     Disc (RM) · Amount (RM) · TOTAL PAYABLE). A removed row is struck and
+     restorable until commit; nothing leaves the order before the change takes
+     effect. Minimum widths keep every money column readable; the form pane is
+     never narrower than this table (see the split below). */
+  const catalogModel = useMemo(() => {
+    const bundle = catalogQ.data;
+    const bySku = new Map<string, { modelId: string; variant: string; price: number }>();
+    const byModel = new Map<string, { name: string; category: string | null; gaps: string[]; skus: Array<{ sku: string; variant: string; price: number }> }>();
+    if (bundle) {
+      for (const m of bundle.models as Array<{ id: string; name: string; category?: string | null; gaps?: string[] | null; allowedOptions?: { gaps?: string[] } }>) {
+        byModel.set(m.id, { name: m.name, category: m.category ?? null, gaps: m.allowedOptions?.gaps ?? m.gaps ?? [], skus: [] });
+      }
+      for (const k of bundle.skus as Array<{ sku: string; modelId: string; variant: string; price: number }>) {
+        bySku.set(k.sku, { modelId: k.modelId, variant: k.variant, price: Number(k.price) });
+        byModel.get(k.modelId)?.skus.push({ sku: k.sku, variant: k.variant, price: Number(k.price) });
+      }
+    }
+    return { bySku, byModel };
+  }, [catalogQ.data]);
+  const [configOpen, setConfigOpen] = useState<Set<string>>(new Set());
+  const itemsScrollRef = useRef<HTMLDivElement | null>(null);
+  const [itemsOverflow, setItemsOverflow] = useState({ over: false, right: false });
+  useEffect(() => {
+    const el = itemsScrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    /* ⛔ SET ONLY WHEN IT CHANGED. A new object every pass, from an effect with
+       no dependency list, is an infinite render loop — measured: the page test
+       run never finished. */
+    const read = () => {
+      const over = el.scrollWidth - el.clientWidth > 1;
+      const right = over && el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setItemsOverflow((prev) => (prev.over === over && prev.right === right ? prev : { over, right }));
+    };
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", read);
+      ro.disconnect();
+    };
+  }, [editing, mode, objectView, draft.lines.length, draft.addons.length]);
+  const [addSku, setAddSku] = useState("");
+  const setDraftLine = (key: string, patch: Partial<DraftLine>) =>
+    setDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
+  const setDraftAddon = (key: string, patch: Partial<DraftAddon>) =>
+    setDraft((d) => ({ ...d, addons: d.addons.map((a) => (a.key === key ? { ...a, ...patch } : a)) }));
+  const surchargeOf = (attrs: Record<string, unknown> | undefined | null) =>
+    Number((attrs as { specials_total?: number } | null)?.specials_total ?? 0) +
+    Number((attrs as { options_total?: number } | null)?.options_total ?? 0);
+  /** ⭐ A GIFT / PWP / BUNDLE LINE KEEPS ITS PROTECTION (0385; owner-approved
+   *  item contract 2026-09-22): its eligibility and source are not a generic
+   *  qty or price box, and the database refuses an edit to one. It reads in
+   *  the draft; cancelling its PARENT shows the gift consequence instead. */
+  const protectedLine = (l: DraftLine) =>
+    ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
+  /** A per-trip charge stays at 1; the stair carry is stamped from the floor. */
+  const fixedQtyService = (key: string) => key === STAIR_CARRY_ADDON_KEY || key.startsWith("DELIVERY");
+  const th = "whitespace-nowrap px-2 py-2 text-label font-medium text-base-500";
+  const editItemsTable = (
+    <div data-testid="edit-items" className="relative">
+      {/* On a screen too narrow for the document's own columns the table scrolls
+          inside its box — never the page — and says so with the DataGrid's
+          grammar: the money columns slide under a fade, and one kit button
+          steps to them. */}
+      <div ref={itemsScrollRef} className="overflow-x-auto" role="region" tabIndex={itemsOverflow.over ? 0 : undefined}
+        aria-label={itemsOverflow.over ? "Items — scroll sideways for more columns" : "Items"}>
+        <table className="w-full border-collapse text-body" data-testid="edit-goods">
+          <thead>
+            <tr className="border-b border-kit-slate-5">
+              <th className={`${th} text-left`} style={{ width: 28 }}>#</th>
+              <th className={`${th} text-left`} style={{ minWidth: 104 }}>Item Code</th>
+              <th className={`${th} text-left`} style={{ minWidth: 130 }}>Description</th>
+              <th className={`${th} text-center`}>Qty</th>
+              <th className={`${th} text-right`}>Unit (RM)</th>
+              <th className={`${th} text-right`}>Disc (RM)</th>
+              <th className={`${th} text-right`}>Amount (RM)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
+              const known = catalogModel.bySku.get(l.sku);
+              const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
+              const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
+              const strike = l.removed ? "line-through text-base-500" : "";
+              const open = configOpen.has(l.key);
+              return [
+                <tr key={l.key} className={`${open ? "" : "border-b border-kit-slate-5"} align-top`} data-testid={`edit-line-${i + 1}`}>
+                  <td className={`px-2 py-2 text-base-500 ${strike}`}>{i + 1}</td>
+                  <td className={`break-words px-2 py-2 font-mono text-meta ${strike}`}>{l.sku}</td>
+                  <td className="px-2 py-2">
+                    <div className={strike}>{nameOfSku(l.sku)}</div>
+                    {configWords(l.attrs) && <div className={`text-meta text-base-600 ${strike}`}>{configWords(l.attrs)}</div>}
+                    {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
+                    {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
+                    {l.removed && <div className="text-meta text-danger">Cancelled when approved · Restore to keep it</div>}
+                    {protectedLine(l) && <div className="text-meta text-base-600">Free item — it follows the item it came with</div>}
+                    <span className="mt-1 inline-flex flex-wrap gap-x-4 text-meta">
+                      {canConfig && !protectedLine(l) && (
+                        <button type="button" className="text-kit-blue-11 hover:underline" aria-expanded={open}
+                          aria-label={`Configure ${nameOfSku(l.sku)}`}
+                          onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
+                          {open ? "Close configuration" : "Configure"}
+                        </button>
+                      )}
+                      {protectedLine(l) ? null : l.removed ? (
+                        <button type="button" className="text-kit-blue-11 hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
+                          onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
+                      ) : (
+                        <button type="button" className="text-danger hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
+                          onClick={() => (l.added
+                            ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
+                            : setDraftLine(l.key, { removed: true }))}>Remove</button>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    {l.removed || protectedLine(l) ? <span className={strike}>{l.qty}</span> : (
+                      <div className="min-w-[56px]">
+                        <Input id={`so-edit-qty-${l.key}`} aria-label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)}
+                          onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-right">
+                    {l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price)}</span> : (
+                      <div className="min-w-[80px]">
+                        <Input id={`so-edit-price-${l.key}`} aria-label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01"
+                          value={String(l.unit_price)}
+                          onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-right text-base-500">—</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price)}</td>
+                </tr>,
+                open && canConfig ? (
+                  <tr key={`${l.key}-config`} className="border-b border-kit-slate-5 bg-kit-slate-2">
+                    <td colSpan={7} className="px-2 py-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {model!.skus.length > 1 && (
+                          <Select id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
+                            onValueChange={(sku) => {
+                              const hit = model!.skus.find((x) => x.sku === sku);
+                              if (!hit) return;
+                              setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
+                            }}
+                            options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
+                        )}
+                        {model!.gaps.length > 0 && (
+                          <Select id={`so-edit-gap-${l.key}`} label="Mattress gap"
+                            value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
+                            onValueChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
+                            options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null,
+              ];
+            })}
+            {draft.addons.map((a) => {
+              const strike = a.removed ? "line-through text-base-500" : "";
+              const stamped = a.addon_key === STAIR_CARRY_ADDON_KEY;
+              return (
+                <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
+                  <td className="px-2 py-2" />
+                  <td className={`break-words px-2 py-2 font-mono text-meta ${strike}`}>{a.addon_key}</td>
+                  <td className="px-2 py-2">
+                    <div className={strike}>{nameOfAddon(a.addon_key)}</div>
+                    {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
+                    {a.added && <div className="text-meta text-kit-blue-11">New line</div>}
+                    {!stamped && (
+                      <span className="mt-1 inline-flex text-meta">
+                        {a.removed ? (
+                          <button type="button" className="text-kit-blue-11 hover:underline" aria-label={`Restore ${nameOfAddon(a.addon_key)}`}
+                            onClick={() => setDraftAddon(a.key, { removed: false })}>Restore</button>
+                        ) : (
+                          <button type="button" className="text-danger hover:underline" aria-label={`Remove ${nameOfAddon(a.addon_key)}`}
+                            onClick={() => (a.added
+                              ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
+                              : setDraftAddon(a.key, { removed: true }))}>Remove</button>
+                        )}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    {a.removed || stamped || fixedQtyService(a.addon_key) ? <span className={strike}>{a.qty}</span> : (
+                      <div className="min-w-[56px]">
+                        <Input id={`so-edit-service-qty-${a.key}`} aria-label={`Qty ${nameOfAddon(a.addon_key)}`} type="number" min={1}
+                          value={String(a.qty)}
+                          onChange={(e) => setDraftAddon(a.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                      </div>
+                    )}
+                  </td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price)}</td>
+                  <td className="px-2 py-2 text-right text-base-500">—</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="font-semibold text-base-900">
+              <td colSpan={6} className="px-2 py-2 text-right">TOTAL PAYABLE</td>
+              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums" data-testid="edit-total">
+                {fmtMoney(
+                  draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty * l.unit_price, 0) +
+                  draft.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0),
+                )}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {itemsOverflow.right && (
+        <div aria-hidden="true" data-testid="items-more-columns" className="pointer-events-none absolute inset-x-0 top-0 h-[2.5rem] bg-gradient-to-l from-kit-slate-6/60 to-transparent" style={{ left: "auto", width: 32 }} />
+      )}
+      {itemsOverflow.over && (
+        <span className="absolute right-1 top-1 z-10">
+          <Button size="sm" variant="neutral" aria-label={itemsOverflow.right ? "Show more Items columns" : "Back to the first Items columns"}
+            data-testid="items-columns-step"
+            onClick={() => {
+              const el = itemsScrollRef.current;
+              if (el) el.scrollBy({ left: (itemsOverflow.right ? 1 : -1) * Math.max(160, el.clientWidth * 0.7), behavior: "smooth" });
+            }}>
+            {itemsOverflow.right ? "›" : "‹"}
+          </Button>
+        </span>
+      )}
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Input id="so-add-item" label="Add item" list="so-sku-catalog" value={addSku}
+              hint={addSku.trim() ? (catalogBySku.get(addSku.trim())?.label ?? NOT_IN_CATALOG) : undefined}
+              onChange={(e) => setAddSku(e.target.value)} />
+            <datalist id="so-sku-catalog">
+              {[...catalogBySku.entries()].map(([sku, info]) => (
+                <option key={sku} value={sku}>{info.label}</option>
+              ))}
+            </datalist>
+          </div>
+          <Button size="sm" variant="neutral" disabled={!catalogBySku.has(addSku.trim())} data-testid="add-item"
+            onClick={() => {
+              const sku = addSku.trim();
+              const hit = catalogBySku.get(sku);
+              if (!hit) return;
+              const key = nextKey();
+              setDraft((d) => ({ ...d, lines: [...d.lines, { key, sku, qty: 1, unit_price: Number(hit.price ?? 0), added: true }] }));
+              setAddSku("");
+            }}>
+            <Plus size={14} /> Add item
+          </Button>
+        </div>
+        <div data-pos-field="orderAddons">
+          <Select id="so-add-service" label="Add service" value=""
+            onValueChange={(key) => {
+              const hit = (catalogQ.data?.addons ?? []).find((x) => x.key === key);
+              if (!hit) return;
+              setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
+            }}
+            options={(catalogQ.data?.addons ?? [])
+              .filter((x) => x.key !== STAIR_CARRY_ADDON_KEY && (x as { active?: boolean }).active !== false)
+              .map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
+        </div>
+      </div>
+      <p className="mt-3 flex flex-wrap gap-x-6 text-body text-base-900" data-testid="edit-qty-line">
+        <span>Qty: {qtyWords(draft.lines.filter((l) => l.sku.trim()), categoryOfSku)}</span>
+        <span>Services: {servicesWords(draft.addons, nameOfAddon)}</span>
+      </p>
+    </div>
+  );
+
   /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
   const form = (
     /* A `fieldset` because the browser's own disabled-descendants rule is the
@@ -2067,11 +2901,77 @@ function SalesOrderWorkspaceBody() {
         second half of why the sections did not separate. */}
     <div className="flex flex-col gap-6">
       {mode === "oldrev" && viewedRevision && (
-        <div className="px-1">
+        <div className="px-1" data-testid="oldrev-notice">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
           </span>
+          {/* ⭐ TWO CASES, AND ONLY ONE OF THEM IS A RECONSTRUCTION — owner
+              ruling 2026-09-23: "Legacy PDFs that were never stored: use the
+              approved reconstructed-copy notice. Newly issued versions after
+              this release: preserve their original issued PDFs as required. A
+              warning does not replace this capability."
+
+              So a version issued since `0565` shows THE FILE IT WAS ISSUED AS,
+              and says so. Only a version that never had one is rebuilt, and it
+              carries the approved notice — verbatim, the same sentence the
+              rebuilt sheet itself prints, so screen and paper agree. */}
+          {storedDocumentUrl && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-issued-document">
+              The document this version was issued as.
+            </p>
+          )}
+          {isReconstruction && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
+              Reconstructed copy — original issued document unavailable.
+            </p>
+          )}
+          {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
+              untouched: it stays on the order and still prints on the current
+              document. */}
+          {isReconstruction && base?.signature_url && (
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
+              Signature version not recorded.
+            </p>
+          )}
+          {isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
+              One payment has no date, so it is not counted in this version.
+            </p>
+          )}
         </div>
+      )}
+
+      {/* 0562 · the supplier-commitment notice (owner ruling 2026-09-21), in both states. */}
+      {mode === "object" && (detailQ.data?.pos ?? []).length > 0 && (
+        <p className="rounded-card border border-kit-slate-5 bg-white px-4 py-3 text-body text-kit-slate-12" data-testid="supplier-commitment-notice">
+          This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.
+        </p>
+      )}
+      {mode === "object" && editing && changeCount > 0 && (
+        <DraftReview
+          rows={draftRows}
+          consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
+          commercial={changeClass?.action === "submit"}
+          blocked={liveBlocksCommercial ? "An earlier change is still waiting for management." : null}
+          reason={changeReason}
+          onReason={setChangeReason}
+          askedOn={changeAskedOn}
+          onAskedOn={setChangeAskedOn}
+          agreement={changeAgreement}
+          onAgreement={setChangeAgreement}
+        />
+      )}
+      {mode === "object" && !editing && liveAmendment && requestView && (
+        <WaitingRequest
+          amendment={liveAmendment}
+          rows={requestView.rows}
+          consequences={requestView.consequences}
+          canDecide={role === "principal"}
+          busy={decideMut.isPending || agreementMut.isPending}
+          onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
+          onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
+          onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
+        />
       )}
 
       {/* ① CUSTOMER — now the whole customer, address included (Jess,
@@ -2079,6 +2979,8 @@ function SalesOrderWorkspaceBody() {
           contact` and `Money`; a reader looking up "where does this go" had to
           pass two unrelated sections to find it. It is the same party's fact,
           so it is the same card, under its own locked name. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
       <Block
         title="Customer"
         headerSlot={
@@ -2258,6 +3160,7 @@ function SalesOrderWorkspaceBody() {
           </>
         )}
       </Block>
+      </fieldset>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
 
@@ -2266,10 +3169,12 @@ function SalesOrderWorkspaceBody() {
           what `Proceed date` meant while it was an editable box the office had
           to reason about. It is a recorded fact now, and a sentence explaining
           a read-only date is the "reduce descriptions" Jess asked for. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
       <Block title="Order info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact label="SO Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
-          {mode === "create" ? (
+          {mode === "create" || editing ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Requested Delivery Date" value={draft.delivery_date}
                 hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} — production lead` : undefined}
@@ -2279,6 +3184,13 @@ function SalesOrderWorkspaceBody() {
                     : undefined
                 }
                 onChange={(iso) => setField("delivery_date", iso)} />
+              {editing && (
+                <div className="mt-2">
+                  <Checkbox id="so-promised-tbd" label="Delivery date to be confirmed"
+                    checked={draft.delivery_date_tbd}
+                    onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
+                </div>
+              )}
             </div>
           ) : (
             <div data-pos-field="deliveryDate">
@@ -2295,24 +3207,8 @@ function SalesOrderWorkspaceBody() {
                   date already has their eye.
                   A LIVE proposal is truth and is NOT hidden behind the modal:
                   it prints here, under the date it is waiting to move. */}
-              {!isNew && mode === "object" && orderId && (
-                liveAmendment ? (
-                  <p className="mt-1 text-meta text-base-600" data-testid="amend-date-waiting">
-                    {liveAmendment.stale
-                      ? "A proposal on this order is out of date."
-                      : "A proposal is waiting for management."}
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAmendDateOpen(true)}
-                    data-testid="amend-date-open"
-                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                  >
-                    Change delivery date
-                  </button>
-                )
-              )}
+              {/* 0562 · the date moves inside the whole-page Edit; a live request
+                  shows once, at the top of the form, never as a second door here. */}
             </div>
           )}
           {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
@@ -2344,10 +3240,10 @@ function SalesOrderWorkspaceBody() {
               blank may be filled, a recorded date may not be moved or cleared.
               This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
-            {mode === "create" || (mode === "object" && !baseline.proceed_date) ? (
+            {mode === "create" || (mode === "object" && (editing || !baseline.proceed_date)) ? (
               <DatePicker id="so-proceed" label="Proceed date" value={draft.proceed_date}
                 hint={
-                  mode === "object"
+                  mode === "object" && !baseline.proceed_date
                     ? "Never recorded — fill it in once, then it locks"
                     : undefined
                 }
@@ -2384,26 +3280,16 @@ function SalesOrderWorkspaceBody() {
             rule + padding therefore appear only when there is a live panel to
             separate; with nothing pending this renders an empty, invisible
             div rather than a bordered strip with no content in it. */}
-        {!isNew && mode === "object" && orderId && (
-          <div className={liveAmendment ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}>
-            <SalesOrderAmendment
-              orderId={orderId}
-              currentLines={(detailQ.data?.lines ?? []).map((l) => ({
-                id: l.id,
-                sku: l.sku,
-                qty: l.qty,
-                unit_price: Number(l.unit_price),
-              }))}
-              currentDeliveryDate={order?.delivery_date ?? null}
-              currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
-              currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
-              proposalSeed={amendmentSeed}
-              openSignal={amendSignal}
-              inlineTrigger={false}
-            />
+        {editing && (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Select id="so-instalment" label="Instalment months"
+              value={draft.installment_months == null ? "none" : String(draft.installment_months)}
+              onValueChange={(v) => setField("installment_months", v === "none" ? null : Number(v))}
+              options={[{ value: "none", label: "None" }, ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: String(m) }))]} />
           </div>
         )}
       </Block>
+      </fieldset>
 
       {/* ③ DELIVERY — where the goods go, and what the lorry meets there
           (approved Sales Order detail organisation, 2026-09-11).
@@ -2415,6 +3301,8 @@ function SalesOrderWorkspaceBody() {
           tag; nothing here is recomputed and no second fee is derived. The
           stair charge is the STAMPED `STAIR_CARRY` addon, stated once here as
           a working line and charged once in GOODS. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
       <Block title="Delivery">
           {/* Merged from the retired `Delivery address` card (Jess,
               2026-08-26). Same fields, same ids, same one-address fact — it
@@ -2664,6 +3552,7 @@ function SalesOrderWorkspaceBody() {
             <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} />
           </div>
       </Block>
+      </fieldset>
 
 
 
@@ -2749,6 +3638,8 @@ function SalesOrderWorkspaceBody() {
               </Button>
             </div>
           </div>
+        ) : editing ? (
+          editItemsTable
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-body" data-testid="document-goods">
@@ -2878,14 +3769,7 @@ function SalesOrderWorkspaceBody() {
                     <td className={`py-2 pr-4 align-top ${cjkClassName(serviceName)}`}>
                       <div>{serviceName}</div>
                       {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
-                      {mode === "object" && orderId && (
-                        <ServiceRowActions
-                          orderId={orderId}
-                          row={a}
-                          catalogAddons={catalogQ.data?.addons ?? []}
-                          status={order?.status ?? null}
-                        />
-                      )}
+
                     </td>
                     <td className="py-2 pr-4 align-top">Not recorded</td>
                     <td className="py-2 pr-4 align-top text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
@@ -2922,15 +3806,9 @@ function SalesOrderWorkspaceBody() {
             office rang the shop to add a disposal service. What is left in
             `SalesOrderAddons` is the one act the table cannot perform — adding
             a service that is not there yet — and the attribute rides that. */}
-        {mode === "object" && orderId && (
-          <div data-pos-field="orderAddons">
-            <SalesOrderAddons
-              orderId={orderId}
-              catalogAddons={catalogQ.data?.addons ?? []}
-              status={order?.status ?? null}
-            />
-          </div>
-        )}
+        {/* The `Add service` door now lives inside the whole-page Edit (0562):
+            a service is part of what was bought, so it moves with the draft
+            through the governed lane instead of a direct write. */}
       </Block>
 
       {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
@@ -3072,25 +3950,6 @@ function SalesOrderWorkspaceBody() {
         ) : null}
       />
 
-      {/* The amend trio, opened from beside `Requested Delivery Date`. The governed
-          note is the modal's DESCRIPTION — the first thing read on opening,
-          rather than a footnote beside the button that commits it. */}
-      {!isNew && mode === "object" && orderId && (
-        <Modal
-          open={amendDateOpen}
-          onOpenChange={setAmendDateOpen}
-          title="Change delivery date"
-          description="creates a Revision · needs approval"
-        >
-          <SalesOrderAmendDeliveryDate
-            orderId={orderId}
-            currentDeliveryDate={order?.delivery_date ?? null}
-            liveAmendment={liveAmendment}
-            onDone={() => setAmendDateOpen(false)}
-          />
-        </Modal>
-      )}
-
       {order && (
         <CancelSalesOrderDialog
           orderId={order.id}
@@ -3181,20 +4040,31 @@ function SalesOrderWorkspaceBody() {
               showViewTabs={false}
               onViewRevision={setViewRev}
               onProposeRevision={(revision) => {
-                const header = revision.snapshot.header ?? {};
-                const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
-                setAmendmentSeed({
-                  lines: (revision.snapshot.lines ?? []).map((line) => ({
-                    ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
-                    sku: line.sku,
-                    qty: Number(line.qty),
-                    unit_price: Number(line.unit_price),
-                  })),
-                  delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
-                  delivery_date_tbd: Boolean(header.delivery_date_tbd),
-                  installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                /* PROPOSE THIS VERSION AGAIN — rollback is a new governed change
+                   (orders/MASTER § Detail, edit, amendment): the complete old
+                   version becomes the draft, on top of today's line identity. */
+                const old = draftFromSnapshot(revision.snapshot);
+                const currentIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                const addonIds = new Map((detailQ.data?.addons ?? []).map((a) => [a.addon_key, a.id]));
+                const oldSkus = new Set(old.lines.map((l) => l.sku));
+                const oldKeys = new Set(old.addons.map((a) => a.addon_key));
+                startEdit({
+                  ...old,
+                  lines: [
+                    ...old.lines.map((l) => {
+                      const id = currentIds.get(l.sku);
+                      return id ? { ...l, id } : { ...l, id: undefined, added: true };
+                    }),
+                    ...baseline.lines.filter((l) => !oldSkus.has(l.sku)).map((l) => ({ ...l, removed: true })),
+                  ],
+                  addons: [
+                    ...old.addons.map((a) => {
+                      const id = addonIds.get(a.addon_key);
+                      return id ? { ...a, id } : { ...a, added: true };
+                    }),
+                    ...baseline.addons.filter((a) => !oldKeys.has(a.addon_key)).map((a) => ({ ...a, removed: true })),
+                  ],
                 });
-                setObjectView("Order");
               }}
             />
             )}
@@ -3204,7 +4074,7 @@ function SalesOrderWorkspaceBody() {
         /* ⭐ TWO PANES, 50 / 50 — owner ruling 2026-08-15. Each pane scrolls on
            its own and the PAGE does not; below 1024px they stack, form first,
            and the page scrolls normally. */
-        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden">
+        <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
           {!isNew && detailQ.isLoading && (
             <div className="px-4 py-4">
               <Loading label="Opening the sales order" />
@@ -3227,34 +4097,14 @@ function SalesOrderWorkspaceBody() {
           )}
 
           {(isNew || order) && (
-            <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="object-two-panes">
-              <div className="flex min-h-0 min-w-0 flex-col lg:w-1/2 lg:overflow-hidden">
-                <div className="min-h-0 flex-1 px-4 py-4 lg:overflow-auto">{form}</div>
-                {/* THE SAVE BAR EXISTS ONLY WHEN SOMETHING CHANGED (§6.4 ⑥). */}
-                {mode === "object" && dirty && (
-                  <div
-                    className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-base-900 bg-base-900 px-4 py-2.5"
-                    data-testid="save-bar"
-                  >
-                    <span className="text-body font-medium text-white">
-                      ⚠ {changedFields.length} {changedFields.length === 1 ? "change" : "changes"}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Button size="sm" variant="ghost" onClick={discard} data-testid="workspace-cancel">
-                        <X size={14} /> Discard
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        loading={saveMut.isPending}
-                        onClick={onSave}
-                        data-testid="workspace-save"
-                      >
-                        Save
-                      </Button>
-                    </span>
-                  </div>
-                )}
+            <div
+              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
+              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
+              data-testid="object-two-panes"
+              data-split={split}
+            >
+              <div className={`flex min-w-0 flex-col ${split === "stack" ? "" : "min-h-0 overflow-hidden"}`}>
+                <div className={`min-h-0 flex-1 px-4 py-4 ${split === "stack" ? "" : "overflow-auto"}`}>{form}</div>
               </div>
 
               <aside
@@ -3265,20 +4115,34 @@ function SalesOrderWorkspaceBody() {
                    pushed the PAGE sideways instead of scrolling inside its own
                    box. Same rule as the tables: the container scrolls, the page
                    never does. */
-                className="min-h-0 min-w-0 overflow-auto border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0"
+                className={`min-h-0 min-w-0 overflow-auto bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}
                 aria-label="Sales Order document"
               >
                 {/* A PENDING AMENDMENT IS A BANNER, NEVER THE DOCUMENT BODY. */}
-                {pendingDeliveryDate && (
+                {liveAmendment && !liveAmendment.stale && (
                   <div
                     className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
                     data-testid="pending-amendment-banner"
                   >
-                    ⚠ Amendment pending approval: delivery date → {fmtDate(pendingDeliveryDate)}
+                    ⚠ Amendment pending approval{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
                   </div>
                 )}
                 <div className="relative mx-auto max-w-[700px]">
-                  <div ref={setPane} data-testid="pdf-pane" />
+                  {/* ⭐ 0565 · THE STORED FILE IS SHOWN AS ITSELF. Not
+                      re-rendered, not re-typeset: the bytes the customer was
+                      issued, in the browser's own viewer. Nothing rebuilt can
+                      appear in this branch, which is the point of it. */}
+                  {storedDocumentUrl ? (
+                    <object
+                      data={storedDocumentUrl}
+                      type="application/pdf"
+                      data-testid="issued-document-pane"
+                      aria-label={`The document Rev ${viewedRevision?.revision ?? ""} was issued as`}
+                      className="h-[860px] w-full rounded-card border border-kit-slate-5 bg-white"
+                    />
+                  ) : (
+                    <div ref={setPane} data-testid="pdf-pane" />
+                  )}
                   {/* The watermark is PREVIEW chrome, painted over the paper and
                       never into it — Print must produce the document, not a
                       picture of this screen. */}

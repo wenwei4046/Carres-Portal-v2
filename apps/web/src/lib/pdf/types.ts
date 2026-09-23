@@ -452,4 +452,29 @@ export type SalesOrderTemplateData = {
    *  checkout. The template renders this inline as the customer signature.
    *  Null when the order has no signature on file. */
   signature_url?: string | null;
+
+  /* ─── A REBUILT SHEET SAYS SO, ON THE PAPER — owner ruling 2026-09-23 ───
+   *
+   * Both fields are OPTIONAL and both default to the behaviour that shipped
+   * before them, so the CURRENT document's bytes do not move. Only the
+   * historical-version path sets either one.
+   *
+   * The page already carried these two statements; a PDF is a separate
+   * artefact that is printed, downloaded and handed to a customer, so a
+   * statement that lives only on screen is not made at all by the time it
+   * matters. The owner approved the exact wording. */
+
+  /** Printed verbatim when this sheet was REBUILT from a version's saved facts
+   *  rather than being the file issued at the time. The owner-approved
+   *  sentence is `Reconstructed copy — original issued document unavailable.`
+   *  Absent/null on the current document and on every stored original. */
+  rebuilt_notice?: string | null;
+
+  /** The order HAS a customer signature, but nothing records which version it
+   *  was given on, so it may not be reproduced here — and this version may not
+   *  be called unsigned either (owner ruling 2026-09-23: unknown is not
+   *  unsigned). The signing box prints the owner-approved
+   *  `Signature version not recorded.` INSTEAD of standing empty, because an
+   *  empty box is what an unsigned document prints. */
+  signature_unknown?: boolean;
 };

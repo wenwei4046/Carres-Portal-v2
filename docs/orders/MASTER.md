@@ -126,13 +126,37 @@ Sales Orders is the truth/register home of the customer order. It lets an author
 the transaction, read the customer promise and follow every related fact and document. It is not a
 second Purchasing, Warehouse, Delivery, Payment or Work screen.
 
-The Sales module contains exactly:
+**Portal navigation — owner approved 2026-09-23 · BUILT 2026-09-23.**
 
 ```
-SALES
-├─ Sales Orders
-└─ Old Orders (temporary)
+Sales Orders
+├─ Outright Sales
+└─ Subscription
 ```
+
+`Outright Sales` is the existing outright-order register and its governed SO detail/amendment
+journey. `Subscription` opens the Subscription-owned journey governed by `docs/rental/MASTER.md`;
+the shared navigation parent does not merge contracts, transactions, permissions or calculations.
+`Purchase` is rejected for this navigation label because it is confused with Purchasing.
+Replace the previous standalone Sales Orders entry; remove the old/legacy order menu entry from
+this tree. Menu removal does not delete orders, history, documents or valid existing deep links.
+Preserve authorised access to existing records and their canonical identity.
+
+The approved Order list and Monthly overview composition belongs inside Outright Sales; it does
+not mix Subscription quantities. Purchasing remains a separate module. This is a navigation ruling,
+not approval to implement the remaining Subscription proposals, migrate legacy orders or delay the
+independently authorised SO Amendment delivery. Reuse the existing PortalSidebar grammar and role
+visibility; never create a second sidebar or expose unauthorised destinations.
+
+**As built (`portal-nav.ts`, `portal-nav.sales.test.ts`).** Neither address moved: `Outright Sales`
+is `/operation/orders` and `Subscription` is `?tab=rental` — the Rental/Subscription registry that
+row has always opened — so every bookmark, in-page link and ⌘K jump still lands and no permission,
+quantity or report changed. The `Subscription` row MOVED out of Customer Care; a copy would be two
+rail rows lighting for one page. `Old Orders (temporary)` left the rail while
+`/operation/old-orders[/:stage]` stays mounted, so `CaseOrderLink` and every legacy deep link still
+resolve. The Admin area's jump to the same register now says `Outright Sales` too — one destination
+never carries two words. **Still not built and not approved by this ruling:** the `Monthly overview`
+composition, and every inner Subscription destination proposed in the Rental Blueprint.
 
 Delivery Orders belongs under Delivery. Purchase Orders, Receiving Sessions, Stock Units and
 Payments stay under their own modules. The Sales Order links to them; it never copies their
@@ -704,6 +728,38 @@ impact → Save or Submit amendment request → approval takes effect → each o
   document; a missing historical file is stated, never rebuilt from current data. A signature belongs
   to the exact version and document the customer signed; a new unsigned version says it is unsigned and
   never borrows the old signature.
+  **PARTLY BUILT 2026-09-23, and the two halves are not the same claim.**
+  🔴 **THE STORED FILE IS NOT STORED, SO WHAT IS SHOWN IS A REBUILD.** The rule says a revision
+  prints its OWN stored document and a missing file is STATED, never rebuilt from current data.
+  No issued PDF is retained, so the panel rebuilds the sheet from the version's own saved facts,
+  and BOTH the page AND THE DOCUMENT ITSELF say so in the owner-approved words (2026-09-23,
+  verbatim, not open to re-wording): *"Reconstructed copy — original issued document
+  unavailable."* It prints at the top of the sheet, above `Bill To`, so the reader knows what they
+  are holding before they read a figure — measured at x=41.4 y=731.7 on A4 in
+  `sales-order-template.rebuilt.test.tsx`, which extracts the text from the finished PDF with
+  pdfjs rather than asserting that a field was passed.
+  **A printed rebuild and an issued document can now be told apart once they leave the screen** —
+  which was the open risk until this shipped. Retaining the issued file is still the other half of
+  the rule and remains the outstanding work; a stored original, when one exists, is served as the
+  file it is and never passes through this path.
+  🟡 **WHICH VERSION THE SIGNATURE COVERS IS UNKNOWN — NOT "UNSIGNED", AND THE DOCUMENT NOW SAYS
+  SO.** On the sheet the owner-approved *"Signature version not recorded."* (2026-09-23) **replaces
+  the signing box** rather than sitting beside it — an empty dashed box under a `Customer
+  Signature` caption is byte-for-byte what a genuinely unsigned document prints, so leaving one
+  made exactly the claim this rule forbids. Measured at x=34.0 y=385.3, on the box's own ground, so
+  the caption below it does not move. A genuinely unsigned order still prints the empty box, and a
+  signature the document is entitled to show still prints. An earlier draft of this
+  section asserted the customer signed Rev 1. Nothing records that: `sales_order_snapshot` stores
+  no signing fact and `orders.signature_url` carries no capture timestamp. So a historical version
+  does not REPRODUCE a mark it cannot attribute, and it does not claim the version was unsigned
+  either. The evidence is preserved untouched — the signature stays on the order and still prints
+  on the CURRENT document — and the page states the unknown in words. Inferring the version from
+  revision order would be invention.
+  ✅ **WHAT IS BUILT:** a revision opens the complete old order from its own immutable snapshot,
+  and its money is the money DATED on or before that version's day, read from the one payments
+  ledger with the one arithmetic. A capture with no date is excluded and said. Named limits: a
+  receipt is dated to the DAY, so an afternoon payment counts toward a morning revision; and a
+  payment voided later leaves every view, so an old document under-reports rather than over-.
 - **Proposal tooling stays out of the product.** Demo switches, role pickers and page-state selectors
   used to review a prototype never enter the staff page.
 - The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
@@ -711,7 +767,40 @@ impact → Save or Submit amendment request → approval takes effect → each o
   `Qty:` with category quantities and `Services:` with service names. `Waiting for management` and
   `Before approval` remain the governed waiting state and impact heading.
 
-### Customer agreement evidence — APPROVED / LOCKED 2026-09-22
+### Sales Order amendment — DELIVERED 2026-09-23, production `abbea07a2`
+
+| | |
+|---|---|
+| PR | #1530, squash-merged as `abbea07a2` |
+| Migrations applied | `0564` (the whole change + the customer-agreement gate) · `0565` (an issued version keeps its document) |
+| Reconciled after applying | all seven function bodies match `md5(prosrc)` of the same files applied to a throwaway PostgreSQL — **zero transcription drift** |
+| In the database now | 6 `customer_agreement_*` columns · both check constraints · `sales_order_revision_documents` · bucket `sales-order-documents` · 2 read policies |
+| Deployed | both Pages projects report `abbea07a2`; the shipped bundle carries `/changes`, `/agreement`, `/document/sign`, and all three document sentences |
+| Rows touched | **none.** 0 agreements recorded, 0 documents stored, and the one open request (`dde58498`, SO-1308, 2026-08-10) was not altered to make anything look clean. |
+
+**⚠️ OWED: the signed-in production walk.** Everything above is either a database
+measurement or an unauthenticated read. A `401` from the Worker proves nothing about routing —
+an unknown path returns `401` too, because authentication runs before the router. The walk
+belongs to whoever holds a session.
+
+### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0564)
+
+**The gate is in the database.** `sales_order_amendments` carries the customer agreement as a
+governed KIND — `signed_document` · `customer_confirmation` · `original_agreement` — with the
+reference it points at, an optional detail, who recorded it, when, and
+`sales_order_amendment_terms_hash(proposed_snapshot)`: the fingerprint of the terms it was
+recorded against. Two check constraints make the ruling structural rather than remembered: a kind
+must be one of the three, and **a kind without a reference is refused** — which is what stops a
+manager's assertion, or a tick box, from ever counting as evidence.
+
+`sales_order_decide_amendment` refuses `approve` with detail `customer_agreement_required` when
+no kind is recorded, and `customer_agreement_stale` when the fingerprint no longer matches the
+proposal being applied, so an agreement can never silently cover different terms. `reject` is not
+gated — refusing a change asks the customer nothing. Operation/Sales record it through
+`sales_order_record_amendment_agreement`; `original_agreement` must name a revision of THAT order,
+checked in the database. The page shows what is on record and disables `Approve and apply` until
+it covers the live proposal. Recording a communication reference authorises no contact with
+anybody.
 
 A change to the customer's actual agreement must have a recorded, traceable basis for that customer's
 acceptance before it takes effect. A signed document or a reference to the relevant customer
@@ -733,160 +822,95 @@ Recording a communication reference does not authorise contacting customers or e
 This evidence gate neither rewrites historical signatures nor turns a WhatsApp confirmation into a
 signature. Preserve the actual revision/document association and separately identify unsigned versions.
 
-**⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
-APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
-doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
-above survives both:
+**BUILT 2026-09-23 — migration `0564`, `sales_order_record_amendment_agreement`,
+`POST /api/operation/orders/amendment/:id/agreement`, `SalesOrderAmendment.tsx`.**
+`sales_order_amendments` now carries the kind, the reference, the optional detail, who recorded it,
+when, and the fingerprint of the terms it was recorded against. Three kinds are accepted and no
+fourth is reachable: `signed_document`, `customer_confirmation` and `original_agreement` — the last
+being the Staff-correction case, whose reference must name a revision of this order that exists.
+**Every kind carries a reference; there is no boolean anywhere in the column set, the schema, the
+API or the screen**, which is how "a manager's statement or checkbox … is not sufficient" is made
+structural rather than a matter of discipline.
 
-```
-CREATE      every door REQUIRES a proceed date — the POS already does; the OFFICE door must too
-BLANK       an existing order with NO proceed date may be filled in ONCE
-RECORDED    an order that HAS one stays read-only — unchanged, this is Jess's ruling
-```
+SUBMIT is unchanged — the request is still written while the evidence is incomplete. REJECT is
+unchanged — refusing a change needs no customer agreement. APPROVE is refused
+(`customer_agreement_required`) until a basis is recorded, and refused again
+(`customer_agreement_stale`) when the recorded basis no longer fingerprints the terms being applied,
+so approval is never silently reused for different terms. A decided amendment's basis cannot be
+rewritten afterwards. The applied history row names the kind and the reference, so the record
+answers what made the change legitimate without a second read.
 
-**The lock is on the ANSWER, never on the emptiness.** Filling a blank is completion; changing a
-recorded date is moving when the factory starts, and that stays shut. YH's reason for the
-fill-once bound: *"those that accept blank proceed date are most likely due to bugs from past
-versions"* — so the door exists to repair history, not to reopen a decision.
+Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole chain, 0564
+applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
+ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
+proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered
+approval applies and mints Rev 2; a decided amendment refuses a backdated basis. Screen words are recorded in COPY-STANDARD
+§ "Customer agreement evidence" and are explicitly **PROPOSAL / NOT LAW** awaiting owner review —
+the ruling settled the rule, not the wording, and writing a word into the dictionary records a
+proposal rather than approving it. The approved amendment words it reuses unchanged are
+`Management decision reason`, `Reject`, `Approve and apply`, `Waiting for management` and
+`Before approval`.
 
-⛔ **The `createOrderInput` sentence removed above was AMBIGUOUS and read as false.** There are
-**two different objects with that name**: the POS door's `createOrderInputSchema`
-(`packages/shared/src/schemas/orders.ts:325-327`, which genuinely does refuse — and
-`order-entry.ts:246` pins the field `locked · defaultRequired · not toggleable`), and the OFFICE
-door's local `createOrderInput` (`apps/api/src/routes/operation/orders.ts:1483-1499`), which
-**does not**. Measured 2026-08-28: the office door is permissive at all three of its layers — no
-`validateDraft` guard, `proceed_date` inherited `.nullable().optional()` from
-`revisionHeaderInput`, and `sales_order_create` inserts `nullif(…)::date` with no NULL check
-(`0374:115`). That is what this ruling closes.
+### Old versions and signatures — measured 2026-09-23, corrected after review
 
-**WHAT THE DATE MEANS, since no rule computes it.** The planned production-START day, keyed by the
-salesperson at the point of sale (`0165:6-13`). There is **no derivation anywhere** — no lead-time
-arithmetic, no production calendar, no delivery-minus-lead formula. The only guidance in the
-product is prose on the POS: *"pick it deliberately (e.g. ~a month before delivery) so we don't
-reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule enforced at every layer is
-`proceed_date <= delivery_date`. It is a planned date only and is never auto-stamped.
+**FIXED: a historical version no longer borrows today's signature.**
+`snapshotTemplateData` read `base.signed` and `base.signature_url` — the live order's eSign PNG —
+so every revision printed the same customer signature under a different set of goods, prices and
+dates. A customer could be shown Rev 2 carrying the mark they put on Rev 1.
 
-📌 **Provenance, recorded because it was asked.** The three read-only lines above entered this file
-in ONE commit — `2515a136`, authored by `yhcominthruWork` as squashed PR #923, whose body never
-mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**, and
-those quotation marks are the whole of the provenance; no separate artefact backs it. Neither Lim,
-Chai nor Jess has ever committed a proceed-date line here. YH confirmed the ruling stands on
-2026-08-28 with the refinement above, which is what makes it binding now.
+**AND THE OPPOSITE CLAIM IS ALSO UNPROVEN — the correction this review forced.** Not reproducing
+the mark is not the same as asserting the version was unsigned, and an earlier draft of this
+MASTER said both (it named Rev 1 as the signed revision, which nothing records). What ships:
+the mark is not reproduced on a version it cannot be attributed to · the signature evidence is
+preserved untouched on the order and still prints on the CURRENT document · the page states the
+unknown in words · the customer document gains no new words and asserts nothing either way.
 
-**BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
-The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
-this page offered an unlabelled tickbox, so an unticked box meant BOTH *no lift* and *nobody said*.
-The answers now live once, in `packages/shared/src/sales-order-form.ts` (`LIFT_OPTIONS`), and both
-surfaces import them. The same ruling brought the POS's stair-carry working-out to this page —
-`3 of 5 items × 2 floors above 2F × RM50 = RM300` — through the one imported `floorSurchargeRaw`
-(Law D: one derived fact, ONE arithmetic).
+**UNKNOWN, and deliberately not guessed: which revision a stored signature covers.**
+`sales_order_snapshot` stores no signing fact (measured against the live function: its header
+carries `so · status · parties · customer · delivery · proceed · instalment · placed_at ·
+entry_fields` and nothing about signing), and `orders` carries `signature_url` with **no capture
+timestamp** — `pod_signed_at` is Delivery's proof of delivery, a different act.
+**Falsifier / the fix when it is wanted:** store the signing fact in the snapshot, or add a
+capture timestamp to `orders`.
 
-**THE SECOND DENSITY PASS — 2026-08-26 (YH), after reading the merged page.** Six lines of standing
-explanation came off once the fields they explained stopped being editable:
+### Retained documents — BUILT 2026-09-23 (0565), and the notice is the legacy case only
 
-- `ORDER INFO` loses its subtitle. It taught what `Proceed date` meant while that was a box the
-  office had to reason about; it is a recorded fact now.
-- The stair-carry working-out prints **only when there is a charge**. It used to narrate the zero
-  (*"No stair carry — floor 1 is within the free 2F"*) on the majority of orders, repeating the two
-  fields directly above it.
-- `Floor` carries its own ceiling — **`Floor (Max is 3rd Floor)`** — instead of a hint underneath
-  that read as advice rather than as the limit the input enforces.
-- `Items needing stair carry` carries a number, never a blank.
+The approved rule is that a revision prints its OWN stored document and that a missing historical
+file is **stated, never rebuilt from current data**. Owner correction, 2026-09-23:
 
-**⭐ AN UNSET STAIR-CARRY COUNT CHARGES NOTHING — OWNER RULING 2026-08-27 (YH), A PRICING DECISION.**
-It used to mean EVERY item: an order where nobody was asked how many pieces needed carrying was
-charged the maximum stair fee. It now means NONE — somebody says how many before the customer is
-charged. Applied in `order-totals.ts` (`floorSurcharge` + `draftTotals`), the POS panel and the
-object page **together**, so a quote and an order can never disagree about the money.
-🟡 Any order whose count was never set now computes RM 0 stair carry where it previously computed a
-full one. That is the ruling, not a side effect.
-⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
-may not be edited (red line 6) — **this section is the current meaning.**
+> "Legacy PDFs that were never stored: use the approved reconstructed-copy notice. Newly issued
+>  versions after this release: preserve their original issued PDFs as required. **A warning does
+>  not replace this capability.**"
 
-**⭐⭐ STAIR CARRY IS MONEY THE CUSTOMER OWES — OWNER RULING (YH, 2026-08-28). APPROVED / LOCKED.**
-*"If stair carry requires money for it, it should be included — whether it's paid on the carry day
-or before, it still needs to be paid."*
+**A version issued from `0565` onward keeps the file it was issued as.** The moment a version is
+minted — by a correction or by an approved amendment — the page renders the document the order is
+issuing at that instant and stores it. Reading that version afterwards shows **that file**, not a
+re-render of it, and printing opens the same bytes.
 
-So the fee is **revenue on this sales order**, not a delivery-day cash arrangement. It belongs in
-the order's total, in what the customer owes, and in what every payment door will accept. **The
-timing of payment does not change whether it is owed.**
-
-⛔ **This settles a three-way contradiction the repo has carried since 0184.** Three files each
-state a different answer, and each is locally coherent:
-| File | Claims |
+| | |
 |---|---|
-| `apps/api/src/lib/delivery-fee-recompute.ts:38-39` | stair *"folds into the order total"* — revenue |
-| `apps/api/src/routes/orders.ts:258-261` | *"a delivery-time concern, not a sales metric"* — excluded |
-| `apps/api/src/routes/stripe-checkout.ts:115-116` | *"a client-side display extra"* — not a charge at all |
-**The first is now the ruling.** The other two describe an implementation that must change; their
-comments are corrected in the same PR that changes them, never left to contradict this section.
+| where the file lives | bucket `sales-order-documents`, key `sales-orders/{order_id}/rev-{n}.pdf` |
+| where the record lives | `sales_order_revision_documents` — one row per version, **beside** the revision |
+| why beside, not on | `sales_order_revisions` is immutable (`sales_order_revisions_no_rewrite`). The first draft of 0565 added a column to that row and the throwaway replay refused it. |
+| written how often | **once.** `(order_id, revision)` is the primary key; a second attempt is `document_already_stored`; there is no UPDATE or DELETE path in the RPC, the policies or the bucket. |
+| who names the path | the API, from the order and the version. The browser never names it, and the database checks the same shape again (`document_path_mismatch`). |
+| who may read it | `operation · principal · finance · hr · bd`. No dealer, supplier or partner — the sheet carries the customer's name, address and the money. |
 
-**MEASURED STATE THIS RULING OVERTURNS** (Sales Order Workspace field audit, 2026-08-28, §2 F-2):
-the fee is computed in the browser on every render from three stored inputs plus a globally
-mutable rate, and is **written down nowhere**. The customer signs a POS screen that itemises it
-twice and folds it into the headline total (`Step3SignaturePayment.tsx:271-278, :314, :123`) under
-a T&C clause promising it is *"billed on this sales order"* (`:655-657`) — while the order's own
-total is lines + addons only (`order-money.ts:100`). Every payment door caps against that lower
-figure: Stripe returns 422 `amount_exceeds_outstanding` **before Stripe is called**
-(`stripe-checkout.ts:158-168`) and `top_up_order` refuses cash identically (`0351:245-249`).
-At seeded rates a 5-item floor-3 order signs at RM 9,600 against a record that can only ever
-describe RM 9,450. **No door in the portal can collect the difference.**
+**A failed store never blocks a version.** Minting a version is business truth; keeping its paper
+is a separate act. If the render or the upload fails, nothing is recorded and that version falls
+back to the reconstruction — honestly labelled, which is the same place a legacy version sits.
 
-**THE SHAPE OF THE FIX — the pattern already exists and is not to be invented.**
-`delivery-fee-recompute.ts` computes the delivery TRIP fee server-side and appends `order_addons`
-rows (`DELIVERY` · `DELIVERY_CROSS` · `DELIVERY_ADD`, seeded `0184:112-116`). Stair carry follows
-the same road: ① seed a stair key into `addons` — the set is **not** closed, `POST /api/catalog/addons`
-(`catalog.ts:1854-1880`, gate `internalOnly`) creates one and the door is on screen at
-**Settings → Catalog → Special Add-ons**; ② have the server recompute write the per-order figure
-into `order_addons.qty` / `unit_price`, exactly as the delivery-fee rows do, since `addons.price`
-is a fixed per-key price and stair carry is computed. The total, the outstanding and every payment
-cap then include it with no further change, because they already read `order_addons`.
-⚠️ The fee must be **stamped at the order**, not re-derived: today changing
-`floor_config.per_floor_per_item` in Settings silently reprices every historic order's displayed
-stair carry. A charge the customer signed for may not move because a rate changed afterwards.
-🟡 Sequencing is the owner's, not the code's: this changes what existing orders are worth. Under
-`CLAUDE.md` §6 every row today is test data, so **no backfill is proposed** — the ruling binds new
-orders from the day it ships.
-- **`Address not given yet` appears only while there is no address**, or while it is already
-  ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
-  hazard, not a field.
-- The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
+**LEGACY — every version minted before this release.** No file was ever stored for it, so the page
+rebuilds it from the version's own immutable snapshot and says so, on screen and on the sheet:
+*"Reconstructed copy — original issued document unavailable."* Its money is the money DATED on or
+before that version's day, read from the one payments ledger with the one arithmetic; a capture
+with no date is excluded and said. Named limits: dates are day-grained, so an afternoon receipt
+counts toward a morning version; and a payment voided later leaves every view, so an old
+reconstruction under-reports rather than over-reports.
 
-**Commercial change entry — owner-approved 2026-09-22, target not built.** Whole-page `Edit`
-contains the commercial draft and preserves items, configuration, unit price, services, dates and
-Instalment months. The server selects `Save` or `Submit amendment request` from actual changes and
-permissions. Do not retain a competing proposal modal as the only way to edit those fields. A live
-request remains visible; submission never changes the effective SO or its official document.
-
-
-Sales may directly correct only its governed safe/customer facts. A commercial commitment change
-uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
-
-## Order Route — one connected drawing
-
-The map has one Sales Order root and three concurrent primary routes. Loan and Service are
-conditional linked obligations, never permanent empty lanes and never fake overall status.
-
-```
-                         SALES ORDER
-                              |
-             +----------------+----------------+
-             |                |                |
-           GOODS           DELIVERY          MONEY
-             |                |                |
-    available / missing    Journey facts    collection facts
-             |                |                |
-             +------ governed Delivery gates -+
-                              |
-                        Delivery Order(s)
-                              |
-                    Deliver → Delivery Proof
-```
-
-It remains one pannable/zoomable canvas, never separate route cards. It must not make the map
-unreadable merely to fit every node at once. Normal load keeps the governed readability floor and
-centres the current work; explicit Fit shows the whole map. A medium desktop keeps the same map,
-with pan/zoom and collapsed item groups rather than a stacked alternate truth.
+Guarded by `SalesOrderWorkspace.historical-document.test.ts`, `sales-order-template.rebuilt.test.tsx`,
+`orders.revision-document.test.ts` (7 door cases) and three cases in `amendment-lane-0564.integration.test.ts`
+proved against a real PostgreSQL.
 
 ### Many goods use groups, not one endless horizontal row
 
@@ -1711,7 +1735,7 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 
 ### One page, one state
 
-- **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** Overwrites the
+- **VIEW FIRST, EDIT ON PURPOSE — OWNER RULING (Jess, 2026-09-21) · BUILT 2026-09-23.** Overwrites the
   2026-08-15 "one page, one state" rule (international ERP practice — SAP display/change, Odoo and
   NetSuite Edit/Save — and the 2990 reference). The Order tab opens READ-ONLY. A dark primary `Edit`
   in the page header enters edit mode; edit mode offers `Cancel` and ONE commit button that the SYSTEM
@@ -1739,6 +1763,15 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **Two panes, 50% / 50% — in BOTH states (owner, 2026-09-21: the preview remains).** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
+  **⭐ AND THE DOCUMENT NEVER SQUEEZES THE FORM — OWNER RULING (Jess, 2026-09-23) · BUILT.**
+  *"1440 宽下不能靠隐藏 Amount 或强制收起菜单才能操作"* — at 1440 with the portal menu OPEN the
+  page's own box is 1156px, so a 50/50 split left the form 578px while the editable Items table
+  needs 594px: `Amount (RM)` fell off the edge. The split is now measured on the page's own box:
+  50/50 while each half carries the table (`FORM_MIN_WIDTH` 660), then the form keeps that minimum
+  and the document takes the rest down to `MIN_PDF_WIDTH` (320), then the governed stack, form
+  first. Measured after the change, menu open, every column visible and no page-level sideways
+  scroll: 1920 half · 1536/1440/1366/1280/1180 form-first (form 660) · 1024/820 stacked. At phone
+  width the table scrolls inside its own box with the DataGrid's fade and one step button.
 - **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
   EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN — see
   § THE CURRENT COMPOSITION (2026-09-11), which is the only current card list.** What survives

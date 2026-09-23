@@ -3128,6 +3128,7 @@ export {
 } from "./schemas/hr";
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
+export * from "./sales-order-change";
 export * from "./sales-order-commitment";
 // ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
 // contact's three-fields-⇄-one-column codec, shared with the object page so the

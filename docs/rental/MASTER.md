@@ -534,7 +534,7 @@ Unit 清单/状态回报、核查条件、提货时段、损坏责任与实际�
 
 **以下未明确批准的细节仍为 PROPOSAL / NOT LAW：**
 
-**OWNER-APPROVED TARGET / NOT BUILT — 导航，2026-09-23：** Portal 使用一个
+**OWNER-APPROVED — 导航，2026-09-23 · BUILT 2026-09-23：** Portal 使用一个
 `Sales Orders` 父入口，下设 `Outright Sales` 与 `Subscription`。后者进入本模块拥有的
 客户流程；原 SO 列表/改单及 Monthly overview 属于 Outright Sales，订阅数量/报表独立。
 `Purchase` 不用于普通销售导航名，避免与 Purchasing 混淆。替换旧独立 SO/legacy 菜单，
@@ -544,6 +544,22 @@ Subscription authority，不导入该任务的其他月报改动。共用父菜�
 
 合同另有身份/签名/版本，SO 承接履约；独立 Subscription 管理不以其他模块报表取代。
 具体创建表单、字段与页面布局仍为提案，导航批准不等于批准整个新业务建设。
+
+**页面标题保留 `Rental` — 由 authority 判定，不是 owner 问题（2026-09-23）。** 导航子项叫
+`Subscription`，打开的页面 h1 仍是 `Rental`，这是有意的：UI MASTER 写明本次裁定
+*"changes navigation only and does not approve Subscription business implementation"*，而
+`Rental` 在已发布面上不止一个标题——`rental_agreements` 与 `RA-` 编号、Finance 的
+`Rental Approver`、Admin 的 `Rental` 设定页（`RentalSettingPage` h1）都还叫 Rental。只改一个
+h1 会造成同一件事两个词，比现在的接缝更糟。**改名的时机是 Subscription 业务实装那一张卡**，
+连同编号、审批页与设定页一起改，由 Rental/Subscription 拥有的任务决定。
+**Falsifier：** 若 owner 裁定导航词即页面词，或 Subscription 实装卡落地并统一了 `RA-`
+编号与审批/设定页标题，本段作废、页面随之改名。
+
+**已建成（`portal-nav.ts`）：** `Subscription` 入口指向本模块既有的
+`?tab=rental` 协议/在租 Unit 登记页，地址没有搬动，旧书签、深链和 ⌘K 全部照常落地；
+页面、权限、数量与报表一律未改。该行是从 Customer Care **移动**过来的，不是复制：
+一个页面两行会让左栏同时点亮两处。§5.10 提出的 Subscription 内部页面
+（Agreements / Forecast proposals 等）仍是 **PROPOSAL / NOT LAW**，本次没有实现。
 
 准备草案 → 客户接受有效版本并签署 → 满足现行适用授权/放行边界 → 匹配已备供应 →
 精确 Unit/Delivery 履约 → 客户接收证据接受 → 开始该床垫服务（上述已批准目标）。
