@@ -2000,8 +2000,19 @@ function SalesOrderWorkspaceBody() {
     if (!orderId || !revision) return;
     try {
       const fresh = await baseQ.refetch();
-      const issued = fresh.data ?? null;
-      if (!issued) return;
+      const base0 = fresh.data ?? null;
+      if (!base0) return;
+      /* ⛔ A NEW VERSION NEVER INHERITS AN OLDER VERSION'S SIGNATURE — owner
+         ruling 2026-09-23. `base` carries the order's stored eSign PNG, which
+         the customer put on whatever version was in front of them THEN. Storing
+         it on the version minted now would file that mark under goods, prices
+         and dates the customer never signed — the same defect the historical
+         view was fixed for, made permanent by being written to a file.
+         Nobody has signed the version being issued here, and which version the
+         stored mark covers is unrecorded, so the sheet says exactly that. */
+      const issued: SalesOrderTemplateData = base0.signature_url
+        ? { ...base0, signed: false, signature_url: null, signature_unknown: true }
+        : base0;
       const blob = await renderSalesOrderPdf(issued);
       const out = await storeIssuedSalesOrderDocument(orderId, revision, blob);
       if (!out.stored) console.error("issued document not kept", { orderId, revision, reason: out.reason });
