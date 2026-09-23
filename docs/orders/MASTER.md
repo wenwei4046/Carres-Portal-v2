@@ -132,7 +132,7 @@ application code, or another module's identity rules. Existing implementation re
 not proof that the privacy requirement is satisfied.
 
 **RULING / APPROVED — revision presentation, 2026-09-23.** Display the revision as a
-parenthesized number separated from the base SO reference by a space: `<SO reference> (1)` for
+parenthesized number attached to the base reference with NO space (owner re-ruling 2026-09-23): `<reference>(1)` for
 the original, `(2)` for the second version, and so on. Do not use `Rev`, `V`, or a hyphen suffix
 for this presentation. The parenthesized revision is not part of the permanent order number;
 amendment preserves that number. Search by the base reference must make its versions available
@@ -144,7 +144,7 @@ the earlier five-digit SO ruling).** The two businesses must be told apart by th
 
 | Document | Outright | Subscription |
 |---|---|---|
-| Order | `SO2609-4827 (1)` — `SO` + creation YYMM + **4** random digits | `SUB2609-48271 (1)` — `SUB` + creation YYMM + **5** random digits |
+| Order | `SO2609-4827(1)` — `SO` + creation YYMM + **4** random digits | `SUB2609-48271(1)` — `SUB` + creation YYMM + **5** random digits |
 | Delivery document | `DO2609-48271` | `SDO2609-48271` |
 
 - Leading zeros allowed: Outright holds **10,000** SO numbers a month; Subscription **100,000** SUB
