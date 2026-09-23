@@ -185,7 +185,7 @@ decided for that row. Nothing here is built.
 - A credit note adjusts the amount owed; it does not prove cash was refunded.
 - Financial numbering needs accounting and e-Invoice validation before live use. Cross-business
   transfers and company-wide transactions still need a clear ownership rule before their prefixes are
-  finalised. **Open:** one PO/GRN/finance document now belongs to one business, so a supplier
+  finalised. **Approved target, may be phased:** one PO/GRN/finance document belongs to one business, so a supplier
   delivering for both businesses receives separate documents.
 - **Measured defect to fix with this:** today's Service Case number `SC`+YYMM+`lpad(seq,2)`
   (`0210:126`) truncates at the 100th case of a month; Supplier Claim today also uses `SC-` (`0288:70`).

@@ -3257,8 +3257,7 @@ so two sources. One field feeding both is the Houzs `Agent: Luis Teo /
 Salesperson: Luis Teo` defect.
 
 **No tax words on customer documents** (owner, 2026-09-23): Carres is not SST-registered, so no tax
-row, no dash for tax and no "tax included / excluded" claim appears. If Malaysia reintroduces GST and
-Carres registers, the owner re-rules this sentence first.
+row, no dash for tax and no "tax included / excluded" claim appears.
 
 **Floor and lift are DELIVERY ORDER words, not Sales Order words** (owner,
 2026-09-21). A document states a charge only where it prints the fact behind it.

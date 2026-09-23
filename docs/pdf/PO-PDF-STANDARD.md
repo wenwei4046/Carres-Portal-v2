@@ -51,7 +51,8 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   and every Deliver To's pages. Between pages only the Deliver To, the goods
   and the footer's `Page n of m` change. The same `PO…({n})` also prints in
   the PO DETAILS `PO No` row and the footer. No separate `Version` row and no
-  version printed on its own. **Measured:** the hero with its version is
+  version printed on its own. **Measured on the OLD `PO-YYYYMMDD-RRRR V{n}` form only — the new
+  `PO260924-4827(n)` form is NOT re-measured and no width below is verified for it:** the hero with its version is
   52.9mm, which leaves 112mm beside the 13mm logo — the address's old second
   line (122.4mm) would run under `PURCHASE ORDER`, so the address prints on
   THREE lines (71.0 · 60.8 · 61.0mm) and the header reserve is 26mm, not

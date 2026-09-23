@@ -601,8 +601,9 @@ PO260924-4827(2)     the same PO after one revision
   share a PO still follows the purchasing grouping rules.
 - Unique, never reused, fixed width, capacity watched internally; any change of width is an owner
   decision. Existing PO numbers and issued PDFs are kept (test data; clean start).
-- **Build consequence (not a UI change):** Outright and Subscription now have separate PO series
-  (`PO…` / `SPO…`), so one PO belongs to one business. Business becomes a SIXTH document-partition
+- **Build consequence (not a UI change):** Outright and Subscription have separate PO series
+  (`PO…` / `SPO…`) — an **APPROVED TARGET that may be implemented in phases**; once built, one PO
+  belongs to one business. Business becomes a SIXTH document-partition
   fact beside Supplier × Category × Deliver To × Purpose × MPR Delivery Date — in the SQL partition
   (`purchasing_issue_pos_batch`'s caller) and `manualPurchaseIssueDocuments` at once — and the
   request/demand rows need a business fact to partition by, which does not exist yet. A supplier
