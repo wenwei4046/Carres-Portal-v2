@@ -261,7 +261,7 @@ vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (J
 overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
 (`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
 reused. It names the request, not a supplier document: the supplier still receives only the PO
-(`PO-YYYYMMDD-RRRR`), and one request may become several POs. Consignment Orders, Repair Orders and
+(approved target `POYYMM-NNNNN`; existing issued numbers remain unchanged), and one request may become several POs. Consignment Orders, Repair Orders and
 other documents keep their own numbers; MPR covers only Manual Purchase requests. Historical
 `MPR-…` values keep their numbers; historical `REQ-####` values stay searchable. The build restores
 the allocator that migration 0424 turned off (a new migration; 0424 is never edited). `MP` is not
@@ -366,9 +366,9 @@ Reason              [ ... ]
                            [Review changes]
 ```
 
-`Review changes` shows the result before anything is saved — example `PO-0042`, V1 → V2:
+`Review changes` shows the result before anything is saved — example `PO2609-48271`, (1) → (2):
 
-| PO-0042 V2 | Deliver To | Qty |
+| PO2609-48271(2) | Deliver To | Qty |
 |---|---|---:|
 | Forte Mattress · King | Carres Klang Warehouse | 4 |
 | Forte Mattress · King | AL Sungai Buloh | 2 |
@@ -465,7 +465,7 @@ Supplier out-of-stock, delayed model/fabric, changed quantity or changed price i
 A supplier price change stops the issue/change and routes to the commercial approver; Operations
 does not decide it.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
+**EXISTING IMPLEMENTATION — not the new PO target; BUILT, migrations 0378 / 0379 / 0380, PR #894.**
 
 - **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
   SQL locks the purchase order, compares, and refuses `stale_po_version` writing nothing. Reading
@@ -508,7 +508,7 @@ below is implementation evidence, not proof this corrected target is built.
 This ruling changes the PO Delivery Date target; it does not remove separately
 governed transport planning facts or silently rewrite SO safety calculations.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
+**EXISTING IMPLEMENTATION — not the new PO target; BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
 
 - **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**
   `purchase_orders.official_delivery_date` is stamped from the birth `eta_date` by trigger at
@@ -585,6 +585,19 @@ answer exists for that version.
 
 ### 6.1 Formal document numbers
 
+**PO — APPROVED TARGET / NOT BUILT, owner ruling 2026-09-23.** New POs use `POYYMM-NNNNN`,
+for example `PO2609-48271(1)`: original issue year/month plus five fixed random decimal digits,
+including leading zeros. The original displays `(1)`, subsequent approved revisions `(2)`, etc.,
+immediately after the base reference without a space. Amendment preserves the base reference and
+original month. Outright and Subscription share one PO numbering family; line-level source links
+and existing supplier/destination/category grouping rules still decide what may share a PO.
+The independent monthly pool holds 100,000 references; enforce uniqueness, never reuse void
+numbers and monitor capacity internally without automatic digit-length changes. Preserve existing
+PO numbers and issued historical PDFs. This is numbering/display approval only, not application
+implementation, cutover or a change to amendment/business grouping rules.
+
+**Other Purchasing document families retain the existing rule below unless separately re-ruled.**
+
 ```text
 PREFIX-YYYYMMDD-RRRR
 ```
@@ -593,13 +606,13 @@ PREFIX-YYYYMMDD-RRRR
   internal Display Request, always with a four-digit year.
 - `RRRR` is chosen from the unused four-digit codes for that date. It is not a sequence, timestamp,
   customer, supplier or parent-document number.
-- All Carres formal documents share the daily visible-code pool. A database uniqueness rule prevents
+- The unchanged Purchasing document families share the daily visible-code pool. A database uniqueness rule prevents
   duplicates. Cancelled/void numbers are never reused.
 - Every new object gets its own number. Relationships live in Source and `Order Route`, never in
   matching tail digits.
-- A revision keeps the original number: `PO-20260820-4827 · Version 2`.
+- A revision keeps its original base number. PO target display follows the ruling above.
 
-**HOW IT IS ENFORCED — BUILT, migration 0381, PR #894.** `allocate_formal_document_code(prefix)`
+**EXISTING IMPLEMENTATION — not the new PO target; BUILT, migration 0381, PR #894.** `allocate_formal_document_code(prefix)`
 DRAWS `RRRR` at random from the day's unused codes and is unique on `(date, code)` ACROSS prefixes,
 so one day has one `4827` whatever document holds it. A losing race gets a unique violation and draws
 again; no lock is held and no number is skipped. Rows are never deleted, so a cancelled number stays
@@ -1398,8 +1411,8 @@ PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres
 - **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
   the two identifiers a person copies, and a reader who must look across four columns to pair a
   document with its goods pairs them wrongly. Both print in FULL and stay selectable.
-  **`PO-20260904-4665` is never shortened to `PO-260904-4665`** — no numbering change is approved,
-  and a shortened number names a document that does not exist.
+  **`PO-20260904-4665` is never shortened to `PO-260904-4665`** — existing identities remain unchanged; the new format in §6.1 applies to new issuance after
+  cutover, not shortening an existing reference.
 - **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
   carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
   not a disabled-looking wash over the module's own audit evidence.

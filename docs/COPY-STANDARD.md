@@ -117,7 +117,7 @@ Hooka has not replied
 Call Hooka about PO-2041 · Record item availability.
 
 PO-2041 Deliver To has changed
-Email PO-2041 Version 2 to Hooka · Ask them to use AL Sungai Buloh.
+Email PO-2041(2) to Hooka · Ask them to use AL Sungai Buloh.
 
 Unit CU-000128 is damaged
 Hold CU-000128 · Add photos for Purchasing.
@@ -1042,7 +1042,7 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 | `Not confirmed by supplier` · `Confirmed by supplier` | RETIRED on this listing with the merged `Expected Delivery Date` cell they explained |
 | A receipt record that carries no arrival clock | `Time not recorded`, under the date |
 | Unknown original date | `Not recorded` |
-| Current version | `PO V{n}` |
+| Current version | `PO ({n})` |
 | Current version sending evidence, supporting line | `PO sent to supplier · {channel} · {date}` / `Sending not confirmed` |
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
 | Multiple physical receipts | `{n} receipt dates` |
@@ -1176,7 +1176,7 @@ with an absence word that implies one is owed.
 recorded before the evidence law reads `Supplier reply recorded without evidence · {date}`; it never
 claims the governed `Supplier Confirmed Delivery Date` and never reads as `Not confirmed`, because a recorded
 answer is not a proven absence. The object's `Reply history` lists every reply by version —
-`PO V{n} · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
+`PO ({n}) · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
 `Delayed — {reason}` · `Date reported` — with its `Reply evidence` link where evidence exists.
 A demand an open purchase order already fully covers refuses issue with
 `An open purchase order ({PO No}) already covers this line.` /
@@ -1188,7 +1188,7 @@ Keep the label `Issue PO`; no second recovery click is needed. If that read fail
 use `Could not open {PO No}.` / `Try again.`; the same button retries opening that PO.
 
 **Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
-actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
+actually received as `Sent document · PO ({n})` · `Recorded at the confirmed send`, with
 `Download PDF`. A version sent before document keeping began answers
 `No kept document for this PO version` — a named absence, never a reconstruction.
 
@@ -1394,7 +1394,7 @@ REVISED*; registered on execution so no screen respells them):
 
 | Where | The word |
 |---|---|
-| The panel title | `PO-2041 · Version 2` — **Version 1 prints nothing**: an unrevised PO is just the PO |
+| The panel title | `{PO reference}(2)` — the original displays `{PO reference}(1)`; no space before the version |
 | The door | `Revise` — beside `Print PDF`, an act on the document; only an open PO offers it |
 | The form's fields | `Qty` · `Destination` · `Why` |
 | The floor, stated inline where it binds | `{n} received` — grey while honoured, red when the draft breaks it |
@@ -2728,15 +2728,15 @@ roles run their whole lifecycle on it.
 **The Register has NO `Work` column.** A Register lists documents and authoritative facts; actions
 live in My Work, Team Work, the Purchase Order detail and Order Route (the shared UI law in
 `docs/ui/MASTER.md`). No register cell carries an action sentence, an owner avatar, an owner name
-or a duty holder. A cell's second line is supporting EVIDENCE only (`PO V1` / `WhatsApp · Thu, 4
-Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is banned as a cell).
+or a duty holder. A cell's second line is supporting EVIDENCE only (`PO (1)` / `WhatsApp · Thu, 4
+Sep`), never an instruction (`PO (1)` / `Send the new version to supplier` is banned as a cell).
 
 | Fact | Canonical word | Do NOT use |
 |---|---|---|
 | Total quantity on the current PO | **`Order Qty`** | Ordered (as this column) · Qty |
 | Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
 | Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
-| The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
+| The current official document version | **`PO Version`**, valued `PO (1)` · `PO (2)` · `PO (3)` | Current Version · Version 1 · PDF Version 1 |
 | Current version sending evidence, inside PO Version on the listing | **`PO sent to supplier · {channel} · {date}`** / **`Sending not confirmed`** | Supplier Has · No current PDF |
 
 The three quantity words above remain in PO detail and receiving progress, not PO listing columns
@@ -2751,7 +2751,7 @@ detail's work card and Order Route:
 | `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` |
 | `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
-| `PO V{n} has not been sent` | `Issue PO V{n} to {supplier}` |
+| `PO ({n}) has not been sent` | `Issue PO ({n}) to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their
@@ -4223,3 +4223,12 @@ the SO revision suffix. Within a cancelled-line status, retain the cancellation 
 `Cancelled · ({n})` for the revision reference. This records approved target copy, not shipped
 behavior, and does not change historical issued documents. Governing scope and limits remain
 in `docs/orders/MASTER.md`, External numbering privacy.
+
+## PO number and version — owner approved 2026-09-23
+
+New PO target identity is `POYYMM-NNNNN`, including leading zeros. Display the original as
+`PO2609-48271(1)` and the second version as `PO2609-48271(2)`, with no space. Use this full
+identity wherever the document number and version appear together; a version-only reference
+may read `PO ({n})`. No separate V/Version suffix and no suppression of original `(1)`.
+Preserve historical issued documents. Scope and numbering capacity are governed by Purchasing
+MASTER §6.1; this is approved target copy, not a claim of production delivery.

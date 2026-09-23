@@ -159,7 +159,7 @@ conceal a running counter, not every inference from transaction activity, and ar
 authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
 does not authorize sending SO numbers to suppliers.
 
-**Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering is separately approved in `docs/delivery/MASTER.md` §3.1. PO,
+**Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering is separately approved in `docs/delivery/MASTER.md` §3.1; PO numbering is approved in `docs/purchasing/MASTER.md` §6.1.
 GRN and Service Case numbering require their own capacity and governing-business-rule review
 before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
 correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
