@@ -33,6 +33,8 @@ const detailCss = readFileSync(
   "utf8",
 );
 const themeCss = readFileSync(join(here, "sales-order-detail-theme.css"), "utf8");
+/* The document the left pane must tally with. */
+const pdfTemplate = readFileSync(join(here, "../../lib/pdf/sales-order-template.tsx"), "utf8");
 const salesOrderForm = readFileSync(
   join(here, "../../../../../packages/shared/src/sales-order-form.ts"),
   "utf8",
@@ -1190,6 +1192,47 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain("{!formLocked && canConfig && !protectedLine(l) && (");
     expect(workspace).toContain("{formLocked || protectedLine(l) ? null : l.removed ? (");
     expect(workspace).toContain("{!stamped && !formLocked && (");
+  });
+
+  it("reads SO info in the RULED order, and in the same order as the paper beside it", () => {
+    /* THE DEFECT JESS FOUND ON THE SHIPPED PAGE, 2026-09-23. CARD ORDER AND
+       NAMES (2026-09-21) rules the card
+       `SO Doc Date · Proceed Date · Customer Requested Delivery Date ·
+        Sales Location · Salesperson · Dealer`
+       and the same section says, in its own sentence, that "the left pane and
+       the Sales Order PDF must tally". It shipped with the last two of each row
+       swapped — while `sales-order-template.tsx` printed the ruled order — so
+       the page and the document beside it disagreed on screen, column by
+       column, which is the one thing that sentence forbids.
+       Every earlier contract read the card's NAMES; none read their ORDER, and
+       that is exactly the gap the defect lived in. */
+    const card = workspace.slice(workspace.indexOf('<Block titleTone="sales-order" title="SO info">'));
+    const body = card.slice(0, card.indexOf("</Block>"));
+    /* The LABEL as it is rendered, not a mention of it in prose above it. */
+    const at = (label: string) => {
+      const i = body.search(new RegExp(`label=(\\{\`|")${label}`));
+      expect(i, `${label} is on the card`).toBeGreaterThan(-1);
+      return i;
+    };
+    const ruled = [
+      "SO Doc Date", "Proceed Date", "Customer Requested Delivery Date",
+      "Sales Location", "Salesperson", "Dealer",
+    ];
+    const seen = ruled.map(at);
+    expect(seen, `SO info reads ${ruled.join(" · ")}`).toEqual([...seen].sort((a, b) => a - b));
+
+    /* ⛔ AND THE PAPER STILL AGREES. Reordering the page to match the ruling is
+       only half of it — the sentence binds BOTH sides, so the document's own
+       SALES ORDER INFO block is read here too and must carry the same order. */
+    const rows = pdfTemplate.indexOf("const orderDetailRows");
+    const info = pdfTemplate.slice(rows, pdfTemplate.indexOf("];", rows));
+    const paper = ["SO Doc Date", "Proceed Date", "Customer Requested", "Sales Location", "Salesperson"];
+    const onPaper = paper.map((w) => {
+      const i = info.indexOf(w);
+      expect(i, `${w} is on the document`).toBeGreaterThan(-1);
+      return i;
+    });
+    expect(onPaper, "the document reads the same order").toEqual([...onPaper].sort((a, b) => a - b));
   });
 
   it("never prints a database key on a customer's document", () => {
