@@ -259,18 +259,21 @@ emergency purpose, extra question, queue or approval/issue bypass. The four pre-
 door accepts them for a new request and no historical row is relabelled into the new
 vocabulary.
 
-**Manual Purchase name and prefixes — final owner ruling, Jess, 2026-09-23;
-APPROVED TARGET / NOT BUILT for Subscription prefix.** The name remains **Manual
-Purchase**. The prefix is **`MPR` for Outright** and **`SMPR` for Subscription**.
-The proposed name Purchase Request and proposed `PR` / `SPR` or `REQ` / `SREQ`
-future prefixes are withdrawn; they are not alternative targets. `MP` remains
-Mattress Protector. `PR` remains Purchase Return and must not name a purchase request.
-This scoped approval covers the name and prefixes only, not a date pattern,
-separator, digit length, navigation change, the full numbering table, application
-implementation or live cutover. Other proposed numbering decisions require their
-own approval; this ruling does not grant it.
+**Manual Purchase Request name and prefixes — latest owner correction, Jess,
+2026-09-23; APPROVED TARGET / NOT BUILT for screen rename and Subscription prefix.**
+The document and screen name are **Manual Purchase Request**; **`MPR` stands for
+Manual Purchase Request**. The prefixes remain **`MPR` for Outright** and **`SMPR`
+for Subscription**. This replaces the target screen name Manual Purchase. References
+to Manual Purchase in existing implementation descriptions identify the current
+screen, not a competing approved future name. The proposed standalone name Purchase
+Request and `PR` / `SPR` or `REQ` / `SREQ` future prefixes remain withdrawn.
+`MP` remains Mattress Protector; `PR` remains Purchase Return.
+This correction changes the name only, not the prefixes, date pattern, separator
+or digit length. It grants no application implementation or live cutover. Approval
+of the wider numbering table is recorded separately by its planning owner; an
+ellipsis in that table does not define the missing identifier format.
 
-Each Manual Purchase has a permanent identity and may lead to several POs; the
+Each Manual Purchase Request has a permanent identity and may lead to several POs; the
 supplier still receives the PO, not the internal request. Approval, allocation and
 source-lineage rules remain unchanged. The existing Outright implementation uses
 `MPR-YYYYMMDD-RRRR` (migration 0546); that is implementation evidence, not new
@@ -639,7 +642,7 @@ permanent and are NOT renumbered.**
 | Existing implementation prefix (not full target-table approval) | Document |
 |---|---|
 | `PO` | Purchase Order |
-| `MPR` | Manual Purchase (Outright) |
+| `MPR` | Manual Purchase Request (Outright) |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
 | `PR` | Purchase Return (visible prefix; migration 0548) |
@@ -649,9 +652,9 @@ permanent and are NOT renumbered.**
 | `CRTN` | Consignment Return |
 | `CSN` | Consignment Sale Notice |
 
-Internal records still use invisible permanent technical IDs. Manual Purchase uses
+Internal records still use invisible permanent technical IDs. Manual Purchase Request uses
 `MPR` for Outright and the approved/not-built target `SMPR` for Subscription (§5.2).
-This is not approval of a complete identifier format or a new navigation name.
+The approved screen name is Manual Purchase Request; a complete identifier format is not defined by this name correction.
 Historical `MPR-…` values keep their numbers; `REQ-####` stays searchable. The
 visible Purchase Return prefix is `PR` (0548), not `PRTN`; its identity is unchanged.
 
