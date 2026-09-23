@@ -49,10 +49,23 @@ import PoIssueEvidence, {
  */
 export interface SoBatchIssueWorkspaceProps {
   documents: readonly SoBatchDocument[];
-  destinations: readonly PurchasingDestination[];
+  destinations: readonly Pick<PurchasingDestination, "id" | "name">[];
   onBack: () => void;
   /** Every document confirmed — the Register refetches and the journey ends. */
   onDone: () => void;
+  /**
+   * ⭐ THE LANE'S OWN ISSUE DOOR (owner instruction 2026-09-23). This surface
+   * is shared by the two buying lanes, and they do NOT share an authority: SO
+   * Batch posts its selections to `to-order/issue-batch`, Manual Purchase
+   * posts its request and demand ids to its own door, which enforces the MPR
+   * approval. Absent, the SO Batch call it has always made.
+   *
+   * It resolves with the same `pos` the SO door returns, so the evidence step
+   * that follows is the same one for both lanes.
+   */
+  onIssue?: () => Promise<{ pos: IssuedPo[] }>;
+  /** The way back to the list this journey started from. Absent: SO Batch's. */
+  backLabel?: string;
 }
 
 type Mode = "review" | "evidence";
@@ -69,6 +82,8 @@ export default function SoBatchIssueWorkspace({
   destinations,
   onBack,
   onDone,
+  onIssue,
+  backLabel,
 }: SoBatchIssueWorkspaceProps) {
   const [at, setAt] = useState(0);
   const [mode, setMode] = useState<Mode>("review");
@@ -117,11 +132,27 @@ export default function SoBatchIssueWorkspace({
       po_id: "",
       version: 0,
       issue_date: "",
-      supplier: { name: current.supplierName ?? "", address: null, contact: null },
-      destination: { name: destination?.name ?? "", address: "" },
+      /* ⭐ THE PREVIEW IS THE DOCUMENT (owner instruction 2026-09-23). The
+         two addresses and the delivery date used to ride as empty strings, so
+         the operator checked a paper that was missing the three facts the
+         supplier reads first. They come from the document, which carries what
+         the SERVER resolved — a browser neither invents an address nor
+         computes a governed date. A lane that does not carry them yet draws
+         exactly what it drew before. */
+      supplier: {
+        name: current.supplierName ?? "",
+        address: current.supplierAddress ?? null,
+        contact: null,
+      },
+      destination: {
+        name: current.destinationName ?? destination?.name ?? "",
+        address: current.destinationAddress ?? "",
+      },
       delivery_instructions: null,
-      // The selected goods deadline is not the issued PO's delivery promise.
-      eta_date: null,
+      /* The selected goods deadline is NOT the issued PO's promise: the PO's
+         own date is `PO Date + n Settings working days`, and the document
+         carries the server's answer or nothing at all. */
+      eta_date: current.poDeliveryDate ?? null,
       terms: null,
       so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
       lines: current.lines.flatMap((line) => line.parts.map((part) => ({
@@ -217,13 +248,15 @@ export default function SoBatchIssueWorkspace({
         await openCoveringPo(coveringPo);
         return;
       }
-      const res = await apiFetch<{ pos: IssuedPo[] }>(
-        "/api/operation/purchase/to-order/issue-batch",
-        {
-          method: "POST",
-          body: JSON.stringify({ selections }),
-        },
-      );
+      const res = onIssue
+        ? await onIssue()
+        : await apiFetch<{ pos: IssuedPo[] }>(
+            "/api/operation/purchase/to-order/issue-batch",
+            {
+              method: "POST",
+              body: JSON.stringify({ selections }),
+            },
+          );
       setPos(res.pos ?? []);
       setMode("evidence");
       setAt(0);
@@ -460,10 +493,24 @@ export default function SoBatchIssueWorkspace({
                           <span className="text-meta text-kit-slate-11">
                             {[l.variant, l.skus.join(" · ")].filter(Boolean).join(" · ")}
                           </span>
+                          {/* What the goods must satisfy, in the requester's
+                              own words (0562) — read-only, and only when one
+                              was recorded. */}
+                          {l.purchaseRequirement ? (
+                            <span
+                              className="text-meta text-kit-slate-11"
+                              data-testid={`so-batch-issue-requirement-${l.demandId}`}
+                            >
+                              {l.purchaseRequirement}
+                            </span>
+                          ) : null}
                         </span>
                       </td>
+                      {/* SO Batch's lines carry a Sales Order; a Manual
+                          Purchase line carries its `MPR No`. One column, one
+                          meaning: where this line came from. */}
                       <td className="py-1 font-mono text-meta">
-                        {l.so == null ? "" : `SO-${l.so}`}
+                        {l.sourceLabel ?? (l.so == null ? "" : `SO-${l.so}`)}
                       </td>
                       <td className="py-1 pr-3 text-right tabular-nums">{l.qty}</td>
                       <td className="py-1 text-meta">
@@ -494,7 +541,7 @@ export default function SoBatchIssueWorkspace({
               ) : null}
               <div className="mt-auto flex items-center justify-between gap-3 pt-4">
                 <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
-                  {W.backToBuying}
+                  {backLabel ?? W.backToBuying}
                 </Button>
                 <Button
                   variant="primary"
@@ -542,7 +589,7 @@ export default function SoBatchIssueWorkspace({
                   Orders`, which is a different module's register. */}
               <div className="mt-4 flex items-center border-t border-kit-slate-5 pt-3">
                 <Button variant="neutral" size="md" data-testid="so-batch-issue-back" onClick={onBack}>
-                  {W.backToBuying}
+                  {backLabel ?? W.backToBuying}
                 </Button>
               </div>
             </>

@@ -1228,6 +1228,17 @@ export interface SoBatchDocumentLine {
   demandId: string;
   orderId: string;
   so: number | null;
+  /**
+   * ⭐ THE SOURCE THIS LINE CAME FROM, when it is not a Sales Order (owner
+   * instruction 2026-09-23). `Review Purchase Orders` is ONE surface for both
+   * buying lanes: SO Batch's lines print `SO-{n}` from `so`, and a Manual
+   * Purchase line prints its `MPR No` here. Absent for SO Batch, which keeps
+   * the number it always had.
+   */
+  sourceLabel?: string | null;
+  /** The requester's `Purchase requirement` (0562), read-only on the review —
+   *  the person checking the document must see what the goods must satisfy. */
+  purchaseRequirement?: string | null;
   item: string;
   variant: string | null;
   skus: string[];
@@ -1255,6 +1266,22 @@ export interface SoBatchDocument {
   supplierKind: "own_logistics" | "factory_pickup" | null;
   /** The governed factory-collection rule, shown as a read-only fact. */
   supplierCollection?: PurchaseDemandRow["supplierCollection"];
+  /**
+   * ── WHAT THE DRAFT PAPER NEEDS, AND WHY IT IS ON THE DOCUMENT ────────────
+   *
+   * The review renders the SAME PO template the supplier receives, so a
+   * preview missing the two addresses and the delivery date is a preview of a
+   * different document (owner instruction 2026-09-23). These carry the facts
+   * the SERVER resolved — the browser computes no date and invents no address.
+   * Optional because SO Batch's own read does not carry them yet; a document
+   * without them draws exactly what it drew before.
+   */
+  supplierAddress?: string | null;
+  destinationName?: string | null;
+  destinationAddress?: string | null;
+  /** The PO Delivery Date this document will be born with — `PO Date + n
+   *  Settings working days`, computed by the server (`poDeliveryDateOf`). */
+  poDeliveryDate?: string | null;
 }
 
 /**

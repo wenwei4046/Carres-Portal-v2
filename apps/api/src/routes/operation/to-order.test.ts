@@ -581,7 +581,7 @@ describe("the reads are chunked", () => {
  * been bought, and a hand-written request cannot invent a line.
  */
 describe("a purchase order is born with its expected arrival", () => {
-  it("stamps eta_date = today + production (factory week) + transit (office week)", async () => {
+  it("stamps eta_date = PO Date + n Settings working days, with NO transit added", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     await postBatch({
@@ -597,22 +597,25 @@ describe("a purchase order is born with its expected arrival", () => {
     expect(pos.every((po) => po.destination_id === KLANG)).toBe(true);
     expect(pos.every((po) => /^\d{4}-\d{2}-\d{2}$/.test(po.eta_date))).toBe(true);
 
-    // 14 production days on Ohana's week (Sunday off) + 1 transit day on the
-    // OFFICE week — arranging the movement is our work, not the factory's.
+    // ⭐ OWNER CORRECTION 2026-09-22, converged across both buying doors on
+    // 2026-09-23: the PO's own delivery date is the SETTINGS date — 14
+    // production days on Ohana's week (Sunday off) — and the transit day is
+    // NOT added. Transit answers a different question (when the goods reach
+    // Carres) and stays behind `Order By` and the register's timing facts.
+    // Printing the arrival under a `PO {n}-Day` label promised the supplier a
+    // day the Settings number never said.
     //
-    // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail. `expectedArrivalOf`
-    // defaults to `myHolidaySet()`, so a naive recomputation here is only equal on
-    // the days no Malaysian public holiday falls inside the window — which is why
-    // this line passed for a week and then failed on 2026-08-10, when Maulidur
-    // Rasul (2026-08-25, my-holidays.ts:41) landed in the 14-day production leg.
-    // The route was right and the expectation was short by exactly that day.
+    // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail: a naive
+    // recomputation is only equal on the days no Malaysian public holiday
+    // falls inside the window, which is why this expectation computes it the
+    // same way the route does.
     const holidays = myHolidaySet();
-    const expected = addWorkingDays(
-      addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays }), // the route's today is KL's
-      1,
-      { offDays: [0, 6], holidays },
+    const settingsDate = addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays });
+    expect(pos.every((po) => po.eta_date === settingsDate)).toBe(true);
+    /* And it is NOT the arrival date: that one is a transit day later. */
+    expect(settingsDate).not.toBe(
+      addWorkingDays(settingsDate, 1, { offDays: [0, 6], holidays }),
     );
-    expect(pos.every((po) => po.eta_date === expected)).toBe(true);
   });
 
   it("NEVER writes expected_ready_date — that column is the factory's promise", async () => {
@@ -630,7 +633,13 @@ describe("a purchase order is born with its expected arrival", () => {
     }
   });
 
-  it("raises the purchase order ANYWAY when transit days are not set, with no invented date", async () => {
+  it("a missing TRANSIT number no longer withholds the PO date — transit is not in it", async () => {
+    /* ⭐ THE CONSEQUENCE OF THE 2026-09-22 CORRECTION. This test used to pin
+       `eta_date === null` when transit was unset, because the date was
+       production PLUS transit. The PO's own delivery date is now the Settings
+       date alone, so a missing transit number cannot withhold it — transit
+       still matters to `Order By` and the arrival facts, which are read
+       elsewhere. */
     const t = TABLES();
     t.purchasing_supplier_settings = {
       data: [{ supplier_id: OHANA, off_days: [0] }], // no transit_days
@@ -643,14 +652,20 @@ describe("a purchase order is born with its expected arrival", () => {
       documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
-    // The goods matter more than the estimate: the PO is still raised.
     expect(res.status).toBe(200);
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
       eta_date: string | null;
     }[];
-    // A guessed arrival would be read downstream as a measurement (P1's law).
-    expect(pos.every((po) => po.eta_date === null)).toBe(true);
+    const holidays = myHolidaySet();
+    const settingsDate = addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays });
+    expect(pos.every((po) => po.eta_date === settingsDate)).toBe(true);
   });
+
+  /* ⛔ AND THE OTHER HALF OF THAT RULE IS NOT TESTABLE HERE, WHICH IS WORTH
+     SAYING: a demand with no production number never becomes ready to order in
+     this lane, so the missing-production case cannot reach this door at all
+     (the route answers 400 before it). Manual Purchase's own door does admit
+     it, and its suite pins the null date there. */
 
   it("leaves issue audit to the atomic database boundary", async () => {
     const sb = makeSb(TABLES());

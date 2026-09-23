@@ -155,6 +155,20 @@ function withDatePlan(
         production == null,
       transit_days_missing:
         settings != null && live && supplierId != null && transit == null,
+      /* ⭐ THE PO DELIVERY DATE THIS LINE WOULD BE ISSUED WITH (owner
+         instruction 2026-09-23): `PO Date + n Settings working days`, from the
+         ONE arithmetic the issue door itself uses, so the draft paper on
+         `Review Purchase Orders` shows the date the document will carry. The
+         browser computes no date; a supplier × category with no recorded
+         production number answers null and the draft prints the absence. */
+      po_delivery_date:
+        settings != null
+          ? poDeliveryDateOf(settings, {
+              supplierId,
+              category,
+              poDateIso: todayIsoMYT(),
+            })
+          : null,
     };
   });
 }
@@ -646,8 +660,17 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     .map((r) => r.for_service_case_id as string | null)
     .filter((v): v is string => v != null);
   const [dests, sups, users, cases] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name, is_default").order("name"),
-    sb.from("suppliers").select("id, name, kind"),
+    /* The ADDRESS rides along because the draft on `Review Purchase Orders`
+       renders the real PO template (owner instruction 2026-09-23): a preview
+       without the two addresses is a preview of a different document. A
+       warehouse-linked destination's address is the warehouse's own. */
+    sb
+      .from("purchasing_destinations")
+      .select("id, name, is_default, address, warehouse_id, warehouses(address)")
+      .order("name"),
+    sb
+      .from("suppliers")
+      .select("id, name, kind, address, whatsapp_group_url, contact_email, contact"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
       ? sb
@@ -785,7 +808,26 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
         delivery_state: order?.state ?? null,
       };
     }),
-    destinations: (dests.data ?? []).map((d) => ({ id: d.id, name: d.name })),
+    /* Name AND address: the review's draft prints the destination block the
+       supplier reads. A warehouse-linked destination borrows the warehouse's
+       address, exactly as Purchasing Settings resolves it. */
+    destinations: (dests.data ?? []).map((d) => {
+      const warehouse = (d as Record<string, unknown>).warehouses as
+        | { address?: string | null }
+        | { address?: string | null }[]
+        | null;
+      const warehouseAddress = Array.isArray(warehouse)
+        ? (warehouse[0]?.address ?? null)
+        : (warehouse?.address ?? null);
+      return {
+        id: d.id,
+        name: d.name,
+        address:
+          (d as Record<string, unknown>).warehouse_id != null
+            ? warehouseAddress
+            : (((d as Record<string, unknown>).address as string | null) ?? null),
+      };
+    }),
     /* ⭐ THE TWO GOVERNED DELIVER TO FACTS (owner, 2026-09-03). Until now the
        create form defaulted Deliver To to whichever destination came first
        and offered every one as an equal choice, so a request for a supplier
@@ -800,7 +842,22 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     supplierCollections: settings?.supplierCollections ?? [],
     /* 0477 — Finance's other creditors share the table; Purchasing's list
        never carries one. */
-    suppliers: purchasingSuppliersOnly(sups.data ?? []),
+    /* 0477 — Finance's other creditors share the table; Purchasing's list
+       never carries one. The ADDRESS and the supplier's own doors ride along:
+       the review's draft prints the address, and the evidence step that
+       follows an issue reaches the supplier through the doors. */
+    suppliers: purchasingSuppliersOnly(sups.data ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: r.id as string,
+        name: r.name as string,
+        kind: (r.kind as string | null) ?? null,
+        address: (r.address as string | null) ?? null,
+        whatsappGroupUrl: (r.whatsapp_group_url as string | null) ?? null,
+        contactEmail: (r.contact_email as string | null) ?? null,
+        contact: (r.contact as string | null) ?? null,
+      };
+    }),
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: await canApprove(c),
@@ -2478,11 +2535,15 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     ) {
       return refuse(c, 422, "unresolved_supplier", { sku: l.sku as string });
     }
-    if (cat.cost == null || cat.cost <= 0) {
-      // The manual lane issues at catalog cost; a SKU without one is a
-      // configuration hole the catalog must fix — surfaced by name.
-      return refuse(c, 422, "cost_required", { sku: l.sku as string });
-    }
+    /* ⭐ PRICE IS NOT A PLACEMENT GATE (owner instruction 2026-09-23). This
+       used to refuse `cost_required` for a SKU with no Catalog cost, so a
+       purchase nobody had priced yet could not be ordered at all — while the
+       goods were needed and the approval that decides whether to BUY had
+       already been given. A line with no recorded price now goes on the
+       document carrying NO commercial claim: no cost, no cost source, no
+       treatment. Recording the price later is Finance's own act, not a
+       re-issue. A price that IS recorded keeps every existing rule, including
+       the free-of-charge reason. */
     /* Catalog is the commercial authority for this normal purchase. The
        creation RPC rechecks the same value inside the transaction. */
     const req = reqById.get(l.request_id as string)!;
@@ -2563,18 +2624,27 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
       procurement_partner_id: kind === "factory_pickup" ? partnerId : null,
       so_refs: null,
       purpose: req.purpose,
-      lines: lines.map((l) => ({
-        sku: l.sku,
-        qty: l.issueQty,
-        /* THE SERVER'S OWN READ is what is stored. */
-        cost: catalog.get(l.sku as string)!.cost,
-        cost_source: "catalog",
-        commercial_treatment: "normal",
-        commercial_reason: null,
-        /* SQL compares the Catalog value again inside the creation transaction. */
-        expected_catalog_cost: catalog.get(l.sku as string)!.cost,
-        demand_id: l.id,
-      })),
+      lines: lines.map((l) => {
+        /* THE SERVER'S OWN READ is what is stored — and when Catalog holds no
+           price, what is stored is the ABSENCE. `commercial_treatment` stays
+           NULL, which is the one state the line's own CHECK constraint keeps
+           for "price not recorded"; `normal` would claim a number nobody
+           recorded and `free_of_charge` would claim a decision nobody made. */
+        const cost = catalog.get(l.sku as string)!.cost;
+        const priced = cost != null && cost > 0;
+        return {
+          sku: l.sku,
+          qty: l.issueQty,
+          cost: priced ? cost : null,
+          cost_source: priced ? "catalog" : null,
+          commercial_treatment: priced ? "normal" : null,
+          commercial_reason: null,
+          /* SQL compares the Catalog value again inside the creation
+             transaction; with no price there is nothing to compare. */
+          expected_catalog_cost: priced ? cost : null,
+          demand_id: l.id,
+        };
+      }),
     });
   }
 
@@ -2595,7 +2665,70 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     return fail(c, batchErr);
   }
   const poIds = ((batch as { po_ids?: unknown } | null)?.po_ids ?? []) as string[];
-  return c.json({ poIds, documents: governedPos.length });
+
+  /* ⭐ THE ISSUED DOCUMENTS, IN THE SHAPE THE SHARED REVIEW READS (owner
+     instruction 2026-09-23). `Review Purchase Orders` is ONE surface for both
+     buying lanes, and after issuing it offers the same evidence step — so this
+     door answers with the same `pos` array the SO Batch door answers with:
+     the number, the parties, and the doors the operator actually sends
+     through. Read best-effort: a supplier with nothing on file gets a named
+     gap on that surface, and the purchase orders exist either way.
+
+     Issue is still not send. Nothing here records that a supplier received
+     anything. */
+  const issuedSupplierIds = [
+    ...new Set(governedPos.map((po) => po.supplier_id as string)),
+  ];
+  const doorsBySupplier = new Map<
+    string,
+    {
+      name: string | null;
+      whatsappGroupUrl: string | null;
+      contactEmail: string | null;
+      contact: string | null;
+    }
+  >();
+  if (issuedSupplierIds.length > 0) {
+    const { data: doorRows } = await sb
+      .from("suppliers")
+      .select("id, name, whatsapp_group_url, contact_email, contact")
+      .in("id", issuedSupplierIds);
+    for (const row of (doorRows ?? []) as Record<string, unknown>[]) {
+      doorsBySupplier.set(row.id as string, {
+        name: (row.name as string | null) ?? null,
+        whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
+        contactEmail: (row.contact_email as string | null) ?? null,
+        contact: (row.contact as string | null) ?? null,
+      });
+    }
+  }
+  const { data: destRows } = await sb
+    .from("purchasing_destinations")
+    .select("id, name")
+    .in("id", [...new Set(governedPos.map((po) => po.destination_id as string))]);
+  const destNameById = new Map(
+    (destRows ?? []).map((d) => [d.id as string, (d.name as string | null) ?? null]),
+  );
+
+  return c.json({
+    poIds,
+    documents: governedPos.length,
+    pos: poIds.map((id, i) => {
+      const po = governedPos[i];
+      const supplierId = (po?.supplier_id as string | undefined) ?? "";
+      const doors = doorsBySupplier.get(supplierId);
+      return {
+        id,
+        supplierId,
+        supplierName: doors?.name ?? null,
+        destinationId: (po?.destination_id as string | undefined) ?? "",
+        destination: destNameById.get((po?.destination_id as string) ?? "") ?? null,
+        whatsappGroupUrl: doors?.whatsappGroupUrl ?? null,
+        contactEmail: doors?.contactEmail ?? null,
+        contact: doors?.contact ?? null,
+      };
+    }),
+  });
 });
 
 manualPurchaseRouter.get("/already-have", requireOperation, async (c) => {
