@@ -558,7 +558,7 @@ The complete 390px PDF, including its balance and signature area, was visible. B
 at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
 clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
-**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / NOT BUILT.** `Delivery` stays its own card
+**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / BUILT 2026-09-23.** `Delivery` stays its own card
 and answers one question — can we deliver it and how is it carried — so address and access are ONE group
 with no `Delivery address` / `Delivery access` headings (international furniture-retail practice); the
 billing relationship and billing address move to `Customer` (who pays). `SO info` (renamed from
@@ -584,14 +584,14 @@ SO info                 SO Doc Date · Proceed Date · Customer Requested Delive
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name.
-  │                     Existing customer carries `· {n} orders ›` (owner ruling 2026-09-21, NOT BUILT):
+  │                     Existing customer carries `· {n} orders ›` (owner ruling 2026-09-21, BUILT 2026-09-23):
   │                     n = this phone's Sales Orders the reader may see; the link opens the Sales Orders
   │                     Register searched by that phone. No new customer page, no new writer.
   ├ Emergency contact   name · phone · relationship      (own heading, own divider)
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
-ITEMS                   the SO document's own table (owner ruling 2026-09-21, NOT BUILT): **NO category
+ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
                         Unit (RM) · Disc (RM) · Amount (RM) · closing `TOTAL PAYABLE` row — exactly the PDF's
@@ -616,18 +616,21 @@ WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 
 **New Sales Order consistency (owner-approved 2026-09-11).** Create uses the same shared form template and theme as saved Sales Orders, including typography, colours, section headers and field sizing. The customer-type badge is hidden during creation; saved orders retain the phone-based customer classification.
 
-**WHY EACH MOVED.** `Sales ownership` stopped being a card: who sold it is part of who bought it,
-and a reader answering *"whose customer is this?"* had to leave the customer to find three names.
-`DELIVERY` became a card because the address and the access conditions are ONE question — *can we
-deliver this, and what will it cost to carry* — and they were split across two cards, the address
-inside `CUSTOMER` and floor/lift/stair on `ORDER INFO`. `MONEY` fell below `GOODS` so the money
-reads after the thing it is about.
+**WHY EACH MOVED.** `SO info` comes first because the page reads *when (which order) · who · where ·
+what · payment*, and the order the showroom opened is the *which*. Dealer, Sales Location and
+Salesperson joined it because who sold it is part of which order this is, and a reader answering
+*"whose customer is this?"* had to leave the customer to find three names. `Delivery` is one card
+because the address and the access conditions are ONE question — *can we deliver it and what will it
+cost to carry* — and they were split across two cards. `Billing` moved to `Customer` because who pays
+is a fact about the customer, not about the delivery. `Payment` sits below `Items` so the money reads
+after the thing it is about.
 
-**NO WORD MOVED.** `Sales ownership`, `Delivery address` and `Emergency contact` are locked words
-and survive as in-card headings; `Block` and `SubHead` render the same string at a different rank.
-`creates a Revision · needs approval` is governed copy that moved onto the subsection heading
-rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
-pins the card list, its order and the placement of every moved field.
+**THE HEADINGS THAT WERE RETIRED, AND THE ONES THAT SURVIVED.** Superseded by the ruling above:
+`Sales ownership` is gone as a heading of any rank, and `Delivery address` / `Delivery access` are
+gone with the split they named. `Emergency contact` and `Billing` survive as in-card headings under
+`Customer`. `creates a Revision · needs approval` is governed copy carried on the subsection heading
+rather than reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which pins the
+card list, its order, the retired headings and the placement of every moved field.
 
 **THE ORDER TOTAL HAS ONE ARITHMETIC.** Every place it prints — the Items `TOTAL PAYABLE` row and the
 Payment totals card, which the page now repeats because the PDF does (owner ruling 2026-09-22 overwrites
@@ -639,9 +642,11 @@ separate summary. The stair WORKING LINE on `DELIVERY` explains the charge; it d
 **THE COLLAPSIBLE FOLD STAYS RETIRED.** A section that is always on screen cannot hide an unsaved
 change or a live amendment, which is the only thing the `forceOpen` machinery existed for.
 
-**A merged section keeps its NAME.** `Delivery address` and `Sales ownership` are locked words and
-survive as in-card headings; the merge moves a border, a 24px gap and a second heading rule, never
-a word. The names are governed by `docs/COPY-STANDARD.md` § *Its section names*.
+**A SURVIVING SECTION KEEPS ITS NAME.** Where a merge only moves a border, a 24px gap and a second
+heading rule, it moves no word — `Emergency contact` and `Billing` read the same under `Customer` as
+they did before. Where the owner RETIRED the question a heading answered, the heading goes with it:
+that is what happened to `Sales ownership` and to `Delivery address` / `Delivery access`. The names,
+and which of them are retired, are governed by `docs/COPY-STANDARD.md` § *Its section names*.
 
 **`DELIVERY JOURNEY` LEAVES THE ORDER TAB.** *"Delivery journey doesn't need to be viewed at order
 tab or a SO but keep it at order route tab."* It was a read-only mirror: `Order Route` builds a

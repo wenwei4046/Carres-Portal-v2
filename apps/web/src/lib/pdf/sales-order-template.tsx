@@ -475,15 +475,21 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
   /* What the printed payment rows add up to. It should equal `paid` — if a
      future payload ever disagrees, the paper shows the rows' own arithmetic,
      never a figure the reader cannot check. */
-  const paymentsSum = payments.reduce((n, pm) => n + Number(pm.amount), 0);
   const hasAddons = addons.length > 0;
 
   const dash = "—";
   const money = (v: number) => formatMoney(v, currency);
 
   // The table's own footer sums the rows it printed (round 24).
-  const totalQty =
-    lines.reduce((n, l) => n + Number(l.qty), 0) + addons.reduce((n, a) => n + Number(a.qty), 0);
+  /* ⛔ A SERVICE IS NOT A PHYSICAL QUANTITY — reviewer finding 13, 2026-09-23.
+     This counted goods AND services, so a document for ONE mattress with a
+     delivery fee and a disposal printed `3` in the quantity column beside the
+     closing total. Quantity means things the customer receives; a service is
+     charged, not counted. The goods count alone stands here, and the category
+     breakdown (`Mattress 1 · …`) is the governed summary elsewhere. */
+  const totalQty = lines.reduce((n, l) => n + Number(l.qty), 0);
+  const goodsAmount = lines.reduce((n, l) => n + Number(l.line_total), 0);
+  const serviceAmount = addons.reduce((n, a) => n + Number(a.line_total), 0);
   const totalDiscount = lines.reduce((n, l) => n + (l.discount && l.discount > 0 ? l.discount : 0), 0);
   const totalAmount =
     lines.reduce((n, l) => n + Number(l.line_total), 0) +
@@ -810,7 +816,7 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
           <View style={styles.bNo}><Text style={styles.cellNo}> </Text></View>
           <View style={[styles.bCode, styles.gridV]}><Text style={styles.cellCode}> </Text></View>
           <View style={[styles.desc, styles.gridV]}>
-            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>GOODS TOTAL</Text>
+            <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL PAYABLE</Text>
           </View>
           <View style={[styles.bQty, styles.gridV]}><Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text></View>
           <View style={[styles.bPrice, styles.gridV]}><Text style={[styles.cellMoney, styles.colPrice]}> </Text></View>
@@ -872,21 +878,14 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
                 <View style={[styles.bPayAmt, styles.gridV]}><Text style={[styles.payCell, styles.payColAmount, { fontWeight: 600 }]}>{moneyDigits(p.amount)}</Text></View>
               </View>
             ))}
-            {/* The table sums the rows it printed — the same law as the goods
-                SUBTOTAL. A customer must never be asked to add 3,240 + 500
-                themselves to learn what they have paid. */}
-            <View wrap={false} style={[styles.row, { borderTopWidth: 0.5, borderTopColor: INK, paddingVertical: mm(1.8) }]}>
-              <ColumnRules xs={PAY_RULE_X} />
-              <View style={styles.bDate}><Text style={styles.payCell}> </Text></View>
-              <View style={[styles.bMethod, styles.gridV]}>
-                <Text style={[styles.payCell, { fontWeight: 700, textAlign: "right" }]}>TOTAL RECEIVED</Text>
-              </View>
-              <View style={[styles.bApproval, styles.gridV]}><Text style={styles.payCell}> </Text></View>
-              <View style={[styles.bBy, styles.gridV]}><Text style={styles.payCell}> </Text></View>
-              <View style={[styles.bPayAmt, styles.gridV]}>
-                <Text style={[styles.payCell, styles.payColAmount, { fontWeight: 700 }]}>{money(paymentsSum)}</Text>
-              </View>
-            </View>
+            {/* ⛔ `TOTAL RECEIVED` IS REMOVED FROM BOTH PAGE AND PDF — OWNER
+                APPROVAL (Jess, 2026-09-22), `docs/orders/MASTER.md` § "Order
+                view" → PAYMENT: "the duplicate `TOTAL RECEIVED` row is REMOVED
+                from BOTH page and PDF; paid money is totalled once, as
+                `Paid to date`." The payment table lists the rows only; the one
+                total of money received is `Paid to date` in the totals block
+                below, which is where the customer reads their balance. Two
+                totals for one fact is the Law D duplication this closes. */}
             <View style={{ borderTopWidth: 0.5, borderTopColor: INK }} />
           </View>
         ) : (
@@ -947,10 +946,22 @@ export function SalesOrderTemplate(data: SalesOrderTemplateData) {
             </Text>
           </View>
           <View style={styles.totalsBlock}>
+            {/* ⭐ THE APPROVED BREAKDOWN — goods amount · service amount ·
+                `Total payable` (owner approval, Jess 2026-09-22). A COMBINED
+                total is never labelled `Goods total`: that label sat on
+                goods + services and is the reason the two lines disagreed with
+                the words above them. The two amounts are the same sums the
+                table printed — no second arithmetic. */}
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Goods total</Text>
-              <Text style={styles.totalsValue}>{money(total)}</Text>
+              <Text style={styles.totalsLabel}>Goods</Text>
+              <Text style={styles.totalsValue}>{money(goodsAmount)}</Text>
             </View>
+            {serviceAmount > 0 && (
+              <View style={styles.totalsRow}>
+                <Text style={styles.totalsLabel}>Services</Text>
+                <Text style={styles.totalsValue}>{money(serviceAmount)}</Text>
+              </View>
+            )}
             <View style={styles.totalsRow}>
               <Text style={styles.totalsLabel}>Tax</Text>
               <Text style={styles.totalsValue}>{dash}</Text>

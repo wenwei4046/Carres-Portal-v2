@@ -43,7 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   DataGrid,
@@ -538,6 +538,8 @@ async function openSalesOrderPdf(orderId: string, so: number): Promise<void> {
 
 export default function SalesOrdersRegister() {
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
+  const seededSearch = urlParams.get("search") ?? "";
   const role = useAuth((s) => s.role);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /* FIX 1 — SERVER SEARCH. The engine emits its debounced trimmed term and
@@ -736,6 +738,12 @@ export default function SalesOrdersRegister() {
                never a breakpoint problem. A placeholder that fits is the fix;
                the search itself still matches SO number, customer, phone and
                item, and the ▽ per-column filters say so column by column. */
+            /* ⭐ A DOOR MAY ARRIVE WITH ITS QUESTION ALREADY ASKED (owner
+               ruling, Jess 2026-09-21): the Sales Order page's
+               `Existing customer · {n} orders ›` opens this register searched
+               by that phone. `?search=` seeds the engine's own search — no new
+               page, no new writer, no second list. */
+            initialSearch={seededSearch}
             searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
             emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
