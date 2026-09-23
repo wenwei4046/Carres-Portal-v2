@@ -1649,9 +1649,9 @@ blank `SO NO`.
 **CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; BUILT in
 PURCHASING CARD 13.**
 
-**MIGRATION STATE, exactly (2026-09-23).** Both halves are **APPLIED to production**
-through the governed `apply_migration` path, each with `md5(statements[1])` equal to the
-committed file's md5:
+**MIGRATION STATE, exactly (2026-09-23).** All THREE migrations this surface owns are
+**APPLIED to production** through the governed `apply_migration` path, each with
+`md5(statements[1])` equal to the committed file's md5:
 
 - `0562_a_manual_purchase_says_what_it_needs` — tracker `20260922211119`, md5
   `7fb88f3b…`. It added the nullable `purchase_requirement` column and the three
@@ -1666,12 +1666,33 @@ committed file's md5:
   not assumed. It also rewrote 0562's own stale comment where it stands, because a
   committed migration is never edited.
 
+- `0573_a_purchase_order_may_be_issued_without_a_recorded_price` — tracker
+  `20260923134012`, md5 `305caeef…`, applied 2026-09-23 AFTER the CARD 13-B merge SHA had
+  converged on all five surfaces. It relaxes the two price gates only (functions only; no
+  table, column, constraint or row touched), and it was applied ONLY after `md5(prosrc)` of
+  both live doors was measured equal to their committed 0443 bodies (`aa16259a…`,
+  `5f1e4415…`) — a replace over a body somebody else had changed would have silently
+  reverted them. Measured after: ONE overload each, the creation helper carrying the
+  both-null rule with its committed 16 raises, and the issue authority guarding both price
+  passes with its committed 21 raises. Born as 0565 and renumbered before it ever ran,
+  because the Sales Order lane shipped its own 0565 while this card was paused (red line 7:
+  measure the MAX at push time).
+
 **DELIVERED.** PR #1529 squash-merged as `3f99f41c9`; the production verifier reports that
 SHA on both Pages projects, both canonical hosts and the API Worker.
 **🔴 THE AUTHENTICATED PRODUCTION WALK IS STILL OWED** — a signed-in walk of the create
 workspace (three sections, the live preview, a `Purchase requirement` that survives the
 round trip) and of `Review Purchase Orders` (documents drawn, `Cancel` creating nothing).
 A converged SHA proves the bundle shipped; it proves nothing about what the register draws.
+
+**CARD 13-B DELIVERED.** PR #1547 squash-merged as `6390c3531`; the production verifier
+reports that SHA on both Pages projects, both canonical hosts and the API Worker, and
+migration 0573 is applied above it. It carries the four defects the owner's review of CARD 13
+found on main — the mixed-selection over-issue, the half-empty draft, the price blocker and
+the duplicated review surface — plus the PO date convergence. **🔴 THE AUTHENTICATED WALK
+COVERS BOTH CARDS AND IS STILL OWED:** a mixed selection (one request whole beside another
+narrowed) issuing exactly the ticked goods, a draft carrying both addresses and the PO
+Delivery Date, a SKU with no Catalog price reaching a real PO, and the printed PO PDF.
 
 Reuse the selected Sales Order form composition, with a 50/50 form and live MPR
 preview at the governed readable desktop width; use the shared stacked layout
