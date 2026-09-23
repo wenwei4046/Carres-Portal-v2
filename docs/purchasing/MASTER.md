@@ -621,7 +621,14 @@ PO260924-4827(2)     the same PO after one revision
   PO's own version, never from the code pool.
 - This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only.
 
-**HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23.**
+**HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23. DELIVERED:** PR #1551
+squash-merged as `e9bc40a0a`, that SHA reported by both Pages projects, both canonical hosts and
+the API Worker, and **migration 0574 APPLIED** through the governed path — tracker
+`20260923160803`, `md5(statements[1]) = ba9eb4b9…` equal to the committed file. Measured live
+afterwards: the pool key is `PRIMARY KEY (code_date, prefix, code)`, `formal_document_code_text`
+answers `PO260924-4827` for PO and `GRN-20260924-4827` / `MPR-20260924-4827` unchanged for the
+others, there is exactly ONE allocator and ONE creation helper, and the helper claims its pool row
+by the number's tail with no `split_part` left in it.
 
 - **One place decides the shape.** `formal_document_code_text(prefix, date, code)` is the only
   place a drawn code becomes a printed number. `PO` wears `PO260924-4827`; MPR, GRN, PRTN, RO,
