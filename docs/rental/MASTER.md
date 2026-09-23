@@ -5,14 +5,18 @@
 
 ---
 
-**RULING / APPROVED REQUIREMENT — business-identifiable numbering, 2026-09-23.** Subscription
-business document numbers must be visibly distinguishable from Outright numbers. Jess specified
-a fixed five-digit random decimal suffix for Subscription, while Outright uses four digits. With
-leading zeros and year/month included, Subscription capacity is 100,000 references per family
-per month; this is finite, not a verified volume forecast. Exact prefixes
-and affected shared document families are not yet approved. A subscription agreement remains
-separate from a sales order; shared physical Units retain one identity across both businesses.
-No renumbering of existing documents or production implementation is authorized by this PLAN ruling.
+**RULING / APPROVED TARGET / NOT BUILT — Subscription numbering, 2026-09-23.** New Subscription
+agreements use `SUBYYMM-NNNNN`, for example `SUB2609-48271(1)`. The base reference uses the
+original creation year/month and five fixed random decimal digits, including leading zeros.
+Show the version immediately after the base reference without a space: `(1)` for the original,
+`(2)` for the second approved version, etc. Amendment preserves the base reference and its
+original month; this display ruling adds no new amendment approval or eligibility workflow.
+Subscription deliveries use `SDOYYMM-NNNNN`, governed by `docs/delivery/MASTER.md` §3.1.
+Each prefix has an independent 100,000-reference monthly pool, with enforced uniqueness and
+no reuse of void references. Capacity alerts are internal; no automatic length increase or
+3,000-document threshold is approved. Preserve existing RA identities and issued documents.
+The subscription agreement remains separate from an Outright SO. Shared physical Units retain
+one identity across businesses. This ruling authorizes no production implementation or cutover.
 
 # §1 · Overview
 

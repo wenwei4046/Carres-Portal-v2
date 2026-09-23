@@ -160,21 +160,23 @@ authorization secrets. Reconcile §9's message-reference rules before cutover; a
 does not authorize sending SO numbers to suppliers.
 
 **Scope boundary.** This approval covers SO numbering and its revision presentation only. DO numbering is separately approved in `docs/delivery/MASTER.md` §3.1. PO,
-GRN, RA and Service Case numbering require their own capacity and governing-business-rule review
+GRN and Service Case numbering require their own capacity and governing-business-rule review
 before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
 correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
 truth, not shipped behavior, whole-blueprint approval or authorization for application code,
 production writes, migration or cutover in this PLAN lane.
 
-**RULING / APPROVED REQUIREMENT — business-identifiable numbering, 2026-09-23.** Jess requires
-Outright and Subscription business document numbers to be visibly distinguishable at a glance.
-The approved SO format remains the Outright target. Jess subsequently specified four random
-digits for lower-volume Outright and five for higher-volume Subscription. This changes Outright
-SO and DO capacity to 10,000 references per family per month, including leading zeros; monitor
-each family separately, since DO volume may exceed SO volume. Exact Subscription prefixes and the scope
-across shared document families remain to be approved; do not treat the earlier DO format as
-approval for indistinguishable numbering across both businesses. This requirement does not
-create a second physical Unit identity, rename existing documents or authorize implementation.
+**RULING / APPROVED — business-identifiable numbering, 2026-09-23.** The final approved targets
+are Outright `SOYYMM-NNNN` (four random digits), Subscription agreement `SUBYYMM-NNNNN`
+(five), Outright delivery `DOYYMM-NNNNN` (five), and Subscription delivery `SDOYYMM-NNNNN`
+(five). Original SO and SUB versions display `(1)` immediately after the base reference, with
+no space; subsequent approved versions show `(2)`, etc. Subscription is governed by
+`docs/rental/MASTER.md`; both delivery families by `docs/delivery/MASTER.md` §3.1.
+With leading zeros, SO capacity is 10,000 per month; SUB, DO and SDO each have 100,000 per month.
+Allocate each family independently. Capacity notifications are internal only and never trigger
+automatic length changes, including at a month boundary. No 3,000-document threshold has been
+approved. Shared physical Unit identity, existing document numbers and historical documents
+remain unchanged. This is scoped target approval, not implementation or cutover authorization.
 
 ## One purpose and one navigation home
 
