@@ -131,21 +131,34 @@ does not authorize changing existing numbers, issued documents, database sequenc
 application code, or another module's identity rules. Existing implementation remains evidence,
 not proof that the privacy requirement is satisfied.
 
-**PROPOSAL / NOT LAW:** a new outward SO reference such as `SO-K7M4Q`, with five randomly allocated
-characters from 32 unambiguous uppercase/digit symbols (excluding I, O, 0 and 1), no date and no
-running counter. Its 33,554,432-code space covers the illustrative ten-year 1,000-orders/day
-scenario (365 days/year: 3,650,000 orders, not a business forecast). Four characters provide only
-1,048,576 codes and fail that scenario. Randomness alone does not prevent collisions: allocation
-must be atomic with uniqueness enforcement and retry; repeated submission must identify the same
-business request. Record links remain authoritative IDs. Preserve historical issued identities and
-documents. Exact format, cutover, staff display and each other document family's treatment require
-review of the complete recommendation; this proposal authorizes no build.
+**RULING / APPROVED — revision presentation, 2026-09-23.** Display the revision as a
+parenthesized number separated from the base SO reference by a space: `<SO reference> (1)` for
+the original, `(2)` for the second version, and so on. Do not use `Rev`, `V`, or a hyphen suffix
+for this presentation. The parenthesized revision is not part of the permanent order number;
+amendment preserves that number. Search by the base reference must make its versions available
+without requiring the parentheses. This is approved target presentation, not a claim of shipped
+behavior or approval of the base numbering format. Historical issued PDFs remain preserved.
 
-**Falsifier:** revise the proposal if confirmed lifetime issuance, offline/multi-system allocation,
-external integrations, or operator reading trials exceed its capacity or make five mixed characters
-unusable. It conceals the running counter, not every possible inference from transaction activity;
-it is never an authorization secret. Reconcile §9's message-reference rules in the concrete cutover,
-without treating a new SO display code as permission to send SO numbers to suppliers.
+**PROPOSAL / NOT LAW — base format still unresolved.** Recommend a year plus six random decimal
+digits, such as `SO26-482917`, to prioritize short, numeric references. With leading zeros allowed,
+this provides 1,000,000 references per document family per year. The owner-review alternative
+`SO2609-48271` includes year and month plus five random decimal digits, providing 100,000 references
+per family per month. The latter is 12 characters versus 11 for the year-only format, before the
+four-character revision suffix ` (2)`. Neither capacity is a verified business forecast or an
+unlimited guarantee. Each document family needs independent capacity assessment; DO issuance can
+exceed SO issuance. No base format or cross-module cutover has been approved.
+
+Randomness alone does not prevent collisions: allocation must enforce uniqueness and retry;
+repeated submission must identify the same business request. Preserve authoritative record links,
+historical issued identities and documents. Fixed random references conceal a running counter,
+not every inference from transaction activity, and are never authorization secrets. Capacity must
+be monitored before exhaustion, with no silent volume-triggered length change.
+
+**Falsifier:** revisit the recommended base format if confirmed peak annual issuance per family,
+offline/multi-system allocation, integrations, or operator evidence defeats its capacity or
+readability, or the owner requires month information in the reference. Reconcile §9's
+message-reference rules before cutover; a new SO display code does not authorize sending SO
+numbers to suppliers. This proposal authorizes no application build or production changes.
 
 ## One purpose and one navigation home
 
