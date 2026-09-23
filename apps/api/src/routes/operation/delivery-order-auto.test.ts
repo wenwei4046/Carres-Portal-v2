@@ -10,7 +10,6 @@
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
-import { docNumber } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -78,7 +77,13 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     }),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DO_NUMBER, error: null }
+          : { data: null, error: null },
+      ),
+    ),
   };
 }
 
@@ -90,12 +95,14 @@ const OK_BODY = {
   confirmedTimeSlot: "Afternoon (12pm–3pm)",
 };
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
-const DO_NUMBER = docNumber({
-  prefix: "DO",
-  date: new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10),
-  seed: ORDER_ID,
-  digits: 4,
-});
+/**
+ * ⭐ 0575 · THE NUMBER IS DRAWN, NOT DERIVED. It used to be
+ * `docNumber({ seed: ORDER_ID })` — a hash of the order id, which is exactly
+ * the defect 0575 removes (two orders, one day, one number). The fake
+ * allocator below answers the way the database's own does, so this test now
+ * proves the API STORES WHAT IT WAS GIVEN instead of re-deriving it.
+ */
+const DO_NUMBER = "DO2609-4827";
 
 function post(jwt: string) {
   return app.fetch(

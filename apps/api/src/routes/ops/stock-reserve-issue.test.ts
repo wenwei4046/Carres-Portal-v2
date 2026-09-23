@@ -67,6 +67,8 @@ function ordersMock(read: Result, afterUpdate: Result) {
 
 const ORDER_ID = "00000000-0000-0000-0000-00000000040a";
 const ITEM_ID = "00000000-0000-0000-0000-000000000501";
+/** What the database's allocator hands back (0575). */
+const DRAWN_DO = "DO2609-4827";
 const MATTRESS = "mattress:FirmCare-K";
 
 /** A fully qualifying order — the unit this draw reserves is the last goods
@@ -119,7 +121,15 @@ function makeSb(tables: Record<string, unknown>) {
       return b;
     }),
     // ops_stock_pool_draw answers with the drawn unit's id.
-    rpc: vi.fn().mockResolvedValue({ data: ITEM_ID, error: null }),
+    /* 0575 · the DO number comes from the allocator, every other RPC keeps
+       answering with the reserved item id. */
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: ITEM_ID, error: null },
+      ),
+    ),
   };
 }
 
@@ -153,7 +163,7 @@ describe("Slice 2 — the reserve doors complete the gate and the system issues"
     // The hook looked the order up by its SO and minted into the empty column.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((t.orders as any).update).toHaveBeenCalledWith({
-      do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/),
+      do_number: DRAWN_DO,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((t.orders as any).is).toHaveBeenCalledWith("do_number", null);
@@ -195,7 +205,15 @@ describe("Slice 2 — the reserve doors complete the gate and the system issues"
       from: vi.fn(() => {
         throw new Error("unmocked table");
       }),
-      rpc: vi.fn().mockResolvedValue({ data: ITEM_ID, error: null }),
+      /* 0575 · the DO number comes from the allocator, every other RPC keeps
+       answering with the reserved item id. */
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: ITEM_ID, error: null },
+      ),
+    ),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

@@ -44,6 +44,7 @@ import {
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
+import { drawDeliveryOrderNumber } from "../../lib/delivery-order-issue";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { storageBlock } from "../../lib/storage-gate";
@@ -3098,9 +3099,17 @@ operationOrdersRouter.post("/:id/attach-do", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, attachDoInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // 0575 · An order with no document yet gets its number from the one
+  // allocator — never a number the browser made up.
+  let doNumber = parsed.data.doNumber;
+  if (!doNumber) {
+    const drawn = await drawDeliveryOrderNumber(sb, c.req.param("id"));
+    if (!drawn.ok) return c.json(drawn.body, drawn.status);
+    doNumber = drawn.doNumber;
+  }
   const { data, error } = await sb.rpc("operation_attach_do_and_deliver", {
     p_order_id: c.req.param("id"),
-    p_do_number: parsed.data.doNumber,
+    p_do_number: doNumber,
     p_do_note: parsed.data.doNote ?? null,
     p_signed: parsed.data.signed,
     p_do_file_path: parsed.data.doFilePath,

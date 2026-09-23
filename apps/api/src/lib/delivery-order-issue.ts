@@ -1,7 +1,5 @@
 import {
-  amendmentSuffix,
   deliveryOrderIssueGate,
-  docNumber,
   myHolidaySet,
   orderActionDone,
   type DeliveryGroupKey,
@@ -28,9 +26,11 @@ import { todayIsoMYT } from "./today";
  *     The mint writes only into an empty column (`.is("do_number", null)`), so
  *     two concurrent callers cannot produce two numbers; the loser re-reads
  *     the winner's.
- *   · **The LOCKED number scheme** — `docNumber`, `DO-DDMMYY-NNNN`, tail
- *     seeded on the ORDER id, date = the day it is issued (Jess 2026-07-19).
- *     A reprint reads the stored number and always matches the original.
+ *   · **The number** (owner ruling 2026-09-23, Delivery MASTER §3.1) is DRAWN
+ *     by the database's one allocator (`delivery_document_number_draw`, 0575):
+ *     `DO2609-4827` for Outright, `SDO2609-48271` for Subscription, random,
+ *     unique across every order and never reused. A reprint reads the stored
+ *     number and always matches the original.
  *   · **The gate** — `deliveryOrderIssueGate`: confirmed date + slot, no
  *     Sunday, no Malaysian public holiday, goods reserved, MONEY IN FULL or an
  *     APPROVED Delivery Payment Approval (owner ruling 2026-08-19, 0362), and
@@ -149,33 +149,13 @@ export async function attemptDeliveryOrderIssue(
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
 
-  // The document date is TODAY — the day it is issued and handed over, which is
-  // what the locked scheme's DDMMYY segment means.
-  const base = docNumber({
-    prefix: "DO",
-    date: todayIsoMYT(),
-    seed: order.id,
-    digits: 4,
-  });
-  // A SAME-DAY re-issue (a rescheduled trip voided this morning, a failed run
-  // rebooked this afternoon) would regenerate the exact base number — and the
-  // old document keeps it forever (0356: history is never deleted). The locked
-  // scheme's own answer is the repeat letter: -B, then -C. Deterministic and
-  // reprint-stable, because the chosen number is STORED on the document row.
-  const { data: taken, error: takenError } = await sb
-    .from("ops_delivery_orders")
-    .select("do_number")
-    .eq("order_id", orderId);
-  if (takenError) {
-    return { outcome: "error", body: { message: takenError.message }, status: 500 };
-  }
-  const existing = new Set(
-    (taken ?? []).map((r: { do_number: string }) => r.do_number),
-  );
-  let doNumber = base;
-  for (let rev = 1; existing.has(doNumber) && rev <= 25; rev++) {
-    doNumber = `${base}${amendmentSuffix(rev)}`;
-  }
+  // The number is DRAWN, never derived (0575): the allocator picks the
+  // business's prefix, redraws a clash and keeps every number forever. A
+  // re-issued trip (rescheduled, redelivered) is a new document with a new
+  // number; the old one keeps its own.
+  const drawn = await drawDeliveryOrderNumber(sb, orderId);
+  if (!drawn.ok) return { outcome: "error", body: drawn.body, status: drawn.status };
+  const doNumber = drawn.doNumber;
   // 0542 · A SPLIT TRIP (the booking names its groups) mints through its own
   // governed door: the one-live index is keyed by trip, so an earlier trip
   // that already ran keeps its document and this trip gets its own.
@@ -236,8 +216,8 @@ export async function attemptDeliveryOrderIssue(
  * 0491 · A JOURNEY LEG'S OWN DOCUMENT — the SAME issuing discipline, a
  * different scope (Delivery MASTER §3.1, §14.1). Leg 1 `Klang WH → JB
  * partner` and leg 2 `JB partner → Singapore customer` each carry their own
- * partner, agreed day, document, handover and result; the number is seeded on
- * the order AND the leg so a reprint returns the same paper.
+ * partner, agreed day, document, handover and result; the number is drawn
+ * once and stored, so a reprint returns the same paper.
  *
  * The gate is the order's gate — money in full or an approved Delivery
  * Payment Approval, no OPEN Finance exception, goods reserved — read through
@@ -327,12 +307,11 @@ export async function attemptLegDocumentIssue(
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
 
-  // The locked scheme, seeded on the order AND the leg; a same-day re-issue of
-  // the same leg takes the repeat letter, exactly as the whole-order path.
-  const base = docNumber({ prefix: "DO", date: todayIsoMYT(), seed: `${orderId}#leg${leg}`, digits: 4 });
-  const taken = new Set(((existingRes.data ?? []) as Array<{ do_number: string }>).map((d) => d.do_number));
-  let doNumber = base;
-  for (let rev = 1; taken.has(doNumber) && rev <= 25; rev++) doNumber = `${base}${amendmentSuffix(rev)}`;
+  // The number is drawn by the one allocator (0575), exactly as the
+  // whole-order path — never derived from the order or the leg.
+  const drawn = await drawDeliveryOrderNumber(sb, orderId);
+  if (!drawn.ok) return { outcome: "error", body: drawn.body, status: drawn.status };
+  const doNumber = drawn.doNumber;
 
   const { data, error } = await sb.rpc("delivery_leg_document_mint", {
     p_order_id: orderId,
@@ -344,3 +323,23 @@ export async function attemptLegDocumentIssue(
   return minted === doNumber ? { outcome: "issued", doNumber } : { outcome: "already", doNumber: minted };
 }
 
+
+/**
+ * 0575 · Draw one Delivery Order number from the database's one allocator.
+ * The allocator — not this module — decides the prefix from the order's
+ * business, redraws a clash, keeps the number forever and refuses when a
+ * month is used up (the width is fixed). Exported for the attach door.
+ */
+export async function drawDeliveryOrderNumber(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ ok: true; doNumber: string } | { ok: false; body: any; status: any }> {
+  const { data, error } = await sb.rpc("delivery_document_number_draw", { p_order_id: orderId });
+  if (error) return { ok: false, body: { message: error.message }, status: 500 };
+  if (typeof data !== "string" || data.length === 0) {
+    return { ok: false, body: { message: "No Delivery Order number was drawn" }, status: 500 };
+  }
+  return { ok: true, doNumber: data };
+}
