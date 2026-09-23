@@ -10,6 +10,9 @@ const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const panels = readFileSync(join(here, "SalesOrderChangePanels.tsx"), "utf8");
 const changeHelpers = readFileSync(join(here, "sales-order-change.ts"), "utf8");
+/* ONE agreement block, rendered by both the amendment panel and the whole-page
+   waiting request — so the words are asserted where they actually live. */
+const agreement = readFileSync(join(here, "customer-agreement.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
 const route = readFileSync(
   join(here, "../../../../../packages/shared/src/sales-order-route.ts"),
@@ -644,9 +647,12 @@ describe("Sales Order object template contract", () => {
        database is the gate (0564 `customer_agreement_required`). The page states the
        same rule and disables the decision it cannot make. */
     expect(panels).toContain("Customer agreement");
-    expect(panels).toContain("Not recorded yet — the change cannot take effect.");
+    expect(agreement).toContain("Nothing on record shows the customer agreed");
+    expect(agreement).toContain("How did the customer agree?");
+    /* No tick box, ever: every kind names a pointer outside the record. */
+    expect(agreement).not.toMatch(/type=["']checkbox["']/);
     expect(panels).toContain("customer_agreement_covers_proposal");
-    expect(panels).toContain("disabled={!decision.trim() || !covered || props.busy}");
+    expect(panels).toContain("disabled={!decision.trim() || !recorded || !covered || props.busy}");
     expect(workspace).toContain("useRecordAmendmentAgreement");
   });
 
@@ -658,13 +664,18 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("Free item: check it is still allowed without the cancelled item");
   });
 
-  it("prints a version as it was issued — its own payments, its own signature", () => {
+  it("prints a version as it was issued — its own money, and never a borrowed signature", () => {
     /* § Old versions and signatures: a revision prints its own document, and a
-       new unsigned version says so instead of borrowing the old signature. */
-    expect(workspace).toContain("asOf?: { date: string; signed: boolean }");
-    expect(workspace).toContain("const signedRevision = 1;");
-    expect(workspace).toContain("currentRev != null && currentRev > signedRevision ? { ...d, signed: false, signature_url: null } : d");
-    expect(workspace).toContain("signed: viewedRevision.revision === signedRevision");
+       new unsigned version says so instead of borrowing the old signature.
+       WHICH revision a stored signature covers is not recorded anywhere, so the
+       enforceable half ships and nothing is guessed: a historical version
+       prints UNSIGNED. The behaviour itself is proved by calling the builder in
+       `SalesOrderWorkspace.historical-document.test.ts`; this pins only that the
+       page keeps asking for the version's own day. */
+    expect(workspace).toContain("asOf?: { date: string }");
+    expect(workspace).toContain("{ date: viewedRevision.created_at.slice(0, 10) }");
+    expect(workspace).not.toContain("signedRevision");
+    expect(workspace).toContain("(base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)");
   });
 
   it("names the governed ownership request and hides it from Operation", () => {

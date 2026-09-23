@@ -634,8 +634,15 @@ export function snapshotTemplateData(
   }));
   const subtotal =
     lines.reduce((s, l) => s + l.line_total, 0) + addons.reduce((s, a) => s + a.line_total, 0);
+  /* ⛔ A RECEIPT NOBODY CAN PLACE IN TIME IS NOT COUNTED IN AN AS-AT VIEW.
+     `order_payments.paid_on` is `date NOT NULL`, so the ledger path always has
+     a day — but the FALLBACK path synthesises ONE row from `placed_at`, and
+     that row carries the whole at-sale amount. With `placed_at` null it has no
+     date at all, and including it would make a Rev 1 document assert the entire
+     deposit had already arrived. Including it is the one choice that misstates,
+     and it misstates in the exact direction this filter exists to prevent. */
   const payments = asOf
-    ? (base?.payments ?? []).filter((pm) => !pm.date || String(pm.date).slice(0, 10) <= asOf.date)
+    ? (base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)
     : (base?.payments ?? []);
   const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
@@ -710,16 +717,23 @@ export function snapshotTemplateData(
        Orders MASTER, not smuggled in here. */
     signed: false,
     signature_url: null,
-    /* ⭐ AND ITS MONEY IS THE MONEY THAT HAD ARRIVED BY THEN. The snapshot
-       stores none, so this reads the SAME payments ledger Payments owns and
-       the SAME arithmetic (sum of the rows) — only the rows whose own date is
-       on or before this version's. It invents no number and it never shows a
-       receipt that arrived after the version existed, which printing today's
-       `paid` on a Rev 1 document did.
-       ⚠️ NAMED LIMIT: a payment VOIDED or corrected later still reads as it
-       reads today, because the ledger keeps one current truth per row and the
-       snapshot keeps no money at all. The real fix is a stored historical
-       position; it is a schema change and is named in the Orders MASTER. */
+    /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
+       snapshot stores none, so this reads the SAME payments ledger Payments
+       owns with the SAME arithmetic (sum of the rows) over the rows dated then
+       or earlier. It invents no number, and it never shows a receipt DATED
+       after this version's day — which printing today's `paid` on a Rev 1
+       document did.
+       ⚠️ TWO NAMED LIMITS, stated as they behave rather than as one would wish:
+       · SAME DAY. `paid_on` is a DATE, so a receipt taken in the afternoon
+         counts toward a version minted that morning. `paid_on` is the business
+         fact and `created_at` is merely when someone typed it, so the day is
+         the right grain and the limit is real.
+       · A LATER VOID UNDER-REPORTS. The read filters `voided_at is null`, so a
+         payment voided afterwards disappears from EVERY view, this one
+         included: an old document shows the money still recognised today, not
+         the money recognised then.
+       Both close the same way — a stored historical position, a schema change,
+       named in the Orders MASTER, not a second arithmetic invented here. */
   } as SalesOrderTemplateData;
 }
 
@@ -1960,7 +1974,7 @@ function SalesOrderWorkspaceBody() {
     if (!changeClass || changeClass.action === "none") return;
     const err = validateDraft(false);
     if (err) return void toast.error(err);
-    if (!changeReason.trim()) return void toast.error("Say why this is changing");
+    if (!changeReason.trim()) return void toast.error("Reason for change");
     changesMut.mutate({
       header: draftHeader(),
       lines: liveLines(draft),
@@ -2828,6 +2842,18 @@ function SalesOrderWorkspaceBody() {
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
           </span>
+          {/* ⭐ A RECEIPT NOBODY CAN PLACE IN TIME IS LEFT OUT, AND SAID SO. The
+              document counts only money dated on or before this version's day;
+              a capture with no date cannot be placed either side of it, so it
+              is excluded and the reader is told rather than shown a total that
+              quietly includes it. The sentence is on the PAGE, never on the
+              customer document — a document gains no new words without Jess.
+              ⚠️ build wording 2026-09-23, owner confirmation owed. */}
+          {(base?.payments ?? []).some((pm) => !pm.date) && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
+              One payment has no date, so it is not counted in this version.
+            </p>
+          )}
         </div>
       )}
 

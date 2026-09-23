@@ -2506,7 +2506,9 @@ const salesOrderChangesInput = z.object({
   lines: z.array(changeLineInput).min(1, "An order needs at least one item"),
   addons: z.array(changeAddonInput),
   installment_months: installmentMonthsField.nullable().optional(),
-  reason: z.string().trim().min(1, "Say why this is changing").max(500),
+  /* The approved word, not a new sentence: COPY-STANDARD § "The Sales Order
+     amendment words" carries `Reason for change`. */
+  reason: z.string().trim().min(1, "Reason for change").max(500),
   customerAskedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   /* 0564 · The agreement may be recorded with the request in one act. It is the
      SAME governed shape the standalone door takes - a kind that always names a
