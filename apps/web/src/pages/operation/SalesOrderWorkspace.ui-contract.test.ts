@@ -724,6 +724,20 @@ describe("Sales Order object template contract", () => {
     /* Both minting doors keep the sheet: a correction and an approved change. */
     expect(workspace).toContain('if (r.action === "saved") void keepIssuedDocument(r.revision);');
     expect(workspace).toContain('if (r.status === "applied") void keepIssuedDocument(Number(r.revision));');
+    /* ⭐ AND PRINTING IS THE OTHER HALF OF "READ" — the gap this was missing.
+       The pane showing the stored file proved nothing about the button the
+       office actually presses: `Print this version` could still have rebuilt
+       the sheet from the snapshot and handed the customer a document that was
+       never issued. The stored URL is opened BEFORE any render path is
+       reached, and the rebuild below it is unreachable for a kept version. */
+    const print = workspace.slice(workspace.indexOf("const openPrint = async () => {"));
+    const body = print.slice(0, print.indexOf("\n  };"));
+    expect(body, "the stored file is opened").toContain('window.open(storedDocumentUrl, "_blank");');
+    expect(
+      body.indexOf("storedDocumentUrl"),
+      "and it is reached before anything is rendered",
+    ).toBeLessThan(body.indexOf("renderSalesOrderPdf"));
+    expect(body.slice(0, body.indexOf("renderSalesOrderPdf")), "the stored branch returns").toContain("return;");
   });
 
   it("carries the approved reconstruction notice ONLY on a version with no stored file", () => {

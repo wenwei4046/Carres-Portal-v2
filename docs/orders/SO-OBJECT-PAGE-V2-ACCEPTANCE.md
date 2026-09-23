@@ -252,3 +252,72 @@ was issued at any point in this verification.
 *"Couldn't load dashboard"*. This is the pre-existing `awaiting_operation_action` defect (retired by
 0167, reintroduced by 0519), already raised with its owner. It is unrelated to the Sales Order page
 and was failing before this deploy.
+
+---
+
+## 10 · AMENDMENT EVIDENCE — reconciled, and the gaps closed, 2026-09-23
+
+The 16 page/PDF corrections in §§8–9 are **closed and not reopened**. This section covers the other
+half of the agreed Sales Order scope: the Amendment behaviour.
+
+### 10.1 · What already existed, read area by area
+
+| Area | Existing evidence |
+|---|---|
+| Save / Submit routing | `sales-order-change.test.ts` (classifier) · `orders.changes.test.ts` (the server chooses, 11 cases) · `sales-order-classification.ts` Class A/B sets |
+| Customer agreement | `amendment-agreement.test.ts` (7 route cases) · `amendment-lane-0564` (kinds, pointer required, must name a revision of THIS order, evidence against different terms) · `SalesOrderAmendment.test.tsx` (7 gate cases) |
+| Approval / rejection | `amendment-lane-0564` (approve applies the WHOLE change as one revision; approve refused with no agreement; reject needs none; withdraw) · `orders.changes.test.ts` (the stair fee re-stamps on approve, not on reject) · `SalesOrderAmendment.test.tsx` (Principal decides, Operation routes) |
+| Version conflicts | `amendment-lane-0564` (a header value that MOVED makes it stale) · `sales-order-contractual-hash.test.ts` (the SQL hash covers exactly Class A, and no Class B field) · `SalesOrderAmendment.test.tsx` (the UI refuses a stale approval) |
+| Exact-version PDF | `issued-document-retention.test.ts` (6) · `orders.revision-document.test.ts` (7 route cases) · `amendment-lane-0564` (record once, wrong path refused, legacy NULL) · `sales-order-template.rebuilt.test.tsx` (12) |
+
+**This evidence was never actually executed.** The integration suites are `describe.skipIf` on
+`CARRES_TEST_DATABASE_URL` and had only ever been reported as SKIPPED. Run for real against a
+throwaway Postgres carrying the whole migration chain, **all 13 original cases pass.**
+
+### 10.2 · The four rules nothing asserted — now closed
+
+| Gap | Why it mattered | Closed by |
+|---|---|---|
+| **A rejection's whole content is that nothing happened** — the existing case proved only that the call is *allowed* without an agreement | A refusal that quietly wrote half the proposal would have passed every case in the file | `amendment-lane-0564` — the order row, every goods line, every service and `max(revision)` are compared before and after; the refusal's `decided_by` and `decision_note` are asserted |
+| **A correction beside an open request must NOT kill it** — only the *stale* direction was tested | A staleness rule that widened to "any edit" would pass the whole suite while, in the shop, one typo fix silently killed a change the customer had already agreed to | `amendment-lane-0564` — a `customer_email` correction saves, the agreed request still approves; the control in the same case moves a value the proposal *was* computed from and must be refused `amendment_stale` |
+| **The instalment plan is a Class A signed term** and had no routing case | Every other Class A route had one; a plan change could have started saving straight through with nothing going red | `sales-order-change.test.ts` — both directions (cash → plan, plan → cash) must be `Submit amendment request` |
+| **Printing a kept version** | The pane showing the stored file proves nothing about the button the office presses; `Print this version` could still have rebuilt the sheet and handed the customer a document that was never issued | `SalesOrderWorkspace.ui-contract.test.ts` — the stored URL is opened and returns before any render path is reached |
+
+**Each was proved RED before being kept**: the print branch removed, `installmentChanged` dropped
+from the commercial test, and a rejection made to write one field — each turned its new case red, and
+green again on restore.
+
+### 10.3 · NO APPLICATION DEFECT WAS FOUND
+
+All five areas behave as ruled. **No product code was changed by this reconciliation** — the work is
+evidence only. One red result during the work was traced to contaminated shared fixture state in the
+integration file (the cases run in one transaction and the earlier approval had already moved the
+order), **not** to a product defect; the new case now reads the order's live base rather than
+assuming the fixture's.
+
+### 10.4 · EXPLICIT LIMITATIONS
+
+1. **The integration cases are local-only.** `describe.skipIf(!URL || !LOCAL)` means CI reports them
+   SKIPPED, not passed. They were executed here against a throwaway cluster; reproduce with:
+   ```
+   LC_ALL=C node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json --keep
+   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> \
+     npx vitest run src/test/amendment-lane-0564.integration.test.ts
+   ```
+   Changing that gate is a CI decision, not this scope.
+2. **Protected ownership routes differently from the MASTER sentence.** The 2026-09-22 ruling lists
+   `Sales Location · Salesperson · Dealer` among the changes that `Submit amendment request` covers.
+   In code they are deliberately excluded from `classifySalesOrderChange` and keep their own governed
+   approval lane (0329) — the save door *refuses* them and `attribution-lane.test.ts` covers submit /
+   approve / apply / withdraw / permissions. **The capability exists and is governed; only the lane
+   differs.** Folding the two lanes together is a design change, not a missing check, and is not done
+   here.
+3. **Migration replay is not clean on `main`.** 564 of 570 files replay; six fail, five on the known
+   baseline and one — `0561_the_voucher_line_guard_survives_a_rebuild.sql`, a syntax error — not on
+   it. Unrelated to Sales Orders, and left with its owner.
+4. **Three Finance integration suites fail on `main`** against the same test database
+   (`finance-approver-role`, `advances-to-suppliers-1230`, `money-moves`). Unrelated to Sales Orders
+   and left with their owner.
+5. **Not covered anywhere, and not claimed:** a real customer order was never amended, approved or
+   rejected to demonstrate any of this. Every transaction-changing scenario ran on the throwaway
+   database, inside one rolled-back transaction.

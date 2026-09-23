@@ -292,4 +292,114 @@ describe.skipIf(!URL || !LOCAL)("0564 · the amendment carries the whole change,
     expect(row.versions).toBeGreaterThan(row.kept);   // some version kept nothing
     expect(row.rev1_kept).toBe(0);                    // and the original is one of them
   });
+
+  /** Clears whatever request the cases above left open, so a new one can be
+   *  proposed. Only ever called inside a savepoint that is rolled back. */
+  async function clearOpenRequests() {
+    await actAs(U.operation);
+    const open = await q("select id from sales_order_amendments where order_id=$1 and status='submitted'", [orderId]);
+    for (const r of open.rows as Array<{ id: string }>) {
+      await q("select public.sales_order_withdraw_amendment($1,'Cleared for this case')", [r.id]);
+    }
+  }
+
+  /* ── RECONCILIATION GAPS, 2026-09-23 ───────────────────────────────────────
+     Reading the existing evidence against the five agreed areas found three
+     rules that the suites ASSERT NOWHERE. Each is the other half of a case
+     already here, which is exactly how they went unnoticed. */
+
+  it("REJECTED, it leaves the order EXACTLY as it was — and says who refused it, and why", async () => {
+    /* THE GAP. The reject case above proves only that the call is allowed
+       without a customer agreement. Nothing anywhere asserts what a rejection
+       LEAVES — and a refusal that quietly wrote half the proposal would pass
+       every test in this file. A rejection is the one decision whose whole
+       content is that nothing happened. */
+    await q("savepoint reject_leaves");
+    const before = await one(
+      `select (select to_jsonb(o) - 'updated_at' from orders o where o.id=$1)                         as o,
+              (select coalesce(jsonb_agg(to_jsonb(l) order by l.id),'[]'::jsonb) from order_lines l where l.order_id=$1)  as lines,
+              (select coalesce(jsonb_agg(to_jsonb(a) order by a.id),'[]'::jsonb) from order_addons a where a.order_id=$1) as addons,
+              (select max(revision) from sales_order_revisions where order_id=$1)                     as rev`,
+      [orderId],
+    );
+    await clearOpenRequests();
+    const a = await submit();
+    await actAs(U.principal);
+    const out = await one("select public.sales_order_decide_amendment($1,'reject','Customer changed their mind') as r", [a.id]);
+    expect(out.r.status).toBe("rejected");
+
+    const after = await one(
+      `select (select to_jsonb(o) - 'updated_at' from orders o where o.id=$1)                         as o,
+              (select coalesce(jsonb_agg(to_jsonb(l) order by l.id),'[]'::jsonb) from order_lines l where l.order_id=$1)  as lines,
+              (select coalesce(jsonb_agg(to_jsonb(a) order by a.id),'[]'::jsonb) from order_addons a where a.order_id=$1) as addons,
+              (select max(revision) from sales_order_revisions where order_id=$1)                     as rev`,
+      [orderId],
+    );
+    expect(after.o).toEqual(before.o);           // not one column of the order moved
+    expect(after.lines).toEqual(before.lines);   // nor a single goods line
+    expect(after.addons).toEqual(before.addons); // nor a service
+    expect(Number(after.rev)).toBe(Number(before.rev)); // and NO version was minted
+
+    /* ⛔ AND THE REFUSAL IS ON THE RECORD. A decision nobody can trace is the
+       same problem as a silent write, one direction later. */
+    const rec = await one("select status, decided_by, decision_note from sales_order_amendments where id=$1", [a.id]);
+    expect(rec.status).toBe("rejected");
+    expect(rec.decided_by).toBe(U.principal);
+    expect(rec.decision_note).toBe("Customer changed their mind");
+    await q("rollback to savepoint reject_leaves");
+  });
+
+  it("a CORRECTION saved while a request is open does not kill it — only a value it was computed from does", async () => {
+    /* THE GAP, AND THE MORE DANGEROUS HALF. One case above proves that moving
+       a value the proposal was computed from makes it stale. Nothing proves
+       the OPPOSITE — that an ordinary correction the proposal never read leaves
+       the request approvable. Without this, a staleness rule that quietly
+       widened to "any edit" would pass the whole suite while, in the shop, one
+       typo fix on an email address silently killed a change the customer had
+       already agreed to. */
+    await q("savepoint correction_beside");
+    await clearOpenRequests();
+    /* ⛔ THE BASE IS READ, NEVER ASSUMED. The cases above already moved this
+       order's phone and proceed date, so the shared `proposal()` fixture's
+       `base_header` is stale before this case starts — and a test that failed
+       for THAT reason would look exactly like the defect it is hunting. */
+    const now = await one("select customer_phone, proceed_date, delivery_date from orders where id=$1", [orderId]);
+    /* One real change — the promise — proposed from the order as it stands. */
+    const p = {
+      header: { customer_phone: now.customer_phone },
+      base_header: { customer_phone: now.customer_phone },
+      delivery_date: "2026-12-24",
+    };
+    expect(ymd(now.delivery_date)).not.toBe("2026-12-24");
+    const a = await submit(p);
+    await q("select public.sales_order_record_amendment_agreement($1,'customer_confirmation','WhatsApp 22 Sep 09:40',null)", [a.id]);
+
+    await actAs(U.operation);
+    const saved = await attempt(
+      `select public.sales_order_save_revision($1,'{"customer_email":"corrected@test.local"}'::jsonb,null,null)`,
+      [orderId],
+    );
+    expect(saved.ok, "a correction is still allowed beside an open request").toBe(true);
+    expect((await one("select customer_email from orders where id=$1", [orderId])).customer_email)
+      .toBe("corrected@test.local");
+
+    await actAs(U.principal);
+    const decided = await attempt("select public.sales_order_decide_amendment($1,'approve','Still agreed') as r", [a.id]);
+    expect(decided, "the request survives a correction it never read").toEqual(expect.objectContaining({ ok: true }));
+
+    /* CONTROL, in the same case: move a value the proposal DID carry, and the
+       same call must refuse. Without this half, the assertion above would pass
+       just as well on a staleness check that had stopped working. */
+    await q("rollback to savepoint correction_beside");
+    await q("savepoint correction_control");
+    await clearOpenRequests();
+    const b = await submit(p);
+    await q("select public.sales_order_record_amendment_agreement($1,'customer_confirmation','WhatsApp 22 Sep 09:40',null)", [b.id]);
+    await actAs(U.operation);
+    await q("update orders set customer_phone='0166666666' where id=$1", [orderId]);
+    await actAs(U.principal);
+    expect(await attempt("select public.sales_order_decide_amendment($1,'approve','ok')", [b.id]))
+      .toMatchObject({ ok: false, detail: "amendment_stale" });
+    await q("rollback to savepoint correction_control");
+  });
 });

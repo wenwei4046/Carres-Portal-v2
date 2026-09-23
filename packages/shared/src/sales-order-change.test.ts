@@ -83,6 +83,36 @@ describe("classifySalesOrderChange — the system chooses the commit", () => {
     expect(classifySalesOrderChange(base, d, open).action).toBe("save");
     expect(classifySalesOrderChange(base, d, { proceeded: true, proceedRecorded: true }).action).toBe("submit");
   });
+  /* ⭐ THE INSTALMENT PLAN IS A SIGNED TERM — `sales-order-classification.ts`
+     puts `orders.installment_months` in CLASS A ("money — any term the customer
+     signed"). The classifier reads it through `installmentChanged`, and nothing
+     asserted it: every other Class A route had a case, this one had none, so a
+     plan change could have started saving straight through without one test
+     going red. */
+  it("the instalment plan is a signed term, so changing it is an amendment request", () => {
+    const d = clone();
+    d.installment_months = 12;
+    const r = classifySalesOrderChange(base, d, open);
+    expect(r.action).toBe("submit");
+    expect(r.installmentChanged).toBe(true);
+    expect(r.header).toEqual([]);          // no header fact moved
+    expect(r.linesChanged).toBe(false);    // and nothing was bought or dropped
+    expect(salesOrderCommitWord(r.action)).toBe("Submit amendment request");
+  });
+
+  it("dropping the plan back to cash is the same commitment, and the same lane", () => {
+    /* The reverse direction is not a correction either: cancelling instalments
+       changes what the customer signed up to pay, and `null` vs a number must
+       not slip through the same-value check the way a blank does. */
+    const withPlan = clone();
+    withPlan.installment_months = 6;
+    const d = clone();
+    d.installment_months = null;
+    const r = classifySalesOrderChange(withPlan, d, open);
+    expect(r.action).toBe("submit");
+    expect(r.installmentChanged).toBe(true);
+  });
+
   it("a mixed change goes to review whole", () => {
     const d = clone();
     d.header.customer_phone = "0199999999";
