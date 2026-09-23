@@ -75,7 +75,7 @@ describe("0565 · a version keeps the document it was issued as", () => {
     const { createSignedUploadUrl } = mockDb({ version: true, doc: true });
     const res = await call(`/api/operation/orders/${ORDER}/revisions/4/document/sign`, "POST");
     expect(res.status).toBe(422);
-    expect((await res.json()).code).toBe("document_already_stored");
+    expect(((await res.json()) as { code?: string }).code).toBe("document_already_stored");
     expect(createSignedUploadUrl).not.toHaveBeenCalled();
   });
 

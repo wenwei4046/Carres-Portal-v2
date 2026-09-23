@@ -1192,16 +1192,22 @@ operationOrdersRouter.get("/:id/revisions", requireOperation, async (c) => {
   /* 0565 · the file each version was ISSUED as — a row BESIDE the version,
      because `sales_order_revisions` is immutable. A version with no row here
      never had a file stored, which is precisely the reconstruction case. */
-  const docs = await sb
-    .from("sales_order_revision_documents")
-    .select("revision, path, stored_at")
-    .eq("order_id", id);
-  const docByRevision = new Map<number, { path: string; stored_at: string }>(
-    ((docs.data ?? []) as Array<{ revision: number; path: string; stored_at: string }>).map((d) => [
-      d.revision,
-      { path: d.path, stored_at: d.stored_at },
-    ]),
-  );
+  /* ⛔ AND A FAILURE HERE NEVER TAKES THE VERSION LIST WITH IT. The versions are
+     the record; which of them kept a PDF is a second fact about them. If this
+     read fails, every version simply reports no stored file — the honest
+     reconstruction case — instead of the list refusing to load at all. */
+  const docByRevision = new Map<number, { path: string; stored_at: string }>();
+  try {
+    const docs = await sb
+      .from("sales_order_revision_documents")
+      .select("revision, path, stored_at")
+      .eq("order_id", id);
+    for (const d of (docs.data ?? []) as Array<{ revision: number; path: string; stored_at: string }>) {
+      docByRevision.set(d.revision, { path: d.path, stored_at: d.stored_at });
+    }
+  } catch (e) {
+    console.error("revision documents unreadable", { orderId: id, reason: e instanceof Error ? e.message : String(e) });
+  }
   const nameById = await resolveActorNames(sb, rows.map((r) => r.created_by));
   const revisions = rows.map((r) => {
     const created_by_name = r.created_by ? (nameById.get(r.created_by) ?? null) : null;
