@@ -455,7 +455,7 @@ Delivery Operations records partner, destination, floor, quantity, carry-up, dis
 disposal/take-out, actual service and evidence. Normal delivery does not wait for quote/price.
 After service, Operation may upload the partner's actual cost and negotiate disputed partner cost.
 
-**SST — **NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.**** Carres is
+**SST — NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.** Carres is
 not registered for SST. Customer documents show **no tax row and no
 "tax included" / "tax excluded" wording**; `invoices.tax_amount` stays 0. **Measured gap (origin/main
 2026-09-23):** `apps/web/src/lib/pdf/invoice-template.tsx:8-16` still prints the "TAX INVOICE" mode with

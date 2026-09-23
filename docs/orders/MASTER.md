@@ -1353,7 +1353,7 @@ invents one.
 
 ```
 NOT READY FOR DELIVERY · {k} of {n} requirements met
-DO-DDMMYY-NNNN · Delivery order issued
+DO2609-4827 · Delivery order issued
 ```
 
 Requirements are plain sentences, GitHub-checks style, with the met count:
@@ -5282,9 +5282,9 @@ card §3/§7 — this OVERWRITES the four-condition `Issue delivery order` actio
 The SYSTEM issues the document at whichever door completes the gate — booking confirm · stock
 reserve · Finance-exception clear · payment-approval approve — under §8's requirements. **No
 Issue, Release or Approve button exists anywhere, and no worklist raises it as work.** The
-number stays the locked `DO-DDMMYY-NNNN` scheme seeded on the order id (a same-day re-issue for
-a superseded trip takes the scheme's repeat letter, `-B`), so a reprint always matches the
-signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
+number follows the 2026-09-23 ruling (`DO2609-4827` Outright / `SDO2609-48271` Subscription,
+random, unique across all orders — `docs/delivery/MASTER.md` §3.1); the stored number is reprinted,
+so a reprint always matches the signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
 `rescheduled` by the system; a failed one keeps its Delivery exception forever and simply stops
 being the active number; a delivered one is untouched history.
 

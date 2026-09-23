@@ -259,7 +259,7 @@ Amount in words: RINGGIT MALAYSIA …            ← one full-width 7pt grey lin
   110mm so the left rail holds with the tables, and the box sits at its bottom
   so it finishes level with the totals card. Printed **name only** — no phone,
   BILL TO has it (round 15; international form: signature over printed name).
-- **Totals card — **NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.**** Carres is not
+- **Totals card — NOT SST-registered — OWNER RULING (Jess, 2026-09-23) · APPROVED / LOCKED; overwrites the 2026-09-21 "SST-registered" ruling.** Carres is not
   registered for SST. The document shows **no tax row and
   no "tax included" / "tax excluded" wording**: `Total payable · Paid to date · BALANCE DUE`. `tax_amount`
   stays 0.
