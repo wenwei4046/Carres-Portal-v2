@@ -585,6 +585,27 @@ answer exists for that version.
 
 ### 6.1 Formal document numbers
 
+**PO — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET / NOT BUILT.**
+
+```text
+PO260924-4827(1)     PO · YYMMDD of first issue · 4 random digits · version
+PO260924-4827(2)     the same PO after one revision
+```
+
+- The date is the day the PO was **first issued** (supplier production lead time counts from it);
+  a revision never changes the date or the number. Version marker has no space, as on the SO.
+- Four random digits, leading zeros allowed: **10,000 PO numbers a day, for PO alone** — the PO
+  draws from its OWN daily pool, never sharing codes with GRN, SB, PV or any other prefix. One PO
+  of any number of lines uses one number.
+- Outright and Subscription share one PO series; every PO line keeps its source link. Whether lines
+  share a PO still follows the purchasing grouping rules.
+- Unique, never reused, fixed width, capacity watched internally; any change of width is an owner
+  decision. Existing PO numbers and issued PDFs are kept (test data; clean start).
+- This replaces `PO-YYYYMMDD-RRRR` and `· Version 2` for the PO only. The other prefixes below keep
+  the family rule that follows until each is ruled.
+
+**Family rule for the other formal documents (unchanged until each is ruled):**
+
 ```text
 PREFIX-YYYYMMDD-RRRR
 ```
@@ -597,7 +618,7 @@ PREFIX-YYYYMMDD-RRRR
   duplicates. Cancelled/void numbers are never reused.
 - Every new object gets its own number. Relationships live in Source and `Order Route`, never in
   matching tail digits.
-- A revision keeps the original number: `PO-20260820-4827 · Version 2`.
+- A revision keeps the original number (PO display: see the PO ruling above).
 
 **HOW IT IS ENFORCED — BUILT, migration 0381, PR #894.** `allocate_formal_document_code(prefix)`
 DRAWS `RRRR` at random from the day's unused codes and is unique on `(date, code)` ACROSS prefixes,

@@ -173,7 +173,7 @@ authorization secrets. Reconcile §9's message-reference rules before cutover; a
 does not authorize sending order numbers to suppliers.
 
 **Scope boundary.** This approval covers the Outright/Subscription order numbers, their delivery-document
-prefixes and the revision presentation (DO detail: `docs/delivery/MASTER.md` §3.1). PO, GRN,
+prefixes and the revision presentation (DO detail: `docs/delivery/MASTER.md` §3.1; PO `PO260924-4827(1)`: `docs/purchasing/MASTER.md` §6.1). GRN,
 Service Case, INV/RC (accountant first) require their own capacity and
 governing-business-rule review. It does not approve revision, rescheduling, voiding or correction
 workflows of other documents. This is approved target truth, not shipped behavior, whole-blueprint
