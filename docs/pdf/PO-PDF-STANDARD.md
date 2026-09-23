@@ -1,5 +1,9 @@
 # Purchase Order PDF Standard
 
+**Start at [`DOCUMENT-KIT.md`](DOCUMENT-KIT.md)** — the shared shape, words and
+owner rulings for every Carres document. This file holds only what this
+document decides for itself.
+
 **Status** — Law
 **Owner** — Loo (baseline 2026-08-01/02; family rewrite approved 2026-08-09)
 **This is the ONLY copy.** Amend in place through the Change Policy; the Change

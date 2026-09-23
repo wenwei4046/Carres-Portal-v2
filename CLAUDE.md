@@ -598,6 +598,7 @@ Never create an empty master for symmetry.
 | [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) | every visible word — the dictionary, the seven verbs, the banned words |
 | [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) | how actions are computed, appear, close, and which shows first |
 | [`docs/01-design-tokens.md`](docs/01-design-tokens.md) · [`02-components.md`](docs/02-components.md) · [`03-page-patterns.md`](docs/03-page-patterns.md) | the design system — token values and components |
+| [`docs/pdf/DOCUMENT-KIT.md`](docs/pdf/DOCUMENT-KIT.md) | **every printed document** — the shared shape, the owner's review rulings, which documents exist and where each one's rules live. Read it BEFORE designing any PDF |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | the stack, the repo, RLS performance, deployment, testing, current production state |
 
 **Open one only when you need a specific answer from it. Do not read them to start work.**

@@ -1,5 +1,8 @@
 # Sales Order PDF Standard
 
+**The family chrome lives here, and [`DOCUMENT-KIT.md`](DOCUMENT-KIT.md) is the
+entry point for every Carres document — read the kit first.**
+
 **Status** — Law
 **Owner** — Loo (approved 2026-08-09, 17 review rounds on real renders)
 **This is the ONLY copy.** Never a FINAL, a V2 or a draft variant. Amend in place;

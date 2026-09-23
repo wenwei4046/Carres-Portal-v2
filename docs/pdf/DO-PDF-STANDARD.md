@@ -1,5 +1,9 @@
 # Delivery Order PDF Standard
 
+**Start at [`DOCUMENT-KIT.md`](DOCUMENT-KIT.md)** — the shared shape, words and
+owner rulings for every Carres document. This file holds only what this
+document decides for itself.
+
 **Status** — Law
 **Owner** — Loo (approved 2026-08-09, reviewed on rendered PDFs alongside the SO)
 **This is the ONLY copy.** Amend in place; the Change Log records every amendment.
