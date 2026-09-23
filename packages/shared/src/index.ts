@@ -2071,6 +2071,7 @@ export {
 // own goods + money answers so the two surfaces cannot disagree.
 export {
   deliveryOrderIssueGate,
+  owedWarning,
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";

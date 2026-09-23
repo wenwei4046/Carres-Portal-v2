@@ -204,15 +204,71 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 
-  it("an outstanding balance blocks with no approval — the 2026-08-19 money gate", async () => {
+  it("0571 · an outstanding balance with no approval WARNS with the amount and issues nothing", async () => {
     const t = tables({ paid: 0 });
     const sb = makeSb(t);
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
-    expect(attempt.outcome).toBe("blocked");
-    expect(
-      attempt.outcome === "blocked" && attempt.reasons.join(" "),
-    ).toContain("still outstanding");
+    expect(attempt).toEqual({
+      outcome: "owed",
+      owed: 2500,
+      message: "RM 2,500.00 is still outstanding. Confirm to issue the delivery order anyway.",
+    });
     expect(t.orders.update).not.toHaveBeenCalled();
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("0571 · with the amount confirmed it issues through the confirming door, never the bare column write", async () => {
+    const t = tables({ paid: 0 });
+    const sb = makeSb(t);
+    sb.rpc.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_order_mint_owed_confirmed"
+          ? { data: DO_NUMBER, error: null }
+          : { data: null, error: null },
+      ),
+    );
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { confirmOwed: 2500 });
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_order_mint_owed_confirmed", {
+      p_order_id: ORDER_ID,
+      p_do_number: DO_NUMBER,
+      p_owed_confirmed: 2500,
+    });
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("0571 · the database's own figure wins: its refusal comes back as the warning to confirm", async () => {
+    const sb = makeSb(tables({ paid: 0 }));
+    sb.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        message: "RM 2,480.00 is still outstanding. Confirm to issue the delivery order anyway.",
+        details: "delivery_money_owed",
+        hint: "2480.00",
+      },
+    });
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { confirmOwed: 2500 });
+    expect(attempt).toEqual({
+      outcome: "owed",
+      owed: 2480,
+      message: "RM 2,480.00 is still outstanding. Confirm to issue the delivery order anyway.",
+    });
+  });
+
+  it("0571 · the database's Finance hold comes back as a refusal, never an error", async () => {
+    const sb = makeSb(tables({ paid: 0 }));
+    sb.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        message: "Finance is holding this delivery: Test reason — Finance clears it.",
+        details: "delivery_finance_hold",
+      },
+    });
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { confirmOwed: 2500 });
+    expect(attempt).toEqual({
+      outcome: "blocked",
+      reasons: ["Finance is holding this delivery: Test reason — Finance clears it."],
+    });
   });
 
   it("an APPROVED Delivery Payment Approval opens the money gate — COD issues the paper", async () => {
@@ -222,7 +278,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
   });
 
-  it("a PENDING request keeps the gate shut — raising changes no gate", async () => {
+  it("a PENDING request does not cover the balance — it still warns", async () => {
     const t = tables({
       paid: 0,
       paymentApprovals: [
@@ -231,10 +287,7 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     });
     const sb = makeSb(t);
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
-    expect(attempt.outcome).toBe("blocked");
-    expect(
-      attempt.outcome === "blocked" && attempt.reasons.join(" "),
-    ).toContain("waiting for the approver");
+    expect(attempt.outcome).toBe("owed");
   });
 
   // Outstation (card §5): goods ready and money in, but the partner has not
@@ -259,16 +312,13 @@ describe("attemptDeliveryOrderIssue — the one issuing path", () => {
     expect(requested).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
   });
 
-  it("the Request Delivery Order door still refuses money — it is not a bypass", async () => {
+  it("the Request Delivery Order door still warns on money — it is not a bypass of the confirmation", async () => {
     const t = tables({ control: OUTSTATION, paid: 0 });
     const sb = makeSb(t);
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, {
       waitBookingConfirm: false,
     });
-    expect(attempt.outcome).toBe("blocked");
-    expect(
-      attempt.outcome === "blocked" && attempt.reasons.join(" "),
-    ).toContain("still outstanding");
+    expect(attempt.outcome).toBe("owed");
     expect(t.orders.update).not.toHaveBeenCalled();
   });
 
@@ -376,11 +426,24 @@ describe("attemptLegDocumentIssue — a Journey leg's own document (0491)", () =
     expect(out).toEqual({ outcome: "blocked", reasons: ["Assign logistics for this leg", "Confirm the delivery date for this leg"] });
   });
 
-  it("the order's money gate still holds for a leg — an owing order issues no leg paper", async () => {
+  it("0571 · an owing order's leg warns and issues no leg paper without a confirmation", async () => {
     const sb = makeSb(legTables({ paid: 0 }));
     const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
-    expect(out.outcome).toBe("blocked");
+    expect(out.outcome).toBe("owed");
     expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("0571 · a confirmed leg issues through the leg's confirming door", async () => {
+    const sb = makeSb(legTables({ paid: 0 }));
+    sb.rpc = vi.fn().mockResolvedValue({ data: { do_number: LEG_DO, leg: 1 }, error: null });
+    const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1, { confirmOwed: 2500 });
+    expect(out).toEqual({ outcome: "issued", doNumber: LEG_DO });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_leg_document_mint_owed_confirmed", {
+      p_order_id: ORDER_ID,
+      p_leg: 1,
+      p_do_number: LEG_DO,
+      p_owed_confirmed: 2500,
+    });
   });
 
   it("a live document for the leg is returned, never re-minted", async () => {
@@ -410,5 +473,24 @@ describe("attemptDeliveryOrderIssue — a split trip's own document (0542)", () 
       p_do_number: DO_NUMBER,
     });
     expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("0571 · a confirmed split trip issues through the trip's confirming door", async () => {
+    const t = tables({ paid: 0, control: { booking_groups: ["bed"] } });
+    const sb = makeSb(t);
+    sb.rpc.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_trip_document_mint_owed_confirmed"
+          ? { data: { do_number: DO_NUMBER, trip: 2 }, error: null }
+          : { data: null, error: null },
+      ),
+    );
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID, { confirmOwed: 2500 });
+    expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_trip_document_mint_owed_confirmed", {
+      p_order_id: ORDER_ID,
+      p_do_number: DO_NUMBER,
+      p_owed_confirmed: 2500,
+    });
   });
 });

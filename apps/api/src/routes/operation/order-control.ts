@@ -757,7 +757,16 @@ orderControlRouter.get("/:id/delivery-attempts", async (c) => {
  * exception — merely without waiting for the booking-confirm trigger. It is
  * never a free-form create: no editable customer, goods, price or number, and
  * a refusal names the failing gate.
+ *
+ * 0571 (owner, 2026-09-23): money still owed WARNS. With no body the door
+ * answers 409 `delivery_money_owed` with the amount; the same request with
+ * `{ confirm_owed: <that amount> }` issues, and the document records the
+ * amount and the person who confirmed. The database enforces it either way.
  */
+const requestDeliveryOrderInput = z
+  .object({ confirm_owed: z.number().positive().finite().optional() })
+  .strict();
+
 orderControlRouter.post("/:id/delivery-order/request", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
@@ -765,9 +774,32 @@ orderControlRouter.post("/:id/delivery-order/request", async (c) => {
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
+  // The body is optional: the first press sends none.
+  const raw = await c.req.text();
+  let body: unknown = {};
+  if (raw.trim()) {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      throw new HTTPException(400, { message: "Body must be valid JSON" });
+    }
+  }
+  const parsed = requestDeliveryOrderInput.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "confirm_owed must be the amount still owed, in RM",
+      },
+      400,
+    );
+  }
+
   const sb = userClient(c.env, auth.jwt);
   const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data, {
     waitBookingConfirm: false,
+    confirmOwed: parsed.data.confirm_owed,
   });
   switch (attempt.outcome) {
     case "issued":
@@ -789,6 +821,16 @@ orderControlRouter.post("/:id/delivery-order/request", async (c) => {
           reasons: attempt.reasons,
         },
         422,
+      );
+    case "owed":
+      return c.json(
+        {
+          error: "delivery_money_owed",
+          code: "delivery_money_owed",
+          message: attempt.message,
+          owed: attempt.owed,
+        },
+        409,
       );
     case "error":
       return c.json(attempt.body, attempt.status);

@@ -169,6 +169,17 @@ describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
     expect(body).toContain("/operation/delivery-orders/");
   });
 
+  it("0571 · money owed warns: the row reads the 409's amount and sends it back only on Confirm", () => {
+    const i = SRC.indexOf("function DeliveryOrderRow(");
+    expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
+    const body = SRC.slice(i, SRC.indexOf("\nfunction ", i + 1));
+    expect(body).toContain('body?.code === "delivery_money_owed"');
+    expect(body).toContain("JSON.stringify({ confirm_owed: confirmOwed })");
+    // the first press never confirms; only the Confirm button sends the amount
+    expect(body).toContain("onClick={() => request.mutate(undefined)}");
+    expect(body).toContain("onClick={() => request.mutate(owed.amount)}");
+  });
+
   it("the row shows the number as a FACT once it exists — no second press", () => {
     const i = SRC.indexOf("function DeliveryOrderRow(");
     expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);

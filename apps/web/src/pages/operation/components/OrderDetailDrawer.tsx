@@ -4902,6 +4902,10 @@ export { waLink };
  * exists. The door walks the SAME issuing path with the SAME gates — goods,
  * money (0362) and the Finance exception — merely without waiting for the
  * booking-confirm trigger. A refusal names the failing gate.
+ *
+ * 0571 (owner, 2026-09-23): money still owed WARNS. The door answers with the
+ * amount; the row shows the warning and a Confirm button that sends that
+ * amount back, and the database records who confirmed and how much.
  */
 function DeliveryOrderRow({
   orderId,
@@ -4912,20 +4916,32 @@ function DeliveryOrderRow({
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [owed, setOwed] = useState<{ amount: number; message: string } | null>(null);
   const request = useMutation({
-    mutationFn: () =>
+    mutationFn: (confirmOwed: number | undefined) =>
       apiFetch<{ order: { do_number: string | null }; issued: boolean }>(
         `/api/operation/orders/${encodeURIComponent(orderId)}/delivery-order/request`,
-        { method: "POST" },
+        confirmOwed === undefined
+          ? { method: "POST" }
+          : { method: "POST", body: JSON.stringify({ confirm_owed: confirmOwed }) },
       ),
     onSuccess: (res) => {
+      setOwed(null);
       void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
       void qc.invalidateQueries({ queryKey: qk.operation.orders() });
       if (res.order.do_number) {
         toast.success(`Delivery order issued — ${res.order.do_number}`);
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      const body =
+        e instanceof ApiError ? (e.body as { code?: string; owed?: number } | null) : null;
+      if (body?.code === "delivery_money_owed" && typeof body.owed === "number") {
+        setOwed({ amount: body.owed, message: e.message });
+        return;
+      }
+      toast.error(e.message);
+    },
   });
   return (
     <DRow k="Delivery order">
@@ -4952,10 +4968,24 @@ function DeliveryOrderRow({
           <Btn
             data-testid="request-delivery-order"
             disabled={request.isPending}
-            onClick={() => request.mutate()}
+            onClick={() => request.mutate(undefined)}
           >
             Request Delivery Order
           </Btn>
+          {owed && (
+            <>
+              <span className="text-meta text-warning" data-testid="delivery-order-owed-warning">
+                {owed.message}
+              </span>
+              <Btn
+                data-testid="confirm-owed-delivery-order"
+                disabled={request.isPending}
+                onClick={() => request.mutate(owed.amount)}
+              >
+                Confirm
+              </Btn>
+            </>
+          )}
         </span>
       )}
     </DRow>

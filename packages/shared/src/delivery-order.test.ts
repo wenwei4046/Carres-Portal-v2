@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deliveryOrderIssueGate, type DeliveryOrderIssueInput } from "./delivery-order";
+import { deliveryOrderIssueGate, owedWarning, type DeliveryOrderIssueInput } from "./delivery-order";
 import type { FinanceException } from "./finance-exception";
 import type { DeliveryPaymentApproval } from "./delivery-payment-approval";
 
@@ -72,7 +72,7 @@ const run = (over: Partial<typeof BASE> & { holidays?: string[] } = {}) =>
 
 describe("deliveryOrderIssueGate — when the document may exist", () => {
   it("passes when confirmation, calendar, goods and money are met and Finance is silent", () => {
-    expect(run()).toEqual({ ok: true, reasons: [] });
+    expect(run()).toEqual({ ok: true, reasons: [], owed: 0 });
   });
 
   it("refuses without the customer's confirmation", () => {
@@ -118,50 +118,50 @@ describe("deliveryOrderIssueGate — when the document may exist", () => {
 });
 
 /**
- * ⭐ THE MONEY GATE (owner ruling 2026-08-19). The 2026-08-16 tests proved a
- * balance could not refuse the paper; these prove it refuses again — and that
- * the ONE exception is a recorded APPROVED payment approval.
+ * 0571 . MONEY OWED WARNS (owner, 2026-09-23: "the automatic block when money
+ * is still owed becomes a warning"). The gate no longer refuses a balance; it
+ * reports the amount as `owed` for a person to confirm. An APPROVED payment
+ * approval still covers the balance.
  */
-describe("deliveryOrderIssueGate — money in full before delivery", () => {
-  it("refuses an outstanding balance with no approval, and names both closers", () => {
+describe("deliveryOrderIssueGate — money owed is a warning, not a refusal", () => {
+  it("an outstanding balance with no approval passes the gate and reports what is owed", () => {
     const r = run({ gate: { ...OK_GATE, outstanding: 2455 } });
-    expect(r.ok).toBe(false);
-    expect(r.reasons[0]).toContain("RM 2,455.00");
-    expect(r.reasons[0]).toContain("still outstanding");
-    expect(r.reasons[0]).toContain("payment approval");
+    expect(r).toEqual({ ok: true, reasons: [], owed: 2455 });
   });
 
-  it("an APPROVED payment approval opens the gate over the balance", () => {
+  it("the warning states the amount in RM to the cent", () => {
+    expect(owedWarning(1050.5)).toBe(
+      "RM 1,050.50 is still outstanding. Confirm to issue the delivery order anyway.",
+    );
+  });
+
+  it("owed is rounded to the cent, the figure the database compares", () => {
+    expect(run({ gate: { ...OK_GATE, outstanding: 1050.505 } }).owed).toBe(1050.51);
+  });
+
+  it("an APPROVED payment approval covers the balance, so nothing is owed", () => {
     const r = run({
       gate: { ...OK_GATE, outstanding: 2455 },
       paymentApprovals: [approval()],
     });
-    expect(r).toEqual({ ok: true, reasons: [] });
+    expect(r).toEqual({ ok: true, reasons: [], owed: 0 });
   });
 
-  it("a PENDING request keeps the gate shut and says the decision is awaited", () => {
-    const r = run({
+  it("a PENDING or REFUSED request does not cover it", () => {
+    const pending = run({
       gate: { ...OK_GATE, outstanding: 2455 },
-      paymentApprovals: [
-        approval({ status: "pending", decidedAt: null, decisionReason: null }),
-      ],
+      paymentApprovals: [approval({ status: "pending", decidedAt: null, decisionReason: null })],
     });
-    expect(r.ok).toBe(false);
-    expect(r.reasons[0]).toContain("waiting for the approver");
-  });
-
-  it("a REFUSED request keeps the gate shut", () => {
-    const r = run({
+    const refused = run({
       gate: { ...OK_GATE, outstanding: 2455 },
-      paymentApprovals: [
-        approval({ status: "refused", decisionReason: "Collect first" }),
-      ],
+      paymentApprovals: [approval({ status: "refused", decisionReason: "Collect first" })],
     });
-    expect(r.ok).toBe(false);
+    expect(pending.owed).toBe(2455);
+    expect(refused.owed).toBe(2455);
   });
 
-  it("paid in full needs no approval — outstanding = 0 is the default door", () => {
-    expect(run({ paymentApprovals: [] }).ok).toBe(true);
+  it("paid in full owes nothing", () => {
+    expect(run({ paymentApprovals: [] })).toEqual({ ok: true, reasons: [], owed: 0 });
   });
 
   it("paid alone never issues — the booking gate still refuses without a date", () => {
@@ -222,7 +222,9 @@ describe("deliveryOrderIssueGate — the Finance exception is the SECOND blocker
       gate: { goodsReady: false, notReadySkus: ["SOFA-01"], outstanding: 900 },
       financeExceptions: [openException()],
     });
-    expect(r.reasons).toHaveLength(4);
+    // Booking, goods and Finance refuse; the 900 owed is a warning (0571).
+    expect(r.reasons).toHaveLength(3);
+    expect(r.owed).toBe(900);
   });
 });
 
@@ -239,10 +241,10 @@ describe("deliveryOrderIssueGate — the Request Delivery Order door", () => {
       confirmedDateIso: null,
       confirmedTimeSlot: null,
     });
-    expect(r).toEqual({ ok: true, reasons: [] });
+    expect(r).toEqual({ ok: true, reasons: [], owed: 0 });
   });
 
-  it("still refuses money — the door is not a bypass", () => {
+  it("reports money owed the same way — the door is not a bypass of the confirmation", () => {
     const r = run({
       waitBookingConfirm: false,
       bookingConfirmed: false,
@@ -250,8 +252,7 @@ describe("deliveryOrderIssueGate — the Request Delivery Order door", () => {
       confirmedTimeSlot: null,
       gate: { ...OK_GATE, outstanding: 1200 },
     });
-    expect(r.ok).toBe(false);
-    expect(r.reasons[0]).toContain("still outstanding");
+    expect(r).toEqual({ ok: true, reasons: [], owed: 1200 });
   });
 
   it("still refuses goods and the Finance exception, naming the failing gate", () => {

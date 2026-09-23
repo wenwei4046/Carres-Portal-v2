@@ -4,6 +4,7 @@ import {
   docNumber,
   myHolidaySet,
   orderActionDone,
+  owedWarning,
   type DeliveryGroupKey,
 } from "@carres/shared";
 import { loadBookingContext } from "./booking-context";
@@ -38,6 +39,12 @@ import { todayIsoMYT } from "./today";
  *     issues nothing and the reasons name what is still open. The database
  *     asserts the money law again on the mint itself (0362's trigger), so no
  *     path around this module can issue an unapproved owing order's paper.
+ *   · **0571 (owner, 2026-09-23): money owed WARNS.** An owing order with no
+ *     approved payment approval comes back as `owed` with the amount. It
+ *     issues only when the caller passes `confirmOwed`, a person's
+ *     confirmation of that amount, through the `*_owed_confirmed` doors; the
+ *     database refuses any issue that did not confirm the amount it computes,
+ *     and records the amount and the person on the document.
  *
  * FAIL-SOFT AT EVERY HOOK. The doors that call this after their own act
  * (confirm / clear / reserve) treat any failure here as "not issued yet" —
@@ -53,11 +60,32 @@ export type DeliveryOrderAttempt =
   | { outcome: "already"; doNumber: string | null }
   /** The gate refused; `reasons` name what is still open, actionably. */
   | { outcome: "blocked"; reasons: string[] }
+  /** 0571 . Money is still owed and nobody confirmed it: nothing was issued.
+   *  `message` is the warning; `owed` is the amount to confirm. */
+  | { outcome: "owed"; owed: number; message: string }
   /** A read/write failed; the caller's fail-soft rule applies. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | { outcome: "error"; body: any; status: any };
 
 export { todayIsoMYT };
+
+/** 0571 . The database's two refusals read back as outcomes. The database
+ *  computes the amount owed itself, so its figure is the one a person confirms,
+ *  even when it differs from the gate's. */
+function refusedByDatabase(error: {
+  message: string;
+  details?: string | null;
+  hint?: string | null;
+}): DeliveryOrderAttempt {
+  if (error.details === "delivery_money_owed") {
+    const owed = Number(error.hint);
+    return { outcome: "owed", owed, message: owedWarning(owed) };
+  }
+  if (error.details === "delivery_finance_hold") {
+    return { outcome: "blocked", reasons: [error.message] };
+  }
+  return { outcome: "error", body: { message: error.message }, status: 500 };
+}
 
 /**
  * Issue this order's delivery order if — and only if — every requirement is
@@ -78,6 +106,8 @@ export async function attemptDeliveryOrderIssue(
      *  booking confirmation — outstation trips need the paper before the
      *  partner has scheduled the customer. Never a free-form create. */
     waitBookingConfirm?: boolean;
+    /** 0571 . A person confirmed issuing while this much is still owed. */
+    confirmOwed?: number;
   },
 ): Promise<DeliveryOrderAttempt> {
   // The trip's scope is the one ALREADY booked (`booking_groups`), never a
@@ -148,6 +178,10 @@ export async function attemptDeliveryOrderIssue(
     waitBookingConfirm: opts?.waitBookingConfirm ?? true,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
+  const confirmOwed = opts?.confirmOwed;
+  if (issue.owed > 0 && confirmOwed === undefined) {
+    return { outcome: "owed", owed: issue.owed, message: owedWarning(issue.owed) };
+  }
 
   // The document date is TODAY — the day it is issued and handed over, which is
   // what the locked scheme's DDMMYY segment means.
@@ -180,27 +214,37 @@ export async function attemptDeliveryOrderIssue(
   // governed door: the one-live index is keyed by trip, so an earlier trip
   // that already ran keeps its document and this trip gets its own.
   if (bookedScope) {
-    const { data, error } = await sb.rpc("delivery_trip_document_mint", {
-      p_order_id: orderId,
-      p_do_number: doNumber,
-    });
-    if (error) return { outcome: "error", body: { message: error.message }, status: 500 };
+    const args = { p_order_id: orderId, p_do_number: doNumber };
+    const { data, error } =
+      confirmOwed === undefined
+        ? await sb.rpc("delivery_trip_document_mint", args)
+        : await sb.rpc("delivery_trip_document_mint_owed_confirmed", {
+            ...args,
+            p_owed_confirmed: confirmOwed,
+          });
+    if (error) return refusedByDatabase(error);
     const minted = (data as { do_number?: string } | null)?.do_number ?? doNumber;
     if (minted !== doNumber) return { outcome: "already", doNumber: minted };
   } else {
     // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
     // in the read above: two callers arriving at the same moment cannot produce
-    // two numbers, and the loser re-reads the winner's.
-    const { data: updated, error } = await sb
-      .from("orders")
-      .update({ do_number: doNumber })
-      .eq("id", orderId)
-      .is("do_number", null)
-      .select("id, do_number")
-      .maybeSingle();
-    if (error) {
-      return { outcome: "error", body: { message: error.message }, status: 500 };
-    }
+    // two numbers, and the loser re-reads the winner's. The confirming door
+    // (0571) makes the same write and returns null when it lost.
+    const { data: updated, error } =
+      confirmOwed === undefined
+        ? await sb
+            .from("orders")
+            .update({ do_number: doNumber })
+            .eq("id", orderId)
+            .is("do_number", null)
+            .select("id, do_number")
+            .maybeSingle()
+        : await sb.rpc("delivery_order_mint_owed_confirmed", {
+            p_order_id: orderId,
+            p_do_number: doNumber,
+            p_owed_confirmed: confirmOwed,
+          });
+    if (error) return refusedByDatabase(error);
     if (!updated) {
       const { data: raced } = await sb
         .from("orders")
@@ -254,6 +298,9 @@ export async function attemptLegDocumentIssue(
   sb: any,
   orderId: string,
   leg: number,
+  /** 0571 . As `attemptDeliveryOrderIssue`: a person's confirmation of the
+   *  amount still owed. */
+  opts?: { confirmOwed?: number },
 ): Promise<DeliveryOrderAttempt> {
   if (!Number.isInteger(leg) || leg < 1) {
     return { outcome: "blocked", reasons: ["A leg document names its leg"] };
@@ -326,6 +373,10 @@ export async function attemptLegDocumentIssue(
     waitBookingConfirm: false,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
+  const confirmOwed = opts?.confirmOwed;
+  if (issue.owed > 0 && confirmOwed === undefined) {
+    return { outcome: "owed", owed: issue.owed, message: owedWarning(issue.owed) };
+  }
 
   // The locked scheme, seeded on the order AND the leg; a same-day re-issue of
   // the same leg takes the repeat letter, exactly as the whole-order path.
@@ -334,12 +385,15 @@ export async function attemptLegDocumentIssue(
   let doNumber = base;
   for (let rev = 1; taken.has(doNumber) && rev <= 25; rev++) doNumber = `${base}${amendmentSuffix(rev)}`;
 
-  const { data, error } = await sb.rpc("delivery_leg_document_mint", {
-    p_order_id: orderId,
-    p_leg: leg,
-    p_do_number: doNumber,
-  });
-  if (error) return { outcome: "error", body: { message: error.message }, status: 500 };
+  const args = { p_order_id: orderId, p_leg: leg, p_do_number: doNumber };
+  const { data, error } =
+    confirmOwed === undefined
+      ? await sb.rpc("delivery_leg_document_mint", args)
+      : await sb.rpc("delivery_leg_document_mint_owed_confirmed", {
+          ...args,
+          p_owed_confirmed: confirmOwed,
+        });
+  if (error) return refusedByDatabase(error);
   const minted = (data as { do_number?: string } | null)?.do_number ?? doNumber;
   return minted === doNumber ? { outcome: "issued", doNumber } : { outcome: "already", doNumber: minted };
 }

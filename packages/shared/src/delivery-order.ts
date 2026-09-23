@@ -31,6 +31,11 @@
  * order's goods owing as 0, so `outstanding` here is only ever a figure
  * somebody actually knows.
  *
+ * 0571 (owner, 2026-09-23): money still owed WARNS instead of refusing. The
+ * gate reports the amount as `owed`, a person confirms it to issue anyway, and
+ * the document records who confirmed and how much. The Finance hold still
+ * refuses. Where this header says the money gate refuses, read "warns".
+ *
  * PURE — no clock, no I/O, no calendar of its own: the holiday set is
  * INJECTED, and the Finance exceptions and payment approvals are handed in as
  * rows the caller read from the one owning table each. Nothing here computes
@@ -43,9 +48,10 @@ import {
   type FinanceException,
 } from "./finance-exception";
 import {
-  paymentApprovalReason,
+  paymentApprovalOpensGate,
   type DeliveryPaymentApproval,
 } from "./delivery-payment-approval";
+import { fmtMoney } from "./money-format";
 
 export interface DeliveryOrderIssueInput {
   /** D1/0277 — the CUSTOMER confirmed (not the logistics company's word). */
@@ -79,6 +85,17 @@ export interface DeliveryOrderIssueResult {
   ok: boolean;
   /** Why not, in the order an operator can act on them. Empty when `ok`. */
   reasons: string[];
+  /** 0571 . Money still owed with no approved payment approval, in RM to the
+   *  cent; 0 when nothing is owed. It never refuses: a person confirms this
+   *  amount to issue anyway (`owedWarning`), and the database refuses an issue
+   *  that did not confirm it. */
+  owed: number;
+}
+
+/** 0571 . The warning a person answers before issuing while money is owed.
+ *  The database raises the same sentence (0571's money gate). */
+export function owedWarning(owed: number): string {
+  return `${fmtMoney(owed)} is still outstanding. Confirm to issue the delivery order anyway.`;
 }
 
 function has(
@@ -139,21 +156,21 @@ export function deliveryOrderIssueGate({
     );
   }
 
-  // ⭐ THE MONEY GATE (owner ruling 2026-08-19). Money in full before delivery
-  // is the only default; the one exception is a recorded APPROVED payment
-  // approval. `paymentApprovalReason` is the shared spelling — this gate never
-  // words the refusal for itself.
-  const moneyReason = paymentApprovalReason(gate.outstanding, paymentApprovals);
-  if (moneyReason) {
-    reasons.push(moneyReason);
-  }
+  // 0571 . Money still owed WARNS, it no longer refuses (owner, 2026-09-23:
+  // "the automatic block when money is still owed becomes a warning"). An
+  // approved payment approval still covers the balance, so nothing is owed.
+  const owed =
+    gate.outstanding > 0 && !paymentApprovalOpensGate(paymentApprovals)
+      ? Math.round(gate.outstanding * 100) / 100
+      : 0;
 
-  // The SECOND money blocker: an OPEN Finance exception refuses regardless of
-  // payment — an approval does not clear a Finance judgement (0355 unchanged).
+  // Finance's explicit hold: an OPEN Finance exception refuses regardless of
+  // payment or confirmation — an approval does not clear a Finance judgement
+  // (0355 unchanged; 0571 asserts it in the database too).
   const financeReason = financeExceptionReason(financeExceptions);
   if (financeReason) {
     reasons.push(financeReason);
   }
 
-  return { ok: reasons.length === 0, reasons };
+  return { ok: reasons.length === 0, reasons, owed };
 }
