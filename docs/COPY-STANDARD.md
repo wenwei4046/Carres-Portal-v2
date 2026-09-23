@@ -2669,6 +2669,8 @@ automatically become a Sales Order state. These words are approved target copy, 
 | Stale proposal state/action | **Out of date — propose again** |
 | The customer's recorded basis for a commercial change (0564) | The screen words are governed by § "Customer agreement evidence — screen wording" below and are **PROPOSAL / NOT LAW**. There is no free-text evidence field and no tick box: a governed KIND always names a pointer outside the record. |
 | Add a catalogue service to the SO object draft (0564) | **Add service** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| The SO `Delivery` field naming the disposal services the order carries (same rows as Items, no money) | **Disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
+| In Edit, add a disposal service from `Delivery` (the same act as `Add service`) | **Add disposal** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | A draft line the promotion protects | **Free item — it follows the item it came with** ⚠️ build wording 2026-09-23, owner confirmation owed |
 | Contract term field | **Instalment months** |
 | Unknown promised date | **Delivery date to be confirmed** |
@@ -3053,7 +3055,7 @@ The T4 Reason Library gained the card's four remaining exception reasons —
 `Goods damaged` · `Wrong goods` · `Delivery photo missing` · `Loan not collected back` — in the
 library itself (`delivery-reasons.ts`), never as a second list. **No Release, Approve or Issue
 button exists anywhere on this surface**: the SYSTEM issues the document
-(`../orders/MASTER.md` §8).
+(`orders/MASTER.md` §8).
 
 ## The Delivery module words (CARD-2026-09-04-delivery-01 — overwrites the 2026-08-24 one-word ruling)
 

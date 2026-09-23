@@ -1,10 +1,10 @@
 /**
  * CARRES PORTAL — DESIGN STANDARD (the machine mirror)
  * =========================================================
- * FOLLOWS: **UI-KIT 2026-07-27** — the edition declared by `docs/UI-KIT.md`
- * §0.3. This module is a MIRROR of that law and nothing else.
+ * FOLLOWS: the design-token law, `docs/01-design-tokens.md` (successor of the
+ * retired `docs/UI-KIT.md`). This module is a MIRROR of that law and nothing else.
  *
- * ⚠️ **`docs/UI-KIT.md` WINS.** Its own first line says so, and §0.3 makes a
+ * ⚠️ **`docs/01-design-tokens.md` WINS.** The law file says so, and makes a
  * second authority claim a Build-Guard failure (D1). This header used to read
  * *"where any older doc, code comment, or token conflicts with UI-KIT v4, v4
  * wins"* — two bodies of one kit each declaring itself the winner. That claim
@@ -16,7 +16,7 @@
  * 2026-07-27 and several tokens moved (see the per-block notes). Correcting a
  * value is a VISUAL change and belongs to the codemod cards **D2 · D3 · D4** —
  * card D0.6 corrected this file's CLAIMS and deliberately touched no exported
- * value. Read a token from `docs/UI-KIT.md` §2–§5, never from here.
+ * value. Read a token from `docs/01-design-tokens.md`, never from here.
  *
  * Measured 2026-07-28, because it changes how much this file matters:
  *   real importers ............................ 1  (lib/staff-avatar.ts, for

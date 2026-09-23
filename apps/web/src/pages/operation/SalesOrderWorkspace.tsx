@@ -94,6 +94,8 @@ import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
+import { SO_HEAD_ROW, SO_TABLE, SO_TH } from "./components/so-document-table";
+import { serviceCodeWord } from "@/lib/service-code";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -135,7 +137,7 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
 import type { RecordedAgreement } from "./customer-agreement";
-import { configWords, diffRows, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { configWords, diffRows, isDisposalService, NOT_IN_CATALOG, qtyWords, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
@@ -941,7 +943,19 @@ export function Block({
               <span>{forceOpen ? "Unsaved changes here" : "Hide"}</span>
             </button>
           )}
-          <div id={bodyId} className="mt-3">
+          {/* ⭐ ONE GAP BETWEEN THE GROUPS OF A SECTION (SO page kit-sizes
+              card, 2026-09-23). Each SO section used to space its own field
+              groups — `mt-3` here, `mt-4` there, none at all between Delivery's
+              address and its access fields (measured 0px). The body now owns
+              it: 12px (`gap-3`, the standard gap) between every group, and a
+              group that renders nothing takes no gap. Children carry no top
+              margin of their own. Opt-in with the SO tone because Purchase
+              Orders and Manual Purchase share this component and space their
+              own bodies. */}
+          <div
+            id={bodyId}
+            className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}
+          >
             {children}
           </div>
         </>
@@ -960,15 +974,22 @@ export function Block({
  * MASTER.md's block order names the section). So the section keeps its exact
  * word and loses only its border, its own 24px gap and its second heading rule.
  *
- * Deliberately quieter than a card title: the ordinary field-group heading
- * (`text-strong`, `01-design-tokens.md` §1) rather than the card title's own
- * mono/uppercase treatment — one "shouting" heading per card, and this reads
- * as a smaller instance of the same body text.
+ * Deliberately quieter than a card title: HEADINGS HAVE TWO RANKS ONLY
+ * (`docs/orders/MASTER.md` § "Order view") — the card title is `text-strong`
+ * 15px/600 blue, and this in-card label is 13px/600 slate-11. It was drawn at
+ * `text-strong` too, so `Emergency contact` read as a second card title
+ * (measured 15px/600, 2026-09-23). No margins: the section body's one 12px
+ * gap spaces it, and the 1px rule above it marks the group.
  */
+/** The 1px rule over `Total payable` and `Balance due` in the Payment totals.
+ *  The label cell carries the 24px between the columns as its own padding, so
+ *  the rule runs unbroken under both cells. */
+const TOTAL_RULE = "border-t border-kit-slate-5 pt-1";
+
 function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-strong text-base-900 first:mt-0"
+      className="flex flex-wrap items-baseline gap-x-2 text-body font-semibold text-kit-slate-11"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
@@ -1916,6 +1937,18 @@ function SalesOrderWorkspaceBody() {
   const orderPaymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
   const nameOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.label || sku, [catalogBySku]);
   const nameOfAddon = useCallback((key: string) => addonNameByKey.get(key) ?? key, [addonNameByKey]);
+  /** ONE act adds a service to the draft — `Add service` under Items and
+   *  `Add disposal` under Delivery both call it, so a disposal picked in either
+   *  place is the same `addons` row, priced once, in the one Items table. */
+  const addServiceToDraft = (key: string) => {
+    const hit = (catalogQ.data?.addons ?? []).find((x) => x.key === key);
+    if (!hit) return;
+    setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
+  };
+  const disposals = draft.addons.filter((a) => isDisposalService(a.addon_key, nameOfAddon(a.addon_key)));
+  const disposalOptions = (catalogQ.data?.addons ?? []).filter(
+    (x) => (x as { active?: boolean }).active !== false && isDisposalService(x.key, x.name),
+  );
   const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
   const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
     const out: string[] = [];
@@ -2712,7 +2745,7 @@ function SalesOrderWorkspaceBody() {
     ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
   /** A per-trip charge stays at 1; the stair carry is stamped from the floor. */
   const fixedQtyService = (key: string) => key === STAIR_CARRY_ADDON_KEY || key.startsWith("DELIVERY");
-  const th = "whitespace-nowrap px-2 py-2 text-label font-medium text-base-500";
+  const th = `whitespace-nowrap ${SO_TH}`;
   const editItemsTable = (
     <div data-testid="edit-items" className="relative">
       {/* On a screen too narrow for the document's own columns the table scrolls
@@ -2721,9 +2754,9 @@ function SalesOrderWorkspaceBody() {
           steps to them. */}
       <div ref={itemsScrollRef} className="overflow-x-auto" role="region" tabIndex={itemsOverflow.over ? 0 : undefined}
         aria-label={itemsOverflow.over ? "Items — scroll sideways for more columns" : "Items"}>
-        <table className="w-full border-collapse text-body" data-testid="edit-goods">
+        <table className={SO_TABLE} data-testid="edit-goods">
           <thead>
-            <tr className="border-b border-kit-slate-5">
+            <tr className={SO_HEAD_ROW}>
               <th className={`${th} text-left`} style={{ width: 28 }}>#</th>
               <th className={`${th} text-left`} style={{ minWidth: 104 }}>Item Code</th>
               <th className={`${th} text-left`} style={{ minWidth: 130 }}>Description</th>
@@ -2743,7 +2776,9 @@ function SalesOrderWorkspaceBody() {
               return [
                 <tr key={l.key} className={`${open ? "" : "border-b border-kit-slate-5"} align-top`} data-testid={`edit-line-${i + 1}`}>
                   <td className={`px-2 py-2 text-base-500 ${strike}`}>{i + 1}</td>
-                  <td className={`break-words px-2 py-2 font-mono text-meta ${strike}`}>{l.sku}</td>
+                  {/* The UI font at 13px, like every other cell (kit-sizes card,
+                      2026-09-23) — it was 12px JetBrains Mono. */}
+                  <td className={`break-words px-2 py-2 ${strike}`}>{l.sku}</td>
                   <td className="px-2 py-2">
                     <div className={strike}>{nameOfSku(l.sku)}</div>
                     {configWords(l.attrs) && <div className={`text-meta text-base-600 ${strike}`}>{configWords(l.attrs)}</div>}
@@ -2829,7 +2864,7 @@ function SalesOrderWorkspaceBody() {
               return (
                 <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
                   <td className="px-2 py-2" />
-                  <td className={`break-words px-2 py-2 font-mono text-meta ${strike}`}>{a.addon_key}</td>
+                  <td className={`break-words px-2 py-2 ${strike}`}>{serviceCodeWord(a.addon_key)}</td>
                   <td className="px-2 py-2">
                     <div className={strike}>{nameOfAddon(a.addon_key)}</div>
                     {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
@@ -2923,11 +2958,7 @@ function SalesOrderWorkspaceBody() {
         </div>
         <div data-pos-field="orderAddons">
           <Select id="so-add-service" label="Add service" value=""
-            onValueChange={(key) => {
-              const hit = (catalogQ.data?.addons ?? []).find((x) => x.key === key);
-              if (!hit) return;
-              setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
-            }}
+            onValueChange={addServiceToDraft}
             options={(catalogQ.data?.addons ?? [])
               .filter((x) => x.key !== STAIR_CARRY_ADDON_KEY && (x as { active?: boolean }).active !== false)
               .map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
@@ -3143,7 +3174,7 @@ function SalesOrderWorkspaceBody() {
               ORDER AND NAMES. `orders.source_ref` is untouched and the importer
               remains its only writer; the SO page simply stops printing it. */}
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
         </div>
         {/* THE ONE DOOR for goods, price and the promised date — opened from
@@ -3154,7 +3185,7 @@ function SalesOrderWorkspaceBody() {
             separate; with nothing pending this renders an empty, invisible
             div rather than a bordered strip with no content in it. */}
         {editing && (
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-instalment" label="Instalment months"
               value={draft.installment_months == null ? "none" : String(draft.installment_months)}
               onValueChange={(v) => setField("installment_months", v === "none" ? null : Number(v))}
@@ -3349,7 +3380,7 @@ function SalesOrderWorkspaceBody() {
             existed only because it was collapsible. */}
         {emergencyEnabled && (
           <>
-            <div className="mt-4 border-t border-kit-slate-5 pt-3">
+            <div className="border-t border-kit-slate-5 pt-3">
               <SubHead>Emergency contact</SubHead>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
@@ -3368,7 +3399,7 @@ function SalesOrderWorkspaceBody() {
                 {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
               </datalist>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} />
             </div>
           </>
@@ -3378,7 +3409,7 @@ function SalesOrderWorkspaceBody() {
             carried — and who pays is not that question. The in-card label is
             `Billing` (COPY-STANDARD § Its section names). Every field keeps its
             id, its POS-parity tag and its codec. */}
-        <div className="mt-4 border-t border-kit-slate-5 pt-3">
+        <div className="border-t border-kit-slate-5 pt-3">
           <SubHead>Billing</SubHead>
         </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
@@ -3634,7 +3665,7 @@ function SalesOrderWorkspaceBody() {
               of orders. The fields above already state the floor and the lift; a
               line that only repeats them back is the noise Jess asked to cut. */}
           {stairWorking && (
-            <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
+            <p className="text-meta text-base-500" data-testid="so-stair-working">
               {stairWorking.quoted ? (
                 <>
                   {stairWorking.items} of {stairWorking.itemsTotal} item
@@ -3653,6 +3684,27 @@ function SalesOrderWorkspaceBody() {
                 <Money value={stairWorking.fee} />
               </span>
             </p>
+          )}
+          {/* ⭐ DISPOSAL READS WITH THE DELIVERY IT RIDES ON (SO page kit-sizes
+              card, 2026-09-23). The lorry that delivers is the lorry that takes
+              the old mattress away, so the Delivery section states it — but it
+              is NOT a second record: it reads the same `draft.addons` rows the
+              Items table prices, prints no money, and `Add disposal` calls the
+              same `addServiceToDraft` as `Add service`. Remove and quantity stay
+              on the Items row, the one place that shows the charge. No in-card
+              heading (Delivery is ONE group, owner ruling 2026-09-21) — a
+              labelled field. */}
+          {(disposals.length > 0 || editing) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="delivery-disposal">
+              <div className="sm:col-span-2">
+                <Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />
+              </div>
+              {editing && disposalOptions.length > 0 && (
+                <Select id="so-add-disposal" label="Add disposal" value=""
+                  onValueChange={addServiceToDraft}
+                  options={disposalOptions.map((x) => ({ value: x.key, label: x.name }))} />
+              )}
+            </div>
           )}
       </Block>
       </fieldset>
@@ -3805,30 +3857,6 @@ function SalesOrderWorkspaceBody() {
           ) : undefined
         }
       >
-        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
-            2026-08-15 `Total large · Paid medium · Outstanding loudest`
-            weighting). The weighting never reached the numerals anyway:
-            `<Money>` renders every amount at its `row` tone, so all three
-            digits were ALREADY 13px and only the CONTAINERS differed. Three
-            different container sizes meant three different line-heights, so
-            under `items-end` the three amounts did not sit on one line —
-            which is what read as "alignment wrong". One size on all three
-            fixes the alignment and the fallback strings at the same time.
-            Colour still separates them: Outstanding is red while owed. */}
-        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
-            last bare label-over-value pair on the page — the shape the rest of
-            the card stopped using when `Fact` took the kit's control skin. A
-            reader scanning down met boxes, boxes, boxes and then three loose
-            numbers, which reads as a different kind of thing rather than as
-            three answers this surface may not change.
-            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
-            door, and nothing here writes. The three-across grid is the same one
-            `Order info` and `Customer` use, so the amounts line up with every
-            other answer instead of packing left on a flex row.
-            Colour survives INSIDE the box: Outstanding is still red while any
-            of it is owed (owner ruling 2026-08-15), and all three keep
-            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
-            untouched. */}
         <PaymentLedger orderId={isNew ? null : (orderId ?? null)} saved={{
           paid: Number(order?.paid ?? 0), method: order?.payment_method,
           months: order?.installment_months, reference: order?.approval_code,
@@ -3857,32 +3885,41 @@ function SalesOrderWorkspaceBody() {
             history mirror (`counted_in_paid: false`) or a storage collection is
             not goods money and is not added here.
             ⭐ `Outstanding` REMAINS RED WHILE OWED (owner ruling 2026-08-15);
-            only the balance line is bold (ruling 2026-09-21), and money amounts
-            never borrow the heading size.
+            `Total payable` and `Balance due` are the bold lines (kit-sizes card,
+            2026-09-23), and money amounts never borrow the heading size.
             ⚠️ The `Goods` and `Services` row WORDS are pending COPY review, as
             the ruling itself records; a combined total is never `Goods total`. */}
-        <div className="mt-3 flex justify-end border-t border-kit-slate-5 pt-3">
-          <div className="grid gap-x-6 gap-y-1 text-right" style={{ gridTemplateColumns: "auto auto" }}
+        {/* ⭐ ONE SIZE, TWO WEIGHTS (SO page kit-sizes card, 2026-09-23).
+            Every label and amount is `text-body` 13/18 — measured before this,
+            the amounts carried no size class and rendered at the browser's
+            16px, the labels at 12px and `Balance due` at the 15px heading
+            size. `Total payable` and `Balance due` are the two answers the
+            reader came for, so they alone take weight 600, each under a 1px
+            rule. No KPI treatment: nothing here is larger than a table cell.
+            No rule above the block — the ledger's last row already draws one,
+            and the section body's 12px gap spaces it. */}
+        <div className="flex justify-end">
+          <div className="grid w-full grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]"
             data-testid="payment-totals">
-            <span className="text-meta text-base-500">Goods</span>
-            <span className="tabular-nums text-base-900" data-testid="money-goods">
+            <span className="pr-6 text-base-500">Goods</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-goods">
               {money.known ? fmtMoney(money.goods) : "No price yet"}
             </span>
-            <span className="text-meta text-base-500">Services</span>
-            <span className="tabular-nums text-base-900" data-testid="money-services">
+            <span className="pr-6 text-base-500">Services</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-services">
               {money.known ? fmtMoney(money.services) : "—"}
             </span>
-            <span className="text-meta text-base-500">Total payable</span>
-            <span className="tabular-nums text-base-900" data-testid="money-total-payable">
+            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Total payable</span>
+            <span className={`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable">
               {money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
             </span>
-            <span className="text-meta text-base-500">Paid to date</span>
-            <span className="tabular-nums text-base-700" data-testid="money-paid">
+            <span className="pr-6 text-base-500">Paid to date</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-paid">
               {fmtMoney(money.paid)}
             </span>
-            <span className="text-meta text-base-500">Balance due</span>
+            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Balance due</span>
             <span
-              className={`text-strong tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              className={`${TOTAL_RULE} text-right font-semibold tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
               data-testid="money-outstanding"
             >
               {!money.known ? "No price yet" : money.outstanding > 0 ? fmtMoney(money.outstanding) : "Paid in full"}

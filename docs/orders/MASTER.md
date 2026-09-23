@@ -676,7 +676,8 @@ and Salesperson join `SO info` (the Register also reads Sales Location · Salesp
 `Sales ownership` heading is retired; **headings have two ranks only** — card title `text-strong` 15px/600 sentence case,
 **blue (`kit-blue-11`) — owner ruling, Jess 2026-09-22: "remain blue"**, kept after the challenge that blue
 elsewhere means clickable; on a white card with a 1px rule (the blue-grey band is retired), in-card label 13px/600 slate-11. Money
-amounts never borrow the heading size; only the balance line is bold.
+amounts never borrow the heading size: every amount is 13px, and `Total payable` and `Balance due` alone
+are weight 600 (owner card "KEEP Existing UI Kit Sizes", 2026-09-23 — overwrites "only the balance line").
 
 ```
 SO info                 SO Doc Date · Proceed Date · Customer Requested Delivery Date · Sales Location · Salesperson ·
@@ -692,6 +693,11 @@ CUSTOMER                name · phone · email · demographics
   └ Billing             billing relationship · billing address  (moved from Delivery 2026-09-21)
 DELIVERY                ONE group, no in-card headings (owner ruling 2026-09-21): the MY address cascade
                         → building type → floor → lift → items needing stair carry + the stair working line
+                        → `Disposal` (owner card 2026-09-23, BUILT): a labelled field reading the SAME
+                        `order_addons` rows Items prices — name, size, ×qty, NO money — and, in Edit,
+                        `Add disposal`, which is the same act as Items' `Add service` (one row, priced once
+                        in Items). Remove and quantity stay on the Items row. Shown only when the order
+                        carries a disposal or the page is in Edit
 ITEMS                   the SO document's own table (owner ruling 2026-09-21, BUILT 2026-09-23): **NO category
                         rows on the page (owner ruling, Jess 2026-09-22: "remove every title — mattress,
                         accessory, service")**; the lines run # 1, 2, 3 … in one list · # · Item Code · Description (name, configuration beneath) · Qty ·
@@ -709,9 +715,15 @@ PAYMENT                 the same money zone as the PDF, one arithmetic (owner ap
                         `Balance due` (the goods/service row words are pending COPY review; a combined
                         total is never labelled `Goods total`; SST rows follow the separate SST ruling).
                         Voided payments stay, struck, with the reason, and are never counted.
-                        Open this order in Payments →. Items and Payment share ONE table style: 12px grey
-                        headers over a 1px line, 13px rows divided by 1px lines, amounts right-aligned in
-                        the same column position, only the closing total bold
+                        Open this order in Payments →. Items and Payment share ONE table style
+                        (`components/so-document-table.ts`): 11px/500 grey headers over a 1px line, 13px rows
+                        with 8px cell padding divided by 1px lines beneath, amounts right-aligned with
+                        tabular figures, only the closing total bold. Item Code and Approval code are ordinary
+                        13px values in the UI font — never monospace. A service's Item Code prints UPPER CASE
+                        on page and PDF from one function (`lib/service-code.ts`); the stored key is not
+                        rewritten, and the SO document payload now carries it (it printed `ADD-ON` before).
+                        Totals: a compact two-column block, every figure 13px; a 1px rule over `Total payable`
+                        and over `Balance due`, which alone are weight 600
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
@@ -777,7 +789,10 @@ Salesperson · Dealer (approval), catalogue-backed Item Code · Qty · Unit (gov
 Proceed Date — EXCEPT three, which print as plain text because they are not this page's to change:
 `SO Doc Date` (the order's birth stamp), the payment rows (Payments owns them; the door is `Open this
 order in Payments →`) and the computed totals (`TOTAL PAYABLE` · `Paid to date` · `Balance due`).
-Type order: card title 15px/600 blue (largest) → value 13px dark → label 12px grey (smallest).
+Type order: card title 15px/600 blue (largest) → value 13px dark → label 11px/500 grey (smallest) — the kit's
+`text-label`, which `FieldFrame` already rendered; the earlier "12px" wording contradicted the kit and is
+overwritten (owner card "KEEP Existing UI Kit Sizes", 2026-09-23). Every section spaces its field groups with ONE
+12px body gap (`Block`, SO tone); controls keep the kit's 32px — the page no longer resizes them.
 
 **ADD / CANCEL AN ITEM — OWNER RULING (Jess, 2026-09-22) · APPROVED / NOT BUILT.** Adding and cancelling
 items stay (existing Class A rule). The one journey is:

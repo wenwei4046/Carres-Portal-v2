@@ -82,16 +82,10 @@
   @apply text-kit-blue-11;
 }
 
-/* ⭐ DENSITY PASS (Jess, 2026-09-10) — a stricter, more scannable ERP read.
-   SO-scoped only: `.po-detail-style` shares the header markup but keeps its
-   own geometry, and the shared `Input`/`Select`/`DatePicker` kit components
-   (§0.1: "no className, no style") stay untouched everywhere else in the
-   portal — this page recolours and resizes them from the outside, the same
-   way it already recolours them above.
-   The header's own padding went with the band: with no band to bleed to the
-   card edge there is nothing to inset, and the component's `pb-2` over the
-   1px rule is the whole treatment. */
-
-.so-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
-  height: 1.75rem;
-}
+/* ⭐ CONTROLS KEEP THE KIT'S 32px (SO page kit-sizes card, 2026-09-23). The
+   2026-09-10 density pass resized inputs to 28px from here, but the read-only
+   box's own `min-h-8` beat it, so one page drew 28px answers beside 32px
+   answers. The kit's `h-8` is "the height every form row aligns to"
+   (`field-recipe.ts`); this page no longer resizes a kit control from the
+   outside. The header's own padding went with the band: the component's
+   `pb-2` over the 1px rule is the whole treatment. */

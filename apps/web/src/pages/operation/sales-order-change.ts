@@ -55,6 +55,15 @@ export function qtyWords(
   return parts.length ? parts.join(" · ") : "No goods";
 }
 
+/**
+ * A disposal service — the old mattress or bedframe the lorry takes away. The
+ * `addons` catalogue carries no category, so a disposal is known by its key or
+ * its catalogue name (`dispose-mattress` · `Dispose old mattress`). Falsifier:
+ * the catalogue gains a service category — then read that instead.
+ */
+export const isDisposalService = (key: string, name: string): boolean =>
+  /dispos/i.test(key) || /dispos/i.test(name);
+
 /** `Dispose old mattress ×2 · Delivery fee` — name, and quantity when above 1. */
 export function servicesWords(
   addons: Array<Pick<EditAddon, "addon_key" | "qty" | "removed">>,

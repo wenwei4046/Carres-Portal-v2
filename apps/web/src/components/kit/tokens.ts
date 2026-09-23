@@ -1,5 +1,6 @@
 /**
- * KIT TOKENS — the machine-readable half of `docs/UI-KIT.md` §2 · §3 · §4 · §5.
+ * KIT TOKENS — the machine-readable half of `docs/01-design-tokens.md` (which
+ * replaced the retired `docs/UI-KIT.md` §2–§5).
  *
  * Card D0.5a. Every Foundation Component in `components/kit/` reads its type,
  * radius, tone and icon size FROM HERE, and `/ui` renders the same records — so

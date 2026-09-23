@@ -38,6 +38,7 @@ import EmptyState from "@/components/kit/EmptyState";
 import { fmtDate } from "@/lib/fmt-date";
 import { atSalePaymentWord, payMethodWord, viewSlip } from "@/lib/payment-display";
 import { useOrderPayments } from "@/lib/queries";
+import { SO_AMOUNT, SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "./so-document-table";
 
 /** What the row is FOR, when it is not the ordinary case. A `payment` needs no
  *  word; a deposit and a storage collection are different debts and say so. */
@@ -64,22 +65,25 @@ export default function PaymentLedger({ orderId, saved }: {
   if (!orderId) return null;
   const hasSavedEvidence = Boolean(saved && (saved.paid > 0 || saved.method || saved.reference || saved.slip));
   const capture = hasSavedEvidence && saved ? (
-    <div className="mb-3 text-body" data-testid="so-payment-saved">
-      <p className="font-medium">Payment details recorded at sale</p>
+    /* No outer margin: the Payment section body spaces its groups (12px). The
+       small heading is the in-card label rank, 13/600 — the same as
+       `Emergency contact` and `Billing`. */
+    <div className="text-body" data-testid="so-payment-saved">
+      <p className="font-semibold text-kit-slate-11">Payment details recorded at sale</p>
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-body" aria-label="Payment details recorded at sale">
+        <table className={SO_TABLE} aria-label="Payment details recorded at sale">
           <thead>
-            <tr className="text-label text-base-500">
-              <th scope="col" className="py-2 pr-4 text-left font-medium align-top">Method</th>
-              <th scope="col" className="py-2 pr-4 text-left font-medium align-top">Reference</th>
-              <th scope="col" className="py-2 text-left font-medium align-top">Slip</th>
+            <tr className={SO_HEAD_ROW}>
+              <th scope="col" className={`${SO_TH} text-left`}>Method</th>
+              <th scope="col" className={`${SO_TH} text-left`}>Reference</th>
+              <th scope="col" className={`${SO_TH} text-left`}>Slip</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t border-kit-slate-5">
-              <td className="py-2 pr-4 align-top" data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</td>
-              <td className="py-2 pr-4 align-top break-words font-mono text-meta">{saved.reference || "Not recorded"}</td>
-              <td className="py-2 align-top">{saved.slip ? (
+            <tr className={SO_ROW}>
+              <td className={SO_TD} data-testid="money-instalment">{atSalePaymentWord(saved.method, saved.months) || "Not recorded"}</td>
+              <td className={`${SO_TD} break-words`}>{saved.reference || "Not recorded"}</td>
+              <td className={SO_TD}>{saved.slip ? (
                 <button type="button" onClick={() => void viewSlip({ receipt_url: saved.slip! })}
                   className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline">View slip</button>
               ) : "Not recorded"}</td>
@@ -120,25 +124,27 @@ export default function PaymentLedger({ orderId, saved }: {
   return (
     /* The page never scrolls sideways; a narrow container scrolls THIS box. */
     <>{capture}<div className="overflow-x-auto">
-      <table className="w-full text-body" data-testid="so-payments">
+      <table className={SO_TABLE} data-testid="so-payments">
         <thead>
           {/* ⭐ THE APPROVED PAYMENT TABLE — OWNER APPROVAL (Jess, 2026-09-22),
               `docs/orders/MASTER.md` § "Order view" → PAYMENT:
               `Date · Payment received · Approval code · Collected by · Amount (RM)`,
-              in that order, sharing ONE table grammar with `Items` — 12px grey
-              headers over a 1px line, 13px rows divided by 1px lines, amounts
-              right-aligned, and the amount column last.
+              in that order, sharing ONE table grammar with `Items`
+              (`so-document-table.ts`): 11px grey headers over a 1px line, 13px
+              rows divided by 1px lines, amounts right-aligned, and the amount
+              column last. The approval code is an ordinary 13px value in the
+              UI font, not monospace.
               ⛔ NO EVIDENCE IS DISCARDED. The receipt number and the slip are
               the PROOF of the approval code, so they ride under it rather than
               occupying two columns the ruling does not list — the same
               "detail beneath its fact" grammar `Items` uses for a line's
               configuration. Nothing is hidden and no read is removed. */}
-          <tr className="text-label text-base-500">
-            <th className="py-2 pr-4 text-left font-medium align-top whitespace-nowrap">Date</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Payment received</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Approval code</th>
-            <th className="py-2 pr-4 text-left font-medium align-top">Collected by</th>
-            <th className="py-2 text-right font-medium align-top whitespace-nowrap">Amount (RM)</th>
+          <tr className={SO_HEAD_ROW}>
+            <th className={`${SO_TH} whitespace-nowrap text-left`}>Date</th>
+            <th className={`${SO_TH} text-left`}>Payment received</th>
+            <th className={`${SO_TH} text-left`}>Approval code</th>
+            <th className={`${SO_TH} text-left`}>Collected by</th>
+            <th className={`${SO_TH} whitespace-nowrap text-right`}>Amount (RM)</th>
           </tr>
         </thead>
         <tbody>
@@ -148,18 +154,18 @@ export default function PaymentLedger({ orderId, saved }: {
             return (
               <tr
                 key={p.id}
-                className={`border-t border-kit-slate-5 ${live ? "" : "text-base-500"}`}
+                className={`${SO_ROW} ${live ? "" : "text-base-500"}`}
                 data-testid={live ? "so-payment-row" : "so-payment-row-voided"}
               >
-                <td className="py-2 pr-4 align-top whitespace-nowrap">{fmtDate(p.paid_on)}</td>
-                <td className="py-2 pr-4 align-top">
+                <td className={`${SO_TD} whitespace-nowrap`}>{fmtDate(p.paid_on)}</td>
+                <td className={SO_TD}>
                   <div>{payMethodWord(p.method)}</div>
                   {kind && <div className="mt-0.5 text-meta text-base-600">{kind}</div>}
                 </td>
-                <td className="py-2 pr-4 align-top font-mono text-meta">
+                <td className={SO_TD}>
                   <div>{p.reference || "Not recorded"}</div>
                   {/* the proof of that code, beneath it */}
-                  <div className="mt-0.5 font-sans text-meta text-base-500">
+                  <div className="mt-0.5 text-meta text-base-500">
                     Receipt {p.receipt_no || "not recorded"}
                     {" · "}
                     {/* ⭐ AN ABSENT SLIP IS NAMED, NOT LEFT BLANK. Riding under
@@ -179,7 +185,7 @@ export default function PaymentLedger({ orderId, saved }: {
                     )}
                   </div>
                 </td>
-                <td className="py-2 pr-4 align-top">
+                <td className={SO_TD}>
                   <div>{p.recorded_by_name || "Not recorded"}</div>
                   {!live && (
                     <div className="mt-0.5 text-meta font-medium text-danger">
@@ -187,7 +193,7 @@ export default function PaymentLedger({ orderId, saved }: {
                     </div>
                   )}
                 </td>
-                <td className={`py-2 align-top text-right tabular-nums whitespace-nowrap ${live ? "" : "line-through"}`}>
+                <td className={`${SO_TD} ${SO_AMOUNT} ${live ? "" : "line-through"}`}>
                   {fmtMoney(Number(p.amount ?? 0))}
                 </td>
               </tr>

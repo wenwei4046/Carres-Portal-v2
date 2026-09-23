@@ -898,6 +898,9 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     expect(body.customer.name).toBe("Tan Mei Ling");
     expect(body.lines).toHaveLength(1);
     expect(body.addons).toHaveLength(1);
+    /* The service carries its own code for the Item Code cell — without it
+       the paper printed the `ADD-ON` placeholder (owner review 2026-08-09). */
+    expect(body.addons[0].sku).toBe("stair_carry");
   });
 
   it("admits operation (revised 2026-05-12 — they need it on handover)", async () => {

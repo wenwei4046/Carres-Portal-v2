@@ -882,9 +882,13 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    /* One size on both, and red only while something is owed. */
+    /* One size for every amount — 13px `text-body` — and weight 600 only on
+       `Total payable` and `Balance due` (kit-sizes card, 2026-09-23). Red only
+       while something is owed. */
     expect(workspace).toContain('data-testid="money-paid"');
-    expect(workspace).toContain('`text-strong tabular-nums ${money.known && money.outstanding > 0');
+    expect(workspace).toContain('`${TOTAL_RULE} text-right font-semibold tabular-nums ${money.known && money.outstanding > 0');
+    expect(workspace).toContain('`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable"');
+    expect(workspace).not.toContain("`text-strong tabular-nums ${money.known");
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
     // The retired sizes may not come back.
     expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
@@ -1470,7 +1474,9 @@ describe("Sales Order object page — one form grammar", () => {
        heading (`text-strong`, `01-design-tokens.md` §1): the ordinary face,
        the ordinary case, one step down in size from the card title. */
     const title = '"text-strong text-kit-blue-11"';
-    const sub = "text-strong text-base-900";
+    /* Two ranks only (orders/MASTER § "Order view"): the in-card label is
+       13px/600 slate-11, one rank below the 15px card title. */
+    const sub = "text-body font-semibold text-kit-slate-11";
     expect(workspace, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
     /* THE OLD SHAPE: the subsection heading copying the card title's own
@@ -1524,8 +1530,74 @@ describe("Sales Order object page — one form grammar", () => {
     expect(attribution).not.toContain(
       '<div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="attribution-lane">',
     );
+    /* No top margin — the SO section body spaces its groups — and no
+       always-present empty button row, so an empty lane is truly `:empty` and
+       takes no gap (kit-sizes card, 2026-09-23). */
     expect(attribution).toContain(
-      'className={request ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}',
+      'className={request ? "border-t border-kit-slate-5 pt-3" : ""}',
     );
+    expect(attribution).toContain(") : canRequest && inlineTrigger ? (");
+  });
+});
+
+/* ⭐ SO PAGE KIT SIZES — 2026-09-23. The token VALUES are the kit's
+   (`01-design-tokens.md` §1/§3); these pin how the page USES them. The rendered
+   numbers were measured in the real shell (so-workspace-shell-preview) before
+   and after; these source contracts keep the causes from coming back. */
+describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
+  const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
+  const table = readFileSync(join(here, "components/so-document-table.ts"), "utf8");
+  const serviceCode = readFileSync(join(here, "../../lib/service-code.ts"), "utf8");
+
+  it("spaces every SO section's groups with ONE 12px body gap, opt-in by tone", () => {
+    expect(workspace).toContain(
+      'className={titleTone === "sales-order" ? "mt-3 flex flex-col gap-3 [&>*:empty]:hidden" : "mt-3"}',
+    );
+    /* The per-group margins it replaced may not return. */
+    expect(workspace).not.toContain('<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">');
+    expect(workspace).not.toContain('<div className="mt-4 border-t border-kit-slate-5 pt-3">');
+    expect(workspace).not.toContain("mb-2 mt-4 flex flex-wrap items-baseline");
+  });
+
+  it("keeps the kit's 32px controls — the page no longer resizes them", () => {
+    expect(themeCss).not.toMatch(/height:\s*1\.75rem/);
+  });
+
+  it("prints Item Code and Approval code in the UI font at 13px, never monospace", () => {
+    expect(workspace).not.toContain("font-mono text-meta ${strike}");
+    expect(ledger).not.toContain("font-mono");
+  });
+
+  it("draws Items and Payment from ONE table recipe", () => {
+    expect(table).toContain('export const SO_TH = "px-2 py-2 text-label text-base-500 align-bottom"');
+    expect(table).toContain('export const SO_ROW = "border-b border-kit-slate-5"');
+    expect(workspace).toContain('from "./components/so-document-table"');
+    expect(ledger).toContain('from "./so-document-table"');
+    /* Payment's own padding and rule-above-each-row are gone. */
+    expect(ledger).not.toContain("py-2 pr-4");
+    expect(ledger).not.toContain("border-t border-kit-slate-5 ${live");
+  });
+
+  it("states every money figure at 13px — no browser-default 16px, no heading size", () => {
+    expect(workspace).toContain('grid-cols-[1fr_auto] gap-y-1 text-body sm:w-auto sm:min-w-[240px]');
+    expect(workspace).not.toContain('<span className="text-meta text-base-500">Balance due</span>');
+  });
+
+  it("prints a service's Item Code upper case on the page AND the paper, from one function", () => {
+    expect(serviceCode).toContain("key.toUpperCase()");
+    expect(workspace).toContain("{serviceCodeWord(a.addon_key)}");
+    expect(pdfTemplate).toContain('{a.sku ? serviceCodeWord(a.sku) : "ADD-ON"}');
+    /* Display only — the stored key is what the draft still writes. */
+    expect(workspace).toContain("addon_key: hit.key");
+  });
+
+  it("shows disposal in Delivery from the SAME service rows, adding through the ONE act", () => {
+    expect(workspace).toContain('data-testid="delivery-disposal"');
+    expect(workspace).toContain('onValueChange={addServiceToDraft}');
+    /* Both doors — Items' `Add service` and Delivery's `Add disposal` — call it. */
+    expect(workspace.match(/onValueChange=\{addServiceToDraft\}/g)?.length).toBe(2);
+    /* It prints no money: the charge is stated once, in Items. */
+    expect(workspace).toContain('<Fact label="Disposal" value={servicesWords(disposals, nameOfAddon)} own={false} />');
+    expect(changeHelpers).toContain("export const isDisposalService");
   });
 });
