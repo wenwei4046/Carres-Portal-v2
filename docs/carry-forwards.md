@@ -1,3 +1,74 @@
+## `do-number-collision` — 🔴 P0 BEFORE OUTRIGHT GO-LIVE, opened 2026-09-23, recorded here 2026-09-24
+
+**Two Sales Orders can carry the SAME Delivery Order number, and one of them ends up with no
+document row at all.** Measured on `origin/main`, not quoted:
+
+1. `packages/shared/src/doc-number.ts:39` — `docTail` is an **FNV-1a hash of the ORDER ID modulo
+   10^digits**, 4 digits by default. It is a derivation, not an allocation: nothing checks whether
+   those digits are already taken by another order on the same day.
+2. `supabase/migrations/0356_a_delivery_order_is_a_document_with_its_own_register.sql:120` —
+   `ops_delivery_orders_materialise` reads
+   `if exists (select 1 from ops_delivery_orders where do_number = new.do_number) then return new;`
+   and **returns silently**. The mint path has already written `orders.do_number`, so the second
+   order keeps the number on its own row while the DO register never gains a document for it.
+
+**The arithmetic, so the risk is not argued from feel.** 4 digits is 10,000 slots a day, and this is
+the birthday problem, not "1 in 10,000":
+
+```
+ 20 DOs in one day →  1.9%      118 DOs in one day → 49.9%
+ 50 DOs in one day → 11.5%      250 DOs in one day → 95.6%
+100 DOs in one day → 39.0%      400 DOs in one day → 100.0%
+```
+
+Jess's own scale benchmark is Coway at 5–8k orders a month — **250–400 a day, where a same-day
+collision is effectively certain.** It is already a coin flip by about 118.
+
+**The approved target it must land on** (owner rulings 2026-09-23, Orders MASTER § order numbers by
+business, PR #1545 → `7df9b7597`): `DO2609-48271` — issue YYMM + **5 random digits**, drawn
+independently of the SO, unique across all orders, never reused, never auto-widening; a rebooked
+trip takes a NEW number (no `-B`). Subscription's twin is `SDO`. ⛔ **Widening the tail is not the
+fix on its own** — 5 digits still collides at ~1.9% by 50 a day while the number stays a hash of the
+order id. The number has to be ALLOCATED, not derived.
+
+### ⭐ WHAT MOVED UNDERNEATH IT ON 2026-09-24 — read this before writing the allocator
+
+Purchasing shipped `PO260924-4827` (PR #1551 → `e9bc40a0a`, migration **0574**). Relayed by that
+session and **verified here against `origin/main`** before being written down, because the DO
+allocator is the next thing likely to touch this machinery:
+
+- **`formal_document_codes` is re-keyed `(code_date, prefix, code)`** — it was `(code_date, code)`.
+  Each prefix now owns an independent pool of 10,000 a day. **Every lookup, update and delete must
+  name its own `prefix`**: a `(date, code)` predicate can now match a different prefix's row. That
+  exact defect was found inside the PO helper before it shipped.
+- **`formal_document_code_text(prefix, date, code)` is the ONE place a printed shape is decided.**
+  Only `PO` is on the short form today; MPR, GRN, PRTN, RO, SB and the finance prefixes still mint
+  `PREFIX-YYYYMMDD-RRRR`. Putting DO/SDO on the short form is one line there — never a second
+  spelling somewhere else.
+- **`poDocumentNumberOf(number, version)` in `@carres/shared`** decides the version marker from the
+  NUMBER's own form (new form → `(2)`, any pre-cutover `PO-…` → ` V2`). Reuse it rather than writing
+  a second version rule.
+- **The migration tail is 0574**, so the next free number is 0575+ — **re-measure at push time**,
+  never from `ls` (red line 7), and never from a working tree sitting on an old branch.
+
+**Today the DO lane does NOT touch that table** — measured: no migration that references
+`formal_document_codes` also references `do_number`. So nothing is broken by 0574 right now. It
+matters because the approved `DO2609-48271` is a POOL number, so the fix is very likely to move DO
+onto exactly this machinery under its own `DO` prefix.
+
+**Why it is recorded here and not fixed here.** The Sales Order page and Amendment scope closed on
+2026-09-23 and this is neither. It has an owner through its own spawned task with no live chat, and
+until now it existed only in that chip and in one session's notes. **A P0 that lives in one chip is
+a P0 nobody will find.**
+
+**Closes when** two Sales Orders proceeding on the same day are proved to receive two different DO
+numbers, both materialised in `ops_delivery_orders`, on the approved format.
+
+**Falsifier:** a read of `ops_delivery_orders` showing an allocation path already in place — then
+the defect was fixed elsewhere and this entry goes.
+
+---
+
 ## `so-amendment-integration-tests-skip-in-ci` — EVIDENCE THAT PASSES LOCALLY AND IS NEVER RUN BY CI, opened 2026-09-23
 
 **🟡 The Sales Order amendment lane's strongest evidence does not run on any pull request.**
