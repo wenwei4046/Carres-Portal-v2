@@ -709,6 +709,14 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
 
 **CURRENT MISSION — Portal readiness PLAN；owner-approved planning direction，2026-09-23：**
+**最新 OWNER PRIORITY / SCOPE RULING：** 主顾问任务
+`01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb` 转达 Jess 明确要求现有 Outright 在两天内建成上线，
+其发布优先；Subscription 不得阻挡该发布或成为其前置条件。两天是 owner 要求，
+不是本任务已验证的交付承诺。Subscription 保持 PLAN，不向 Outright 强加新的实物 QR
+或扫码选货流程；Outright 现有内部 Unit 记录、exact-stock 规则及安全门槛继续保留。
+完整限定范围蓝图批准前不创建新的 build 任务。本裁定只记录优先级与范围，不授权本
+Subscription 任务编写应用、合并或部署；不把尚在建议中的导航/发布实现方案升为 law。
+
 来源：主顾问任务 `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb` 转达 Jess 最新 “ye”，
 明确只批准规划方向，不批准 BUILD。先规划经理手动录入每月数量 KPI 与可追溯的采购建议，
 再依次核实客户供应分配、Diglant 工厂提货、既有 Delivery 的衔接；Subscription / Outright
@@ -716,7 +724,8 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 不得把目标直接当采购量。自动统计预测后置；满三个月真实历史只是原有最低门槛，
 不是届时自动启用的授权。具体公式、报告日、页面和采购转换细节仍保留各自待审状态。
 
-五个准备日以实际 Portal 能展示及操作什么、最小必要缺口与依赖为核查重点；会议脚本、
+Subscription 后续核查以实际 Portal 能展示及操作什么、最小必要缺口与依赖为重点，
+服从上述 Outright 两天发布优先级，不以原五日准备窗口延后 Outright；会议脚本、
 排练和展示 mockup 不属于当前任务。先检查现有 Stock Plan、Purchasing、Stock、Orders
 及 Delivery 能力是否可复用；按当前认证操作证据、历史验收、源码证据分别记录，
 没有当前实测就标未验证。区分功能缺口与纯展示缺口，不把部署成功当业务闭环可用，
