@@ -804,9 +804,36 @@ proposal rather than approving it. The approved amendment words it reuses unchan
 `Management decision reason`, `Reject`, `Approve and apply`, `Waiting for management` and
 `Before approval`.
 
+### Old versions and signatures — measured 2026-09-23
+
+**FIXED: a historical version no longer borrows today's signature.**
+`snapshotTemplateData` read `base.signed` and `base.signature_url` — the live order's eSign PNG —
+so every revision printed the same customer signature under a different set of goods, prices and
+dates. A customer could be shown Rev 2 carrying the mark they put on Rev 1. A historical version
+now prints UNSIGNED, using the document's existing empty signature box, with no new words added to
+a customer document. Guarded by `SalesOrderWorkspace.historical-document.test.ts`, whose control was
+run red against the old two lines before the fix was kept.
+
+**UNKNOWN, and deliberately not guessed: which revision a stored signature covers.**
+`sales_order_snapshot` stores no signing fact (measured against the live function: its header
+carries `so · status · parties · customer · delivery · proceed · instalment · placed_at ·
+entry_fields` and nothing about signing), and `orders` carries `signature_url` with **no capture
+timestamp** — `pod_signed_at` is Delivery's proof of delivery, a different act. So the record
+cannot place the signature on a revision, and inferring it from revision order would be invention.
+The enforceable half of the rule ships; the other half waits on evidence.
+**Falsifier / the fix when it is wanted:** store the signing fact in the snapshot, or add a capture
+timestamp to `orders`, and a revision can print the signature it really carries.
+
+**OPEN GAP: a historical document still states today's money.** `payments` and `paid` ride from the
+live base, so an old version's `Balance due` is THAT version's goods total minus TODAY's receipts —
+an arithmetic that described no real moment (ownership Law D). Payments owns the money and the
+snapshot stores none of it, so the honest fix is a stored historical position, not a second
+arithmetic on the Sales Order page. Pinned as-is by a named `KNOWN GAP` test so the day it changes,
+it changes deliberately.
+
 **Still not built in this scope:** whole-page `Edit` with server-chosen `Save` vs
-`Submit amendment request`, catalogue `Add item` / `Remove` / `Restore`, the `Before` / `After`
-review, and version-bound historical documents and signatures.
+`Submit amendment request`, catalogue configuration, `Add item` / `Remove` / `Restore`, the
+`Before` / `After` review with downstream impacts, and version-conflict presentation.
 
 **⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
 APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that

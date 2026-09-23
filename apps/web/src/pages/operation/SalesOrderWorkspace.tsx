@@ -582,7 +582,10 @@ function draftTemplateData(
 /** An OLD revision's PDF renders FROM THAT SNAPSHOT — printable. The names
  *  the snapshot stored at mint time are what print; the payments ledger is
  *  live money and rides from the base. */
-function snapshotTemplateData(
+/* Exported for `SalesOrderWorkspace.historical-document.test.ts` — the
+   signature rule is a business guarantee about a CUSTOMER DOCUMENT, so it
+   is proved by calling the builder, not by grepping this file. */
+export function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
   /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
@@ -595,7 +598,7 @@ function snapshotTemplateData(
   /** 0562 — A VERSION PRINTS AS IT WAS ISSUED: only the payments recorded by
    *  that version's own time, and the customer signature only on the version
    *  the customer actually signed (orders/MASTER § Old versions and signatures). */
-  asOf?: { date: string; signed: boolean },
+  asOf?: { date: string },
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -675,8 +678,48 @@ function snapshotTemplateData(
     paid,
     balance_due: subtotal - paid,
     currency: base?.currency ?? "MYR",
-    signed: asOf ? asOf.signed && (base?.signed ?? false) : (base?.signed ?? false),
-    signature_url: asOf && !asOf.signed ? null : (base?.signature_url ?? null),
+    /* ⭐ A HISTORICAL VERSION NEVER BORROWS TODAY'S SIGNATURE — APPROVED /
+       LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md` § "Old versions
+       and signatures"):
+
+         "A signature belongs to the exact version and document the customer
+          signed; a new unsigned version says it is unsigned and never borrows
+          the old signature."
+
+       This read `base?.signed` and `base?.signature_url` — the ORDER's current
+       eSign PNG — so every revision printed the same signature under a
+       different set of goods, prices and dates. A customer could be shown Rev 2
+       carrying the mark they put on Rev 1.
+
+       ⛔ AND IT IS NOT REPLACED BY A GUESS. `sales_order_snapshot` stores no
+       signature fact (measured 2026-09-23 against the live function: header
+       carries so · status · parties · customer · delivery · proceed ·
+       instalment · placed_at · entry_fields, and nothing about signing), and
+       `orders` has `signature_url` with NO capture timestamp — only
+       `pod_signed_at`, which is Delivery's proof of delivery, a different act.
+       So which revision a stored signature covers is genuinely unprovable from
+       what is recorded today: an UNKNOWN, not a thing to infer from revision
+       order. The safe half of the rule is the half that is enforceable, so a
+       historical version prints UNSIGNED — the template's existing empty
+       signature box, no new words on a customer document — and never a
+       signature the record cannot place.
+
+       FALSIFIER: store the signing fact in the snapshot (or add a capture
+       timestamp to `orders`) and a revision can print the signature it really
+       carries. That is a schema change and is named as an open gap in the
+       Orders MASTER, not smuggled in here. */
+    signed: false,
+    signature_url: null,
+    /* ⭐ AND ITS MONEY IS THE MONEY THAT HAD ARRIVED BY THEN. The snapshot
+       stores none, so this reads the SAME payments ledger Payments owns and
+       the SAME arithmetic (sum of the rows) — only the rows whose own date is
+       on or before this version's. It invents no number and it never shows a
+       receipt that arrived after the version existed, which printing today's
+       `paid` on a Rev 1 document did.
+       ⚠️ NAMED LIMIT: a payment VOIDED or corrected later still reads as it
+       reads today, because the ledger keeps one current truth per row and the
+       snapshot keeps no money at all. The real fix is a stored historical
+       position; it is a schema change and is named in the Orders MASTER. */
   } as SalesOrderTemplateData;
 }
 
@@ -1536,7 +1579,6 @@ function SalesOrderWorkspaceBody() {
      Portal captures it at birth, so it is Rev 1's; a later version is unsigned
      and says so instead of borrowing it (orders/MASTER § Old versions and
      signatures). */
-  const signedRevision = 1;
   /* 0562 · THE FORM IS NEVER SQUEEZED BY THE DOCUMENT (Jess, 2026-09-23). The
      approved 50/50 holds whenever each half can carry the Items table; with
      less room the form keeps its minimum and the document takes the rest down to
@@ -1557,15 +1599,13 @@ function SalesOrderWorkspaceBody() {
     return () => ro.disconnect();
     /* Re-attached when the node the split lives in can have changed. */
   }, [mode, objectView, showRoute, isNew, order?.id]);
-  const unsignedIfLater = (d: SalesOrderTemplateData): SalesOrderTemplateData =>
-    currentRev != null && currentRev > signedRevision ? { ...d, signed: false, signature_url: null } : d;
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
     () =>
       mode === "oldrev"
         ? null
-        : unsignedIfLater(draftTemplateData(draft, baseline, base, refs, stair?.fee ?? 0, (key) => addonNameByKey.get(key) ?? key)),
+        : (draftTemplateData(draft, baseline, base, refs, stair?.fee ?? 0, (key) => addonNameByKey.get(key) ?? key)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, draft, baseline, base, refs, stair?.fee, addonNameByKey, currentRev],
   );
@@ -1574,7 +1614,7 @@ function SalesOrderWorkspaceBody() {
     if (mode === "oldrev" && viewedRevision)
       return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
         addonNameByKey.get(key) ?? key,
-        { date: viewedRevision.created_at.slice(0, 10), signed: viewedRevision.revision === signedRevision },
+        { date: viewedRevision.created_at.slice(0, 10) },
       );
     return debouncedDraftData;
   }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
@@ -1590,7 +1630,7 @@ function SalesOrderWorkspaceBody() {
      template, the same `renderSalesOrderPdf` call path, a second blob — and the
      operator is told which one they got. */
   const printData: SalesOrderTemplateData | null =
-    mode === "oldrev" && viewedRevision ? templateData : base ? unsignedIfLater(base) : null;
+    mode === "oldrev" && viewedRevision ? templateData : base;
   const printableRef = useRef<{ data: SalesOrderTemplateData | null; url: string | null }>({
     data: null,
     url: null,
