@@ -314,6 +314,9 @@ describe("R4 · Edit and send again", () => {
       p_destination_id: DEST,
       p_required_by: "2026-10-30",
       p_why: null,
+      /* 0562 · the round carries the requirement and REPLACES it, so a
+         requester who cleared it sends the real absence. */
+      p_purchase_requirement: null,
       p_for_service_case_id: null,
       p_for_staff_user_id: null,
       p_for_subsidiary_name: null,

@@ -115,6 +115,10 @@ import {
   ReadyStockCell,
   useManualPurchaseStock,
 } from "./ManualPurchaseStock";
+import ManualPurchaseDraftPreview from "./ManualPurchaseDraftPreview";
+import ManualPurchaseIssueWorkspace, {
+  type ManualPurchaseIssueLineView,
+} from "./ManualPurchaseIssueWorkspace";
 import PurchasingTabs from "./PurchasingTabs";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { Block } from "./SalesOrderWorkspace";
@@ -273,13 +277,22 @@ interface RequestRegisterRow {
   supplierGap: boolean;
   productionDaysMissing: boolean;
   transitDaysMissing: boolean;
-  /** The document-partition facts behind `Issue {n} PO{s}`. */
+  /** The document-partition facts behind `Issue {n} PO{s}` — and, since the
+   *  2026-09-22 review surface, the facts each DRAFT purchase order prints.
+   *  One list, so the count the toolbar shows and the documents the operator
+   *  reads can never come from two different readings of the same rows. */
   issueWalls: Array<{
+    demandId: string;
     supplierId: string | null;
+    supplierName: string | null;
     category: string | null;
     destinationId: string;
+    destinationName: string;
     purpose: string;
+    purposeLabel: string;
     deliveryDate: string | null;
+    sku: string;
+    item: string;
     remainingQty: number;
   }>;
   goods: GoodsRow[];
@@ -464,11 +477,18 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       productionDaysMissing: live.some((l) => l.production_days_missing === true),
       transitDaysMissing: live.some((l) => l.transit_days_missing === true),
       issueWalls: live.map((l) => ({
+        demandId: l.id,
         supplierId: l.supplier_id,
+        supplierName: l.supplier_id ? (supplierName.get(l.supplier_id) ?? null) : null,
         category: (l.category as string | null | undefined) ?? null,
         destinationId: l.destination_id ?? r.destination_id,
+        destinationName:
+          destName.get(l.destination_id ?? r.destination_id) ?? "",
         purpose: r.purpose,
+        purposeLabel: purposeLabelOf(r.purpose),
         deliveryDate: (l.delivery_date ?? l.required_by ?? r.required_by) || null,
+        sku: l.sku,
+        item: l.item_label ?? l.sku,
         remainingQty: remainingOf(l),
       })),
       goods: lines.flatMap((l): GoodsRow[] => {
@@ -810,6 +830,22 @@ export default function OperationManualPurchase() {
     selectedRows.flatMap((r) => r.issueWalls),
   );
 
+  /**
+   * ⭐ REVIEW BEFORE ISSUE (owner ruling 2026-09-22). `Issue PO` used to call
+   * the door directly: purchase orders existed — numbered, with Unit IDs born
+   * under them — before anybody saw a document. It now opens the same 50/50
+   * `Review Purchase Orders` surface SO Batch Purchase has had since Card 02,
+   * and the door is called from THERE.
+   *
+   * The state carries the wire payload UNCHANGED, so the request the server
+   * receives is the one the checks above already validated.
+   */
+  const [review, setReview] = useState<null | {
+    lines: ManualPurchaseIssueLineView[];
+    requestCount: number;
+    payload: { requestIds: string[]; together: boolean; demandIds?: string[] };
+  }>(null);
+
   async function issueSelected() {
     setIssueError(null);
     const ids = selectedRows.map((r) => r.id);
@@ -856,48 +892,48 @@ export default function OperationManualPurchase() {
       });
       return;
     }
-    try {
-      /* The chosen LINES, when the operator narrowed any of the selected
-         requests in its expansion. The server recomputes every quantity from
-         its own read, so this can only narrow the issue, never widen it. */
-      const chosenDemandIds = selectedRows.flatMap((r) => {
-        const picked = goodsChoice.get(r.id);
-        return picked ? [...picked] : [];
-      });
-      await issue.mutateAsync({
+    /* The chosen LINES, when the operator narrowed any of the selected
+       requests in its expansion. The server recomputes every quantity from
+       its own read, so this can only narrow the issue, never widen it. */
+    const chosenDemandIds = selectedRows.flatMap((r) => {
+      const picked = goodsChoice.get(r.id);
+      return picked ? [...picked] : [];
+    });
+    const narrowed =
+      chosenDemandIds.length > 0 && selectedRows.every((r) => goodsChoice.has(r.id))
+        ? new Set(chosenDemandIds)
+        : null;
+    /* The documents the operator is about to create, from the SAME walls the
+       toolbar counted — narrowed to the exact lines the wire will carry, so
+       the review cannot show goods the request does not ask for. */
+    setReview({
+      requestCount: ids.length,
+      lines: selectedRows.flatMap((r) =>
+        r.issueWalls.filter((w) => narrowed == null || narrowed.has(w.demandId)),
+      ),
+      payload: {
         requestIds: ids,
         together: true,
-        ...(chosenDemandIds.length > 0 &&
-        selectedRows.every((r) => goodsChoice.has(r.id))
-          ? { demandIds: chosenDemandIds }
-          : {}),
-      });
-      setSelected(new Set());
-      setGoodsChoice(new Map());
-      void q.refetch();
-    } catch (e) {
-      const body = (
-        e as {
-          body?: {
-            message?: string;
-            action?: string;
-            code?: string;
-            sku?: string | null;
-            supplier?: string | null;
-            destination?: string | null;
-          };
-        }
-      ).body;
-      const fallback = purchasingRefusal(body?.code, {
-        sku: body?.sku ?? null,
-        supplier: body?.supplier ?? null,
-        destination: body?.destination ?? null,
-      });
-      setIssueError({
-        wrong: body?.message ?? fallback.wrong,
-        todo: body?.action ?? fallback.todo,
-      });
-    }
+        ...(narrowed ? { demandIds: [...narrowed] } : {}),
+      },
+    });
+  }
+
+  /**
+   * THE DOOR ITSELF — called from the review surface, never from a row.
+   *
+   * A refusal is NOT swallowed here: the operator is standing on the review
+   * page, so the server's two lines belong on the surface they are reading,
+   * and that surface prints them in the same governed grammar. The door is
+   * atomic, so a refusal created nothing and the selection is still intact.
+   */
+  async function issueReviewed() {
+    if (!review) return;
+    await issue.mutateAsync(review.payload);
+    setReview(null);
+    setSelected(new Set());
+    setGoodsChoice(new Map());
+    void q.refetch();
   }
 
   const openRequest = useCallback((r: RequestRegisterRow) => setMode({ detail: r.id }), []);
@@ -1348,7 +1384,7 @@ export default function OperationManualPurchase() {
          */
         key: "po_default_delivery_date",
         label: MW.colPoDefaultDeliveryDate,
-        headerLines: ["PO Default", "Delivery Date"],
+        headerLines: ["PO", "Delivery Date"],
         width: 152,
         minWidth: 120,
         sortable: true,
@@ -1446,12 +1482,24 @@ export default function OperationManualPurchase() {
 
   return (
     <div className={`${detailId == null ? registerStyles.page : ""} flex h-full min-h-0 flex-col`}>
-      {detailId == null && <PurchasingTabs />}
+      {detailId == null && review == null && <PurchasingTabs />}
       <div className="relative min-h-0 flex-1">
+      {/* ⭐ REVIEW PURCHASE ORDERS — the surface between the tick and the door
+          (owner 2026-09-22). The Register stays MOUNTED underneath, exactly as
+          the object does, so `Cancel` restores the whole selection rather than
+          making the operator tick twelve rows again. */}
+      {review != null ? (
+        <ManualPurchaseIssueWorkspace
+          lines={review.lines}
+          requestCount={review.requestCount}
+          onBack={() => setReview(null)}
+          onIssue={issueReviewed}
+        />
+      ) : null}
       <div
         ref={canvasRef}
-        className={`${registerStyles.canvas} absolute inset-0 flex overflow-hidden${detailId != null ? " invisible" : ""}`}
-        aria-hidden={detailId != null || undefined}
+        className={`${registerStyles.canvas} absolute inset-0 flex overflow-hidden${detailId != null || review != null ? " invisible" : ""}`}
+        aria-hidden={detailId != null || review != null || undefined}
         data-testid="mp-register-surface"
       >
         {filterRailOpen && (
@@ -2208,7 +2256,11 @@ function CreateRequestWorkspace({
   /** Back to the object that was being edited (its id), or the Register. */
   onDone: (returnTo?: string) => void;
 }) {
-  const email = useAuth((s) => s.session?.user?.email ?? "");
+  /** The requester is a PERSON, resolved through the same Staff list the
+   *  Register reads — never the login's email and never `(you)`. A shared or
+   *  unnamed account resolves to the governed absence, exactly as every other
+   *  surface prints it (COPY-STANDARD, Manual Purchase). */
+  const authUserId = useAuth((s) => s.session?.user?.id ?? null);
   const editing = editId != null;
   const existing = useManualPurchaseDetail(editId);
   const resubmit = useResubmitManualPurchase();
@@ -2245,6 +2297,14 @@ function CreateRequestWorkspace({
   const [dateTouched, setDateTouched] = useState(false);
   /** Only `Other Purchase` asks — and must answer — `What is this for?`. */
   const [why, setWhy] = useState("");
+  /**
+   * ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner 2026-09-22).
+   * What the goods must satisfy, in the requester's words. It is NOT the
+   * `Other Purchase` reason: that one is required and answers *why buy at
+   * all*, and one field cannot carry two questions without one of them
+   * becoming a guess about which was answered.
+   */
+  const [requirement, setRequirement] = useState("");
   /** The per-purpose structured For fact (Card 04 §4). */
   const [serviceCaseId, setServiceCaseId] = useState<string | undefined>(undefined);
   const [staffUserId, setStaffUserId] = useState<string | undefined>(undefined);
@@ -2279,6 +2339,9 @@ function CreateRequestWorkspace({
       setDateTouched(true);
     }
     setWhy(r.purpose === "other_purchase" ? (r.why ?? "") : "");
+    /* R4 — a returned request reopens with the requirement it was sent with;
+       a request that recorded none opens empty and stays optional. */
+    setRequirement(r.purchase_requirement ?? "");
     setServiceCaseId(r.for_service_case_id ?? undefined);
     setStaffUserId(r.for_staff_user_id ?? undefined);
     setSubsidiaryName(r.for_subsidiary_name ?? "");
@@ -2547,6 +2610,7 @@ function CreateRequestWorkspace({
           destinationId: chosenDest,
           requiredBy: deliveryDate,
           why: purpose === "other_purchase" ? why.trim() : null,
+          purchaseRequirement: requirement.trim() || null,
           serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
           staffUserId: purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
           subsidiaryName: purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
@@ -2576,6 +2640,10 @@ function CreateRequestWorkspace({
         destinationId: chosenDest,
         requiredBy: deliveryDate || null,
         why: purpose === "other_purchase" ? why.trim() : null,
+        /* Optional on every purpose, and sent as a real absence when it is
+           empty — a blank string would store "the requester answered nothing"
+           as if it were an answer. */
+        purchaseRequirement: requirement.trim() || null,
         serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
         staffUserId:
           purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
@@ -2608,6 +2676,84 @@ function CreateRequestWorkspace({
 
   const namedStaff = staff.filter((s) => (s.name ?? "").trim() !== "");
 
+  /* ── THE REQUESTER IS A PERSON ───────────────────────────────────────────
+     Resolved through the Staff list this page already loads, so the create
+     form, the Register and the object all name the same individual from one
+     source. A shared login (`operation@carres.com`) or an unnamed account has
+     no individual to name, and the governed absence says exactly that instead
+     of printing a mailbox. */
+  const requesterName =
+    namedStaff.find((s) => s.id === authUserId)?.name?.trim() ||
+    MW.staffIdentityNotRecorded;
+
+  /* ── THE LIVE PREVIEW READS THE FORM, NEVER A SECOND COPY ────────────────
+     Same facts, same order, same words. A fact the requester has not filled
+     in yet prints nothing: a draft is unfinished, which is not the same as a
+     record that failed to store something. */
+  const previewRequestDetails = [
+    { label: MW.createPurpose, value: purposeLabelOf(purpose) },
+    ...(purpose === "service_case"
+      ? [
+          {
+            label: MW.serviceCase,
+            value:
+              (casesQ.data?.items ?? []).find((sc) => sc.id === serviceCaseId)?.caseNo ??
+              (casesQ.data?.items ?? []).find((sc) => sc.id === serviceCaseId)?.case_no ??
+              null,
+          },
+        ]
+      : []),
+    ...(purpose === "internal_staff_purchase"
+      ? [
+          {
+            label: MW.staffMember,
+            value: namedStaff.find((s) => s.id === staffUserId)?.name ?? null,
+          },
+        ]
+      : []),
+    ...(purpose === "subsidiary_purchase"
+      ? [{ label: MW.subsidiary, value: subsidiaryName.trim() || null }]
+      : []),
+    ...(purpose === "other_purchase"
+      ? [{ label: MW.whatIsThisFor, value: why.trim() || null }]
+      : []),
+    {
+      label: MW.canStockAnswer,
+      value:
+        stockAnswer === "concrete_need"
+          ? MW.canStockAnswerYes
+          : stockAnswer === "additional_stock"
+            ? MW.canStockAnswerNo
+            : null,
+    },
+    { label: MW.purchaseRequirement, value: requirement.trim() || null },
+    { label: MW.createRequestedBy, value: requesterName },
+    {
+      label: MW.proceedDate,
+      value: plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null,
+    },
+  ];
+  const previewDelivery = [
+    {
+      label: MW.createDeliverTo,
+      value: destinations.find((d) => d.id === chosenDest)?.name ?? null,
+    },
+    { label: MW.deliveryDate, value: deliveryDate ? fmtDate(deliveryDate) : null },
+  ];
+  const previewLines = lines
+    .map((l) => ({ line: l, picked: items.find((it) => it.sku === l.sku) ?? null }))
+    .filter((p): p is { line: LineDraft; picked: DemandPickItem } => p.picked != null)
+    .map(({ line, picked }) => ({
+      key: line.id,
+      sku: picked.sku,
+      item: picked.label,
+      /* Catalog's supplier, never a typed one — the request may carry several,
+         and the PO grouping at Issue PO is what splits them. */
+      supplier: picked.supplier ?? null,
+      qty: Number(line.qty) || 0,
+      note: line.note.trim() || null,
+    }));
+
   /* ⭐ D1 · SEND STAYS ON SCREEN (measured 2026-09-17: at 390px the header's
      action pair sat past the right edge and the goods input shrank to ~42px).
      The pair is drawn ONCE per width: in the shell header on a wide canvas,
@@ -2633,25 +2779,27 @@ function CreateRequestWorkspace({
   return (
     <div className="mp-create-shell flex min-h-0 flex-1 flex-col">
       {/* The action pair lives on the shell's own header row (壳画头) on a
-          wide canvas — never inside the card. */}
+          wide canvas — never inside the form. */}
       <PurchasingTabs right={actions("header")} />
       <div
         className="mp-create-page flex min-h-0 flex-1 flex-col overflow-auto p-4"
         data-testid="manual-purchase-create"
       >
-      <section className="mp-create-card">
-      <div className="mp-create-header">
-        <h2 className="mp-create-title">
+        <h2 className="mp-create-heading">
           {editing ? MW.editAndSendAgain : "New Manual Purchase"}
         </h2>
-      </div>
-
-      {/* ── The header — asked once for the whole request ── */}
-      <div className="mp-create-body flex flex-col gap-6">
-      <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* ⭐ THE SALES ORDER COMPOSITION (owner 2026-09-22): the form on the
+            left, the live internal MPR preview on the right, ONE reading order
+            across both. The halves bind from 1130px — the measured narrowest
+            readable pair — and stack below it, so a phone gets the form first
+            and the preview under it rather than two unreadable columns. */}
+        <div className="mp-create-split" data-testid="object-two-panes">
+          <div className="mp-create-form mp-create-style flex min-w-0 flex-col gap-6">
+            <Block title={MW.secCreateRequestDetails}>
+              <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="mp-purpose" className="text-meta text-kit-slate-11">
-            {MW.needFor}
+            {MW.createPurpose}
           </label>
           <Select
             id="mp-purpose"
@@ -2685,73 +2833,6 @@ function CreateRequestWorkspace({
             ]}
           />
         </div>
-        <div>
-          <label htmlFor="mp-dest" className="text-meta text-kit-slate-11">
-            {MW.deliverTo}
-          </label>
-          <Select
-            id="mp-dest"
-            value={chosenDest}
-            onValueChange={setDest}
-            disabled={governedRule != null}
-            options={destinations.map((d) => ({ value: d.id, label: d.name }))}
-          />
-          {/* The lock names its rule in the ONE approved sentence for this
-              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
-              line 1) — no new word reaches the screen. */}
-          {governedRule ? (
-            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
-              {
-                purchasingRefusal("supplier_collection_destination_mismatch", {
-                  supplier: governedRule.supplierName || null,
-                  destination:
-                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
-                }).wrong
-              }
-            </p>
-          ) : null}
-        </div>
-        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
-            Malaysia-date preview before Send; the stored hand-off truth
-            after. Never an input, never a browser clock. */}
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
-            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
-          </p>
-        </div>
-        {/* `Delivery Date` — the ONE date input. The server proposes the
-            slowest selected line's arrival once lead facts are complete; a
-            chosen date is the person's and is never silently overwritten. */}
-        <div>
-          <DatePicker
-            id="mp-delivery-date"
-            label={MW.deliveryDate}
-            /* The SETTINGS floor (0422), never a hard-coded number: the
-               picker used to refuse anything within 14 days whatever
-               Purchasing Settings said. */
-            minDate={earliestDeliveryDate ?? undefined}
-            value={deliveryDate || null}
-            onChange={(v) => {
-              setDateTouched(true);
-              setDeliveryDate(v ?? "");
-            }}
-          />
-          {/* 0422 — the door's own refusal, printed before Send is pressed. */}
-          {dateTooEarlyWords ? (
-            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-date-too-early">
-              {dateTooEarlyWords.wrong} {dateTooEarlyWords.todo}
-            </p>
-          ) : null}
-        </div>
-        <div>
-          <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
-          {/* A FACT, never a control — the server stamps created_by itself. */}
-          <p className="pt-1.5 text-body text-base-900" data-testid="mp-raised-by">
-            {email.split("@")[0]} (you)
-          </p>
-        </div>
-
         {/* ── THE STRUCTURED FOR (Card 04 §4) — each exceptional purpose
             names its object; routine purposes ask nothing extra. ── */}
         {purpose === "service_case" ? (
@@ -2798,8 +2879,26 @@ function CreateRequestWorkspace({
             />
           </div>
         ) : null}
-      </div>
-
+        <div>
+          <span className="text-meta text-kit-slate-11">{MW.createRequestedBy}</span>
+          {/* A FACT, never a control — the server stamps `created_by` itself.
+              The NAME is resolved through the same Staff list the Register
+              reads; a shared or unnamed login prints the governed absence
+              rather than an email or `(you)`, which named nobody. */}
+          <p className="pt-1.5 text-body text-base-900" data-testid="mp-raised-by">
+            {requesterName}
+          </p>
+        </div>
+        {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
+            Malaysia-date preview before Send; the stored hand-off truth
+            after. Never an input, never a browser clock. */}
+        <div>
+          <span className="text-meta text-kit-slate-11">{MW.proceedDate}</span>
+          <p className="pt-1.5 text-body text-base-900" data-testid="mp-proceed-date">
+            {plan.data?.proceedDate ? fmtDate(plan.data.proceedDate) : null}
+          </p>
+        </div>
+              </div>
       {/* Card 04 — ONLY `Other Purchase` asks the question, and it must be
           answered before Send unlocks. Routine purposes do not ask a
           duplicate `Why`. */}
@@ -2819,12 +2918,87 @@ function CreateRequestWorkspace({
         </div>
       ) : null}
 
+      {/* ⭐ `Purchase requirement` — OPTIONAL, ON EVERY PURPOSE (owner
+          2026-09-22). It stays inside Request Details: the requirement is part
+          of what is being asked for, not a third kind of need and not a
+          question at the bottom of the form. It never borrows `Other
+          Purchase`'s required reason field. */}
+      <div className="max-w-[720px]">
+        <label htmlFor="mp-requirement" className="text-meta text-kit-slate-11">
+          {MW.purchaseRequirement}
+        </label>
+        <textarea
+          id="mp-requirement"
+          data-testid="mp-requirement"
+          value={requirement}
+          onChange={(e) => setRequirement(e.target.value)}
+          rows={2}
+          className="mt-1 w-full rounded-md border border-base-200 bg-white px-3 py-2 text-body text-base-900 outline-none focus:border-kit-blue-9"
+        />
+      </div>
       {headerError ? (
         <p className="text-meta text-kit-red-11" data-testid="mp-header-error">
           {headerError}
         </p>
       ) : null}
+            </Block>
 
+            <Block title={MW.secCreateDelivery}>
+              <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="mp-dest" className="text-meta text-kit-slate-11">
+            {MW.createDeliverTo}
+          </label>
+          <Select
+            id="mp-dest"
+            value={chosenDest}
+            onValueChange={setDest}
+            disabled={governedRule != null}
+            options={destinations.map((d) => ({ value: d.id, label: d.name }))}
+          />
+          {/* The lock names its rule in the ONE approved sentence for this
+              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
+              line 1) — no new word reaches the screen. */}
+          {governedRule ? (
+            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
+              {
+                purchasingRefusal("supplier_collection_destination_mismatch", {
+                  supplier: governedRule.supplierName || null,
+                  destination:
+                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+                }).wrong
+              }
+            </p>
+          ) : null}
+        </div>
+        {/* `Delivery Date` — the ONE date input. The server proposes the
+            slowest selected line's arrival once lead facts are complete; a
+            chosen date is the person's and is never silently overwritten. */}
+        <div>
+          <DatePicker
+            id="mp-delivery-date"
+            label={MW.deliveryDate}
+            /* The SETTINGS floor (0422), never a hard-coded number: the
+               picker used to refuse anything within 14 days whatever
+               Purchasing Settings said. */
+            minDate={earliestDeliveryDate ?? undefined}
+            value={deliveryDate || null}
+            onChange={(v) => {
+              setDateTouched(true);
+              setDeliveryDate(v ?? "");
+            }}
+          />
+          {/* 0422 — the door's own refusal, printed before Send is pressed. */}
+          {dateTooEarlyWords ? (
+            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-date-too-early">
+              {dateTooEarlyWords.wrong} {dateTooEarlyWords.todo}
+            </p>
+          ) : null}
+        </div>
+              </div>
+            </Block>
+
+            <Block title={MW.secCreateItems}>
       {/* ── ITEMS · one row per SKU, the dialog's proven split ──
           ONE grid holds the caption row and every line, so the four tracks are
           resolved once and `Note` sits over the note it names. Two grids
@@ -2834,9 +3008,6 @@ function CreateRequestWorkspace({
           cells join the grid directly; whatever stacks under it (supplier,
           lead gap, already-have, error, picker) spans the full row. */}
       <div className="mp-create-items flex min-w-0 flex-col gap-3" data-testid="mp-lines">
-        <h3 className="text-body font-semibold text-base-900">
-          Order Items
-        </h3>
 
         {/* D1 — below a 640px form the four tracks reflow: the item takes the
             whole row, Qty · Note · Remove sit under it, and each cell carries
@@ -2988,9 +3159,23 @@ function CreateRequestWorkspace({
           </Button>
         </div>
       </div>
+            </Block>
+          </div>
+
+          {/* The preview reads the SAME draft the form holds — never a second
+              copy of the facts, and never a supplier document. */}
+          <aside className="mp-create-preview-pane" aria-label={MW.page}>
+            <ManualPurchaseDraftPreview
+              requestDetails={previewRequestDetails}
+              delivery={previewDelivery}
+              lines={previewLines}
+              itemWord={W.itemLabel}
+              qtyWord={W.itemsColQty}
+              supplierWord={W.supplierLabel}
+            />
+          </aside>
+        </div>
       </div>
-      </section>
-    </div>
       <div className="mp-create-footer" data-testid="mp-create-footer">
         {actions("footer")}
       </div>
@@ -3942,6 +4127,19 @@ function ManualPurchaseObject({
               {request.why && request.purpose !== "other_purchase" ? (
                 <Fact label={MW.why} testId="mp-detail-why" wide>
                   {request.why}
+                </Fact>
+              ) : null}
+              {/* ⭐ `Purchase requirement` (0562) — shown only when the
+                  requester actually wrote one. It is OPTIONAL, so an empty row
+                  would print a label over nothing and read as a fact somebody
+                  failed to record. */}
+              {request.purchase_requirement ? (
+                <Fact
+                  label={MW.purchaseRequirement}
+                  testId="mp-detail-purchase-requirement"
+                  wide
+                >
+                  {request.purchase_requirement}
                 </Fact>
               ) : null}
             </dl>

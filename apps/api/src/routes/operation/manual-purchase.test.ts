@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { signTestJwt, useTestJwks } from "../../test/jwt";
-import { purchasingRefusal } from "@carres/shared";
+import { poDeliveryDateOf, purchasingRefusal } from "@carres/shared";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -1438,9 +1439,21 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
     } as unknown as ReturnType<typeof userClient>;
   }
 
-  it("two Delivery Dates create two POs, each saving its approved date as eta_date", async () => {
+  it("two Delivery Dates still create two POs — and neither prints the requested date", async () => {
+    /**
+     * ⭐ THE OWNER CORRECTION OF 2026-09-22, IN ONE TEST.
+     *
+     * The MPR's `Delivery Date` still SPLITS the documents — two approved
+     * dates are two supplier commitments, so the five-fact partition keeps
+     * them apart. What changed is what reaches the supplier's paper: the PO's
+     * own delivery date is now `PO Date + n Settings working days`, with no
+     * transit added, so a request raised for a showroom two months out stops
+     * printing that far date as if the factory had agreed it.
+     */
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-1", "PO-2"] }, error: null });
     vi.mocked(userClient).mockReturnValue(makeDatedIssueSb(rpc));
+    /* The Settings the date now comes from: Hooka, sofa, 5 working days. */
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("https://api.test/api/operation/purchasing/requests/issue", {
@@ -1457,12 +1470,21 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
     );
     expect(res.status).toBe(200);
     const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
-    // Same supplier × category × destination × purpose — but two approved
-    // Delivery Dates are two supplier commitments (Card 06 §7).
+    // Same supplier × category × destination × purpose — two approved
+    // Delivery Dates are two supplier commitments (Card 06 §7, unchanged).
     expect(pos).toHaveLength(2);
-    expect(new Set(pos.map((p) => p.eta_date))).toEqual(
-      new Set(["2026-10-10", "2026-10-20"]),
-    );
+    // ⛔ THE REQUESTED DATES NO LONGER REACH THE DOCUMENT.
+    expect(pos.map((p) => p.eta_date)).not.toContain("2026-10-10");
+    expect(pos.map((p) => p.eta_date)).not.toContain("2026-10-20");
+    // Every document carries the ONE Settings arithmetic, from today's PO
+    // Date — the same function the paper's `PO {n}-Day` label counts back.
+    const expected = poDeliveryDateOf(CARD06_SETTINGS, {
+      supplierId: SUP,
+      category: "sofa",
+      poDateIso: todayIsoMYT(),
+    });
+    expect(expected).not.toBeNull();
+    expect(new Set(pos.map((p) => p.eta_date))).toEqual(new Set([expected]));
     expect((await res.json() as { documents: number }).documents).toBe(2);
   });
 });
@@ -1900,7 +1922,7 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
      later by somebody wondering why nothing arrived. The test now pins the
      refusal, and pins that NOTHING was written behind it. */
   for (const code of ["PGRST202", "42883"]) {
-    it(`refuses in words when 0410 is not applied yet, and writes nothing (${code})`, async () => {
+    it(`refuses in words when the create migration is not applied yet, and writes nothing (${code})`, async () => {
       const rpc = vi.fn().mockResolvedValue({ data: null, error: { code, message: "not found" } });
       const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
       expect(res.status).toBe(503);
@@ -1908,7 +1930,10 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
       expect(body.code).toBe("migration_not_applied");
       /* It says what happened and who fixes it — never a bare code. */
       expect(body.message).toBeTruthy();
-      expect(body.action).toContain("0410");
+      /* The refusal names the migration THIS build needs (0562 since Card 13),
+         not the one two cards ago — an operator forwarding it to IT must be
+         able to act on the sentence. */
+      expect(body.action).toContain("0562");
       /* ⛔ AND IT DOES NOT QUIETLY TRY THE HEADER-ONLY DOOR. One call, one
          refusal; a second call here would be the dropped-lines bug again. */
       expect(rpc).toHaveBeenCalledTimes(1);

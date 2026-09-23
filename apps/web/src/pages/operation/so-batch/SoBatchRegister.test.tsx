@@ -366,7 +366,7 @@ describe("the approved columns, in the approved reading order", () => {
     "Supplier",
     "Supplier Deliver To",
     "PO No",
-    "PO Default Delivery Date",
+    "PO Delivery Date",
   ];
 
   it("draws exactly the twelve business columns, in the owner's order", () => {

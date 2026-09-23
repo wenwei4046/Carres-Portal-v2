@@ -494,7 +494,9 @@ does not decide it.
 
 ### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
 
-**PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22), APPROVED / NOT BUILT.**
+**PO DELIVERY DATE — OWNER CORRECTION (Jess, 2026-09-22). BUILT for the Manual
+Purchase issue door in CARD 13 (`poDeliveryDateOf`); the SO Batch door still owes
+the same convergence — see §9.2's named gap.**
 The single-PO label is `PO {n}-Day Delivery Date`; the register column remains
 `PO Delivery Date`. `n` is exactly the applicable working-day value from Settings
 recorded for that PO: Settings 14 means 14 working days, Settings 10 means 10.
@@ -1593,7 +1595,21 @@ blank `SO NO`.
 
 ### 9.2 Manual Purchase
 
-**CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; APPROVED / NOT BUILT.**
+**CREATE / RETURNED-REQUEST EDIT BLUEPRINT — owner confirmed 2026-09-22; BUILT in
+PURCHASING CARD 13.**
+
+**MIGRATION STATE, exactly (2026-09-23).** `0562_a_manual_purchase_says_what_it_needs`
+is **APPLIED to production** through the governed `apply_migration` path (tracker
+`20260922211119`); `md5(statements[1])` equals the committed file's md5, the column is
+present and nullable, and all three requirement-carrying doors exist. It deliberately
+leaves the superseded overloads standing: a migration lands before its bundle, and
+dropping the nine-name door would have refused every Manual Purchase raised in that
+window. **`0563_one_create_door_per_name_again` is WRITTEN AND NOT APPLIED** — it drops
+them and re-asserts one door per name, and it is applied only after all three production
+surfaces report this card's merge SHA. Until the bundle is live, a request raised by the
+old bundle records no requirement: the honest NULL, not a dropped fact.
+**The authenticated production walk is OWED**, and so is the merge itself — see the
+card's delivery note below.
 Reuse the selected Sales Order form composition, with a 50/50 form and live MPR
 preview at the governed readable desktop width; use the shared stacked layout
 below it. This overrides the former blanket ban on a Manual Purchase split
@@ -1693,9 +1709,48 @@ in review; never silently alter the request or claim a supplier has confirmed it
 Current issue code's approved-MPR-date handoff is implementation evidence to be
 changed, not an alternative approved calculation. Do not rewrite historical POs.
 
-**Empty PO fact.** Where a request has no linked PO, print `No PO yet`, never a
-blank, a dash, or `Not ordered yet`. Failed/unknown lineage still uses its own
-loading/error state and never asserts that no PO exists.
+**Empty PO fact — BUILT (CARD 13).** Where a request has no linked PO, print
+`No PO yet`, never a blank, a dash, or `Not ordered yet`. Failed/unknown lineage
+still uses its own loading/error state and never asserts that no PO exists.
+`manualPurchasePoSummary([])` is the one place the word lives.
+
+**REVIEW PURCHASE ORDERS BEFORE ISSUE — BUILT (CARD 13), owner ruling 2026-09-22.**
+`Issue PO` on the Register opens the same 50/50 review surface SO Batch Purchase
+has carried since CARD 02; the issue door is called from THERE and never from a
+row. The measured defect it closes: one click created numbered purchase orders —
+with Unit IDs born under them — and no document was ever shown.
+
+- The review draws ONE draft per ACTUAL purchase order, grouped by the five
+  facts the issue door partitions on (`Supplier × Category × Deliver To ×
+  Purpose × MPR Delivery Date`) through the shared
+  `manualPurchaseIssueDocuments`, which is also what the toolbar's
+  `Issue {n} PO(s)` counts — one arithmetic, two readers (Law D).
+- The draft uses the PO template and creates NOTHING: no PO number, no version,
+  no issue date, no Unit IDs, and no delivery date (that one is computed on the
+  server at issue). It carries the governed `This is a preview. Issue PO creates
+  the number.`
+- `Cancel` leaves with nothing created and the selection intact. A refusal is
+  printed on the review surface in the server's own two lines, because the door
+  is atomic and the operator is standing there.
+- Issue is still not send: sending evidence remains the Purchase Order object's.
+
+**THE PO's DELIVERY DATE COMES FROM SETTINGS — BUILT (CARD 13), owner correction
+2026-09-22.** The issue door stamps `PO Date + n Settings working days` through
+the shared `poDeliveryDateOf`, with NO transit day added and `n` the recorded
+Supplier × Category production number. This REPLACES Card 06 §7's "the approved
+Manual Delivery Date becomes the official PO delivery date": a request raised for
+a showroom two months out used to print that far date on the factory's paper. The
+MPR's own `Delivery Date` keeps every other job — `Order By`, the timing rail and
+the document partition above. A supplier × category with no recorded production
+number issues with NO date and the paper prints `Not recorded`.
+
+🟡 **NAMED GAP — the SO Batch issue path still stamps production + transit**
+(`apps/api/src/routes/operation/to-order.ts`, `expectedArrivalOf`). The ruling is
+about the PO's delivery date whatever door creates it, so that path owes the same
+convergence; it was left untouched here because changing it moves customer
+arrival projections, which is not this card's scope. Falsifier: run the SO Batch
+issue door and compare the stamped `eta_date` with `poDeliveryDateOf` — they
+differ by that supplier's transit days.
 
 
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**
@@ -2202,6 +2257,18 @@ demand goes to PO Duty by Order By.
 **Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
 missing governed Catalog/supplier relationship, refused/withdrawn request.
 **Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
+
+**PURCHASING CARD 13 — DELIVERY NOTE, 2026-09-23.** The vertical slice is implemented on
+`build/purchasing-13-manual-purchase` and its gates ran locally. **It is NOT merged and NOT
+deployed**, and the reason is a credential, not a decision: `git push` fails with
+`failed to get: -60008` / `could not read Username for 'https://github.com'` — this machine's
+login keychain refuses to hand git the GitHub credential to a non-interactive session, and
+`gh auth status` reports the stored token invalid. A second lane on the same machine
+(`build/so-nav-amendment`) is stuck one commit ahead for the same reason, so it is the
+machine's credential state, not this branch. Nothing else is owed before merge: the branch
+is rebased on `origin/main`, `ci:migrations` and the migration replay pass (0562 replays
+cleanly; the only new replay failure on the chain is another lane's `0561`), and the
+Manual Purchase suite is green.
 
 ### 9.3 Purchase Orders
 

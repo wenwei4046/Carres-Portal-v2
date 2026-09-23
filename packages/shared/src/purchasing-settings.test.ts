@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addWorkingDays } from "./working-days";
-import { poDeliveryWorkingDays,
+import { poDeliveryDateOf,
+  poDeliveryWorkingDays,
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
   orderByFromDeliveryDate,
@@ -268,6 +269,79 @@ describe("the wire refuses what the database would refuse", () => {
  * cannot say anything about the arithmetic.
  */
 const NO_HOLIDAYS: ReadonlySet<string> = new Set();
+
+/**
+ * ⭐ `poDeliveryDateOf` — THE PO's OWN DELIVERY DATE (owner ruling Jess,
+ * 2026-09-22). `PO Date + n Settings working days`, and `n` is exactly the
+ * recorded production number: NO transit day is added. It is deliberately a
+ * DIFFERENT answer from `expectedArrivalOf`, which is when the goods reach
+ * Carres — the pair below is the whole point of having two functions.
+ */
+describe("poDeliveryDateOf — the Settings date the supplier's paper prints", () => {
+  it("counts the recorded production days on the FACTORY's week and adds no transit", () => {
+    // Ohana works Saturday (offDays [0]) on a 7-day bedframe lead: Mon 3 Aug
+    // + 7 working days is Tue 11 Aug. `expectedArrivalOf` then adds Ohana's
+    // transit day and answers Wed 12 Aug — one day later, for a different
+    // question. The PAPER prints the factory's own promise.
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-11");
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        fromIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-12");
+  });
+
+  it("the label's `n` counts back to the same number it was computed from", () => {
+    /* The paper prints `PO {n}-Day Delivery Date`, and `n` is counted from the
+       two dates by `poDeliveryWorkingDays`. Computing the date from Settings
+       and counting it back must agree, or the label and the date would be two
+       arithmetics again (Law D). */
+    const date = poDeliveryDateOf(SETTINGS, {
+      supplierId: NICE,
+      category: "mattress",
+      poDateIso: "2026-08-03",
+      holidays: NO_HOLIDAYS,
+    });
+    expect(date).not.toBeNull();
+    expect(
+      poDeliveryWorkingDays(SETTINGS, {
+        supplierId: NICE,
+        poDateIso: "2026-08-03",
+        deliveryDateIso: date,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe(productionWorkingDaysFor(SETTINGS, NICE, "mattress"));
+  });
+
+  it("NULL IS A REAL ANSWER — no production number, no date", () => {
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "mattress",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: null,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+  });
+});
 
 describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
   it("production on the FACTORY's week, then transit on the OFFICE week", () => {

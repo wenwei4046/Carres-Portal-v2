@@ -992,7 +992,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, initialSearc
            `Goods Must Arrive`, never an "if ordered today" estimate. */
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
-        headerLines: ["PO Default", "Delivery Date"],
+        headerLines: ["PO", "Delivery Date"],
         width: 120, minWidth: 110,
         sortable: true,
         chooserGroup: "Documents",

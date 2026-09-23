@@ -537,6 +537,7 @@ import {
   manualPurchaseApprovalOf,
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
+  manualPurchaseIssueDocuments,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   manualPurchaseItemsSummary,
@@ -630,7 +631,11 @@ describe("Card 04 · the one remainder arithmetic", () => {
 
 describe("Card 04 · the deterministic summaries", () => {
   it("PO No: absence sentence · the one number · a count", () => {
-    expect(manualPurchasePoSummary([])).toBe("\u2014");
+    /* ⭐ `No PO yet` — owner ruling 2026-09-21 (UI MASTER §6.0 rule 3), BUILT
+       in CARD 13. The retired `—` could not tell an operator the difference
+       between *no purchase order exists yet* and *this cell has nothing to
+       say*; the read's loading and failure states keep their own words. */
+    expect(manualPurchasePoSummary([])).toBe("No PO yet");
     expect(manualPurchasePoSummary(["PO-20260829-1234"])).toBe("PO-20260829-1234");
     expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");
   });
@@ -777,6 +782,39 @@ describe("Card 06 · selection and the issue sentence", () => {
   it("pluralises from facts", () => {
     expect(manualPurchaseIssueSentence(1, 1, 1)).toBe("1 selected · 1 unit · Issue 1 PO");
     expect(manualPurchaseIssueSentence(2, 5, 3)).toBe("2 selected · 5 units · Issue 3 POs");
+  });
+
+  /**
+   * ⭐ THE REVIEW SURFACE READS THE SAME WALLS THE COUNT DOES (owner ruling
+   * 2026-09-22). `Review Purchase Orders` draws one draft per document; if it
+   * grouped the selection its own way, the operator would check three papers
+   * and the database would create four.
+   */
+  it("groups the selection into the documents the count predicts, keeping each document's lines", () => {
+    const line = (over: Partial<Parameters<typeof manualPurchaseIssueGroupCount>[0][number]> & { sku?: string }) => ({
+      supplierId: "s1",
+      category: "sofa",
+      destinationId: "d1",
+      purpose: "ready_stock",
+      deliveryDate: "2026-09-15",
+      remainingQty: 1,
+      sku: "A",
+      ...over,
+    });
+    const lines = [
+      line({ sku: "A" }),
+      line({ sku: "B" }),
+      line({ sku: "C", deliveryDate: "2026-09-22" }),
+      line({ sku: "D", supplierId: "s2" }),
+      line({ sku: "E", remainingQty: 0 }),
+    ];
+    const docs = manualPurchaseIssueDocuments(lines);
+    expect(docs).toHaveLength(manualPurchaseIssueGroupCount(lines));
+    expect(docs).toHaveLength(3);
+    // Each document keeps its OWN lines, in the order they were offered.
+    expect(docs.map((d) => d.lines.map((l) => l.sku))).toEqual([["A", "B"], ["C"], ["D"]]);
+    // Nothing left to buy is in no document at all.
+    expect(docs.flatMap((d) => d.lines.map((l) => l.sku))).not.toContain("E");
   });
 });
 

@@ -288,7 +288,7 @@ describe("Card 02-B · optional Supplier and PO Default Delivery Date", () => {
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
       "Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty",
-      "Supplier", "PO Default Delivery Date", "Item",
+      "Supplier", "PO Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();
     expect(screen.getByText("Fri, 18 Sep")).toBeInTheDocument();

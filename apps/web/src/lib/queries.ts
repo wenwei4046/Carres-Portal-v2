@@ -4684,6 +4684,12 @@ export interface PurchaseRequestRow {
    *  the request recorded no answer, and the Ready Stock section says so.
    *  Optional so an older API reads as not recorded. */
   fulfilment_intent?: "concrete_need" | "additional_stock" | null;
+  /** ⭐ `Purchase requirement` (0562, owner 2026-09-22) — OPTIONAL on every
+   *  purpose: what the goods must satisfy, in the requester's words. It is not
+   *  `why`, which is `Other Purchase`'s required reason for buying at all.
+   *  Optional on the type so an older API reads as none recorded, and NULL is
+   *  never guessed or backfilled. */
+  purchase_requirement?: string | null;
   /** 0522 · R3 — the requester withdrew it before a decision. Optional so an
    *  older API reads as not withdrawn. */
   withdrawn_at?: string | null;
@@ -5004,6 +5010,9 @@ export function useResubmitManualPurchase() {
       destinationId: string;
       requiredBy: string;
       why: string | null;
+      /** 0562 — the round REPLACES the requirement, so clearing it is a real
+       *  edit rather than a fact that can never be taken back. */
+      purchaseRequirement: string | null;
       serviceCaseId: string | null;
       staffUserId: string | null;
       subsidiaryName: string | null;
@@ -5056,6 +5065,8 @@ export function useCreatePurchaseRequest() {
       requiredBy?: string | null;
       /** Card 04: ONLY `other_purchase` answers `What is this for?`. */
       why?: string | null;
+      /** 0562 — optional on every purpose; empty rides as a real absence. */
+      purchaseRequirement?: string | null;
       /** The structured For fact, required on its own purpose (Card 04). */
       serviceCaseId?: string | null;
       staffUserId?: string | null;
