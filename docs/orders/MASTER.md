@@ -122,7 +122,7 @@ The implementation record that follows is evidence, not a competing target.
 
 ## External numbering privacy — owner requirements 2026-09-23
 
-**RULING / APPROVED REQUIREMENTS; format and implementation NOT APPROVED.** Jess requires
+**RULING / APPROVED REQUIREMENTS; SO format approved below, implementation not authorized in this PLAN lane.** Jess requires
 customers and other outside parties not to infer Carres' order count from document numbers, and
 requires the shortest practical readable numbers. A sequential external SO reference is therefore
 not an acceptable future recommendation merely because its integer capacity is sufficient.
@@ -137,28 +137,34 @@ the original, `(2)` for the second version, and so on. Do not use `Rev`, `V`, or
 for this presentation. The parenthesized revision is not part of the permanent order number;
 amendment preserves that number. Search by the base reference must make its versions available
 without requiring the parentheses. This is approved target presentation, not a claim of shipped
-behavior or approval of the base numbering format. Historical issued PDFs remain preserved.
+behavior. Historical issued PDFs remain preserved.
 
-**PROPOSAL / NOT LAW — base format still unresolved.** Recommend a year plus six random decimal
-digits, such as `SO26-482917`, to prioritize short, numeric references. With leading zeros allowed,
-this provides 1,000,000 references per document family per year. The owner-review alternative
-`SO2609-48271` includes year and month plus five random decimal digits, providing 100,000 references
-per family per month. The latter is 12 characters versus 11 for the year-only format, before the
-four-character revision suffix ` (2)`. Neither capacity is a verified business forecast or an
-unlimited guarantee. Each document family needs independent capacity assessment; DO issuance can
-exceed SO issuance. No base format or cross-module cutover has been approved.
+**RULING / APPROVED — SO base format, 2026-09-23.** Jess approved `SOYYMM-NNNNN`,
+for example `SO2609-48271`: year and month of original order creation plus a fixed five-digit
+random decimal suffix. Leading zeros are allowed (`00000` through `99999`), providing 100,000
+possible SO references per calendar month. Display the original as `SO2609-48271 (1)` and the
+second version as `SO2609-48271 (2)`. Amendment never changes the base reference or its original
+year/month, including amendments made in a later month. The encoded month is not the delivery,
+receipt, warranty-start, or amendment month; use the actual governed dates for those purposes.
 
-Randomness alone does not prevent collisions: allocation must enforce uniqueness and retry;
-repeated submission must identify the same business request. Preserve authoritative record links,
-historical issued identities and documents. Fixed random references conceal a running counter,
-not every inference from transaction activity, and are never authorization secrets. Capacity must
-be monitored before exhaustion, with no silent volume-triggered length change.
+Suffix length stays fixed; do not silently expand it based on issuance volume. Allocation must
+ensure unique references and retry random collisions; repeated submission must identify the same
+business request. Void references are not reused. Preserve authoritative record links, existing
+order numbers and historical issued documents. Search by the base reference makes its versions
+available without requiring a revision suffix.
 
-**Falsifier:** revisit the recommended base format if confirmed peak annual issuance per family,
-offline/multi-system allocation, integrations, or operator evidence defeats its capacity or
-readability, or the owner requires month information in the reference. Reconcile §9's
-message-reference rules before cutover; a new SO display code does not authorize sending SO
-numbers to suppliers. This proposal authorizes no application build or production changes.
+**Acceptance boundary / limitations.** Capacity is finite and must be monitored before exhaustion;
+100,000 per month is not a verified forecast or an unlimited guarantee. Fixed random references
+conceal a running counter, not every inference from transaction activity, and are never
+authorization secrets. Reconcile §9's message-reference rules before cutover; an SO display code
+does not authorize sending SO numbers to suppliers.
+
+**Scope boundary.** This approval covers SO numbering and its revision presentation only. PO, DO,
+GRN, RA and Service Case numbering require their own capacity and governing-business-rule review
+before adopting a similar appearance. It does not approve their revision, rescheduling, voiding or
+correction workflows. Unit IDs, INV and RC remain outside this change. This is approved target
+truth, not shipped behavior, whole-blueprint approval or authorization for application code,
+production writes, migration or cutover in this PLAN lane.
 
 ## One purpose and one navigation home
 
