@@ -2441,21 +2441,20 @@ operationOrdersRouter.post(
        office save runs reads the SAVED row back and runs the ONE arithmetic
        (Law D); it writes nothing when the number has not moved, and it never
        fails the decision that already succeeded. */
-    const applied = (data as { status?: string } | null)?.status === "applied";
-    if (applied) {
-      const owner = await sb
-        .from("sales_order_amendments")
-        .select("order_id")
-        .eq("id", amendmentId)
-        .maybeSingle();
-      const orderId = (owner.data as { order_id?: string } | null)?.order_id;
-      if (orderId) {
+    /* ⛔ AND IT NEVER FAILS A DECISION THAT ALREADY SUCCEEDED. The amendment is
+       applied and its revision is minted before this runs; a throw here would
+       tell the principal their approval failed when it did not. The re-stamp
+       helper makes that promise for itself, so the READ that finds the order
+       has to make it too - caught here rather than merely intended. */
+    if ((data as { status?: string } | null)?.status === "applied") {
+      try {
+        const owner = await sb.from("sales_order_amendments").select("order_id").eq("id", amendmentId).maybeSingle();
+        const orderId = (owner.data as { order_id?: string } | null)?.order_id;
+        if (!orderId) throw new Error(owner.error?.message ?? "amendment owner unreadable");
         const restamp = await restampStairCarry(sb, orderId);
-        if (!restamp.ok) {
-          console.error("stair carry re-stamp failed", { orderId, amendmentId, reason: restamp.reason });
-        }
-      } else {
-        console.error("stair carry re-stamp skipped - amendment owner unreadable", { amendmentId });
+        if (!restamp.ok) throw new Error(restamp.reason);
+      } catch (e) {
+        console.error("stair carry re-stamp skipped", { amendmentId, reason: e instanceof Error ? e.message : String(e) });
       }
     }
     return c.json(data);
