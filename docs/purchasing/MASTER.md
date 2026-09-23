@@ -1863,11 +1863,17 @@ document do not change.
   commercial-approval path for a price that IS recorded, and every table constraint.
 - Half a commercial fact still refuses by name: a cost with no treatment, or a treatment
   with no cost, raises `cost_required` / `commercial_treatment_required` exactly as before.
-- 🟡 **NAMED GAP — the SO Batch door still refuses `cost_required`**
-  (`apps/api/src/routes/operation/to-order.ts`). 0573 makes the database accept an absent
-  price from either lane; that lane's API still demands one and owes the same convergence.
-  It is not changed here because its commercial review surface declares prices per
-  document, which is a different journey from Manual Purchase's.
+- **THE SO BATCH LANE CONVERGED — BUILT (CARD 15), 2026-09-24.** That door refused
+  `cost_required` for a SKU Catalog had never priced; it now issues the line carrying the
+  same absence Manual Purchase sends (no cost, no cost source, no treatment), and 0573's
+  `v_price_not_recorded` verdict skips the cost-source gate and the approval engine for
+  exactly that line. **Two cases stay refused, because they cost a supplier different
+  things:** a DECLARED catalog price that Catalog no longer has (the operator reviewed a
+  figure that is gone — the schema makes them declare a positive number, so that is not an
+  unknown), and a RECORDED price that is not positive (a Catalog mistake; filling it with
+  RM0 would put a number nobody agreed on a supplier's paper). Free of charge keeps its own
+  declared decision and its own reason. The web never sends line decisions today, so the
+  no-decision path is the live one.
 
 **ONE REVIEW SURFACE FOR BOTH BUYING LANES — owner instruction 2026-09-23, BUILT
 (CARD 13-B).** `Review Purchase Orders` is `so-batch/SoBatchIssueWorkspace`, used by SO
@@ -1926,13 +1932,13 @@ MPR's own `Delivery Date` keeps every other job — `Order By`, the timing rail 
 the document partition above. A supplier × category with no recorded production
 number issues with NO date and the paper prints `Not recorded`.
 
-🟡 **NAMED GAP — the SO Batch issue path still stamps production + transit**
-(`apps/api/src/routes/operation/to-order.ts`, `expectedArrivalOf`). The ruling is
-about the PO's delivery date whatever door creates it, so that path owes the same
-convergence; it was left untouched here because changing it moves customer
-arrival projections, which is not this card's scope. Falsifier: run the SO Batch
-issue door and compare the stamped `eta_date` with `poDeliveryDateOf` — they
-differ by that supplier's transit days.
+**BOTH DOORS NOW STAMP THE SAME DATE — BUILT (CARD 13-B), 2026-09-23.** The SO Batch
+issue path used to stamp production + transit through `expectedArrivalOf`; it calls
+`poDeliveryDateOf` too, so the PO's delivery date is one arithmetic whatever door creates
+it (Law D). `expectedArrivalOf` still answers the DIFFERENT question — when the goods reach
+the customer — and customer arrival projections and every already-issued PO are untouched.
+Falsifier: a stamped `eta_date` that differs from `poDeliveryDateOf` for the same supplier
+and category.
 
 
 **APPROVED / LOCKED — Jess, 2026-09-16. BUILT in Manual Purchase Round 2 (migration 0522).**

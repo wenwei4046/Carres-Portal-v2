@@ -633,7 +633,38 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
          rechecks the same live value inside the creation transaction. */
       if (!d) {
         const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
-        if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
+        /**
+         * ⭐ PRICE NOT RECORDED DOES NOT STOP THE ORDER — owner instruction
+         * 2026-09-23, the same ruling Manual Purchase shipped under 0573, and
+         * the gap MASTER §9.2 named on this lane.
+         *
+         * A SKU Carres has never been quoted for is issued carrying NO
+         * commercial claim: no cost, no cost source, no treatment. That is the
+         * one shape `purchase_order_lines`' own CHECK keeps for an absence, and
+         * the door's `v_price_not_recorded` verdict skips the cost-source gate
+         * and the approval engine for exactly that line — so it neither needs
+         * nor spends an approval.
+         *
+         * ⛔ AND AN ABSENCE IS NOT A ZERO. A price that IS recorded but is not
+         * positive is a Catalog mistake, not an unknown, and it keeps refusing
+         * by name: filling it with RM0 would put a number nobody agreed on a
+         * supplier's paper. Free of charge remains its own declared decision
+         * with its own reason.
+         */
+        if (liveCost == null) {
+          lines.push({
+            sku: line.sku,
+            qty: line.qty,
+            cost: null,
+            cost_source: null,
+            commercial_treatment: null,
+            commercial_reason: null,
+            expected_catalog_cost: null,
+            sources,
+          });
+          continue;
+        }
+        if (liveCost <= 0) return refuse(c, 422, "cost_required", facts);
         lines.push({
           sku: line.sku,
           qty: line.qty,
@@ -667,7 +698,13 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
            (`purchasing_check_line_commercials`). */
         const facts = { sku: line.sku, supplier: group.proposal.supplierName ?? null };
         /* CATALOG HAS NO PRICE is a configuration hole, not a price that moved,
-           and the two need different acts. */
+           and the two need different acts.
+           ⛔ THIS BRANCH IS NOT THE ABSENCE CASE (owner instruction 2026-09-23).
+           A `catalog` decision means the operator REVIEWED a number — the
+           schema requires a positive `unitCost` — so a line whose Catalog price
+           has since gone is a review that no longer holds, not an unknown
+           price. The absence path is the no-decision one above, where nobody
+           claimed to have seen a figure. */
         if (liveCost == null || liveCost <= 0) return refuse(c, 422, "cost_required", facts);
         /* Nothing declared means nothing reviewed. */
         if (d.expectedCatalogCost == null) {
