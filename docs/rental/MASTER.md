@@ -141,6 +141,14 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   exact mattresses creates per-piece permanent Carres Unit IDs linked to PO line, model and size.
   ID creation is not production completion, receipt or available stock. PO, Unit and DO are
   separate identifiers; example numbers are illustrative, not a new numbering format.
+  **Owner-confirmed identity boundary, same advisor relay:** commercial flows are separated by
+  business type. Subscription has its own agreement reference, linked through records to its SO,
+  deliveries and actual Units; those references need not share identical digits. One physical
+  mattress keeps one permanent Unit ID regardless of use: mutable Outright/Subscription use
+  must not be encoded into that identity. A different replacement mattress uses its own identity;
+  agreement-to-Unit history preserves both old and new associations. This approves traceability
+  only, not replacement eligibility, fees, billing or entitlement. Final numbering format and any
+  SO sequence split remain unapproved; existing numbering rules continue to apply.
   Diglant receives these company-wide Unit numbers and is intended to attach labels during
   production. No early customer-specific search for interchangeable eligible mattresses is required.
   The driver scans actual eligible picked Units to associate them with the planned delivery,
@@ -709,6 +717,8 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
 
 **CURRENT MISSION — Portal readiness PLAN；owner-approved planning direction，2026-09-23：**
+整体业务规划由主顾问任务 `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb` 继续，符合 Jess
+返回主讨论的要求。本专题只同步已批准裁定与保留资料，不自行恢复细节规划或向 owner 提问。
 **最新 OWNER PRIORITY / SCOPE RULING：** 主顾问任务
 `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb` 转达 Jess 明确要求现有 Outright 在两天内建成上线，
 其发布优先；Subscription 不得阻挡该发布或成为其前置条件。两天是 owner 要求，
