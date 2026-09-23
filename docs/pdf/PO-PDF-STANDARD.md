@@ -214,15 +214,15 @@ unused codes, unique across every prefix. Production mints `PO-20260922-8987`
 `PREFIX-DDMMYY-NNNN` proposal are both retired; existing identities are
 permanent and are never renumbered.
 
-**THE HEADER, MEASURED ON THE REAL NUMBER — 2026-09-23.** §2's `52.9mm` hero was
+**HISTORICAL HEADER MEASUREMENT — 2026-09-23; OLD NUMBER FORMAT ONLY.** §2's `52.9mm` hero was
 measured on `PO-2609-0042 V2`, a number this system cannot produce. Re-measured
 against the actual Noto Sans SC 700 file at 18pt, the real hero
-`PO260922-8987(2)` is **67.9mm** — fifteen millimetres wider. The header still
+`PO-20260922-8987 V2` is **67.9mm** — fifteen millimetres wider. The header still
 holds, and here is the whole arithmetic so nobody has to guess again:
 
 ```
 content                                        186.0mm
-− hero `PO260922-8987(2)`   18/700           67.9
+− hero `PO-20260922-8987 V2`   18/700           67.9
 − headerLeft paddingRight                        4.0
 − logo                                          13.0
 − logo → name gap                                4.0
@@ -239,6 +239,13 @@ address line spends it. The draft hero without a version is 58.8mm and
 `PURCHASE ORDER` beneath is 27.5mm, so neither is the binding constraint. The
 26mm header RESERVE is a height and is unaffected. Re-run the measurement
 against the font whenever the company block or the number shape changes.
+
+**New-format measurement is outstanding.** The approved target example
+`PO260922-8987(2)` has not been measured in this record. The 67.9mm hero,
+97.1mm available width and 9.5mm margin above apply only to the historical
+string and must not be reused as proof that the new form fits. Measure and
+render the new form with the actual font before claiming its width or fit.
+This evidence correction changes no approved numbering or layout rule.
 
 **~~the PO itself never revises~~ — SUPERSEDED (Jess, 2026-08-18; 0364).** A
 sent PO is not overwritten, it is REVISED: the NUMBER is kept and a version is
@@ -269,4 +276,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO…({n})` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
 | 2026-09-22 | **BUILT** (`po-template.tsx`, `GET /print-data`): every rule of 2026-09-21/22 above. The route ADDS `delivery_working_days` (shared `poDeliveryWorkingDays`, the supplier's week + holidays) and `delivery_method` (`suppliers.kind = 'factory_pickup'` → `We collect`) beside the SQL document and overwrites nothing; a kept version (`?version=N`) gets neither and reprints as sent. Every PO closes with `TOTAL`; sofa drawings one set per page. Words never split at a line end (family, SO-PDF-STANDARD §9). No migration. | Jess |
 | 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). **BUILT** on the live template the same day. | Jess |
-| 2026-09-23 | Header re-measured on the REAL number: `PO260922-8987(2)` is 67.9mm, not the 52.9mm §2 quoted for a number the allocator cannot mint. The left column is 97.1mm and its widest content — the company name row at 87.6mm, not the address — leaves 9.5mm. No layout change; the figures are now true. | measured |
+| 2026-09-23 | Historical header measurement on the OLD number format: `PO-20260922-8987 V2` is 67.9mm, not the 52.9mm §2 quoted for a number the allocator cannot mint. The left column is 97.1mm and its widest content — the company name row at 87.6mm, not the address — leaves 9.5mm. No layout change; these figures apply only to that historical string. The new `PO260922-8987(2)` form remains unmeasured. | historical measurement |
