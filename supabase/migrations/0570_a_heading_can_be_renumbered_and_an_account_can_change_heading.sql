@@ -57,8 +57,12 @@
 --     functions, listed in section 3). gl_entry_lines, gl_money_accounts,
 --     card_settlement_routes, gl_payment_account_map, gl_income_account_map and
 --     gl_account_roles carry no update trigger. The sanity block refuses the
---     file if any update trigger on those tables lacks the allowance, so a
---     trigger this clone does not have cannot slip through on apply.
+--     file if the text of any update trigger on those tables does not MENTION
+--     the allowance (gl_renumber_only or gl_renumber_from) and each of its
+--     table's chart columns, quoted. It reads text
+--     only: a trigger that names them only in a comment passes it, and then
+--     refuses the renumber when one is made (the renumber rolls back whole;
+--     nothing is changed).
 --     A renumber never rewrites an amount, a date, a status or any other
 --     column; a direct edit of a frozen document is refused exactly as before.
 --
@@ -1404,9 +1408,11 @@ begin
     raise exception '0570 sanity: % key(s) naming the chart still do not cascade', v_left;
   end if;
 
-  -- Every UPDATE trigger on a table that names the chart lets a renumber
-  -- through, and names every one of that table's chart columns. A trigger this
-  -- file did not rebuild (one the clone lacked) stops the apply here.
+  -- Every UPDATE trigger on a table that names the chart MENTIONS the
+  -- allowance and every one of that table's chart columns. A trigger this file
+  -- did not rebuild (one the clone lacked) stops the apply here. This reads the
+  -- text only: a mention inside a comment passes, and such a trigger then
+  -- refuses the renumber itself, which rolls back whole.
   select string_agg(format('%s.%s (%s)', t.tgrelid::regclass, t.tgname, k.col), ', ') into v_bad
     from pg_trigger t
     join pg_proc p on p.oid = t.tgfoid
