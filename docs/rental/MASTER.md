@@ -135,20 +135,26 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   including final nationwide delivery. Calendar basis/start trigger still require supplier evidence.
 - One Carres-issued Unit ID identifies each physical mattress; Diglant attaches those labels.
   A direct route must never fabricate a Carres warehouse receipt.
-- **OWNER-APPROVED CONCEPT / NOT BUILT — 2026-09-23:** Jess confirmed “yes, so that we can
-  control our stock”, relayed by main advisor task `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb`.
-  Carres supplies unique Unit numbers grouped by supplier, PO line, model and size batch;
-  Diglant is intended to attach them during production. These remain the company-wide permanent
-  Unit IDs, not a separate supplier numbering system. At pickup the driver should use the Carres
-  DO and scan actual eligible matching mattresses, avoiding advance selection of particular
-  interchangeable physical serials that requires customer-specific searching. The same ID follows
-  the mattress through subsequent journeys. Diglant's label capability is **not supplier-confirmed**;
+- **OWNER-APPROVED BUSINESS CONCEPT / NOT BUILT — 2026-09-23:** Jess answered YES to the
+  consolidated identity, pickup and SO information blueprint in main advisor task
+  `01a0cc71-3fc4-7162-b6a0-1eed3e7e16eb`. PO identifies a purchase batch; the official PO for
+  exact mattresses creates per-piece permanent Carres Unit IDs linked to PO line, model and size.
+  ID creation is not production completion, receipt or available stock. PO, Unit and DO are
+  separate identifiers; example numbers are illustrative, not a new numbering format.
+  Diglant receives these company-wide Unit numbers and is intended to attach labels during
+  production. No early customer-specific search for interchangeable eligible mattresses is required.
+  The driver scans actual eligible picked Units to associate them with the planned delivery,
+  checking correct goods and preventing double assignment. The permanent ID and original
+  supplier/PO/line provenance persist across custody, dealer display, repair, return and location
+  history. Diglant's actual label capability is **not supplier-confirmed**;
   physical/packaging copies of the same ID and CSV/PDF exchange remain implementation proposals.
   **CURRENT-AUTHORITY CONFLICT / workflow approval and validation required:** Delivery MASTER
   §§3–4 issue/scope rules snapshot exact Units before pickup (0424/0491); Outbound proves their
-  handover. Desired scan-at-pickup selection is not existing scan-time binding and does not approve
-  bypassing issue/freeze, eligibility, allocation or unique-claim gates. The owning modules must
-  reconcile and approve that workflow separately; this concept is not a technical gate override.
+  handover. Scan-at-pickup selection intent is owner-approved, but scan-time binding is not claimed
+  to exist. The exact issue/selection/freeze transaction sequence requires a separate scoped PLAN
+  and owning-module workflow approval/validation before implementation. Existing immutable
+  published DOs and eligibility, allocation and unique-claim gates remain binding; the driver
+  cannot freely change an issued DO. This concept is not a technical gate override.
 - **OWNER SCOPE CORRECTION — 2026-09-23:** Jess: “now diglant product do this. outright
   cannot yet”, relayed by the same main advisor. The proposed physical QR labelling rollout
   applies to Diglant products first; Outright cannot adopt that physical labelling process yet.
@@ -158,9 +164,13 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   eligible supply/the item with an order under the owning allocation and DO gates. These are
   separate facts. Supplier implementation capability remains unverified; adopting rollout scope
   is not observed production readiness. Do not infer all future Subscription products must be
-  Diglant or all Outright goods must forever lack labels/tracking. Jess's follow-up about which
-  SO/PO/Unit numbers to show and how to control system numbering is a pending information/control
-  proposal request, not approval of new columns, schema, numbering rules or assignment workflow.
+  Diglant or all Outright goods must forever lack labels/tracking.
+- **SO INFORMATION HIERARCHY — OWNER-APPROVED CONCEPT / NOT BUILT, 2026-09-23:** the list
+  identifies customer, goods/quantity/date and business type; detail links procurement, deliveries
+  and actual selected Unit identities. Do not invent an exact Unit before selection. This approves
+  the information hierarchy, not final columns/layout, dictionary changes, schema or a new
+  numbering format. Existing module record owners remain unchanged. Blueprint planning comes
+  first; advice on build tasks follows readiness, with no new build tasks or implementation here.
 - Go-live starts empty. Early forecasts are manager-entered; automatic suggestions may begin
   only after three months of genuine sales, never imported/test transactions.
 - The requested review scope is a fixed-day monthly proposal by model/size, manager revision
@@ -595,13 +605,14 @@ Subscription authority，不导入该任务的其他月报改动。共用父菜�
 开所属异常，不从下拉状态捏造回收、销毁或客户同意。已提交对象不破坏性删除；改单留
 接受版本和所有下游影响。新计划条款未批准时，不允许以本蓝图直接开始销售。
 
-**Dealer display / repair / damage / return traceability — explanatory PROPOSAL / NOT LAW,
-2026-09-23:** 原供应商、PO 和 PO line 来源保留；当前持有人、位置及状态分别追踪。
+**Dealer display / repair / damage / return traceability — 2026-09-23:** §4 已批准同一实物
+在这些历程中保留永久 ID 与原供应商/PO/line 来源；这部分不再是未批准提案。
+**以下操作细节仍为 explanatory PROPOSAL / NOT LAW：** 当前持有人、位置及状态分别追踪。
 每次交接保留来源/目的地、实际 actor、时间及证据，未接受收货仍为在途。
 同一实物维修或退回保留永久 ID（实物替换按既有 Stock/Purchasing 规则用新 ID）；
 退回后检查合格才可用。丢失只显示最后确认位置，不捏造实际所在。展示调拨及维修/退回
 移动不是销售，不增加销量；Stock、Service、Delivery 保留原记录所有权。
-这些是对 owner 新问题的解释建议，并非新生命周期已获批准或当前系统已有完整支持。
+上述未批准的操作细节不因身份/来源概念获批而成为 law，也不代表当前系统已有完整支持。
 
 ## 5.10 · 页面、员工一天与权限
 
