@@ -51,6 +51,27 @@ allocator is the next thing likely to touch this machinery:
 - **The migration tail is 0574**, so the next free number is 0575+ — **re-measure at push time**,
   never from `ls` (red line 7), and never from a working tree sitting on an old branch.
 
+### ⛔ AND THE POOL IS FOUR DIGITS WIDE IN THREE PLACES — the 5-digit DO's real cost
+
+Raised by the Purchasing session and **measured here**; it is one place worse than reported, and the
+extra place is the dangerous one. `DO2609-48271` is a **5-digit** tail, and the shared pool is hard
+4 everywhere:
+
+| # | Where | Today |
+|---|---|---|
+| 1 | `0381…:43` the table | `code text not null check (code ~ '^\d{4}$')` |
+| 2 | `0574…:140` the SHARED allocator | `v_code := lpad((floor(random() * 10000))::int::text, 4, '0')` |
+| 3 | `0574…:88` `formal_document_code_text` | `when p_prefix in ('PO')` — DO is not on the list |
+
+**⚠️ #2 is the trap.** `allocate_formal_document_code` is ONE function serving every prefix. Widening
+its draw to five digits silently re-shapes `PO` and every other prefix too, and the table's own CHECK
+would then reject what it draws. The width has to become **per-prefix** — the same lesson 0574
+already learned when the pool key had to grow a `prefix` — not a bigger constant.
+
+Get any one of the three wrong and it fails differently: the CHECK alone → the allocator still draws
+4; the allocator alone → the CHECK rejects the insert and the 200-try loop raises
+`document_code_pool_exhausted`; the text function alone → a correct number printed in the wrong shape.
+
 **Today the DO lane does NOT touch that table** — measured: no migration that references
 `formal_document_codes` also references `do_number`. So nothing is broken by 0574 right now. It
 matters because the approved `DO2609-48271` is a POOL number, so the fix is very likely to move DO
