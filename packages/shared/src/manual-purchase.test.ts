@@ -417,7 +417,7 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
 describe("Card 06 §7 · the two Work actions", () => {
   const input = (over: Partial<ManualPurchaseWorkInput>): ManualPurchaseWorkInput => ({
     requestId: "r1",
-    context: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
+    context: "Manual Purchase Request \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
     status: "ready_to_order",
     remainingQty: 2,
     orderBy: "2026-09-03",
@@ -438,7 +438,7 @@ describe("Card 06 §7 · the two Work actions", () => {
     expect(items[0]).toMatchObject({
       ruleKey: "manual_purchase.approve",
       module: "purchasing",
-      soRef: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
+      soRef: "Manual Purchase Request \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
       orderId: "r1",
       action: "Approve purchase",
       ownerName: "Jess",
@@ -601,9 +601,9 @@ describe("the settled nine column words", () => {
   });
 
   it("the toolbar's create words are COPY-STANDARD's own", () => {
-    expect(MANUAL_PURCHASE_WORDS.newRequest).toBe("+ Manual Purchase");
-    expect(MANUAL_PURCHASE_WORDS.createTitle).toBe("NEW MANUAL PURCHASE");
-    expect(MANUAL_PURCHASE_WORDS.emptyRegister).toBe("No Manual Purchase yet.");
+    expect(MANUAL_PURCHASE_WORDS.newRequest).toBe("+ Manual Purchase Request");
+    expect(MANUAL_PURCHASE_WORDS.createTitle).toBe("NEW MANUAL PURCHASE REQUEST");
+    expect(MANUAL_PURCHASE_WORDS.emptyRegister).toBe("No Manual Purchase Request yet.");
   });
 });
 
@@ -925,21 +925,21 @@ describe("the document identity — MPR No, and the names still banned", () => {
         forText: "Carres Klang",
         supplierSummary: "Nice Future",
       }),
-    ).toBe("Manual Purchase · Ready Stock · Carres Klang · Nice Future");
+    ).toBe("Manual Purchase Request · Ready Stock · Carres Klang · Nice Future");
     expect(
       manualPurchaseWorkContext({
         purposeLabel: "Service Case",
         forText: "SC-2041",
         supplierSummary: "",
       }),
-    ).toBe("Manual Purchase · Service Case · SC-2041");
+    ).toBe("Manual Purchase Request · Service Case · SC-2041");
     expect(
       manualPurchaseWorkContext({
         purposeLabel: null,
         forText: null,
         supplierSummary: null,
       }),
-    ).toBe("Manual Purchase");
+    ).toBe("Manual Purchase Request");
   });
 
   it("the two Work action sentences carry no number, name or UUID", () => {
@@ -955,23 +955,23 @@ describe("the document identity — MPR No, and the names still banned", () => {
       manualPurchaseObjectHeading({ purposeLabel: "Service Case", forText: "" }),
     ).toBe("Service Case");
     expect(manualPurchaseObjectHeading({ purposeLabel: null, forText: null })).toBe(
-      "Manual Purchase",
+      "Manual Purchase Request",
     );
   });
 
-  it("PO source wording: one `Manual Purchase`, several `{n} Manual Purchases`, zero nothing", () => {
+  it("PO source wording: one `Manual Purchase Request`, several `{n} Manual Purchase Requests`, zero nothing", () => {
     expect(manualPurchaseSourceSummary(0)).toBeNull();
-    expect(manualPurchaseSourceSummary(1)).toBe("Manual Purchase");
-    expect(manualPurchaseSourceSummary(3)).toBe("3 Manual Purchases");
+    expect(manualPurchaseSourceSummary(1)).toBe("Manual Purchase Request");
+    expect(manualPurchaseSourceSummary(3)).toBe("3 Manual Purchase Requests");
   });
 
   it("a detailed source line distinguishes by business facts, never a number", () => {
     expect(
       manualPurchaseSourceLine({ purposeLabel: "Ready Stock", proceedDateLabel: "Thu, 4 Sep" }),
-    ).toBe("Manual Purchase · Ready Stock · Thu, 4 Sep");
+    ).toBe("Manual Purchase Request · Ready Stock · Thu, 4 Sep");
     expect(
       manualPurchaseSourceLine({ purposeLabel: null, proceedDateLabel: null }),
-    ).toBe("Manual Purchase");
+    ).toBe("Manual Purchase Request");
   });
 
   it("`PO No` before issue is the bare fact `—`", () => {

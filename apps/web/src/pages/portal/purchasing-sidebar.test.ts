@@ -75,7 +75,7 @@ describe("the approved hierarchy", () => {
 
     expect(group("purchasing-buy")).toEqual([
       "SO Batch Purchase",
-      "Manual Purchase",
+      "Manual Purchase Request",
       "Purchase Orders",
     ]);
     expect(group("purchasing-receive")).toEqual(["Receiving"]);
@@ -117,6 +117,8 @@ describe("the approved hierarchy", () => {
       "Purchase Demands",
       "Consignment Overview",
       "Consignment Receipts",
+      /* The PLURAL stays banned as a NAVIGATION label; the singular
+         `Manual Purchase Request` is the row's own word since 2026-09-23. */
       "Manual Purchase Requests",
       "Report",
     ]) {
@@ -143,7 +145,7 @@ describe("the live destinations keep their exact current addresses", () => {
         .map((item) => [item.label, navItemHref(operation, item)]),
     ).toEqual([
       ["SO Batch Purchase", "/operation?tab=purchase"],
-      ["Manual Purchase", "/operation?tab=manual-purchase"],
+      ["Manual Purchase Request", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
       ["Receiving", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
@@ -155,9 +157,9 @@ describe("the live destinations keep their exact current addresses", () => {
     ]);
   });
 
-  it("`Manual Purchase` kept its key and its address — only the word changed", () => {
+  it("`Manual Purchase Request` kept its key and its address — only the word changed", () => {
     const item = purchasing.find((i) => i.key === "manual-purchase");
-    expect(item?.label).toBe("Manual Purchase");
+    expect(item?.label).toBe("Manual Purchase Request");
     expect(item?.pageGroup).toBe("purchasing-buy");
     expect(navItemHref(operation, item as PortalNavItem)).toBe(
       "/operation?tab=manual-purchase",

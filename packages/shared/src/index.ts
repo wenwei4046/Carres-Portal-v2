@@ -1012,6 +1012,7 @@ export {
   poSupplierDeliveryDateOf,
   poReplyDateOf,
   poRecordedReplyOf,
+  poDocumentNumberOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,

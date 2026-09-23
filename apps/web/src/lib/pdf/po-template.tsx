@@ -4,7 +4,7 @@
  *
  * Owner rulings 2026-09-21/22, reviewed on rendered previews:
  * - EVERY page prints the same full header — logo · legal name · SSM · address
- *   (three lines) · the hero `PO-… V{n}` over `PURCHASE ORDER`. Between pages
+ *   (three lines) · the hero `PO260924-4827(1)` over `PURCHASE ORDER`. Between pages
  *   only the Deliver To, the goods and `Page n of m` change. (PO-only override
  *   of the SO's one-line continuation header.)
  * - ONE PO may carry several Deliver To. Each Deliver To starts on a NEW page
@@ -27,6 +27,7 @@ import type { ReactNode } from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
 import { CARRES_COMPANY } from "./letterhead";
+import { poDocumentNumberOf } from "@carres/shared";
 import type { PoTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -40,8 +41,16 @@ const mm = (v: number) => v * 2.83465;
 
 const MARGIN = mm(12);
 /** The full header on EVERY page: name line + three address lines + rule.
- *  Measured: the hero with its version is 52.9mm, so the address cannot share
- *  one 122.4mm line beside it — three lines, and a 26mm reserve. */
+ *  MEASURED against the actual Noto Sans SC 700 file at 18pt (2026-09-23,
+ *  fontkit over the Fontsource TTF this renderer fetches) — PO-PDF-STANDARD
+ *  asked for the new form to be measured before anyone claimed it fits:
+ *    `PO-20260922-8987 V2`  192.5pt  67.9mm  (the old form; reproduces the
+ *                                             standard's own figure)
+ *    `PO260924-4827(1)`     163.0pt  57.5mm  (the new form — 10.4mm NARROWER)
+ *    `PO260924-4827(10)`    173.6pt  61.2mm  (a two-digit version still fits)
+ *  So the left column grows from 97.1mm to 107.5mm and the company name row
+ *  (87.6mm) keeps 19.9mm instead of 9.5mm. The address still prints on three
+ *  lines, and the 26mm reserve is a HEIGHT, unchanged by any of this. */
 const HEADER_H = mm(26);
 const FOOTER_H = mm(8);
 
@@ -251,15 +260,26 @@ function isChaise(code: string): boolean {
   return /^L\(/.test(code) || code.includes("CHL");
 }
 
-const destKey = (d: Destination) => `${d.name} ${d.address}`;
+/* The key joins two free-text facts, so it needs a separator no address can
+   contain. It is written as an ESCAPE, never as a raw NUL byte: a literal
+   0x00 in the source made `file` report this template as `data` and made
+   grep skip it silently — a template nobody can search is a template
+   nobody reviews. */
+const destKey = (d: Destination) => `${d.name}\u0000${d.address}`;
 
 export function PoTemplate(data: PoTemplateData) {
   const { po_number, version, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
   const draft = Boolean(data.draft);
   /* 0378 + owner 2026-09-22 — the version TRAVELS WITH THE NUMBER on every page
-     (hero, PO No row, footer). V1 prints too: a supplier holding two papers with
-     one number cannot tell which to build from. It never prints on its own. */
-  const poId = draft ? "DRAFT" : `${po_number} V${version ?? 1}`;
+     (hero, PO No row, footer). Version 1 prints too: a supplier holding two
+     papers with one number cannot tell which to build from. It never prints on
+     its own.
+     ⭐ THE SPELLING IS THE NUMBER'S OWN (owner ruling 2026-09-23, MASTER §6.1):
+     a new `PO260924-4827` wears `(1)`, while every pre-cutover `PO-20260904-4665`
+     keeps the ` V1` its supplier already holds — including a kept version
+     reprinted from `po_version_documents`, whose payload carries that same old
+     number. `poDocumentNumberOf` is the one place that decides. */
+  const poId = draft ? "DRAFT" : poDocumentNumberOf(po_number, version);
 
   const soCell = (line: PoLine): string[] => {
     const src = (line.sources ?? []).filter((s) => s.so != null);

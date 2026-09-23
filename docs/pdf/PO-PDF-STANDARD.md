@@ -240,12 +240,22 @@ address line spends it. The draft hero without a version is 58.8mm and
 26mm header RESERVE is a height and is unaffected. Re-run the measurement
 against the font whenever the company block or the number shape changes.
 
-**New-format measurement is outstanding.** The approved target example
-`PO260922-8987(2)` has not been measured in this record. The 67.9mm hero,
-97.1mm available width and 9.5mm margin above apply only to the historical
-string and must not be reused as proof that the new form fits. Measure and
-render the new form with the actual font before claiming its width or fit.
-This evidence correction changes no approved numbering or layout rule.
+**NEW-FORMAT MEASUREMENT — DONE 2026-09-23, and the new hero is NARROWER.**
+Measured the way the old figure was: fontkit over the very Noto Sans SC 700
+TTF this renderer fetches from Fontsource, at 18pt.
+
+```
+PO-20260922-8987 V2    192.5pt   67.9mm    the old form (reproduces the figure above)
+PO260924-4827(1)       163.0pt   57.5mm    the new form — 10.4mm NARROWER
+PO260924-4827(10)      173.6pt   61.2mm    a two-digit version still fits
+DRAFT                   58.2pt   20.5mm    unchanged
+```
+
+So the left column grows from 97.1mm to **107.5mm**, and its widest content —
+the company name row at 87.6mm — keeps **19.9mm** instead of 9.5mm. The address
+still prints on three lines and the 26mm header reserve is a HEIGHT, unaffected.
+The figures live beside the code in `po-template.tsx`, so the next person who
+changes the company block or the number shape re-measures rather than guesses.
 
 **~~the PO itself never revises~~ — SUPERSEDED (Jess, 2026-08-18; 0364).** A
 sent PO is not overwritten, it is REVISED: the NUMBER is kept and a version is
@@ -276,4 +286,5 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-09-22 | **Every page prints the same full header** (logo · company · SSM · address · hero `PO…({n})` · `PURCHASE ORDER`) — the one-line continuation header and the page-1 hero without version are deleted; only Deliver To, goods and `Page n of m` change between pages. Address prints on three lines and the header reserve grows to 26mm (hero with version measured 52.9mm; old address line 122.4mm collided). Overrides SO-PDF-STANDARD §3's continuation header for the PO only. | Jess |
 | 2026-09-22 | **BUILT** (`po-template.tsx`, `GET /print-data`): every rule of 2026-09-21/22 above. The route ADDS `delivery_working_days` (shared `poDeliveryWorkingDays`, the supplier's week + holidays) and `delivery_method` (`suppliers.kind = 'factory_pickup'` → `We collect`) beside the SQL document and overwrites nothing; a kept version (`?version=N`) gets neither and reprints as sent. Every PO closes with `TOTAL`; sofa drawings one set per page. Words never split at a line end (family, SO-PDF-STANDARD §9). No migration. | Jess |
 | 2026-09-23 | `PO Date` → **`PO Doc Date`** — owner ruling: every document's own date reads `{DOC} Doc Date` (COPY-STANDARD). **BUILT** on the live template the same day. | Jess |
+| 2026-09-23 | **BUILT** — the hero, the `PO No` row and the footer print `poDocumentNumberOf(po_number, version)`: a new-form number wears `(n)` with no space (`PO260924-4827(2)`), and every pre-cutover number keeps the ` V{n}` its supplier already holds, INCLUDING a kept version reprinted from `po_version_documents` (its payload carries the old number, so the frozen paper comes back exactly as sent — no stored flag). New form measured at 57.5mm, 10.4mm narrower than the old one; no layout change was needed. Numbers themselves come from migration 0574. | Jess |
 | 2026-09-23 | Historical header measurement on the OLD number format: `PO-20260922-8987 V2` is 67.9mm, not the 52.9mm §2 quoted for a number the allocator cannot mint. The left column is 97.1mm and its widest content — the company name row at 87.6mm, not the address — leaves 9.5mm. No layout change; these figures apply only to that historical string. The new `PO260922-8987(2)` form remains unmeasured. | historical measurement |

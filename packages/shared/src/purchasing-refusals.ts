@@ -110,7 +110,7 @@ export function purchasingRefusal(
     case "already_decided":
       return {
         wrong: "This purchase was already decided.",
-        todo: "Reload the Manual Purchase to see the decision.",
+        todo: "Reload the Manual Purchase Request to see the decision.",
       };
     case "reason_required":
       return {
@@ -145,12 +145,12 @@ export function purchasingRefusal(
     case "not_sent_back":
       return {
         wrong: "This request was not sent back for changes.",
-        todo: "Reload the Manual Purchase to see where it is now.",
+        todo: "Reload the Manual Purchase Request to see where it is now.",
       };
     case "request_already_ordered":
       return {
         wrong: "This request already has a purchase order.",
-        todo: "Reload the Manual Purchase. It can no longer be withdrawn.",
+        todo: "Reload the Manual Purchase Request. It can no longer be withdrawn.",
       };
     case "lines_required":
       return {
@@ -165,7 +165,7 @@ export function purchasingRefusal(
     case "decision_not_recorded":
       return {
         wrong: "The decision was not recorded.",
-        todo: "Reload the Manual Purchase and try once more. Tell IT if it happens again.",
+        todo: "Reload the Manual Purchase Request and try again. Tell IT if it happens again.",
       };
 
     // ── THE MONEY (0380) ──────────────────────────────────────────────────
@@ -291,17 +291,17 @@ export function purchasingRefusal(
        and each gets its own sentence — fact first, in the operator's words. */
     case "unknown_request":
       return {
-        wrong: "One Manual Purchase on this list is no longer there.",
+        wrong: "One Manual Purchase Request on this list is no longer there.",
         todo: "Reload the page, then tick the ones that are left and issue again.",
       };
     case "not_ready_to_order":
       return {
-        wrong: "One Manual Purchase has not been approved yet.",
+        wrong: "One Manual Purchase Request has not been approved yet.",
         todo: "Ask its approver to Approve it, then issue again.",
       };
     case "request_refused":
       return {
-        wrong: "One Manual Purchase was refused.",
+        wrong: "One Manual Purchase Request was refused.",
         todo: "Go back and untick the refused one, then issue again.",
       };
     /* The Deliver To door on an existing request (0421). A request whose line

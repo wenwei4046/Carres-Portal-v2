@@ -31,14 +31,15 @@ function renderAt(path: string) {
 }
 
 describe("PurchasingTabs — the destination word", () => {
-  it("`Manual Purchase` — the final rail word, not the request one", () => {
+  /* Owner ruling 2026-09-23 (MASTER §6.1): the request word came BACK. What
+     the operator raises is a request; the purchase is the PO that answers it. */
+  it("`Manual Purchase Request` — the owner put the request word back", () => {
     renderAt("/operation?tab=manual-purchase");
-    expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("Manual Purchase");
-    expect(screen.getByTestId("purchasing-tabs")).not.toHaveTextContent(
-      "Manual Purchase Requests",
-    );
-    expect(screen.getByText("Manual Purchase")).toBeInTheDocument();
-    expect(document.title).toBe("Manual Purchase · Purchasing — Carres");
+    expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("Manual Purchase Request");
+    /* Exact text, so the bare word cannot pass as the new one. */
+    expect(screen.getByText("Manual Purchase Request")).toBeInTheDocument();
+    expect(screen.queryByText("Manual Purchase")).toBeNull();
+    expect(document.title).toBe("Manual Purchase Request · Purchasing — Carres");
   });
 
   it("`Receiving` — and the retired `Goods Receipts` is gone from the header", () => {

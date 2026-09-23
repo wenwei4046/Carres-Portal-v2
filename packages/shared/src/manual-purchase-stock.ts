@@ -225,12 +225,12 @@ export type ManualPurchaseStockSaveResult = z.infer<typeof manualPurchaseStockSa
  * made two sentences disagree about a fact they share.
  */
 export const MANUAL_PURCHASE_STOCK_REFUSAL_WORDS: Record<string, string> = {
-  mpr_line_not_found: "That purchase line is no longer on this Manual Purchase.",
-  mpr_line_has_no_request: "That purchase line belongs to no Manual Purchase.",
+  mpr_line_not_found: "That purchase line is no longer on this Manual Purchase Request.",
+  mpr_line_has_no_request: "That purchase line belongs to no Manual Purchase Request.",
   mpr_line_not_going_ahead: "That purchase line is not going ahead.",
   mpr_line_already_covered:
     "That purchase line is already covered by Ready Stock or a purchase order.",
-  mpr_line_needs_request_ref: "Stock is saved against this Manual Purchase's own number.",
+  mpr_line_needs_request_ref: "Stock is saved against this Manual Purchase Request's own number.",
   request_not_approved: "This purchase is not approved.",
   request_not_a_concrete_need:
     "This purchase buys extra stock, so what is on the shelf cannot be saved against it.",
@@ -245,26 +245,26 @@ export const MANUAL_PURCHASE_STOCK_REFUSAL_WORDS: Record<string, string> = {
   duplicate_unit_chosen: "One Unit was chosen twice.",
   too_many_units: "Choose at most 50 Units at a time.",
   one_binding_only: "That Unit is already held for a Sales Order.",
-  forbidden: "You cannot save stock for a Manual Purchase.",
+  forbidden: "You cannot save stock for a Manual Purchase Request.",
 };
 
 /** The second line — what to DO about it. Fact, then act (COPY-STANDARD). */
 export const MANUAL_PURCHASE_STOCK_REFUSAL_ACTS: Record<string, string> = {
-  mpr_line_not_found: "Reopen the Manual Purchase to see its lines.",
-  mpr_line_has_no_request: "Reopen the Manual Purchase to see its lines.",
-  mpr_line_not_going_ahead: "Reopen the Manual Purchase to see where it is now.",
-  mpr_line_already_covered: "Reopen the Manual Purchase to see what covers it.",
-  mpr_line_needs_request_ref: "Reopen the Manual Purchase and choose the Units again.",
+  mpr_line_not_found: "Reopen the Manual Purchase Request to see its lines.",
+  mpr_line_has_no_request: "Reopen the Manual Purchase Request to see its lines.",
+  mpr_line_not_going_ahead: "Reopen the Manual Purchase Request to see where it is now.",
+  mpr_line_already_covered: "Reopen the Manual Purchase Request to see what covers it.",
+  mpr_line_needs_request_ref: "Reopen the Manual Purchase Request and choose the Units again.",
   request_not_approved: "Wait for the approver to decide it.",
   request_not_a_concrete_need: "Issue a PO for the extra stock instead.",
-  request_has_no_number: "Raise a new Manual Purchase for these goods.",
+  request_has_no_number: "Raise a new Manual Purchase Request for these goods.",
   unit_not_found: "Choose another Unit.",
   unit_does_not_match_line: "Choose a Unit of the goods this line asked for.",
   unit_not_available: "Choose another Unit.",
   unit_no_longer_free: "Choose another Unit.",
-  unit_cannot_be_released: "Reopen the Manual Purchase to see what holds it now.",
+  unit_cannot_be_released: "Reopen the Manual Purchase Request to see what holds it now.",
   quantity_row_not_bindable: "Choose a Unit that has its own Unit ID.",
-  stock_selection_changed: "Reopen the Manual Purchase and choose the Units again.",
+  stock_selection_changed: "Reopen the Manual Purchase Request and choose the Units again.",
   duplicate_unit_chosen: "Choose each Unit once.",
   too_many_units: "Untick some Units, then save again.",
   one_binding_only: "Choose another Unit.",
@@ -282,7 +282,7 @@ export function manualPurchaseStockRefusal(code: string | null | undefined): {
       : "The stock selection was not saved.",
     todo: key
       ? MANUAL_PURCHASE_STOCK_REFUSAL_ACTS[key]!
-      : "Reopen the Manual Purchase and try once more. Tell IT if it happens again.",
+      : "Reopen the Manual Purchase Request and try again. Tell IT if it happens again.",
   };
 }
 

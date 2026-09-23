@@ -591,7 +591,7 @@ answer exists for that version.
 
 ### 6.1 Formal document numbers
 
-**PO — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET / NOT BUILT.**
+**PO — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT, migration 0574.**
 
 ```text
 PO260924-4827(1)     PO · YYMMDD of first issue · 4 random digits · version
@@ -621,6 +621,38 @@ PO260924-4827(2)     the same PO after one revision
   PO's own version, never from the code pool.
 - This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only.
 
+**HOW IT IS BUILT — migration 0574 + `poDocumentNumberOf`, 2026-09-23.**
+
+- **One place decides the shape.** `formal_document_code_text(prefix, date, code)` is the only
+  place a drawn code becomes a printed number. `PO` wears `PO260924-4827`; MPR, GRN, PRTN, RO,
+  SB, PV, ARI, RV, TR and MM still mint exactly what they minted before, and a PGlite test
+  executes the committed migration to prove both halves. The family rule is approved for every
+  prefix, but moving one is that document's own scope: a number shape that changes unannounced is
+  how a supplier ends up holding two numbers for one job.
+- **Each prefix owns its daily pool.** `formal_document_codes` is re-keyed from
+  `(code_date, code)` to `(code_date, prefix, code)`. No row is read, written or deleted — every
+  existing row already satisfied the wider key. What stops is the REFUSAL of a second prefix the
+  same digits, which is 0381's rule that the owner retired.
+- **The pool claim reads the number's TAIL.** `_operation_create_po_inner` wrote its number back
+  onto the pool row by `split_part(id, '-', 3)`. `PO260924-4827` has no third dash-piece, so that
+  update would have matched nothing and the row would have kept no `document_id`. It now claims by
+  `(date, prefix 'PO', right(id, 4))` — the code in BOTH shapes.
+- **`(n)` is the PAPER's, printed from the PO's own `version`.** No code, pool or row carries it.
+  `poDocumentNumberOf` decides the spelling FROM THE NUMBER'S OWN FORM: a new-form number wears
+  `(1)`/`(2)`, and every pre-cutover number keeps the ` V{n}` its supplier already holds. That is
+  the permanence carve-out enforced by construction — a kept version reprints from
+  `po_version_documents`, whose payload carries the old number, so the old paper comes back spelt
+  exactly as it was sent. No stored flag, no print-date rule.
+- **The hero was MEASURED before it shipped** (PO-PDF-STANDARD asked for exactly this): fontkit
+  over the Noto Sans SC 700 file the renderer fetches, at 18pt —
+  `PO-20260922-8987 V2` 67.9mm (reproducing the standard's figure),
+  `PO260924-4827(1)` **57.5mm**, `PO260924-4827(10)` 61.2mm. The new form is 10.4mm NARROWER, so
+  the left column grows from 97.1mm to 107.5mm and the company name row (87.6mm) keeps 19.9mm
+  instead of 9.5mm.
+- 🔴 **OWED: the authenticated walk** — a real PO issued after 0574, wearing the new number, with
+  its pool row claimed and the printed paper read end to end. A green test suite and a converged
+  SHA prove the code shipped, not that a supplier can read the paper.
+
 **Family rule for every other formal document — owner ruling 2026-09-23:**
 
 ```text
@@ -628,7 +660,10 @@ PREFIXYYMMDD-NNNN        e.g. MPR260924-4827 · Subscription twin SMPR260924-482
 ```
 
 - `YYMMDD` = original document date; four random digits, leading zeros allowed; **each prefix has
-  its own independent daily pool of 10,000** (no shared pool across prefixes). Existing numbers in
+  its own independent daily pool of 10,000** (no shared pool across prefixes). **The per-prefix
+  POOL is BUILT (0574) for every prefix; the short FORM is built for `PO` only** — MPR, GRN, PRTN,
+  RO and the finance prefixes still mint `PREFIX-YYYYMMDD-RRRR`, and moving one is that document's
+  own scope (`formal_document_code_text` is the single line to change). Existing numbers in
   the old `PREFIX-YYYYMMDD-RRRR` form are permanent and never renumbered. Finance prefixes (SB, PV,
   ARI, RV, SMB, MM, JE, MJ) go live only after the accountant's check. Complete table: Orders MASTER
   *order numbers by business*.

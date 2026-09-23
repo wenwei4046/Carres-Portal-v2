@@ -944,7 +944,7 @@ describe("the decision gate — render asks what the door asks", () => {
     const body = (await res.json()) as { code: string; message: string; action: string };
     expect(body.code).toBe("already_decided");
     expect(body.message).toBe("This purchase was already decided.");
-    expect(body.action).toBe("Reload the Manual Purchase to see the decision.");
+    expect(body.action).toBe("Reload the Manual Purchase Request to see the decision.");
   });
 
   it("a refusal without its reason leaves as the governed two lines", async () => {

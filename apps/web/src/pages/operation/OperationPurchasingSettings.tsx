@@ -1037,8 +1037,8 @@ export default function OperationPurchasingSettings({
                 The Manual Purchase create door refuses a Delivery Date
                 earlier than Proceed Date + this; 0 means no floor. */}
             <NumberRow
-              label="Earliest Delivery Date a Manual Purchase may ask for"
-              hint="A Manual Purchase cannot ask for a Delivery Date closer than this to its Proceed Date."
+              label="Earliest Delivery Date a Manual Purchase Request may ask for"
+              hint="A Manual Purchase Request cannot ask for a Delivery Date closer than this to its Proceed Date."
               unit="days"
               value={data.manualPurchaseMinDeliveryDays}
               min={PURCHASING_NUMBER_RANGE.manual_purchase_min_delivery_days.min}

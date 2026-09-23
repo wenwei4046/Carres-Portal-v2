@@ -767,7 +767,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     );
     expect(rows).toEqual([
       "SO Batch Purchase",
-      "Manual Purchase",
+      "Manual Purchase Request",
       "Purchase Orders",
       "Receiving",
       "Supplier Claims",
@@ -834,10 +834,10 @@ describe("PortalSidebar — the Purchasing map", () => {
         .getByTestId("nav-group-children-purchasing-buy")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["SO Batch Purchase", "Manual Purchase", "Purchase Orders"]);
+    expect(rows).toEqual(["SO Batch Purchase", "Manual Purchase Request", "Purchase Orders"]);
   });
 
-  it("the rail word is `Manual Purchase`, in BUY, and the old word is gone", () => {
+  it("the rail word is `Manual Purchase Request`, in BUY (owner 2026-09-23)", () => {
     renderAt("/operation?tab=receiving");
     expect(screen.getByText("Receiving")).toBeInTheDocument();
     // `Goods Receipts` retired as navigation (owner instruction 2026-09-04;
@@ -846,7 +846,10 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
     fireEvent.click(group_("purchasing-buy"));
     const buy = screen.getByTestId("nav-group-children-purchasing-buy");
-    expect(within(buy).getByText("Manual Purchase")).toBeInTheDocument();
+    expect(within(buy).getByText("Manual Purchase Request")).toBeInTheDocument();
+    /* The bare word is no longer a row of its own, and the PLURAL was never
+       a navigation label (it belongs to the register's footer). */
+    expect(within(buy).queryByText("Manual Purchase")).toBeNull();
     expect(screen.queryByText("Manual Purchase Requests")).not.toBeInTheDocument();
     expect(screen.queryByText("To Order")).not.toBeInTheDocument();
     expect(screen.queryByText("Claims")).not.toBeInTheDocument();

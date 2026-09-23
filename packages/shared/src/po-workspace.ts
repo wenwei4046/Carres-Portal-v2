@@ -561,6 +561,35 @@ export function ordinalLabel(n: number): string {
  * that ever prints them. COPY-STANDARD's PURCHASING block registers each.
  */
 
+/**
+ * THE DOCUMENT NUMBER A SUPPLIER READS, VERSION AND ALL.
+ *
+ * Owner ruling 2026-09-23 (`docs/purchasing/MASTER.md` §6.1): a new purchase
+ * order is `PO260924-4827` and its version is a marker with NO space —
+ * `PO260924-4827(1)` on the original, `(2)` after one revision.
+ *
+ * ⭐ THE SPELLING FOLLOWS THE NUMBER, NEVER THE PRINT DATE. Every pre-cutover
+ * PO keeps the form its supplier already holds (`PO-20260904-4665 V2`, and the
+ * older `PO-2054 V1`), because §6.1's permanence rule and PO-PDF-STANDARD's
+ * frozen-document rule both say a paper reprints as it was received — and the
+ * kept payload of a sent version carries that same old number, so a reprint
+ * lands on the old spelling by construction rather than by a stored flag.
+ *
+ * One version is printed too, never suppressed: a factory holding two papers
+ * with one number cannot tell which to build from (0378).
+ */
+const NEW_FORM_DOCUMENT_NO = /^[A-Z]{2,4}\d{6}-\d{4}$/;
+
+export function poDocumentNumberOf(
+  poNumber: string,
+  version?: number | null,
+): string {
+  const n = version != null && version > 0 ? version : 1;
+  return NEW_FORM_DOCUMENT_NO.test(poNumber)
+    ? `${poNumber}(${n})`
+    : `${poNumber} V${n}`;
+}
+
 /** `Version 2` for the panel title's ` · Version 2` — and NOTHING for
  *  Version 1: an unrevised PO is just the PO, and printing `Version 1`
  *  everywhere would teach operators the word means nothing. */

@@ -521,10 +521,10 @@ describe("the register — one request per row (card §7)", () => {
     expect(document.body.textContent).not.toContain("RM ");
   });
 
-  it("`+ Manual Purchase` is the page's create door — COPY-STANDARD's own word", async () => {
+  it("`+ Manual Purchase Request` is the page's create door — COPY-STANDARD's own word", async () => {
     await loaded();
     const btn = screen.getByTestId("manual-purchase-new-request");
-    expect(btn).toHaveTextContent("+ Manual Purchase");
+    expect(btn).toHaveTextContent("+ Manual Purchase Request");
     expect(btn).toHaveTextContent(MW.newRequest);
   });
 
@@ -698,7 +698,7 @@ describe("Card 03 · the left filter rail", () => {
     expect(history).toHaveTextContent("No PO needed1");
     expect(history).toHaveAttribute("aria-expanded", "false");
     // Collapsed rows stay in the total.
-    expect(screen.getByTestId("mp-footer")).toHaveTextContent("3 Manual Purchases");
+    expect(screen.getByTestId("mp-footer")).toHaveTextContent("3 Manual Purchase Requests");
     expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
     fireEvent.click(history);
     expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
@@ -1854,7 +1854,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
           Object.assign(new Error("refused"), {
             body: {
               code: "not_ready_to_order",
-              message: "One Manual Purchase has not been approved yet.",
+              message: "One Manual Purchase Request has not been approved yet.",
               action: "Ask its approver to Approve it, then issue again.",
             },
           }),
@@ -1870,7 +1870,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
        an unsaved stock draft). */
     const lines = err;
     expect(lines.children).toHaveLength(2);
-    expect(lines.children[0]).toHaveTextContent("One Manual Purchase has not been approved yet.");
+    expect(lines.children[0]).toHaveTextContent("One Manual Purchase Request has not been approved yet.");
     expect(lines.children[1]).toHaveTextContent("Ask its approver to Approve it, then issue again.");
   });
 
@@ -1885,7 +1885,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
           Object.assign(new Error("refused"), {
             body: {
               code: "unknown_request",
-              message: "One Manual Purchase on this list is no longer there.",
+              message: "One Manual Purchase Request on this list is no longer there.",
               action: "Reload the page, then tick the ones that are left and issue again.",
             },
           }),
@@ -1895,7 +1895,7 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     });
     await tickReady();
     const err = await issueFromReview();
-    expect(err).toHaveTextContent("One Manual Purchase on this list is no longer there.");
+    expect(err).toHaveTextContent("One Manual Purchase Request on this list is no longer there.");
     /* ⭐ AND IT STAYS. The refusal that MOST needs reading is this one, and
        the review keeps both the message and the selection: leaving is the
        operator's act (`Cancel`), never a tick that empties underneath them. */
@@ -3277,13 +3277,13 @@ describe("Card 05 · the object detail", () => {
   it("the Object Header: one back destination, the identity, one state pill", async () => {
     const detail = await openObject();
     // The shared object header (Law C) with the Register as back destination.
-    expect(within(detail).getByLabelText("Manual Purchase")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Manual Purchase Request")).toBeInTheDocument();
     /* Card 08 §3.3 — the identity is `{Need for} · {For}` (REQ1's retired
        purpose prints its own truthful word; its For was never stored), and
        no number or UUID appears anywhere in the header. */
     expect(within(detail).getByTestId("object-identity")).toHaveTextContent("Display");
     expect(within(detail).getByTestId("object-identity").textContent).not.toContain("REQ-");
-    expect(document.title).toBe("Manual Purchase — Carres");
+    expect(document.title).toBe("Manual Purchase Request — Carres");
     expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
       "Waiting for approval",
     );
@@ -3299,7 +3299,7 @@ describe("Card 05 · the object detail", () => {
     // R2 default order: REQ-0001 (Need approval) · REQ-0002 (To buy) ·
     // REQ-0003 (No purchase needed) — the open object is 1 of 3.
     expect(within(detail).getByTestId("mp-object-position")).toHaveTextContent("1 of 3");
-    fireEvent.click(within(detail).getByLabelText("Next Manual Purchase"));
+    fireEvent.click(within(detail).getByLabelText("Next Manual Purchase Request"));
     await waitFor(() =>
       expect(screen.getByTestId("mp-object-position")).toHaveTextContent("2 of 3"),
     );
@@ -3309,7 +3309,7 @@ describe("Card 05 · the object detail", () => {
     const detail = await openObject();
     // The Register surface is preserved (hidden), not unmounted.
     expect(screen.getByTestId("mp-register-surface")).toHaveAttribute("aria-hidden", "true");
-    fireEvent.click(within(detail).getByLabelText("Manual Purchase"));
+    fireEvent.click(within(detail).getByLabelText("Manual Purchase Request"));
     await screen.findByTestId("purchasing-tabs");
     expect(screen.queryByTestId("mp-detail")).toBeNull();
     expect(screen.getByTestId("mp-register-surface")).not.toHaveAttribute("aria-hidden");
@@ -3532,7 +3532,7 @@ describe("Card 05 · the object detail", () => {
     });
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
-    await screen.findByText("This Manual Purchase could not be opened");
+    await screen.findByText("This Manual Purchase Request could not be opened");
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 });
@@ -3641,7 +3641,7 @@ describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by
     expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
-    fireEvent.click(screen.getByText("Manual Purchase", { selector: "a *, a" }));
+    fireEvent.click(screen.getByText("Manual Purchase Request", { selector: "a *, a" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 
