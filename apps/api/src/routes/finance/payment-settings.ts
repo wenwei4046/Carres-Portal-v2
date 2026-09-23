@@ -6,7 +6,7 @@ import {
   paymentTemplateKeyInput,
   paymentTemplateSaveInput,
 } from "@carres/shared/payment-templates";
-import { paymentMethodKeySchema, paymentMethodSaveInput } from "@carres/shared";
+import { ledgerAccountCodeShape, paymentMethodKeySchema, paymentMethodSaveInput } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -172,7 +172,7 @@ paymentSettingsRouter.post("/method/save", async (c) => {
 const systemRowInput = z.object({
   method: z.enum(["card", "online"]),
   sourceChannel: z.string().trim().min(1).max(40),
-  accountCode: z.string().regex(/^\d{4}$/),
+  accountCode: z.string().regex(ledgerAccountCodeShape),
 });
 
 paymentSettingsRouter.post("/system-method", async (c) => {

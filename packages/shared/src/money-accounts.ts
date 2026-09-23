@@ -12,6 +12,7 @@
  * PURE — no clock, no I/O.
  */
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "./finance-ledger";
 
 export const MONEY_ACCOUNT_KINDS = ["CASH", "BANK", "HOLDING"] as const;
 export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
@@ -79,9 +80,9 @@ export interface CardRouteRow {
 }
 
 export const cardRouteInput = z.object({
-  holding_code: z.string().regex(/^\d{4}$/, "Choose the card account."),
+  holding_code: z.string().regex(ledgerAccountCodeShape, "Choose the card account."),
   channel: z.enum(CARD_CHANNELS, { errorMap: () => ({ message: "Choose showroom or dealer." }) }),
-  bank_code: z.string().regex(/^\d{4}$/, "Choose the bank."),
+  bank_code: z.string().regex(ledgerAccountCodeShape, "Choose the bank."),
 });
 export type CardRouteInput = z.infer<typeof cardRouteInput>;
 

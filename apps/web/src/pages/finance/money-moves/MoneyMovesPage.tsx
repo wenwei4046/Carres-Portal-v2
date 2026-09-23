@@ -24,6 +24,7 @@ import {
   type MoneyMoveRow,
 } from "@carres/shared/money-moves";
 import { parseTypedAmount } from "@carres/shared/other-money-in";
+import { roleAccount } from "@carres/shared/finance-ledger";
 import { CARD_CHANNELS, CARD_CHANNEL_WORD, settlementBank, type CardChannel } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
@@ -39,6 +40,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { toast } from "sonner";
 import { useCardRoutes, useMoneyAccounts } from "../settings/api";
+import { useLedgerChart } from "../ledger/ledger-queries";
 import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/parts";
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
 
@@ -234,6 +236,7 @@ export default function MoneyMovesPage() {
 
 function MoneyMoveForm({ onClose }: { onClose: () => void }) {
   const accounts = useMoneyAccounts();
+  const chart = useLedgerChart();
   const prepare = usePrepareMoneyMove();
   const [key] = useState(() => crypto.randomUUID());
   const [kind, setKind] = useState<MoneyMoveKind>("TRANSFER");
@@ -256,9 +259,16 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
   const options = (side: "from" | "to") =>
     moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
   const amountN = parseTypedAmount(amount);
-  // 0537: a bank credit always comes from 4900, a bank charge always goes to 6500.
-  const fixedFrom = kind === "BANK_CREDIT" ? "4900" : undefined;
-  const fixedTo = kind === "BANK_CHARGE" ? "6500" : undefined;
+  // 0537: a bank credit always comes from the other-income account, a bank
+  // charge always goes to the bank-charges account. 0570: which accounts those
+  // are is the chart's roles, never a number written here.
+  const fixedRole = kind === "BANK_CREDIT" ? "OTHER_INCOME" : kind === "BANK_CHARGE" ? "BANK_AND_PAYMENT_CHARGES" : undefined;
+  const fixedAccount = fixedRole ? roleAccount(chart.data, fixedRole) : undefined;
+  const fixedFrom = kind === "BANK_CREDIT" ? fixedAccount?.code ?? "" : undefined;
+  const fixedTo = kind === "BANK_CHARGE" ? fixedAccount?.code ?? "" : undefined;
+  const fixedWhere = fixedAccount
+    ? `${fixedAccount.code} ${fixedAccount.name}`
+    : chart.isLoading ? null : undefined;
   const feeN = kind !== "CARD_PAYOUT" ? 0 : parseTypedAmount(fee) ?? 0;
   const gross = amountN && !Number.isNaN(amountN) && !Number.isNaN(feeN) ? moneyMoveGross(amountN, feeN) : null;
 
@@ -319,7 +329,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           options={MONEY_MOVE_KINDS.map((k) => ({ value: k, label: MONEY_MOVE_KIND_WORD[k] }))}
         />
         <DatePicker id="move-date" label="Date" required value={date} onChange={setDate} />
-        {!fixedFrom && (
+        {fixedFrom === undefined && (
           <Select
             id="move-from"
             label="Paid from"
@@ -345,7 +355,7 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
             options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
           />
         )}
-        {!fixedTo && (
+        {fixedTo === undefined && (
           <Select
             id="move-to"
             label="Paid into"
@@ -362,11 +372,15 @@ function MoneyMoveForm({ onClose }: { onClose: () => void }) {
           required
           inputMode="decimal"
           hint={
-            kind === "BANK_CHARGE"
-              ? "Goes to 6500 Bank and payment charges."
-              : kind === "BANK_CREDIT"
-                ? "Goes to 4900 Other income. Money from a customer is recorded as a payment, not here."
-                : undefined
+            !fixedRole
+              ? undefined
+              : fixedWhere === null
+                ? "Loading accounts…"
+                : fixedWhere === undefined
+                  ? "The chart of accounts could not be loaded. Try again."
+                  : kind === "BANK_CHARGE"
+                    ? `Goes to ${fixedWhere}.`
+                    : `Goes to ${fixedWhere}. Money from a customer is recorded as a payment, not here.`
           }
           value={amount}
           onChange={(e) => setAmount(e.target.value)}

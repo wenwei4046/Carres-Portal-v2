@@ -108,15 +108,19 @@ const acct = (code: string, parent: string | null, isHeader = false) => ({
 });
 const CHART = {
   go_live_on: GO_LIVE,
-  accounts: [acct("1000", null, true), acct("1100", "1000", true), acct("1110", "1100"), acct("1120", "1100"), acct("1210", "1000")],
+  // AutoCount-shaped: CASH IN HAND (320-0000) sits outside the 310-0000 bank
+  // heading; the money-accounts list, not the heading, makes it count.
+  accounts: [acct("399-0000", null, true), acct("310-0000", "399-0000", true), acct("320-0000", "399-0000"),
+    acct("310-1000", "310-0000"), acct("300-0000", "399-0000")],
+  money_accounts: ["310-1000", "320-0000"],
 };
 type Line = { entry_no: string; entry_date: string; debit: number; credit: number };
 const CASH_LINES: Record<string, Line[]> = {
-  "1120": [
+  "310-1000": [
     { entry_no: "JE-202609-0003", entry_date: "2026-09-10", debit: 1000, credit: 0 },
     { entry_no: "JE-202609-0009", entry_date: "2026-09-15", debit: 300, credit: 0 }, // from the cash drawer
   ],
-  "1110": [
+  "320-0000": [
     { entry_no: "JE-202609-0004", entry_date: "2026-09-12", debit: 0, credit: 250 },
     { entry_no: "JE-202609-0009", entry_date: "2026-09-15", debit: 0, credit: 300 }, // to the bank
   ],
@@ -146,7 +150,7 @@ const E_SALE = { ...entryBase, id: "e3", entry_no: "JE-202609-0003", entry_date:
 const DETAIL = {
   entry: E_SALE,
   lines: [
-    { line_no: 1, account_code: "1120", account_name: "Bank", debit: 1000, credit: 0, party_type: null, party_id: null, party_name: null, memo: null },
+    { line_no: 1, account_code: "310-1000", account_name: "Bank", debit: 1000, credit: 0, party_type: null, party_id: null, party_name: null, memo: null },
     { line_no: 2, account_code: "4100", account_name: "Sales", debit: 0, credit: 1000, party_type: null, party_id: null, party_name: null, memo: null },
   ],
   related: [],
@@ -263,8 +267,8 @@ describe("Finance Dashboard", () => {
     // Every account ledger read starts at go-live and ends today (Malaysia), one per cash account.
     const reads = api.urls.filter((u) => u.startsWith(ACCOUNT_LEDGER));
     expect(reads.sort()).toEqual([
-      `${ACCOUNT_LEDGER}?account=1110&from=${GO_LIVE}&to=${TODAY}`,
-      `${ACCOUNT_LEDGER}?account=1120&from=${GO_LIVE}&to=${TODAY}`,
+      `${ACCOUNT_LEDGER}?account=310-1000&from=${GO_LIVE}&to=${TODAY}`,
+      `${ACCOUNT_LEDGER}?account=320-0000&from=${GO_LIVE}&to=${TODAY}`,
     ]);
     // The chart's weeks add up to the tile; the first week starts on go-live, not its Monday.
     const chart = screen.getByTestId("dashboard-cashflow");
@@ -392,7 +396,7 @@ describe("Finance Dashboard", () => {
       throw Object.assign(new Error("too many rows"), { status: 422, body: { code: "too_many_rows" } });
     }
     const code = q.get("account")!;
-    const pool = [...(CASH_LINES[code] ?? []), ...(code === "1120" ? [RECENT] : [])];
+    const pool = [...(CASH_LINES[code] ?? []), ...(code === "310-1000" ? [RECENT] : [])];
     const lines = pool.filter((l) => l.entry_date >= from && l.entry_date <= q.get("to")!);
     const sum = (k: "debit" | "credit") => lines.reduce((s, l) => s + l[k], 0);
     return {

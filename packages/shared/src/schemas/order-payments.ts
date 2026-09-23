@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "../finance-ledger";
 
 /**
  * Order payment ledger — the balance job's foundation (Jess 2026-06-26
@@ -66,7 +67,7 @@ export interface PaymentMoneyAccount {
 export const paymentMethodSaveInput = z.object({
   method: paymentMethodKeySchema.nullish(),
   label: z.string().trim().min(1, "a payment method needs a name").max(40, "keep the name to 40 characters"),
-  accountCode: z.string().trim().regex(/^[0-9]{3,6}$/, "choose an account"),
+  accountCode: z.string().trim().regex(ledgerAccountCodeShape, "choose an account"),
   active: z.boolean().default(true),
 });
 export type PaymentMethodSaveInput = z.infer<typeof paymentMethodSaveInput>;

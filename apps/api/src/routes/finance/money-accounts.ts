@@ -6,6 +6,7 @@ import {
   type CardRouteRow,
   type MoneyAccountRow,
 } from "@carres/shared/money-accounts";
+import { ledgerAccountCodeShape } from "@carres/shared/finance-ledger";
 import { requireFinance } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -74,7 +75,7 @@ financeMoneyAccountsRouter.post("/card-routes", requireFinance, async (c) => {
 
 financeMoneyAccountsRouter.patch("/:code", requireFinance, async (c) => {
   const code = c.req.param("code");
-  if (!/^\d{4}$/.test(code)) {
+  if (!ledgerAccountCodeShape.test(code)) {
     return c.json({ error: "not_found", code: "not_found", message: "That money account is not on the list." }, 404);
   }
   const body = await parseJsonBody(c, moneyAccountUpdateInput);

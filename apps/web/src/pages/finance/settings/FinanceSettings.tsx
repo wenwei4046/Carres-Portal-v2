@@ -5,8 +5,9 @@
  * The one list of money accounts: cash, each real bank, and the holding
  * account of each card or online payment company. Every Paid from and
  * Received into picker reads this list; Finance adds, renames and takes an
- * account out of use here. The database picks the code (1121–1129 a bank,
- * 1131–1139 a holding account) and refuses taking an account out of use while
+ * account out of use here. The database picks the code from the money-accounts
+ * heading (0570: NNN-K000 under NNN-0000, HH01..HH99 under HH00, the smallest
+ * free one, banks and holding accounts alike) and refuses taking an account out of use while
  * the ledger holds money in it or a payment method still lands money in it
  * (0515, 0523).
  *

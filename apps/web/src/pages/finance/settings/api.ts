@@ -15,7 +15,7 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
-import type { LedgerAccountReorderInput } from "@carres/shared";
+import type { LedgerAccountMoveInput, LedgerAccountReorderInput } from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
 
@@ -91,6 +91,20 @@ export function useReorderAccounts() {
   return useMutation<{ moved: number }, Error, LedgerAccountReorderInput>({
     mutationFn: (v) =>
       apiFetch("/api/finance/ledger/accounts/reorder", { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/**
+ * Put one account under another heading (0570). The number and name stay; the
+ * parent and the order under both headings change. Both headings' `was` go up,
+ * and the database refuses with 409 when either is no longer the stored order.
+ */
+export function useMoveAccount() {
+  const qc = useQueryClient();
+  return useMutation<{ code: string }, Error, LedgerAccountMoveInput>({
+    mutationFn: (v) =>
+      apiFetch("/api/finance/ledger/accounts/move", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }

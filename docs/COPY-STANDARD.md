@@ -3884,7 +3884,7 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 |---|---|---|
 | Tabs | **`Money accounts`** · **`Chart of accounts`** | The two tabs of Finance Settings. The second is `?tab=chart`. |
 | Chart | `{code} {name}` | One account, indented under its parent. A heading account (one that other accounts sit under) is bold; nothing is ever posted to it. |
-| Form | `Account` · `{code} · {kind}` | The rename form's heading, and the line under it. Only the name changes; the code never does. |
+| Form | `Account` · `{code} · {kind}` | The account form's heading, and the line under it. The name and the number change here, for an account and a heading alike (0570); a heading's accounts stay under it when its number changes. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
 | Account | **`Accrued expenses`** | The name of account 2130, under 2100 Payables: expenses owed at month end that no bill has arrived for yet. Posted by a manual journal, cleared by a payment voucher line. |
 | Refusals (database, 0557 — moving an account) | `The chart changed while you were dragging. Open it again and redo the move.` · `Move an account only among the accounts under the same heading.` · `Send every account under this heading, in the order you want them.` · `Send the order the chart was in before the drag.` · `The same account is listed twice.` · `The order has a blank where an account should be.` | Six causes, six sentences — **a refusal may not borrow another refusal's cause.** In order: somebody else moved an account while this screen was open, so this move is refused whole and nothing of theirs is lost · the move crossed into another heading, which is a reparent and a different ruling · the list left an account out, or was empty · the caller sent no before-order to check against · one account twice · a blank where a code should be. `Only Finance changes the chart of accounts.` and `That account is not in the chart.` are reused from 0539, unchanged. |
@@ -3893,10 +3893,30 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 Finance -> Settings -> Chart of accounts is dragged among the accounts under its own heading; `rowDrag`
 was added to the shared `DataGrid` for it, using the browser's own drag and drop. The six sentences
 above are the server's refusals and the screen prints them as they come, so their wording is already
-settled. The screen never offers a move across a heading, so `Move an account only among the accounts
-under the same heading.` should not be reachable from this page.
+settled. A drop on an account under the same heading reorders; a drop of a posting account on a
+heading it may go under puts it there, a heading beside it included (0570, below). Alt + arrow only
+reorders. `Move an account only among the accounts under the same heading.` stays the refusal for an
+order that names an account from another heading; the screen never sends one.
 
-| PROPOSAL - PENDING APPROVAL | `Drag an account to move it. Hold Alt and press the up or down arrow to move it from the keyboard.` | One line above the chart. A drag with no keyboard equal locks out anyone not using a mouse, and a keyboard move nobody is told about is not a control. Plain ASCII throughout; the only punctuation is the full stop. **NOT APPROVED — it is on the screen in this branch and must be approved or replaced before merge.** |
+| PROPOSAL - PENDING APPROVAL | ~~`Drag an account to move it. Hold Alt and press the up or down arrow to move it from the keyboard.`~~ | **REPLACED in 0570** by the two sentences in the 0570 table below; no longer on the screen. It was never approved. |
+
+**An account can move under another heading, and a heading's number can change (0570).** Owner:
+*"it doesnt change account number or name, it's just that it falls under different header so that in
+report that account belongs in the new header"* and *"header name and number need to be changeable as
+well"*. The move changes the heading and the place under it; the P&L and the Balance Sheet print the
+account under its new heading on their next read. Only a POSTING account changes heading; a heading keeps
+its place among its siblings. Nothing moves into or out of a heading whose accounts decide how money may be
+recorded (CUSTOMER_MONEY_HEADING, STOCK_HEADING), and the last account under a heading never leaves it.
+Every sentence below is NEW and NOT APPROVED.
+
+| Group | Word | Meaning |
+|---|---|---|
+| APPROVED 2026-09-23 (YH) | `Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.` | The one line above the chart. YH asked for it shorter on 23 Sep and approved this wording ("ok"). It replaces the two-sentence proposal. A drop on a heading the account may go under puts it there; a drop on an account under the same heading reorders; Alt+Up/Down only reorders; Shift+F10 opens the row menu. |
+| APPROVED 2026-09-23 (YH) | `Move under {code} {name}` | One item per heading in the row menu (Shift+F10, the Menu key or a right-click). Only headings the account may go under are listed: the account is a posting account and not the last one under its heading; the heading is the same kind, not the one it is under now, and neither heading is one whose accounts decide how money may be recorded. A heading's row menu lists none. |
+| APPROVED 2026-09-23 (YH) — refusals (database, 0570 — the number) | `A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.` · `An account numbered {code} is already in the chart.` | The number's shape, and a number another account has. The shape is four digits, or three digits, a dash, a digit or capital letter, and three digits (AutoCount's form); ASCII only, and a lower-case letter is stored in capitals. The first sentence replaces the earlier one with an EM DASH, which is no longer on the screen. Both are shown under `Number` on the account form, for an account and a heading alike; the form checks the shape itself, with the same sentence. |
+| PROPOSAL - PENDING APPROVAL: refusals (database, 0570: a new money account's number) | `There is no free number left under {code} {name}.` · `A new account is numbered from its heading, and {code} {name} does not end in 00 or -0000.` | Adding a bank or holding account on Finance Settings. The number is the smallest free one under the money-accounts heading: NNN-K000 under NNN-0000, HH01..HH99 under HH00. The first says every such number is taken; the second says the heading's own number has neither form, so no number can be made from it. |
+| PROPOSAL - PENDING APPROVAL: the usual account (0570) | `{code} {name} (usual)` · `The usual account` | The blank choice on a bill's Payables account and on a GRN line's account. The account is the chart's role (trade or other payables, cost of goods sold), named from the chart. `The usual account` shows only while the chart loads or when it could not be read. |
+| APPROVED 2026-09-23 (YH) — refusals (database, 0570 — a move under another heading) | `That account is already under this heading.` · `{code} {name} is a heading. A heading stays where it is; drag it among the headings beside it to change its place.` · `{code} {name} is not a heading. Move the account under a heading.` · `An account moves only under a heading of the same kind.` · `{code} {name} decides how money may be recorded, not only where an account prints. No account moves into or out of it.` · `{code} {name} is the last account under {code} {name}. Move another account under that heading first.` | Six causes, six sentences. In order: the target is the heading it is under now · the account being moved is a heading (the P&L and Balance Sheet group by the immediate parent only, so a heading under another heading would print 0.00 there) · the target has no accounts under it, so it is an account, not a heading; this also covers the account itself · the target is another kind (asset, liability, equity, income, expense), which would put the account on a different statement · the heading left or joined is CUSTOMER_MONEY_HEADING or STOCK_HEADING, whose accounts `fin_money_in_account_problem` reads to decide how money may come in, so a move there would switch a money guard on or off · the account is the last one under its heading, active or retired, and an empty heading would become a posting account. The screen never offers any of these; they are the database's own guard. Reused unchanged: `That account is not in the chart.` (0539) and the 0557 sentences above, which now also cover the heading an account joins. |
 
 Finance words that never appear on screen. A finance person says the word on the left; the screen
 always says the word on the right. One fact, one word (rule 2).
@@ -3913,11 +3933,11 @@ Money moves gain two kinds (0537). Nothing below is approved yet.
 | Words | Where and meaning |
 |---|---|
 | `Bank charge` · `Bank credit` | The two new kinds (`BANK_CHARGE` · `BANK_CREDIT`), and the Journal's Source for them (with ` reversal`). A bank charge is money the bank took; a bank credit is money the bank added with no document (interest). |
-| `Goes to 6500 Bank and payment charges.` | Hint under the amount on a bank charge. |
-| `Goes to 4900 Other income. Money from a customer is recorded as a payment, not here.` | Hint under the amount on a bank credit. |
+| `Goes to {code} {name}.` | Hint under the amount on a bank charge. The account is the chart's bank-charges role (0570), not a number the screen knows; today 6500 Bank and payment charges. `Loading accounts…` while the chart loads, `The chart of accounts could not be loaded. Try again.` when it fails. |
+| `Goes to {code} {name}. Money from a customer is recorded as a payment, not here.` | Hint under the amount on a bank credit. The account is the chart's other-income role (0570); today 4900 Other income. |
 | `Only a card payout has a fee.` · `Only a card payout has a fee. Record a bank charge as its own money move.` | Form refusal · database refusal, replacing `A bank transfer has no fee.` and its database sentence. |
 | `Choose a bank transfer, a card payout, a bank charge or a bank credit.` | Refusal when no kind is chosen, replacing `Choose a bank transfer or a card payout.` |
-| `A bank charge is taken from a bank account in use.` · `A bank charge goes to 6500 Bank and payment charges.` · `A bank credit comes from 4900 Other income.` · `A bank credit goes into a bank account in use.` | Database refusals for the wrong account on each side. |
+| `A bank charge is taken from a bank account in use.` · `A bank charge goes to {code} {name}.` · `A bank credit comes from {code} {name}.` · `A bank credit goes into a bank account in use.` | Database refusals for the wrong account on each side. Since 0570 the account is named from its role, so a renumbered chart prints its own number. |
 
 ## PROPOSAL — PENDING APPROVAL (card-routing)
 

@@ -26,9 +26,9 @@ const row = (over: Partial<MoneyMoveRow>): MoneyMoveRow => ({
   kind: "CARD_PAYOUT",
   status: "prepared",
   move_date: "2026-09-17",
-  from_account_code: "1131",
+  from_account_code: "311-G001",
   from_account_name: "GHL",
-  to_account_code: "1123",
+  to_account_code: "310-2000",
   to_account_name: "Hong Leong",
   amount: 97.5,
   fee: 2.5,
@@ -51,11 +51,23 @@ beforeEach(() => {
     "GET /api/finance/money-moves": [row({}), MINE],
     "GET /api/finance/money-moves/me": { mayApprove: true },
     "GET /api/finance/ledger/money-accounts": [
-      { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true },
-      { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true },
-      { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
+      { code: "310-5000", name: "Public Bank", money_kind: "BANK", is_active: true },
+      { code: "310-2000", name: "Hong Leong", money_kind: "BANK", is_active: true },
+      { code: "311-G001", name: "GHL", money_kind: "HOLDING", is_active: true },
     ],
     [`POST /api/finance/money-moves/${row({}).move_id}/approve`]: { id: row({}).move_id },
+    // An AutoCount-shaped chart: the bank-charges and other-income accounts are
+    // found by their roles, never by a number the screen knows.
+    "GET /api/finance/ledger/accounts": {
+      go_live_on: "2026-09-10",
+      accounts: [
+        { code: "902-0000", name: "BANK CHARGES", kind: "EXPENSE", parent_code: null, is_control: false, control_for: null, is_active: true, is_header: false, sort_order: 0 },
+        { code: "580-0000", name: "OTHER INCOME", kind: "INCOME", parent_code: null, is_control: false, control_for: null, is_active: true, is_header: false, sort_order: 0 },
+      ],
+      roles: { BANK_AND_PAYMENT_CHARGES: "902-0000", OTHER_INCOME: "580-0000" },
+      money_accounts: ["310-5000", "310-2000", "311-G001"],
+    },
+    "POST /api/finance/money-moves": { move_id: "aaaaaaaa-0000-4000-8000-000000000009" },
   };
   net.calls = [];
   localStorage.clear();
@@ -85,7 +97,7 @@ describe("Money moves", () => {
 
     fireEvent.click(screen.getAllByTitle("Inspect money move")[0]!);
     const theirs = await screen.findByTestId("money-move-MM-20260917-1111");
-    expect(theirs).toHaveTextContent("RM 100.00 from 1131 · GHL · RM 97.50 into 1123 · Hong Leong · Fee RM 2.50");
+    expect(theirs).toHaveTextContent("RM 100.00 from 311-G001 · GHL · RM 97.50 into 310-2000 · Hong Leong · Fee RM 2.50");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() =>
       expect(net.calls.map((c) => c.key)).toContain(`POST /api/finance/money-moves/${row({}).move_id}/approve`),
@@ -100,5 +112,26 @@ describe("Money moves", () => {
     fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
     expect(await screen.findByTestId("money-move-refusal")).toHaveTextContent("Choose where the money came from.");
     expect(net.calls.some((c) => c.key === "POST /api/finance/money-moves")).toBe(false);
+  });
+
+  it.each([
+    ["Bank charge", "Goes to 902-0000 BANK CHARGES.", { to_account_code: "902-0000" }, "Paid into"],
+    ["Bank credit", "Goes to 580-0000 OTHER INCOME. Money from a customer is recorded as a payment, not here.",
+      { from_account_code: "580-0000" }, "Paid from"],
+  ])("a %s names and sends the account the chart's role gives", async (word, hint, sent, hidden) => {
+    show();
+    await screen.findByText("MM-20260917-1111");
+    fireEvent.click(screen.getByRole("button", { name: /New money move/ }));
+    fireEvent.keyDown(await screen.findByRole("combobox", { name: /Kind/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: word }));
+    expect(await screen.findByText(hint)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: new RegExp(hidden) })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: "12.50" } });
+    const other = hidden === "Paid into" ? "Paid from" : "Paid into";
+    fireEvent.keyDown(screen.getByRole("combobox", { name: new RegExp(other) }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /310-2000/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
+    await waitFor(() => expect(net.calls.find((c) => c.key === "POST /api/finance/money-moves")?.body)
+      .toMatchObject(sent));
   });
 });

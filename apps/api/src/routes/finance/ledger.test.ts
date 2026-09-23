@@ -460,6 +460,48 @@ describe("GET /accounts", () => {
     expect(body.go_live_on).toBe("2026-09-01");
     expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([["1000", true], ["1210", false], ["4100", false]]);
   });
+
+  it("names the headings no account moves into or out of (0570 gl_rule_headings)", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) => (call.name === "gl_rule_headings" ? ok(["2200", "1300"]) : answer(call)));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_rule_headings");
+    expect(body.rule_headings).toEqual(["2200", "1300"]);
+  });
+
+  it("still serves the chart when that list cannot be read; the move door refuses on its own", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) => (call.name === "gl_rule_headings" ? fail("42883") : answer(call)));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.rule_headings).toEqual([]);
+  });
+
+  it("names which account does each job and which accounts hold money (0570), so no screen writes a number", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) =>
+      call.name === "gl_account_roles_read" ? ok({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" })
+      : call.name === "gl_money_accounts" ? ok([{ account_code: "320-0000" }, { account_code: "310-A001" }])
+      : answer(call));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_roles_read");
+    expect(body.roles).toEqual({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" });
+    expect(body.money_accounts).toEqual(["320-0000", "310-A001"]);
+  });
+
+  it("still serves the chart when the roles or the money accounts cannot be read", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) =>
+      call.name === "gl_account_roles_read" || call.name === "gl_money_accounts" ? fail("42501") : answer(call));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.roles).toEqual({});
+    expect(body.money_accounts).toEqual([]);
+  });
 });
 
 describe("PATCH /accounts/:code", () => {
@@ -497,6 +539,27 @@ describe("PATCH /accounts/:code", () => {
     });
   });
 
+  it("takes AutoCount's letter form, and sends a lower-case letter in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A001"));
+    const res = await patch("/accounts/6900", { name: "Advertisement", code: " 900-a001 " });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "6900", p_name: "Advertisement", p_new_code: "900-A001" });
+    expect((await patch("/accounts/900-A001", { name: "Advertisement" })).status).toBe(200);
+  });
+
+  it.each(["900-AA01", "90-A001", "900-A0011", "900-ı001", "900-İ001", "٩٠٠-A001", "９０００"])(
+    "refuses %s before the database",
+    async (code) => {
+      const { sb } = fakeClient(() => ok("x"));
+      const res = await patch("/accounts/6900", { name: "X", code });
+      expect(res.status).toBe(422);
+      expect((await json(res)).message).toBe(
+        "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
+      );
+      expect(sb.rpc).not.toHaveBeenCalled();
+    },
+  );
+
   it("reaches an account that already carries the dashed shape in its own path", async () => {
     const { sb } = fakeClient(() => ok("100-0001"));
     expect((await patch("/accounts/100-0001", { name: "Accruals" })).status).toBe(200);
@@ -512,7 +575,7 @@ describe("PATCH /accounts/:code", () => {
     const shape = await patch("/accounts/2130", { name: "X", code: "99" });
     expect(shape.status).toBe(422);
     expect((await json(shape)).message).toBe(
-      "A number is four digits, or three digits, a dash and four — 1210 or 100-0001.",
+      "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
     );
     // A field the door does not take is still refused.
     expect((await patch("/accounts/2130", { name: "X", kind: "ASSET" })).status).toBe(422);
@@ -521,7 +584,7 @@ describe("PATCH /accounts/:code", () => {
   // 0550's four refusals, each one reaching the user as its own sentence under
   // its own tag rather than as raw database text.
   it.each([
-    ["code_shape", "22023", 422, "A number is four digits, or three digits, a dash and four — 1210 or 100-0001."],
+    ["code_shape", "22023", 422, "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001."],
     ["code_exists", "22023", 422, "An account numbered 2140 is already in the chart."],
     ["name_exists", "22023", 422, "An account named Accruals is already in the chart."],
     ["not_finance", "42501", 403, "Only Finance changes the chart of accounts."],
@@ -539,6 +602,78 @@ describe("PATCH /accounts/:code", () => {
     const res = await patch("/accounts/2130", { name: "Accruals" });
     expect(res.status).toBe(500);
     expect((await json(res)).code).toBe("rpc_failed");
+  });
+});
+
+describe("POST /accounts/move and /accounts/reorder", () => {
+  const post = async (path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  const MOVE = {
+    code: "5200",
+    toParentCode: "6000",
+    from: { was: ["5100", "5200"], now: ["5100"] },
+    to: { was: ["6100", "6500"], now: ["6100", "6500", "5200"] },
+  };
+
+  it("forwards both headings' before and after orders to gl_account_move untouched", async () => {
+    const { sb } = fakeClient(() => ok("5200"));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "5200" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_move", {
+      p_code: "5200",
+      p_to_parent: "6000",
+      p_from_was: ["5100", "5200"],
+      p_from_now: ["5100"],
+      p_to_was: ["6100", "6500"],
+      p_to_now: ["6100", "6500", "5200"],
+    });
+  });
+
+  it("refuses operation, a missing before-order, an emptied heading and an extra field before the database", async () => {
+    expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post("/accounts/move", { ...MOVE, to: { was: [], now: ["5200"] } })).status).toBe(422);
+    // The last account under a heading never leaves it (0570), so an empty
+    // after-order for the heading it leaves never reaches the database.
+    const emptied = await post("/accounts/move", {
+      code: "1310", toParentCode: "1200",
+      from: { was: ["1310"], now: [] },
+      to: { was: ["1210"], now: ["1210", "1310"] },
+    });
+    expect(emptied.status).toBe(422);
+    expect((await post("/accounts/move", { ...MOVE, name: "Freight" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["order_stale", "40001", 409, "The chart changed while you were dragging. Open it again and redo the move."],
+    ["move_onto_account", "22023", 422, "6500 Bank and payment charges is not a heading. Move the account under a heading."],
+    ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
+    ["move_heading", "22023", 422, "2100 Payables is a heading. A heading stays where it is; drag it among the headings beside it to change its place."],
+    ["move_rule_heading", "22023", 422, "2200 Customer money held decides how money may be recorded, not only where an account prints. No account moves into or out of it."],
+    ["move_last_child", "22023", 422, "2310 SST payable is the last account under 2300 Taxes. Move another account under that heading first."],
+  ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
+    fakeClient(() => refuse(sqlstate, details as string, message as string));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(status);
+    const body = await json(res);
+    expect(body.code).toBe(details);
+    expect(body.message).toBe(message);
+  });
+
+  it("reorders an account that carries the dashed number shape", async () => {
+    const { sb } = fakeClient(() => ok(2));
+    const res = await post("/accounts/reorder", { parentCode: "600-0000", was: ["610-0001", "610-0002"], now: ["610-0002", "610-0001"] });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_accounts_reorder", {
+      p_parent_code: "600-0000", p_was: ["610-0001", "610-0002"], p_now: ["610-0002", "610-0001"],
+    });
   });
 });
 
