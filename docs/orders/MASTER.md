@@ -757,7 +757,7 @@ Recording a communication reference does not authorise contacting customers or e
 This evidence gate neither rewrites historical signatures nor turns a WhatsApp confirmation into a
 signature. Preserve the actual revision/document association and separately identify unsigned versions.
 
-**BUILT 2026-09-23 — migration `0562`, `sales_order_record_amendment_agreement`,
+**BUILT 2026-09-23 — migration `0564`, `sales_order_record_amendment_agreement`,
 `POST /api/operation/orders/amendment/:id/agreement`, `SalesOrderAmendment.tsx`.**
 `sales_order_amendments` now carries the kind, the reference, the optional detail, who recorded it,
 when, and the fingerprint of the terms it was recorded against. Three kinds are accepted and no
@@ -775,7 +775,7 @@ so approval is never silently reused for different terms. A decided amendment's 
 rewritten afterwards. The applied history row names the kind and the reference, so the record
 answers what made the change legitimate without a second read.
 
-Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole 565-file chain, 0562
+Proven on a throwaway Postgres by `scripts/dry-run-migrations.mjs` (the whole 565-file chain, 0564
 applying cleanly): approve with nothing recorded is refused; a blank reference is refused; an
 ungoverned kind is refused; a WhatsApp confirmation is accepted and read back as covering the
 proposal; changing the terms afterwards re-refuses the approval; reject still succeeds; a covered

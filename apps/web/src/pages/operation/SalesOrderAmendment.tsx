@@ -45,7 +45,7 @@ import {
   type CustomerAgreementKind,
 } from "@/lib/queries";
 
-/* ⭐ HOW THE CUSTOMER AGREED — the three kinds 0562 accepts, and the reason
+/* ⭐ HOW THE CUSTOMER AGREED — the three kinds 0564 accepts, and the reason
    there is no fourth (owner ruling 2026-09-22, APPROVED / LOCKED):
 
      "A signed document or a reference to the relevant customer confirmation
@@ -116,7 +116,7 @@ export default function SalesOrderAmendment({
   const impactQ = useSalesOrderAmendmentImpact(amendment?.id ?? null);
   const role = useAuth((s) => s.role);
 
-  /* 0562 · the two facts the approve button answers to. Both come from the
+  /* 0564 · the two facts the approve button answers to. Both come from the
      server on every read — the screen never decides for itself that a change
      is agreed, and the database refuses the approval regardless. */
   const agreementRecorded = !!amendment?.customer_agreement_kind;
@@ -243,7 +243,7 @@ export default function SalesOrderAmendment({
             </div>
           )}
 
-          {/* ⭐ THE CUSTOMER AGREEMENT — 0562, owner ruling 2026-09-22.
+          {/* ⭐ THE CUSTOMER AGREEMENT — 0564, owner ruling 2026-09-22.
               It sits ABOVE the decision, because it is the thing the approver
               is being asked to check: "Sales records the confirmation basis;
               the authorised approver checks that it covers the proposed
@@ -343,7 +343,7 @@ export default function SalesOrderAmendment({
                   Reject
                 </Button>
                 {/* ⭐ APPROVE WAITS ON THE CUSTOMER, NOT ON THE APPROVER'S
-                    CONFIDENCE (0562). `Reject` beside it is deliberately NOT
+                    CONFIDENCE (0564). `Reject` beside it is deliberately NOT
                     gated: refusing a change needs no customer agreement. The
                     database refuses this press too — this only stops the
                     principal walking into a refusal they cannot fix from here. */}

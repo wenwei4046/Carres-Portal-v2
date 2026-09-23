@@ -1,4 +1,11 @@
--- 0562_an_amendment_takes_effect_only_on_recorded_customer_agreement
+-- 0564_an_amendment_takes_effect_only_on_recorded_customer_agreement
+--
+-- ⚠️ RENUMBERED 0562 → 0564 (2026-09-23). `0562_a_manual_purchase_says_what_it_needs`
+-- is APPLIED in production (`supabase_migrations.schema_migrations`
+-- `20260922211119`) and Purchasing CARD 13 also holds an unapplied
+-- `0563_one_create_door_per_name_again.sql`, so 0562 and 0563 are both taken.
+-- Verified against the live tracker and every worktree on this machine, not
+-- from `ls` of one checkout — Constitution red line 7.
 --
 -- CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
 -- (`docs/orders/MASTER.md` § "Customer agreement evidence").
@@ -76,11 +83,11 @@ alter table public.sales_order_amendments
   add column if not exists customer_agreement_at        timestamptz;
 
 comment on column public.sales_order_amendments.customer_agreement_kind is
-  '0562 - HOW the customer''s acceptance is evidenced: signed_document (a document the customer signed), customer_confirmation (a traceable reference to the customer''s own confirmation, e.g. a WhatsApp message) or original_agreement (a Staff correction where the agreement did not change, pointing back at the order''s existing signed agreement). A manager''s assertion is not a kind.';
+  '0564 - HOW the customer''s acceptance is evidenced: signed_document (a document the customer signed), customer_confirmation (a traceable reference to the customer''s own confirmation, e.g. a WhatsApp message) or original_agreement (a Staff correction where the agreement did not change, pointing back at the order''s existing signed agreement). A manager''s assertion is not a kind.';
 comment on column public.sales_order_amendments.customer_agreement_reference is
-  '0562 - the traceable pointer the kind demands. It must identify something outside this table that can be found again.';
+  '0564 - the traceable pointer the kind demands. It must identify something outside this table that can be found again.';
 comment on column public.sales_order_amendments.customer_agreement_covers is
-  '0562 - fingerprint of the proposed terms this basis was recorded against. Approve refuses when it no longer matches the proposal being applied, so approval is never silently reused for different terms.';
+  '0564 - fingerprint of the proposed terms this basis was recorded against. Approve refuses when it no longer matches the proposal being applied, so approval is never silently reused for different terms.';
 
 do $$
 begin
@@ -120,7 +127,7 @@ as $$
 $$;
 
 comment on function public.sales_order_amendment_terms_hash(jsonb) is
-  '0562 - the fingerprint customer-agreement evidence is bound to. jsonb normalises object key order, so equal terms hash equal.';
+  '0564 - the fingerprint customer-agreement evidence is bound to. jsonb normalises object key order, so equal terms hash equal.';
 
 -- ---------------------------------------------------------------------
 -- 3. Sales records the confirmation basis
@@ -261,7 +268,7 @@ begin
     'stale', v_now is distinct from v_a.base_contractual_hash,
     'proposed_snapshot', v_a.proposed_snapshot,
     'submitted_at', v_a.submitted_at,
-    -- 0562 · what the approver must check before approving.
+    -- 0564 · what the approver must check before approving.
     'customer_agreement_kind', v_a.customer_agreement_kind,
     'customer_agreement_reference', v_a.customer_agreement_reference,
     'customer_agreement_detail', v_a.customer_agreement_detail,
@@ -276,7 +283,7 @@ begin
 end $$;
 
 comment on function public.sales_order_amendment_live(uuid) is
-  '0334 live-amendment read; 0562 adds the recorded customer-agreement basis and whether it still covers the proposed terms.';
+  '0334 live-amendment read; 0564 adds the recorded customer-agreement basis and whether it still covers the proposed terms.';
 
 -- ---------------------------------------------------------------------
 -- 5. THE GATE — an amendment takes effect only on recorded agreement
@@ -342,7 +349,7 @@ begin
     return jsonb_build_object('id',v_a.id,'status','rejected');
   end if;
 
-  -- ── 0562 · THE CUSTOMER AGREEMENT GATE ──────────────────────────────────
+  -- ── 0564 · THE CUSTOMER AGREEMENT GATE ──────────────────────────────────
   -- APPROVED / LOCKED 2026-09-22. Everything below this point CHANGES the
   -- customer's order, so the customer's acceptance has to be on the record
   -- first, and it has to be the acceptance of THESE terms.
@@ -408,7 +415,7 @@ begin
   else
     -- 0420 · EVERY GUARD ABOVE HAS ALREADY PASSED — principal, decision note,
     -- not already decided, the customer's recorded agreement covers these very
-    -- terms (0562), not stale, every proposed line still owned by this order.
+    -- terms (0564), not stale, every proposed line still owned by this order.
     -- Only now does the lane name itself to the writer, so 0415's F-11 and
     -- F-12 know this is the door they point at. `true` is is_local: the setting
     -- dies with this transaction and no other caller can see it.
@@ -428,7 +435,7 @@ begin
      set status='applied', decided_by=auth.uid(), decided_at=now(), applied_at=now(),
          decision_note=v_note, decision_impact=v_impact
    where id=v_a.id;
-  /* 0562 · the applied record names the basis it was approved on, so the
+  /* 0564 · the applied record names the basis it was approved on, so the
      history answers "what made this change legitimate" without a second read. */
   insert into order_history(order_id,text,by_role,by_user_id,metadata)
   values(v_a.order_id,'Amendment approved and applied - Rev ' || (v_result->>'revision'),
@@ -446,4 +453,4 @@ revoke all on function public.sales_order_decide_amendment(uuid,text,text) from 
 grant execute on function public.sales_order_decide_amendment(uuid,text,text) to authenticated;
 
 comment on function public.sales_order_decide_amendment(uuid,text,text) is
-  '0348 governed amendment decision; 0420 exempts F-11/F-12 for the one door they name; 0562 refuses APPROVE unless the customer''s recorded agreement exists and still covers the exact proposed terms. Reject is unchanged - refusing a change needs no customer agreement.';
+  '0348 governed amendment decision; 0420 exempts F-11/F-12 for the one door they name; 0564 refuses APPROVE unless the customer''s recorded agreement exists and still covers the exact proposed terms. Reject is unchanged - refusing a change needs no customer agreement.';

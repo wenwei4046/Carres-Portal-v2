@@ -83,7 +83,7 @@ describe("an amendment awaiting management", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
   });
 
-  /* The decision reason was the ONLY thing this asked for until 0562. It now
+  /* The decision reason was the ONLY thing this asked for until 0564. It now
      also needs the customer's recorded agreement, because approving is what
      makes the change real — see "the customer agreement gate" below. The
      reason is still required, and that is what this still proves. */
@@ -128,7 +128,7 @@ describe("no amendment open", () => {
 
 /**
  * ⭐ CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
- * (`docs/orders/MASTER.md`; enforced by migration `0562`).
+ * (`docs/orders/MASTER.md`; enforced by migration `0564`).
  *
  *   "A change to the customer's actual agreement must have a recorded,
  *    traceable basis for that customer's acceptance before it takes effect...

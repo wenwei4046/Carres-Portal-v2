@@ -1,7 +1,7 @@
 /**
  * ⭐ CUSTOMER AGREEMENT EVIDENCE AT THE DOOR — owner ruling 2026-09-22,
  * APPROVED / LOCKED (`docs/orders/MASTER.md` § "Customer agreement evidence";
- * enforced in the database by migration `0562`).
+ * enforced in the database by migration `0564`).
  *
  *   "A signed document or a reference to the relevant customer confirmation
  *    (for example, WhatsApp) is acceptable... A manager's statement or checkbox
@@ -9,7 +9,7 @@
  *    substitute for the evidence."
  *
  * The RPC enforces the gate — approve is refused without a covering basis, and
- * `0562`'s own replay evidence proves that. What only THIS layer can assert is
+ * `0564`'s own replay evidence proves that. What only THIS layer can assert is
  * what the door will and will not forward:
  *
  *   · a kind outside the three governed ones never reaches the database,

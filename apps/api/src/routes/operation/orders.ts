@@ -2182,7 +2182,7 @@ operationOrdersRouter.post(
 //
 //   GET  /:id/amendment          the live amendment + whether it is STALE
 //   POST /:id/amendment          SUBMIT
-//   POST /amendment/:aid/agreement  the customer's recorded acceptance (0562)
+//   POST /amendment/:aid/agreement  the customer's recorded acceptance (0564)
 //   POST /amendment/:aid/apply   the REFUSAL — and that refusal is the point
 //
 // There is no ISSUE door and no ACCEPT door here, deliberately: the signing
@@ -2333,7 +2333,7 @@ operationOrdersRouter.get("/:id/cancel-impact", requireOperation, async (c) => {
 /**
  * ⭐ CUSTOMER AGREEMENT EVIDENCE — APPROVED / LOCKED, owner ruling 2026-09-22
  * (`docs/orders/MASTER.md` § "Customer agreement evidence"; enforced in the
- * database by `0562`).
+ * database by `0564`).
  *
  * "A signed document or a reference to the relevant customer confirmation (for
  *  example, WhatsApp) is acceptable... A manager's statement or checkbox saying

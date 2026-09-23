@@ -5873,7 +5873,7 @@ export interface SalesOrderAmendment {
   /** 0354 — the day the CUSTOMER asked, as the operator was told it. Null on
    *  a goods proposal and on every amendment written before the field. */
   customer_asked_on?: string | null;
-  /* ⭐ THE CUSTOMER'S RECORDED ACCEPTANCE — 0562, owner ruling 2026-09-22
+  /* ⭐ THE CUSTOMER'S RECORDED ACCEPTANCE — 0564, owner ruling 2026-09-22
      APPROVED / LOCKED. Null while the basis has not been recorded: "The request
      may remain recorded while evidence is incomplete; it cannot take effect."
      There is no boolean here on purpose — a manager's checkbox saying the
@@ -5887,7 +5887,7 @@ export interface SalesOrderAmendment {
   customer_agreement_covers_proposal?: boolean;
 }
 
-/** How the customer's acceptance is evidenced (0562). A signed document, a
+/** How the customer's acceptance is evidenced (0564). A signed document, a
  *  traceable reference to the customer's own confirmation, or — for a Staff
  *  correction where the agreement did not change — the revision whose signed
  *  agreement still covers it. */
@@ -5999,7 +5999,7 @@ export function useDecideSalesOrderAmendment(
 }
 
 /**
- * Sales records the basis for the customer's acceptance (0562).
+ * Sales records the basis for the customer's acceptance (0564).
  *
  * Separate from SUBMIT on purpose, and that is the ruling, not a convenience:
  * "The request may remain recorded while evidence is incomplete; it cannot take
