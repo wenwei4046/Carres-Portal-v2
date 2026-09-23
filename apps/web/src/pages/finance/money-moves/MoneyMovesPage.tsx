@@ -232,17 +232,27 @@ export default function MoneyMovesPage() {
   );
 }
 
-function MoneyMoveForm({ onClose }: { onClose: () => void }) {
+/** What a caller already knows; staff still choose the accounts and press Prepare. */
+export interface MoneyMoveFormInitial {
+  kind: MoneyMoveKind;
+  date: string;
+  amount: number;
+  fee: number;
+  reference: string;
+}
+
+/** 0572 — Card settlement opens this form filled from a matched day. */
+export function MoneyMoveForm({ onClose, initial }: { onClose: () => void; initial?: MoneyMoveFormInitial }) {
   const accounts = useMoneyAccounts();
   const prepare = usePrepareMoneyMove();
   const [key] = useState(() => crypto.randomUUID());
-  const [kind, setKind] = useState<MoneyMoveKind>("TRANSFER");
-  const [date, setDate] = useState<string | null>(appTodayIso());
+  const [kind, setKind] = useState<MoneyMoveKind>(initial?.kind ?? "TRANSFER");
+  const [date, setDate] = useState<string | null>(initial?.date ?? appTodayIso());
   const [fromCode, setFromCode] = useState<string | undefined>();
   const [toCode, setToCode] = useState<string | undefined>();
-  const [amount, setAmount] = useState("");
-  const [fee, setFee] = useState("");
-  const [reference, setReference] = useState("");
+  const [amount, setAmount] = useState(initial ? initial.amount.toFixed(2) : "");
+  const [fee, setFee] = useState(initial ? initial.fee.toFixed(2) : "");
+  const [reference, setReference] = useState(initial?.reference ?? "");
   const [note, setNote] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   /* 0541 — a card payout's bank defaults from Finance Settings' route; still changeable. */

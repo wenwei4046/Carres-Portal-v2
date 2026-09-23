@@ -39,6 +39,7 @@ import {
   Receipt,
   Banknote,
   CalendarClock,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -609,6 +610,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
       // 0529 — Finance moving its own money: bank transfers and card payouts.
       { key: "money-moves", label: "Money moves", icon: ArrowLeftRight, financePath: "/finance/money-moves" },
+      // 0572 — the card companies' files, matched to the recorded card payments.
+      { key: "card-settlement", label: "Card settlement", icon: CreditCard, financePath: "/finance/card-settlement" },
       // 0543 — Finance keeps the dealer master (code, state, address, contact)
       // on the same list the principal uses; inviting stays principal-only.
       { key: "dealers", label: "Dealers", icon: Users, financePath: "/finance/dealers" },
