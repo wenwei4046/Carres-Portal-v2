@@ -147,8 +147,16 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   mattress keeps one permanent Unit ID regardless of use: mutable Outright/Subscription use
   must not be encoded into that identity. A different replacement mattress uses its own identity;
   agreement-to-Unit history preserves both old and new associations. This approves traceability
-  only, not replacement eligibility, fees, billing or entitlement. Final numbering format and any
-  SO sequence split remain unapproved; existing numbering rules continue to apply.
+  only, not replacement eligibility, fees, billing or entitlement. **Numbering authority:** use
+  [Orders MASTER — External numbering privacy](../orders/MASTER.md#external-numbering-privacy--owner-requirements-2026-09-23),
+  whose later owner-approved complete document-numbering table defines distinct business document
+  families with shared permanent Unit identity. Do not duplicate that format table here or describe
+  all formats/business series as unapproved. **Source verified 2026-09-23:** branch
+  `codex/so-numbering-privacy-plan`, commit `5172f35e2f7d667df936514f8cab53e520c2fe24`,
+  Orders MASTER lines 123–213; PR #1544 is CLOSED, not merged, and the fetched main does not
+  contain this section. This reference identifies approved branch-only planning truth, not main
+  publication or implemented numbering. Preserve existing identifiers until authorized cutover;
+  the separate scan/official-DO issue/freeze dependency below remains unresolved.
   Diglant receives these company-wide Unit numbers and is intended to attach labels during
   production. No early customer-specific search for interchangeable eligible mattresses is required.
   The driver scans actual eligible picked Units to associate them with the planned delivery,
@@ -176,8 +184,9 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
 - **SO INFORMATION HIERARCHY — OWNER-APPROVED CONCEPT / NOT BUILT, 2026-09-23:** the list
   identifies customer, goods/quantity/date and business type; detail links procurement, deliveries
   and actual selected Unit identities. Do not invent an exact Unit before selection. This approves
-  the information hierarchy, not final columns/layout, dictionary changes, schema or a new
-  numbering format. Existing module record owners remain unchanged. Blueprint planning comes
+  the information hierarchy, not final columns/layout, dictionary changes or schema. Numbering
+  follows the separately approved Orders authority cited above. Existing module record owners
+  remain unchanged. Blueprint planning comes
   first; advice on build tasks follows readiness, with no new build tasks or implementation here.
 - Go-live starts empty. Early forecasts are manager-entered; automatic suggestions may begin
   only after three months of genuine sales, never imported/test transactions.
