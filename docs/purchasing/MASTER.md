@@ -3950,6 +3950,15 @@ recipient, channel, actor and time. Generating/downloading PDF proves neither se
 acceptance. Preserve sent revisions and corrections. Price recording is not a second financial
 ledger; payment, balance and credit processing remain in Finance, outside the register.
 
+**THE DOCUMENT CARRIES THE REASON AND THE PHOTOGRAPHS — owner, Jess 2026-09-23.**
+The issued Repair Order prints a `Reason` box saying what is being repaired, and the
+damage photographs on a page of their own after the goods table, laid out as the PO lays
+out a sofa set. Warehouse, driver, supplier and operation read one paper and see the same
+thing. The pictures are the source Claim's and the Unit's own evidence, read through —
+never a second upload against the document — so paper and screen cannot disagree. The
+paper stays money-free (`../pdf/DOCUMENT-KIT.md` §4); rules and layout live in
+`../pdf/DOCUMENT-KIT.md` §3 rules 11–12.
+
 #### Physical execution and completion
 
 Outbound records exact Units actually handed out, actual recipient/collector, time and evidence.
