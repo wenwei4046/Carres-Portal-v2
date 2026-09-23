@@ -685,36 +685,30 @@ export function snapshotTemplateData(
     paid,
     balance_due: subtotal - paid,
     currency: base?.currency ?? "MYR",
-    /* ⭐ A HISTORICAL VERSION NEVER BORROWS TODAY'S SIGNATURE — APPROVED /
-       LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md` § "Old versions
-       and signatures"):
-
-         "A signature belongs to the exact version and document the customer
-          signed; a new unsigned version says it is unsigned and never borrows
-          the old signature."
+    /* ⭐ A SIGNATURE IS NOT REPRODUCED ON A VERSION IT CANNOT BE ATTRIBUTED TO —
+       and that is NOT the same as saying this version is unsigned.
+       APPROVED / LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md`
+       § "Old versions and signatures"): "A signature belongs to the exact
+       version and document the customer signed."
 
        This read `base?.signed` and `base?.signature_url` — the ORDER's current
-       eSign PNG — so every revision printed the same signature under a
-       different set of goods, prices and dates. A customer could be shown Rev 2
-       carrying the mark they put on Rev 1.
+       eSign PNG — so every revision printed the same mark under a different set
+       of goods, prices and dates. A customer could be shown Rev 2 carrying the
+       signature they put on Rev 1. That is the defect.
 
-       ⛔ AND IT IS NOT REPLACED BY A GUESS. `sales_order_snapshot` stores no
-       signature fact (measured 2026-09-23 against the live function: header
-       carries so · status · parties · customer · delivery · proceed ·
-       instalment · placed_at · entry_fields, and nothing about signing), and
-       `orders` has `signature_url` with NO capture timestamp — only
-       `pod_signed_at`, which is Delivery's proof of delivery, a different act.
-       So which revision a stored signature covers is genuinely unprovable from
-       what is recorded today: an UNKNOWN, not a thing to infer from revision
-       order. The safe half of the rule is the half that is enforceable, so a
-       historical version prints UNSIGNED — the template's existing empty
-       signature box, no new words on a customer document — and never a
-       signature the record cannot place.
+       ⛔ AND THE OPPOSITE CLAIM IS ALSO UNPROVEN. Which revision a stored
+       signature covers is UNKNOWN: `sales_order_snapshot` records no signing
+       fact and `orders.signature_url` has no capture timestamp (`pod_signed_at`
+       is Delivery's, a different act). So this version is not "unsigned" — the
+       record simply cannot place the signature. The document therefore makes NO
+       claim either way: the mark is not reproduced here, the customer's
+       signature evidence is untouched on the order and still prints on the
+       CURRENT document, and the PAGE states the unknown in words (a customer
+       document gains no new words without the owner).
 
-       FALSIFIER: store the signing fact in the snapshot (or add a capture
-       timestamp to `orders`) and a revision can print the signature it really
-       carries. That is a schema change and is named as an open gap in the
-       Orders MASTER, not smuggled in here. */
+       FALSIFIER: store the signing fact in the snapshot, or timestamp the
+       capture on `orders`, and a revision can print the signature it really
+       carries. Named as open work in the Orders MASTER. */
     signed: false,
     signature_url: null,
     /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
@@ -1659,6 +1653,13 @@ function SalesOrderWorkspaceBody() {
     const printable = printableRef.current.url;
     if (!printable) return;
     if (dirty) toast.message("You have unsaved changes — printing the saved version");
+    /* ⭐ A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT. The
+       file issued at the time is not stored, so this sheet is rebuilt from the
+       version's saved facts. The sentence is on the PAGE, never added to the
+       customer document. ⚠️ build wording 2026-09-23, owner confirmation owed. */
+    if (mode === "oldrev") {
+      toast.message("Rebuilt from this version's saved facts — not the document issued at the time");
+    }
     window.open(printable, "_blank");
   };
   useEffect(
@@ -2838,19 +2839,32 @@ function SalesOrderWorkspaceBody() {
         second half of why the sections did not separate. */}
     <div className="flex flex-col gap-6">
       {mode === "oldrev" && viewedRevision && (
-        <div className="px-1">
+        <div className="px-1" data-testid="oldrev-notice">
           <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
             Viewing Rev {viewedRevision.revision} · read-only
           </span>
-          {/* ⭐ A RECEIPT NOBODY CAN PLACE IN TIME IS LEFT OUT, AND SAID SO. The
-              document counts only money dated on or before this version's day;
-              a capture with no date cannot be placed either side of it, so it
-              is excluded and the reader is told rather than shown a total that
-              quietly includes it. The sentence is on the PAGE, never on the
-              customer document — a document gains no new words without Jess.
+          {/* ⭐ WHAT THIS IS, SAID PLAINLY — APPROVED / LOCKED 2026-09-22:
+              "a revision prints its OWN stored document; a missing historical
+              file is STATED, never rebuilt from current data." The issued file
+              is not stored yet, so what the panel draws is REBUILT from the
+              version's own saved facts. Saying so is the half of the rule that
+              can be kept today; storing the file is the other half and is named
+              as open work in the Orders MASTER.
               ⚠️ build wording 2026-09-23, owner confirmation owed. */}
+          <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
+            Rebuilt from this version's saved facts. The document issued at the time is not stored.
+          </p>
+          {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
+              untouched: it stays on the order and still prints on the current
+              document. */}
+          {base?.signature_url && (
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
+              This order carries a customer signature. Which version it was given on is not
+              recorded, so it is not shown here.
+            </p>
+          )}
           {(base?.payments ?? []).some((pm) => !pm.date) && (
-            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
               One payment has no date, so it is not counted in this version.
             </p>
           )}

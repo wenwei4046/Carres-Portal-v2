@@ -665,17 +665,37 @@ describe("Sales Order object template contract", () => {
   });
 
   it("prints a version as it was issued — its own money, and never a borrowed signature", () => {
-    /* § Old versions and signatures: a revision prints its own document, and a
-       new unsigned version says so instead of borrowing the old signature.
-       WHICH revision a stored signature covers is not recorded anywhere, so the
-       enforceable half ships and nothing is guessed: a historical version
-       prints UNSIGNED. The behaviour itself is proved by calling the builder in
-       `SalesOrderWorkspace.historical-document.test.ts`; this pins only that the
-       page keeps asking for the version's own day. */
+    /* § Old versions and signatures. WHICH revision a stored signature covers is
+       not recorded anywhere, so the page asks for the version's own day and the
+       builder attributes nothing. The behaviour itself is proved by calling the
+       builder in `SalesOrderWorkspace.historical-document.test.ts`. */
     expect(workspace).toContain("asOf?: { date: string }");
     expect(workspace).toContain("{ date: viewedRevision.created_at.slice(0, 10) }");
     expect(workspace).not.toContain("signedRevision");
     expect(workspace).toContain("(base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)");
+  });
+
+  it("says a historical version is REBUILT, because the issued file is not stored", () => {
+    /* § Retained documents: "a missing historical file is STATED, never rebuilt
+       from current data." No file is retained, so the half that can be kept is
+       saying so — beside the version chip AND when it is printed, so a sheet
+       that leaves the screen was at least announced for what it is. */
+    expect(workspace).toContain('data-testid="oldrev-rebuilt"');
+    expect(workspace).toContain("The document issued at the time is not stored");
+    expect(workspace).toContain("Rebuilt from this version's saved facts — not the document issued at the time");
+  });
+
+  it("calls the signature UNKNOWN on an old version, never absent, and keeps the evidence", () => {
+    /* Not reproducing a mark that cannot be attributed is not the same as
+       asserting the version was unsigned. The evidence stays on the order and
+       still prints on the CURRENT document; only the page says the unknown, and
+       only when there is a signature to be unknown about. */
+    expect(workspace).toContain('data-testid="oldrev-signature-unknown"');
+    expect(workspace).toContain("Which version it was given on is not");
+    expect(workspace).toContain("{base?.signature_url && (");
+    /* The live document is NOT stripped: no rule may turn today's signed order
+       into an unsigned one. */
+    expect(workspace).not.toContain("signed: false, signature_url: null }");
   });
 
   it("names the governed ownership request and hides it from Operation", () => {

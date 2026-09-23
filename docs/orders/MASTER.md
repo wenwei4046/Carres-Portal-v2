@@ -728,14 +728,27 @@ impact → Save or Submit amendment request → approval takes effect → each o
   document; a missing historical file is stated, never rebuilt from current data. A signature belongs
   to the exact version and document the customer signed; a new unsigned version says it is unsigned and
   never borrows the old signature.
-  **BUILT 2026-09-23, and the boundary is stated rather than implied:** a revision prints from its
-  own immutable snapshot with the payments recorded by that revision's own time, and the customer
-  signature only on the revision the customer signed (Rev 1, the Sales Portal's capture at birth);
-  every later version — including the current one after any revision — prints as unsigned.
-  ⚠️ **RETAINED DOCUMENT FILES ARE NOT STORED YET.** The historical document is re-rendered from
-  the immutable snapshot, not read back from a stored PDF, so a template change alters how an old
-  version LOOKS while its facts stay the version's own. Storing the issued file at approval is the
-  remaining work.
+  **PARTLY BUILT 2026-09-23, and the two halves are not the same claim.**
+  🔴 **THE STORED FILE IS NOT STORED, SO WHAT IS SHOWN IS A REBUILD.** The rule says a revision
+  prints its OWN stored document and a missing file is STATED, never rebuilt from current data.
+  No issued PDF is retained, so the panel rebuilds the sheet from the version's own saved facts
+  and the page SAYS SO in words — *"Rebuilt from this version's saved facts. The document issued
+  at the time is not stored."* — beside the version chip and again when it is printed. Stating the
+  absence is the half of the rule that can be kept today; retaining the issued file is the other
+  half and is the remaining work. Until it exists, a printed rebuild and an issued document cannot
+  be told apart once they leave the screen.
+  🔴 **WHICH VERSION THE SIGNATURE COVERS IS UNKNOWN — NOT "UNSIGNED".** An earlier draft of this
+  section asserted the customer signed Rev 1. Nothing records that: `sales_order_snapshot` stores
+  no signing fact and `orders.signature_url` carries no capture timestamp. So a historical version
+  does not REPRODUCE a mark it cannot attribute, and it does not claim the version was unsigned
+  either. The evidence is preserved untouched — the signature stays on the order and still prints
+  on the CURRENT document — and the page states the unknown in words. Inferring the version from
+  revision order would be invention.
+  ✅ **WHAT IS BUILT:** a revision opens the complete old order from its own immutable snapshot,
+  and its money is the money DATED on or before that version's day, read from the one payments
+  ledger with the one arithmetic. A capture with no date is excluded and said. Named limits: a
+  receipt is dated to the DAY, so an afternoon payment counts toward a morning revision; and a
+  payment voided later leaves every view, so an old document under-reports rather than over-.
 - **Proposal tooling stays out of the product.** Demo switches, role pickers and page-state selectors
   used to review a prototype never enter the staff page.
 - The approved SO draft/revision words are registered in COPY-STANDARD: `Add item`, `Remove` /
@@ -745,15 +758,22 @@ impact → Save or Submit amendment request → approval takes effect → each o
 
 ### Customer agreement evidence — APPROVED / LOCKED 2026-09-22 · SERVER GATE BUILT 2026-09-23 (0564)
 
-**The gate is in the database.** `sales_order_amendments` carries the evidence note, who recorded
-it, when, and an md5 of the proposal it was recorded against.
-`sales_order_decide_amendment` refuses `approve` with detail `evidence_required` when the note is
-missing OR when the proposal has changed since the evidence was recorded, so evidence can never
-silently cover different terms. Operation/Sales record it with
-`sales_order_record_amendment_evidence`; the page shows the recorded basis and disables
-`Approve and apply` until it covers the live proposal. Recording a communication reference
-authorises no contact with anybody.
+**The gate is in the database.** `sales_order_amendments` carries the customer agreement as a
+governed KIND — `signed_document` · `customer_confirmation` · `original_agreement` — with the
+reference it points at, an optional detail, who recorded it, when, and
+`sales_order_amendment_terms_hash(proposed_snapshot)`: the fingerprint of the terms it was
+recorded against. Two check constraints make the ruling structural rather than remembered: a kind
+must be one of the three, and **a kind without a reference is refused** — which is what stops a
+manager's assertion, or a tick box, from ever counting as evidence.
 
+`sales_order_decide_amendment` refuses `approve` with detail `customer_agreement_required` when
+no kind is recorded, and `customer_agreement_stale` when the fingerprint no longer matches the
+proposal being applied, so an agreement can never silently cover different terms. `reject` is not
+gated — refusing a change asks the customer nothing. Operation/Sales record it through
+`sales_order_record_amendment_agreement`; `original_agreement` must name a revision of THAT order,
+checked in the database. The page shows what is on record and disables `Approve and apply` until
+it covers the live proposal. Recording a communication reference authorises no contact with
+anybody.
 
 A change to the customer's actual agreement must have a recorded, traceable basis for that customer's
 acceptance before it takes effect. A signed document or a reference to the relevant customer
@@ -804,220 +824,43 @@ proposal rather than approving it. The approved amendment words it reuses unchan
 `Management decision reason`, `Reject`, `Approve and apply`, `Waiting for management` and
 `Before approval`.
 
-### Old versions and signatures — measured 2026-09-23
+### Old versions and signatures — measured 2026-09-23, corrected after review
 
 **FIXED: a historical version no longer borrows today's signature.**
 `snapshotTemplateData` read `base.signed` and `base.signature_url` — the live order's eSign PNG —
 so every revision printed the same customer signature under a different set of goods, prices and
-dates. A customer could be shown Rev 2 carrying the mark they put on Rev 1. A historical version
-now prints UNSIGNED, using the document's existing empty signature box, with no new words added to
-a customer document. Guarded by `SalesOrderWorkspace.historical-document.test.ts`, whose control was
-run red against the old two lines before the fix was kept.
+dates. A customer could be shown Rev 2 carrying the mark they put on Rev 1.
+
+**AND THE OPPOSITE CLAIM IS ALSO UNPROVEN — the correction this review forced.** Not reproducing
+the mark is not the same as asserting the version was unsigned, and an earlier draft of this
+MASTER said both (it named Rev 1 as the signed revision, which nothing records). What ships:
+the mark is not reproduced on a version it cannot be attributed to · the signature evidence is
+preserved untouched on the order and still prints on the CURRENT document · the page states the
+unknown in words · the customer document gains no new words and asserts nothing either way.
 
 **UNKNOWN, and deliberately not guessed: which revision a stored signature covers.**
 `sales_order_snapshot` stores no signing fact (measured against the live function: its header
 carries `so · status · parties · customer · delivery · proceed · instalment · placed_at ·
 entry_fields` and nothing about signing), and `orders` carries `signature_url` with **no capture
-timestamp** — `pod_signed_at` is Delivery's proof of delivery, a different act. So the record
-cannot place the signature on a revision, and inferring it from revision order would be invention.
-The enforceable half of the rule ships; the other half waits on evidence.
-**Falsifier / the fix when it is wanted:** store the signing fact in the snapshot, or add a capture
-timestamp to `orders`, and a revision can print the signature it really carries.
+timestamp** — `pod_signed_at` is Delivery's proof of delivery, a different act.
+**Falsifier / the fix when it is wanted:** store the signing fact in the snapshot, or add a
+capture timestamp to `orders`.
 
-**OPEN GAP: a historical document still states today's money.** `payments` and `paid` ride from the
-live base, so an old version's `Balance due` is THAT version's goods total minus TODAY's receipts —
-an arithmetic that described no real moment (ownership Law D). Payments owns the money and the
-snapshot stores none of it, so the honest fix is a stored historical position, not a second
-arithmetic on the Sales Order page. Pinned as-is by a named `KNOWN GAP` test so the day it changes,
-it changes deliberately.
+### Retained documents — the rule is not met yet, and the page says so
 
-**Still not built in this scope:** whole-page `Edit` with server-chosen `Save` vs
-`Submit amendment request`, catalogue configuration, `Add item` / `Remove` / `Restore`, the
-`Before` / `After` review with downstream impacts, and version-conflict presentation.
+The approved rule is that a revision prints its OWN stored document and that a missing historical
+file is **stated, never rebuilt from current data**. No issued PDF is retained today, so:
 
-**⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
-APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
-doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
-above survives both:
+- what the panel draws for an old revision is a **REBUILD** from that version's immutable
+  snapshot, and the page says exactly that beside the version chip and again on print;
+- its money is the one payments ledger read as at that version's day — the snapshot stores no
+  money, so any figure on a historical sheet is necessarily read from current records;
+- **a printed rebuild cannot be told from an issued document once it leaves the screen.** That is
+  the residual risk of keeping `Print this version` before files are retained, and it is the
+  owner's call whether printing waits for retention.
 
-```
-CREATE      every door REQUIRES a proceed date — the POS already does; the OFFICE door must too
-BLANK       an existing order with NO proceed date may be filled in ONCE
-RECORDED    an order that HAS one stays read-only — unchanged, this is Jess's ruling
-```
-
-**The lock is on the ANSWER, never on the emptiness.** Filling a blank is completion; changing a
-recorded date is moving when the factory starts, and that stays shut. YH's reason for the
-fill-once bound: *"those that accept blank proceed date are most likely due to bugs from past
-versions"* — so the door exists to repair history, not to reopen a decision.
-
-⛔ **The `createOrderInput` sentence removed above was AMBIGUOUS and read as false.** There are
-**two different objects with that name**: the POS door's `createOrderInputSchema`
-(`packages/shared/src/schemas/orders.ts:325-327`, which genuinely does refuse — and
-`order-entry.ts:246` pins the field `locked · defaultRequired · not toggleable`), and the OFFICE
-door's local `createOrderInput` (`apps/api/src/routes/operation/orders.ts:1483-1499`), which
-**does not**. Measured 2026-08-28: the office door is permissive at all three of its layers — no
-`validateDraft` guard, `proceed_date` inherited `.nullable().optional()` from
-`revisionHeaderInput`, and `sales_order_create` inserts `nullif(…)::date` with no NULL check
-(`0374:115`). That is what this ruling closes.
-
-**WHAT THE DATE MEANS, since no rule computes it.** The planned production-START day, keyed by the
-salesperson at the point of sale (`0165:6-13`). There is **no derivation anywhere** — no lead-time
-arithmetic, no production calendar, no delivery-minus-lead formula. The only guidance in the
-product is prose on the POS: *"pick it deliberately (e.g. ~a month before delivery) so we don't
-reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule enforced at every layer is
-`proceed_date <= delivery_date`. It is a planned date only and is never auto-stamped.
-
-📌 **Provenance, recorded because it was asked.** The three read-only lines above entered this file
-in ONE commit — `2515a136`, authored by `yhcominthruWork` as squashed PR #923, whose body never
-mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**, and
-those quotation marks are the whole of the provenance; no separate artefact backs it. Neither Lim,
-Chai nor Jess has ever committed a proceed-date line here. YH confirmed the ruling stands on
-2026-08-28 with the refinement above, which is what makes it binding now.
-
-**BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
-The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
-this page offered an unlabelled tickbox, so an unticked box meant BOTH *no lift* and *nobody said*.
-The answers now live once, in `packages/shared/src/sales-order-form.ts` (`LIFT_OPTIONS`), and both
-surfaces import them. The same ruling brought the POS's stair-carry working-out to this page —
-`3 of 5 items × 2 floors above 2F × RM50 = RM300` — through the one imported `floorSurchargeRaw`
-(Law D: one derived fact, ONE arithmetic).
-
-**THE SECOND DENSITY PASS — 2026-08-26 (YH), after reading the merged page.** Six lines of standing
-explanation came off once the fields they explained stopped being editable:
-
-- `ORDER INFO` loses its subtitle. It taught what `Proceed date` meant while that was a box the
-  office had to reason about; it is a recorded fact now.
-- The stair-carry working-out prints **only when there is a charge**. It used to narrate the zero
-  (*"No stair carry — floor 1 is within the free 2F"*) on the majority of orders, repeating the two
-  fields directly above it.
-- `Floor` carries its own ceiling — **`Floor (Max is 3rd Floor)`** — instead of a hint underneath
-  that read as advice rather than as the limit the input enforces.
-- `Items needing stair carry` carries a number, never a blank.
-
-**⭐ AN UNSET STAIR-CARRY COUNT CHARGES NOTHING — OWNER RULING 2026-08-27 (YH), A PRICING DECISION.**
-It used to mean EVERY item: an order where nobody was asked how many pieces needed carrying was
-charged the maximum stair fee. It now means NONE — somebody says how many before the customer is
-charged. Applied in `order-totals.ts` (`floorSurcharge` + `draftTotals`), the POS panel and the
-object page **together**, so a quote and an order can never disagree about the money.
-🟡 Any order whose count was never set now computes RM 0 stair carry where it previously computed a
-full one. That is the ruling, not a side effect.
-⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
-may not be edited (red line 6) — **this section is the current meaning.**
-
-**⭐⭐ STAIR CARRY IS MONEY THE CUSTOMER OWES — OWNER RULING (YH, 2026-08-28). APPROVED / LOCKED.**
-*"If stair carry requires money for it, it should be included — whether it's paid on the carry day
-or before, it still needs to be paid."*
-
-So the fee is **revenue on this sales order**, not a delivery-day cash arrangement. It belongs in
-the order's total, in what the customer owes, and in what every payment door will accept. **The
-timing of payment does not change whether it is owed.**
-
-⛔ **This settles a three-way contradiction the repo has carried since 0184.** Three files each
-state a different answer, and each is locally coherent:
-| File | Claims |
-|---|---|
-| `apps/api/src/lib/delivery-fee-recompute.ts:38-39` | stair *"folds into the order total"* — revenue |
-| `apps/api/src/routes/orders.ts:258-261` | *"a delivery-time concern, not a sales metric"* — excluded |
-| `apps/api/src/routes/stripe-checkout.ts:115-116` | *"a client-side display extra"* — not a charge at all |
-**The first is now the ruling.** The other two describe an implementation that must change; their
-comments are corrected in the same PR that changes them, never left to contradict this section.
-
-**MEASURED STATE THIS RULING OVERTURNS** (Sales Order Workspace field audit, 2026-08-28, §2 F-2):
-the fee is computed in the browser on every render from three stored inputs plus a globally
-mutable rate, and is **written down nowhere**. The customer signs a POS screen that itemises it
-twice and folds it into the headline total (`Step3SignaturePayment.tsx:271-278, :314, :123`) under
-a T&C clause promising it is *"billed on this sales order"* (`:655-657`) — while the order's own
-total is lines + addons only (`order-money.ts:100`). Every payment door caps against that lower
-figure: Stripe returns 422 `amount_exceeds_outstanding` **before Stripe is called**
-(`stripe-checkout.ts:158-168`) and `top_up_order` refuses cash identically (`0351:245-249`).
-At seeded rates a 5-item floor-3 order signs at RM 9,600 against a record that can only ever
-describe RM 9,450. **No door in the portal can collect the difference.**
-
-**THE SHAPE OF THE FIX — the pattern already exists and is not to be invented.**
-`delivery-fee-recompute.ts` computes the delivery TRIP fee server-side and appends `order_addons`
-rows (`DELIVERY` · `DELIVERY_CROSS` · `DELIVERY_ADD`, seeded `0184:112-116`). Stair carry follows
-the same road: ① seed a stair key into `addons` — the set is **not** closed, `POST /api/catalog/addons`
-(`catalog.ts:1854-1880`, gate `internalOnly`) creates one and the door is on screen at
-**Settings → Catalog → Special Add-ons**; ② have the server recompute write the per-order figure
-into `order_addons.qty` / `unit_price`, exactly as the delivery-fee rows do, since `addons.price`
-is a fixed per-key price and stair carry is computed. The total, the outstanding and every payment
-cap then include it with no further change, because they already read `order_addons`.
-⚠️ The fee must be **stamped at the order**, not re-derived: today changing
-`floor_config.per_floor_per_item` in Settings silently reprices every historic order's displayed
-stair carry. A charge the customer signed for may not move because a rate changed afterwards.
-🟡 Sequencing is the owner's, not the code's: this changes what existing orders are worth. Under
-`CLAUDE.md` §6 every row today is test data, so **no backfill is proposed** — the ruling binds new
-orders from the day it ships.
-- **`Address not given yet` appears only while there is no address**, or while it is already
-  ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
-  hazard, not a field.
-- The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
-
-**Commercial change entry — owner-approved 2026-09-22, BUILT 2026-09-23 (migration 0564).**
-Whole-page `Edit` contains the commercial draft and preserves items, configuration, unit price,
-services, dates and Instalment months. The server selects `Save` or `Submit amendment request` from
-actual changes and permissions. Do not retain a competing proposal modal as the only way to edit
-those fields. A live request remains visible; submission never changes the effective SO or its
-official document.
-
-**WHAT SHIPPED, AND WHERE THE RULE LIVES.**
-- `packages/shared/src/sales-order-change.ts` — `classifySalesOrderChange`, ONE rule read twice:
-  the page labels its single commit button with it and `POST /api/operation/orders/:id/changes`
-  decides with it against the STORED order. A mixed change goes to review whole.
-- `Save` covers the permitted correction (contact, address, demographics, billing, entry fields,
-  delivery access before Proceed, a proceed date that was never recorded). Everything else —
-  items, configuration, quantity, price, services, the promised date, a RECORDED proceed date,
-  delivery access after Proceed, Instalment months — is `Submit amendment request`.
-- Approval applies the WHOLE proposal in one transaction: header keys, lines with their
-  configuration (`attrs`), services (`order_addons`) and the plan, as one complete new revision.
-- `sales_order_save_revision` exempts the proceed lock for the approved amendment lane only; a
-  direct save still cannot move a recorded proceed date.
-- Each proposed header value carries the value it was computed from (`base_header`); if any has
-  moved, approval refuses as `amendment_stale` rather than overwriting it silently.
-- `sales_order_withdraw_amendment` closes a live request; `Propose this version again` withdraws
-  an out-of-date one and reopens the draft on the current order.
-
-**NOT BUILT, and named rather than implied:**
-- Sales Location · Salesperson · Dealer keep their existing governed attribution lane (0329);
-  they are not part of the whole-page draft yet.
-- A line that a supplier thread holds still refuses removal here (`line_in_production`); the
-  approved "approval hands the commitment to Purchasing" needs Purchasing's own settlement path.
-- Configuration editing covers size (a sibling catalogue SKU, price re-derived from the catalogue
-  plus the recorded surcharges) and the mattress gap; fabric, specials, legs and divan heights are
-  shown and preserved but not yet editable here.
-- `Fulfilment replacement` is still not a recordable cause; an applied amendment writes
-  `customer_change`.
-
-
-Sales may directly correct only its governed safe/customer facts. A commercial commitment change
-uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
-
-## Order Route — one connected drawing
-
-The map has one Sales Order root and three concurrent primary routes. Loan and Service are
-conditional linked obligations, never permanent empty lanes and never fake overall status.
-
-```
-                         SALES ORDER
-                              |
-             +----------------+----------------+
-             |                |                |
-           GOODS           DELIVERY          MONEY
-             |                |                |
-    available / missing    Journey facts    collection facts
-             |                |                |
-             +------ governed Delivery gates -+
-                              |
-                        Delivery Order(s)
-                              |
-                    Deliver → Delivery Proof
-```
-
-It remains one pannable/zoomable canvas, never separate route cards. It must not make the map
-unreadable merely to fit every node at once. Normal load keeps the governed readability floor and
-centres the current work; explicit Fit shows the whole map. A medium desktop keeps the same map,
-with pan/zoom and collapsed item groups rather than a stacked alternate truth.
+Guarded by `SalesOrderWorkspace.historical-document.test.ts`, whose control was run red against
+the old borrowing behaviour before the fix was kept.
 
 ### Many goods use groups, not one endless horizontal row
 

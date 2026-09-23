@@ -69,7 +69,7 @@ const REV2_SNAPSHOT = {
 } as any;
 
 describe("a historical Sales Order version's document", () => {
-  it("prints UNSIGNED even when the live order carries a signature", () => {
+  it("does not reproduce a signature it cannot attribute — which is NOT a claim of unsigned", () => {
     const doc = snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE);
     expect(doc.signed).toBe(false);
     expect(doc.signature_url).toBeNull();
@@ -77,7 +77,7 @@ describe("a historical Sales Order version's document", () => {
 
   /* The leak had a shape: the SAME url on every version. This asserts the url
      cannot travel, not merely that one field is false. */
-  it("never carries the live order's signature url onto any revision", () => {
+  it("never carries the live order's signature url onto any revision, and never alters the live one", () => {
     const rev1 = snapshotTemplateData({ ...REV2_SNAPSHOT, lines: [] }, SIGNED_BASE);
     const rev2 = snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE);
     for (const doc of [rev1, rev2]) {
@@ -89,6 +89,16 @@ describe("a historical Sales Order version's document", () => {
   /* THE PHOTOGRAPH IS STILL THE PHOTOGRAPH. Removing the signature must not
      quietly remove the version's own truth — the goods, the money they add up
      to and the promised date all come from the snapshot, not from today. */
+  it("leaves the CURRENT document's signature evidence exactly as it was", () => {
+    /* Preserving the evidence is half the ruling. Building a historical view
+       must not strip, blank or rewrite what the order itself carries. */
+    const before = JSON.stringify(SIGNED_BASE);
+    snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE, undefined, { date: "2026-08-10" });
+    expect(JSON.stringify(SIGNED_BASE)).toBe(before);
+    expect(SIGNED_BASE.signed).toBe(true);
+    expect(SIGNED_BASE.signature_url).toBeTruthy();
+  });
+
   it("still prints THAT version's goods, total and promised date", () => {
     const doc = snapshotTemplateData(REV2_SNAPSHOT, SIGNED_BASE);
     expect(doc.lines).toHaveLength(1);
