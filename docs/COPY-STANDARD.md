@@ -978,7 +978,7 @@ do not create a second business status, work queue or source of truth.
 | Level | Exact visible words |
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
-| BUY pages | `SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` |
+| BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase` — titles/buttons follow in the build) · `Purchase Orders` |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |

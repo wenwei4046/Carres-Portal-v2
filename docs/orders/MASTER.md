@@ -142,25 +142,53 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-| Document | Outright — 4 random digits | Subscription — `S` in front |
-|---|---|---|
-| Order | `SO2609-4827(1)` | `SUB2609-48271(1)` (5 digits; `SSO` is not used) |
-| Delivery document | `DO2609-4827` | `SDO2609-48271` (5) |
-| Invoice / monthly bill | `INV2609-4827` | `SINV2609-482917` (6 — one bill per subscriber per month) |
-| Receipt | `RC2609-4827` | `SRC2609-482917` (6) |
-| Credit note | `CN2609-4827` | `SCN2609-48271` (5) |
-| Customer service case | `CS2609-4827` | `SCS2609-48271` (5) |
-| Loan note | `LN2609-4827` | — (no loan in Subscription) |
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Prefixes are APPROVED for
+every row. A full example is the approved format; `…` means date pattern and digit length are NOT yet
+decided for that row. Nothing here is built.
 
-**Shared by both businesses (not split):** PO `PO260924-4827(1)` (Purchasing MASTER §6.1) · Unit ID
-`U1-000-001` · every internal document (GRN, MPR, TR, RO, DR, CO, CRTN, CSN, PRTN, supplier bill SB,
-PV, ARI, RV, SMB, MM, JE/MJ) keeps its current family format. Supplier Claim changes prefix `SC` →
-**`CLM`** (Claim) so no internal prefix reads like a Subscription `S…` document. Staff rule: **only
-`SUB`, `SDO`, `SINV`, `SRC`, `SCN`, `SCS` mean Subscription** — "starts with S" alone does not
-(`SO`, `SB` are not Subscription). YYMM = month the document is first issued. Invoice / receipt /
-credit-note formats are checked by the accountant before first use (e-Invoice), without changing the
-split. **Measured defect to fix with this:** today's Service Case number `SC`+YYMM+`lpad(seq,2)`
-(`0210:126`) truncates at the 100th case of a month.
+| Document | Outright | Subscription |
+|---|---|---|
+| Sales Order / Subscription Agreement | `SO2609-4827(1)` | `SUB2609-48271(1)` |
+| Delivery Order | `DO2609-4827` | `SDO2609-48271` |
+| Manual Purchase Request | `MPR…` | `SMPR…` |
+| Purchase Order | `PO260924-4827(1)` | `SPO260924-4827(1)` |
+| Goods Receipt Note | `GRN260924-4827` | `SGRN260924-4827` |
+| Customer Invoice / Monthly Subscription Bill | `INV2609-4827` | `SINV2609-482917` |
+| Customer Receipt | `RC2609-4827` | `SRC2609-482917` |
+| Credit Note | `CN2609-4827` | `SCN2609-48271` |
+| Customer Service Case | `CS2609-4827` | `SCS2609-48271` |
+| Loan Note | `LN2609-4827` | `SLN2609-48271` |
+| Stock Transfer | `TR…` | `STR…` |
+| Supplier Claim | `CLM…` | `SCLM…` |
+| Purchase Return | `PR…` | `SPR…` |
+| Repair Order | `RO…` | `SRO…` |
+| Display Request | `DR…` | `SDR…` |
+| Consignment Order | `CO…` | `SCO…` |
+| Consignment Return | `CRTN…` | `SCRTN…` |
+| Consignment Sale Notice | `CSN…` | `SCSN…` |
+| Supplier Bill | `SB…` | `SSB…` |
+| Payment Voucher | `PV…` | `SPV…` |
+| Other Receivable Invoice | `ARI…` | `SARI…` |
+| Other Receipt Voucher | `RV…` | `SRV…` |
+| Supplier Money Back | `SMB…` | `SSMB…` |
+| Internal Money Movement | `MM…` | `SMM…` |
+| Journal Entry | `JE…` | `SJE…` |
+| Manual Journal | `MJ…` | `SMJ…` |
+| Physical Unit ID | `U1-000-001` | shared with Outright — no `S` prefix |
+
+- **MPR** = Manual Purchase Request; the screen name becomes **`Manual Purchase Request`** (owner,
+  2026-09-23). **SMPR** = Subscription Manual Purchase Request. **MP** stays Mattress Protector;
+  **PR** stays Purchase Return.
+- Subscription documents add **`S`** before the Outright prefix; the order/agreement exception is
+  **`SUB`**. Note: Outright `SB` and `SMB` also begin with `S`, so staff read the whole prefix, not
+  the first letter.
+- A credit note adjusts the amount owed; it does not prove cash was refunded.
+- Financial numbering needs accounting and e-Invoice validation before live use. Cross-business
+  transfers and company-wide transactions still need a clear ownership rule before their prefixes are
+  finalised. **Open:** one PO/GRN/finance document now belongs to one business, so a supplier
+  delivering for both businesses receives separate documents.
+- **Measured defect to fix with this:** today's Service Case number `SC`+YYMM+`lpad(seq,2)`
+  (`0210:126`) truncates at the 100th case of a month; Supplier Claim today also uses `SC-` (`0288:70`).
 
 - Leading zeros allowed: Outright holds **10,000** numbers a month per 4-digit series; Subscription
   **100,000** per 5-digit and **1,000,000** per 6-digit series (Subscription is expected to be the high-volume business; owner benchmark
@@ -187,13 +215,11 @@ conceal a running counter, not every inference from transaction activity, and ar
 authorization secrets. Reconcile §9's message-reference rules before cutover; an order display code
 does not authorize sending order numbers to suppliers.
 
-**Scope boundary.** This approval covers the Outright/Subscription order numbers, their delivery-document
-prefixes and the revision presentation (DO detail: `docs/delivery/MASTER.md` §3.1; PO `PO260924-4827(1)`: `docs/purchasing/MASTER.md` §6.1). GRN,
-Service Case, INV/RC (accountant first) require their own capacity and
-governing-business-rule review. It does not approve revision, rescheduling, voiding or correction
-workflows of other documents. This is approved target truth, not shipped behavior, whole-blueprint
-approval or authorization for application code, production writes, migration or cutover in this
-PLAN lane.
+**Scope boundary.** This covers document prefixes and the formats shown in full above (DO detail:
+`docs/delivery/MASTER.md` §3.1; PO: `docs/purchasing/MASTER.md` §6.1). Rows marked `…` still need
+their date pattern and digit length. It does not approve revision, rescheduling, voiding or correction
+workflows of other documents, and is not authorization for application code, production writes,
+migration or cutover in this PLAN lane.
 
 ## One purpose and one navigation home
 

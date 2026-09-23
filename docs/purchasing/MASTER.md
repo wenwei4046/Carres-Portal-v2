@@ -631,9 +631,9 @@ permanent and are NOT renumbered.**
 | Prefix | Document |
 |---|---|
 | `PO` | Purchase Order |
-| `MPR` | Manual Purchase Request |
+| `MPR` / `SMPR` | Manual Purchase Request — Outright / Subscription (screen name `Manual Purchase Request`, owner 2026-09-23) |
 | `GRN` | Goods Receipt |
-| `CLM` | Supplier Claim (was `SC`; owner ruling 2026-09-23 — `S…` prefixes read as Subscription) |
+| `CLM` | Supplier Claim (was `SC`; owner 2026-09-23). Every prefix has an `S…` Subscription twin — table: Orders MASTER *order numbers by business* |
 | `PRTN` | Purchase Return |
 | `RO` | Repair Order |
 | `DR` | Display Request |
