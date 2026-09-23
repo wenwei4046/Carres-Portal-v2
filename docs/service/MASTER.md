@@ -13,6 +13,14 @@
 
 ---
 
+**Numbering — APPROVED TARGET / NOT BUILT, owner 2026-09-23.** New Outright cases use
+`CSYYMM-NNNN`; Subscription cases use `SCSYYMM-NNNNN`. Use original creation month plus fixed
+random decimal digits including leading zeros, independent pools of 10,000 and 100,000 per month.
+Monitor capacity, enforce uniqueness and preserve historical SC references. Supplier Claims use
+different approved prefixes CLM/SCLM; their approved format is `CLMYYMMDD-NNNN` / `SCLMYYMMDD-NNNN`. Existing SC code
+and examples below are implementation/history, not target numbering. Governing complete table
+and remaining limitations: Orders MASTER, External numbering privacy. No live cutover authorized.
+
 # §1 · Overview
 
 ### MISSION

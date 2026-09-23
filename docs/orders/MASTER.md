@@ -120,6 +120,107 @@ This is the current owner-approved Sales Order operating model and UI authority.
 older Sales Order placement, route-copy and action-presentation wording wherever they conflict.
 The implementation record that follows is evidence, not a competing target.
 
+## External numbering privacy — owner requirements 2026-09-23
+
+**RULING / APPROVED REQUIREMENTS; SO format approved below, implementation not authorized in this PLAN lane.** Jess requires
+customers and other outside parties not to infer Carres' order count from document numbers, and
+requires the shortest practical readable numbers. A sequential external SO reference is therefore
+not an acceptable future recommendation merely because its integer capacity is sufficient.
+Check the whole outward document/reference surface, not only the SO heading. This requirement
+does not authorize changing existing numbers, issued documents, database sequences, permissions,
+application code, or another module's identity rules. Existing implementation remains evidence,
+not proof that the privacy requirement is satisfied.
+
+**RULING / APPROVED — revision presentation, 2026-09-23.** Display the revision as a
+parenthesized number attached to the base reference with NO space (owner re-ruling 2026-09-23): `<reference>(1)` for
+the original, `(2)` for the second version, and so on. Do not use `Rev`, `V`, or a hyphen suffix
+for this presentation. The parenthesized revision is not part of the permanent order number;
+amendment preserves that number. Search by the base reference must make its versions available
+without requiring the parentheses. This is approved target presentation, not a claim of shipped
+behavior. Historical issued PDFs remain preserved.
+
+**RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
+the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
+
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row is APPROVED
+TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
+four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
+own independent daily pool of 10,000. Previously explicit formats are unchanged.
+
+| Document | Outright | Subscription |
+|---|---|---|
+| Sales Order / Subscription Agreement | `SO2609-4827(1)` | `SUB2609-48271(1)` |
+| Delivery Order | `DO2609-4827` | `SDO2609-48271` |
+| Manual Purchase Request | `MPR260924-4827` | `SMPR260924-4827` |
+| Purchase Order | `PO260924-4827(1)` | `SPO260924-4827(1)` |
+| Goods Receipt Note | `GRN260924-4827` | `SGRN260924-4827` |
+| Customer Invoice / Monthly Subscription Bill | `INV2609-4827` | `SINV2609-482917` |
+| Customer Receipt | `RC2609-4827` | `SRC2609-482917` |
+| Credit Note | `CN2609-4827` | `SCN2609-48271` |
+| Customer Service Case | `CS2609-4827` | `SCS2609-48271` |
+| Loan Note | `LN2609-4827` | `SLN2609-48271` |
+| Stock Transfer | `TR260924-4827` | `STR260924-4827` |
+| Supplier Claim | `CLM260924-4827` | `SCLM260924-4827` |
+| Purchase Return | `PR260924-4827` | `SPR260924-4827` |
+| Repair Order | `RO260924-4827` | `SRO260924-4827` |
+| Display Request | `DR260924-4827` | `SDR260924-4827` |
+| Consignment Order | `CO260924-4827` | `SCO260924-4827` |
+| Consignment Return | `CRTN260924-4827` | `SCRTN260924-4827` |
+| Consignment Sale Notice | `CSN260924-4827` | `SCSN260924-4827` |
+| Supplier Bill | `SB260924-4827` | `SSB260924-4827` |
+| Payment Voucher | `PV260924-4827` | `SPV260924-4827` |
+| Other Receivable Invoice | `ARI260924-4827` | `SARI260924-4827` |
+| Other Receipt Voucher | `RV260924-4827` | `SRV260924-4827` |
+| Supplier Money Back | `SMB260924-4827` | `SSMB260924-4827` |
+| Internal Money Movement | `MM260924-4827` | `SMM260924-4827` |
+| Journal Entry | `JE260924-4827` | `SJE260924-4827` |
+| Manual Journal | `MJ260924-4827` | `SMJ260924-4827` |
+| Physical Unit ID | `U1-000-001` | shared with Outright — no `S` prefix |
+
+- **MPR** = Manual Purchase Request; the screen name becomes **`Manual Purchase Request`** (owner,
+  2026-09-23). **SMPR** = Subscription Manual Purchase Request. **MP** stays Mattress Protector;
+  **PR** stays Purchase Return.
+- Subscription documents add **`S`** before the Outright prefix; the order/agreement exception is
+  **`SUB`**. Note: Outright `SB` and `SMB` also begin with `S`, so staff read the whole prefix, not
+  the first letter.
+- A credit note adjusts the amount owed; it does not prove cash was refunded.
+- Financial numbering needs accounting and e-Invoice validation before live use. Cross-business
+  transfers and company-wide transactions still need a clear ownership rule before their prefixes are
+  finalised. **Approved target, may be phased:** one PO/GRN/finance document belongs to one business, so a supplier
+  delivering for both businesses receives separate documents.
+- **Measured defect to fix with this:** today's Service Case number `SC`+YYMM+`lpad(seq,2)`
+  (`0210:126`) truncates at the 100th case of a month; Supplier Claim today also uses `SC-` (`0288:70`).
+
+- Leading zeros allowed: Outright holds **10,000** numbers a month per 4-digit series; Subscription
+  **100,000** per 5-digit and **1,000,000** per 6-digit series (Subscription is expected to be the high-volume business; owner benchmark
+  Coway ≈ 5,000–8,000 orders/month, Cuckoo ≈ 1,000/month — her figures, not measured).
+- `SUB` is the one customer-facing number of a Subscription; it replaces the `RA-` agreement
+  number (`RA-` rows are test data). A Subscription customer is never handed a second `SO` number.
+- **Width is fixed.** The system never changes the number of digits. Capacity is watched internally
+  only; any widening is an explicit owner decision, never automatic.
+- Every series draws independently and guarantees uniqueness with collision retry; repeated
+  submission identifies the same business request; void numbers are never reused.
+- Amendment never changes the base number or its original year/month, including amendments made
+  in a later month. The encoded month is the creation month — not delivery, receipt,
+  warranty-start or amendment month; use the actual governed dates for those purposes.
+- **Unit ID stays ONE shared series for both businesses** — one physical item has one identity.
+  **Owner ruling 2026-09-23: keep `U1-000-001` and its sequential allocation** (Purchasing MASTER
+  §6.2). Accepted trade-off: a sequential Unit ID can reveal the scale of Unit allocation (not
+  order volume, sales or current stock). Revisit only with a proven scan-first workflow; a random
+  start with consecutive blocks per PO was considered and rejected (range fragmentation,
+  non-PO sources, and a range never replaces checking the physical pieces).
+
+**Acceptance boundary / limitations.** Capacity is finite and must be monitored before exhaustion;
+the monthly limits are not a verified forecast or an unlimited guarantee. Fixed random references
+conceal a running counter, not every inference from transaction activity, and are never
+authorization secrets. Reconcile §9's message-reference rules before cutover; an order display code
+does not authorize sending order numbers to suppliers.
+
+**Scope boundary.** This covers document prefixes and the formats shown in full above (DO detail:
+`docs/delivery/MASTER.md` §3.1; PO: `docs/purchasing/MASTER.md` §6.1). Every other row uses original document date YYMMDD + four random digits. It does not approve revision, rescheduling, voiding or correction
+workflows of other documents, and is not authorization for application code, production writes,
+migration or cutover in this PLAN lane.
+
 ## One purpose and one navigation home
 
 Sales Orders is the truth/register home of the customer order. It lets an authorised employee find
@@ -704,7 +805,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
    Worked sample (SO-1319): Mattress 2 · Accessory 1; Delivery fee + Stair carry; goods RM3,780.00 +
    services RM350.00 = Total payable RM4,130.00; Paid to date RM1,999.50 (voided RM1,200 excluded);
    Balance due RM2,130.50. This presentation change does not change the money or separate SST rules.
-5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · Rev {n}` is a
+5. **Revisions keep the complete old version.** `{item} · Qty {n} · Cancelled · ({n})` is a
    cancellation mark on the new version, never a substitute for the full old document and its record.
 
 **Refined 2026-09-22 (owner approval of the reviewed plan):**
@@ -716,7 +817,7 @@ impact → Save or Submit amendment request → approval takes effect → each o
 - **Services follow their own pricing contract:** per-trip charges show qty 1; per-piece charges keep
   their real quantity.
 - **Draft line words (owner-approved):** `Remove` / `Restore` before commit (a line is struck and stays
-  visible); after approval the line reads `Cancelled · Rev {n}`. `Cancel item` is rejected — it collides
+  visible); after approval the line reads `Cancelled · ({n})`. `Cancel item` is rejected — it collides
   with the edit-mode `Cancel` and `Cancel SO`.
 - **Before submitting** the reason (required) and a `Before` / `After` review show the category quantities and changed service quantities, the
   amount change and each affected object with its owner: purchase demand, an issued PO or promised
@@ -1147,9 +1248,9 @@ read only as implementation history.
   cancelled. A placed PO does not force cancel/reorder; it changes a simple edit into a governed
   Amendment with explicit downstream impact handling. `Staff correction`, `Customer change` and
   `Fulfilment replacement` are different causes and may not be collapsed.
-- Rev 1 is permanently the original SO. A pending or rejected amendment is not a Revision. Every
-  approved, applied amendment creates Rev 2/3/4… and preserves the complete historical version and
-  its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
+- Version `(1)` is permanently the original SO. A pending or rejected amendment is not a Revision.
+  Every approved, applied amendment creates `(2)`/`(3)`/`(4)`… on the same SO number and preserves
+  the complete historical version and its PDF/document truth. **Revisions are complete versions; History is an event ledger. They are
   separate views and concepts.**
 - Amendment impact is computed before approval across supplier/PO commitments, Unit/warehouse
   allocation, Receiving, payment/commercial difference, delivery commitment, Work, permissions and
@@ -1252,7 +1353,7 @@ invents one.
 
 ```
 NOT READY FOR DELIVERY · {k} of {n} requirements met
-DO-DDMMYY-NNNN · Delivery order issued
+DO2609-4827 · Delivery order issued
 ```
 
 Requirements are plain sentences, GitHub-checks style, with the met count:
@@ -1325,7 +1426,7 @@ The status word is the owning module's own translation — no internal enum reac
 | Split quantity | one fork per Purchase Order, each in its own column |
 | Partial receiving | `1 of 2 received`, and RECEIVING holds the goods CURRENT |
 | Service lines | no goods fork; a linked case appears on the strip only |
-| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · Rev {n}`, **no chain and no gate edge** |
+| Cancelled line | one node, `{item} · Qty {n}` + `Cancelled · ({n})`, **no chain and no gate edge** |
 | Amended line | the map always reflects the CURRENT effective Revision |
 | Delivered | DELIVER complete with its date; DELIVERY PHOTO becomes the open step |
 
@@ -5181,9 +5282,9 @@ card §3/§7 — this OVERWRITES the four-condition `Issue delivery order` actio
 The SYSTEM issues the document at whichever door completes the gate — booking confirm · stock
 reserve · Finance-exception clear · payment-approval approve — under §8's requirements. **No
 Issue, Release or Approve button exists anywhere, and no worklist raises it as work.** The
-number stays the locked `DO-DDMMYY-NNNN` scheme seeded on the order id (a same-day re-issue for
-a superseded trip takes the scheme's repeat letter, `-B`), so a reprint always matches the
-signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
+number follows the 2026-09-23 ruling (`DO2609-4827` Outright / `SDO2609-48271` Subscription,
+random, unique across all orders — `docs/delivery/MASTER.md` §3.1); the stored number is reprinted,
+so a reprint always matches the signed original. A REBOOKED trip is a NEW document (card §6): an un-run document is voided
 `rescheduled` by the system; a failed one keeps its Delivery exception forever and simply stops
 being the active number; a delivered one is untouched history.
 

@@ -978,7 +978,7 @@ do not create a second business status, work queue or source of truth.
 | Level | Exact visible words |
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
-| BUY pages | `SO Batch Purchase` · `Manual Purchase` · `Purchase Orders` |
+| BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase` — titles/buttons follow in the build) · `Purchase Orders` |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
@@ -1042,11 +1042,11 @@ Supplier Deliver To · PO Delivery Date · Supplier Confirmed Delivery Date · G
 | `Not confirmed by supplier` · `Confirmed by supplier` | RETIRED on this listing with the merged `Expected Delivery Date` cell they explained |
 | A receipt record that carries no arrival clock | `Time not recorded`, under the date |
 | Unknown original date | `Not recorded` |
-| Current version | `PO V{n}` |
+| Current version | `{PO No}({n})` |
 | Current version sending evidence, supporting line | `PO sent to supplier · {channel} · {date}` / `Sending not confirmed` |
 | Multiple SO / GRN references | `{n} SOs` · `{n} GRNs` |
 | Multiple physical receipts | `{n} receipt dates` |
-| Manual source in `SO No / MPR No` | the request's stored `MPR-YYYYMMDD-RRRR`; `Manual Purchase` ONLY where no number is stored (owner ruling 2026-09-18, overwriting the 2026-09-04 MPR retirement). Never a UUID, never a minted number |
+| Manual source in `SO No / MPR No` | the request's stored `MPRYYMMDD-NNNN`; `Manual Purchase` ONLY where no number is stored (owner ruling 2026-09-18, overwriting the 2026-09-04 MPR retirement). Never a UUID, never a minted number |
 | Exact-unit PO line with no Unit IDs | `Unit IDs missing on this line — do not send this PO` |
 | Quantity-managed PO line's Unit ID cell | `—` |
 | The Unit ID read has not answered / failed | `Reading Unit IDs…` · `Unit IDs could not be read` — "we have not looked" is not "they are missing" |
@@ -1176,7 +1176,7 @@ with an absence word that implies one is owed.
 recorded before the evidence law reads `Supplier reply recorded without evidence · {date}`; it never
 claims the governed `Supplier Confirmed Delivery Date` and never reads as `Not confirmed`, because a recorded
 answer is not a proven absence. The object's `Reply history` lists every reply by version —
-`PO V{n} · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
+`{PO No}({n}) · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
 `Delayed — {reason}` · `Date reported` — with its `Reply evidence` link where evidence exists.
 A demand an open purchase order already fully covers refuses issue with
 `An open purchase order ({PO No}) already covers this line.` /
@@ -1188,7 +1188,7 @@ Keep the label `Issue PO`; no second recovery click is needed. If that read fail
 use `Could not open {PO No}.` / `Try again.`; the same button retries opening that PO.
 
 **Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
-actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
+actually received as `Sent document · {PO No}({n})` · `Recorded at the confirmed send`, with
 `Download PDF`. A version sent before document keeping began answers
 `No kept document for this PO version` — a named absence, never a reconstruction.
 
@@ -1291,7 +1291,7 @@ These stock-picker words do not rename every Warehouse screen.
 | Stock picker actions | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel`. No per-Unit Undo; save writes, checkbox alone does not. |
 | Stock picker feedback | `{n} selected` · `Not saved` · `Stock selection saved.` · `Choose up to {n} Units for {SO No}.` · `{n} of {N} reserved for {SO No}.` · `Save or cancel your stock selection before issuing a PO.` · `Choose no more than {n} Units.` |
 | The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
-| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
+| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in full in the ruled form `PO260924-4827` (owner 2026-09-23: YYMMDD, no hyphen after the prefix — overwrites the four-digit-year `PO-20260904-4665` form). **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
 | `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Waiting for goods from supplier`** · **`Sending not confirmed`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
 | A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
 | HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
@@ -1322,7 +1322,7 @@ These stock-picker words do not rename every Warehouse screen.
 | The states | `Waiting for approval` · `Sent back for changes` · `Withdrawn` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
 | The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
 | Retired purpose words — history only, never offered, never relabelled | `Display` · `Warranty` · `Office` · `Spare Parts` — a pre-ruling row keeps printing the word it was actually asked as; the doors refuse these values for a new request |
-| The document identity — owner ruling 2026-09-18 (overwrites Card 08, 2026-09-04) | Each Manual Purchase request shows its `MPR No` (`MPR-YYYYMMDD-RRRR`); the supplier still receives only the PO. `Manual Purchase No`, `Request No`, `Draft PO` and `MP` stay banned. Historical `MPR-…` numbers show as they are; `REQ-…` stays searchable. |
+| The document identity — owner ruling 2026-09-18 (overwrites Card 08, 2026-09-04) | Each Manual Purchase request shows its `MPR No` (`MPRYYMMDD-NNNN`); the supplier still receives only the PO. `Manual Purchase No`, `Request No`, `Draft PO` and `MP` stay banned. Historical `MPR-…` numbers show as they are; `REQ-…` stays searchable. |
 | Manual PO grouping | `Issue {p} PO(s)` counts Supplier × Category × Deliver To × Purpose × Delivery Date. Different Delivery Dates create different POs; each PO keeps that approved `PO Delivery Date`. |
 | The register's empty state | `No Manual Purchase yet.` |
 | The Object Detail sections — Card 05 (2026-08-29), exactly and in this order | `Request` · `Items Requested` · `What We Already Have` · `Approval` · `Purchase Orders` · `History` — one full-width scroll; no tabs, no split preview |
@@ -1625,7 +1625,7 @@ entry, and both were live on Carres screens for months with none.
 |---|---|---|
 | Add one more line to a form (SO object draft exception: see Sales Order amendment words) | **`Add line`** (rendered `+ Add line`) | Add line item · Add item · Add row · New line · Insert · `+` alone |
 | Take a line back out, before it is submitted | **`Remove`** | Delete · Remove line · Clear · Discard · `×` alone |
-| Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · Rev {n}`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
+| Put a removed line back, before it is submitted — the SO amendment draft (owner approval 2026-09-22) | **`Restore`** · after approval the line reads **`Cancelled · ({n})`** | Undo · Removed (as a state) · `Cancel item` (collides with the edit `Cancel` and `Cancel SO`) |
 
 **Loo chose from three candidates with their costs attached**, and the two he did not choose
 are recorded because each was already on a real screen and a later chat will find them:
@@ -2009,7 +2009,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Items` | Recorded goods summary; expansion preserves all items and their exact references. |
 | `SO No / MPR No` | PO combined-reference header (owner ruling 2026-09-18: no `CO No` — consignment marking is not a CO link; the header changes only by a deliberate Blueprint update); actual linked references only, not invented mandatory relationships. |
 | `SO No / MPR No / CO No / RO No` | GRN combined-reference header. PO No remains separate. Preserve multiple references and per-line attribution; do not select one arbitrary source. |
-| `MPR No` | Manual Purchase Request number `MPR-YYYYMMDD-RRRR` (owner ruling 2026-09-18): each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
+| `MPR No` | Manual Purchase Request number `MPRYYMMDD-NNNN` (owner ruling 2026-09-18): each Manual Purchase request has one; CO, RO and other documents keep their own numbers. `MPR` = Manual Purchase Request. Never `MP` (Mattress Protector SKU code) and never `Manual Purchase No.` |
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 | `Need PO` · `No PO needed` | SO Batch Purchase's `Status`: whether the record still needs a NEW purchase order, read from the same remaining demand that decides its group. It renames no group and no rail row, and it is never permission to buy — unknown coverage and every other blocker still refuse the tick and state their own reason. Not a progress badge: `Partial` and `Ordered` stay retired. |
 | `{n} available` · `{n} reserved` | The Ready Stock cell on an item row: free exact Units for those goods, then Units saved against THIS item line. `0` prints only for a SUCCESSFUL read that found neither; a read that is loading, failed or unverified says so in its own words and NEVER as a zero. |
@@ -2586,7 +2586,7 @@ what has not happened yet, in the plainest words available:
 | The photo is on file | **`Uploaded by {name}`** + **`Uploaded: {date}`** | Done · Complete |
 | A loan item is out | **`{n} {item} on loan to customer`** + **`Collect back on delivery day`** | On loan · Lent · Outstanding loan |
 | A loan is still out after delivery | **`Loan not collected back`** | Overdue loan · Not returned |
-| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · Rev {n}`** | Removed · Deleted · Void |
+| A line a Revision removed | **`{item} · Qty {n}`** + **`Cancelled · ({n})`** | Removed · Deleted · Void |
 
 **BANNED on this surface, as everywhere:** `No data` · `No results` · `Not available`. Every empty
 state answers three things — what is missing, why, and who does what next.
@@ -2645,7 +2645,7 @@ surface is how a dictionary splits.
 **APPROVED / LOCKED — owner approval 2026-09-22.** For the Sales Order object draft only,
 `Add item` is the approved catalogue action. This explicit surface exception replaces the generic
 `Add line` restriction here; other forms retain `Add line`. `Remove` / `Restore` describe draft
-operations; `Cancelled · Rev {n}` describes approved cancellation. A receiving-state word does not
+operations; `Cancelled · ({n})` describes approved cancellation. A receiving-state word does not
 automatically become a Sales Order state. These words are approved target copy, not build proof.
 
 | Meaning | Use exactly |
@@ -2752,7 +2752,7 @@ detail's work card and Order Route:
 | `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` |
 | `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
-| `PO V{n} has not been sent` | `Issue PO V{n} to {supplier}` |
+| `{PO No}({n}) has not been sent` | `Issue {PO No}({n}) to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their
@@ -3247,7 +3247,7 @@ vocabulary, and the two files may not disagree.
 | Who the customer calls | **`Salesperson`** | `Agent` — Houzs prints both for one person |
 | Who made the document | **`Issued by {name}`** (footer) | `Printed by` — a reprint would name a different person |
 | No payments on file | **`No payments recorded.`** | a vanished block |
-| The Sales Order totals (owner ruling 2026-09-21 · NOT BUILT) | **`Total excluding SST · SST 8% · Total payable · Paid to date · BALANCE DUE`** — the Sales Invoice's shape | `Tax —` (Carres IS SST-registered) · `Goods total` |
+| The Sales Order totals (owner ruling 2026-09-23 — Carres is NOT SST-registered) | **`Total payable · Paid to date · BALANCE DUE`** — no tax row | `Total excluding SST` · `SST 8%` · `Tax —` · `incl. SST` · `excl. SST` · `Goods total` |
 | Items table closing row | **`TOTAL PAYABLE`** — the same figure as `Total payable` | `GOODS TOTAL` (retired 2026-09-21) · `Subtotal` |
 | What the customer owes in all | **`Total payable`** | `Total` alone · `Grand total` |
 
@@ -3257,11 +3257,8 @@ is `salespersons.name`; `Issued by` is the `audit_log` actor for the creation
 so two sources. One field feeding both is the Houzs `Agent: Luis Teo /
 Salesperson: Luis Teo` defect.
 
-**`Tax —` is the one place a dash is LAW, not laziness.** It is a money row in a
-money card: the customer must read that the tax line exists and is nil. Verified
-2026-09-21: the POS computes no tax, `order-money.ts` carries no tax term, and
-migrations 0098/0229 insert `tax_amount = 0`. If Carres ever registers for SST,
-this row stops being a dash and the SENTENCE in the standard changes first.
+**No tax words on customer documents** (owner, 2026-09-23): Carres is not SST-registered, so no tax
+row, no dash for tax and no "tax included / excluded" claim appears.
 
 **Floor and lift are DELIVERY ORDER words, not Sales Order words** (owner,
 2026-09-21). A document states a charge only where it prints the fact behind it.

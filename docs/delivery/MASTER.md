@@ -173,9 +173,26 @@ leg's arrangement carries its partner and its agreed day and the order's money a
 gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
 order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
-- **Numbering** stays the locked `DO-DDMMYY-NNNN` scheme (`docNumber`, seeded on the order id):
-  a retry, refresh or reprint returns the SAME number; a rebooked trip is a NEW document on its
-  own issue date.
+- **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · APPROVED TARGET /
+  NOT BUILT.** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
+  issue **`SDO2609-48271`** (five, 100,000 a month): prefix + two-digit year + two-digit month of
+  **issue** + `-` + random digits (leading zeros allowed). The two businesses are
+  told apart by the prefix; the document model, gates and team are one. Fixed width — the system
+  never widens it. Drawn independently of the order number (a shared tail means nothing); the link
+  to the order/trip is the record link. **Unique across every order; never reused**; a voided DO
+  keeps its number forever. A retry, refresh or reprint returns the SAME stored number; a
+  rebooked or failed-then-redelivered trip is a NEW document with a NEW number (no `-B` letter).
+  Old `DO-DDMMYY-NNNN` numbers are test data (clean start). Order side: `docs/orders/MASTER.md`
+  → *order numbers by business*.
+- **🔴 P0 FACT, measured 2026-09-23 on origin/main `855c305c4` — must be gone before Outright go-live,
+  whatever the format.** Today `docNumber` seeds the tail on the ORDER id (`FNV mod 10⁴`), and the
+  collision check reads only the SAME order's numbers (`apps/api/src/lib/delivery-order-issue.ts:163-178`).
+  Two different orders can therefore produce the same `DO-DDMMYY-NNNN` on one day, and the
+  materialiser silently skips an existing number (`0356:120-122`): the second order wears the first
+  order's DO and has **no document row of its own**; the split-trip mint returns the other order's
+  row (`0542`). Because the tail is deterministic, retrying fails identically all day. Expected
+  frequency at 30 DOs/day ≈ 13 days a year. **Acceptance:** two orders issued the same day always
+  get different numbers and each owns its row; a conflicting number is REFUSED, never skipped.
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
   facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·

@@ -5,6 +5,28 @@
 
 ---
 
+**RULING / APPROVED TARGET / NOT BUILT — Subscription numbering, 2026-09-23.** New Subscription
+agreements use `SUBYYMM-NNNNN`, for example `SUB2609-48271(1)`. The base reference uses the
+original creation year/month and five fixed random decimal digits, including leading zeros.
+Show the version immediately after the base reference without a space: `(1)` for the original,
+`(2)` for the second approved version, etc. Amendment preserves the base reference and its
+original month; this display ruling adds no new amendment approval or eligibility workflow.
+Subscription procurement uses `SPOYYMMDD-NNNN`, independently numbered from Outright PO;
+a purchase order belongs to one business only (Purchasing MASTER §6.1).
+Subscription deliveries use `SDOYYMM-NNNNN`, governed by `docs/delivery/MASTER.md` §3.1.
+SUB and SDO each have an independent 100,000-reference monthly pool, with enforced uniqueness and
+no reuse of void references. Capacity alerts are internal; no automatic length increase or
+3,000-document threshold is approved. Preserve existing RA identities and issued documents.
+The subscription agreement remains separate from an Outright SO. Shared physical Units retain
+one identity across businesses. This ruling authorizes no production implementation or cutover.
+
+**Additional numbering — APPROVED TARGET, 2026-09-23:** Subscription invoice `SINVYYMM-NNNNNN`,
+receipt `SRCYYMM-NNNNNN`, credit note `SCNYYMM-NNNNN`, Service Case `SCSYYMM-NNNNN`, loan note
+`SLNYYMM-NNNNN` and goods receipt `SGRNYYMMDD-NNNN`. Other Subscription prefixes and remaining
+format/ownership gaps are governed by the complete approved table in Orders MASTER, External
+numbering privacy. Financial formats retain accounting/e-invoice validation before live use.
+Manual Purchase Request is the approved screen name; `SMPR260924-4827` (`SMPRYYMMDD-NNNN`, own daily 10,000 pool) is the approved format.
+
 # §1 · Overview
 
 ### MISSION
