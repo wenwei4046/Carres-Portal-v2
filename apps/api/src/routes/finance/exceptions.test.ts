@@ -288,6 +288,9 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
     clear_evidence: "Bank confirmed — ref 8821",
   };
 
+  /** What the database's allocator hands back (0575): `DO` + YYMM + 4 digits. */
+  const DRAWN_DO = "DO2609-4827";
+
   function adminTables(over?: { doNumber?: string | null }) {
     return {
       orders: issueOrdersMock(
@@ -330,7 +333,18 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     });
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    /* ⭐ 0575 · THE NUMBER IS DRAWN BY THE DATABASE, and this is the path with
+       NOBODY WATCHING: Finance clears the exception and the SYSTEM issues. So
+       the fake answers the allocator the way the real one does — if the draw
+       ever stops answering here, this test goes red rather than a background
+       issue silently minting nothing. */
+    const rpc = vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: null, error: null },
+      ),
+    );
     vi.mocked(adminClient).mockReturnValue({ from, rpc } as never);
     return { from, rpc };
   }
@@ -347,9 +361,7 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
     // The attempt ran as the system, wrote only into an empty column, and
     // stamped the LOCKED scheme's number.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((t.orders as any).update).toHaveBeenCalledWith({
-      do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/),
-    });
+    expect((t.orders as any).update).toHaveBeenCalledWith({ do_number: DRAWN_DO });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((t.orders as any).is).toHaveBeenCalledWith("do_number", null);
   });

@@ -47,14 +47,24 @@ function ordersMock(read: Result, afterUpdate: Result) {
   return b;
 }
 
-function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
+/** The database's one allocator (0575) answers `delivery_document_number_draw`
+ *  with the next number in `drawn`; every other RPC answers null. */
+function makeSb(tables: Record<string, ReturnType<typeof tableMock>>, drawn: string[] = [DO_NUMBER]) {
+  const queue = [...drawn];
   return {
     from: vi.fn((t: string) => {
       const b = tables[t];
       if (!b) throw new Error(`unmocked table ${t}`);
       return b;
     }),
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn(
+      (fn: string): Promise<{ data: unknown; error: unknown }> =>
+        Promise.resolve(
+          fn === "delivery_document_number_draw"
+            ? { data: queue.shift() ?? null, error: null }
+            : { data: null, error: null },
+        ),
+    ),
   };
 }
 
@@ -62,12 +72,8 @@ const ORDER_ID = "00000000-0000-0000-0000-00000000020a";
 const MATTRESS = "mattress:FirmCare-K";
 /** Monday 24 Aug 2026 — a working day, not on the Selangor calendar. */
 const CONFIRMED_DATE = "2026-08-24";
-const DO_NUMBER = docNumber({
-  prefix: "DO",
-  date: todayIsoMYT(),
-  seed: ORDER_ID,
-  digits: 4,
-});
+/** What the allocator hands back in these tests (owner form 2026-09-23). */
+const DO_NUMBER = "DO2609-4827";
 
 function tables(over?: {
   doNumber?: string | null;
@@ -145,29 +151,60 @@ const APPROVED_ROW = {
 };
 
 describe("attemptDeliveryOrderIssue — the one issuing path", () => {
-  it("a same-day re-issue steps to the repeat letter — a voided document keeps its number forever", async () => {
-    const t = tables({
-      existingDocuments: [DO_NUMBER],
-      afterUpdate: { data: { id: ORDER_ID, do_number: `${DO_NUMBER}-B` }, error: null },
-    });
-    const sb = makeSb(t);
-    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
-    expect(attempt.outcome).toBe("issued");
-    if (attempt.outcome === "issued") {
-      expect(attempt.doNumber).toBe(`${DO_NUMBER}-B`);
+  it("two different orders issued the same day never share a number — the P0 on 855c305c4", async () => {
+    // Find two order ids the OLD scheme (DO-DDMMYY + FNV(order id) mod 10^4)
+    // gave the same number today. The unfixed module issued both of them that
+    // same number; the allocator must hand each its own.
+    const oldNumber = (id: string) => docNumber({ prefix: "DO", date: todayIsoMYT(), seed: id, digits: 4 });
+    const seen = new Map<string, string>();
+    let pair: [string, string] | null = null;
+    for (let i = 0; i < 100000 && !pair; i++) {
+      const id = `00000000-0000-4000-8000-${i.toString(16).padStart(12, "0")}`;
+      const n = oldNumber(id);
+      const other = seen.get(n);
+      if (other) pair = [other, id];
+      else seen.set(n, id);
     }
-    // the mint wrote the bumped number, not the taken base
-    expect(t.orders.update).toHaveBeenCalledWith({ do_number: `${DO_NUMBER}-B` });
+    expect(pair).not.toBeNull();
+    const [first, second] = pair!;
+    const issued: string[] = [];
+    for (const id of [first, second]) {
+      const t = tables();
+      t.orders = ordersMock(
+        { data: { id, so: 1234, paid: 2500, do_number: null }, error: null },
+        { data: { id, do_number: "(set below)" }, error: null },
+      );
+      const sb = makeSb(t, [id === first ? "DO2609-0001" : "DO2609-0002"]);
+      const attempt = await attemptDeliveryOrderIssue(sb, id);
+      expect(attempt.outcome).toBe("issued");
+      if (attempt.outcome === "issued") issued.push(attempt.doNumber);
+      expect(sb.rpc).toHaveBeenCalledWith("delivery_document_number_draw", { p_order_id: id });
+    }
+    expect(issued[0]).not.toBe(issued[1]);
   });
 
-  it("issues when every requirement is met — paid in full, with the LOCKED scheme", async () => {
+  it("a re-issue after a void is a NEW document with a NEW number — no repeat letter", async () => {
+    const t = tables({ existingDocuments: ["DO2609-1111"] });
+    const sb = makeSb(t, ["DO2609-2222"]);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt).toEqual({ outcome: "issued", doNumber: "DO2609-2222" });
+    expect(t.orders.update).toHaveBeenCalledWith({ do_number: "DO2609-2222" });
+  });
+
+  it("a failed draw issues nothing and reports the error — never a made-up number", async () => {
+    const t = tables();
+    const sb = makeSb(t, []);
+    const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
+    expect(attempt.outcome).toBe("error");
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("issues when every requirement is met — paid in full, with the number the allocator drew", async () => {
     const t = tables();
     const sb = makeSb(t);
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);
     expect(attempt).toEqual({ outcome: "issued", doNumber: DO_NUMBER });
-    expect(attempt.outcome === "issued" && attempt.doNumber).toMatch(
-      /^DO-\d{6}-\d{4}$/,
-    );
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_document_number_draw", { p_order_id: ORDER_ID });
     // Idempotent at the DATABASE: the mint writes only into an empty column.
     expect(t.orders.update).toHaveBeenCalledWith({ do_number: DO_NUMBER });
     expect(t.orders.is).toHaveBeenCalledWith("do_number", null);
@@ -331,7 +368,7 @@ describe("attemptLegDocumentIssue — a Journey leg's own document (0491)", () =
     { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", status: "pending" },
     { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", status: "pending" },
   ];
-  const LEG_DO = docNumber({ prefix: "DO", date: todayIsoMYT(), seed: `${ORDER_ID}#leg1`, digits: 4 });
+  const LEG_DO = "DO2609-0761";
   function legTables(over?: {
     stops?: unknown[] | null;
     arrangement?: Record<string, unknown> | null;
@@ -354,12 +391,18 @@ describe("attemptLegDocumentIssue — a Journey leg's own document (0491)", () =
     return t;
   }
 
-  it("issues the leg's document through the governed mint, numbered on the order AND the leg", async () => {
+  it("issues the leg's document through the governed mint, with a number the allocator drew", async () => {
     const sb = makeSb(legTables());
-    sb.rpc = vi.fn().mockResolvedValue({ data: { do_number: LEG_DO, leg: 1 }, error: null });
+    sb.rpc = vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: LEG_DO, error: null }
+          : { data: { do_number: LEG_DO, leg: 1 }, error: null },
+      ),
+    );
     const out = await attemptLegDocumentIssue(sb, ORDER_ID, 1);
     expect(out).toEqual({ outcome: "issued", doNumber: LEG_DO });
-    expect(LEG_DO).not.toBe(DO_NUMBER);
+    expect(sb.rpc).toHaveBeenCalledWith("delivery_document_number_draw", { p_order_id: ORDER_ID });
     expect(sb.rpc).toHaveBeenCalledWith("delivery_leg_document_mint", { p_order_id: ORDER_ID, p_leg: 1, p_do_number: LEG_DO });
   });
 
@@ -400,7 +443,9 @@ describe("attemptDeliveryOrderIssue — a split trip's own document (0542)", () 
       Promise.resolve(
         fn === "delivery_trip_document_mint"
           ? { data: { do_number: DO_NUMBER, trip: 2 }, error: null }
-          : { data: null, error: null },
+          : fn === "delivery_document_number_draw"
+            ? { data: DO_NUMBER, error: null }
+            : { data: null, error: null },
       ),
     );
     const attempt = await attemptDeliveryOrderIssue(sb, ORDER_ID);

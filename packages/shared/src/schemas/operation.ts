@@ -217,7 +217,10 @@ export type RecordBalanceDateInput = z.infer<typeof recordBalanceDateInput>;
  * dispute resolution need the actual artefact, not just a typed-in number.
  */
 export const attachDoInput = z.object({
-  doNumber: z.string().min(3),
+  // 0575 · The number the order already carries. Absent only when the order
+  // reached delivery without a document: the API then DRAWS one from the one
+  // allocator — the browser never invents a number.
+  doNumber: z.string().min(3).optional(),
   doNote: z.string().optional(),
   signed: z.literal(true),
   doFilePath: z.string().min(3).max(300),

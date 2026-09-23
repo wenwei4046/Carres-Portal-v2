@@ -142,7 +142,7 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row is APPROVED
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row except Delivery Order (BUILT by `0575`, Delivery MASTER §3.1) is APPROVED
 TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
 four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
 own independent daily pool of 10,000. Previously explicit formats are unchanged.

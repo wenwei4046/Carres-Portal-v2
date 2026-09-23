@@ -1197,6 +1197,34 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
     ]);
   });
 
+  it("an order with no document gets its number DRAWN by the one allocator (0575), never invented", async () => {
+    const rpc = vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: "DO2609-0042", error: null }
+          : { data: { id: ORDER_ID }, error: null },
+      ),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const { doNumber: _omitted, ...withoutNumber } = VALID;
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(withoutNumber),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_document_number_draw", { p_order_id: ORDER_ID });
+    expect(rpc).toHaveBeenCalledWith(
+      "operation_attach_do_and_deliver",
+      expect.objectContaining({ p_do_number: "DO2609-0042" }),
+    );
+  });
+
   it("rejects when signed is false", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);

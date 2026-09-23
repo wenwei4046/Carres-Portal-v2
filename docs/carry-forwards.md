@@ -1,4 +1,30 @@
-## `do-number-collision` — 🔴 P0 BEFORE OUTRIGHT GO-LIVE, opened 2026-09-23, recorded here 2026-09-24
+## `do-number-collision` — ✅ FIXED 2026-09-24, PR #1550 (0575). Kept for its evidence only
+
+**THE FIX.** The number is now DRAWN from the Delivery Order's own pool
+(`delivery_document_numbers`, migration 0575): `DO`+YYMM+4 digits for Outright, `SDO`+YYMM+5 for
+Subscription (`orders.source_system = 'rental'`), random, unique across every order, kept forever so
+a voided document's number is never handed out again, fixed width, and the materialiser now REFUSES
+a number another order owns (`delivery_order_number_taken`) instead of silently skipping it. The
+legacy dispatch backstop draws from the same pool instead of inventing `DO-<SO>`.
+
+**MEASURED BOTH WAYS on a real Postgres running the whole migration chain**, because the nine-case
+integration suite is `describe.skipIf(!URL || !LOCAL)` and had therefore NEVER actually run:
+
+| Chain | The headline case |
+|---|---|
+| stopped at 0574 (before the fix) | `{ ok: true, value: 'DO-230926-4242' }` — **the second order was allowed to wear the first order's number** |
+| with 0575 applied | refused; 9 of 9 cases pass |
+
+**The width table below is still true and still matters** — but only for the shared
+`formal_document_codes` pool, which the DO number deliberately does NOT use. 0575 gave DO its own
+pool with a per-series width, so the three-places problem was side-stepped rather than solved: it
+returns the day any OTHER five-digit prefix joins the shared pool.
+
+**Status of the original P0 record, kept below unchanged for the evidence it carries.**
+
+---
+
+## ~~`do-number-collision`~~ — the original record, opened 2026-09-23, recorded 2026-09-24
 
 **Two Sales Orders can carry the SAME Delivery Order number, and one of them ends up with no
 document row at all.** Measured on `origin/main`, not quoted:
@@ -90,7 +116,49 @@ the defect was fixed elsewhere and this entry goes.
 
 ---
 
+## `do-number-month-capacity` — 🟡 OWNER DECISION, opened 2026-09-24 (measured, not estimated)
+
+**The Outright DO pool holds 10,000 numbers a month, and Jess's own volume benchmark reaches it.**
+
+`DO` + YYMM + **four** digits is 10,000 numbers per calendar month; `SDO` + YYMM + **five** is
+100,000. The pools are separate (proved: a full DO month does not touch SDO). When a month is used
+up the draw REFUSES by name — `delivery_order_numbers_used_up` — and **no new Delivery Order can be
+issued until the next month**. It never widens itself, which is the approved behaviour.
+
+| Volume | DOs per month (≈26 working days) | Against 10,000 |
+|---|---|---|
+| 30/day (today's shape) | 780 | 8% — comfortable |
+| 250/day (Jess's Coway benchmark, low) | 6,500 | 65% — works, but the redraw loop is already re-trying |
+| 400/day (Jess's benchmark, high) | 10,400 | **EXHAUSTED before month end** |
+
+Two costs, not one. The hard stop is obvious. The quieter one is the redraw: the allocator picks at
+random and retries a clash up to 500 times, so at 90% full it needs ~10 draws per number and at 99%
+full ~100 — still correct, and still inside the loop, but every issue gets slower as the month fills.
+
+**RECOMMENDATION (mine, not a ruling): give `DO` five digits, exactly like `SDO`.** One migration,
+one symmetric rule, 100,000 a month, and it costs one character on the supplier's paper
+(`DO2609-04827`). The alternative — `YYMMDD` instead of `YYMM` — gives 10,000 a DAY but changes the
+approved format more visibly and makes the number longer in a different place.
+
+**Why it is not fixed here.** The width is part of the format Jess approved on 2026-09-23
+(`DO2609-4827`, four digits, stated explicitly). Changing an approved document number silently is
+exactly what a numbering rule exists to prevent. It is one migration the day she says which way.
+
+**Closes when** the owner either widens the Outright series or accepts the monthly ceiling with the
+refusal as its guard.
+
+**Falsifier:** a measured Outright volume that stays well under ~8,000 DOs a month at go-live, in
+which case four digits is simply enough and this entry goes.
+
+---
+
 ## `so-amendment-integration-tests-skip-in-ci` — EVIDENCE THAT PASSES LOCALLY AND IS NEVER RUN BY CI, opened 2026-09-23
+
+**A SECOND INSTANCE, 2026-09-24.** `apps/api/src/test/delivery-order-number-0575.integration.test.ts`
+shipped with nine cases guarding a P0 and had **never executed** — same `describe.skipIf`, same
+green-looking report. It was run by hand against a kept replay (before AND after 0575) to close
+`do-number-collision`. Two instances make this a pattern, not an accident: a suite whose gate is an
+environment variable reports as passing in the one place anybody looks.
 
 **🟡 The Sales Order amendment lane's strongest evidence does not run on any pull request.**
 `apps/api/src/test/amendment-lane-0564.integration.test.ts` (15 cases) and every sibling under

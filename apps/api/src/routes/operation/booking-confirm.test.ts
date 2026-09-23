@@ -50,7 +50,14 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
     }),
     // T8 — the split confirm appends a plain-English activity line through the
     // existing SECURITY DEFINER annotation door (fail-soft, same as T4/T6).
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        /* 0575 · the allocator answers; nothing derives a number any more. */
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: null, error: null },
+      ),
+    ),
   };
 }
 
@@ -62,6 +69,8 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 const ORDER_ID = "00000000-0000-0000-0000-00000000010a";
+/** What the database's allocator hands back (0575). */
+const DRAWN_DO = "DO2609-4827";
 /** CARD 3 (0346) — the logistics company assigned to the order under test. */
 const PARTNER_ID = "00000000-0000-0000-0000-0000000002be";
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
@@ -717,12 +726,12 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
       deliveryOrder: { do_number: string; issued: boolean } | null;
     };
     // The lib reports the number it MINTED (the locked scheme), and issued=true.
-    expect(body.deliveryOrder?.do_number).toMatch(/^DO-\d{6}-\d{4}$/);
+    expect(body.deliveryOrder?.do_number).toBe(DRAWN_DO);
     expect(body.deliveryOrder?.issued).toBe(true);
     // The mint went through the ONE shared write: an idempotent update guarded
     // on the empty column, never an unconditional set.
     expect(t.orders.update).toHaveBeenCalledWith(
-      expect.objectContaining({ do_number: expect.stringMatching(/^DO-\d{6}-\d{4}$/) }),
+      expect.objectContaining({ do_number: DRAWN_DO }),
     );
     expect(t.orders.is).toHaveBeenCalledWith("do_number", null);
   });
