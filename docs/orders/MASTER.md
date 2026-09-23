@@ -142,15 +142,16 @@ behavior. Historical issued PDFs remain preserved.
 **RULING / APPROVED — order numbers by business, 2026-09-23 (Jess; re-ruled the same day, replacing
 the earlier five-digit SO ruling).** The two businesses must be told apart by the number alone.
 
-**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Prefixes are APPROVED for
-every row. A full example is the approved format; `…` means date pattern and digit length are NOT yet
-decided for that row. Nothing here is built.
+**Complete document numbering table — owner agreed 2026-09-23 (Jess).** Every row is APPROVED
+TARGET / NOT BUILT. Rows that were `…` are now approved as **original document date (YYMMDD) +
+four random digits** (leading zeros allowed), Subscription with the `S` prefix, each prefix with its
+own independent daily pool of 10,000. Previously explicit formats are unchanged.
 
 | Document | Outright | Subscription |
 |---|---|---|
 | Sales Order / Subscription Agreement | `SO2609-4827(1)` | `SUB2609-48271(1)` |
 | Delivery Order | `DO2609-4827` | `SDO2609-48271` |
-| Manual Purchase Request | `MPR…` | `SMPR…` |
+| Manual Purchase Request | `MPR260924-4827` | `SMPR260924-4827` |
 | Purchase Order | `PO260924-4827(1)` | `SPO260924-4827(1)` |
 | Goods Receipt Note | `GRN260924-4827` | `SGRN260924-4827` |
 | Customer Invoice / Monthly Subscription Bill | `INV2609-4827` | `SINV2609-482917` |
@@ -158,22 +159,22 @@ decided for that row. Nothing here is built.
 | Credit Note | `CN2609-4827` | `SCN2609-48271` |
 | Customer Service Case | `CS2609-4827` | `SCS2609-48271` |
 | Loan Note | `LN2609-4827` | `SLN2609-48271` |
-| Stock Transfer | `TR…` | `STR…` |
-| Supplier Claim | `CLM…` | `SCLM…` |
-| Purchase Return | `PR…` | `SPR…` |
-| Repair Order | `RO…` | `SRO…` |
-| Display Request | `DR…` | `SDR…` |
-| Consignment Order | `CO…` | `SCO…` |
-| Consignment Return | `CRTN…` | `SCRTN…` |
-| Consignment Sale Notice | `CSN…` | `SCSN…` |
-| Supplier Bill | `SB…` | `SSB…` |
-| Payment Voucher | `PV…` | `SPV…` |
-| Other Receivable Invoice | `ARI…` | `SARI…` |
-| Other Receipt Voucher | `RV…` | `SRV…` |
-| Supplier Money Back | `SMB…` | `SSMB…` |
-| Internal Money Movement | `MM…` | `SMM…` |
-| Journal Entry | `JE…` | `SJE…` |
-| Manual Journal | `MJ…` | `SMJ…` |
+| Stock Transfer | `TR260924-4827` | `STR260924-4827` |
+| Supplier Claim | `CLM260924-4827` | `SCLM260924-4827` |
+| Purchase Return | `PR260924-4827` | `SPR260924-4827` |
+| Repair Order | `RO260924-4827` | `SRO260924-4827` |
+| Display Request | `DR260924-4827` | `SDR260924-4827` |
+| Consignment Order | `CO260924-4827` | `SCO260924-4827` |
+| Consignment Return | `CRTN260924-4827` | `SCRTN260924-4827` |
+| Consignment Sale Notice | `CSN260924-4827` | `SCSN260924-4827` |
+| Supplier Bill | `SB260924-4827` | `SSB260924-4827` |
+| Payment Voucher | `PV260924-4827` | `SPV260924-4827` |
+| Other Receivable Invoice | `ARI260924-4827` | `SARI260924-4827` |
+| Other Receipt Voucher | `RV260924-4827` | `SRV260924-4827` |
+| Supplier Money Back | `SMB260924-4827` | `SSMB260924-4827` |
+| Internal Money Movement | `MM260924-4827` | `SMM260924-4827` |
+| Journal Entry | `JE260924-4827` | `SJE260924-4827` |
+| Manual Journal | `MJ260924-4827` | `SMJ260924-4827` |
 | Physical Unit ID | `U1-000-001` | shared with Outright — no `S` prefix |
 
 - **MPR** = Manual Purchase Request; the screen name becomes **`Manual Purchase Request`** (owner,
@@ -216,8 +217,7 @@ authorization secrets. Reconcile §9's message-reference rules before cutover; a
 does not authorize sending order numbers to suppliers.
 
 **Scope boundary.** This covers document prefixes and the formats shown in full above (DO detail:
-`docs/delivery/MASTER.md` §3.1; PO: `docs/purchasing/MASTER.md` §6.1). Rows marked `…` still need
-their date pattern and digit length. It does not approve revision, rescheduling, voiding or correction
+`docs/delivery/MASTER.md` §3.1; PO: `docs/purchasing/MASTER.md` §6.1). Every other row uses original document date YYMMDD + four random digits. It does not approve revision, rescheduling, voiding or correction
 workflows of other documents, and is not authorization for application code, production writes,
 migration or cutover in this PLAN lane.
 

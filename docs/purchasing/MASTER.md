@@ -258,7 +258,7 @@ emergency purpose, extra question, queue or approval/issue bypass. The four pre-
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
 vocabulary. **Each Manual Purchase request has an MPR number — owner ruling (Jess, 2026-09-18);
-overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPR-YYYYMMDD-RRRR`
+overwrites the 2026-09-04 no-number correction (Card 08).** The number is `MPRYYMMDD-NNNN`
 (`MPR` = Manual Purchase Request), allocated when the request is created, permanent and never
 reused. It names the request, not a supplier document: the supplier still receives only the PO
 (`PO-YYYYMMDD-RRRR`), and one request may become several POs. Consignment Orders, Repair Orders and
@@ -613,10 +613,21 @@ PO260924-4827(2)     the same PO after one revision
   and search match BOTH shapes while pre-cutover POs exist. The new form and `(n)` change the
   ALLOCATOR (0381 mints `PREFIX-YYYYMMDD-RRRR`), so they need a migration; the `(n)` comes from the
   PO's own version, never from the code pool.
-- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only. The other prefixes below keep
-  the family rule that follows until each is ruled.
+- This replaces `PO-YYYYMMDD-RRRR` and `V{n}` for NEW POs only.
 
-**Family rule for the other formal documents (unchanged until each is ruled):**
+**Family rule for every other formal document — owner ruling 2026-09-23:**
+
+```text
+PREFIXYYMMDD-NNNN        e.g. MPR260924-4827 · Subscription twin SMPR260924-4827
+```
+
+- `YYMMDD` = original document date; four random digits, leading zeros allowed; **each prefix has
+  its own independent daily pool of 10,000** (no shared pool across prefixes). Existing numbers in
+  the old `PREFIX-YYYYMMDD-RRRR` form are permanent and never renumbered. Finance prefixes (SB, PV,
+  ARI, RV, SMB, MM, JE, MJ) go live only after the accountant's check. Complete table: Orders MASTER
+  *order numbers by business*.
+
+**Old family rule, kept only to read pre-cutover numbers:**
 
 ```text
 PREFIX-YYYYMMDD-RRRR
@@ -626,7 +637,8 @@ PREFIX-YYYYMMDD-RRRR
   internal Display Request, always with a four-digit year.
 - `RRRR` is chosen from the unused four-digit codes for that date. It is not a sequence, timestamp,
   customer, supplier or parent-document number.
-- All Carres formal documents share the daily visible-code pool. A database uniqueness rule prevents
+- (Old pool, measured 0381) all formal documents shared one daily visible-code pool — the new rule gives
+  each prefix its own pool. A database uniqueness rule prevents
   duplicates. Cancelled/void numbers are never reused.
 - Every new object gets its own number. Relationships live in Source and `Order Route`, never in
   matching tail digits.
@@ -1909,7 +1921,7 @@ Supplier Deliver To · PO No · PO Delivery Date
 
 **Identity — MPR, owner ruling (Jess, 2026-09-18); overwrites the same-day "PO No as identity" and
 the 2026-09-04 MPR retirement. BUILT in 0546.** Each Manual Purchase request has its own number
-`MPR-YYYYMMDD-RRRR` (§6.1), allocated when the request is created, permanent and never reused.
+`MPRYYMMDD-NNNN` (§6.1), allocated when the request is created, permanent and never reused.
 0546 restores the `allocate_formal_document_code('MPR')` default that 0424 dropped. **Rows raised
 between 0424 and 0546 stored NULL and are NOT backfilled** (CLAUDE.md §6): they print the governed
 absence `Not recorded`, open from the row and its menu, and no number is invented to fill a column.
@@ -2354,7 +2366,7 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   update, never an automatic one. A multi-source PO preserves all line allocations.
   **MPR is the Manual Purchase's visible identity again (owner ruling 2026-09-18, which overwrites
   Card 08 §3.5's 2026-09-04 retirement):** the request's own stored `purchase_requests.req_no`
-  (`MPR-YYYYMMDD-RRRR`, §6.1 / migration 0359) is READ and printed. A request with no stored number
+  (`MPRYYMMDD-NNNN`, §6.1 / migration 0359) is READ and printed. A request with no stored number
   keeps the governed label `Manual Purchase` and opens nothing — never a UUID, never a minted
   number. Manual sources still dedupe by request identity, never by label.
 - `Items`: one name or `{first item} + {n} more`; expansion shows every item.
@@ -3003,7 +3015,7 @@ pending decision for this PLAN.
 
 **RESOLVED:** keep permanent internal identity. **Prefix `CLM` (Outright) / `SCLM` (Subscription) — owner
 ruling 2026-09-23, prospective only:** existing `SC-…` numbers are permanent and never renumbered
-(they are test data; clean start). Date pattern and digits for `CLM` are still open; non-reuse law in
+(they are test data; clean start). Format `CLMYYMMDD-NNNN` / `SCLMYYMMDD-NNNN`; non-reuse law in
 §6.1 holds. Revisions keep the number; links, not matching digits, show family relationships.
 
 **APPROVED:** intake creates the permanent workstream ID. The formal SC number is allocated when
