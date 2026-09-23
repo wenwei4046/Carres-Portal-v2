@@ -149,6 +149,18 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   handover. Desired scan-at-pickup selection is not existing scan-time binding and does not approve
   bypassing issue/freeze, eligibility, allocation or unique-claim gates. The owning modules must
   reconcile and approve that workflow separately; this concept is not a technical gate override.
+- **OWNER SCOPE CORRECTION — 2026-09-23:** Jess: “now diglant product do this. outright
+  cannot yet”, relayed by the same main advisor. The proposed physical QR labelling rollout
+  applies to Diglant products first; Outright cannot adopt that physical labelling process yet.
+  This does not remove Outright's existing internal Unit IDs, exact-stock rules or tracking
+  records: absence of a physical label is not absence of an identifier. The permanent internal
+  Unit ID identifies the item; a physical label represents that identity; assignment associates
+  eligible supply/the item with an order under the owning allocation and DO gates. These are
+  separate facts. Supplier implementation capability remains unverified; adopting rollout scope
+  is not observed production readiness. Do not infer all future Subscription products must be
+  Diglant or all Outright goods must forever lack labels/tracking. Jess's follow-up about which
+  SO/PO/Unit numbers to show and how to control system numbering is a pending information/control
+  proposal request, not approval of new columns, schema, numbering rules or assignment workflow.
 - Go-live starts empty. Early forecasts are manager-entered; automatic suggestions may begin
   only after three months of genuine sales, never imported/test transactions.
 - The requested review scope is a fixed-day monthly proposal by model/size, manager revision
