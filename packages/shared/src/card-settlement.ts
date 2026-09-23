@@ -180,7 +180,6 @@ function ghl(text: string): CardFileParse {
  */
 function maybank(text: string): CardFileParse {
   const all = lines(text);
-  const first = (i: number) => csvCells(all[i])[0]?.trim() ?? "";
   let reportDate: string | null = null;
   let merchant: string | null = null;
   let header: string[] | null = null;

@@ -94,7 +94,7 @@ describe("/api/finance/card-settlement", () => {
     const sb = stubRpc({ data: null, error: null });
     const res = await call("POST", "/import", { acquirer: "MAYBANK", fileName: "a.csv", content: pbbFile([sale]) });
     expect(res.status).toBe(422);
-    expect((await res.json()).message).toBe("This is not a Maybank settlement file. Check the card company and the file.");
+    expect(await res.json()).toMatchObject({ message: "This is not a Maybank settlement file. Check the card company and the file." });
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
