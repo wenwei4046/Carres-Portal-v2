@@ -199,6 +199,43 @@ describe("the current document", () => {
 
 
 /**
+ * 0565 · THE SHEET A NEW VERSION IS ISSUED AS — owner ruling 2026-09-23:
+ * "Confirm the retained PDF belongs to the exact issued revision and cannot
+ *  inherit an older revision's signature."
+ *
+ * The stored file is rendered from the order as it stands the instant the
+ * version is minted, and the order carries the eSign PNG the customer put on
+ * whatever version was in front of them THEN. Writing that mark into the file
+ * kept for the version minted NOW would make the inheritance permanent — the
+ * same defect the historical view was fixed for, on paper this time.
+ */
+describe("the document a NEW version is issued as", () => {
+  /** What `keepIssuedDocument` hands the renderer for an order that carries a
+   *  signature nobody can attribute to the version being minted. */
+  const ISSUED_NOW = { ...BASE, signed: false, signature_url: null, signature_unknown: true };
+
+  it("never carries the order's stored signature", async () => {
+    const text = await pdfText(ISSUED_NOW);
+    expect(text).toContain("Signature version not recorded.");
+    const bytes = await renderPdf(ISSUED_NOW);
+    expect(Buffer.from(bytes).includes(Buffer.from("esign"))).toBe(false);
+  }, 180000);
+
+  it("is NOT dressed as a reconstruction — it IS the issued document", async () => {
+    const text = await pdfText(ISSUED_NOW);
+    expect(text).not.toContain("Reconstructed copy");
+  }, 180000);
+
+  /* THE CONTROL. Without the override the mark rides along, which is the whole
+     reason the override exists — if this ever stops differing, the assertions
+     above are passing for the wrong reason. */
+  it("CONTROL: the same data WITHOUT the override still draws the signature box", async () => {
+    const withMark = await pdfText({ ...BASE, signed: true, signature_url: "https://x/esign/ord-1.png" });
+    expect(withMark).not.toContain("Signature version not recorded.");
+  }, 180000);
+});
+
+/**
  * VISUAL INSPECTION HARNESS — writes the two real sheets side by side so the
  * notices can be LOOKED AT rather than only asserted on (owner requirement
  * 2026-09-23: "Test the generated PDF itself, visually inspect it").

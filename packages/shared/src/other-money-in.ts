@@ -17,6 +17,7 @@
  */
 import { lineDepartmentFieldsSnake } from "./department";
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "./finance-ledger";
 
 /* ── input ─────────────────────────────────────────────────────────────────── */
 
@@ -30,7 +31,7 @@ export const moneyInAmount = z
   .refine((n) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6, "An amount has at most two decimals.");
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date.");
-const accountCode = z.string().regex(/^\d{4}$/, "Choose an account.");
+const accountCode = z.string().regex(ledgerAccountCodeShape, "Choose an account.");
 const optionalText = (max: number) => z.string().max(max).nullable().optional();
 
 export const financePartyInput = z.object({
@@ -75,7 +76,7 @@ export type MoneyInCancelInput = z.infer<typeof moneyInCancelInput>;
 export const otherReceiptInput = z
   .object({
     receipt_date: isoDate,
-    money_account_code: z.string().regex(/^\d{4}$/, "Choose where the money was received."),
+    money_account_code: z.string().regex(ledgerAccountCodeShape, "Choose where the money was received."),
     party_id: z.string().uuid().nullable().optional(),
     payer_name: optionalText(200),
     reference: optionalText(120),

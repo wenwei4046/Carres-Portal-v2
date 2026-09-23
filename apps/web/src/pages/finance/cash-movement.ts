@@ -7,10 +7,12 @@
  * `GET /api/finance/ledger/account-ledger`. It never reads `payments` or the
  * retired 0062–0064 cashflow functions.
  *
- * WHICH ACCOUNTS. Every posting account under `1100 Cash and bank` in the
- * chart — the same mark `gl_money_account_ok` (0476) uses to decide where
- * customer money may land. A retired account under 1100 still counts: money
- * that moved through it moved.
+ * WHICH ACCOUNTS. Every posting account on the money-accounts list
+ * (`gl_money_accounts`, sent with the chart as `money_accounts`), wherever it
+ * sits in the chart. No heading, number or number range decides it, so a
+ * renumbered chart, or a CASH IN HAND kept outside the bank heading, still
+ * adds up. A retired money account still counts: money that moved through it
+ * moved.
  *
  * A MOVEMENT, NEVER A BALANCE. The ledger holds no opening balances, so the
  * figure is money in less money out over the weeks shown — never "cash on
@@ -37,26 +39,17 @@ import type { LedgerAccount, LedgerChart } from "@carres/shared/finance-ledger";
 import { apiFetch } from "@/lib/api";
 import { ledgerKeys } from "./ledger/ledger-queries";
 
-/** The chart header every cash and bank account hangs under (0461; 0476's `gl_money_account_ok`). */
-export const CASH_AND_BANK = "1100";
 /** How many weeks the tile and the chart cover. */
 export const CASH_WEEKS = 12;
 
 const DAY_MS = 86_400_000;
 const cents = (n: number) => Math.round(n * 100);
 
-/** Posting accounts under 1100 Cash and bank, at any depth. */
+/** The money accounts that take postings, in chart order. Empty when the
+ *  chart came without its money-accounts list; the read then fails visibly. */
 export function cashAccounts(chart: LedgerChart): LedgerAccount[] {
-  const byCode = new Map(chart.accounts.map((a) => [a.code, a]));
-  const underCash = (a: LedgerAccount) => {
-    let parent = a.parent_code;
-    for (let depth = 0; parent && depth < 12; depth += 1) {
-      if (parent === CASH_AND_BANK) return true;
-      parent = byCode.get(parent)?.parent_code ?? null;
-    }
-    return false;
-  };
-  return chart.accounts.filter((a) => !a.is_header && underCash(a));
+  const money = new Set(chart.money_accounts ?? []);
+  return chart.accounts.filter((a) => !a.is_header && money.has(a.code));
 }
 
 const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);

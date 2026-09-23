@@ -10,6 +10,8 @@ import type {
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
 import { defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
+import { roleAccount, type LedgerAccount } from "@carres/shared/finance-ledger";
+import { useLedgerChart } from "../ledger/ledger-queries";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
@@ -490,6 +492,7 @@ function BillForm() {
   const existing = useSupplierBill(id);
   const suppliers = useApSuppliers();
   const accounts = useApAccounts();
+  const chart = useLedgerChart();
   const save = useSaveBill();
 
   const [supplierId, setSupplierId] = useState(params.get("supplier") ?? "");
@@ -633,7 +636,7 @@ function BillForm() {
                 <select aria-label="Payables account" className={`${fieldCls} mt-1`} value={apAccount}
                   onChange={(e) => setApAccount(e.target.value)}>
                   <option value="">
-                    {supplier?.kind === "other_creditor" ? "2120 Other payables (usual)" : "2110 Trade payables (usual)"}
+                    {usualLabel(roleAccount(chart.data, supplier?.kind === "other_creditor" ? "OTHER_PAYABLE" : "TRADE_PAYABLE"))}
                   </option>
                   {apAccounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
                 </select>
@@ -671,6 +674,7 @@ function BillForm() {
                     <tbody>
                       {lines.map((l, i) => (
                         <BillLineRow key={l.key} line={l} index={i} accounts={lineAccounts}
+                          usualGoods={usualLabel(roleAccount(chart.data, "COST_OF_GOODS_SOLD"))}
                           onChange={(patch) => setLine(l.key, patch)}
                           onRemove={() => setLines((b) => b.filter((x) => x.key !== l.key))} />
                       ))}
@@ -715,10 +719,19 @@ function CreditorOptions({ rows }: { rows: ApCreditor[] }) {
   );
 }
 
-function BillLineRow({ line, index, accounts, onChange, onRemove }: {
+/* 0570: the account a blank choice falls back to is the chart's role, named
+   from the chart, never a number written here. Until the chart is read the
+   row says only that the usual account is used.
+   PROPOSAL - PENDING APPROVAL: "The usual account". */
+function usualLabel(a: LedgerAccount | undefined): string {
+  return a ? `${a.code} ${a.name} (usual)` : "The usual account";
+}
+
+function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: {
   line: LineDraft;
   index: number;
   accounts: ApAccountChoice[];
+  usualGoods: string;
   onChange: (patch: Partial<LineDraft>) => void;
   onRemove: () => void;
 }) {
@@ -740,7 +753,7 @@ function BillLineRow({ line, index, accounts, onChange, onRemove }: {
       <td className="py-1 pr-2">
         <select aria-label={`Line ${n} account`} className={fieldCls} value={line.accountCode}
           onChange={(e) => onChange({ accountCode: e.target.value })}>
-          <option value="">{fromGrn ? "5100 Cost of goods sold (usual)" : "Choose an account"}</option>
+          <option value="">{fromGrn ? usualGoods : "Choose an account"}</option>
           {accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
         </select>
       </td>

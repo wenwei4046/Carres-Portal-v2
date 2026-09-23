@@ -39,7 +39,7 @@ import { FieldError } from "@/components/kit/FieldFrame";
  *   Unpaid · AP · Payables                     money-owed.ts over ap_outstanding
  *                                              → opens AP · Payables
  *   Net cash · 12 wks · Cashflow               cash-movement.ts over the ledger's
- *   Movement since go-live (per account)       account ledger (1100 Cash and bank)
+ *   Movement since go-live (per account)       account ledger (every money account)
  *   Activity                                   the Journal's own entries read
  *   Export month-end pack                      month-end-pack.ts: Trial Balance,
  *                                              Profit and Loss, Balance Sheet

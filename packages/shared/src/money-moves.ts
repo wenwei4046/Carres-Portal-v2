@@ -15,6 +15,7 @@
  * PURE — no clock, no I/O.
  */
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "./finance-ledger";
 import { moneyInAmount } from "./other-money-in";
 import type { MoneyAccountRow } from "./money-accounts";
 
@@ -29,7 +30,7 @@ export const MONEY_MOVE_KIND_WORD: Record<MoneyMoveKind, string> = {
   BANK_CREDIT: "Bank credit",
 };
 
-const accountCode = (msg: string) => z.string().regex(/^\d{4}$/, msg);
+const accountCode = (msg: string) => z.string().regex(ledgerAccountCodeShape, msg);
 
 export const moneyMoveInput = z
   .object({

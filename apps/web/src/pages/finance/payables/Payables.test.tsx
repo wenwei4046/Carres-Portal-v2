@@ -129,6 +129,16 @@ beforeEach(() => {
     [`${B}/suppliers`]: suppliers,
     [`${B}/accounts`]: accounts,
     [MONEY]: moneyAccounts,
+    // AutoCount-shaped roles: the form names the usual accounts from these.
+    "/api/finance/ledger/accounts": {
+      go_live_on: "2026-09-01",
+      accounts: [
+        { code: "400-0000", name: "TRADE CREDITORS", kind: "LIABILITY", parent_code: null, is_control: true, control_for: "AP", is_active: true, is_header: false, sort_order: 0 },
+        { code: "405-0000", name: "OTHER CREDITORS", kind: "LIABILITY", parent_code: null, is_control: true, control_for: "AP", is_active: true, is_header: false, sort_order: 0 },
+        { code: "610-0000", name: "PURCHASES", kind: "EXPENSE", parent_code: null, is_control: false, control_for: null, is_active: true, is_header: false, sort_order: 0 },
+      ],
+      roles: { TRADE_PAYABLE: "400-0000", OTHER_PAYABLE: "405-0000", COST_OF_GOODS_SOLD: "610-0000" },
+    },
     ["/api/finance/ledger/departments"]: departments,
     [`${B}/bills`]: { rows: [billRow({}), billRow({ id: BILL2, bill_no: null, status: "draft", unpaid: null,
       supplier_invoice_no: "LSW-902", total_amount: "200.00", price_flags: 0, file_count: 0 })] },
@@ -227,6 +237,9 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
 
     await waitFor(() => expect(screen.getByLabelText("Line 1 qty")).toHaveValue("1"));
+    // The usual accounts are named from the chart's roles, never a number the page knows.
+    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("610-0000 PURCHASES (usual)"));
+    expect(screen.getByLabelText("Payables account").querySelector("option")).toHaveTextContent("400-0000 TRADE CREDITORS (usual)");
     expect(screen.getByLabelText("Line 1 unit price")).toHaveValue("520.00");
     expect(screen.getByLabelText("Line 2 qty")).toHaveValue("2");
     expect(screen.getByTestId("line-1-price-check")).toHaveTextContent("Same as PO price");
@@ -293,6 +306,7 @@ describe("Bill form — Convert GRN to bill", () => {
   it("a typed line for an other creditor sends the account and the amount", async () => {
     show(`/finance/bills/new?supplier=${LANDLORD}`);
     await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LANDLORD));
+    await waitFor(() => expect(screen.getByLabelText("Payables account").querySelector("option")).toHaveTextContent("405-0000 OTHER CREDITORS (usual)"));
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
     fireEvent.change(screen.getByLabelText("Line 1 description"), { target: { value: "August rent" } });
     fireEvent.change(screen.getByLabelText("Line 1 account"), { target: { value: "6500" } });
