@@ -558,7 +558,7 @@ The complete 390px PDF, including its balance and signature area, was visible. B
 at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
 clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
-**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / BUILT 2026-09-23.** `Delivery` stays its own card
+**CARD ORDER AND NAMES — OWNER RULING (Jess, 2026-09-21) · APPROVED / PRODUCTION-VERIFIED 2026-09-23 (`87a83b729`).** Walked signed-in on SO-1365; the measured evidence, before and after, is `docs/orders/SO-OBJECT-PAGE-V2-ACCEPTANCE.md` §9. `Delivery` stays its own card
 and answers one question — can we deliver it and how is it carried — so address and access are ONE group
 with no `Delivery address` / `Delivery access` headings (international furniture-retail practice); the
 billing relationship and billing address move to `Customer` (who pays). `SO info` (renamed from

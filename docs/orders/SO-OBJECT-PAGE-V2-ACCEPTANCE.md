@@ -193,3 +193,62 @@ browser — `docs/evidence/so-page-v2/`), `PDF` (the generated document's own te
   (`project_authenticated_acceptance_is_owner_only`).
 - The Amendment safeguards in §2 were preserved, not re-verified end to end by this work; their own
   suites (`amendment-lane-0564`, `issued-document-retention`, the rebuilt-PDF contracts) still pass.
+
+
+---
+
+## 9 · PRODUCTION VERIFICATION — signed in, read-only, 2026-09-23
+
+**Deployed SHA `87a83b729`** (PR #1541 merged 10:12:51Z; deploy run `35847487030`;
+`__carres_deploy.json` → `builtAt 2026-09-23T10:24:06.621Z`).
+**Order walked: SO-1365** at `/operation/orders/so/ecef2b53-…` — the same order the review reported.
+
+**Local verification (§8) and production verification (this section) are separate.** §8 proves the
+build; this proves the deploy. Nothing below was inferred from a bundle string or a source read.
+
+### The BEFORE, measured on production `598ba5b58` minutes earlier
+
+| | Measured |
+|---|---|
+| Cards | `Customer · Order info · Delivery · Goods · Money` |
+| First card title | `color: rgb(38,56,74)` · `text-transform: uppercase` · header background `rgb(185,201,216)` |
+
+That is findings 1–6 and the band, observed live, on the deployed build the review complained about.
+
+### The AFTER, measured on production `87a83b729`
+
+| # | Measured on the deployed page / document |
+|---|---|
+| 1 | `[data-block]` → `SO info · Customer · Delivery · Items · Payment` |
+| 2 | all five titles `color: rgb(13,116,206)` · `text-transform: none` · `15px` / `600` · header background `rgba(0,0,0,0)` · `border-bottom 1px` |
+| 3 | `SO info` carries `Dealer` · `Sales Location` · `Salesperson`; no `Sales ownership` heading on the page |
+| 4 | `SO info` labels read `SO Doc Date` · `Customer Requested Delivery Date` · `Proceed Date` |
+| 5 | `Billing` is inside `Customer` (with `Emergency contact`) and absent from `Delivery` |
+| 6 | `Delivery` has zero in-card headings |
+| 7 | `Delivery` label order: … `Floor (Max is 3rd Floor)` · `Lift available?` · `Items needing stair carry` |
+| 8 | Items `thead` → `# · Item Code · Description · Qty · Unit (RM) · Disc (RM) · Amount (RM)`, closing `TOTAL PAYABLE RM 1,529.00`, no category rows |
+| 9 | **View:** the `Items` card sits in a `fieldset` reporting `disabled: true`, and the table renders **zero** buttons. **Edit:** the same seven columns, the fieldsets report `disabled: false`, and `Configure` / `Remove` return. `Cancel` restores the locked state with no dirty banner |
+| 10 | `Qty: Mattress 1` and `Services: Dispose old sofa … · Dispose old mattress` print in View |
+| 11 | ledger `thead` → `Date · Payment received · Approval code · Collected by · Amount (RM)`; the row prints `Receipt RC-230926-3537 · View slip` under the approval code |
+| 12 | totals → `Goods RM 1,399.00 · Services RM 130.00 · Total payable RM 1,529.00 · Paid to date RM 765.00 · Balance due RM 764.00` |
+| 13 | **the generated document**: one mattress at qty 1 plus TWO services prints `TOTAL PAYABLE  1` in the QTY column — services no longer inflate the physical count |
+| 14 | `TOTAL RECEIVED` absent from the page body AND from the document; the document's totals read `Goods · Services · Tax · Total payable · Paid to date · BALANCE DUE` |
+| 15 | chip reads `Existing customer · 1 order ›` (correct singular) → the Register opens with its search box seeded from `?search=` and returns exactly 1 row |
+| 16 | `SO Doc Date` computes `background rgba(0,0,0,0)` / `border 0px`; an editable field beside it computes `background rgb(255,255,255)` / `border 1px` |
+
+**Preserved, measured:** the four object tabs `Order · Revisions · History · Order Route` are all
+present. The **Purchase Orders object** on the same deploy still reads `color: rgb(38,56,74)` ·
+`uppercase` · header background `rgb(185,201,216)` — Purchasing did not move.
+
+**No customer transaction was altered.** `Edit` was entered and `Cancel` pressed on SO-1365 with no
+field touched; the page returned to the locked state with no unsaved-change banner. No write request
+was issued at any point in this verification.
+
+**Outstanding from the 16: none.**
+
+### Known, and NOT caused by this work
+
+🟡 `/api/operation/dashboard` still returns an error on production — the Operation dashboard renders
+*"Couldn't load dashboard"*. This is the pre-existing `awaiting_operation_action` defect (retired by
+0167, reintroduced by 0519), already raised with its owner. It is unrelated to the Sales Order page
+and was failing before this deploy.
