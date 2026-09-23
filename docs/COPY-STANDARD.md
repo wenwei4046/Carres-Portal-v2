@@ -4061,30 +4061,38 @@ it: one destination never carries two words. The approved `Monthly overview` com
 part of this entry and is not built.
 
 
-## Customer agreement evidence — owner ruling 2026-09-22 APPROVED / LOCKED · BUILT 2026-09-23
+## Customer agreement evidence — screen wording · ⚠️ PROPOSAL / NOT LAW
 
-The words the amendment lane prints for the customer's recorded acceptance. Registered here
-because the ruling settled the RULE and not the wording; these are the words the shipped screen
-uses and they are open to owner correction.
+**The RULE is APPROVED / LOCKED (owner ruling 2026-09-22, `docs/orders/MASTER.md`
+§ "Customer agreement evidence"). THE WORDS BELOW ARE NOT.** They were written by the chat that
+built the gate, they ship behind the approved rule so the capability is usable, and they are
+**proposed for owner review — being written in this file does not approve them.** Adding wording to
+the dictionary is how a proposal is recorded, never how it becomes law.
 
-| Meaning | Approved wording |
-|---|---|
-| The block heading on a waiting amendment | `Customer agreement` |
-| The picker | `How did the customer agree?` |
-| A document the customer signed | `Signed document` |
-| A traceable reference to the customer's own message | `Customer confirmation` |
-| A Staff correction leaning on the agreement already signed | `Original agreement` |
-| The optional description | `What did the customer agree to? (optional)` |
-| The commit | `Record customer agreement` |
-| Nothing recorded yet | `Nothing on record shows the customer agreed to this change, so it cannot take effect yet. The proposal is kept.` |
-| Recorded, but the terms moved | `The proposed change is no longer what the customer agreed to. Record the customer agreement again before this can be approved.` |
+Approved wording is reused wherever it already exists: the decision controls stay
+**`Management decision reason`** · **`Reject`** · **`Approve and apply`**, the waiting state stays
+**`Waiting for management`** and the impact heading stays **`Before approval`** — all from
+§ "The Sales Order amendment words" above. Nothing in that approved table is re-spelled here.
+
+| Meaning | Proposed wording | Status |
+|---|---|---|
+| The block heading on a waiting amendment | `Customer agreement` | PROPOSAL |
+| The picker | `How did the customer agree?` | PROPOSAL |
+| A document the customer signed | `Signed document` | PROPOSAL |
+| A traceable reference to the customer's own message | `Customer confirmation` | PROPOSAL |
+| A Staff correction leaning on the agreement already signed | `Original agreement` | PROPOSAL |
+| The optional description | `What did the customer agree to? (optional)` | PROPOSAL |
+| The commit | `Record customer agreement` | PROPOSAL |
+| Nothing recorded yet | `Nothing on record shows the customer agreed to this change, so it cannot take effect yet. The proposal is kept.` | PROPOSAL |
+| Recorded, but the terms moved | `The proposed change is no longer what the customer agreed to. Record the customer agreement again before this can be approved.` | PROPOSAL |
 
 Each kind's field label names what to type, because a blank box called `Reference` teaches nobody:
 `The file name of the document the customer signed` · `Where the customer's own message can be
 found — for example WhatsApp, the date and the number` · `The revision whose signed agreement
-already covers this — for example Rev 1`.
+already covers this — for example Rev 1`. **All three are PROPOSAL.**
 
-**There is no tick box and there never may be one.** *"A manager's statement or checkbox saying the
-customer agreed is not sufficient by itself and cannot substitute for the evidence."* Every kind
-carries a reference that points at something findable outside the record. `Approve and apply` is
-refused until one is recorded and still covers the proposal; `Reject` never is.
+**What IS approved, and is not open to re-wording:** there is no tick box and there never may be
+one. *"A manager's statement or checkbox saying the customer agreed is not sufficient by itself and
+cannot substitute for the evidence."* Every kind carries a reference that points at something
+findable outside the record. `Approve and apply` is refused until one is recorded and still covers
+the proposal; `Reject` never is.
