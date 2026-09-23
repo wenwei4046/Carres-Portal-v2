@@ -281,8 +281,13 @@ export function MoneyMoveForm({
     if (bank && moveAccounts("CARD_PAYOUT", "to", accounts.data ?? []).some((a) => a.code === bank)) setToCode(bank);
   };
 
+  /* 0572 — a card account a route serves is paid out on Card settlement (Approve day) only; the database refuses it here too. */
+  const routed = new Set((routes.data ?? []).map((r) => r.holding_code));
+  const cardSettlementOnly = kind === "CARD_PAYOUT" && !fixed && routed.size > 0;
   const options = (side: "from" | "to") =>
-    moveAccounts(kind, side, accounts.data ?? []).map((a) => ({ value: a.code, label: accountLabel(a) }));
+    moveAccounts(kind, side, accounts.data ?? [])
+      .filter((a) => !(cardSettlementOnly && side === "from" && routed.has(a.code)))
+      .map((a) => ({ value: a.code, label: accountLabel(a) }));
   const amountN = parseTypedAmount(amount);
   // 0537: a bank credit always comes from 4900, a bank charge always goes to 6500.
   const fixedFrom = kind === "BANK_CREDIT" ? "4900" : undefined;
@@ -359,6 +364,7 @@ export function MoneyMoveForm({
               if (kind === "CARD_PAYOUT") routeBank(v, channel);
             }}
             options={options("from")}
+            hint={cardSettlementOnly ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement." : undefined}
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}

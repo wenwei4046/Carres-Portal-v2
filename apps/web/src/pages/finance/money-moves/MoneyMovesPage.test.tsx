@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +90,25 @@ describe("Money moves", () => {
     await waitFor(() =>
       expect(net.calls.map((c) => c.key)).toContain(`POST /api/finance/money-moves/${row({}).move_id}/approve`),
     );
+  });
+
+  it("a card payout from a card account with a payout bank is not offered here: Card settlement pays it out", async () => {
+    net.routes["GET /api/finance/ledger/money-accounts"] = [
+      { code: "1123", name: "Hong Leong", money_kind: "BANK", is_active: true },
+      { code: "1130", name: "Other card", money_kind: "HOLDING", is_active: true },
+      { code: "1131", name: "GHL", money_kind: "HOLDING", is_active: true },
+    ];
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "dealer", bank_code: "1123" }];
+    show();
+    await screen.findByText("MM-20260917-1111");
+    fireEvent.click(screen.getByRole("button", { name: /New money move/ }));
+    const form = await screen.findByTestId("money-move-form");
+    fireEvent.keyDown(within(form).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "Card payout" }));
+    expect(await within(form).findByText("A card account that has a payout bank in Finance Settings is paid out on Card settlement.")).toBeInTheDocument();
+    fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
+    const options = await screen.findAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["1130 · Other card"]);
   });
 
   it("the form refuses a move with no accounts before the server", async () => {

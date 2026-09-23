@@ -373,4 +373,175 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     expect(noDate).toMatchObject({ ok: false, detail: "date_missing" });
     expect(await prepareDay(day, null, plus(D, 1))).toMatchObject({ ok: true });
   });
+
+  it("a card payout from a routed card account has one door: Approve day. Money moves is refused; an unrouted account is not", async () => {
+    await actAs(U.finance);
+    expect(await attempt("select public.card_settlement_route_set($1, 'showroom', $2) as r", [holding, bank])).toMatchObject({ ok: true });
+    const mb = (await review()).days.find((d) => d.acquirer === "MAYBANK")!;
+    const direct = await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, 198, 2, $4) as r", [mb.day_date, holding, bank, mb.reference]);
+    console.log("Money moves card payout from a routed card account:", JSON.stringify(direct));
+    expect(direct).toMatchObject({ ok: false, detail: "card_payout_by_card_settlement" });
+    const other = (await q(
+      "select account_code from gl_money_accounts where money_kind = 'HOLDING' and gl_money_account_ok(account_code, 'in') and account_code not in (select holding_code from card_settlement_routes) order by 1 limit 1",
+    )).rows[0]?.account_code as string | undefined;
+    console.log("an unrouted card account:", other ?? "none on this database");
+    if (other) {
+      expect(await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, 10, 0, 'IT unrouted') as r", [mb.day_date, other, bank]))
+        .toMatchObject({ ok: true });
+    }
+    // Approve day passes; a tab-only note is stored as no note
+    const made = await attempt(
+      "select public.card_settlement_payout_prepare($1, $2::date, $3, $2::date, $4, $5, $6, $7::uuid) as r",
+      [mb.acquirer, mb.day_date, mb.group_key, holding, bank, "\t", uid("bb1")],
+    );
+    expect(made).toMatchObject({ ok: true });
+    const move = (await q(
+      "select m.kind, m.amount, m.fee, m.note from card_settlement_payouts cp join gl_money_moves m on m.id = cp.move_id where cp.group_key = $1 and cp.released_at is null",
+      [mb.group_key],
+    )).rows;
+    expect(move).toEqual([{ kind: "CARD_PAYOUT", amount: "198.00", fee: "2.00", note: null }]);
+    // a second payout for that day through Money moves is still refused
+    expect(await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, 198, 2, $4) as r", [mb.day_date, holding, bank, mb.reference]))
+      .toMatchObject({ ok: false, detail: "card_payout_by_card_settlement" });
+  });
+
+  it("an idempotency key returns only the day's own live payout; any other key is refused and links nothing", async () => {
+    await actAs(U.finance);
+    const mb = (await review()).days.find((d) => d.acquirer === "MAYBANK")!;
+    expect(await prepareDay(mb, uid("bb1"))).toMatchObject({ ok: true }); // the same press again
+    // a key that belongs to a bank transfer
+    const bank2 = (await q(
+      "select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') and account_code <> $1 order by 1 limit 1",
+      [bank],
+    )).rows[0].account_code;
+    expect(await attempt("select public.gl_money_move_create('TRANSFER', $1::date, $2, $3, 12345, 0, 'IT transfer', null, $4::uuid) as r", [D, bank, bank2, uid("bb2")]))
+      .toMatchObject({ ok: true });
+    await pay("keyDay", 44, D, "KEY444");
+    const f = pbbFile([{ sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), amt: "44.00", net: "43.56", mid: "900000000004", tid: "90000004", code: "KEY444", trace: "000401" }]);
+    expect(await importFile("PBB", "pbb-key.csv", f)).toMatchObject({ ok: true });
+    const kd = (await review()).days.find((d) => d.group_key === "900000000004 / 90000004")!;
+    expect(kd.matched_count).toBe(1);
+    const hijack = await prepareDay(kd, uid("bb2"));
+    console.log("a bank transfer's key sent with Approve day:", JSON.stringify(hijack));
+    expect(hijack).toMatchObject({ ok: false, detail: "idempotency_key_used" });
+    // another day's key
+    expect(await prepareDay(kd, uid("bb1"))).toMatchObject({ ok: false, detail: "idempotency_key_used" });
+    expect((await q("select count(*)::int as n from card_settlement_payouts where group_key = $1", [kd.group_key])).rows[0].n).toBe(0);
+    // a cancelled payout's key does not bring it back
+    expect(await prepareDay(kd, uid("bb3"))).toMatchObject({ ok: true });
+    const moveId = (await q("select move_id from card_settlement_payouts where group_key = $1", [kd.group_key])).rows[0].move_id;
+    expect(await attempt("select public.gl_money_move_reverse($1, 'IT cancel') as r", [moveId])).toMatchObject({ ok: true });
+    expect(await prepareDay(kd, uid("bb3"))).toMatchObject({ ok: false, detail: "idempotency_key_used" });
+    expect(await prepareDay(kd, uid("bb4"))).toMatchObject({ ok: true });
+  });
+
+  it("a card payout made outside Card settlement from a routed card account is listed on the day of its date", async () => {
+    await actAs(U.finance);
+    // as a payout made on Money moves before Approve day was its only door
+    await q("select set_config('carres.card_payout_day', 'IT before the door', true)");
+    const old = await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, 50, 1, 'IT before the door') as r", [D, holding, bank]);
+    await q("select set_config('carres.card_payout_day', '', true)");
+    expect(old.ok).toBe(true);
+    const day = (await review()).days.find((d) => d.group_key === "TESTTERM01")!;
+    console.log("unlinked payouts on the GHL day:", JSON.stringify(day.unlinked_payouts));
+    expect(day.unlinked_payouts).toMatchObject([{ move_id: old.ok ? old.value : "", from_account_code: holding, move_date: D, status: "prepared" }]);
+  });
+});
+
+/**
+ * The final matches do not depend on the order the files are imported. Four
+ * files (Public Bank, two GHL machines, Maybank) over one set of payments,
+ * imported in two orders in one transaction (a savepoint between).
+ */
+describe.skipIf(!URL)("card settlement: the import order does not change the matches (real PostgreSQL, 0572)", () => {
+  let db: pg.Client;
+  const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
+  const T = { fin: uid("f1"), dealer: uid("f2"), sales: uid("f3"), order: uid("f4") };
+  let D = "";
+  const files = (): Record<string, [CardAcquirer, string, string]> => ({
+    pbb: ["PBB", "pbb-order.csv", pbbFile([
+      { sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), amt: "150.00", net: "148.50", mid: "900000000071", tid: "90000071", code: "AAA111", trace: "000701" },
+      { sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), amt: "333.00", net: "329.67", mid: "900000000071", tid: "90000071", code: "Z9Z9Z9", trace: "000702" },
+      // a one-character typo of B2C3D5, the same amount and day as a GHL row
+      { sett: ddmmyyyy(plus(D, 1)), trans: ddmmyyyy(D), amt: "275.00", net: "272.25", mid: "900000000071", tid: "90000071", code: "B2C3D4", trace: "000703" },
+    ])],
+    ghlA: ["GHL", `StatementOfAccountDetails${plus(D, 1)}_71.csv`, ghlFile([
+      { at: `${D} 10:00:00.0`, amount: "333.00", fee: "3.33", net: "329.67", tid: "ORDERT01", txId: "7701" },
+      { at: `${D} 10:01:00.0`, amount: "120.00", fee: "1.20", net: "118.80", tid: "ORDERT01", txId: "7702" },
+      { at: `${D} 10:02:00.0`, amount: "88.00", fee: "0.88", net: "87.12", tid: "ORDERT01", txId: "7703" },
+      { at: `${D} 10:03:00.0`, amount: "275.00", fee: "2.75", net: "272.25", tid: "ORDERT01", txId: "7704" },
+    ])],
+    ghlB: ["GHL", `StatementOfAccountDetails${plus(D, 1)}_72.csv`, ghlFile([
+      { at: `${D} 11:00:00.0`, amount: "120.00", fee: "1.20", net: "118.80", tid: "ORDERT02", txId: "7711" },
+    ])],
+    mbb: ["MAYBANK", "t41-order.csv", maybankFile({
+      merchant: "900000000079", reportDate: ddmmyy(plus(D, 2)),
+      sales: [
+        { amount: "60.00", date: ddmmyy(D), code: "MMM111", tid: "90000079", ref: "600000000071" },
+        { amount: "88.00", date: ddmmyy(D), code: "MB8888", tid: "90000079", ref: "600000000072" },
+      ],
+      gross: "148.00", fee: "1.48", net: "146.52",
+    })],
+  });
+  async function importAll(order: string[]) {
+    for (const k of order) {
+      const [acquirer, name, content] = files()[k]!;
+      const parsed = parseCardFile(acquirer, content, name);
+      if (!parsed.ok) throw new Error(parsed.message);
+      await q("select public.card_settlement_import($1, $2, $3, $4::jsonb, $5::jsonb)", [acquirer, name, content, JSON.stringify(parsed.rows), JSON.stringify(parsed.published)]);
+    }
+    const r = await q(`
+      select l.acquirer || ' ' || l.group_key || ' ' || l.amount || ' -> ' || coalesce(p.reference, 'open') || ' ' || coalesce(l.matched_how, '')
+             || ' | ' || coalesce((select string_agg(pp.reference || '/' || c.how, ',' order by pp.reference)
+                                     from public._card_settlement_candidates(l.id) c join order_payments pp on pp.id = c.payment_id), '') as s
+        from card_settlement_lines l left join order_payments p on p.id = l.payment_id
+       where l.group_key in ('900000000071 / 90000071', 'ORDERT01', 'ORDERT02', '900000000079')
+       order by 1`);
+    return r.rows.map((x) => x.s as string);
+  }
+
+  beforeAll(async () => {
+    if (!LOCAL) throw new Error("CARRES_TEST_DATABASE_URL must point at localhost");
+    db = new pg.Client({ connectionString: URL });
+    await db.connect();
+    await q("begin");
+    await q("update gl_config set go_live_on = coalesce(go_live_on, date '2026-01-01') where id");
+    D = (await q(`select greatest(timezone('Asia/Kuala_Lumpur', now())::date - 10, (select go_live_on from gl_config where id) + 7)::text as d`)).rows[0].d;
+    await q("insert into auth.users (id, email) values ($1, $2)", [T.fin, `it-cs-order-${RUN}@carres.test`]);
+    await q("insert into app_users (id, email, name, role, status) values ($1, $2, 'IT order', 'finance', 'active')", [T.fin, `it-cs-order-${RUN}@carres.test`]);
+    await q("insert into dealers (id, name) values ($1, 'IT Dealer order')", [T.dealer]);
+    await q("insert into salespersons (id, dealer_id, name) values ($1, $2, 'IT Salesperson order')", [T.sales, T.dealer]);
+    await q("insert into orders (id, dealer_id, salesperson_id, customer_name, customer_phone) values ($1, $2, $3, 'IT customer order', '0100000000')", [T.order, T.dealer, T.sales]);
+    for (const [ref, amount] of [["AAA111", 150], ["Z9Z9Z9", 333], ["B2C3D5", 275], ["GH0120", 120], ["GH0088", 88], ["MB8888", 88], ["MMM111", 60]] as const) {
+      await q("insert into order_payments (order_id, amount, paid_on, method, reference, recorded_by) values ($1, $2, $3::date, 'credit_card', $4, $5)", [T.order, amount, D, ref, T.fin]);
+    }
+    await q("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: T.fin, role: "authenticated" })]);
+  }, 30000);
+
+  afterAll(async () => {
+    if (!db) return;
+    await q("rollback").catch(() => undefined);
+    await db.end();
+  });
+
+  it("four files in two orders end in the same matches and the same suggestions", async () => {
+    await q("savepoint first");
+    const a = await importAll(["pbb", "ghlA", "ghlB", "mbb"]);
+    await q("rollback to savepoint first");
+    const b = await importAll(["mbb", "ghlB", "ghlA", "pbb"]);
+    console.log(`pbb > ghlA > ghlB > mbb:\n  ${a.join("\n  ")}\nmbb > ghlB > ghlA > pbb:\n  ${b.join("\n  ")}`);
+    expect(b).toEqual(a);
+    expect(a).toEqual([
+      "GHL ORDERT01 120.00 -> open  | GH0120/amount_and_date",
+      "GHL ORDERT01 275.00 -> open  | B2C3D5/amount_and_date",
+      "GHL ORDERT01 333.00 -> open  | ",
+      "GHL ORDERT01 88.00 -> GH0088 amount_and_date | GH0088/amount_and_date",
+      "GHL ORDERT02 120.00 -> open  | GH0120/amount_and_date",
+      "MAYBANK 900000000079 60.00 -> MMM111 approval_code | MMM111/approval_code",
+      "MAYBANK 900000000079 88.00 -> MB8888 approval_code | MB8888/approval_code",
+      "PBB 900000000071 / 90000071 150.00 -> AAA111 approval_code | AAA111/approval_code",
+      "PBB 900000000071 / 90000071 275.00 -> open  | B2C3D5/code_near",
+      "PBB 900000000071 / 90000071 333.00 -> Z9Z9Z9 approval_code | Z9Z9Z9/approval_code",
+    ]);
+  });
 });

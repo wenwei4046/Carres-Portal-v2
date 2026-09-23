@@ -4096,3 +4096,12 @@ these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; every
   `The payout for this day is already prepared. Cancel that money move before you change a match.` ·
   `Row {n} is for a day whose payout is already prepared. Cancel that money move first.`
 - Payout reference: `Card settlement {PBB|GHL|MAYBANK} {machine} {YYYY-MM-DD}`
+- Added in the PR 1538 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+  - Import toast tail: `· {n} opened again to check` (after `{m} matched`, only when an
+    automatic match was taken off because another file made it uncertain)
+  - Expand line (red, one per payout): `Card payout {move no} of {RM} from {code} on {date} is not
+    linked to any card settlement day. Check it is not this day's money before you approve the day.`
+  - Money moves → Card payout, `Paid from` hint: `A card account that has a payout bank in Finance
+    Settings is paid out on Card settlement.`
+  - Refusals (database): `A card payout from this card account is prepared on Card settlement.
+    Approve the day there.` · `This form was used before. Close it and press Approve day again.`

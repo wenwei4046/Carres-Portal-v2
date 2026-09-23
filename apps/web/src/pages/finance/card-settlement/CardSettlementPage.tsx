@@ -167,7 +167,10 @@ export default function CardSettlementPage() {
     importFile.mutate(
       { acquirer, fileName: file.name, content: await file.text() },
       {
-        onSuccess: (r) => toast.success(`${r.imported} of ${r.rows} rows imported · ${r.matched} matched.`),
+        onSuccess: (r) =>
+          toast.success(
+            `${r.imported} of ${r.rows} rows imported · ${r.matched} matched${r.released ? ` · ${r.released} opened again to check` : ""}.`,
+          ),
         onError: (e) => toast.error(e.message),
       },
     );
@@ -338,6 +341,12 @@ function DayExpansion({
             </>
           )}
         </div>
+      ))}
+      {day.unlinked_payouts.map((u) => (
+        <p key={u.move_id} role="alert" className="text-kit-red-11" data-testid={`card-unlinked-${u.move_no}`}>
+          Card payout {u.move_no} of {rm(Number(u.amount))} from {u.from_account_code} on {fmtDate(u.move_date)} is not linked to any
+          card settlement day. Check it is not this day's money before you approve the day.
+        </p>
       ))}
       {day.payout_status !== null ? (
         <p>

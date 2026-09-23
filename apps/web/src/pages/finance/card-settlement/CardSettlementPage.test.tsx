@@ -37,6 +37,7 @@ const day = (over: Partial<CardSettlementDay>): CardSettlementDay => ({
   reference: "Card settlement PBB 900000000001 / 90000001 2026-09-18",
   payout_status: null,
   payout_move_no: null,
+  unlinked_payouts: [],
   ...over,
 });
 const line = (over: Partial<CardSettlementRow>): CardSettlementRow => ({
@@ -214,6 +215,32 @@ describe("Card settlement", () => {
     fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
     expect(await within(form).findByTestId("money-move-refusal")).toHaveTextContent("Choose a date.");
     expect(posts()).toEqual([]);
+  });
+
+  it("a card payout made outside Card settlement on the day's date is shown on the day", async () => {
+    const d = day({
+      unlinked_payouts: [{
+        move_id: "m1", move_no: "MM-20260918-4444", status: "prepared", move_date: "2026-09-18", from_account_code: "1131",
+        amount: 420.75, fee: 4.25, reference: null,
+      }],
+    });
+    net.routes["GET /api/finance/card-settlement"] = { ...REVIEW, days: [d] };
+    show();
+    fireEvent.click((await screen.findAllByTitle("Check the sales"))[0]!);
+    expect(await screen.findByTestId("card-unlinked-MM-20260918-4444")).toHaveTextContent(
+      `Card payout MM-20260918-4444 of RM 420.75 from 1131 on ${fmtDate("2026-09-18")} is not linked to any card settlement day. Check it is not this day's money before you approve the day.`,
+    );
+  });
+
+  it("an import that opens earlier automatic matches again says so", async () => {
+    net.routes["POST /api/finance/card-settlement/import"] = { rows: 1, imported: 1, matched: 1, released: 1 };
+    show();
+    await screen.findByText("All machines · 900000000009");
+    fireEvent.keyDown(document.getElementById("card-company")!, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "Public Bank" }));
+    const content = pbbFile([{ sett: "18092026", trans: "17092026", amt: "333.00", net: "329.67", mid: "900000000002", tid: "90000002", code: "Z9Z9Z9", trace: "000301" }]);
+    fireEvent.change(screen.getByTestId("card-file-input"), { target: { files: [Object.assign(new File([content], "pbb.csv", { type: "text/csv" }), { text: async () => content })] } });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("1 of 1 rows imported · 1 matched · 1 opened again to check."));
   });
 
   it("imports a file for the chosen card company, and asks for the company first", async () => {

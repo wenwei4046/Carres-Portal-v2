@@ -288,6 +288,20 @@ export interface CardSettlementDay {
   reference: string;
   payout_status: CardPayoutStatus | null;
   payout_move_no: string | null;
+  /** Live card payouts linked to no day, from a card account a route serves, on this day's date. */
+  unlinked_payouts: CardUnlinkedPayout[];
+}
+
+/** A card payout prepared outside Card settlement that may be this day's money paid twice. */
+export interface CardUnlinkedPayout {
+  move_id: string;
+  move_no: string;
+  status: CardPayoutStatus;
+  move_date: string;
+  from_account_code: string;
+  amount: number;
+  fee: number;
+  reference: string | null;
 }
 
 export interface CardSettlementRow {

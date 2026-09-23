@@ -114,7 +114,7 @@ describe("parseCardFile — Maybank T41", () => {
 });
 
 describe("day helpers", () => {
-  const day = { acquirer: "PBB" as const, day_date: "2026-09-02", payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, reference: "r", payout_status: null, payout_move_no: null };
+  const day = { acquirer: "PBB" as const, day_date: "2026-09-02", payout_date: "2026-09-02", group_key: "k", row_count: 2, matched_count: 2, gross: 2600, net: 2574.01, recorded: 2600, reference: "r", payout_status: null, payout_move_no: null, unlinked_payouts: [] };
   it("a day may fill the payout form only when every row is matched and no payout exists", () => {
     expect(dayMayApprove(day)).toBe(true);
     expect(dayMayApprove({ ...day, matched_count: 1 })).toBe(false);

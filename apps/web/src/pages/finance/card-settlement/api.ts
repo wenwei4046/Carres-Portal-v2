@@ -25,7 +25,7 @@ function useReviewMutation<TVars, TOut>(fn: (vars: TVars) => Promise<TOut>) {
 
 export const useImportCardFile = () =>
   useReviewMutation((v: { acquirer: CardAcquirer; fileName: string; content: string }) =>
-    apiFetch<{ rows: number; imported: number; matched: number }>(`${BASE}/import`, { method: "POST", body: JSON.stringify(v) }),
+    apiFetch<{ rows: number; imported: number; matched: number; released?: number }>(`${BASE}/import`, { method: "POST", body: JSON.stringify(v) }),
   );
 
 export const useMatchCardRow = () =>
