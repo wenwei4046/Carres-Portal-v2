@@ -147,6 +147,11 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     await q("update order_payments set voided_at = now(), voided_by = $2, void_reason = 'IT' where id = $1", [P.voided, U.finance]);
     holding = (await q("select account_code from gl_money_accounts where money_kind = 'HOLDING' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
     bank = (await q("select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') order by account_code limit 1")).rows[0].account_code;
+    // Approve day pays only from a routed card account into its route's bank.
+    await q(
+      "insert into card_settlement_routes (holding_code, channel, bank_code) values ($1, 'showroom', $2) on conflict (holding_code, channel) do update set bank_code = excluded.bank_code",
+      [holding, bank],
+    );
     ledgerAtStart = await ledgerRows();
   }, 30000);
 
@@ -305,6 +310,10 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
     expect(await match(none.id, P.cash)).toMatchObject({ ok: false, detail: "not_card_payment" });
     expect(await match(none.id, P.voided)).toMatchObject({ ok: false, detail: "not_card_payment" });
     expect(await match(none.id, P.sameAmountOtherCode)).toMatchObject({ ok: true, value: { matched_how: "by_hand" } });
+    // an automatic match saved again by staff becomes theirs, so no import releases it
+    expect(exact.matched_how).toBe("approval_code");
+    expect(await match(exact.id, P.exact)).toMatchObject({ ok: true, value: { matched_how: "suggestion" } });
+    expect((await q("select matched_by from card_settlement_lines where id = $1", [exact.id])).rows[0].matched_by).toBe(U.finance);
     // taken off and put back
     expect(await match(exact.id, null)).toMatchObject({ ok: true, value: { payment_id: null } });
     expect(await match(exact.id, P.exact)).toMatchObject({ ok: true, value: { matched_how: "suggestion" } });
@@ -389,6 +398,15 @@ describe.skipIf(!URL)("card settlement matching (real PostgreSQL, 0572)", () => 
       expect(await attempt("select public.gl_money_move_create('CARD_PAYOUT', $1::date, $2, $3, 10, 0, 'IT unrouted') as r", [mb.day_date, other, bank]))
         .toMatchObject({ ok: true });
     }
+    // Approve day refuses an unrouted card account, and a bank that is not the route's
+    const otherBank = (await q(
+      "select account_code from gl_money_accounts where money_kind = 'BANK' and gl_money_account_ok(account_code, 'in') and account_code <> $1 order by 1 limit 1",
+      [bank],
+    )).rows[0].account_code as string;
+    const prep = (from: string, to: string) =>
+      attempt("select public.card_settlement_payout_prepare($1, $2::date, $3, $2::date, $4, $5) as r", [mb.acquirer, mb.day_date, mb.group_key, from, to]);
+    if (other) expect(await prep(other, bank)).toMatchObject({ ok: false, detail: "from_not_routed" });
+    expect(await prep(holding, otherBank)).toMatchObject({ ok: false, detail: "to_not_routed" });
     // Approve day passes; a tab-only note is stored as no note
     const made = await attempt(
       "select public.card_settlement_payout_prepare($1, $2::date, $3, $2::date, $4, $5, $6, $7::uuid) as r",

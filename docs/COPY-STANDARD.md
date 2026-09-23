@@ -4108,6 +4108,12 @@ these words is approved. `·` is U+00B7, `…` is U+2026, `—` is U+2014; every
     Settings is paid out on Card settlement.`
   - Refusals (database): `A card payout from this card account is prepared on Card settlement.
     Approve the day there.` · `This form was used before. Close it and press Approve day again.`
+- Added in the PR 1538 round 3 fix (PROPOSAL — PENDING APPROVAL, 23 Sep 2026):
+  - Approve day's card payout form offers only a card account that has a payout bank in Finance
+    Settings and that account's payout bank, each chosen already when it is the only one. `Paid from`
+    hint when none has: `No card account has a payout bank in Finance Settings yet. Set one there first.`
+  - Refusals (database): `Choose a card account that has a payout bank in Finance Settings.` ·
+    `Choose the payout bank Finance Settings sets for this card account.`
 
 ## Sales Orders navigation — owner approved 2026-09-23 · BUILT 2026-09-23
 

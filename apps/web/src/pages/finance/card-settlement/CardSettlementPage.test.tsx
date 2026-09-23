@@ -167,6 +167,13 @@ describe("Card settlement", () => {
 
   it("Approve day fills the card payout form with the file's figures, read only, and prepares through the day's door", async () => {
     net.routes["POST /api/finance/card-settlement/days/payout"] = { move_id: "m", move_no: "MM-1" };
+    net.routes["GET /api/finance/ledger/money-accounts"] = [
+      { code: "1123", name: "Test Bank", money_kind: "BANK", is_active: true },
+      { code: "1121", name: "Other Bank", money_kind: "BANK", is_active: true },
+      { code: "1131", name: "Test Card", money_kind: "HOLDING", is_active: true },
+      { code: "1132", name: "Other Card", money_kind: "HOLDING", is_active: true },
+    ];
+    net.routes["GET /api/finance/ledger/money-accounts/card-routes"] = [{ holding_code: "1131", channel: "showroom", bank_code: "1123" }];
     show();
     await screen.findByText("All machines · 900000000009");
     fireEvent.click(screen.getAllByTitle("Check the sales")[1]!);
@@ -186,10 +193,13 @@ describe("Card settlement", () => {
     expect(within(form).getByText(/^Date the bank received it/)).toBeInTheDocument();
     expect(posts()).toEqual([]);
 
-    fireEvent.keyDown(within(form).getByRole("combobox", { name: /Paid from/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: /Test Card/ }));
-    fireEvent.keyDown(within(form).getByRole("combobox", { name: /^Paid into/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: /Test Bank/ }));
+    // only the routed card account and its route's bank are offered, and each is the only one, so it is chosen
+    const from = within(form).getByRole("combobox", { name: /Paid from/ });
+    await waitFor(() => expect(from).toHaveTextContent("Test Card"));
+    expect(within(form).getByRole("combobox", { name: /^Paid into/ })).toHaveTextContent("Test Bank");
+    fireEvent.keyDown(from, { key: "Enter" });
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([expect.stringContaining("Test Card")]);
+    fireEvent.keyDown(from, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Prepare money move" }));
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(posts()[0]).toMatchObject({

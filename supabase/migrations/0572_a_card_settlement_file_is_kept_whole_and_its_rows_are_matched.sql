@@ -17,7 +17,9 @@
 --      day_date is the day the row is paid in: the payout date for Public Bank
 --      and Maybank, the sale date for GHL. The GHL file carries no settlement
 --      date; its payout_date is the statement date in the file name when the
---      name has one, and is left empty when it does not.
+--      name has one, and is left empty when it does not. A row that is in two
+--      GHL statements keeps the date of the file imported first, so that
+--      day's Paid out date depends on which file came in first.
 --   3. card_settlement_payouts: the one link from a settled day to its card
 --      payout money move. At most one link per day is live (unique index);
 --      a link whose move was cancelled or reversed is released when the day
@@ -27,31 +29,46 @@
 --      known. A row already imported from another file is skipped. A row for a
 --      day whose payout is already prepared is refused. After every import
 --      the match rule runs again over every row, of every file, that is open
---      or was matched automatically, so the result does not depend on the
---      order the files came in: a row is matched only when the pairing is
---      unique from both sides (the row has one candidate, and that payment is
---      the candidate of no other open row). An automatic match whose payment
---      has become contested is released to open; a pairing that has become
---      unique is matched. A payment that a Public Bank or Maybank row may own
---      (its approval code, the code with another amount, or a likely typo of
---      it) is contested for GHL: only suggested there. Never changed here: a
---      match made by staff (approved suggestion or by hand), a row staff took
---      the match off (kept_open), and every row of a day whose payout is
---      prepared or approved (frozen).
+--      or was matched automatically. While no day is paid and no two files
+--      hold the same row, the result does not depend on the order the files
+--      came in; paying a day between imports freezes its rows and can change
+--      how an unpaid day of another machine ends. A row is matched only when
+--      the pairing is unique from both sides (the row has one candidate, and
+--      that payment is the candidate of no other open row). An automatic match
+--      whose payment has become contested is released to open, and a pairing
+--      that has become unique is matched, at the next import: a payment
+--      recorded after the last import leaves such a match matched until then.
+--      A payment that a Public Bank or Maybank row may own (its approval code,
+--      the code with another amount, or a likely typo of it) is contested for
+--      GHL: only suggested there. This holds even when that row is already
+--      matched to its exact code, so GHL asks staff more often than it must.
+--      Never changed here: a match made by staff (approved suggestion or by
+--      hand, or an automatic match staff saved again), a row staff took the
+--      match off (kept_open), and every row of a day whose payout is prepared
+--      or approved (frozen).
 --   5. card_settlement_review: the days (one payout per machine, or per
 --      merchant for Maybank, per day), their rows and each open row's
 --      suggestions. Read only. A day's payout is read from the link in 3.
 --      Each day also lists the card payouts not linked to any day that left a
 --      card account a card settlement route serves on the day's date (a payout
---      made on Money moves before this door was the only one).
+--      made on Money moves before this door was the only one). Such a payout,
+--      or one made directly as postgres, is listed only when its date is the
+--      day's date.
 --   6. card_settlement_match: staff approve a suggestion or pick the payment by
---      hand; a null payment takes the match off and keeps the row open.
+--      hand; a null payment takes the match off and keeps the row open. Staff
+--      saving the payment an automatic match already holds make it theirs
+--      (suggestion, their name and time), so no import releases it.
 --      Refused once the day's payout is prepared or approved.
 --   7. card_settlement_payout_prepare: Approve day. Prepares the CARD_PAYOUT
 --      move through gl_money_move_create with the file's net and fee and a
---      fixed reference, and links it to the day in the same transaction. An
---      idempotency key returns only this day's own live payout; any other use
---      of a key is refused, and the move made is checked to be this day's.
+--      fixed reference, and links it to the day in the same transaction. The
+--      money must leave a holding account a card settlement route serves and
+--      go to that route's bank (0541); routes carry no card company, so any
+--      routed holding is accepted. An idempotency key returns only this day's
+--      own live payout; any other use of a key is refused. The key's own lock
+--      (gl_money_move_create's) is taken before the key is checked, and the
+--      move made is checked to be this day's: kind, amount, fee, reference,
+--      accounts and date.
 --   8. order_payments_paid_on_idx: the candidate search reads payments by
 --      date first.
 --   9. gl_money_move_create (rebuilt from pg_proc, every guard kept): a card
@@ -60,6 +77,8 @@
 --      day it pays in the transaction-local setting carres.card_payout_day.
 --      Any other card payout from such an account is refused. A card payout
 --      from a holding account no route serves goes through as before.
+--      LIMIT: the guard trusts that transaction-local setting. No PostgREST
+--      path can set it, but a direct SQL session as authenticated could.
 --
 -- WHAT IT DOES NOT DO
 --   Nothing here writes the ledger or edits a payment. A typed approval code
@@ -633,8 +652,15 @@ begin
     return jsonb_build_object('id', p_line_id, 'payment_id', null);
   end if;
 
-  -- The same payment saved again keeps how it was matched.
+  -- The same payment saved again: a staff match stays as it was; an automatic
+  -- match becomes staff's (confirmed), so no import releases it.
   if p_payment_id = v_line.payment_id then
+    if v_line.matched_how in ('approval_code', 'amount_and_date') then
+      update public.card_settlement_lines
+         set matched_how = 'suggestion', matched_by = auth.uid(), matched_at = now()
+       where id = p_line_id;
+      return jsonb_build_object('id', p_line_id, 'payment_id', p_payment_id, 'matched_how', 'suggestion');
+    end if;
     return jsonb_build_object('id', p_line_id, 'payment_id', p_payment_id, 'matched_how', v_line.matched_how);
   end if;
 
@@ -657,7 +683,7 @@ end;
 $fn$;
 
 comment on function public.card_settlement_match(uuid, uuid) is
-  '0572: matches one card settlement row to a recorded card payment (an approved suggestion, or picked by hand), or takes the match off (null) and keeps the row open: an import never matches it again. Refused once the day''s payout is prepared or approved. Edits no payment and writes no ledger row.';
+  '0572: matches one card settlement row to a recorded card payment (an approved suggestion, or picked by hand), or takes the match off (null) and keeps the row open: an import never matches it again. Saving the payment an automatic match holds makes it a staff match. Refused once the day''s payout is prepared or approved. Edits no payment and writes no ledger row.';
 revoke all on function public.card_settlement_match(uuid, uuid) from public, anon;
 grant execute on function public.card_settlement_match(uuid, uuid) to authenticated;
 
@@ -695,6 +721,9 @@ begin
   -- belongs to any other move (another kind, another day, a cancelled or
   -- reversed payout) is refused, never returned.
   if p_idempotency_key is not null then
+    -- gl_money_move_create's own lock for this key, taken first: a move another
+    -- session is making with the key is seen here once it commits.
+    perform pg_advisory_xact_lock(hashtextextended('gl_money_move:' || p_idempotency_key::text, 0));
     select m.id, m.move_no, m.status, cp.acquirer, cp.day_date, cp.group_key, cp.released_at, cp.id is not null as linked
       into v_key
       from public.gl_money_moves m
@@ -723,6 +752,18 @@ begin
     raise exception 'Match every sale before you approve the day.' using errcode = '22023', detail = 'day_not_matched';
   end if;
 
+  -- The money leaves a card account a route serves and goes to that route's
+  -- bank (0541), so Money moves can never pay the same day again.
+  if not exists (select 1 from public.card_settlement_routes r where r.holding_code = btrim(p_from_account_code)) then
+    raise exception 'Choose a card account that has a payout bank in Finance Settings.'
+      using errcode = '22023', detail = 'from_not_routed';
+  end if;
+  if not exists (select 1 from public.card_settlement_routes r
+                  where r.holding_code = btrim(p_from_account_code) and r.bank_code = btrim(p_to_account_code)) then
+    raise exception 'Choose the payout bank Finance Settings sets for this card account.'
+      using errcode = '22023', detail = 'to_not_routed';
+  end if;
+
   -- a payout that was cancelled or reversed frees the day
   update public.card_settlement_payouts cp
      set released_at = now()
@@ -747,7 +788,10 @@ begin
   -- only a new card payout of exactly this day's net and fee.
   if not exists (select 1 from public.gl_money_moves m
                   where m.id = v_move and m.kind = 'CARD_PAYOUT' and m.status = 'prepared'
-                    and m.amount = v_net and m.fee = v_gross - v_net) then
+                    and m.amount = v_net and m.fee = v_gross - v_net
+                    and m.reference = v_ref and m.move_date = p_move_date
+                    and m.from_account_code = btrim(p_from_account_code)
+                    and m.to_account_code = btrim(p_to_account_code)) then
     raise exception 'This form was used before. Close it and press Approve day again.'
       using errcode = '22023', detail = 'idempotency_key_used';
   end if;
@@ -759,7 +803,7 @@ end;
 $fn$;
 
 comment on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) is
-  '0572: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payout is prepared or approved, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a routed card account. Posts nothing: the finance approver approves the move.';
+  '0572: Approve day. Prepares the day''s one CARD_PAYOUT money move (0529, via gl_money_move_create) with the file''s net and fee and a fixed reference, and links it to the day. Refuses a day not fully matched, a day whose payout is prepared or approved, a from account no card settlement route serves, a to account that is not that route''s bank, and an idempotency key that is not this day''s own live payout. The only door for a card payout from a routed card account. Posts nothing: the finance approver approves the move.';
 revoke all on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) from public, anon;
 grant execute on function public.card_settlement_payout_prepare(text, date, text, date, text, text, text, uuid) to authenticated;
 

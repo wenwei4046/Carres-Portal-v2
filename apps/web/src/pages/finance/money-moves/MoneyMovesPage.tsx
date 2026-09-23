@@ -284,10 +284,19 @@ export function MoneyMoveForm({
   /* 0572 — a card account a route serves is paid out on Card settlement (Approve day) only; the database refuses it here too. */
   const routed = new Set((routes.data ?? []).map((r) => r.holding_code));
   const cardSettlementOnly = kind === "CARD_PAYOUT" && !fixed && routed.size > 0;
-  const options = (side: "from" | "to") =>
+  /* 0572 — Approve day pays only from a card account a route serves into that route's bank; the database refuses any other. */
+  const routeBanks = (holding: string | undefined) =>
+    new Set((routes.data ?? []).filter((r) => r.holding_code === holding).map((r) => r.bank_code));
+  const options = (side: "from" | "to", holding?: string) =>
     moveAccounts(kind, side, accounts.data ?? [])
       .filter((a) => !(cardSettlementOnly && side === "from" && routed.has(a.code)))
+      .filter((a) => !fixed || (side === "from" ? routed.has(a.code) : routeBanks(holding).has(a.code)))
       .map((a) => ({ value: a.code, label: accountLabel(a) }));
+  const onlyOne = (o: { value: string }[]) => (fixed && o.length === 1 ? o[0]!.value : undefined);
+  const fromOptions = options("from");
+  const from = fromCode ?? onlyOne(fromOptions);
+  const toOptions = options("to", from);
+  const to = toCode ?? onlyOne(toOptions);
   const amountN = parseTypedAmount(amount);
   // 0537: a bank credit always comes from 4900, a bank charge always goes to 6500.
   const fixedFrom = kind === "BANK_CREDIT" ? "4900" : undefined;
@@ -300,8 +309,8 @@ export function MoneyMoveForm({
     const parsed = moneyMoveInput.safeParse({
       kind,
       move_date: date ?? "",
-      from_account_code: fixedFrom ?? fromCode ?? "",
-      to_account_code: fixedTo ?? toCode ?? "",
+      from_account_code: fixedFrom ?? from ?? "",
+      to_account_code: fixedTo ?? to ?? "",
       amount: amountN === null || Number.isNaN(amountN) ? undefined : amountN,
       fee: Number.isNaN(feeN) ? undefined : feeN,
       reference: reference.trim() || null,
@@ -358,13 +367,20 @@ export function MoneyMoveForm({
             id="move-from"
             label="Paid from"
             required
-            value={fromCode}
+            value={from}
             onValueChange={(v) => {
               setFromCode(v);
+              if (fixed) setToCode(undefined);
               if (kind === "CARD_PAYOUT") routeBank(v, channel);
             }}
-            options={options("from")}
-            hint={cardSettlementOnly ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement." : undefined}
+            options={fromOptions}
+            hint={
+              cardSettlementOnly
+                ? "A card account that has a payout bank in Finance Settings is paid out on Card settlement."
+                : fixed && routes.isSuccess && fromOptions.length === 0
+                  ? "No card account has a payout bank in Finance Settings yet. Set one there first."
+                  : undefined
+            }
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}
@@ -375,7 +391,7 @@ export function MoneyMoveForm({
             value={channel}
             onValueChange={(v) => {
               setChannel(v as CardChannel);
-              routeBank(fromCode, v as CardChannel);
+              routeBank(from, v as CardChannel);
             }}
             options={CARD_CHANNELS.map((v) => ({ value: v, label: CARD_CHANNEL_WORD[v] }))}
           />
@@ -385,9 +401,9 @@ export function MoneyMoveForm({
             id="move-to"
             label="Paid into"
             required
-            value={toCode}
+            value={to}
             onValueChange={setToCode}
-            options={options("to")}
+            options={toOptions}
             placeholder={accounts.isLoading ? "Loading accounts…" : "Choose an account"}
           />
         )}
@@ -414,7 +430,7 @@ export function MoneyMoveForm({
             inputMode="decimal"
             readOnly={fixed}
             value={fee}
-            hint={gross !== null ? `${rm(gross)} leaves ${fromCode ?? "the holding account"}` : undefined}
+            hint={gross !== null ? `${rm(gross)} leaves ${from ?? "the holding account"}` : undefined}
             onChange={(e) => setFee(e.target.value)}
           />
         )}
