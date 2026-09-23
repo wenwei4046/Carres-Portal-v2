@@ -279,8 +279,37 @@ each owner should take the one-line change with a test.
   `Carres Klang` is warehouse-linked and reads its address through that column, so the **PO PDF's
   `Deliver To` prints the site name with no address line** until an authorised user records the
   real one in `Settings → Warehouse → Warehouse Details`. A blank line is honest; an operator
-  description printed as a delivery address is not. **Falsifier / next step:** the real Klang
-  address is typed into Warehouse Details, and one PO PDF is re-rendered to prove `Deliver To`.
+  description printed as a delivery address is not.
+  **🔴 MEASURED ON PRODUCTION 2026-09-24 — THE RECORDED CONSEQUENCE ABOVE IS TOO MILD, AND HAS BEEN
+  SINCE THE DAY THIS WAS WRITTEN.** The `Deliver To` line does not print blank: **the document does
+  not compose at all.** `purchasing_po_document` raises `destination_address_missing` when the
+  resolved address is empty, and it has done so since **`0402`** — which is EARLIER than `0456`, so
+  the moment 0456 cleared the column those POs stopped producing paper. Probed read-only, all 63
+  live POs:
+
+  ```
+  total POs   63
+  can print   14   destination `Ohana` — the only one NOT warehouse-backed, so it carries its own address
+  CANNOT      49   destination_address_missing @ Carres Klang   ← 78%, one cause, one field
+  ```
+
+  So this is not a cosmetic blank on a document — **49 purchase orders cannot be put on paper at
+  all**, and the page says so honestly ("No address on file for this PO's destination"). `AL Sungai
+  Buloh` and `HOUZS Balakong` are also empty and block 0 POs *today* only because nothing has used
+  them yet.
+  ⚠️ **Do not try to fix this on the destination.** `purchasing_destinations` carries
+  `check (warehouse_id is null or address is null)` (`0307:39`) — a warehouse-backed destination is
+  FORBIDDEN from holding its own address, by design, so that one address has one owner. The field to
+  fill is `warehouses.address`, through `Warehouse → Settings → Full address`
+  (`PUT /api/operation/warehouse-settings/details` → `rpc warehouse_set_site_details`, gated on
+  `warehouse_can_manage_settings`).
+  **It is an unfinished handoff, not a defect.** 0456 correctly removed an operator name that was
+  sitting in an address field and said in its own header that an authorised user would record the
+  real address in Warehouse Settings. Every line of code involved is behaving as designed; the human
+  step was never taken. **The real address is Jess's to type — nobody should invent one from a
+  fixture onto a supplier-facing document.**
+  **Falsifier / next step:** the real Klang address is typed into Warehouse Details, and one PO PDF
+  is re-rendered to prove `Deliver To` — at which point the count above should go 49 → 0.
 - ~~`merged-migrations-absent-from-the-tracker`~~ — **CLOSED 2026-09-17.**
   - **`0454`:** now tracked (`20260913032213`).
   - **`0516`, `0517`:** were NOT applied. Both were probed in rollback, then applied from the exact
