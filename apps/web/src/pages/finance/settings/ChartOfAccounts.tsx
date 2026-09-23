@@ -189,10 +189,9 @@ export default function ChartOfAccounts() {
   if (query.isError) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
-      {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0570). */}
+      {/* Approved by YH, 23 Sep 2026 (docs/COPY-STANDARD.md, 0570). */}
       <p className="text-body text-kit-slate-11">
-        Drag an account onto a heading to put it under that heading, or onto an account beside it to change its place.
-        From the keyboard, hold Alt and press the up or down arrow to change its place, or press Shift+F10 to choose a heading.
+        Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.
       </p>
       {refusal && (
         <p role="alert" data-testid="chart-refusal" className="text-body text-kit-red-11">
