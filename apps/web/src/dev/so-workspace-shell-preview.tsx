@@ -150,9 +150,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         outlet_name: "PJ Showroom" },
       partner: null,
       lines: LINES.map((l) => ({ ...l, description: l.label, line_total: l.qty * l.unit_price })),
-      addons: ADDONS.map((a) => ({ ...a, label: a.addon_key === "DELIVERY" ? "Delivery fee" : "Stair carry", line_total: a.qty * a.unit_price })),
+      /* The server sends each service's stored key as `sku` (the Item Code). */
+      addons: ADDONS.map((a) => ({ ...a, sku: a.addon_key,
+        label: a.addon_key === "DELIVERY" ? "Delivery fee" : a.addon_key === "STAIR_CARRY" ? "Stair carry" : "Dispose old mattress",
+        line_total: a.qty * a.unit_price })),
       payments: [],
-      subtotal: 4130, total: 4130, paid: ORDER.paid, balance_due: 4130 - ORDER.paid,
+      subtotal: 3780 + SERVICES_TOTAL, total: 3780 + SERVICES_TOTAL, paid: ORDER.paid,
+      balance_due: 3780 + SERVICES_TOTAL - ORDER.paid,
       delivery_date: "2026-09-24",
     });
   if (url.includes("/api/operation/workspace-duties")) return json({ duties: [] });
